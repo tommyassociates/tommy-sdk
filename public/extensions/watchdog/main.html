@@ -1,0 +1,53 @@
+<!-- <div class="content-block-title">Tommy Extension SDK watchdog</div> -->
+<div class="content-block">
+  <div class="content-block-inner">
+    <p>
+      This is the demo <strong>Watchdog</strong> extension in action!
+      This demo is a good starting point for building your own extensions that interact with the
+      <a href="http://api.mytommy.com" target="_blank" class="external">Tommy API</a>.
+    </p>
+    <p>
+      It retreives a list of employees from the Tommy API,
+      and sends the employee a <strong>WOOF!</strong> notification when you
+      click on their name - just to make sure they're not slacking off :)
+    </p>
+    <p>
+      The source code is located in <code>/public/extensions/watchdog</code>
+    </p>
+  </div>
+</div>
+
+<div class="content-block-title">Current Employees</div>
+<div id="ext-watchdog-users" class="list-block">
+  <ul></ul>
+</div>
+
+<script>
+  // Instantiate the Tommy API
+  var tommy = new Tommy.API();
+
+  // Get a list of accessible account employees from the API
+  tommy.get('/employees', {}, function(err, res) {
+    console.log('employees', err, res)
+    if (err) {
+      alert('Could not fetch employees');
+      return;
+    }
+
+    // Add each of the users to the view
+    for (i = 0; i < res.length; i++) {
+      var employee = res[i];
+
+      // Create the list item
+      var navItem = $('<li><a href="#' + employee.id + '" class="item-link">' +
+          '<div class="item-content">' +
+            '<div class="item-inner">' +
+              '<div class="item-title">' + employee.id + '</div>' +
+            '</div>' +
+          '</div></a></li>');
+
+      // Add the sidebar menu
+      $('#ext-watchdog-users ul').append(navItem);
+    }
+  });
+</script>

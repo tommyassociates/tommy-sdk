@@ -1,0 +1,14 @@
+{
+  "name": "Hello World",
+  "package": "hello",
+  "version": "0.0.1",
+  "author": "Kam Low",
+  "private": false,
+
+  "views": [
+    {
+      "name": "Hello World",
+      "file": "main.html"
+    }
+  ]
+}
