@@ -6,7 +6,8 @@
     "node": ">= 0.8.x"
   },
   "dependencies": {
-    "express": "3.x"
+    "express" : "4.x",
+    "ejs" : "2.x"
   },
   "license": "apache 2.0"
 }

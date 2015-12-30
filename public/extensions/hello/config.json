@@ -8,7 +8,14 @@
   "views": [
     {
       "name": "Hello World",
-      "file": "main.html"
+      "file": "main.html",
+      "permissions": {}
+    },
+    {
+      "name": "Hello World Options",
+      "file": "form.html",
+      "type": "form",
+      "permissions": {}
     }
   ]
 }

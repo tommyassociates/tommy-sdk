@@ -26,18 +26,24 @@ Tommy = {
      *  The Tommy API endpoint to use.
      */
 
-    API_ENDPOINT: "http://localhost:3000"
+    API_ENDPOINT: "http://localhost:3000",
+
+    /** Constant: API_KEY
+     *  The Tommy API key to use for authenticating API requests.
+     */
+
+    API_KEY: null
 }
 
 /** Class: Tommy.API
  *  Create a Tommy.API object.
  *
- *  @param (string) apiKey - The developer API key to authenticate requests with.
+ *  @param (string) apiKey - The optional developer API key to authenticate requests with.
  */
 
 Tommy.API = function (apiKey)
 {
-    this.apiKey = apiKey;
+    this.apiKey = apiKey || Tommy.API_KEY;
 };
 
 Tommy.API.prototype = {
@@ -115,7 +121,7 @@ Tommy.API.prototype = {
            data: params,
            type: type,
            headers: {
-             'Authorization': 'Basic ' + btoa(this.apiKey)
+             'Authorization': 'Token ' + this.apiKey //btoa(this.apiKey)
            },
            success: function(data, status, xhr) {
              callback(null, data);
@@ -126,3 +132,6 @@ Tommy.API.prototype = {
         });
     }
 }
+
+// Assign a short accessor for the Tommy object
+window.T = Tommy;
