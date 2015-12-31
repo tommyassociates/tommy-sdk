@@ -8,13 +8,16 @@
   "views": [
     {
       "name": "Hello World",
-      "file": "main.html",
+      "file": "client/main.html",
+      "type": "page",
+      "scope": "client",
       "permissions": {}
     },
     {
-      "name": "Hello World Options",
-      "file": "form.html",
+      "name": "Hello World Admin",
+      "file": "admin/form.html",
       "type": "form",
+      "scope": "admin",
       "permissions": {}
     }
   ]

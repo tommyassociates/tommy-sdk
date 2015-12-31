@@ -1,2 +1,2 @@
-Load user extensions from api.js call with API_KEY.
-Load extension link into sidebar
+catch form onchange events for updating config items
+auto load extra extensions

@@ -1,13 +1,29 @@
 {
-  "name": "tommy-extension-sdk",
-  "version": "1.0.0",
-  "main": "main.js",
-  "engines": {
-    "node": ">= 0.8.x"
-  },
+  "name": "tommy_extension_sdk",
+  "version": "0.1.0",
+  "description": "SDK for building Tommy extensions",
+  "main": "server.js",
   "dependencies": {
     "express" : "4.x",
     "ejs" : "2.x"
   },
-  "license": "apache 2.0"
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tommyassociates/tommy_extension_sdk.git"
+  },
+  "keywords": [
+    "tommy",
+    "extensions",
+    "sdk"
+  ],
+  "author": "Kam Low <auscaster@gmail.com> (http://sourcey.com)",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tommyassociates/tommy_extension_sdk/issues"
+  },
+  "homepage": "http://mytommy.com"
 }
