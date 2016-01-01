@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <title>Tommy Extension SDK Playground</title>
+    <title>Tommy Extension SDK Emulator</title>
     <!-- Path to Framework7 Library CSS-->
     <link rel="stylesheet" href="css/framework7.ios.min.css">
     <link rel="stylesheet" href="css/framework7.ios.colors.min.css">
@@ -22,31 +22,8 @@
     <div class="panel panel-left layout-dark panel-reveal">
       <div class="content-block-title">Extensions</div>
       <div class="list-block">
-        <ul class="extension-list">
-          <!-- <li><a href="/" class="item-link">
-              <div class="item-content">
-                <div class="item-inner">
-                  <div class="item-title">Home</div>
-                </div>
-              </div></a></li> -->
-          <!-- <li><a href="about.html" class="item-link">
-              <div class="item-content">
-                <div class="item-inner">
-                  <div class="item-title">About</div>
-                </div>
-              </div></a></li>
-          <li><a href="services.html" class="item-link">
-              <div class="item-content">
-                <div class="item-inner">
-                  <div class="item-title">Services</div>
-                </div>
-              </div></a></li>
-          <li><a href="form.html" class="item-link">
-              <div class="item-content">
-                <div class="item-inner">
-                  <div class="item-title">Form</div>
-                </div>
-              </div></a></li> -->
+        <!-- Sidebar extensions list-->
+        <ul class="extension-views-nav">
         </ul>
       </div>
     </div>
@@ -64,7 +41,7 @@
         <div class="navbar">
           <div class="navbar-inner">
             <!-- We have home navbar without left link-->
-            <div class="center sliding">Home</div>
+            <div class="center sliding">Extension Emulator</div>
             <div class="right">
               <!-- Right link contains only icon - additional "icon-only" class--><a href="#" class="link icon-only open-panel"> <i class="icon icon-bars"></i></a>
             </div>
@@ -76,12 +53,20 @@
           <div data-page="index" class="page">
             <!-- Scrollable page content-->
             <div class="page-content">
+              <!-- List View -->
               <div class="content-block-title">Loaded Extensions</div>
-              <div class="list-block">
-                <ul class="extension-list"></ul>
+              <div class="list-block accordion-list">
+                <ul class="extensions-nav">
+                </ul>
               </div>
 
-              <div class="content-block-title">Getting Started</div>
+              <div class="content-block-title">Loaded Views</div>
+              <div class="list-block">
+                <!-- Main extensions list-->
+                <ul class="extension-views-nav"></ul>
+              </div>
+
+              <!-- <div class="content-block-title">Getting Started</div>
               <div class="content-block">
                 <div class="content-block-inner">
                   <p>
@@ -100,7 +85,7 @@
                     titles in the list above to view the rendered extension.
                   </p>
                 </div>
-              </div>
+              </div> -->
             </div>
           </div>
         </div>
@@ -116,16 +101,24 @@
 
     <script type="text/javascript">
       // Set the API_KEY constant
-      T.API_KEY = '<%- apiKey %>';
+      T.api = new Tommy.API('<%- apiKey %>', 'v1', 'http://localhost:3000');
 
-      // Set the environment variables
-      T.Env.f7App = myApp;
-      T.Env.f7View = mainView;
+      // Set the framework7 environment variables
+      T.env = new Tommy.Environment();
+      T.env.f7App = myApp;
+      T.env.f7View = mainView;
 
       // Load the Extensions API
-      var ext = new T.Extensions();
-      ext.loadLocalExtension('hello');
-      ext.loadLocalExtension('poke');
+      var ext = new Tommy.Extensions();
+
+      // Load all local developer extensions
+      var localExtensions = '<%- localExtensions %>'.split(',');
+      for (i = 0; i < localExtensions.length; i++) {
+        ext.loadLocal(localExtensions[i]);
+      }
+
+      // Load all remote installed extensions
+      ext.loadAll();
     </script>
   </body>
 </html>

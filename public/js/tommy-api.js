@@ -1,49 +1,19 @@
-var Tommy;
-
-/** Class: Tommy
- *  An object container for all Tommy library functions.
- *
- *  This class is just a container for all the objects and constants
- *  used in the library.  It is not meant to be instantiated, but to
- *  provide a namespace for library objects, constants, and functions.
- */
-
-Tommy = {
-
-    /** Constant: VERSION
-     *  The version of the Tommy library.
-     */
-
-    VERSION: "0.1.0",
-
-    /** Constant: API_VERSION
-     *  The version of the Tommy API to use.
-     */
-
-    API_VERSION: "v1",
-
-    /** Constant: API_ENDPOINT
-     *  The Tommy API endpoint to use.
-     */
-
-    API_ENDPOINT: "http://localhost:3000",
-
-    /** Constant: API_KEY
-     *  The Tommy API key to use for authenticating API requests.
-     */
-
-    API_KEY: null
-}
+if (typeof Tommy === 'undefined')
+    var Tommy = {};
 
 /** Class: Tommy.API
  *  Create a Tommy.API object.
  *
- *  @param (string) apiKey - The optional developer API key to authenticate requests with.
+ *  @param (string) apiKey - The Tommy API key to use for authenticating API requests.
+ *  @param (string) version - The version of the Tommy API to use (default: v1).
+ *  @param (string) version - The Tommy API endpoint URL to use (default: https://api.mytommy.com).
  */
 
-Tommy.API = function (apiKey)
+Tommy.API = function (apiKey, version, endpoint)
 {
     this.apiKey = apiKey || Tommy.API_KEY;
+    this.version = version || 'v1';
+    this.endpoint = endpoint || 'https://api.mytommy.com';
 };
 
 Tommy.API.prototype = {
@@ -112,16 +82,13 @@ Tommy.API.prototype = {
 
     _call: function (type, uri, params, callback)
     {
-        console.log('call', type, uri, params);
-
-        params = params || {}
-        // params = $.extend(this.credentials, params); //{ action: action },
+        console.log('tommy api call', type, uri, params);
         return $.ajax({
-           url: Tommy.API_ENDPOINT + '/' + Tommy.API_VERSION + uri,
+           url: this.endpoint + '/' + this.version + uri,
            data: params,
            type: type,
            headers: {
-             'Authorization': 'Token ' + this.apiKey //btoa(this.apiKey)
+             'Authorization': 'Token ' + this.apiKey
            },
            success: function(data, status, xhr) {
              callback(null, data);

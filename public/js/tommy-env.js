@@ -1,12 +1,12 @@
 /** Class: Tommy.Environment
- *  An object container for all Tommy Environment library functions.
- *
- *  This class is just a container for all the objects and constants
- *  used in the library.  It is not meant to be instantiated, but to
- *  provide a namespace for library objects, constants, and functions.
- */
+  *  Create a Tommy.Environment object.
+  */
 
-Tommy.Environment = {
+Tommy.Environment = function()
+{
+};
+
+Tommy.Environment.prototype = {
 
     /**
      *  Object containing all loaded extension package objects scoped by package name.
@@ -26,6 +26,3 @@ Tommy.Environment = {
 
     f7View: null
 };
-
-// Assign a short accessor for the Tommy.Environment object
-window.T.Env = Tommy.Environment;

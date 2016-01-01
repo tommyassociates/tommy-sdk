@@ -30,15 +30,12 @@
 </div>
 
 <script type="javascript">
-  // Instantiate the Tommy API
-  var tommy = new Tommy.API();
-
   // Show a loading indicator
-  myApp.showPreloader('Loading Employees...');
+  T.env.f7App.showPreloader('Loading Employees...');
 
   // Get a list of accessible account employees from the API
-  tommy.get('/employees', {}, function(err, res) {
-    myApp.hidePreloader();
+  T.api.get('/employees', {}, function(err, res) {
+    T.env.f7App.hidePreloader();
 
     console.log('employees response', err, res);
     if (err) {
@@ -61,9 +58,9 @@
         '</div></a></li>');
 
       navItem.find('a').click(function(){
-        myApp.alert('Would you like to poke ' + employee.user.first_name + '?',
+        T.env.f7App.alert('Would you like to poke ' + employee.user.first_name + '?',
                     'Confirm', function() {
-          pokeUser(employee.user)
+          pokeUser(employee.user);
         });
         return false;
       });
@@ -74,7 +71,7 @@
   });
 
   function pokeUser(receiver) {
-    tommy.create('/chat_messages', {
+    T.api.create('/chat_messages', {
         receiver_id: receiver.id,
         message: 'You\'ve been Poked!'}, function(err, res) {
       console.log('send message response', err, res);
@@ -83,7 +80,7 @@
         return;
       }
 
-      myApp.addNotification({
+      T.env.f7App.addNotification({
         message: ('You have poked ' + receiver.first_name + '!')
       });
     });

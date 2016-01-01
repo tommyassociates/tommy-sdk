@@ -55,6 +55,7 @@ A minimal `manifest.json` file with both `client` and `admin` views would look l
       "file": "client/main.html",
       "type": "page",
       "scope": "client",
+      "framed": false,
       "permissions": {}
     },
     {
@@ -62,6 +63,7 @@ A minimal `manifest.json` file with both `client` and `admin` views would look l
       "file": "admin/form.html",
       "type": "form",
       "scope": "admin",
+      "framed": false,
       "permissions": {}
     }
   ]
@@ -85,6 +87,7 @@ Each extension may contain multiple views to be exposed on the interface. Views 
 * **file**: (String) The relative view path to the view HTML file ie. `client/main.html`.
 * **type**: (String) The view type, current supported are `page` and `form`.
 * **scope**: (String) The view type, current supported are `client` and `admin`.
+* **framed**: (Boolean) Weather or not the view should be loaded inside an iframe for security.
 * **permissions**: (Object) The view permission object.
 
 Special care should be taken when defining the view application scope, which has two options; `client`, and `admin`. Views with the `client` scope will be exposed within the client side mobile app used by employees, and views with the `admin` scope will be exposed within the backend app used by employers.

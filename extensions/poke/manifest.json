@@ -11,6 +11,7 @@
       "file": "main.html",
       "type": "page",
       "scope": "client",
+      "framed": false,
       "permissions": {}
     }
   ]

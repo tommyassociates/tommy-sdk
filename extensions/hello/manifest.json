@@ -11,6 +11,7 @@
       "file": "client/main.html",
       "type": "page",
       "scope": "client",
+      "framed": false,
       "permissions": {}
     },
     {
@@ -18,6 +19,7 @@
       "file": "admin/form.html",
       "type": "form",
       "scope": "admin",
+      "framed": false,
       "permissions": {}
     }
   ]
