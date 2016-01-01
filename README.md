@@ -79,7 +79,7 @@ The `manifest.json` options are as follows:
 * **private**: (Boolean) The privacy setting that determines if this extension is usable by other Tommy users or not.
 * **views**: (Object) The object containing the views to be exposed on the interface.
 
-#### Exposing Views
+#### Views
 
 Each extension may contain multiple views to be exposed on the interface. Views are defined within the `views` option in the `manifest.json` file.
 
@@ -87,7 +87,9 @@ Each extension may contain multiple views to be exposed on the interface. Views 
 * **file**: (String) The relative view path to the view HTML file ie. `client/main.html`.
 * **type**: (String) The view type, current supported are `page` and `form`.
 * **scope**: (String) The view type, current supported are `client` and `admin`.
-* **framed**: (Boolean) Weather or not the view should be loaded inside an iframe for security.
+* **framed**: (Boolean) Weather or not the view should be loaded inside an iframe.
 * **permissions**: (Object) The view permission object.
 
 Special care should be taken when defining the view application scope, which has two options; `client`, and `admin`. Views with the `client` scope will be exposed within the client side mobile app used by employees, and views with the `admin` scope will be exposed within the backend app used by employers.
+
+If you want your view to be framed inside an `iframe`, you can do so by specifying the `framed: true` option. This is good for securing your view data, but be aware that since your view will be running in a sandboxed environment, none of the Tommy environment, API instance, or CSS styles will be available for use.

@@ -38,7 +38,7 @@
       <!-- Your main view, should have "view-main" class-->
       <div class="view view-main">
         <!-- Top Navbar-->
-        <div class="navbar">
+        <div class="navbar layout-dark theme-white">
           <div class="navbar-inner">
             <!-- We have home navbar without left link-->
             <div class="center sliding">Extension Emulator</div>
@@ -95,30 +95,30 @@
     <script type="text/javascript" src="js/framework7.min.js"></script>
     <script type="text/javascript" src="js/my-app.js"></script>
 
-    <script type="text/javascript" src="js/tommy-api.js"></script>
-    <script type="text/javascript" src="js/tommy-env.js"></script>
-    <script type="text/javascript" src="js/tommy-ext.js"></script>
+    <script type="text/javascript" src="js/tommy/tommy.js"></script>
+    <script type="text/javascript" src="js/tommy/tommy-api.js"></script>
+    <script type="text/javascript" src="js/tommy/tommy-env.js"></script>
+    <script type="text/javascript" src="js/tommy/tommy-ext.js"></script>
+    <script type="text/javascript" src="js/tommy/tommy-dev.js"></script>
 
     <script type="text/javascript">
-      // Set the API_KEY constant
+      // Create the Tommy API instance
       T.api = new Tommy.API('<%- apiKey %>', 'v1', 'http://localhost:3000');
 
-      // Set the framework7 environment variables
+      // Create the Tommy Environment instance and set the necessary variables
       T.env = new Tommy.Environment();
       T.env.f7App = myApp;
       T.env.f7View = mainView;
 
-      // Load the Extensions API
-      var ext = new Tommy.Extensions();
+      // Create the Tommy Extensions instance and load all installed extensions
+      T.ext = new Tommy.Extensions();
+      T.ext.loadAllRemote();
 
-      // Load all local developer extensions
+      // Load all local developer extensions for emulation
       var localExtensions = '<%- localExtensions %>'.split(',');
       for (i = 0; i < localExtensions.length; i++) {
-        ext.loadLocal(localExtensions[i]);
+        T.ext.load(localExtensions[i], true);
       }
-
-      // Load all remote installed extensions
-      ext.loadAll();
     </script>
   </body>
 </html>
