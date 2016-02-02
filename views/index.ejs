@@ -110,6 +110,16 @@
       T.env.f7App = myApp;
       T.env.f7View = mainView;
 
+      // Set the current account
+      // TODO: make this dynamic
+      T.env.account = {
+        user_id: 42,
+        account_id: 7,
+        account_type: 'Employee',
+        // account_id: 7,
+        // account_type: 'Employer'
+      }
+
       // Create the Tommy Extensions instance and load all installed extensions
       T.ext = new Tommy.Extensions();
       T.ext.loadAllRemote();
@@ -119,6 +129,39 @@
       for (i = 0; i < localExtensions.length; i++) {
         T.ext.load(localExtensions[i], true);
       }
+
+      // Handle extension created events
+      $(document).on('tommy:extension:view:create', function(event, data) {
+        var package = data.package,
+          local = T.ext.get(data.package, 'local'),
+          view = data.view;
+
+        // Create the sidebar menu item
+        var navItem = $('<li><a href="#' + view.id + '" class="item-link">' +
+          '<div class="item-content">' +
+            '<div class="item-inner">' +
+              '<div class="item-title">' + view.name + '</div>' +
+              '<div class="item-after">' + (local ? 'Local' : 'Remote') + '</div>' +
+            '</div>' +
+          '</div></a></li>');
+
+        // Add the sidebar menu
+        $('.extension-views-nav').append(navItem);
+
+        // Handle sidebar clicks to display the page
+        // TODO: does f7 have a better way to handle this?
+        $('.extension-views-nav a[href="#' + view.id + '"]').unbind('click').click(function() {
+          if ($('.view-main').data('page') == view.id)
+            return;
+
+          T.ext.showView(view.id);
+        });
+
+        // Show a specific view on load
+        if (data.package == 'barbonus') {
+          T.ext.showView('barbonus-Bonuses');
+        }
+      });
     </script>
   </body>
 </html>

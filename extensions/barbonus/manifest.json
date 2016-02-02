@@ -1,0 +1,19 @@
+{
+  "name": "Bar Bonus",
+  "package": "barbonus",
+  "version": "0.0.1",
+  "author": "Kam Low",
+  "private": false,
+
+  "views": [
+    {
+      "name": "Bonuses",
+      "file": "employee.html",
+      "type": "page",
+      "scopes": ["client", "employee"],
+      "main": false,
+      "framed": false,
+      "permissions": {}
+    }
+  ]
+}

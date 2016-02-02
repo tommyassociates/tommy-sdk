@@ -26,7 +26,7 @@ Tommy.Extensions.prototype = {
 
     bind: function() {
       var self = this;
-      T.env.f7App.onPageAfterAnimation('*', function (page) {
+      T.env.f7App.onPageAfterAnimation('*', function(page) {
         var $page = $(page.container);
         var view = self.views[page.name];
 
@@ -37,7 +37,24 @@ Tommy.Extensions.prototype = {
           if (view.framed) {
             var $iframe = $page.find('.page-content > iframe:first');
             $iframe.ready(function() {
-                $iframe.contents().find("body").append(view.data);
+              $iframe.contents().find("body").append(view.data);
+            });
+          }
+
+          if (view.type == 'form') {
+            $page.find('input, select, textarea').change(function() {
+              console.log('input change');
+              var $e = $(this);
+              if (!$e.val() || !$e.attr('name')) {
+                console.log('skipping invalid input');
+                return;
+              }
+              T.api.create('/settings', {
+                key: 'extensions:' + view.package + ':' + $e.attr('name'),
+                data: $e.val()
+              }, function(err, res) {
+                console.log('created setting', err, res);
+              });
             });
           }
 
@@ -45,7 +62,7 @@ Tommy.Extensions.prototype = {
           $('body').append($page.find('.popup'));
 
           // Evaluate queued JavaScripts after animation completes
-          self.evalPageJavaScript(page.name);
+          self.evalPageJavaScript(view);
         }
       });
     },
@@ -54,12 +71,18 @@ Tommy.Extensions.prototype = {
       T.env.f7View.router.loadContent(this.views[viewId].html);
     },
 
-    evalPageJavaScript: function(viewId) {
-      if (this.views[viewId] &&
-        this.views[viewId].js &&
-        this.views[viewId].js.length) {
-        eval(this.views[viewId].js);
-        // this.views[viewId].js = null; // only run once
+    evalPageJavaScript: function(view) {
+      if (view) {
+        if (view.jsSrcs && view.jsSrcs.length) {
+          for (var i = 0; i < view.jsSrcs.length; i++) {
+            $('<script>').attr('src', view.jsSrcs[i]).appendTo(document.body);
+          }
+          // view.jsSrcs = null; // only run once
+        }
+        if (view.js && view.js.length) {
+          eval(view.js);
+          // view.js = null; // only run once
+        }
       }
     },
 
@@ -85,14 +108,68 @@ Tommy.Extensions.prototype = {
     },
 
     addViewToUI: function(package, view, data) {
-      alert('addViewToUI: implement me');
+      // alert('addViewToUI: implement me');
+      var self = this;
+      var manifest = this.get(package, 'manifest');
+      var local = this.get(package, 'local');
+      var $page = $(data);
+
+      //var view.id = package + '-' + view.name;
+
+      console.log('add extension view', view.id);
+
+      // HTML content of new page
+      var pageContent = '' +
+        '<div class="navbar">' +
+          '<div class="navbar-inner">' +
+            '<div class="left"><a href="#" class="back link"> <i class="icon icon-back"></i><span>Back</span></a></div>' +
+            '<div class="center sliding">' + view.name + '</div>' +
+            '<div class="right">' +
+              '<a href="#" class="link icon-only open-panel"> <i class="icon icon-bars"></i></a>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="pages">' +
+          '<div class="page" data-page="' + view.id + '">' +
+            '<div class="page-content">' +
+              (view.framed ?
+                '<iframe width="100%" height="100%" frameborder="0" seamless="seamless"></iframe>' : data)
+            '</div>' +
+          '</div>' +
+        '</div>';
+
+      // Parse JavaScripts to be evaluated
+      var js = '', jsSrcs = [];
+      var $scripts = $page.find('script').addBack('script');
+      $scripts.each(function() {
+        console.log('script', this)
+        if ($(this).attr('src'))
+          jsSrcs.push($(this).attr('src'));
+        else
+          js += $(this).text();
+      });
+
+      // Store the page view data
+      view.html = pageContent;
+      view.data = data;
+      view.js = js;
+      view.jsSrcs = jsSrcs;
+      view.package = package;
+      this.views[view.id] = view;
     },
 
     loadView: function(package, view) {
       var self = this;
+      var manifest = this.get(package, 'manifest');
       var local = this.get(package, 'local');
       this.loadFile(package, view.file, local, function(err, res) {
+        view.id = package + '-' + view.name;
+        res = res.replace(new RegExp('{{basePath}}', 'g'), '/extensions/' + package + '/');
+        console.log(res);
         self.addViewToUI(package, view, res);
+
+        $(document).trigger('tommy:extension:view:create', {
+          package: package, manifest: manifest, view: view });
       });
     },
 
@@ -107,12 +184,14 @@ Tommy.Extensions.prototype = {
       }
     },
 
-    load: function(package, local) {
+    load: function(package, local, callback) {
       var self = this;
       this.loadFile(package, 'manifest.json', local, function(err, res) {
         var manifest = res; //JSON.parse(res);
         self.set(package, 'local', local);
         self.onManifestLoaded(manifest);
+        if (callback)
+          callback(manifest);
       });
     },
 
@@ -137,8 +216,8 @@ Tommy.Extensions.prototype = {
           return;
         }
 
-        for (i = 0; i < res.length; i++) {
-          var ext = res[0].extension;
+        for (var i = 0; i < res.length; i++) {
+          var ext = res[0];
           self.load(ext.package, false);
         }
       });
