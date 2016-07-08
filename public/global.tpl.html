@@ -1,0 +1,164 @@
+<script id="addonDetailsSandboxTemplate" type="text/template">
+  <div class="content-block-title">Sandbox Testing</div>
+  <div class="list-block bottom-15">
+    <ul>
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title label">Status</div>
+            <div class="item-input">
+              {{#if status}}
+                {{#if deleting}}
+                  Deleting...
+                {{else}}
+                  Installed
+                {{/if}}
+              {{else}}
+                {{#if uploading}}
+                  Uploading...
+                {{else}}
+                  Not Installed
+                {{/if}}
+              {{/if}}
+            </div>
+          </div>
+        </div>
+      </li>
+      {{#if updated_at}}
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title label">Updated At</div>
+            <div class="item-input">
+              {{updated_at}}
+            </div>
+          </div>
+        </div>
+      </li>
+      {{/if}}
+      <!-- {{#if installed}}
+        <li><a href="#" data-command="addon-sandbox-uninstall" class="list-button item-link">Uninstall</a></li>
+      {{else}}
+        <li><a href="#" data-command="addon-sandbox-install" class="list-button item-link">Install</a></li>
+      {{/if}} -->
+      <!-- <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title label">Install</div>
+            <div class="item-input">
+              {{#if installed}}
+                <label class="label-switch">
+                  <input name="addon-sandbox-install" type="checkbox" checked>
+                  <div class="checkbox"></div>
+                </label>
+              {{else}}
+                {{#if installing}}
+                  <label class="label-switch disabled">
+                    <input name="addon-sandbox-install" type="checkbox" checked>
+                    <div class="checkbox"></div>
+                  </label>
+                {{else}}
+                  <label class="label-switch">
+                    <input name="addon-sandbox-install" type="checkbox">
+                    <div class="checkbox"></div>
+                  </label>
+                {{/if}}
+              {{/if}}
+            </div>
+          </div>
+        </div>
+      </li>-->
+    </ul>
+  </div>
+  <div class="content-block top-15">
+    {{#if status}}
+      {{#if deleting}}
+      <p><a href="#" data-command="sandbox-delete" class="button button-fill button-big color-red disabled">Deleting...</a></p>
+      {{else}}
+      <p><a href="#" data-command="sandbox-delete" class="button button-fill button-big color-red">Delete from Sandbox</a></p>
+      {{/if}}
+    {{else}}
+      {{#if uploading}}
+        <p><a href="#" data-command="sandbox-upload" class="button button-fill button-big disabled">Uploading...</a></p>
+      {{else}}
+        <p><a href="#" data-command="sandbox-upload" class="button button-fill button-big">Upload to Sandbox</a></p>
+      {{/if}}
+    {{/if}}
+  </div>
+</script>
+
+<script id="addonDetailsStoreTemplate" type="text/template">
+  <div class="content-block-title">Addon Store</div>
+  <div class="list-block bottom-15">
+    <ul>
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title label">Status</div>
+            <div class="item-input">
+              {{#if status}}
+                {{status}}
+              {{else}}
+              {{#if submitting}}
+                Submitting...
+              {{else}}
+                Not Submitted
+              {{/if}}
+              {{/if}}
+            </div>
+          </div>
+        </div>
+      </li>
+      {{#if updated_at}}
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title label">Updated At</div>
+            <div class="item-input">
+              {{updated_at}}
+            </div>
+          </div>
+        </div>
+      </li>
+      {{/if}}
+    </ul>
+  </div>
+  <div class="content-block top-15">
+    {{#if status}}
+      {{#if deleting}}
+      <p><a href="#" data-command="store-delete" class="button button-fill button-big color-red disabled">Deleting...</a></p>
+      {{else}}
+      <p><a href="#" data-command="store-delete" class="button button-fill button-big color-red">Delete from Store</a></p>
+      {{/if}}
+    {{else}}
+      {{#if submitting}}
+      <p><a href="#" data-command="store-submit" class="button button-fill button-big disabled">Submitting...</a></p>
+      {{else}}
+      <p><a href="#" data-command="store-submit" class="button button-fill button-big">Submit for Review</a></p>
+      {{/if}}
+    {{/if}}
+  </div>
+</script>
+
+<script id="accountListTemplate" type="text/template">
+  <!-- <div class="content-block-title">Accounts</div> -->
+  <div class="list-block media-list">
+    <ul>
+      {{#each this}}
+      <li>
+        <a href="#" data-command="change-account" data-account-id="{{id}}" data-account-type="{{type}}" class="item-link item-content">
+          <div class="item-media"><img class="icon" width="80" src="{{icon_url}}" /></div>
+          <div class="item-inner">
+            <div class="item-title-row">
+              <div class="item-title">{{display_name}}</div>
+              <!-- <div class="item-after"></div> -->
+            </div>
+            <div class="item-subtitle">{{title}}</div>
+            <!-- <div class="item-text">{{display_name}}</div> -->
+          </div>
+        </a>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+</script>

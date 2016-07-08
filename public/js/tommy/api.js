@@ -4,14 +4,14 @@ if (typeof Tommy === 'undefined')
 /** Class: Tommy.API
  *  Create a Tommy.API object.
  *
- *  @param (string) apiKey - The Tommy API key to use for authenticating API requests.
+ *  @param (string) token - The Tommy API key to use for authenticating API requests.
  *  @param (string) version - The version of the Tommy API to use (default: v1).
  *  @param (string) version - The Tommy API endpoint URL to use (default: https://api.mytommy.com).
  */
 
-Tommy.API = function (apiKey, version, endpoint)
+Tommy.API = function (token, version, endpoint)
 {
-    this.apiKey = apiKey || Tommy.API_KEY;
+    this.token = token || Tommy.API_KEY;
     this.version = version || 'v1';
     this.endpoint = endpoint || 'https://api.mytommy.com';
 };
@@ -82,23 +82,25 @@ Tommy.API.prototype = {
 
     _call: function (type, uri, params, callback)
     {
-        console.log('tommy api call', type, uri, params);
+        // console.log('tommy api call', type, uri, params);
         return $.ajax({
-           url: this.endpoint + '/' + this.version + uri,
-           data: params,
-           type: type,
-           headers: {
-             'Authorization': 'Token ' + this.apiKey
-           },
-           success: function(data, status, xhr) {
-             callback(null, data);
-           },
-           error: function(xhr, status, error) {
-             callback(error || 'Bad request', null);
-           }
+            url: this.endpoint + '/' + this.version + uri,
+            data: params,
+            type: type,
+            headers: {
+                'Authorization': 'Token ' + this.token
+            },
+            success: function(data, status, xhr) {
+                // console.log('tommy api call success', type, uri, params, xhr);
+                callback(null, data, xhr);
+            },
+            error: function(xhr, status, error) {
+                var json = JSON.parse(xhr.responseText),
+                    err = error || 'Bad request';
+                if (json && json.message)
+                    err = json.message;
+                callback(err, null, xhr);
+            }
         });
     }
 }
-
-// Assign a short accessor for the Tommy object
-window.T = Tommy;

@@ -27,6 +27,12 @@ Tommy = {
      */
 
     env: null,
+
+    /** Variable: util
+     *  The Tommy Utilities accessor assigned in util.js.
+     */
+
+    util: null,
 };
 
 // Assign a short accessor for the Tommy object (window.T)

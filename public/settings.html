@@ -1,0 +1,33 @@
+<div class="navbar onpage">
+  <div class="navbar-inner">
+    <div class="left sliding"><a href="#" class="back link"><i class="icon icon-back"></i><span>Back</span></a></div>
+    <div class="center sliding">Settings</div>
+    <div class="right"></div>
+  </div>
+</div>
+<div class="pages navbar-through">
+  <div data-page="settings" class="page" id="settings">
+    <div class="page-content">
+      <div class="content-block-title">Account</div>
+      <div class="list-block">
+        <ul>
+          <li>
+            <a href="#" class="item-link smart-select">
+              <select name="current-user">
+                {{#each accounts}}
+                <option value="{{id}}-{{type}}" data-account-id="{{id}}" data-account-type="{{type}}" data-option-image="{{icon_url}}" {{#if current}}selected{{/if}}>{{display_name}} ({{title}})</option>
+                {{/each}}
+              </select>
+              <div class="item-content">
+                <div class="item-inner">
+                  <div class="item-title">Current Account</div>
+                  <div class="item-after"></div>
+                </div>
+              </div>
+            </a>
+          </li>
+        <ul>
+      </div>
+    </div>
+  </div>
+</div>
