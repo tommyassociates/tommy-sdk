@@ -1,11 +1,13 @@
 {
-  "name": "tommy_extension_sdk",
+  "name": "tommy_addon_sdk",
   "version": "0.1.1",
-  "description": "SDK for building Tommy extensions",
+  "description": "SDK for building Tommy addons",
   "main": "server.js",
   "dependencies": {
-    "express" : "4.x",
-    "ejs" : "2.x"
+    "archiver": "^1.0.0",
+    "ejs": "2.x",
+    "express": "4.x",
+    "request": "^2.72.0"
   },
   "devDependencies": {},
   "scripts": {
@@ -13,7 +15,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tommyassociates/tommy_extension_sdk.git"
+    "url": "git+https://github.com/tommyassociates/tommy_addon_sdk.git"
   },
   "keywords": [
     "tommy",
@@ -23,7 +25,7 @@
   "author": "Kam Low <auscaster@gmail.com> (http://sourcey.com)",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/tommyassociates/tommy_extension_sdk/issues"
+    "url": "https://github.com/tommyassociates/tommy_addon_sdk/issues"
   },
   "homepage": "http://mytommy.com"
 }

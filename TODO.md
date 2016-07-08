@@ -1,2 +1,3 @@
-catch form onchange events for saving config items
-load extension settings on init
+remove buttons from not owned addons
+
+extension configuration views

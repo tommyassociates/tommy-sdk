@@ -1,0 +1,6 @@
+#calendar_container .has-events {
+  background: #ffe88a;
+}
+#calendar_container .full-width {
+  width: 100%;
+}

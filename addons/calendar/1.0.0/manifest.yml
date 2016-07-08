@@ -1,0 +1,18 @@
+---
+  name: "Calendar"
+  package: "calendar"
+  version: "1.0.0"
+  summary: "Manage your schedules."
+  description: "The calendar addon lets you manage your schedules via a calendar interface."
+  author: "Tommy Associates Pty Ltd"
+  homepage: "https://mytommy.com"
+  views:
+    -
+      file: "views/main.tpl.html"
+      type: "template"
+    -
+      title: "Calendar"
+      id: "main"
+      file: "views/main.html"
+      type: "page"
+      framed: false

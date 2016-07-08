@@ -1,0 +1,219 @@
+<script type="text/template7" id="calendar_eventListTemplate">
+  <div class="content-block-title">{{calendar_listHeadingDate date}}</div>
+  <div class="list-block media-list">
+    <ul>
+      {{#each events}}
+      <li>
+        <a href="{{@global.addons.calendar.path}}views/event-details.html?event_id={{id}}" class="item-link item-content">
+          <div class="item-media">
+            {{#if endAt}}
+              <img width="48" src="{{@global.addons.calendar.path}}assets/schedule-icon.png" />
+            {{else}}
+              <img width="48" src="{{@global.addons.calendar.path}}assets/todo-icon.png" />
+            {{/if}}
+          </div>
+          <div class="item-inner">
+            <div class="item-title-row">
+              <div class="item-title">
+                {{calendar_simpleTime startAt}}
+                {{#if endAt}}
+                  - {{calendar_simpleTime endAt}}
+                {{/if}}
+              </div>
+              <!-- <div class="item-after"></div> -->
+            </div>
+            <!-- <div class="item-subtitle"></div> -->
+            <div class="item-text">
+              {{title}}
+              {{#if location}}
+                at {{location}}
+              {{/if}}
+            </div>
+            <!-- {{#if notes}}
+              <div class="item-text">{{notes}}</div>
+            {{/if}} -->
+          </div>
+        </a>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+</script>
+
+<script type="text/template7" id="calendar_eventFormTemplate">
+  <form>
+    <div class="list-block inset">
+      <ul>
+        <li>
+          <div class="item-content">
+            <!-- <div class="item-media"><i class="icon icon-form-name"></i></div> -->
+            <div class="item-inner">
+              <div class="item-input">
+                <input type="text" name="title" value="{{title}}" placeholder="Title">
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="list-block inset">
+      <ul>
+        <li>
+          <div class="item-content">
+            <div class="item-inner">
+              <div class="item-input">
+                <input type="text" name="location" value="{{location}}" placeholder="Location">
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="list-block inset">
+      <ul>
+        <li>
+          <div class="item-content">
+            <div class="item-inner">
+              <div class="item-input">
+                <input type="text" name="start_at" value="{{calendar_dateTime startAt}}" placeholder="Start time">
+              </div>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div class="item-content">
+            <div class="item-inner">
+              <div class="item-input">
+                <input type="text" name="end_at" value="{{calendar_dateTime endAt}}" placeholder="End time">
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="list-block inset">
+      <ul>
+        <li>
+          <div class="item-content">
+            <div class="item-inner">
+              <div class="item-input">
+                <input type="text" name="reminder" value="{{reminder}}" placeholder="Reminder">
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="list-block inset">
+      <ul>
+        <li>
+          <div class="item-content">
+            <div class="item-inner">
+              <div class="item-input">
+                <textarea name="notes" placeholder="Notes">{{notes}}</textarea>
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <!-- <div class="list-block inset topset">
+      <button type="submit" class="button button-big button-fill color-blue full-width">SAVE</button>
+    </div> -->
+  </form>
+</script>
+
+<script type="text/template7" id="calendar_eventDetailsTemplate">
+  <div class="list-block media-list inset">
+    <ul>
+      <li class="item-content">
+        <!-- <a href="#" class="item-link item-content"> -->
+          <div class="item-media">
+            {{#if endAt}}
+              <img width="48" src="{{@global.addons.calendar.path}}assets/schedule-icon.png" />
+            {{else}}
+              <img width="48" src="{{@global.addons.calendar.path}}assets/todo-icon.png" />
+            {{/if}}
+          </div>
+          <div class="item-inner">
+            <div class="item-title-row">
+              <div class="item-title">
+                {{calendar_simpleTime startAt}}
+                {{#if endAt}}
+                  - {{calendar_simpleTime endAt}}
+                {{/if}}
+              </div>
+            </div>
+            <!-- <div class="item-subtitle"></div> -->
+            <div class="item-text">
+              {{title}}
+              {{#if location}}
+                at {{location}}
+              {{/if}}
+            </div>
+            <!-- {{#if notes}}
+              <div class="item-text">{{notes}}</div>
+            {{/if}} -->
+          </div>
+        <!-- </a> -->
+      </li>
+    </ul>
+  </div>
+  <div class="list-block inset">
+    <ul>
+      <!-- <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-input">
+              <input type="text" name="title" placeholder="Title">
+            </div>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-input">
+              <input type="text" name="location" placeholder="Location">
+            </div>
+          </div>
+        </div>
+      </li> -->
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-input">
+              {{calendar_dateTime startAt}}
+            </div>
+          </div>
+        </div>
+      </li>
+      {{#if endAt}}
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-input">
+              {{calendar_dateTime endAt}}
+            </div>
+          </div>
+        </div>
+      </li>
+      {{/if}}
+    </ul>
+  </div>
+  {{#if notes}}
+  <div class="list-block inset">
+    <ul>
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-input">
+              {{notes}}
+            </div>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </div>
+  {{/if}}
+</script>

@@ -1,0 +1,100 @@
+<div class="navbar onpage">
+  <div class="navbar-inner">
+    <div class="left sliding"><a href="#" class="back link"><i class="icon icon-back"></i><span>Back</span></a></div>
+    <div class="center sliding">Addon Details</div>
+    <div class="right"></div>
+  </div>
+</div>
+<div class="pages navbar-through">
+  <div data-page="addon-details" data-package="{{package}}" data-version="{{version}}" class="page" id="addon-details">
+    <div class="page-content">
+      <div class="content-block-title">Details</div>
+      <div class="list-block">
+        <ul>
+          <li>
+            <div class="item-content">
+              <div class="item-inner">
+                <div class="item-title label">Name</div>
+                <div class="item-input">
+                  {{name}} ({{package}})
+                </div>
+              </div>
+            </div>
+          </li>
+          <li>
+            <div class="item-content">
+              <div class="item-inner">
+                <div class="item-title label">Version</div>
+                <div class="item-input">
+                  {{version}}
+                </div>
+              </div>
+            </div>
+          </li>
+          <!-- <li>
+            <div class="item-content">
+              <div class="item-inner">
+                <div class="item-title label">Package</div>
+                <div class="item-input">
+                  {{package}}
+                </div>
+              </div>
+            </div>
+          </li> -->
+          <li>
+            <div class="item-content">
+              <div class="item-inner">
+                <div class="item-title label">Author</div>
+                <div class="item-input">
+                  {{author}}
+                  {{#if homepage}}
+                    (<a href="{{homepage}}" target="_blank">{{homepage}}</a>)
+                  {{/if}}
+                </div>
+              </div>
+            </div>
+          </li>
+          <!-- <li>
+            <div class="item-content">
+              <div class="item-inner">
+                <div class="item-title label">Homepage</div>
+                <div class="item-input">
+                  {{homepage}}
+                </div>
+              </div>
+            </div>
+          </li> -->
+          <li>
+            <div class="item-content">
+              <div class="item-inner">
+                <div class="item-title label">Summary</div>
+                <div class="item-input">
+                  {{summary}}
+                </div>
+              </div>
+            </div>
+          </li>
+          {{#if private}}
+          <li>
+            <div class="item-content">
+              <div class="item-inner">
+                <div class="item-title label">Private</div>
+                <div class="item-input">
+                  Yes
+                </div>
+              </div>
+            </div>
+          </li>
+          {{/if}}
+        <ul>
+      </div>
+      <div id="addon-details-sandbox"></div>
+      <div id="addon-details-store"></div>
+
+      <!-- <div class="content-block-title">Manifest</div>
+      <div class="content-block">
+        {{this}}
+      </div> -->
+    </div>
+  </div>
+</div>

@@ -1,4 +1,7 @@
 node_modules/
 vendor/
+archives/
+backup
+config.json
 *.log
 *~
