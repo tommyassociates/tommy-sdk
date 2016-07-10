@@ -240,7 +240,7 @@ Tommy.SDK.prototype.deleteStoreAddon = function(package, version, callback) {
 // emulator dev environemnt:
 
 Tommy.Addons.prototype.addAddonToUI = function(manifest) {
-  var iconPath = this.localFilePath(manifest.package, manifest.version, 'icon.png');
+  var iconPath = this.filePath(manifest.package, manifest.version, 'icon.png');
 
   var extItem = $$('<li><a href="/addon-details.html?package=' + manifest.package + '&package=' + manifest.package + '&version=' + manifest.version + '" class="item-link item-content">' +
       '<div class="item-media"><img src="' + iconPath + '" width="80"></div>' +
