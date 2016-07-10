@@ -5,12 +5,12 @@
         monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August' , 'September' , 'October', 'November', 'December'],
         eventCache = {},
         calendar,
-        today = new Date();
+        now = new Date();
 
     // Initialize the Calendar widget
     calendar = T.env.f7App.calendar({
         container: $page.find('#calendar_container'),
-        value: [today],
+        value: [now],
         weekHeader: false,
         toolbarTemplate:
             '<div class="toolbar calendar-custom-toolbar">' +
@@ -34,7 +34,7 @@
             });
             loadMonth(p.currentYear, p.currentMonth, function(err, res) {
                 // console.log('!!!!!!!selectDay', p, p.currentYear, p.currentMonth, p.currentDay)
-                selectDay(p.currentYear, p.currentMonth, today.getDate());
+                selectDay(p.currentYear, p.currentMonth, now.getDate());
             });
         },
         onDayClick: function (p, dayContainer, year, month, day) {
@@ -78,7 +78,7 @@
 
     function eventsForDate(year, month, day) {
         var events = [];
-        for (id in eventCache) {
+        for (var id in eventCache) {
             var event = eventCache[id];
             if (event.year == year &&
                 event.month == month &&
@@ -96,46 +96,39 @@
         return events;
     }
 
+    function updateCalendar() {
+        $$(calendar.container).find('.picker-calendar-day').removeClass('has-events');
+        for (var id in eventCache) {
+            var event = eventCache[id];
+            getDayElement(event.year, event.month, event.startDay).addClass('has-events');
+
+            // TODO: Add event to days between start and end
+            if (event.startDay != event.endDay) {
+                getDayElement(event.year, event.month, event.endDay).addClass('has-events');
+            }
+        }
+    }
+
     function addEvent(event) {
         event.startAt = new Date(event.start_at);
         event.year = event.startAt.getFullYear();
         event.month = event.startAt.getMonth();
+        // event.zeroMonth = event.startAt.getMonth() - 1; // zero based month index for JS
         event.startDay = event.startAt.getDate();
-
         if (event.end_at) {
             event.endAt = new Date(event.end_at);
             event.endDay = event.endAt.getDate();
         }
-        // var year = item.startAt.getFullYear(),
-        //     month = item.startAt.getMonth(),
-        //     startDay = item.startAt.getDate(),
-        //     endDay = item.endAt.getDate();
 
-        //console.log('insert calendar event', year, month, startDay, endDay, item);
-
+        console.log('event added', event)
         eventCache[event.id] = event;
-        // if (!eventCache[year])
-        //     eventCache[year] = {};
-        // if (!eventCache[year][month])
-        //     eventCache[year][month] = { all: [] };
-        // if (!eventCache[year][month][startDay])
-        //     eventCache[year][month][startDay] = [];
-        // eventCache[year][month].all.push(item);
-        // eventCache[year][month][startDay].push(item);
-        getDayElement(event.year, event.month, event.startDay).addClass('has-events');
-
-        // TODO: Add event to days between start and end
-        if (event.startDay != event.endDay) {
-            // if (!eventCache[year][month][endDay])
-            //     eventCache[year][month][endDay] = [];
-            // eventCache[year][month][endDay].push(item);
-            getDayElement(event.year, event.month, event.endDay).addClass('has-events');
-        }
     }
 
     function loadMonth(year, month, callback) {
         //console.log('events load', year, month);
         T.env.f7App.showPreloader('Loading Events...');
+        if (month)
+            month += 1;
 
         T.api.get('/events', { year: year, month: month }, function(err, res) {
             //console.log('events response', err, res);
@@ -150,6 +143,7 @@
                     addEvent(res[i]);
                 }
             }
+            updateCalendar();
 
             if (callback)
                 callback(err, res);
@@ -176,7 +170,7 @@
 
         T.util.renderTemplate7('calendar_eventFormTemplate', event, $formPage.find('.page-content'));
 
-        console.log('init event form', page, $formNav.find('a.save').length);
+        // console.log('init event form', page, $formNav.find('a.save').length);
 
         $formNav.find('a.save').on('click', function(ev) {
             var data = T.env.f7App.formToJSON($formPage.find('form'));
@@ -184,7 +178,6 @@
             ev.preventDefault();
         });
 
-        // save
         // $form = $page.find('form');
         // $form.on('submit', function(ev) {
         //     var data = T.env.f7App.formToJSON($form);
@@ -192,31 +185,69 @@
         //     ev.preventDefault();
         // });
 
-        initDatePicker($formPage.find('input[name="start_at"]'));
-        initDatePicker($formPage.find('input[name="end_at"]'));
+        initDatePicker($formPage.find('input[name="start_at"]'), event.startAt || now);
+        initDatePicker($formPage.find('input[name="end_at"]'), event.endAt || event.startAt || now);
+        initReminderWidget($formPage.find('.reminder'));
     }
 
-    function initDatePicker(input) {
+    function initReminderWidget($element) {
+        var picker = T.env.f7App.picker({
+            input: $element.find('input[name="reminder_display"]'),
+            rotateEffect: true,
+            inputReadOnly: true,
+            onChange: function (p, values, displayValues) {
+                // console.log('set reminder', values, displayValues)
+                $element.find('input[name="reminder"]').val(values[0]);
+                $element.addClass('has-reminder');
+            },
+            formatValue: function (p, values, displayValues) {
+                return displayValues[0];
+            },
+            cols: [
+                {
+                    textAlign: 'center',
+                    values: [10, 15, 30, 60, 90, 120],
+                    displayValues: ['10 minutes before', '15 minutes before', '30 minutes before', '1 hour before', '1.5 hours before', '2 hours before']
+                }
+            ]
+        });
+
+        $element.find('.reminder-add').click(function(event) {
+            picker.open();
+            event.preventDefault();
+        });
+
+        $element.find('.reminder-delete').click(function(event) {
+            $element.find('input[name="reminder"]').val('');
+            $element.find('input[name="reminder_display"]').val('');
+            $element.removeClass('has-reminder');
+            event.preventDefault();
+        });
+
+        if ($element.find('input[name="reminder"]').val()) {
+            $element.addClass('has-reminder');
+        }
+    }
+
+    function initDatePicker(input, initialDate) {
+        // if (!initialDate) initialDate = now;
         return T.env.f7App.picker({
             input: input,
             rotateEffect: true,
-
-            value: [today.getMonth(), today.getDate(), today.getFullYear(), today.getHours(), (today.getMinutes() < 10 ? '0' + today.getMinutes() : today.getMinutes())],
-
+            inputReadOnly: true,
+            value: [initialDate.getMonth(), initialDate.getDate(), initialDate.getFullYear(), initialDate.getHours(), (initialDate.getMinutes() < 10 ? '0' + initialDate.getMinutes() : initialDate.getMinutes())],
             onChange: function (picker, values, displayValues) {
                 var daysInMonth = new Date(picker.value[2], picker.value[0]*1 + 1, 0).getDate();
                 if (values[1] > daysInMonth) {
                     picker.cols[1].setValue(daysInMonth);
                 }
             },
-
             formatValue: function (p, values, displayValues) {
                 if (!displayValues.length) {
                     return $$(input).val();
                 }
                 return displayValues[0] + ' ' + values[1] + ', ' + values[2] + ' ' + values[3] + ':' + values[4];
             },
-
             cols: [
                 // Months
                 {
@@ -266,22 +297,56 @@
         });
     }
 
+    // function initReminderWidget(input) {
+    //     return T.env.f7App.picker({
+    //         input: input,
+    //         cols: [
+    //             {
+    //                 textAlign: 'center',
+    //                 displayValues: ['10 minutes', '15 minutes', '30 minutes', '1 hour', '2 hours'],
+    //                 values: [10, 15, 30, 60, 120]
+    //             }
+    //         ]
+    //     });
+    // }
+
     function saveEvent(data) {
-        T.env.f7App.showPreloader('Saving Event');
-        T.api.create('/events', data, function(err, res) {
-            console.log('create event', data, err, res);
+        var complete = function(err, res) {
+            console.log('event created', data, err, res);
             T.env.f7App.hidePreloader();
             if (T.util.handleAPIError(err, 'Failed to save event')) {
                 return;
             }
             addEvent(res);
-            T.env.f7View.router.back();
-        });
+            T.env.f7View.router.back({
+                // url: xxxxx,
+                // force: true,
+                // ignoreCache: true
+            });
+        }
+
+        data.start_at = new Date(data.start_at).toUTCString();
+        if (data.end_at && data.end_at.length)
+            data.end_at = new Date(data.end_at).toUTCString();
+        console.log('event create', data, new Date(data.start_at), new Date(data.start_at).toUTCString());
+
+        T.env.f7App.showPreloader('Saving Event');
+        if (data.id) {
+            T.api.update('/events/' + data.id, data, complete);
+        }
+        else {
+            T.api.create('/events', data, complete);
+        }
     }
 
     //
     /// Router
     //
+
+    //
+    /// Calendar
+
+    T.env.f7App.onPageAfterAnimation('calendar_main', updateCalendar);
 
     //
     /// Event Form
@@ -292,12 +357,15 @@
     //
     /// Event Details
 
-    T.env.f7App.onPageInit('calendar_event-details', function(page) {
+    function initEventDetails(page) {
         var event = eventCache[page.query.event_id],
             $page = $$(page.container);
 
         T.util.renderTemplate7('calendar_eventDetailsTemplate', event, $page.find('.page-content'));
-    });
+    };
+
+    T.env.f7App.onPageInit('calendar_event-details', initEventDetails);
+    T.env.f7App.onPageAfterAnimation('calendar_event-details', initEventDetails);
 
     //
     /// Template Helpers
@@ -324,5 +392,24 @@
             min = date.getMinutes() < 10 ? '0' + date.getMinutes() : date.getMinutes();
         return monthNames[m] + ' ' + d + ', ' + y + ' ' + h + ':' + min;
     });
+
+    T.env.t7.registerHelper('calendar_humanizeMinutes', function(value) {
+        if (value > 60) {
+            var text = '',
+                hours,
+                minutes;
+            hours = Math.trunc(value / 60);
+            minutes = value % 60;
+            text += (hours + ' hours');
+            if (minutes > 0) {
+                text += (' and ' + minutes + ' minutes');
+            }
+            return text;
+        }
+        else {
+            return value + ' minutes';
+        }
+    });
+
 
 })(Tommy);
