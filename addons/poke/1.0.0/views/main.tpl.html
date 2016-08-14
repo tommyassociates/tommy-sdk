@@ -1,10 +1,10 @@
-<script type="text/template7" id="addonPokeContactListTemplate">
+<script type="text/template7" id="poke_contactListTemplate">
   <div class="content-block-title">Contacts</div>
   <div class="list-block media-list">
     <ul>
       {{#each this}}
       <li>
-        <a href="#" class="item-link item-content">
+        <a href="#" data-user-id="{{user_id}}" data-first-name="{{first_name}}" class="item-link item-content">
           <div class="item-media"><img class="icon" width="23" src="{{icon_url}}" /></div>
           <div class="item-inner">
             <div class="item-title-row">
@@ -12,7 +12,7 @@
               <!-- <div class="item-after"></div> -->
             </div>
             <!-- <div class="item-subtitle">{{title}}</div> -->
-            <!-- <div class="item-text">{{display_name}}</div> -->
+            <!-- <div class="item-text">{{name}}</div> -->
           </div>
         </a>
       </li>

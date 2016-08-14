@@ -32,7 +32,7 @@
       name: "Calendar event starting message"
       summary: "Calendar event starting message notification."
       trigger: "calendar.triggers.event_start"
-      activity: "message.activities.send"
+      activity: "chat.activities.send"
       internal: true
       mappings:
         message:
@@ -45,7 +45,7 @@
       name: "Calendar event ending message"
       summary: "Calendar event ending message notification."
       trigger: "calendar.triggers.event_end"
-      activity: "message.activities.send"
+      activity: "chat.activities.send"
       internal: true
       mappings:
         message:
@@ -53,3 +53,21 @@
           type: "string"
           source: "custom"
           value: "%{trigger.name} is ending at %{trigger.time}"
+  views:
+    -
+      file: "views/main.tpl.html"
+      type: "template"
+    -
+      id: "main"
+      title: "Calendar"
+      file: "views/main.html"
+      type: "page"
+      framed: false
+      main: true
+      assets:
+        -
+          type: "stylesheet"
+          file: "views/main.css"
+        -
+          type: "javascript"
+          file: "views/main.js"

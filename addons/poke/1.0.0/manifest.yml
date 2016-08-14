@@ -1,7 +1,4 @@
-
-  -
-    file: "views/main.tpl.html"
-    type: "template"---
+---
   name: "Poke"
   package: "poke"
   version: "1.0.0"
@@ -77,6 +74,12 @@
       title: "Poke"
       file: "views/main.html"
       type: "page"
-      scope: "client"
       framed: false
-      permissions: {}
+      main: true
+      assets:
+        -
+          type: "stylesheet"
+          file: "views/main.css"
+        -
+          type: "javascript"
+          file: "views/main.js"

@@ -1,6 +1,8 @@
 var express = require('express'),
   fs = require('fs'),
+  yaml = require('js-yaml'),
   path = require('path'),
+  url = require('url'),
   request = require('request'),
   config = loadConfig('config.json'),
   app = express();
@@ -13,12 +15,22 @@ app.use(express.static('./'));
 app.get('/', function(req, res) {
   res.render('index', {
     localAddons: readLocalAddons(),
-    config: config
+    config: config,
+    url: getSdkUrl()
   });
 });
 
 app.get('/addons', function(req, res) {
   res.send(readLocalAddons());
+});
+
+app.get('/addons/:package/:version', function(req, res) {
+  res.send(readLocalAddon(req.params.package, req.params.version));
+});
+
+app.get('/addons/:package/versions/:version/files/*', function(req, res) {
+  res.sendFile(getLocalAddonFilePath(req.params.package, req.params.version, req.params['0']));
+  // console.log(req.params);
 });
 
 app.post('/addon/archive/:package/:version', function(req, res) {
@@ -104,11 +116,55 @@ function createAddon(host, action, package, version, archivePath, callback) {
 //   return String(fs.readFileSync(path.join(__dirname, './APIKEY'))).trim();
 // }
 
-function readLocalAddons() {
+function readLocalAddonVersions() {
   var addons = {}
   var packages = fs.readdirSync(path.join(__dirname, 'addons'));
   for (var i = 0; i < packages.length; i++) {
     addons[packages[i]] = fs.readdirSync(path.join(__dirname, 'addons', packages[i]))
+  }
+  return addons;
+}
+
+function getLocalAddonFilePath(package, version, file) {
+  return path.join(__dirname, 'addons', package, version, file);
+}
+
+function getSdkUrl() {
+  return 'http://localhost:' + app.get('port');
+  // url.resolve();
+}
+
+function readLocalAddon(package, version) {
+  var addon =  yaml.safeLoad(fs.readFileSync(getLocalAddonFilePath(package, version, 'manifest.yml'), 'utf8'));
+  var base = '/addons/' + addon.package + '/versions/' + addon.version + '/files/';
+  addon.url = url.resolve(getSdkUrl(), base);
+  addon.icon_url =  url.resolve(addon.url, 'icon.png'); //path + '/icon.png';
+  addon.local = true;
+  if (addon.views) {
+    for (var i = 0; i < addon.views.length; i++) {
+      var view = addon.views[i];
+      view.url = url.resolve(addon.url, view.file);
+      if (view.assets) {
+        for (var x = 0; x < view.assets.length; x++) {
+          var asset = view.assets[x];
+          asset.url = url.resolve(addon.url, asset.file);
+        }
+      }
+    }
+  }
+  return addon;
+}
+
+function readLocalAddons() {
+  var addons = [];
+  var data = readLocalAddonVersions();
+  for (var package in data) {
+    var versions = data[package];
+    for (var i = 0; i < versions.length; i++) {
+      var manifest = readLocalAddon(package, versions[i]);
+      // console.log(manifest);
+      addons.push(manifest);
+    }
   }
   return addons;
 }

@@ -4,6 +4,14 @@
 #calendar_container .full-width {
   width: 100%;
 }
+#calendar_container .calendar-custom-toolbar {
+  color: #000;
+}
+#calendar_container .calendar-custom-toolbar .left a,
+#calendar_container .calendar-custom-toolbar .right a {
+  color: #000;
+}
+
 
 /* Reminder Widget */
 #calendar_event-form .reminder .reminder-input-wrap {

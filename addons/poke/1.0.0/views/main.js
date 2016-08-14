@@ -1,37 +1,35 @@
-// Show a loading indicator
-T.env.f7App.showPreloader('Loading Users...');
+require(['app','api','util','cache','tplManager'],
+function (app,api,util,cache,tplManager) {
 
-// Get a list of accessible account contacts from the API
-T.api.get('/contacts', {}, function(err, res) {
-    console.log('contacts response', err, res);
-    T.env.f7App.hidePreloader();
-    if (err) {
-        alert('API error: Could not fetch contacts');
-        return;
+    // Setup router
+    app.f7.onPageInit('poke_main', initContacts);
+
+    // Initialize the main contacts page
+    function initContacts(page) {
+        app.f7.showPreloader('Loading Contacts...');
+
+        api.getContacts(function(response) {
+            app.f7.hidePreloader();
+            var $element = tplManager.renderInline('poke_contactListTemplate', response);
+            $element.find('a').click(function() {
+              var $link = $$(this),
+                  userId = $link.data('user-id'),
+                  firstName = $link.data('first-name');
+              app.f7.alert('Would you like to poke ' + firstName + '?', 'Confirm', function() {
+                  pokeUser(userId, firstName);
+              });
+              return false;
+            });
+        });
     }
-    T.util.renderTemplate7('addonPokeContactListTemplate', res, '#addon-poke-contacts');
 
-    //   navItem.find('a').click(function(){
-    //     T.env.f7App.alert('Would you like to poke ' + contact.user.first_name + '?',
-    //                 'Confirm', function() {
-    //       pokeUser(contact.user);
-    //     });
-    //     return false;
-    //   });
+    // Send the poke message to the recipient
+    function pokeUser(userId, firstName) {
+        api.sendDirectMessage(userId, 'You\'ve been Poked!', null, function(response) {
+            console.log('send message response', response);
+            app.f7.addNotification({
+                message: ('You poked ' + firstName + '!')
+            });
+        });
+    }
 });
-
-function pokeUser(receiver) {
-  T.api.create('/chat_messages', {
-      receiver_id: receiver.id,
-      message: 'You\'ve been Poked!'}, function(err, res) {
-    console.log('send message response', err, res);
-    if (err) {
-      alert('API error: Could not send message');
-      return;
-    }
-
-    T.env.f7App.addNotification({
-      message: ('You have poked ' + receiver.first_name + '!')
-    });
-  });
-}
