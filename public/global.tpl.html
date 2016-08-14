@@ -140,6 +140,41 @@
   </div>
 </script>
 
+<script id="addonListTemplate" type="text/template">
+  <ul>
+    {{#each this}}
+    <li>
+      <a href="/addon-details.html?package={{package}}&version={{version}}" data-package="{{package}}" data-version="{{version}}" class="item-link item-content">
+        <div class="item-media"><img class="icon" width="80" src="{{icon_url}}" /></div>
+        <div class="item-inner">
+          <div class="item-title-row">
+            <div class="item-title">{{name}}</div>
+            <div class="item-after">{{version}}</div>
+          </div>
+          <!-- <div class="item-subtitle">{{title}}</div> -->
+          <div class="item-text">{{summary}}</div>
+        </div>
+      </a>
+    </li>
+    {{/each}}
+  </ul>
+</script>
+
+<script id="addonViewsListTemplate" type="text/template">
+  <ul>
+    {{#each this}}
+    <li>
+      <a href="{{url}}" class="item-link item-content">
+        <div class="item-inner">
+          <div class="item-title">{{title}}</div>
+          <!-- <div class="item-after"></div> -->
+        </div>
+      </a>
+    </li>
+    {{/each}}
+  </ul>
+</script>
+
 <script id="accountListTemplate" type="text/template">
   <!-- <div class="content-block-title">Accounts</div> -->
   <div class="list-block media-list">

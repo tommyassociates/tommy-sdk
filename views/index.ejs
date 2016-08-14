@@ -5,23 +5,41 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <title>Tommy Addon SDK Emulator</title>
-    <link rel="stylesheet" href="css/framework7.ios.min.css">
+    <title>Tommy Addon SDK</title>
+    <!-- <link rel="stylesheet" href="css/framework7.ios.min.css">
     <link rel="stylesheet" href="css/framework7.ios.colors.min.css">
     <link rel="stylesheet" href="vendor/material/material-icons.css">
     <link rel="stylesheet" href="css/tommy.css">
-    <link rel="stylesheet" href="css/addons.css">
+    <link rel="stylesheet" href="css/addons.css"> -->
+    <link rel="stylesheet" href="lib/vendors/framework7/framework7.ios.min.css">
+    <link rel="stylesheet" href="lib/vendors/material/material-icons.css">
+    <link rel="stylesheet" href="lib/styles/tommy.css">
   </head>
   <body>
     <div class="statusbar-overlay"></div>
-    <!-- <div class="panel-overlay"></div>
+    <div class="panel-overlay"></div>
     <div class="panel panel-left layout-dark panel-reveal">
-      <div class="content-block-title">Account</div>
+      <div class="content-block-title">Navigation</div>
+      <div class="list-block">
+        <ul class="addon-views-nav">
+          <li>
+            <a href="settings.html" class="close-panel item-link">
+              <div class="item-content">
+                <div class="item-inner">
+                  <div class="item-title">Settings</div>
+                </div>
+              </div>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- <div class="content-block-title">Addons</div>
       <div class="list-block">
         <ul class="addon-views-nav">
         </ul>
-      </div>
-    </div> -->
+      </div> -->
+    </div>
     <!-- <div class="panel panel-right panel-cover">
       <div class="content-block">
         <p>Right panel content goes here</p>
@@ -31,122 +49,94 @@
       <div class="view view-main">
         <div class="navbar layout-dark theme-white">
           <div class="navbar-inner">
-            <!-- <div class="left">
-              <a href="#" class="link icon-only do-switch-account"><img src="" class="current-avatar"></a></a>
-            </div> -->
+            <div class="left">
+              <a href="#" class="link icon-only open-panel"><i class="icon icon-bars"></i></a>
+              <!-- <a href="#" class="link icon-only do-switch-account"><img src="" class="current-avatar"></a></a> -->
+            </div>
             <div class="center sliding">Addon Emulator</div>
             <div class="right">
-              <a href="settings.html" class="link icon-only"><i class="icon icon-bars"></i></a>
+              <!-- <a href="settings.html" class="link icon-only"><i class="icon icon-bars"></i></a> -->
               <!-- open-panel -->
             </div>
           </div>
         </div>
         <div class="pages navbar-through toolbar-through">
           <div data-page="index" class="page">
-            <div class="page-content">
-              <!-- Main addons list-->
-              <div class="content-block-title">Addons</div>
-              <div class="list-block media-list">
-                <ul class="addons-nav">
-                </ul>
-              </div>
-
-              <!-- Main addons views list-->
-              <div class="content-block-title">Views</div>
-              <div class="list-block">
-                <ul class="addon-views-nav"></ul>
-              </div>
-
-              <!-- <div class="content-block-title">Getting Started</div>
-              <div class="content-block">
-                <div class="content-block-inner">
-                  <p>
-                    The Tommy Addon SDK playground exists on the far away dog star, Sirius B,
-                    and provides a place for Tommy's furry developer friends
-                    to learn and play with the addons API in order to add custom functionality to Tommy,
-                    and advance canine technology beyond the bounds of human imagination.
-                  </p>
-                  <p>
-                    All the addons in <code>/addons</code> will be automatically loaded,
-                    and you can build and test them in the Tommy environment which is
-                    sumulated by this demo app.
-                  </p>
-                  <p>
-                    We've built a couple of simple addon demos to get you started, just click on the
-                    titles in the list above to view the rendered addon.
-                  </p>
-                </div>
-              </div> -->
-            </div>
           </div>
         </div>
       </div>
     </div>
-    <script type="text/javascript" src="js/jquery-2.1.4.min.js"></script>
+    <!-- <script type="text/javascript" src="js/jquery-2.1.4.min.js"></script>
     <script type="text/javascript" src="js/js-yaml.js"></script>
     <script type="text/javascript" src="js/framework7.min.js"></script>
     <script type="text/javascript" src="js/app.js"></script>
 
-    <script type="text/javascript" src="js/tommy/tommy.js"></script>
-    <script type="text/javascript" src="js/tommy/util.js"></script>
-    <script type="text/javascript" src="js/tommy/api.js"></script>
-    <script type="text/javascript" src="js/tommy/environment.js"></script>
-    <script type="text/javascript" src="js/tommy/addons.js"></script>
+    <script type="text/javascript" src="js/lib/tommy.js"></script>
+    <script type="text/javascript" src="js/lib/util.js"></script>
+    <script type="text/javascript" src="js/lib/api.js"></script>
+    <script type="text/javascript" src="js/lib/environment.js"></script>
+    <script type="text/javascript" src="js/lib/addons.js"></script>
 
-    <script type="text/javascript" src="js/sdk.js"></script>
+    <script type="text/javascript" src="js/sdk.js"></script> -->
 
     <script type="text/javascript">
-      // Create the Tommy API instances
-      T.api = new Tommy.API('<%- config.apiKey %>', 'v1', '<%- config.apiEndpoint %>');
-      // T.apiAccount = new Tommy.API('<%- config.apiKey %>', 'v1', '<%- config.apiEndpoint %>');
-      T.apiSandbox = new Tommy.API('<%- config.apiKey %>', 'v1', '<%- config.apiSandboxEndpoint %>');
+      SDK_URL = '<%- url %>';
+      SDK_CONFIG = <%- JSON.stringify(config) %>;
+      SDK_ADDONS = <%- JSON.stringify(localAddons) %>;
 
-      // Create the Tommy Environment instance and set the necessary variables
-      T.env = new Tommy.Environment();
-      T.env.f7App = myApp;
-      T.env.f7View = mainView;
-      T.env.t7 = Template7;
-
-      // Create the Tommy Addons instance and load all installed addons
-      T.addons = new Tommy.Addons();
-      // T.addons.loadAllRemote();
-
-      // Initialize the SDK
-      T.sdk = new Tommy.SDK();
-      T.sdk.loadLocalAddons();
-
-      // Handle addon created events
-      $$(document).on('tommy:addon:view:create', function(event) {
-        var package = event.detail.package,
-          // local = T.addons.get(package, 'local'),
-          view = event.detail.view;
-
-        // Create the sidebar menu item
-        var navItem = $('<li><a href="#" data-addon="' + view.package + '" data-view="' + view.id + '" class="item-link">' +
-          '<div class="item-content">' +
-            '<div class="item-inner">' +
-              '<div class="item-title">' + view.title + '</div>' +
-              // '<div class="item-after">' + (local ? 'Local' : 'Remote') + '</div>' +
-            '</div>' +
-          '</div></a></li>');
-
-        // Add the sidebar menu
-        $('.addon-views-nav').append(navItem);
-
-        // Handle sidebar clicks to display the page
-        // TODO: does f7 have a better way to handle this?
-        navItem.find('a').unbind('click').click(function() {
-          // if ($('.view-main').data('page') == view.id)
-          //   return;
-
-          T.addons.showView(package, view.id);
-        });
-
-        // // Show a specific view on load
-        // if (data.package == 'barbonus') {
-        //   T.addons.showView('barbonus-bonuses');
-        // }
-      });
+      // // Create the Tommy API instances
+      // T.api = new Tommy.API('<%- config.apiKey %>', 'v1', '<%- config.apiEndpoint %>');
+      // // T.apiAccount = new Tommy.API('<%- config.apiKey %>', 'v1', '<%- config.apiEndpoint %>');
+      // T.apiSandbox = new Tommy.API('<%- config.apiKey %>', 'v1', '<%- config.apiSandboxEndpoint %>');
+      //
+      // // Create the Tommy Environment instance and set the necessary variables
+      // T.env = new Tommy.Environment();
+      // T.env.f7App = myApp;
+      // T.env.f7View = mainView;
+      // T.env.t7 = Template7;
+      //
+      // // Create the Tommy Addons instance and load all installed addons
+      // T.addons = new Tommy.Addons();
+      // // T.addons.loadAllRemote();
+      //
+      // // Initialize the SDK
+      // T.sdk = new Tommy.SDK();
+      // T.sdk.loadLocalAddons();
+      //
+      // // Handle addon created events
+      // $$(document).on('tommy:addon:view:create', function(event) {
+      //   var package = event.detail.package,
+      //     // local = T.addons.get(package, 'local'),
+      //     view = event.detail.view;
+      //
+      //   // Create the sidebar menu item
+      //   var navItem = $('<li><a href="#" data-addon="' + view.package + '" data-view="' + view.id + '" class="item-link">' +
+      //     '<div class="item-content">' +
+      //       '<div class="item-inner">' +
+      //         '<div class="item-title">' + view.title + '</div>' +
+      //         // '<div class="item-after">' + (local ? 'Local' : 'Remote') + '</div>' +
+      //       '</div>' +
+      //     '</div></a></li>');
+      //
+      //   // Add the sidebar menu
+      //   $('.addon-views-nav').append(navItem);
+      //
+      //   // Handle sidebar clicks to display the page
+      //   // TODO: does f7 have a better way to handle this?
+      //   navItem.find('a').unbind('click').click(function() {
+      //     // if ($('.view-main').data('page') == view.id)
+      //     //   return;
+      //
+      //     T.addons.showView(package, view.id);
+      //   });
+      //
+      //   // // Show a specific view on load
+      //   // if (data.package == 'barbonus') {
+      //   //   T.addons.showView('barbonus-bonuses');
+      //   // }
+      // });
     </script>
+
+    <script data-main="js/main" src="lib/vendors/require/require.js"></script>
   </body>
 </html>
