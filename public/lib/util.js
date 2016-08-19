@@ -15,7 +15,7 @@ define(['config','cache','i18n!nls/lang','Framework7'],function (config,cache,i1
             return str.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
         },
 
-        capitalise: function (str) {
+        capitalize: function (str) {
             return str.charAt(0).toUpperCase() + str.slice(1);
         },
 

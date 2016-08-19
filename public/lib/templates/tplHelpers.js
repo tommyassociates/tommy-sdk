@@ -6,36 +6,42 @@ define(['config','util','moment','Framework7'], function (config,util,moment) {
         init: function () {
 
             t7.registerHelper('if_compare', function (a, operator, b, options) {
-              var match = false;
-              if ((operator === '==' && a == b) ||
-                  (operator === '===' && a === b) ||
-                  (operator === '!=' && a != b) ||
-                  (operator === '>' && a > b) ||
-                  (operator === '<' && a < b) ||
-                  (operator === '>=' && a >= b) ||
-                  (operator === '<=' && a <= b) ) {
-                  match = true;
-              }
-              if (match)
-                  return options.fn(this);
-              else
-                  return options.inverse(this);
+                var match = false;
+                if ((operator === '==' && a == b) ||
+                    (operator === '===' && a === b) ||
+                    (operator === '!=' && a != b) ||
+                    (operator === '>' && a > b) ||
+                    (operator === '<' && a < b) ||
+                    (operator === '>=' && a >= b) ||
+                    (operator === '<=' && a <= b) ) {
+                    match = true;
+                }
+                if (match)
+                    return options.fn(this);
+                else
+                    return options.inverse(this);
             });
 
             t7.registerHelper('if_any', function (array, options) {
-              var match = array && array.length > 0;
-              if (match)
-                  return options.fn(this);
-              else
-                  return options.inverse(this);
+                var match = array && array.length > 0;
+                if (match)
+                    return options.fn(this);
+                else
+                    return options.inverse(this);
             });
 
             t7.registerHelper('if_empty', function (array, options) {
-              var match = !array || array.length == 0;
-              if (match)
-                  return options.fn(this);
-              else
-                  return options.inverse(this);
+                var match = !array || array.length == 0;
+                if (match)
+                    return options.fn(this);
+                else
+                    return options.inverse(this);
+            });
+
+            t7.registerHelper('count', function (array, options) {
+                if (array)
+                    return array.length;
+                return 0;
             });
 
             //
@@ -47,7 +53,7 @@ define(['config','util','moment','Framework7'], function (config,util,moment) {
             });
 
             t7.registerHelper('capitalize', function (text) {
-                return text.charAt(0).toUpperCase() + text.slice(1);
+                return util.capitalize(text);
             });
 
             t7.registerHelper('isSelected', function (a, b) {

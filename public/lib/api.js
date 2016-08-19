@@ -494,12 +494,58 @@ define(['xhr','util','config','cache'], function(xhr,util,config,cache) {
         },
 
         //
+        // Schedules
+        //
+
+        getSchedules: function(params, success, error) {
+            return this.call({
+                endpoint: 'schedules',
+                method: 'GET',
+                data: params
+            }, success, error);
+        },
+
+        createSchedule: function(data, success, error) {
+            return this.call({
+                endpoint: 'schedules',
+                method: 'POST',
+                data: data
+            }, success, error);
+        },
+
+        updateSchedule: function(schedule_id, data, success, error) {
+            return this.call({
+                endpoint: 'schedules/' + schedule_id,
+                method: 'PUT',
+                data: data
+            }, success, error);
+        },
+
+        updateSchedulesStatus: function(schedule_ids, status, success, error) {
+            return this.call({
+                endpoint: 'schedules/status/' + status,
+                method: 'PUT',
+                data: {
+                  schedule_ids: schedule_ids
+                }
+            }, success, error);
+        },
+
+        //
         // Events
         //
 
         getEvents: function(params, success, error) {
             return this.call({
                 endpoint: 'events',
+                method: 'GET',
+                data: params
+            }, success, error);
+        },
+
+        getEventAttendances: function(event_id, params, success, error) {
+            return this.call({
+                endpoint: 'events/' + event_id + '/attendances',
                 method: 'GET',
                 data: params
             }, success, error);

@@ -8,7 +8,11 @@ function(app,config,api,util,cache,TM,TH,addons) {
             }
             else {
                 appCtrl.initCurrentAccount(function() {
-                    tommyView.router.loadPage('local-addons.html');
+                    // tommyView.router.loadPage('local-addons.html');
+                    tommyView.router.load({
+                        url: 'local-addons.html',
+                        animatePages: false
+                    });
                 }, function() {
                     appCtrl.onInvalidSession();
                 });
