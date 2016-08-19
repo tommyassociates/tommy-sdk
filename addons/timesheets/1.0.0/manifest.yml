@@ -1,0 +1,93 @@
+---
+  name: "Timesheets"
+  package: "timesheets"
+  summary: "Timesheets for managing employee timesheets."
+  description: "Timesheets for managing employee timesheets."
+  version: "1.0.0"
+  author: "Tommy Associates Pty Ltd"
+  homepage: "http://mytommy.com"
+  default: true
+  private: false
+  default_trigger_parameters: &default_trigger_parameters
+    name:
+      name: "Event name"
+      type: "string"
+      required: true
+    time:
+      name: "Event time"
+      type: "string"
+      required: true
+  triggers:
+    -
+      module: "timesheets.triggers.create"
+      name: "Timesheet Created"
+      parameters: *default_trigger_parameters
+    -
+      module: "timesheets.triggers.view"
+      name: "Timesheet Veiwed"
+      parameters: *default_trigger_parameters
+    -
+      function: "delete"
+      name: "Timesheet Veiwed"
+      parameters: *default_trigger_parameters
+  actions:
+    -
+      module: "timesheets.actions.event_start_message"
+      name: "Timesheets event starting message"
+      summary: "Timesheets event starting message notification."
+      trigger: "timesheets.triggers.event_start"
+      activity: "chat.activities.send"
+      internal: true
+      mappings:
+        message:
+          name: "Message text"
+          type: "string"
+          source: "custom"
+          value: "%{trigger.name} is starting at %{trigger.time}"
+    -
+      module: "timesheets.actions.event_end_message"
+      name: "Timesheets event ending message"
+      summary: "Timesheets event ending message notification."
+      trigger: "timesheets.triggers.event_end"
+      activity: "chat.activities.send"
+      internal: true
+      mappings:
+        message:
+          name: "Message text"
+          type: "string"
+          source: "custom"
+          value: "%{trigger.name} is ending at %{trigger.time}"
+  views:
+    -
+      file: "views/main.tpl.html"
+      type: "template"
+    -
+      id: "main"
+      title: "Timesheets"
+      file: "views/main.html"
+      type: "page"
+      framed: false
+      manager: false
+      main: true
+      assets:
+        -
+          type: "stylesheet"
+          file: "views/main.css"
+        -
+          type: "javascript"
+          file: "views/main.js"
+    -
+      id: "manager"
+      title: "Timesheets"
+      file: "views/manager/index.html"
+      type: "page"
+      framed: false
+      manager: true
+      main: true
+      assets:
+        -
+          type: "stylesheet"
+          file: "views/main.css"
+        -
+          type: "javascript"
+          file: "views/main.js"

@@ -1,6 +1,6 @@
 {
   "name": "tommy_addon_sdk",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "SDK for building Tommy addons",
   "main": "server.js",
   "dependencies": {
@@ -20,10 +20,10 @@
   },
   "keywords": [
     "tommy",
-    "extensions",
-    "sdk"
+    "sdk",
+    "api"
   ],
-  "author": "Kam Low <auscaster@gmail.com> (http://sourcey.com)",
+  "author": "Kam Low <support@mytommy.com> (https://mytommy.com)",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/tommyassociates/tommy_addon_sdk/issues"

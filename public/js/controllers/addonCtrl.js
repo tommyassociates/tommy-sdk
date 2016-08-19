@@ -15,10 +15,23 @@ function(util,xhr,app,config,api,addons,TM) {
                 });
                 return false;
             });
+
+            // Autoload timesheets addon view
+            setTimeout(function() {
+                // addonCtrl.viewAddon('timesheets', 'main');
+                $$('#addon-views-local-nav').find('a[data-addon="timesheets"][data-view-id="manager"]').click();
+            }, 100);
         },
 
+        // viewAddon: function(package, viewId) {
+        //     var $link = $$('#addon-views-local-nav').find('a[data-addon="' + package + '"][data-view-id="' + viewId + '"]');
+        //     app.f7view.router.load({
+        //         url: $link[0].href
+        //     });
+        // },
+
         onViewLoaded: function(addon, view) {
-            // console.log('addonCtrl', 'onViewLoaded', view);
+            // console.log('addonCtrl', 'onViewLoaded', addon, view);
         },
 
         onAddonLoaded: function(addon) {

@@ -1,0 +1,39 @@
+#timesheets_container .has-items {
+  background: #D8FFAC;
+}
+#timesheets_container .full-width {
+  width: 100%;
+}
+#timesheets_container .timesheets-custom-toolbar {
+  color: #000;
+}
+#timesheets_container .timesheets-custom-toolbar .left a,
+#timesheets_container .timesheets-custom-toolbar .right a {
+  color: #000;
+}
+
+
+/* Reminder Widget */
+#timesheets_item-form .reminder .reminder-input-wrap {
+  position: relative;
+  /*display: none;*/
+  opacity: 0;
+  height: 0;
+}
+#timesheets_item-form .reminder.has-reminder .reminder-input-wrap {
+  /*display: block;*/
+  opacity: 1;
+  height: auto;
+}
+#timesheets_item-form .reminder .reminder-input-wrap:after {
+  display: none;
+}
+#timesheets_item-form .reminder .reminder-input-wrap .reminder-delete {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+}
+#timesheets_item-form .reminder.has-reminder .button {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}

@@ -1,0 +1,15 @@
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="left sliding"><a href="#" class="back link"><i class="material-icons md-36">keyboard_arrow_left</i><span>Cancel</span></a></div>
+    <div class="center sliding">Time sheet</div>
+    <div class="right"><a href="{{addonAssetUrl "views/edit-timesheet.html"}}&event_id={{url_query.event_id}}" class="link"><span>Edit</span></a></div>
+  </div>
+</div>
+<div class="pages">
+  <div class="page navbar-through" id="timesheets_timesheet-details" data-page="timesheets_timesheet-details">
+    <div class="page-content">
+      <div data-template="timesheets_timesheetDetailsTemplate"></div>
+      <div data-template="timesheets_itemListTemplate"></div>
+    </div>
+  </div>
+</div>

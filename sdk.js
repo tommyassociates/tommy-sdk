@@ -30,7 +30,6 @@ app.get('/addons/:package/:version', function(req, res) {
 
 app.get('/addons/:package/versions/:version/files/*', function(req, res) {
   res.sendFile(getLocalAddonFilePath(req.params.package, req.params.version, req.params['0']));
-  // console.log(req.params);
 });
 
 app.post('/addon/archive/:package/:version', function(req, res) {
@@ -111,10 +110,6 @@ function createAddon(host, action, package, version, archivePath, callback) {
     }
   });
 }
-
-// function readAPIKey() {
-//   return String(fs.readFileSync(path.join(__dirname, './APIKEY'))).trim();
-// }
 
 function readLocalAddonVersions() {
   var addons = {}

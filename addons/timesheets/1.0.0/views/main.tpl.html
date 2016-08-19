@@ -1,0 +1,352 @@
+<script id="timesheets_timesheetListTemplate" type="text/template">
+  <div class="list-block media-list no-margin no-line-top">
+    <ul>
+      {{#each this}}
+      <li>
+        <a href="{{addonAssetUrl "views/timesheet-details.html"}}&schedule_id={{id}}" class="item-link item-content">
+          <div class="item-media">
+            <!-- <img src="{{icon_url}}" class="circle"> -->
+          </div>
+          <div class="item-inner">
+            <div class="item-title-row">
+              <div class="item-title">{{start_date}} - {{end_date}}</div>
+              <div class="item-after">{{capitalize status}}</div>
+            </div>
+            <div class="item-text">{{count events}} items</div>
+          </div>
+        </a>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+</script>
+
+<script id="timesheets_timesheetListSelectTemplate" type="text/template">
+  <form id="timesheet-approval-form">
+    <div class="list-block media-list no-margin no-line-top">
+      <ul>
+        {{#each this}}
+        <li>
+          <label class="label-checkbox item-content">
+            <input type="checkbox" name="schedule_ids[]" value="{{id}}">
+            <div class="item-media"><i class="icon icon-form-checkbox"></i></div>
+            <!-- <div class="item-media"></div> -->
+            <div class="item-inner">
+              <div class="item-title-row">
+                <div class="item-title">{{start_date}} - {{end_date}}</div>
+                <div class="item-after">{{capitalize status}}</div>
+              </div>
+              <div class="item-text">{{count events}} items</div>
+            </div>
+          </label>
+        </li>
+        {{/each}}
+      </ul>
+    </div>
+  </form>
+</script>
+
+<script id="timesheets_timesheetListGroupTemplate" type="text/template">
+  <div class="list-block media-list no-margin no-line-top">
+    <div class="list-group">
+      <ul>
+        {{#each this}}
+        <li class="list-group-title no-line-top">{{@key}}</li>
+        {{#each this}}
+        <li>
+          <a href="{{addonAssetUrl "views/timesheet-details.html"}}&schedule_id={{id}}" class="item-link item-content">
+            <div class="item-media">
+              <!-- <img src="{{icon_url}}" class="circle"> -->
+            </div>
+            <div class="item-inner">
+              <div class="item-title-row">
+                <div class="item-title">{{start_date}} - {{end_date}}</div>
+                <div class="item-after">{{capitalize status}}</div>
+              </div>
+              <div class="item-text">{{count events}} items</div>
+            </div>
+          </a>
+        </li>
+        {{/each}}
+        {{/each}}
+      </ul>
+    </div>
+  </div>
+</script>
+
+<script type="text/template7" id="timesheets_timesheetDetailsTemplate">
+  <div class="list-block form-block inset">
+    <ul>
+      <li>
+        <div class="item-content">
+          <!-- <div class="item-media">media</div> -->
+          <div class="item-inner">
+            <div class="item-title label">ID</div>
+            <div class="item-input">TS{{id}}</div>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title label">Dates</div>
+            <div class="item-input">{{start_date}} - {{end_date}}</div>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title label">Status</div>
+            <div class="item-input">{{capitalize status}}</div>
+          </div>
+        </div>
+      </li>
+      <!-- <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title label">Hours</div>
+            <div class="item-input">{{capitalize status}}</div>
+          </div>
+        </div>
+      </li> -->
+    </ul>
+  </div>
+</script>
+
+<script type="text/template7" id="timesheets_itemListTemplate">
+  {{#if_any this}}
+  <div class="content-block-title">Items</div>
+  <div class="list-block media-list">
+    <ul>
+      {{#each this}}
+      <li>
+        <a href="{{addonAssetUrl "views/item-details.html"}}&schedule_id={{resource_id}}&event_id={{id}}" class="item-link item-content">
+          <div class="item-media"></div>
+          <div class="item-inner">
+            <div class="item-title-row">
+              <div class="item-title">
+                {{start_at}}
+              </div>
+              <!-- <div class="item-after">timeOfDay </div> -->
+            </div>
+            <!-- <div class="item-subtitle"></div> -->
+            <div class="item-text">
+              {{title}}
+              {{#if location}}
+                at {{location}}
+              {{/if}}
+            </div>
+          </div>
+        </a>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+  {{/if_any}}
+</script>
+
+<script type="text/template7" id="timesheets_itemFormTemplate">
+  <form id="timesheets_item-form">
+    {{#if id}}
+      <input type="hidden" name="id" value="{{id}}">
+    {{/if}}
+    <div class="list-block form-block inset">
+      <ul>
+        <li>
+          <div class="item-content">
+            <!-- <div class="item-media"><i class="icon icon-form-name"></i></div> -->
+            <div class="item-inner">
+              <div class="item-input">
+                <input type="text" name="title" value="{{title}}" placeholder="Title">
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="list-block form-block inset">
+      <ul>
+        <li>
+          <div class="item-content">
+            <div class="item-inner">
+              <div class="item-input">
+                <input type="text" name="location" value="{{location}}" placeholder="Location">
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="list-block form-block inset">
+      <ul>
+        <li>
+          <div class="item-content">
+            <div class="item-inner">
+              <div class="item-input">
+                <input type="text" name="start_at" value="{{dateTime startAt}}" placeholder="Start time">
+              </div>
+            </div>
+          </div>
+        </li>
+        <li>
+          <div class="item-content">
+            <div class="item-inner">
+              <div class="item-input">
+                <input type="text" name="end_at" value="{{dateTime endAt}}" placeholder="End time">
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="list-block form-block inset reminder">
+      <ul>
+        <li class="reminder-input-wrap">
+          <div class="item-content">
+            <div class="item-inner">
+              <div class="item-input">
+                <a class="reminder-delete" href="#"><i class="material-icons">close</i></a>
+                <input type="hidden" name="reminder" value="{{reminder}}">
+                <input type="text" name="reminder_display" value="{{timesheets_humanizeMinutes reminder}} before" readonly>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li>
+          <button class="button button-fill full-width reminder-add">Add Reminder</button>
+          <!-- color-blue  -->
+        </li>
+      </ul>
+    </div>
+    <div class="list-block form-block inset">
+      <ul>
+        <li>
+          <div class="item-content">
+            <div class="item-inner">
+              <div class="item-input">
+                <textarea name="notes" placeholder="Notes">{{notes}}</textarea>
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <!-- <div class="list-block form-block inset topset">
+      <button type="submit" class="button button-big button-fill color-blue full-width">SAVE</button>
+    </div> -->
+  </form>
+</script>
+
+<script type="text/template7" id="timesheets_itemDetailsTemplate">
+  <div class="list-block form-block media-list inset">
+    <ul>
+      <li class="item-content">
+        <div class="item-media">
+          <img width="48" src="{{addonAssetUrl "assets/timesheet-icon.png"}}" />
+        </div>
+        <div class="item-inner">
+          <div class="item-title-row">
+            <div class="item-title">
+              {{timeOfDay startAt}}
+              {{#if endAt}}
+                - {{timeOfDay endAt}}
+              {{/if}}
+            </div>
+          </div>
+          <!-- <div class="item-subtitle"></div> -->
+          <div class="item-text">
+            {{title}}
+            {{#if location}}
+              at {{location}}
+            {{/if}}
+          </div>
+        </div>
+      </li>
+    </ul>
+  </div>
+  <div class="list-block form-block inset">
+    <ul>
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title label">Date</div>
+            <div class="item-input">{{dateTime startAt}}</div>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title label">Hours</div>
+            <div class="item-input">{{hours}}</div>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </div>
+</script>
+
+<script type="text/template7" id="timesheets_attendanceListTemplate">
+  {{#if_any this}}
+  <div class="content-block-title">Timeline</div>
+  <div class="list-block media-list">
+    <ul>
+      {{#each this}}
+      <li>
+        <a href="#" class="item-link item-content">
+          <div class="item-media">
+            {{#if icon_url}}
+              <img src="{{icon_url}}" width="48" />
+            {{/if}}
+          </div>
+          <div class="item-inner">
+            <div class="item-title-row">
+              <div class="item-title">
+                {{created_at}}
+              </div>
+              <!-- <div class="item-after"></div> -->
+            </div>
+            <!-- <div class="item-subtitle"></div> -->
+            <div class="item-text">
+              {{#if latitude}}
+                <i class="material-icons md-18">location_on</i>
+                S {{latitude}} &deg;
+                {{#if longitude}}
+                  - E {{longitude}} &deg;
+                {{/if}}
+              {{/if}}
+            </div>
+          </div>
+        </a>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+  {{/if_any}}
+</script>
+
+
+<!--
+  Manager Templates
+-->
+
+<script id="timesheets_managerTimesheetStatusListTemplate" type="text/template">
+  <div class="list-block no-margin no-line-top">
+    <ul>
+      {{#each this}}
+      <li>
+        <a href="{{addonAssetUrl "views/manager/moderate-timesheets.html"}}&status={{@key}}" class="item-link item-content">
+          <div class="item-media">
+            <!-- <img src="{{icon_url}}" class="circle"> -->
+          </div>
+          <div class="item-inner">
+            <div class="item-title">{{capitalize @key}}</div>
+            <div class="item-after">{{count}}</div>
+          </div>
+        </a>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+</script>
