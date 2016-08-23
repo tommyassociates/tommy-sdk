@@ -1,5 +1,5 @@
-define(['config','app','util','tplManager','controllers/module'], //, 'xhr' , 'underscore'
-function(config,app,util,TM,CM) {
+define(['config','app','util','tplManager','controllers/module','addons'], //, 'xhr' , 'underscore'
+function(config,app,util,TM,CM,addons) {
     // var $$ = Dom7;
     // var t7 = Template7;
 
@@ -36,6 +36,16 @@ function(config,app,util,TM,CM) {
             }
         },
 
+        preprocess: function(content, url, next) {
+            if (!url) return content;
+            // url = url.split('?')[0];
+
+            console.log('router', 'preprocess', url);
+
+            content = addons.preprocess(content, url);
+
+            return content;
+        }
         // initSettings: function(page) {
         //     console.log('router', 'initSettings', page);
         //     var $page = $$(page.container)//,

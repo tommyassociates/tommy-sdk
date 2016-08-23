@@ -177,15 +177,15 @@ ul.plain {
 	/*top: 60px;*/
 }
 
-/*.list-block.media-list.sortable li::after {
-	background-color: #c8c7cc;
-	bottom: 0;
-	content: "";
-	height: 1px;
-	position: absolute;
-	top: 0;
-	width: 100%;
-}*/
+.swipeout-actions-left a.bg-green,
+.list-block .swipeout-actions-right a.bg-green,
+a.bg-green {
+    background-color: #4cd964;
+}
+.list-block .swipeout-actions-left a.swipeout-delete,
+.list-block .swipeout-actions-right a.swipeout-delete {
+    background: #ff3b30;
+}
 
 /*
   Button

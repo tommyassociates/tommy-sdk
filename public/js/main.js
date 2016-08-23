@@ -53,13 +53,15 @@
                     // modalTitle: i18n.global.modal_title,
                     // modalButtonOk: i18n.global.modal_button_ok,
                     // modalButtonCancel: i18n.global.cancel,
-                    // preprocess: router.preprocess,
+                    preprocess: router.preprocess,
                     // tapHold: true,
                     // swipeBackPage: false,
                     // smartSelectBackTemplate: '<div class="left sliding"><a href="#" class="back link icon-only"><i class="material-icons md-36">keyboard_arrow_left</i></a></div>'
                 });
 
                 $$('body').append(GTPL);
+
+                util.bindDynamicSubmitButtons();
 
                 TM.initGlobalVariables();
                 TH.init();
