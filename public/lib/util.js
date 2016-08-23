@@ -115,9 +115,10 @@ define(['config','cache','i18n!nls/lang','Framework7'],function (config,cache,i1
 
         // Bind submit buttons that exist outside of form scope such as in the
         // navbar or toolbar
-        bindDynamicSubmitButtons: function (page) {
-            $$(page.container).add(page.navbarInnerContainer).find('a[data-submit]').click(function(event) {
-                $$(page.container).find('form' + $$(this).data('submit')).trigger('submit');
+
+        bindDynamicSubmitButtons: function () {
+            $$(document).on('click', 'a[data-submit]', function (event) {
+                $$('.view-main .page-on-center').find('form' + $$(this).data('submit')).trigger('submit');
                 event.preventDefault();
             });
         },

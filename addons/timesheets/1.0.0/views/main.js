@@ -11,7 +11,7 @@ function (app,api,util,cache,tplManager,moment) {
         cache: {},
 
         timesheetsGroupByStatus: function () {
-            var items = { 'Current': [] };
+            var items = {};
             for (var id in Timesheets.cache) {
                 var item = Timesheets.cache[id],
                     status = util.capitalize(item.status);
@@ -78,17 +78,20 @@ function (app,api,util,cache,tplManager,moment) {
             Timesheets.cache[item.id] = item;
         },
 
+        addSchedules: function (items) {
+            if (items && items.length) {
+                for (var i = 0; i < items.length; i++) {
+                    Timesheets.addSchedule(items[i]);
+                }
+            }
+        },
+
         loadSchedules: function (params, callback) { //year, month,
             console.log('load timesheets', params);
 
             api.getSchedules(params, function (res) { // year: year, month: month
                 console.log('items response', res);
-
-                if (res.length) {
-                    for (var i = 0; i < res.length; i++) {
-                        Timesheets.addSchedule(res[i]);
-                    }
-                }
+                Timesheets.addSchedules(res);
 
                 if (callback)
                     callback(res);
@@ -367,9 +370,19 @@ function (app,api,util,cache,tplManager,moment) {
         ModerateTimesheets: {
 
             init: function (page) {
-              var items = Timesheets.timesheetsFilterByStatus(page.query.status);
-              console.log('manager moderate timesheets', items)
-              tplManager.renderInline('timesheets_timesheetListTemplate', items, page.container);
+                var items = Timesheets.timesheetsFilterByStatus(page.query.status),
+                    $page = $$(page.container);
+                console.log('manager moderate timesheets', items)
+                tplManager.renderInline('timesheets_timesheetManagerApprovalListTemplate', items, $page);
+
+                $page.find('a[data-status]').click(function(event) {
+                    var $link = $$(this);
+                    api.updateSchedulesStatus([ $link.data('schedule-id') ], $link.data('status'), function(response) {
+                        console.log('save approved timesheets response', response);
+                        Timesheets.addSchedules(response);
+                        $link.parents('li.swipeout').remove();
+                    });
+                });
             },
 
             // invalidate: function (page) {
@@ -388,14 +401,14 @@ function (app,api,util,cache,tplManager,moment) {
                 console.log('manager approve timesheets', items)
                 tplManager.renderInline('timesheets_timesheetListSelectTemplate', items, $page);
 
-                util.bindDynamicSubmitButtons(page);
-
                 $form = $page.find('form');
                 $form.submit(function(event) {
                     var values = app.f7.formToJSON($form);
                     console.log('save approved timesheets', values);
                     api.updateSchedulesStatus(values['schedule_ids[]'], 'approved', function(response) {
                         console.log('save approved timesheets response', response);
+                        Timesheets.addSchedules(response);
+                        app.f7view.router.back();
                     })
                     return false;
                 });

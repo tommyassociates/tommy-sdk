@@ -1,26 +1,3 @@
-<script id="timesheets_timesheetListTemplate" type="text/template">
-  <div class="list-block media-list no-margin no-line-top">
-    <ul>
-      {{#each this}}
-      <li>
-        <a href="{{addonAssetUrl "views/timesheet-details.html"}}&schedule_id={{id}}" class="item-link item-content">
-          <div class="item-media">
-            <!-- <img src="{{icon_url}}" class="circle"> -->
-          </div>
-          <div class="item-inner">
-            <div class="item-title-row">
-              <div class="item-title">{{start_date}} - {{end_date}}</div>
-              <div class="item-after">{{capitalize status}}</div>
-            </div>
-            <div class="item-text">{{count events}} items</div>
-          </div>
-        </a>
-      </li>
-      {{/each}}
-    </ul>
-  </div>
-</script>
-
 <script id="timesheets_timesheetListSelectTemplate" type="text/template">
   <form id="timesheet-approval-form">
     <div class="list-block media-list no-margin no-line-top">
@@ -330,6 +307,32 @@
 <!--
   Manager Templates
 -->
+<script id="timesheets_timesheetManagerApprovalListTemplate" type="text/template">
+  <div class="list-block media-list no-margin no-line-top">
+    <ul>
+      {{#each this}}
+      <li class="swipeout">
+        <a href="{{addonAssetUrl "views/timesheet-details.html"}}&schedule_id={{id}}" class="item-link item-content swipeout-content">
+          <div class="item-media">
+            <!-- <img src="{{icon_url}}" class="circle"> -->
+          </div>
+          <div class="item-inner">
+            <div class="item-title-row">
+              <div class="item-title">{{start_date}} - {{end_date}}</div>
+              <div class="item-after">{{capitalize status}}</div>
+            </div>
+            <div class="item-text">{{count events}} items</div>
+          </div>
+        </a>
+        <div class="swipeout-actions-right">
+          <a class="bg-green" href="#" data-status="approved" data-schedule-id="{{id}}">Approve</a>
+          <a class="swipeout-delete" href="#" data-status="rejected" data-schedule-id="{{id}}">Reject</a>
+        </div>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+</script>
 
 <script id="timesheets_managerTimesheetStatusListTemplate" type="text/template">
   <div class="list-block no-margin no-line-top">

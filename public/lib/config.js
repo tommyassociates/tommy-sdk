@@ -1,7 +1,7 @@
 define(['cache'], function (cache) {
     var config = {
         // The current operating environment (development or production).
-        environment: document.location.hostname == 'localhost' ? 'development' : 'production',
+        environment: localStorage.getItem('environment') || 'production',
 
         // The base server endpoint
         getServerUrl: function () {
@@ -78,7 +78,7 @@ define(['cache'], function (cache) {
 
         isTeamOwnerOrManager: function () {
             var account = this.getCurrentAccount();
-            return (account && (account.team || account.team_manager));
+            return !!(account && (account.team || account.team_manager));
         },
 
         setCurrentAvatar: function (icon) {

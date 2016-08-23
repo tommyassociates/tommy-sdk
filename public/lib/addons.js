@@ -28,37 +28,40 @@ function(api,util,config,cache,util) {
             if (!t7.global.addonViews)
                 t7.global.addonViews = {};
 
-            this.bind();
+            // this.bind();
+
+            tommyApp.onPageInit('*', this.renderView); //onPageAfterAnimation
         },
 
         /**
          *  Bind the addons interface.
          */
 
-        bind: function () {
+        preprocess: function (content, url) {
 
             // Set the last visible addon for template URL helpers
             // such as `addonAssetUrl`
-            $$(document).on('ajaxStart', function(e) {
-                var xhr = e.detail.xhr,
-                    url = xhr.requestUrl,
-                    pos = url.indexOf('/addons');
+            // $$(document).on('ajaxStart', function(e) {
+            // xhr = e.detail.xhr,
+            // url = xhr.requestUrl,
+
+                var pos = url.indexOf('/addons');
                 if (pos !== -1) {
                     var parts = url.substring(pos + 1).split('/');
                     if (parts.length >= 4 && parts[0] == 'addons' && parts[2] == 'versions') {
                         var package = parts[1],
                             version = parts[3],
                             addon = cache.get('addons', package); //, 'addon'
-                        console.log('entering addon context', package, version)
+                        console.log('entering addon context', package, version, url)
 
                         // Set the last visible addon for template URL helpers
                         // such as `addonAssetUrl`
                         t7.global.lastVisibleAddon = addon;
                     }
                 }
-            });
+            // });
 
-            tommyApp.onPageInit('*', this.renderView) //onPageAfterAnimation
+            return content;
         },
 
         renderView: function (page) {
@@ -148,9 +151,20 @@ function(api,util,config,cache,util) {
                 // t7.global.addons[package].path = addon.basePath;
                 // t7.global.addons[package].url = addon.baseUrl;
 
+                var isManager = config.isTeamOwnerOrManager();
+
                 // Add each of the views to the interface
                 for (i = 0; i < addon.views.length; i++) {
                     var view = addon.views[i];
+
+                    // If `view.manager` is true OR false we conditionally show
+                    // OR hide the view depending on manager status
+                    if (typeof(view.manager) !== 'undefined' &&
+                        view.manager !== isManager) {
+                        console.log('%%%%%%%%%%%55', view.manager, isManager)
+                        continue;
+                    }
+
                     switch(view.type) {
                         case 'template':
                             this.initTemplateView(addon, view);
