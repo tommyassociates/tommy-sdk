@@ -1,179 +1,200 @@
-define(['xhr','util','config','cache'], function(xhr,util,config,cache) {
+define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
 
     var api = {
-        call: function(options, success, error) { //, showLoader
-            // if (showLoader !== false)
-            //     util.showLoader();
-            // options.url = config.getApiUrl();
-
-            if (typeof(success) !== 'undefined' && options.cache && options.endpoint) {
-                var cachedResponse = cache.get('api', options.endpoint);
-                if (cachedResponse) {
-                    console.log('api: returning cached response', cachedResponse);
-                    success(cachedResponse);
-                    return;
-                }
-            }
-
-            // options.url = options.url ? options.url : config.getApiUrl();
-            options.url = options.url || config.getApiUrl();
-            if (options.endpoint)
-                options.url += options.endpoint;
-
-            // console.log('api: request', data);
-            return xhr.call(options, function(response) {
-                // console.log('api: response', data.func, response);
-                if (options.cache && options.endpoint) {
-                    cache.set('api', options.endpoint, response);
-                }
-                if (typeof(success) !== 'undefined')
-                    success(response);
+        call: function(options) {
+            return new Promise(function(resolve, reject) {
                 // if (showLoader !== false)
-                //     util.hideLoader();
-            }, error);
+                //     util.showLoader();
+                // options.url = config.getApiUrl();
+                // typeof(success) !== 'undefined' &&
+
+                // Get the cached object if available
+                if (options.cache && options.endpoint) {
+                    var cachedResponse = cache.get('api', options.endpoint);
+                    if (cachedResponse) {
+                        console.log('api: returning cached response', cachedResponse);
+                        resolve(cachedResponse);
+                        return;
+                    }
+                }
+
+                // Set the full URL
+                // options.url = options.url ? options.url : config.getApiUrl();
+                options.url = options.url || config.getApiUrl();
+                if (options.endpoint)
+                    options.url += options.endpoint;
+
+                // Setup the Actor ID for managed calls.
+                // if (api.actorId) {
+                //     if (!options.data)
+                //         options.data = {};
+                //     options.data['actor_id'] = api.actorId;
+                // }
+
+                // Make the XHR request
+                // console.log('api: request', options);
+                return xhr.call(options, function(response) {
+                    // console.log('api: response', data.func, response);
+
+                    // Set the object in the config `localStore` if requested
+                    if (options.configKey) {
+                        config.setJSON(options.configKey, response);
+                    }
+
+                    // Cache the value for next time
+                    if (options.cache && options.endpoint) {
+                        cache.set('api', options.endpoint, response);
+                    }
+                    resolve(response);
+                    // if (showLoader !== false)
+                    //     util.hideLoader();
+                }, reject);
+            });
         },
 
-        login: function(emailOrPhone, password, success, error) {
-            return this.call({
+        login: function(emailOrPhone, password, options) {
+            return this.call(Object.assign({
                 endpoint: 'sessions',
                 method: 'POST',
                 data: {
                     login: emailOrPhone,
                     password: password
                 }
-            }, success, error);
+            }, options));
         },
 
-        registerDevice: function(uuid, type, success, error) {
-            return this.call({
+        registerDevice: function(platform, environment, uuid, token, options) {
+            return this.call(Object.assign({
                 endpoint: 'devices',
                 method: 'POST',
                 data: {
+                    platform: platform,
+                    environment: environment,
                     uuid: uuid,
-                    type: type
+                    token: token,
                 }
-            }, success, error);
+            }, options));
         },
 
-        unregisterDevice: function(uuid, success, error) {
-            return this.call({
-                endpoint: 'devices/' + uuid,
+        unregisterDevice: function(token, options) {
+            return this.call(Object.assign({
+                endpoint: 'devices/' + token,
                 method: 'DELETE'
-            }, success, error);
+            }, options));
         },
 
-        createUser: function(data, success, error) {
-            return this.call({
+        createUser: function(data, options) {
+            return this.call(Object.assign({
                 endpoint: 'users',
                 method: 'POST',
                 data: data
-            }, success, error);
+            }, options));
         },
 
-        updateUser: function(user_id, data, success, error) {
-            return this.call({
+        updateUser: function(user_id, data, options) {
+            return this.call(Object.assign({
                 endpoint: 'users/' + user_id,
                 method: 'PUT',
                 data: data
-            }, success, error);
+            }, options));
         },
 
-        getAccounts: function(success, error) {
-            return this.call({
+        getAccounts: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'user/accounts',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getCurrentUser: function(success, error) {
-            return this.call({
+        getCurrentUser: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'user',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        updateCurrentUser: function(data, success, error) {
-            return this.call({
+        updateCurrentUser: function(data, options) {
+            return this.call(Object.assign({
                 endpoint: 'user',
                 method: 'PUT',
                 data: data
-            }, success, error);
+            }, options));
         },
 
-        getCurrentAccount: function(success, error, showLoader) {
-            return this.call({
+        getCurrentAccount: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'user/current_account',
                 method: 'GET'
-            }, success, error, showLoader);
+            }, options));
         },
 
-        getCurrentTeam: function(success, error, showLoader) {
-            return this.call({
+        getCurrentTeam: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'team',
                 method: 'GET'
-            }, success, error, showLoader);
+            }, options));
         },
 
         // deprecated
-        getCurrentTeamWithCache: function(success, error, showLoader) {
-            var currentTeam = config.getCurrentTeam();
-            if (currentTeam && typeof(success) === 'function')
-                success(currentTeam);
-            this.getCurrentTeam(function(response) {
-                config.setCurrentTeam(response);
-                if (typeof(success) === 'function')
-                    success(response);
-            }, error, showLoader);
-        },
+        // getCurrentTeamWithCache: function(options) {
+        //     var currentTeam = config.getCurrentTeam();
+        //     if (currentTeam && typeof(success) === 'function')
+        //         success(currentTeam);
+        //     this.getCurrentTeam().then(function(response) {
+        //         config.setCurrentTeam(response);
+        //         if (typeof(success) === 'function')
+        //             success(response);
+        //     }); //, error, showLoader
+        // },
 
-        getCurrentTeamTags: function(cache, success, error) {
-            return this.call({
+        getCurrentTeamTags: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'team/tags',
                 method: 'GET',
-                cache: cache
-            }, success, error);
+                // cache: cache
+            }, options));
         },
 
-        getCurrentTeamMembers: function(success, error, showLoader) {
-            return this.call({
+        getCurrentTeamMembers: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'team/members',
                 method: 'GET'
-            }, success, error, showLoader);
+            }, options));
         },
 
-        getCurrentTeamMember: function(user_id, success, error, showLoader) {
-            return this.call({
+        getCurrentTeamMember: function(user_id, options) {
+            return this.call(Object.assign({
                 endpoint: 'team/members/' + user_id,
                 method: 'GET'
-            }, success, error, showLoader);
+            }, options));
         },
 
-        updateCurrentTeamMember: function(user_id, data, success, error, showLoader) {
-            return this.call({
+        updateCurrentTeamMember: function(user_id, data, options) {
+            return this.call(Object.assign({
                 endpoint: 'team/members/' + user_id,
                 method: 'PUT',
                 data: data
-            }, success, error, showLoader);
+            }, options));
         },
 
-        createTeam: function(data, success, error) {
-            return this.call({
+        createTeam: function(data, options) {
+            return this.call(Object.assign({
                 endpoint: 'teams',
                 method: 'POST',
                 data: data
-            }, success, error);
+            }, options));
         },
 
-        updateTeam: function(team_id, data, success, error) {
-            return this.call({
+        updateTeam: function(team_id, data, options) {
+            return this.call(Object.assign({
                 endpoint: 'teams/' + team_id,
                 method: 'PUT',
                 data: data
-            }, success, error);
+            }, options));
         },
 
-        updateCurrentAccount: function(account_id, account_type, location_id, success, error) {
-            return this.call({
+        updateCurrentAccount: function(account_id, account_type, location_id, options) {
+            return this.call(Object.assign({
                 endpoint: 'user/current_account',
                 method: 'PUT',
                 data: {
@@ -181,79 +202,96 @@ define(['xhr','util','config','cache'], function(xhr,util,config,cache) {
                     current_account_type: account_type,
                     current_location_id: location_id
                 }
-            }, success, error);
+            }, options));
         },
 
-        getContacts: function(success, error) {
-            return this.call({
+        getContacts: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'contacts',
                 method: 'GET',
                 data: {
                     team_id: config.getCurrentTeamId()
                 }
-            }, success, error);
+            }, options));
         },
 
-        getContact: function(user_id, success, error) {
-            return this.call({
+        getContact: function(user_id, options) {
+            return this.call(Object.assign({
                 endpoint: 'contacts/' + user_id,
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        updateContact: function(user_id, data, success, error) {
-            return this.call({
+        updateContact: function(user_id, data, options) {
+            return this.call(Object.assign({
                 endpoint: 'contacts/' + user_id,
                 method: 'PUT',
                 data: data
-            }, success, error);
+            }, options));
         },
 
-        getChat: function(chat_id, success, error) {
-            return this.call({
+        getChat: function(chat_id, options) {
+            return this.call(Object.assign({
                 endpoint: 'chats/' + chat_id,
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        initiateChat: function(user_ids, success, error) {
-            return this.call({
+        initiateChat: function(user_ids, options) {
+            return this.call(Object.assign({
                 endpoint: 'chats/initiate',
                 method: 'POST',
                 data : { user_ids: user_ids }
-            }, success, error);
+            }, options));
         },
 
-        getChatMessages: function(chat_id, success, error) {
-            return this.call({
+        getChatMessages: function(chat_id, options) {
+            return this.call(Object.assign({
                 endpoint: 'chats/' + chat_id + '/messages',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getChatUsers: function(chat_id, success, error) {
-            return this.call({
+        getChatUsers: function(chat_id, options) {
+            return this.call(Object.assign({
                 endpoint: 'chats/' + chat_id + '/users',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getRecentChatMessages: function(success, error) {
-            return this.call({
+        createChatUser: function(chat_id, user_id, options) {
+            return this.call(Object.assign({
+                endpoint: 'chats/' + chat_id + '/users',
+                method: 'POST',
+                data: {
+                    user_id: user_id
+                }
+            }, options));
+        },
+
+        deleteChatUser: function(chat_id, user_id, options) {
+            return this.call(Object.assign({
+                endpoint: 'chats/' + chat_id + '/users/' + user_id,
+                method: 'DELETE'
+            }, options));
+        },
+
+        getRecentChatMessages: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'messages/recent',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getFavoriteChatMessages: function(success, error) {
-            return this.call({
+        getFavoriteChatMessages: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'messages/favorite',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        sendMessage: function(chat_id, message, send_at, success, error) {
-            return this.call({
+        sendMessage: function(chat_id, message, send_at, options) {
+            return this.call(Object.assign({
                 endpoint: 'messages',
                 method: 'POST',
                 data: {
@@ -261,11 +299,11 @@ define(['xhr','util','config','cache'], function(xhr,util,config,cache) {
                     message: message,
                     send_at: send_at
                 }
-            }, success, error);
+            }, options));
         },
 
-        sendDirectMessage: function(receiver_ids, message, send_at, success, error) {
-            return this.call({
+        sendDirectMessage: function(receiver_ids, message, send_at, options) {
+            return this.call(Object.assign({
                 endpoint: 'messages',
                 method: 'POST',
                 data: {
@@ -273,298 +311,327 @@ define(['xhr','util','config','cache'], function(xhr,util,config,cache) {
                     receiver_ids: receiver_ids,
                     send_at: send_at
                 }
-            }, success, error);
+            }, options));
         },
 
         //
         // Addons
         //
 
-        getAddons: function(success, error) {
-            return this.call({
+        getAddons: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'addons',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getInstalledAddons: function(success, error) {
-            return this.call({
+        getInstalledAddons: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'addons/installed',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getRecommendedAddons: function(success, error) {
-            return this.call({
+        getRecommendedAddons: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'addons/recommended',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getAddon: function(package, success, error) {
-            return this.call({
+        getAddon: function(package, options) {
+            return this.call(Object.assign({
                 endpoint: 'addons/' + package,
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getAddonFile: function(package, version, fileName, success, error) {
-            return this.call({
+        getAddonVersion: function(package, version, options) {
+            return this.call(Object.assign({
+                endpoint: 'addons/' + package + '/versions/' + version,
+                method: 'GET'
+            }, options));
+        },
+
+        getAddonFile: function(package, version, fileName, options) {
+            return this.call(Object.assign({
                 endpoint: 'addons/' + package + '/versions/' + version + '/files/' + fileName,
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        installAddon: function(package, params, success, error) {
-            return this.call({
+        installAddon: function(package, params, options) {
+            return this.call(Object.assign({
                 endpoint: 'addons/' + package + '/install',
                 method: 'POST',
                 data: params
-            }, success, error);
+            }, options));
         },
 
-        uninstallAddon: function(package, success, error) {
-            return this.call({
+        uninstallAddon: function(package, options) {
+            return this.call(Object.assign({
                 endpoint: 'addons/' + package + '/install',
                 method: 'DELETE'
-            }, success, error);
+            }, options));
         },
 
-        getInstalledAddonSetting: function(package, name, success, error) {
-            return this.call({
+        getInstalledAddonSetting: function(package, name, options) {
+            return this.call(Object.assign({
                 endpoint: 'addons/' + package + '/settings/' + name,
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        updateInstalledAddonSetting: function(package, name, data, success, error) {
-            return this.call({
+        updateInstalledAddonSetting: function(package, name, data, options) {
+            return this.call(Object.assign({
                 endpoint: 'addons/' + package + '/settings/' + name,
                 method: 'PUT',
                 data: data
-            }, success, error);
+            }, options));
+        },
+
+        getInstalledAddonPermissions: function(package, options) {
+            return this.call(Object.assign({
+                endpoint: 'addons/' + package + '/permissions',
+                method: 'GET'
+            }, options));
+        },
+
+        getInstalledAddonPermission: function(package, id, options) {
+            return this.call(Object.assign({
+                endpoint: 'addons/' + package + '/permissions/' + id,
+                method: 'GET'
+            }, options));
+        },
+
+        updateInstalledAddonPermission: function(package, id, data, options) {
+            return this.call(Object.assign({
+                endpoint: 'addons/' + package + '/permissions/' + id,
+                method: 'PUT',
+                data: data
+            }, options));
         },
 
         //
         // Actions
         //
 
-        getActions: function(success, error) {
-            return this.call({
+        getActions: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'actions',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getAction: function(action_id, success, error) {
-            return this.call({
+        getAction: function(action_id, options) {
+            return this.call(Object.assign({
                 endpoint: 'actions/' + action_id,
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getActionVariableList: function(action_id, success, error) {
-            return this.call({
+        getActionVariableList: function(action_id, options) {
+            return this.call(Object.assign({
                 endpoint: 'actions/' + action_id + '/variables',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getInstalledActions: function(success, error) {
-            return this.call({
+        getInstalledActions: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'actions/installed',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getRecentActions: function(success, error) {
-            return this.call({
+        getRecentActions: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'actions/recent',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getActionTriggers: function(success, error) {
-            return this.call({
+        getActionTriggers: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'actions/triggers',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getActionConditions: function(success, error) {
-            return this.call({
+        getActionConditions: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'actions/conditions',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getActionActivities: function(success, error) {
-            return this.call({
+        getActionActivities: function(options) {
+            return this.call(Object.assign({
                 endpoint: 'actions/activities',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        installAction: function(action_id, install_dependencies, success, error) {
-            return this.call({
+        installAction: function(action_id, install_dependencies, options) {
+            return this.call(Object.assign({
                 endpoint: 'actions/' + action_id + '/install',
                 method: 'POST',
                 data: {
                     install_dependencies: install_dependencies
                 }
-            }, success, error);
+            }, options));
         },
 
-        uninstallAction: function(action_id, success, error) {
-            return this.call({
+        uninstallAction: function(action_id, options) {
+            return this.call(Object.assign({
                 endpoint: 'actions/' + action_id + '/install',
                 method: 'DELETE'
-            }, success, error);
+            }, options));
         },
 
-        updateInstalledAction: function(action_id, data, success, error) {
-            return this.call({
+        updateInstalledAction: function(action_id, data, options) {
+            return this.call(Object.assign({
                 endpoint: 'actions/' + action_id + '/install',
                 method: 'PUT',
                 data: data
-            }, success, error);
+            }, options));
         },
 
-        runInstalledAction: function(action_id, success, error) {
-            return this.call({
+        runInstalledAction: function(action_id, options) {
+            return this.call(Object.assign({
                 endpoint: 'actions/' + action_id + '/install/run',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getInstalledAction: function(action_id, success, error) {
-            return this.call({
+        getInstalledAction: function(action_id, options) {
+            return this.call(Object.assign({
                 endpoint: 'actions/' + action_id + '/install',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getInstalledActionEvents: function(action_id, success, error) {
-            return this.call({
-                endpoint: 'actions/' + action_id + '/events',
+        getInstalledActionHistory: function(action_id, options) {
+            return this.call(Object.assign({
+                endpoint: 'actions/' + action_id + '/install/history',
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        getInstalledActionSetting: function(action_id, scope, success, error) {
-            return this.call({
+        getInstalledActionSetting: function(action_id, scope, options) {
+            return this.call(Object.assign({
                 endpoint: 'actions/' + action_id + '/settings/' + scope,
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        updateInstalledActionSetting: function(action_id, scope, data, success, error) {
-            return this.call({
+        updateInstalledActionSetting: function(action_id, scope, data, options) {
+            return this.call(Object.assign({
                 endpoint: 'actions/' + action_id + '/settings/' + scope,
                 method: 'PUT',
                 data: data
-            }, success, error);
+            }, options));
         },
 
         //
         // Custom Actions
         //
 
-        createCustomAction: function(data, success, error) {
-            return this.call({
+        createCustomAction: function(data, options) {
+            return this.call(Object.assign({
                 endpoint: 'custom_actions',
                 method: 'POST',
                 data: data
-            }, success, error);
+            }, options));
         },
 
-        getCustomAction: function(action_id, success, error) {
-            return this.call({
+        getCustomAction: function(action_id, options) {
+            return this.call(Object.assign({
                 endpoint: 'custom_actions/' + action_id,
                 method: 'GET'
-            }, success, error);
+            }, options));
         },
 
-        updateCustomAction: function(action_id, data, success, error) {
-            return this.call({
+        updateCustomAction: function(action_id, data, options) {
+            return this.call(Object.assign({
                 endpoint: 'custom_actions/' + action_id,
                 method: 'PUT',
                 data: data
-            }, success, error);
+            }, options));
         },
 
         //
         // Schedules
         //
 
-        getSchedules: function(params, success, error) {
-            return this.call({
+        getSchedules: function(params, options) {
+            return this.call(Object.assign({
                 endpoint: 'schedules',
                 method: 'GET',
                 data: params
-            }, success, error);
+            }, options));
         },
 
-        createSchedule: function(data, success, error) {
-            return this.call({
+        createSchedule: function(data, options) {
+            return this.call(Object.assign({
                 endpoint: 'schedules',
                 method: 'POST',
                 data: data
-            }, success, error);
+            }, options));
         },
 
-        updateSchedule: function(schedule_id, data, success, error) {
-            return this.call({
+        updateSchedule: function(schedule_id, data, options) {
+            return this.call(Object.assign({
                 endpoint: 'schedules/' + schedule_id,
                 method: 'PUT',
                 data: data
-            }, success, error);
+            }, options));
         },
 
-        updateSchedulesStatus: function(schedule_ids, status, success, error) {
-            return this.call({
+        updateSchedulesStatus: function(schedule_ids, status, options) {
+            return this.call(Object.assign({
                 endpoint: 'schedules/status/' + status,
                 method: 'PUT',
                 data: {
-                  schedule_ids: schedule_ids
+                    schedule_ids: schedule_ids
                 }
-            }, success, error);
+            }, options));
         },
 
         //
         // Events
         //
 
-        getEvents: function(params, success, error) {
-            return this.call({
+        getEvents: function(params, options) {
+            return this.call(Object.assign({
                 endpoint: 'events',
                 method: 'GET',
                 data: params
-            }, success, error);
+            }, options));
         },
 
-        getEventAttendances: function(event_id, params, success, error) {
-            return this.call({
+        getEventAttendances: function(event_id, params, options) {
+            return this.call(Object.assign({
                 endpoint: 'events/' + event_id + '/attendances',
                 method: 'GET',
                 data: params
-            }, success, error);
+            }, options));
         },
 
-        createEvent: function(data, success, error) {
-            return this.call({
+        createEvent: function(data, options) {
+            return this.call(Object.assign({
                 endpoint: 'events',
                 method: 'POST',
                 data: data
-            }, success, error);
+            }, options));
         },
 
-        updateEvent: function(event_id, data, success, error) {
-            return this.call({
+        updateEvent: function(event_id, data, options) {
+            return this.call(Object.assign({
                 endpoint: 'events/' + event_id,
                 method: 'PUT',
                 data: data
-            }, success, error);
+            }, options));
         }
     };
 

@@ -7,6 +7,7 @@ function(app,config,api,util,cache,TM,TH,addons) {
                 appCtrl.onInvalidSession();
             }
             else {
+                console.log('starting session');
                 appCtrl.initCurrentAccount(function() {
                     // tommyView.router.loadPage('local-addons.html');
                     tommyView.router.load({
@@ -20,6 +21,7 @@ function(app,config,api,util,cache,TM,TH,addons) {
         },
 
         onInvalidSession: function() {
+            console.log('invalid session');
             config.destorySession();
             // tommyView.router.loadPage('views/login.html');
         },
@@ -33,7 +35,7 @@ function(app,config,api,util,cache,TM,TH,addons) {
 
             // Update the current team if required
             if (account.team_id) {
-                api.getCurrentTeam(function(response) {
+                api.getCurrentTeam().then(function(response) {
                     config.setCurrentTeam(response);
                     // appCtrl.renderAccountHeader(account);
                     // VM.module('appView').renderAccountHeader(account);
@@ -106,7 +108,7 @@ function(app,config,api,util,cache,TM,TH,addons) {
             console.log('appCtrl', 'initCurrentAccount');
 
             // Always reload on initialization
-            api.getCurrentAccount(function(response) {
+            api.getCurrentAccount().then(function(response) {
                 appCtrl.onCurrentAccountChanged(response);
                 if (success)
                     success();
@@ -126,13 +128,13 @@ function(app,config,api,util,cache,TM,TH,addons) {
         // },
 
         // loadRecommendedAddons: function() {
-        //     api.getRecommendedAddons(function(response) {
+        //     api.getRecommendedAddons().then(function(response) {
         //         TM.renderInline('mainMenuRecommendedAddons', response);
         //     });
         // },
 
         loadUserAccounts: function() {
-            api.getAccounts(function(response) {
+            api.getAccounts().then(function(response) {
                 app.t7.global.accounts = response;
 
                 // var $accountMenu = $$('#top-menu');
@@ -167,7 +169,7 @@ function(app,config,api,util,cache,TM,TH,addons) {
         },
 
         changeCurrentAccount: function(accountID, accountType, locationId) {
-            api.updateCurrentAccount(accountID, accountType, locationId, function(response) {
+            api.updateCurrentAccount(accountID, accountType, locationId).then(function(response) {
 
                 // // Handle developer account switching
                 // if (response.developer)

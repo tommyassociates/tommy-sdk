@@ -35,6 +35,9 @@ function(Framework7,TH) { //,Framework73D
                 dynamicNavbar: true
             });
 
+            if (!app.t7.global)
+                app.t7.global = {};
+
             TH.init();
         }
     };

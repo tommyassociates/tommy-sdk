@@ -22,8 +22,14 @@ define(['config','util','moment','Framework7'], function (config,util,moment) {
                     return options.inverse(this);
             });
 
-            t7.registerHelper('if_any', function (array, options) {
-                var match = array && array.length > 0;
+            t7.registerHelper('if_any', function (object, options) {
+                var match = false;
+                if (object) {
+                    if (object.length)
+                        match = true;
+                    if (!match)
+                        for (var item in object) { match = true; break; }
+                }
                 if (match)
                     return options.fn(this);
                 else
@@ -112,19 +118,19 @@ define(['config','util','moment','Framework7'], function (config,util,moment) {
             //
 
             // t7.registerHelper('addonAssetPath', function (file) {
-            //     if (!t7.global.lastVisibleAddon)
+            //     if (!t7.global.currentAddon)
             //         throw 'Cannot render addon asset path: ' + file;
             //     return util.addonAssetPath(
-            //         t7.global.lastVisibleAddon.package,
-            //         t7.global.lastVisibleAddon.version, file);
+            //         t7.global.currentAddon.package,
+            //         t7.global.currentAddon.version, file);
             // });
 
             t7.registerHelper('addonAssetUrl', function (file) {
-                if (!t7.global.lastVisibleAddon)
+                if (!t7.global.currentAddon)
                     throw 'Cannot render addon asset URL: ' + file;
                 return util.addonAssetUrl(
-                    t7.global.lastVisibleAddon.package,
-                    t7.global.lastVisibleAddon.version, file, true);
+                    t7.global.currentAddon.package,
+                    t7.global.currentAddon.version, file, true);
             });
 
             t7.registerHelper('apiUrl', function (part, part1, part2) {
@@ -282,9 +288,8 @@ define(['config','util','moment','Framework7'], function (config,util,moment) {
                 }
             });
 
-            // This is used ins displaying the date properly on chat message.
-            // NOTE: framework.js was manually edited to call this helper
-            t7.registerHelper('messageDate', function (text) {
+            // This is used for displaying the date properly on timed message.
+            t7.registerHelper('prettyTime', function (text) {
                 var localTime  = moment.utc(text).toDate();
                 if (moment(localTime).isValid()) {
                     var fromnow = moment(localTime).fromNow(true);
@@ -298,23 +303,24 @@ define(['config','util','moment','Framework7'], function (config,util,moment) {
                     else if (diff >= 365)
                         return moment(localTime).format("MMM D, YYYY h:mm A");
                     else if (diff === 1)
-                        return 'Yesterday '+ moment(localTime).format("h:mm A");
+                        return 'Yesterday ' + moment(localTime).format("h:mm A");
                     else
-                        return 'Today '+ moment(localTime).format("h:mm A");
+                        return 'Today ' + moment(localTime).format("h:mm A");
                 }
                 else {
                     return 'None';
                 }
             });
 
-            t7.registerHelper('formatDate', function (format,text) {
-                var localTime  = moment.utc(text).toDate();
-                var day = moment(localTime, "YYYY-MM-DD");
-                return moment(day).format(format);
+            t7.registerHelper('formatDate', function (text,format) {
+                var localTime = moment.utc(text).toDate();
+                // console.log('localTime', localTime)
+                // var day = moment(localTime, "YYYY-MM-DD");
+                // console.log('day', day.toDate(), text, format)
+                return moment(localTime).format(format);
             });
 
-            t7.registerHelper('formatDateTime', function (format,text) {
-                // var localTime  = moment.utc(text).toDate();
+            t7.registerHelper('formatDateTime', function (text,format) {
                 return moment(text).format(format);
             });
 

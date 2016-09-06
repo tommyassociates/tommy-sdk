@@ -76,7 +76,7 @@
                     endpoint: 'sessions',
                     method: 'POST',
                     data: { api_key: SDK_CONFIG.apiKey }
-                }, function(response) {
+                }).then(function(response) {
                     console.log('authenticated', response);
                     config.setCurrentUser(response, response.token);
                     CM.module('appCtrl').init();
