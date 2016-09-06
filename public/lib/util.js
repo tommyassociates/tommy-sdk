@@ -188,6 +188,44 @@ define(['config','cache','i18n!nls/lang','Framework7'],function (config,cache,i1
             }
         },
 
+        minutesToHoursAndMinutes: function (value) {
+            var hours = 0,
+                minutes = 0;
+            // if (value > 0) {
+            //     minutes = value / 60; // secs to minutes
+                if (value > 60) {
+                    hours = Math.trunc(value / 60);
+                    minutes = value % 60;
+                }
+                else if (value > 0) {
+                    minutes = value;
+                }
+            // }
+            return {
+                hours: hours,
+                minutes: minutes
+            }
+        },
+
+        // secondsToHoursAndMinutes: function (seconds) {
+        //       var hours = 0,
+        //           minutes = 0;
+        //       if (seconds > 0) {
+        //           minutes = seconds / 60; // secs to minutes
+        //           if (minutes > 60) {
+        //               hours = Math.trunc(minutes / 60);
+        //               minutes = minutes % 60;
+        //           }
+        //           // else {
+        //           //     minutes = value;
+        //           // }
+        //       }
+        //       return {
+        //           hours: hours,
+        //           minutes: minutes
+        //       }
+        // },
+
         //
         // URL and Query
         //

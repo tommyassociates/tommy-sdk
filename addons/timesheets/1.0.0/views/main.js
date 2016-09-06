@@ -64,18 +64,32 @@ function (app,api,util,cache,tplManager,moment) {
             }
         },
 
-        addSchedule: function (item) {
-            item.startAt = new Date(item.start_date);
-            item.startDay = item.startAt.getDate();
-            // item.year = item.startAt.getFullYear();
-            // item.month = item.startAt.getMonth();
-            if (item.end_date) {
-                item.endAt = new Date(item.end_date);
-                item.endDay = item.endAt.getDate();
+        addScheduleEvent: function (scheduleId, event) {
+            var schedule = Timesheets.cache[scheduleId];
+            if (schedule) {
+                if (schedule.events) {
+                    for (var i = 0; i < schedule.events.length; i++) {
+                        if (schedule.events[i].id == event.id) {
+                            schedule.events[i] = event;
+                            return;
+                        }
+                    }
+                }
+                else {
+                    schedule.events = [];
+                }
+                event = Timesheets.coerceScheduleEvent(event);
+                schedule.events.push(event);
             }
+            else {
+                alert('Cannot add event for unknown schedule ' + scheduleId);
+            }
+        },
 
-            console.log('item added', item)
+        addSchedule: function (item) {
+            item = Timesheets.coerceSchedule(item);
             Timesheets.cache[item.id] = item;
+            console.log('item added', item)
         },
 
         addSchedules: function (items) {
@@ -89,13 +103,41 @@ function (app,api,util,cache,tplManager,moment) {
         loadSchedules: function (params, callback) { //year, month,
             console.log('load timesheets', params);
 
-            api.getSchedules(params, function (res) { // year: year, month: month
+            api.getSchedules(params).then(function (res) { // year: year, month: month
                 console.log('items response', res);
                 Timesheets.addSchedules(res);
 
                 if (callback)
                     callback(res);
             });
+        },
+
+        coerceSchedule: function (item) {
+            item.startAt = new Date(item.start_date);
+            item.startDay = item.startAt.getDate();
+            if (item.end_date) {
+                item.endAt = new Date(item.end_date);
+                item.endDay = item.endAt.getDate();
+            }
+
+            if (item.events && item.events.length) {
+                for (var i = 0; i < item.events.length; i++) {
+                    item.events[i] = Timesheets.coerceScheduleEvent(item.events[i]);
+                }
+            }
+
+            return item;
+        },
+
+        coerceScheduleEvent: function (item) {
+            item.startAt = new Date(item.start_at);
+            item.startDay = item.startAt.getDate();
+            if (item.end_at) {
+                item.endAt = new Date(item.end_at);
+                item.endDay = item.endAt.getDate();
+            }
+
+            return item;
         }
     };
 
@@ -147,72 +189,74 @@ function (app,api,util,cache,tplManager,moment) {
         ItemForm: {
 
             init: function(page) {
-                var item = Timesheets.cache[page.query.event_id] || {},
+                var item = Timesheets.getScheduleEvent(page.query.schedule_id, page.query.event_id), //cache[page.query.event_id] || {},
                     $page = $$(page.container),
-                    $nav = $$(page.navbarInnerContainer);
+                    $nav = $$(page.navbarInnerContainer),
+                    $form;
+
+                console.log('init item form', page, item);
 
                 tplManager.renderTarget('timesheets_itemFormTemplate', item, $page.find('.page-content'));
 
-                // console.log('init item form', page, $nav.find('a.save').length);
-
-                $nav.find('a.save').on('click', function (ev) {
-                    var data = app.f7.formToJSON($page.find('form'));
-                    ItemForm.saveItem(data);
-                    ev.pritemDefault();
-                });
-
-                // $form = $page.find('form');
-                // $form.on('submit', function (ev) {
-                //     var data = app.f7.formToJSON($form);
-                //     saveItem(data);
-                //     ev.pritemDefault();
+                // $nav.find('a.save').on('click', function (ev) {
+                //     var data = app.f7.formToJSON($page.find('form'));
+                //     Client.ItemForm.saveItem(data);
+                //     ev.preventDefault();
                 // });
 
-                ItemForm.createDatePicker($page.find('input[name="start_at"]'), item.startAt || new Date);
-                ItemForm.createDatePicker($page.find('input[name="end_at"]'), item.endAt || item.startAt || new Date);
-                ItemForm.createReminderWidget($page.find('.reminder'));
+                $form = $page.find('form');
+                $form.on('submit', function (ev) {
+                    var data = app.f7.formToJSON($form);
+                    Client.ItemForm.saveItem(data);
+                    ev.preventDefault();
+                });
+
+                Client.ItemForm.createDatePicker($page.find('input[name="start_at"]'), item.startAt || new Date);
+                Client.ItemForm.createDatePicker($page.find('input[name="end_at"]'), item.endAt || item.startAt || new Date);
+                // Client.ItemForm.createReminderWidget($page.find('.reminder'));
             },
 
-            createReminderWidget: function($element) {
-                var picker = app.f7.picker({
-                    input: $element.find('input[name="reminder_display"]'),
-                    rotateEffect: true,
-                    inputReadOnly: true,
-                    onChange: function (p, values, displayValues) {
-                        // console.log('set reminder', values, displayValues)
-                        $element.find('input[name="reminder"]').val(values[0]);
-                        $element.addClass('has-reminder');
-                    },
-                    formatValue: function (p, values, displayValues) {
-                        return displayValues[0];
-                    },
-                    cols: [
-                        {
-                            textAlign: 'center',
-                            values: [10, 15, 30, 60, 90, 120],
-                            displayValues: ['10 minutes before', '15 minutes before', '30 minutes before', '1 hour before', '1.5 hours before', '2 hours before']
-                        }
-                    ]
-                });
-
-                $element.find('.reminder-add').click(function (item) {
-                    picker.open();
-                    item.pritemDefault();
-                });
-
-                $element.find('.reminder-delete').click(function (item) {
-                    $element.find('input[name="reminder"]').val('');
-                    $element.find('input[name="reminder_display"]').val('');
-                    $element.removeClass('has-reminder');
-                    item.pritemDefault();
-                });
-
-                if ($element.find('input[name="reminder"]').val()) {
-                    $element.addClass('has-reminder');
-                }
-            },
+            // createReminderWidget: function($element) {
+            //     var picker = app.f7.picker({
+            //         input: $element.find('input[name="reminder_display"]'),
+            //         rotateEffect: true,
+            //         inputReadOnly: true,
+            //         onChange: function (p, values, displayValues) {
+            //             // console.log('set reminder', values, displayValues)
+            //             $element.find('input[name="reminder"]').val(values[0]);
+            //             $element.addClass('has-reminder');
+            //         },
+            //         formatValue: function (p, values, displayValues) {
+            //             return displayValues[0];
+            //         },
+            //         cols: [
+            //             {
+            //                 textAlign: 'center',
+            //                 values: [10, 15, 30, 60, 90, 120],
+            //                 displayValues: ['10 minutes before', '15 minutes before', '30 minutes before', '1 hour before', '1.5 hours before', '2 hours before']
+            //             }
+            //         ]
+            //     });
+            //
+            //     $element.find('.reminder-add').click(function (item) {
+            //         picker.open();
+            //         item.preventDefault();
+            //     });
+            //
+            //     $element.find('.reminder-delete').click(function (item) {
+            //         $element.find('input[name="reminder"]').val('');
+            //         $element.find('input[name="reminder_display"]').val('');
+            //         $element.removeClass('has-reminder');
+            //         item.preventDefault();
+            //     });
+            //
+            //     if ($element.find('input[name="reminder"]').val()) {
+            //         $element.addClass('has-reminder');
+            //     }
+            // },
 
             createDatePicker: function($input, initialDate) {
+                console.log('create date picker', initialDate.getMonth(), initialDate.getDate(), initialDate.getFullYear(), initialDate.getHours(), (initialDate.getMinutes() < 10 ? '0' + initialDate.getMinutes() : initialDate.getMinutes()))
                 return app.f7.picker({
                     input: $input,
                     rotateEffect: true,
@@ -283,19 +327,19 @@ function (app,api,util,cache,tplManager,moment) {
                 data.start_at = new Date(data.start_at).toUTCString();
                 if (data.end_at && data.end_at.length)
                     data.end_at = new Date(data.end_at).toUTCString();
-                // console.log('save item', data);
+                console.log('save item', data);
 
                 if (data.id) {
-                    api.updateItem(data.id, data, ItemForm.onSave);
+                    api.updateEvent(data.id, data).then(Client.ItemForm.onSave);
                 }
                 else {
-                    api.createItem(data, ItemForm.onSave);
+                    api.createEvent(data).then(Client.ItemForm.onSave);
                 }
             },
 
             onSave: function(res) {
                 console.log('item saved', res);
-                Timesheets.addSchedule(res);
+                Timesheets.addScheduleEvent(res.resource_id, res);
                 app.f7view.router.back();
             }
         },
@@ -309,9 +353,11 @@ function (app,api,util,cache,tplManager,moment) {
                 var item = Timesheets.getScheduleEvent(page.query.schedule_id, page.query.event_id),
                     $page = $$(page.container);
 
+                console.log('show item details', page.query, item, Timesheets.cache)
+
                 tplManager.renderInline('timesheets_itemDetailsTemplate', item, $page);
 
-                api.getEventAttendances(item.id, {}, function(response) {
+                api.getEventAttendances(item.id, {}).then(function(response) {
                     console.log('loaded item attendances', response)
                     tplManager.renderInline('timesheets_attendanceListTemplate', response, $page);
                 });
@@ -377,7 +423,7 @@ function (app,api,util,cache,tplManager,moment) {
 
                 $page.find('a[data-status]').click(function(event) {
                     var $link = $$(this);
-                    api.updateSchedulesStatus([ $link.data('schedule-id') ], $link.data('status'), function(response) {
+                    api.updateSchedulesStatus([ $link.data('schedule-id') ], $link.data('status')).then(function(response) {
                         console.log('save approved timesheets response', response);
                         Timesheets.addSchedules(response);
                         $link.parents('li.swipeout').remove();
@@ -405,7 +451,7 @@ function (app,api,util,cache,tplManager,moment) {
                 $form.submit(function(event) {
                     var values = app.f7.formToJSON($form);
                     console.log('save approved timesheets', values);
-                    api.updateSchedulesStatus(values['schedule_ids[]'], 'approved', function(response) {
+                    api.updateSchedulesStatus(values['schedule_ids[]'], 'approved').then(function(response) {
                         console.log('save approved timesheets response', response);
                         Timesheets.addSchedules(response);
                         app.f7view.router.back();
@@ -449,27 +495,53 @@ function (app,api,util,cache,tplManager,moment) {
     /// Template7 Helpers
     //
 
-    app.t7.registerHelper('timesheets_listHeadingDate', function (date) {
-        if (!date) return '';
-        return (util.dayNames[date.getDay()] + ', ' + util.monthNames[date.getMonth()] + ' ' + date.getDate());
+    app.t7.registerHelper('timesheets_itemDurationIcon', function (seconds) {
+        var text = '',
+            data = util.minutesToHoursAndMinutes(seconds / 60);
+        // if (value > 0) {
+        //     value /= 60; // secs to minutes
+        //     if (value > 60) {
+        //         hours = Math.trunc(value / 60);
+        //         minutes = value % 60;
+        //     }
+        //     else {
+        //         minutes = value;
+        //     }
+        // }
+        text += ('<span class="hours">' + data.hours + 'h</span>');
+        // if (minutes > 0) {
+            text += ('<small class="minutes">' + data.minutes + 'm</small>');
+        // }
+        return text;
     });
 
-    app.t7.registerHelper('timesheets_humanizeMinutes', function (value) {
-        if (value > 60) {
-            var text = '',
-                hours,
-                minutes;
-            hours = Math.trunc(value / 60);
-            minutes = value % 60;
-            text += (hours + ' hours');
-            if (minutes > 0) {
-                text += (' and ' + minutes + ' minutes');
+    app.t7.registerHelper('timesheets_itemDurationHours', function (seconds) {
+        var data = util.minutesToHoursAndMinutes(seconds / 60);
+        if (data.minutes < 10) {
+            data.minutes = '0' + data.minutes;
+        }
+        return data.hours + ':' + data.minutes;
+    });
+
+
+    app.t7.registerHelper('timesheets_humanizeMinutes', function (minutes) {
+        var text = '',
+            data = util.minutesToHoursAndMinutes(minutes);
+        if (data.minutes > 60) {
+            // var text = ''; //,
+                // hours,
+                // minutes;
+            // hours = Math.trunc(value / 60);
+            // minutes = value % 60;
+            text += (data.hours + ' hours');
+            if (data.minutes > 0) {
+                text += (' and ' + data.minutes + ' minutes');
             }
-            return text;
         }
         else {
-            return value + ' minutes';
+            text += (data.minutes + ' minutes');
         }
+        return text;
     });
 
 
@@ -500,7 +572,7 @@ function (app,api,util,cache,tplManager,moment) {
                     end_date: endWeekDate.format('D/M/YYYY')
                 }
                 console.log('create schedule', data);
-                api.createSchedule(data, function(response) {
+                api.createSchedule(data).then(function(response) {
                     console.log('created schedule', response);
 
                     // create shift event every two days
@@ -514,7 +586,7 @@ function (app,api,util,cache,tplManager,moment) {
                             resource_type: 'Schedule'
                         }
                         console.log('create event', eventData);
-                        api.createItem(eventData, function(eventResponse) {
+                        api.createEvent(eventData).then(function(eventResponse) {
                             console.log('created event', eventResponse);
                         });
                         // return;

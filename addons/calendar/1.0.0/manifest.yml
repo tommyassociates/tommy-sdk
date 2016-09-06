@@ -17,6 +17,23 @@
       name: "Event time"
       type: "string"
       required: true
+  permissions:
+    -
+      name: "Allow Team Member Access"
+      description: "Select Team Members who can access this Add-on"
+      default: "everyone"
+      visibility: "manager"
+      resource_type: "ActionInstall"
+      operations:
+        - view
+    -
+      name: "Allow Team Members to View Each Others Events"
+      description: "Select Team Members who can view events created by others"
+      default: "everyone"
+      visibility: "manager"
+      resource_type: "Event"
+      operations:
+        - view
   triggers:
     -
       module: "calendar.triggers.event_start"
@@ -55,15 +72,12 @@
           value: "%{trigger.name} is ending at %{trigger.time}"
   views:
     -
-      file: "views/main.tpl.html"
-      type: "template"
-    -
       id: "main"
       title: "Calendar"
       file: "views/main.html"
       type: "page"
       framed: false
-      main: true
+      default: true
       assets:
         -
           type: "stylesheet"
@@ -71,3 +85,6 @@
         -
           type: "javascript"
           file: "views/main.js"
+        -
+          type: "template"
+          file: "views/main.tpl.html"

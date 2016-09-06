@@ -59,16 +59,13 @@
           value: "%{trigger.name} is ending at %{trigger.time}"
   views:
     -
-      file: "views/main.tpl.html"
-      type: "template"
-    -
       id: "main"
       title: "Timesheets"
       file: "views/main.html"
       type: "page"
+      visibility: "member"
+      default: true
       framed: false
-      manager: false
-      main: true
       assets:
         -
           type: "stylesheet"
@@ -76,14 +73,17 @@
         -
           type: "javascript"
           file: "views/main.js"
+        -
+          file: "views/main.tpl.html"
+          type: "template"
     -
       id: "manager"
-      title: "Timesheets"
+      title: "Manage Timesheets"
       file: "views/manager/index.html"
       type: "page"
+      visibility: "manager"
+      default: true
       framed: false
-      manager: true
-      main: true
       assets:
         -
           type: "stylesheet"
@@ -91,3 +91,6 @@
         -
           type: "javascript"
           file: "views/main.js"
+        -
+          file: "views/main.tpl.html"
+          type: "template"

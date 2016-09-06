@@ -1,5 +1,5 @@
-require(['app','api','util','cache','tplManager'],
-function (app,api,util,cache,tplManager) {
+require(['app','api','util','cache','addons','tplManager'],
+function (app,api,util,cache,addons,tplManager) {
 
     //
     /// Main Calendar Widget
@@ -11,13 +11,21 @@ function (app,api,util,cache,tplManager) {
         cache: {},
 
         // Framework7 calendar widget
-        widget: {},
+        widget: null,
+
+        // The current selected date
+        selectedDate: null,
 
         init: function (page) {
             var $page = $$(page.container),
                 now = new Date();
-                // ,
-                // Calendar.cache = {}
+
+            console.log('calendar initialize');
+            // if (Calendar.widget) {
+            //     console.log('calendar already initialized');
+            //     Calendar.loadCurrentMonthAndSelectToday();
+            //     return;
+            // }
 
             Calendar.widget = app.f7.calendar({
                 container: $page.find('#calendar_container'),
@@ -45,13 +53,27 @@ function (app,api,util,cache,tplManager) {
                         // Calendar.widget
                         p.nextMonth();
                     });
-                    Calendar.loadMonth(p.currentYear, p.currentMonth, function (res) {
-                        Calendar.selectDay(p.currentYear, p.currentMonth, now.getDate());
-                    });
+                    // setTimeout(Calendar.loadCurrentMonthAndSelectToday)
+                    // Calendar.selectDay(year, month, day);
+
+                    var year = p.currentYear,
+                        month = p.currentMonth;
+
+                    // Load events for the current month
+                    if (!Calendar.eventsForDate(year, month).length) {
+                        Calendar.loadMonth(year, month, function (res) {
+
+                            // Select the current day
+                            Calendar.selectDay(year, month, now.getDate());
+                            // Calendar.getDayElement(year, month, now.getDate()).trigger('click');
+                        });
+                    }
+
                 },
                 onDayClick: function (p, dayContainer, year, month, day) {
-                    // console.log('onDayClick', p, dayContainer, year, month, day);
+                    console.log('onDayClick', p, dayContainer, year, month, day);
                     // calendarLoadDate(p.currentYear, p.currentMonth, p.currentDay);
+
                     Calendar.selectDay(year, month, day);
                 },
                 onMonthYearChangeStart: function (p, year, month) {
@@ -64,7 +86,14 @@ function (app,api,util,cache,tplManager) {
             });
         },
 
+        uninit: function () {
+            console.log('calendar uninitialize');
+            Calendar.cache = {};
+        },
+
         invalidate: function () {
+            console.log('calendar invalidate');
+
             $$(Calendar.widget.container).find('.picker-calendar-day').removeClass('has-events');
             for (var id in Calendar.cache) {
                 var event = Calendar.cache[id];
@@ -75,7 +104,20 @@ function (app,api,util,cache,tplManager) {
                     Calendar.getDayElement(event.year, event.month, event.endDay).addClass('has-events');
                 }
             }
+
+            // Calendar.selectCurrentDay();
         },
+
+        // loadCurrentMonthAndSelectToday: function () {
+        //     console.log('calendar loadCurrentMonthAndSelectToday', Calendar.widget);
+        //     var year = Calendar.widget.currentYear,
+        //         month = Calendar.widget.currentMonth,
+        //         day = (new Date()).getDate();
+        //
+        //     Calendar.loadMonth(year, month, function (res) {
+        //         Calendar.selectDay(year, month, day);
+        //     });
+        // },
 
         getDayElement: function (year, month, day) {
             return $$(Calendar.widget.container).find('[data-year="' + year + '"][data-month="' + month + '"][data-day="' + day + '"]');
@@ -110,33 +152,53 @@ function (app,api,util,cache,tplManager) {
         },
 
         loadMonth: function (year, month, callback) {
-            //console.log('load events', year, month);
             if (month)
                 month += 1;
 
-            api.getEvents({ year: year, month: month }, function (res) {
-                //console.log('events response', res);
+            var params = { year: year, month: month };
 
+            // Always query actor events at user scope for now
+            params.actor_id = addons.currentActorID();
+            params.user_id = addons.currentActorOrUserID();
+            params.resource_type = 'AddonInstall';
+            params.resource_id = addons.currentAddon().addon_install_id;
+
+            console.log('load events', params);
+
+            api.getEvents(params).then(function (res) {
+                console.log('events response', res);
                 if (res.length) {
                     for (var i = 0; i < res.length; i++) {
                         Calendar.addEvent(res[i]);
                     }
                 }
-                Calendar.invalidate();
-
                 if (callback)
                     callback(res);
+
+                Calendar.invalidate();
             });
+        },
+
+        selectCurrentDay: function () {
+            if (Calendar.selectedDate) {
+                Calendar.selectDay(
+                    Calendar.selectedDate.getFullYear(),
+                    Calendar.selectedDate.getMonth(),
+                    Calendar.selectedDate.getDate()
+                );
+            }
         },
 
         selectDay: function (year, month, day) {
             var context = {
                 date: new Date(year, month, day),
-                events: Calendar.eventsForDate(year, month, day)//,
-                // basePath: basePath
+                events: Calendar.eventsForDate(year, month, day)
             };
 
             tplManager.renderTarget('calendar_eventListTemplate', context, '#calendar_events');
+
+            // Set the `selectedDate` for `selectCurrentDay()` calls
+            Calendar.selectedDate = new Date(year, month, day);
         }
     };
 
@@ -283,13 +345,22 @@ function (app,api,util,cache,tplManager) {
             data.start_at = new Date(data.start_at).toUTCString();
             if (data.end_at && data.end_at.length)
                 data.end_at = new Date(data.end_at).toUTCString();
-            // console.log('save event', data);
+
+            // For now always save events at actor user scope.
+            // Later we may also save account events.
+            data.actor_id = addons.currentActorID();
+            data.user_id = addons.currentActorOrUserID();
+            // data.account_type = 'User';
+            // data.account_id = addons.currentActorOrUserID();
+            data.resource_type = 'AddonInstall';
+            data.resource_id = addons.currentAddon().addon_install_id;
+            console.log('save event', data);
 
             if (data.id) {
-                api.updateEvent(data.id, data, EventForm.onSave);
+                api.updateEvent(data.id, data).then(EventForm.onSave);
             }
             else {
-                api.createEvent(data, EventForm.onSave);
+                api.createEvent(data).then(EventForm.onSave);
             }
         },
 
@@ -321,6 +392,7 @@ function (app,api,util,cache,tplManager) {
     /// Calendar
 
     app.f7.onPageInit('calendar_main', Calendar.init);
+    app.f7.onPageBack('calendar_main', Calendar.uninit);
     app.f7.onPageAfterAnimation('calendar_main', Calendar.invalidate);
 
     //

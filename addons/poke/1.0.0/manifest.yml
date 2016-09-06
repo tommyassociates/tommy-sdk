@@ -67,15 +67,12 @@
         interval: 30
   views:
     -
-      file: "views/main.tpl.html"
-      type: "template"
-    -
       id: "Poke"
       title: "Poke"
       file: "views/main.html"
       type: "page"
       framed: false
-      main: true
+      default: true
       assets:
         -
           type: "stylesheet"
@@ -83,3 +80,6 @@
         -
           type: "javascript"
           file: "views/main.js"
+        -
+          file: "views/main.tpl.html"
+          type: "template"

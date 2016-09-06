@@ -19,7 +19,9 @@ function(util,xhr,app,config,api,addons,TM) {
             // Autoload timesheets addon view
             setTimeout(function() {
                 // addonCtrl.viewAddon('timesheets', 'main');
-                $$('#addon-views-local-nav').find('a[data-addon="timesheets"][data-view-id="manager"]').click();
+                // $$('#addon-views-local-nav').find('a[data-addon="timesheets"][data-view-id="manager"]').click();
+
+                $$('#addon-views-local-nav').find('a[data-addon="timesheets"][data-view-id="main"]').click();
             }, 100);
         },
 
@@ -70,14 +72,14 @@ function(util,xhr,app,config,api,addons,TM) {
               addonCtrl.deleteStoreAddon(package, version);
             });
 
-            // api.getAddon(package, function(addon) {
+            // api.getAddon(package).then(function(addon) {
             //     console.log('addonCtrl: initAddonDetails:', package, addon);
             //     var $page = $$(page.container);
             //     addonCtrl.renderAddonDetails($page, addon);
             //
             //     // Permissions tag select
             //     if (addon.installed && config.isCurrentTeam()) {
-            //         api.getInstalledAddonSetting(package, 'permissions', function(response) {
+            //         api.getInstalledAddonSetting(package, 'permissions').then(function(response) {
             //             var savedTags = response ? response.value : [];
             //             var $tagSelect = $page.find('#addon-permissions-form .tag-select');
             //             tagSelect.initWidget($tagSelect, savedTags, function(data) {
@@ -93,7 +95,7 @@ function(util,xhr,app,config,api,addons,TM) {
         },
 
         initAddonDetailsSandbox: function(package, version, callback) {
-          // T.apiSandbox.get('/addons/' + package + '/versions/' + version, {}, function(err, res) {
+          // T.api.andbox.get('/addons/' + package + '/versions/' + version, {}).then(function(err, res) {
           //   addonCtrl.renderAddonDetailsSandbox(res);
           //   if (callback)
           //     callback(err, res);
@@ -101,7 +103,7 @@ function(util,xhr,app,config,api,addons,TM) {
         },
 
         initAddonDetailsStore: function(package, version, callback) {
-          // T.api.get('/addons/' + package + '/versions/' + version, {}, function(err, res) {
+          // T.api.get('/addons/' + package + '/versions/' + version, {}).then(function(err, res) {
           //   addonCtrl.renderAddonDetailsStore(res);
           //   if (callback)
           //     callback(err, res);
@@ -178,7 +180,7 @@ function(util,xhr,app,config,api,addons,TM) {
         deleteSandboxAddon: function(package, version, callback) {
           console.log('Uninstalling addon version', package, version);
           addonCtrl.renderAddonDetailsSandbox({ status: 'Deleting...', deleting: true });
-          T.apiSandbox.delete('/addons/' + package + '/versions/' + version, {}, function(err, res) {
+          T.api.andbox.delete('/addons/' + package + '/versions/' + version, {}).then(function(err, res) {
             addonCtrl.renderAddonDetailsSandbox();
             if (err) {
               app.f7.addNotification({
@@ -202,7 +204,7 @@ function(util,xhr,app,config,api,addons,TM) {
         deleteStoreAddon: function(package, version, callback) {
           console.log('Deleting store addon version', package, version);
           addonCtrl.renderAddonDetailsStore({ status: 'Deleting...', deleting: true });
-          T.api.delete('/addons/' + package + '/versions/' + version, {}, function(err, res) {
+          T.api.delete('/addons/' + package + '/versions/' + version, {}).then(function(err, res) {
             addonCtrl.renderAddonDetailsStore();
             if (err) {
               app.f7.addNotification({

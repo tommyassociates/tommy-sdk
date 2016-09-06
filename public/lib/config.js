@@ -1,7 +1,11 @@
 define(['cache'], function (cache) {
     var config = {
         // The current operating environment (development or production).
+        // To override run `localStorage.setItem('environment', 'development')`
         environment: localStorage.getItem('environment') || 'production',
+
+        // Set to true to disable the chat client
+        disableChat: localStorage.getItem('disableChat') || false,
 
         // The base server endpoint
         getServerUrl: function () {
@@ -78,7 +82,7 @@ define(['cache'], function (cache) {
 
         isTeamOwnerOrManager: function () {
             var account = this.getCurrentAccount();
-            return !!(account && (account.team || account.team_manager));
+            return (account && (account.team || account.team_manager));
         },
 
         setCurrentAvatar: function (icon) {
@@ -132,7 +136,13 @@ define(['cache'], function (cache) {
         },
 
         destorySession: function () {
-            localStorage.clear();
+            // localStorage.clear();
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('team');
+            localStorage.removeItem('account');
+            localStorage.removeItem('previous_account');
+            localStorage.removeItem('developer_mode');
         },
 
         setJSON: function (key, value) {

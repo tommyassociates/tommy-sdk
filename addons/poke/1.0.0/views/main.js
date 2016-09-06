@@ -8,7 +8,7 @@ function (app,api,util,cache,tplManager) {
     function initContacts(page) {
         app.f7.showPreloader('Loading Contacts...');
 
-        api.getContacts(function(response) {
+        api.getContacts().then(function(response) {
             app.f7.hidePreloader();
             var $element = tplManager.renderInline('poke_contactListTemplate', response);
             $element.find('a').click(function() {
@@ -25,7 +25,7 @@ function (app,api,util,cache,tplManager) {
 
     // Send the poke message to the recipient
     function pokeUser(userId, firstName) {
-        api.sendDirectMessage(userId, 'You\'ve been Poked!', null, function(response) {
+        api.sendDirectMessage(userId, 'You\'ve been Poked!', null).then(function(response) {
             console.log('send message response', response);
             app.f7.addNotification({
                 message: ('You poked ' + firstName + '!')

@@ -24,6 +24,7 @@
 </script>
 
 <script id="timesheets_timesheetListGroupTemplate" type="text/template">
+  {{#if_any this}}
   <div class="list-block media-list no-margin no-line-top">
     <div class="list-group">
       <ul>
@@ -32,12 +33,12 @@
         {{#each this}}
         <li>
           <a href="{{addonAssetUrl "views/timesheet-details.html"}}&schedule_id={{id}}" class="item-link item-content">
-            <div class="item-media">
-              <!-- <img src="{{icon_url}}" class="circle"> -->
+            <div class="item-media timesheets_duration-icon">
+              {{timesheets_itemDurationIcon duration}}
             </div>
             <div class="item-inner">
               <div class="item-title-row">
-                <div class="item-title">{{start_date}} - {{end_date}}</div>
+                <div class="item-title">{{formatDate start_date "D MMM YY"}} - {{formatDate end_date "D MMM YY"}}</div>
                 <div class="item-after">{{capitalize status}}</div>
               </div>
               <div class="item-text">{{count events}} items</div>
@@ -49,9 +50,16 @@
       </ul>
     </div>
   </div>
+  {{else}}
+  <div class="content-block no-data">
+    <h2>No timesheets to display</h2>
+    <p>Have any shifts been logged yet?</p>
+  </div>
+  {{/if_any}}
 </script>
 
 <script type="text/template7" id="timesheets_timesheetDetailsTemplate">
+  <div class="content-block-title">Details</div>
   <div class="list-block form-block inset">
     <ul>
       <li>
@@ -67,7 +75,7 @@
         <div class="item-content">
           <div class="item-inner">
             <div class="item-title label">Dates</div>
-            <div class="item-input">{{start_date}} - {{end_date}}</div>
+            <div class="item-input">{{formatDate start_date "D MMM YY"}} - {{formatDate end_date "D MMM YY"}}</div>
           </div>
         </div>
       </li>
@@ -79,33 +87,35 @@
           </div>
         </div>
       </li>
-      <!-- <li>
+      <li>
         <div class="item-content">
           <div class="item-inner">
             <div class="item-title label">Hours</div>
-            <div class="item-input">{{capitalize status}}</div>
+            <div class="item-input">{{timesheets_itemDurationHours duration}}</div>
           </div>
         </div>
-      </li> -->
+      </li>
     </ul>
   </div>
 </script>
 
 <script type="text/template7" id="timesheets_itemListTemplate">
-  {{#if_any this}}
   <div class="content-block-title">Items</div>
+  {{#if_any this}}
   <div class="list-block media-list">
     <ul>
       {{#each this}}
       <li>
         <a href="{{addonAssetUrl "views/item-details.html"}}&schedule_id={{resource_id}}&event_id={{id}}" class="item-link item-content">
-          <div class="item-media"></div>
+          <div class="item-media timesheets_duration-icon">
+            {{timesheets_itemDurationIcon duration}}
+          </div>
           <div class="item-inner">
             <div class="item-title-row">
               <div class="item-title">
-                {{start_at}}
+                {{formatDate start_at "ddd, D MMM"}}
               </div>
-              <!-- <div class="item-after">timeOfDay </div> -->
+              <!-- <div class="item-after"></div> -->
             </div>
             <!-- <div class="item-subtitle"></div> -->
             <div class="item-text">
@@ -119,6 +129,11 @@
       </li>
       {{/each}}
     </ul>
+  </div>
+  {{else}}
+  <div class="content-block no-data">
+    <!-- <h2>No timesheets to display</h2> -->
+    <p>No items found!</p>
   </div>
   {{/if_any}}
 </script>
@@ -161,7 +176,7 @@
           <div class="item-content">
             <div class="item-inner">
               <div class="item-input">
-                <input type="text" name="start_at" value="{{dateTime startAt}}" placeholder="Start time">
+                <input type="text" name="start_at" value="{{formatDate start_at "LL HH:mm"}}" placeholder="Start time">
               </div>
             </div>
           </div>
@@ -170,14 +185,14 @@
           <div class="item-content">
             <div class="item-inner">
               <div class="item-input">
-                <input type="text" name="end_at" value="{{dateTime endAt}}" placeholder="End time">
+                <input type="text" name="end_at" value="{{formatDate end_at "LL HH:mm"}}" placeholder="End time">
               </div>
             </div>
           </div>
         </li>
       </ul>
     </div>
-    <div class="list-block form-block inset reminder">
+    <!-- <div class="list-block form-block inset reminder">
       <ul>
         <li class="reminder-input-wrap">
           <div class="item-content">
@@ -192,10 +207,9 @@
         </li>
         <li>
           <button class="button button-fill full-width reminder-add">Add Reminder</button>
-          <!-- color-blue  -->
         </li>
       </ul>
-    </div>
+    </div> -->
     <div class="list-block form-block inset">
       <ul>
         <li>
@@ -225,9 +239,9 @@
         <div class="item-inner">
           <div class="item-title-row">
             <div class="item-title">
-              {{timeOfDay startAt}}
-              {{#if endAt}}
-                - {{timeOfDay endAt}}
+              {{formatDate start_at "h:mm a"}}
+              {{#if end_at}}
+                 - {{formatDate end_at "h:mm a"}}
               {{/if}}
             </div>
           </div>
@@ -248,7 +262,7 @@
         <div class="item-content">
           <div class="item-inner">
             <div class="item-title label">Date</div>
-            <div class="item-input">{{dateTime startAt}}</div>
+            <div class="item-input">{{formatDate start_at "ddd, D MMM YY"}}</div>
           </div>
         </div>
       </li>
@@ -256,7 +270,7 @@
         <div class="item-content">
           <div class="item-inner">
             <div class="item-title label">Hours</div>
-            <div class="item-input">{{hours}}</div>
+            <div class="item-input">{{timesheets_itemDurationHours duration}}</div>
           </div>
         </div>
       </li>
@@ -265,8 +279,8 @@
 </script>
 
 <script type="text/template7" id="timesheets_attendanceListTemplate">
-  {{#if_any this}}
   <div class="content-block-title">Timeline</div>
+  {{#if_any this}}
   <div class="list-block media-list">
     <ul>
       {{#each this}}
@@ -299,6 +313,11 @@
       </li>
       {{/each}}
     </ul>
+  </div>
+  {{else}}
+  <div class="content-block no-data">
+    <!-- <h2>No timesheets to display</h2> -->
+    <p>No items found!</p>
   </div>
   {{/if_any}}
 </script>

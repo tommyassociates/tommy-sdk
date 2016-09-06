@@ -7,7 +7,7 @@ function (util,api,app) {
 
     var tagSelectComponent = {
         initWidget: function ($tagSelect, savedTags, onChange) {
-            api.getCurrentTeamTags(true, function(tagItems) {
+            api.getCurrentTeamTags({cache: true}).then(function(tagItems) {
 
                 // Populate the tag select
                 var $select = $tagSelect.find('select');

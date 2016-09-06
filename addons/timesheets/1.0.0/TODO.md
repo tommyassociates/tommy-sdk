@@ -1,11 +1,10 @@
 # TODO
 
-- Add time icons to timesheets
-- Add hours/minutes to items
-- Pretty date format
-- Add no data message for timesheets list
+Order main view state headings
 
 # Non Critical
 
+- Manager search screen
 - Allow copying timesheets
+- Allow adding timesheets
 - Allow adding items
