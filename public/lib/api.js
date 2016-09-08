@@ -632,6 +632,13 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
                 method: 'PUT',
                 data: data
             }, options));
+        },
+
+        deleteEvent: function(event_id, options) {
+            return this.call(Object.assign({
+                endpoint: 'events/' + event_id,
+                method: 'DELETE'
+            }, options));
         }
     };
 

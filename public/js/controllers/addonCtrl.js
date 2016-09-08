@@ -19,9 +19,9 @@ function(util,xhr,app,config,api,addons,TM) {
             // Autoload timesheets addon view
             setTimeout(function() {
                 // addonCtrl.viewAddon('timesheets', 'main');
+                $$('#addon-views-local-nav').find('a[data-addon="agent_bookings"][data-view-id="main"]').click();
                 // $$('#addon-views-local-nav').find('a[data-addon="timesheets"][data-view-id="manager"]').click();
-
-                $$('#addon-views-local-nav').find('a[data-addon="timesheets"][data-view-id="main"]').click();
+                // $$('#addon-views-local-nav').find('a[data-addon="timesheets"][data-view-id="main"]').click();
             }, 100);
         },
 

@@ -1,6 +1,6 @@
 {
   "name": "tommy_addon_sdk",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "SDK for building Tommy addons",
   "main": "server.js",
   "dependencies": {
