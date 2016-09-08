@@ -39,7 +39,7 @@
             <div class="item-inner">
               <div class="item-title-row">
                 <div class="item-title">{{formatDate start_date "D MMM YY"}} - {{formatDate end_date "D MMM YY"}}</div>
-                <div class="item-after">{{capitalize status}}</div>
+                <div class="item-after">{{timesheets_timesheetStatus this}}</div>
               </div>
               <div class="item-text">{{count events}} items</div>
             </div>
@@ -54,6 +54,31 @@
   <div class="content-block no-data">
     <h2>No timesheets to display</h2>
     <p>Have any shifts been logged yet?</p>
+  </div>
+  {{/if_any}}
+</script>
+
+<script type="text/template7" id="timesheets_newTimesheetDateRageList">
+  {{#if_any this}}
+  <div class="list-block modal-list">
+    <ul>
+      {{#each this}}
+      <li>
+        <a href="#" class="item-link item-content" data-start="{{start_date}}" data-end="{{end_date}}">
+          <div class="item-inner">
+            <div class="item-title">
+              {{formatDate start_date "D MMM YY"}} - {{formatDate end_date "D MMM YY"}}
+            </div>
+            <!-- <div class="item-after"></div> -->
+          </div>
+        </a>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+  {{else}}
+  <div class="content-block no-data">
+    <p>No items found!</p>
   </div>
   {{/if_any}}
 </script>
@@ -105,8 +130,8 @@
   <div class="list-block media-list">
     <ul>
       {{#each this}}
-      <li>
-        <a href="{{addonAssetUrl "views/item-details.html"}}&schedule_id={{resource_id}}&event_id={{id}}" class="item-link item-content">
+      <li class="swipeout">
+        <a href="{{addonAssetUrl "views/item-details.html"}}&schedule_id={{resource_id}}&event_id={{id}}" class="item-link item-content swipeout-content">
           <div class="item-media timesheets_duration-icon">
             {{timesheets_itemDurationIcon duration}}
           </div>
@@ -126,6 +151,10 @@
             </div>
           </div>
         </a>
+        <div class="swipeout-actions-right">
+          <a class="bg-green" href="#" data-interaction="copy-event" data-event-id="{{id}}">Copy</a>
+          <a class="swipeout-delete" href="#" data-interaction="delete-event" data-event-id="{{id}}">Delete</a>
+        </div>
       </li>
       {{/each}}
     </ul>
@@ -143,6 +172,8 @@
     {{#if id}}
       <input type="hidden" name="id" value="{{id}}">
     {{/if}}
+    <input type="hidden" name="resource_type" value="{{resource_type}}">
+    <input type="hidden" name="resource_id" value="{{resource_id}}">
     <div class="list-block form-block inset">
       <ul>
         <li>
@@ -209,7 +240,7 @@
           <button class="button button-fill full-width reminder-add">Add Reminder</button>
         </li>
       </ul>
-    </div> -->
+    </div>
     <div class="list-block form-block inset">
       <ul>
         <li>
@@ -222,7 +253,7 @@
           </div>
         </li>
       </ul>
-    </div>
+    </div> -->
     <!-- <div class="list-block form-block inset topset">
       <button type="submit" class="button button-big button-fill color-blue full-width">SAVE</button>
     </div> -->
@@ -317,7 +348,7 @@
   {{else}}
   <div class="content-block no-data">
     <!-- <h2>No timesheets to display</h2> -->
-    <p>No items found!</p>
+    <p>No timeline found!</p>
   </div>
   {{/if_any}}
 </script>
@@ -332,13 +363,13 @@
       {{#each this}}
       <li class="swipeout">
         <a href="{{addonAssetUrl "views/timesheet-details.html"}}&schedule_id={{id}}" class="item-link item-content swipeout-content">
-          <div class="item-media">
-            <!-- <img src="{{icon_url}}" class="circle"> -->
+          <div class="item-media timesheets_duration-icon">
+            {{timesheets_itemDurationIcon duration}}
           </div>
           <div class="item-inner">
             <div class="item-title-row">
-              <div class="item-title">{{start_date}} - {{end_date}}</div>
-              <div class="item-after">{{capitalize status}}</div>
+              <div class="item-title">{{formatDate start_date "D MMM YY"}} - {{formatDate end_date "D MMM YY"}}</div>
+              <div class="item-after">{{timesheets_timesheetStatus this}}</div>
             </div>
             <div class="item-text">{{count events}} items</div>
           </div>
@@ -364,7 +395,7 @@
           </div>
           <div class="item-inner">
             <div class="item-title">{{capitalize @key}}</div>
-            <div class="item-after">{{count}}</div>
+            <div class="item-after">{{this}}</div>
           </div>
         </a>
       </li>

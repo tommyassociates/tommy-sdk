@@ -1,10 +1,8 @@
 # TODO
 
-Order main view state headings
+- Copy timesheet item date select modal (#6)
+- Use pretty numbers on Manager list categories item count
+- Icons
+- Manager tag search screen (tags on events or users through team members?)
 
 # Non Critical
-
-- Manager search screen
-- Allow copying timesheets
-- Allow adding timesheets
-- Allow adding items

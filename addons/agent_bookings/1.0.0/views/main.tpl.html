@@ -1,0 +1,113 @@
+<script id="agent_bookings__bookingListGroupTemplate" type="text/template">
+  {{#if_any this}}
+  <div class="list-block media-list no-margin no-line-top">
+    <div class="list-group">
+      <ul>
+        {{#each this}}
+        <li class="list-group-title no-line-top">{{@key}}</li>
+        {{#each this}}
+        <li>
+          <a href="{{addonAssetUrl "views/booking-details.html"}}&event_id={{id}}" class="item-link item-content">
+            <div class="item-media text-icon">
+              <span>{{formatDate start_at "D"}}</span>
+              <small>{{formatDate start_at "MMM"}}</small>
+            </div>
+            <div class="item-inner">
+              <div class="item-title-row">
+                <div class="item-title">
+                  {{formatDate start_at "hh:mm a"}}
+                  {{#if end_at}}
+                    - {{formatDate end_at "hh:mm a"}}
+                  {{/if}}
+                </div>
+                <!-- <div class="item-after"></div> -->
+              </div>
+              <div class="item-text">
+                {{title}}
+                {{#if location}}
+                  at {{location}}
+                {{/if}}
+              </div>
+            </div>
+          </a>
+        </li>
+        {{/each}}
+        {{/each}}
+      </ul>
+    </div>
+  </div>
+  {{else}}
+  <div class="content-block no-data">
+    <h2>No bookings have been assigned</h2>
+    <p>Please check back later...</p>
+  </div>
+  {{/if_any}}
+</script>
+
+<script type="text/template7" id="agent_bookings__bookingDetailsTemplate">
+  <div class="content-block-title">Details</div>
+  <div class="list-block">
+    <ul>
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title label">Title</div>
+            <div class="item-input">{{title}}</div>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title label">Location</div>
+            <div class="item-input">{{location}}</div>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="content-block-title">Start</div>
+  <div class="list-block">
+    <ul>
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title label">Date</div>
+            <div class="item-input">{{formatDate start_at "D MMM YY"}}</div>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title label">Time</div>
+            <div class="item-input">{{formatDate start_at "hh:mm a"}}</div>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </div>
+
+  <div class="content-block-title">End</div>
+  <div class="list-block">
+    <ul>
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title label">Date</div>
+            <div class="item-input">{{formatDate end_at "D MMM YY"}}</div>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title label">Time</div>
+            <div class="item-input">{{formatDate end_at "hh:mm a"}}</div>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </div>
+</script>

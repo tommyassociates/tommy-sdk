@@ -3,8 +3,8 @@
   padding: 0 10px 0;
   border-right: 1px solid #ddd;
   min-height: 100%;*/
-  height: 52px;
-  width: 52px;
+  height: 50px;
+  width: 50px;
   text-align: center;
   background: #FF5615;
   border-radius: 50%;
@@ -21,7 +21,7 @@
 
 .timesheets_duration-icon span {
   display: block;
-  font-size: 110%;
+  /*font-size: 105%;*/
   font-weight: bold;
   /*margin: 2px 0 -3px;*/
   /*font-size: 150%;*/

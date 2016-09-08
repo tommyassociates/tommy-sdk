@@ -10,21 +10,24 @@ function (app,api,util,cache,tplManager,moment) {
         // Item cache
         cache: {},
 
-        timesheetsGroupByStatus: function () {
-            var items = {};
+        timesheetsGroupByStatus: function (useCurrent) {
+            var items = {
+              'Current': [],
+              'Unsubmitted': [],
+              'Submitted': [],
+              'Denied': [],
+              'Approved': []
+            };
             for (var id in Timesheets.cache) {
                 var item = Timesheets.cache[id],
-                    status = util.capitalize(item.status);
-                if (item.endAt > (new Date()))
-                    status = 'Current';
+                    status = Helpers.timesheetStatusCategory(item, useCurrent);
                 if (!items[status])
                     items[status] = [];
                 items[status].push(item);
-                // if (item.year == year &&
-                //     item.month == month &&
-                //     (item.startDay == day || item.endDay == day || !day)) {
-                //     items.push(item);
-                // }
+            }
+            for (var status in items) {
+                if (items[status].length == 0)
+                    delete items[status];
             }
             return items;
         },
@@ -40,12 +43,19 @@ function (app,api,util,cache,tplManager,moment) {
         },
 
         timesheetsStatusCounts: function () {
-            var items = {};
+            var items = {
+                'unsubmitted': 0,
+                'submitted': 0,
+                'denied': 0,
+                'approved': 0
+            };
             for (var id in Timesheets.cache) {
                 var item = Timesheets.cache[id];
-                if (!items[item.status])
-                    items[item.status] = { count: 0 };
-                items[item.status].count++;
+                items[item.status]++;
+            }
+            for (var status in items) {
+                if (items[status] == 0)
+                    delete items[status];
             }
             return items;
         },
@@ -80,6 +90,7 @@ function (app,api,util,cache,tplManager,moment) {
                 }
                 event = Timesheets.coerceScheduleEvent(event);
                 schedule.events.push(event);
+                schedule.duration += event.duration;
             }
             else {
                 alert('Cannot add event for unknown schedule ' + scheduleId);
@@ -156,15 +167,60 @@ function (app,api,util,cache,tplManager,moment) {
             // page: null,
 
             init: function (page) {
-                // Client.Main.page = page;
+                var $page = $$(page.container),
+                    $nav = $$(page.navbarInnerContainer);
+
                 Timesheets.loadSchedules({}, function() {
                     Client.Main.invalidate(page);
+                });
+
+                // Handle adding new Timesheets
+                $nav.find('.new-timesheet').on('click', function () {
+                    var startDate = moment().subtract(30, 'days'),
+                        endDate = moment().day('Monday').add('days', 7)
+                        dates = [];
+                    for (var m = moment(startDate); m.isBefore(endDate); m.add(7, 'days')) {
+                        dates.push({
+                            start_date: m.format('YYYY-MM-DD'),
+                            end_date: m.clone().add('days', 7).format('YYYY-MM-DD')
+                        });
+                    }
+                    console.log('displaying new timesheet modal', dates);
+
+                    var modal = app.f7.modal({
+                        title: 'Select Week',
+                        text: tplManager.render('timesheets_newTimesheetDateRageList', dates),
+                        buttons: [
+                            {
+                                text: 'Done',
+                                color: 'red'
+                            }
+                        ]
+                    });
+
+                    $$(modal).find('.list-block a').click(function(event) {
+                        var $link = $$(this);
+                        var data = {
+                            start_date: $link.data('start'),
+                            end_date: $link.data('end')
+                        }
+                        console.log('create schedule', data);
+                        api.createSchedule(data).then(function(response) {
+                            console.log('created schedule', response);
+                            Timesheets.addSchedule(response);
+                            Client.Main.invalidate(page);
+                            app.f7.closeModal();
+                        });
+                        return false;
+                    });
+
+                    return false;
                 });
             },
 
             invalidate: function (page) {
                 console.log('invalidating timesheets', Timesheets.timesheetsGroupByStatus())
-                tplManager.renderInline('timesheets_timesheetListGroupTemplate', Timesheets.timesheetsGroupByStatus(), page.container);
+                tplManager.renderInline('timesheets_timesheetListGroupTemplate', Timesheets.timesheetsGroupByStatus(true), page.container);
             }
         },
 
@@ -174,11 +230,35 @@ function (app,api,util,cache,tplManager,moment) {
 
         TimesheetDetails: {
             init: function (page) {
-                var item = Timesheets.cache[page.query.schedule_id],
+                var scheduleId = page.query.schedule_id,
+                    schedule = Timesheets.cache[scheduleId],
                     $page = $$(page.container);
 
-                tplManager.renderInline('timesheets_timesheetDetailsTemplate', item, $page);
-                tplManager.renderInline('timesheets_itemListTemplate', item.events, $page);
+                Client.TimesheetDetails.invalidate(page);
+
+                $page.find('a[data-interaction]').click(function() {
+                    var $link = $$(this),
+                        interaction = $link.data('interaction'),
+                        eventId = $link.data('event-id');
+                    if (interaction == 'copy-event') {
+                        var item = Timesheets.getScheduleEvent(scheduleId, eventId);
+                        api.createEvent(item).then(function(response) {
+                            Timesheets.addScheduleEvent(scheduleId, response);
+                            Client.TimesheetDetails.invalidate(page);
+                        });
+                    }
+                    else if (interaction == 'delete-event') {
+                        api.deleteEvent(eventId);
+                    }
+                });
+            },
+
+            invalidate: function(page) {
+                var scheduleId = page.query.schedule_id,
+                    schedule = Timesheets.cache[scheduleId];
+
+                tplManager.renderInline('timesheets_timesheetDetailsTemplate', schedule, page.container);
+                tplManager.renderInline('timesheets_itemListTemplate', schedule.events, page.container);
             }
         },
 
@@ -194,15 +274,17 @@ function (app,api,util,cache,tplManager,moment) {
                     $nav = $$(page.navbarInnerContainer),
                     $form;
 
+                // Initialize the object on creation
+                if (!item) {
+                    item = {
+                        resource_type: 'Schedule',
+                        resource_id: page.query.schedule_id
+                    };
+                }
+
                 console.log('init item form', page, item);
 
-                tplManager.renderTarget('timesheets_itemFormTemplate', item, $page.find('.page-content'));
-
-                // $nav.find('a.save').on('click', function (ev) {
-                //     var data = app.f7.formToJSON($page.find('form'));
-                //     Client.ItemForm.saveItem(data);
-                //     ev.preventDefault();
-                // });
+                tplManager.renderInline('timesheets_itemFormTemplate', item, $page);
 
                 $form = $page.find('form');
                 $form.on('submit', function (ev) {
@@ -324,6 +406,7 @@ function (app,api,util,cache,tplManager,moment) {
             },
 
             saveItem: function(data) {
+                data.kind = 'shift';
                 data.start_at = new Date(data.start_at).toUTCString();
                 if (data.end_at && data.end_at.length)
                     data.end_at = new Date(data.end_at).toUTCString();
@@ -491,9 +574,47 @@ function (app,api,util,cache,tplManager,moment) {
     // -------------------------------------------------------------------------
     // HELPERS
 
+    var Helpers = {
+        timesheetStatusCategory: function (timesheet, useCurrent) {
+            switch (timesheet.status) {
+                case 'unsubmitted':
+                    if (useCurrent && timesheet.endAt > (new Date()))
+                        return 'Current';
+                    return 'Unsubmitted';
+                case 'submitted':
+                    return 'Submitted';
+                case 'approved':
+                    return 'Approved';
+                case 'denied':
+                    return 'Denied';
+            }
+            alert('Invalid timesheet status: ' + timesheet.status);
+        },
+
+        timesheetStatus: function (timesheet) { //, useNew
+            switch (timesheet.status) {
+                case 'unsubmitted':
+                    // if (useNew && timesheet.endAt > (new Date()))
+                    //     return 'New';
+                    return 'New';
+                case 'submitted':
+                    return 'Pending Approval';
+                case 'approved':
+                    return 'Approved';
+                case 'denied':
+                    return 'Denied';
+            }
+            alert('Invalid timesheet status: ' + timesheet.status);
+        }
+    }
+
     //
     /// Template7 Helpers
     //
+
+    app.t7.registerHelper('timesheets_timesheetStatus', function (timesheet) {
+        return Helpers.timesheetStatus(timesheet);
+    });
 
     app.t7.registerHelper('timesheets_itemDurationIcon', function (seconds) {
         var text = '',

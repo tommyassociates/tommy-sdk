@@ -5,8 +5,8 @@
   description: "Timesheets for managing employee timesheets."
   version: "1.0.0"
   author: "Tommy Associates Pty Ltd"
-  homepage: "http://mytommy.com"
-  default: true
+  homepage: "https://mytommy.com"
+  default: false
   private: false
   default_trigger_parameters: &default_trigger_parameters
     name:
@@ -27,36 +27,9 @@
       name: "Timesheet Veiwed"
       parameters: *default_trigger_parameters
     -
-      function: "delete"
+      module: "timesheets.triggers.delete"
       name: "Timesheet Veiwed"
       parameters: *default_trigger_parameters
-  actions:
-    -
-      module: "timesheets.actions.event_start_message"
-      name: "Timesheets event starting message"
-      summary: "Timesheets event starting message notification."
-      trigger: "timesheets.triggers.event_start"
-      activity: "chat.activities.send"
-      internal: true
-      mappings:
-        message:
-          name: "Message text"
-          type: "string"
-          source: "custom"
-          value: "%{trigger.name} is starting at %{trigger.time}"
-    -
-      module: "timesheets.actions.event_end_message"
-      name: "Timesheets event ending message"
-      summary: "Timesheets event ending message notification."
-      trigger: "timesheets.triggers.event_end"
-      activity: "chat.activities.send"
-      internal: true
-      mappings:
-        message:
-          name: "Message text"
-          type: "string"
-          source: "custom"
-          value: "%{trigger.name} is ending at %{trigger.time}"
   views:
     -
       id: "main"

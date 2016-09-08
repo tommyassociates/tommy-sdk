@@ -132,6 +132,9 @@ ul.plain {
 	text-align: center;
 	padding-top: 25px;
 }
+.no-data > p:only-child {
+	margin: 0;
+}
 
 
 /*
@@ -336,6 +339,34 @@ a.bg-green {
 	height: 50px;
 }
 
+/* Text Icons (for dates etc) */
+.list-block .item-media.text-icon {
+  height: 50px;
+  width: 50px;
+  text-align: center;
+  background: #FF5615;
+  border-radius: 50%;
+  color: white;
+  padding-top: 11px;
+  line-height: 1.25;
+
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.list-block .item-media.text-icon span {
+  display: block;
+  font-weight: bold;
+}
+
+.list-block .item-media.text-icon small {
+  display: block;
+  font-size: 80%;
+}
+
 /*border-radius: 25px;
 -webkit-border-radius: 25px;
 -moz-border-radius: 25px;*/
@@ -375,6 +406,22 @@ a.bg-green {
 .list-block.no-dividers li::after,
 .list-block.no-dividers .item-inner::after {
 	background-color: transparent !important;
+}
+
+/* Modal List */
+.list-block.modal-list {
+	margin: 0;
+}
+.list-block.modal-list ul {
+	background-color: transparent !important;
+}
+.list-block.modal-list .item-link .item-inner {
+	background: transparent !important;
+	padding-right: 0;
+}
+.list-block.modal-list .item-title {
+	text-align: center;
+	min-width: 100%;
 }
 
 /*
