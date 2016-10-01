@@ -153,6 +153,10 @@ ul.plain {
 .no-line-top > *:before {
 	display: none !important;
 }
+.no-line-top:before,
+.no-line-top > .list-group:first-child > ul:before {
+	display: none !important;
+}
 .no-line-bottom:after,
 .no-line-bottom > *:after {
 	display: none !important;
@@ -408,20 +412,58 @@ a.bg-green {
 	background-color: transparent !important;
 }
 
+
+/*
+  Modals
+*/
+
+/* left align and underline titles */
+.modal-title {
+  margin-left: -15px;
+  margin-right: -15px;
+  padding-left: 15px;
+  padding-right: 15px;
+  padding-bottom: 10px;
+  text-align: left;
+	border-bottom: 1px solid #D9D9D9;
+}
+
+
 /* Modal List */
 .list-block.modal-list {
-	margin: 0;
+	margin: -5px -15px -15px;
 }
 .list-block.modal-list ul {
 	background-color: transparent !important;
+  /*font-size: 90%;*/
+}
+.list-block.modal-list ul:before,
+.list-block.modal-list ul:after {
+	background-color: transparent !important;
+}
+.list-block.modal-list li::after,
+.list-block.modal-list .item-inner::after {
+	background-color: transparent !important;
+}
+.list-block.modal-list li {
+	border-bottom: 1px solid #E9E9E9;
+}
+.list-block.modal-list li:last-child {
+  border: none;
 }
 .list-block.modal-list .item-link .item-inner {
-	background: transparent !important;
-	padding-right: 0;
+	/*background: transparent !important;*/
+	/*padding-right: 0;*/
 }
 .list-block.modal-list .item-title {
-	text-align: center;
-	min-width: 100%;
+	/*text-align: center;
+	min-width: 100%;*/
+}
+.list-block.modal-list .item-input {
+  max-width: 50px;
+  text-align: right;
+	/*text-align: center;
+	min-width: 100%;*/
 }
 
 /*
