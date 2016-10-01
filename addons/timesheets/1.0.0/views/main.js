@@ -12,11 +12,11 @@ function (app,api,util,cache,tplManager,moment) {
 
         timesheetsGroupByStatus: function (useCurrent) {
             var items = {
-              'Current': [],
-              'Unsubmitted': [],
-              'Submitted': [],
-              'Denied': [],
-              'Approved': []
+                'Current': [],
+                'Unsubmitted': [],
+                'Submitted': [],
+                'Denied': [],
+                'Approved': []
             };
             for (var id in Timesheets.cache) {
                 var item = Timesheets.cache[id],
@@ -72,6 +72,23 @@ function (app,api,util,cache,tplManager,moment) {
                     }
                 }
             }
+        },
+
+        removeScheduleEvent: function (scheduleId, eventId) {
+            var schedule = Timesheets.cache[scheduleId];
+            if (schedule) {
+                if (schedule.events) {
+                    for (var i = 0; i < schedule.events.length; i++) {
+                        var event = schedule.events[i];
+                        if (event.id == eventId) {
+                            schedule.events.splice(i, 1);
+                            schedule.duration -= event.duration;
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
         },
 
         addScheduleEvent: function (scheduleId, event) {
@@ -153,7 +170,7 @@ function (app,api,util,cache,tplManager,moment) {
     };
 
     // -------------------------------------------------------------------------
-    // CLIENT
+    // Client Controller
 
     var Client = {
 
@@ -192,8 +209,7 @@ function (app,api,util,cache,tplManager,moment) {
                         text: tplManager.render('timesheets_newTimesheetDateRageList', dates),
                         buttons: [
                             {
-                                text: 'Done',
-                                color: 'red'
+                                text: 'Done'
                             }
                         ]
                     });
@@ -235,30 +251,79 @@ function (app,api,util,cache,tplManager,moment) {
                     $page = $$(page.container);
 
                 Client.TimesheetDetails.invalidate(page);
+            },
+
+            cloneScheduleItem: function(page, schedule, eventToClone) {
+                var currentDate = moment(schedule.start_date),
+                    endDate = moment(schedule.end_date),
+                    allDates = [],
+                    modal;
+
+                function copyEventForSelectedDates() {
+                    var dates = app.f7.formToJSON($$(modal).find('form')).dates,
+                        prevStart = moment(eventToClone.start_at),
+                        prevEnd = moment(eventToClone.end_at),
+                        diff = prevEnd.diff(prevStart, 'minutes');
+
+                    for (var i = 0; i < dates.length; i++) {
+                        var newDate = moment(dates[i]),
+                            newContext = {
+                              'year': newDate.get('year'),
+                              'month': newDate.get('month') + 1,
+                              'date': newDate.get('date')
+                            };
+
+                        // diff two dates, change date part of timestamp,
+                        // and add diff to end date
+                        var data = Object.assign({}, eventToClone, {
+                          start_at: prevStart.clone().set(newContext).format(),
+                          end_at: prevStart.clone().set(newContext).add(diff, 'minutes').format()
+                        })
+
+                        console.log('cloning schedule item', data)
+                        api.createEvent(data).then(function(response) {
+                            Timesheets.addScheduleEvent(schedule.id, response);
+                            Client.TimesheetDetails.invalidate(page);
+                        });
+                    }
+                }
+
+                while(currentDate.add(1, 'day') < endDate) {
+                    allDates.push(currentDate.format('YYYY-MM-DD'));
+                }
+                modal = app.f7.modal({
+                    title: 'Choose Dates',
+                    text: tplManager.render('timesheets_copyItemDateList', allDates),
+                    buttons: [
+                        { text: 'Cancel' },
+                        { text: 'Done', onClick: copyEventForSelectedDates }
+                    ]
+                });
+            },
+
+            invalidate: function(page) {
+                var scheduleId = page.query.schedule_id,
+                    schedule = Timesheets.cache[scheduleId],
+                    $page = $$(page.container);
+
+                tplManager.renderInline('timesheets_timesheetDetailsTemplate', schedule, $page);
+                tplManager.renderInline('timesheets_itemListTemplate', schedule.events, $page);
 
                 $page.find('a[data-interaction]').click(function() {
                     var $link = $$(this),
                         interaction = $link.data('interaction'),
                         eventId = $link.data('event-id');
                     if (interaction == 'copy-event') {
-                        var item = Timesheets.getScheduleEvent(scheduleId, eventId);
-                        api.createEvent(item).then(function(response) {
-                            Timesheets.addScheduleEvent(scheduleId, response);
+                        var event = Timesheets.getScheduleEvent(scheduleId, eventId);
+                        Client.TimesheetDetails.cloneScheduleItem(page, schedule, event);
+                    }
+                    else if (interaction == 'delete-event') {
+                        api.deleteEvent(eventId).then(function(response) {
+                            Timesheets.removeScheduleEvent(scheduleId, eventId);
                             Client.TimesheetDetails.invalidate(page);
                         });
                     }
-                    else if (interaction == 'delete-event') {
-                        api.deleteEvent(eventId);
-                    }
                 });
-            },
-
-            invalidate: function(page) {
-                var scheduleId = page.query.schedule_id,
-                    schedule = Timesheets.cache[scheduleId];
-
-                tplManager.renderInline('timesheets_timesheetDetailsTemplate', schedule, page.container);
-                tplManager.renderInline('timesheets_itemListTemplate', schedule.events, page.container);
             }
         },
 
@@ -440,10 +505,11 @@ function (app,api,util,cache,tplManager,moment) {
 
                 tplManager.renderInline('timesheets_itemDetailsTemplate', item, $page);
 
-                api.getEventAttendances(item.id, {}).then(function(response) {
-                    console.log('loaded item attendances', response)
-                    tplManager.renderInline('timesheets_attendanceListTemplate', response, $page);
-                });
+                // NOTE: Disabling attendances/item timeline for now
+                // api.getEventAttendances(item.id, {}).then(function(response) {
+                //     console.log('loaded item attendances', response)
+                //     tplManager.renderInline('timesheets_attendanceListTemplate', response, $page);
+                // });
             }
         }
     }
@@ -478,7 +544,7 @@ function (app,api,util,cache,tplManager,moment) {
 
 
     // -------------------------------------------------------------------------
-    // MANAGER
+    // Manager Controller
 
     var Manager = {
 
@@ -572,7 +638,7 @@ function (app,api,util,cache,tplManager,moment) {
 
 
     // -------------------------------------------------------------------------
-    // HELPERS
+    // Helpers
 
     var Helpers = {
         timesheetStatusCategory: function (timesheet, useCurrent) {
@@ -667,7 +733,7 @@ function (app,api,util,cache,tplManager,moment) {
 
 
     // -------------------------------------------------------------------------
-    // TESTS
+    // Tests
 
     //
     /// Test Fixtures
@@ -677,15 +743,13 @@ function (app,api,util,cache,tplManager,moment) {
         create: function () {
             console.log('creating schedule fixtures')
 
-            // loop weeks for the next 100 days
-
             var now = moment(),
                 startDate = now.clone().startOf('day').subtract(100, 'days'),
                 endDate = now.clone().startOf('day'),
                 currDate = startDate.clone().startOf('day');
 
-            // console.log('DIFF', startDate.format('M/D/YYYY'), endDate.format('M/D/YYYY'), currDate.format('M/D/YYYY'), currDate.add('days', 1).diff(endDate));
-            while(currDate.add(7, 'days').diff(endDate) < 0) {
+            // Loop weeks for the last 100 days
+            while(currDate.add(7, 'days') < endDate) {
                 var startWeekDate = currDate.clone(),
                     endWeekDate = currDate.clone().add('days', 7);
                 var data = {
@@ -696,15 +760,16 @@ function (app,api,util,cache,tplManager,moment) {
                 api.createSchedule(data).then(function(response) {
                     console.log('created schedule', response);
 
-                    // create shift event every two days
-                    while(startWeekDate.add(2, 'days').diff(endWeekDate) < 0) {
+                    // Create shift event every two days
+                    while(startWeekDate.add(2, 'days') < endWeekDate) {
                         var eventData = {
                             title: 'Bartender',
                             location: 'Sydney',
                             start_at: startWeekDate.format(),
                             end_at: startWeekDate.clone().add('hours', 8.2).format(),
                             resource_id: response.id,
-                            resource_type: 'Schedule'
+                            resource_type: 'Schedule',
+                            kind: 'Shift'
                         }
                         console.log('create event', eventData);
                         api.createEvent(eventData).then(function(eventResponse) {

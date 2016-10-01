@@ -59,7 +59,6 @@
 </script>
 
 <script type="text/template7" id="timesheets_newTimesheetDateRageList">
-  {{#if_any this}}
   <div class="list-block modal-list">
     <ul>
       {{#each this}}
@@ -76,11 +75,29 @@
       {{/each}}
     </ul>
   </div>
-  {{else}}
-  <div class="content-block no-data">
-    <p>No items found!</p>
-  </div>
-  {{/if_any}}
+</script>
+
+<script type="text/template7" id="timesheets_copyItemDateList">
+  <form>
+    <div class="list-block modal-list">
+      <ul>
+        {{#each this}}
+        <li>
+          <div class="item-content">
+            <div class="item-inner">
+              <div class="item-label">
+                {{formatDate this "D MMM YY"}}
+              </div>
+              <div class="item-input">
+                <input type="checkbox" name="dates" value="{{formatDate this "YYYY-MM-DD"}}" />
+              </div>
+            </div>
+          </div>
+        </li>
+        {{/each}}
+      </ul>
+    </div>
+  </form>
 </script>
 
 <script type="text/template7" id="timesheets_timesheetDetailsTemplate">
@@ -162,7 +179,10 @@
   {{else}}
   <div class="content-block no-data">
     <!-- <h2>No timesheets to display</h2> -->
-    <p>No items found!</p>
+    <p>
+      No items found!<br>
+      Click "+" to add new items.
+    </p>
   </div>
   {{/if_any}}
 </script>
@@ -353,11 +373,12 @@
   {{/if_any}}
 </script>
 
-
 <!--
   Manager Templates
 -->
+
 <script id="timesheets_timesheetManagerApprovalListTemplate" type="text/template">
+  {{#if_any this}}
   <div class="list-block media-list no-margin no-line-top">
     <ul>
       {{#each this}}
@@ -382,9 +403,16 @@
       {{/each}}
     </ul>
   </div>
+  {{else}}
+  <div class="content-block no-data">
+    <h2>No timesheets to display</h2>
+    <p>Have any new shifts been logged?</p>
+  </div>
+  {{/if_any}}
 </script>
 
 <script id="timesheets_managerTimesheetStatusListTemplate" type="text/template">
+  {{#if_any this}}
   <div class="list-block no-margin no-line-top">
     <ul>
       {{#each this}}
@@ -402,4 +430,10 @@
       {{/each}}
     </ul>
   </div>
+  {{else}}
+  <div class="content-block no-data">
+    <h2>No timesheets to display</h2>
+    <p>Have any new shifts been logged?</p>
+  </div>
+  {{/if_any}}
 </script>
