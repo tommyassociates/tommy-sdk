@@ -1,0 +1,27 @@
+<script id="availability__availabilityListGroupTemplate" type="text/template">
+  <div class="list-block no-margin no-line-top dividers">
+    <ul>
+      {{#each this}}
+      <li class="item-content">
+        <div class="item-media availability__list-date">
+          <strong>{{dayOrToday time}}</strong>
+          <span>{{formatDate time "Do MMM"}}</span>
+        </div>
+        <div class="item-inner">
+          <div class="item-title availability__toggle-container">
+            <a href="#" class="availability__toggle-availability {{availability__unavailableProperty "AM" data "unavailable"}}" data-availability="AM"><span>AM<span></a>
+            <a href="#" class="availability__toggle-availability {{availability__unavailableProperty "PM" data "unavailable"}}" data-availability="PM"><span>PM<span></a>
+            <a href="#" class="availability__toggle-availability {{availability__unavailableProperty "NS" data "unavailable"}}" data-availability="NS"><span>NS<span></a>
+            <form>
+              <input type="hidden" name="time" value="{{formatDate time "YYYY-MM-DD"}}" />
+              <input type="checkbox" name="AM" {{availability__unavailableProperty "AM" data "checked"}} />
+              <input type="checkbox" name="PM" {{availability__unavailableProperty "PM" data "checked"}} />
+              <input type="checkbox" name="NS" {{availability__unavailableProperty "NS" data "checked"}} />
+            </form>
+          </div>
+        </div>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+</script>

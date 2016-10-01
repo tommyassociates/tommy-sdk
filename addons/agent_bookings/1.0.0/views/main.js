@@ -1,5 +1,5 @@
-require(['app','api','util','cache','tplManager','moment'],
-function (app,api,util,cache,tplManager,moment) {
+require(['app','api','addons','util','cache','tplManager','moment'],
+function (app,api,addons,util,cache,tplManager,moment) {
 
     //
     /// Bookings Context
@@ -9,9 +9,13 @@ function (app,api,util,cache,tplManager,moment) {
         // Item cache
         cache: {},
 
+        getEvent: function (id) {
+            return Bookings.cache['_' + id];
+        },
+
         addEvent: function (item) {
-            Bookings.cache[item.id] = item;
-            console.log('booking added', item)
+            Bookings.cache['_' + item.id] = item;
+            console.log('booking added', item);
         },
 
         addEvents: function (items) {
@@ -24,19 +28,26 @@ function (app,api,util,cache,tplManager,moment) {
 
         loadEvents: function (params) {
             console.log('load bookings', params);
-            params = Object.assign({ kind: 'booking' }, params);
+            params = Object.assign({ kind: 'AgentBooking' }, params);
             return api.getEvents(params).then(Bookings.addEvents);
         },
 
-        eventsGroupByDate: function () {
-            var items = {};
-            for (var id in Bookings.cache) {
-                var item = Bookings.cache[id],
-                    status = moment(item.start_at).format('D MMM');
-                if (!items[status])
-                    items[status] = [];
-                items[status].push(item);
+        groupByCategory: function () {
+            var items = { Current: [], Previous: [] },
+                today = moment().startOf('day');
+            for (var key in Bookings.cache) {
+                var item = Bookings.cache[key],
+                    category = moment(item.start_at) >= today ? 'Current' : 'Previous';
+                    // date = moment(item.start_at).format('D MMM');
+                // if (!items[category])
+                //     items[category] = [];
+                items[category].push(item);
             }
+            if (!items.Current.length)
+                delete items.Current;
+            if (!items.Previous.length)
+                delete items.Previous;
+            // console.log('groupByCategory', items);
             return items;
         },
     };
@@ -52,8 +63,8 @@ function (app,api,util,cache,tplManager,moment) {
         },
 
         invalidate: function (page) {
-            console.log('invalidating main agent_bookings', Bookings.eventsGroupByDate())
-            tplManager.renderInline('agent_bookings__bookingListGroupTemplate', Bookings.eventsGroupByDate(), page.container);
+            console.log('invalidating main agent_bookings', Bookings.groupByCategory())
+            tplManager.renderInline('agent_bookings__bookingListGroupTemplate', Bookings.groupByCategory(), page.container);
         }
     }
 
@@ -62,7 +73,7 @@ function (app,api,util,cache,tplManager,moment) {
 
     var BookingDetails = {
         init: function (page) {
-            var event = Bookings.cache[page.query.event_id];
+            var event = Bookings.getEvent(page.query.event_id);
 
             tplManager.renderInline('agent_bookings__bookingDetailsTemplate', event, page.container);
         }
@@ -181,59 +192,49 @@ function (app,api,util,cache,tplManager,moment) {
     //     }
     //     return text;
     // });
+
+
+    // -------------------------------------------------------------------------
+    // TESTS
+
     //
+    /// Test Fixtures
     //
-    // // -------------------------------------------------------------------------
-    // // TESTS
-    //
-    // //
-    // /// Test Fixtures
-    // //
-    //
-    // var Fixtures = {
-    //     create: function () {
-    //         console.log('creating event fixtures')
-    //
-    //         // loop weeks for the next 100 days
-    //
-    //         var now = moment(),
-    //             startDate = now.clone().startOf('day').subtract(100, 'days'),
-    //             endDate = now.clone().startOf('day'),
-    //             currDate = startDate.clone().startOf('day');
-    //
-    //         // console.log('DIFF', startDate.format('M/D/YYYY'), endDate.format('M/D/YYYY'), currDate.format('M/D/YYYY'), currDate.add('days', 1).diff(endDate));
-    //         while(currDate.add(7, 'days').diff(endDate) < 0) {
-    //             var startWeekDate = currDate.clone(),
-    //                 endWeekDate = currDate.clone().add('days', 7);
-    //             var data = {
-    //                 start_date: startWeekDate.format('D/M/YYYY'),
-    //                 end_date: endWeekDate.format('D/M/YYYY')
-    //             }
-    //             console.log('create event', data);
-    //             api.createEvent(data).then(function(response) {
-    //                 console.log('created event', response);
-    //
-    //                 // create shift event every two days
-    //                 while(startWeekDate.add(2, 'days').diff(endWeekDate) < 0) {
-    //                     var eventData = {
-    //                         title: 'Bartender',
-    //                         location: 'Sydney',
-    //                         start_at: startWeekDate.format(),
-    //                         end_at: startWeekDate.clone().add('hours', 8.2).format(),
-    //                         resource_id: response.id,
-    //                         resource_type: 'Event'
-    //                     }
-    //                     console.log('create event', eventData);
-    //                     api.createEvent(eventData).then(function(eventResponse) {
-    //                         console.log('created event', eventResponse);
-    //                     });
-    //                     // return;
-    //                 }
-    //             });
-    //             // return;
-    //         }
-    //     }
-    // }
-    //
-    // // Fixtures.create();
+
+    var Fixtures = {
+        create: function () {
+            console.log('creating event fixtures')
+
+            var now = moment(),
+                startDate = now.clone().subtract(10, 'days'), //.startOf('day') .subtract(100, 'days'),
+                endDate = now.clone().add(30, 'days'), //.startOf('day')
+                currDate = startDate.clone().startOf('day');
+
+            // Create a single booking every day for the previous 10 and next 30 days
+            while(currDate.add(2, 'days') < endDate) {
+                // var startWeekDate = currDate.clone(),
+                //     endWeekDate = currDate.clone().add('days', 7);
+                // var data = {
+                //     start_at: currDate.format('D/M/YYYY'),
+                //     end_date: currDatee.clone().add(3, 'hours').format('D/M/YYYY')
+                // }
+                var data = {
+                    title: 'Bartender',
+                    location: 'Sydney',
+                    start_at: currDate.format(),
+                    end_at: currDate.clone().add(4.3, 'hours').format(),
+                    resource_type: 'AddonInstall',
+                    resource_id: addons.currentAddonInstallId(),
+                    kind: 'AgentBooking'
+                }
+                console.log('create fixture event', data);
+                api.createEvent(data).then(function(response) {
+                    console.log('created fixture event', response);
+                });
+                // return;
+            }
+        }
+    }
+
+    // Fixtures.create();
 });

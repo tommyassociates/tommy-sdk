@@ -15,9 +15,9 @@
             <div class="item-inner">
               <div class="item-title-row">
                 <div class="item-title">
-                  {{formatDate start_at "hh:mm a"}}
+                  {{formatDate start_at "h:mm a"}}
                   {{#if end_at}}
-                    - {{formatDate end_at "hh:mm a"}}
+                    - {{formatDate end_at "h:mm a"}}
                   {{/if}}
                 </div>
                 <!-- <div class="item-after"></div> -->
@@ -82,7 +82,7 @@
         <div class="item-content">
           <div class="item-inner">
             <div class="item-title label">Time</div>
-            <div class="item-input">{{formatDate start_at "hh:mm a"}}</div>
+            <div class="item-input">{{formatDate start_at "h:mm a"}}</div>
           </div>
         </div>
       </li>
@@ -104,7 +104,7 @@
         <div class="item-content">
           <div class="item-inner">
             <div class="item-title label">Time</div>
-            <div class="item-input">{{formatDate end_at "hh:mm a"}}</div>
+            <div class="item-input">{{formatDate end_at "h:mm a"}}</div>
           </div>
         </div>
       </li>

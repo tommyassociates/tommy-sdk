@@ -1,0 +1,73 @@
+.list-block .availability__list-date {
+  padding-top: 11px;
+  line-height: 1.25;
+  width: 120px;
+  text-align: left;
+
+  display: -ms-flexbox;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  justify-content: left;
+  align-items: initial;
+}
+
+.list-block .availability__list-date strong {
+  display: block;
+  font-weight: bold;
+}
+
+.list-block .availability__list-date span {
+  display: block;
+  font-size: 80%;
+}
+
+
+.availability__toggle-container {
+  text-align: right;
+  width: 100%;
+}
+
+
+.availability__toggle-container form {
+  visibility: hidden;
+  position: absolute;
+}
+
+
+.list-block a.availability__toggle-availability {
+  border: 1px solid #FF5615;
+  height: 50px;
+  width: 50px;
+  box-sizing: border-box;
+  padding-top: 22px;
+  display: inline-block;
+  text-align: center;
+  border-radius: 50%;
+  position: relative;
+  margin-right: 20px;
+}
+
+.list-block a.availability__toggle-availability span {
+  font-size: 90%;
+}
+
+.list-block a.availability__toggle-availability:before {
+  position: absolute;
+  content: '\2713';
+  background: none !important;
+  width: 50px;
+  height: 50px;
+  top: 0;
+  left: 0;
+  padding-top: 5px;
+}
+
+.list-block a.availability__toggle-availability.unavailable {
+  border-color: #ababab;
+  color: #707070;
+}
+
+.list-block a.availability__toggle-availability.unavailable:before {
+  content: '\2717';
+}

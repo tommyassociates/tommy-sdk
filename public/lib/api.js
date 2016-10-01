@@ -639,6 +639,41 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
                 endpoint: 'events/' + event_id,
                 method: 'DELETE'
             }, options));
+        },
+
+        //
+        // Fragments
+        //
+
+        getFragments: function(params, options) {
+            return this.call(Object.assign({
+                endpoint: 'fragments',
+                method: 'GET',
+                data: params
+            }, options));
+        },
+
+        createFragment: function(data, options) {
+            return this.call(Object.assign({
+                endpoint: 'fragments',
+                method: 'POST',
+                data: data
+            }, options));
+        },
+
+        updateFragment: function(fragment_id, data, options) {
+            return this.call(Object.assign({
+                endpoint: 'fragments/' + fragment_id,
+                method: 'PUT',
+                data: data
+            }, options));
+        },
+
+        deleteFragment: function(fragment_id, options) {
+            return this.call(Object.assign({
+                endpoint: 'fragments/' + fragment_id,
+                method: 'DELETE'
+            }, options));
         }
     };
 
