@@ -17,12 +17,12 @@ function(util,xhr,app,config,api,addons,TM) {
             });
 
             // Autoload timesheets addon view
-            setTimeout(function() {
-                // addonCtrl.viewAddon('timesheets', 'main');
-                $$('#addon-views-local-nav').find('a[data-addon="agent_bookings"][data-view-id="main"]').click();
-                // $$('#addon-views-local-nav').find('a[data-addon="timesheets"][data-view-id="manager"]').click();
-                // $$('#addon-views-local-nav').find('a[data-addon="timesheets"][data-view-id="main"]').click();
-            }, 100);
+            if (page.query.addon && page.query.view) {
+                console.log('Force loading addon', page.query)
+                setTimeout(function() {
+                    $$('#addon-views-local-nav').find('a[data-addon="' + page.query.addon + '"][data-view-id="' + page.query.view + '"]').click();
+                }, 100);
+            }
         },
 
         // viewAddon: function(package, viewId) {

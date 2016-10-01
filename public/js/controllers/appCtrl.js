@@ -12,6 +12,7 @@ function(app,config,api,util,cache,TM,TH,addons) {
                     // tommyView.router.loadPage('local-addons.html');
                     tommyView.router.load({
                         url: 'local-addons.html',
+                        query: $$.parseUrlQuery(window.location.href),
                         animatePages: false
                     });
                 }, function() {

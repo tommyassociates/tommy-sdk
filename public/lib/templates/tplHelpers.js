@@ -324,6 +324,14 @@ define(['config','util','moment','Framework7'], function (config,util,moment) {
                 return moment(text).format(format);
             });
 
+            t7.registerHelper('dayOrToday', function (time) {
+                time = moment(time);
+                if (time.isSame(moment(), 'day'))
+                    return 'Today';
+                return time.format('dddd');
+            });
+
+
             // t7.registerHelper('actionConditionOptions', function (selected, options) {
             //     var html = '',
             //         conditions = ['equals',

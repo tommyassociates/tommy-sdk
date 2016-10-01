@@ -372,15 +372,34 @@ function(api,util,config,cache,util) {
             return cache.get('addonViews', package + '-' + viewId);
         },
 
+        getDefaultAddonView: function (package, version) {
+            var addon = this.getAddon(package, version);
+            if (addon && addon.views && addon.views.length) {
+                for (var i = 0; i < addon.views.length; i++) {
+                    var view = addon.views[i];
+                    if (view.default) {
+                        return view;
+                    }
+                }
+            }
+        },
+
         currentAddon: function () {
+            // NOTE: `currentAddon` will be null while using the SDK in development
+            // mode, until the addon is created via the API and installed for the
+            // current user account.
             return t7.global.currentAddon;
         },
 
-        currentActorID: function () {
+        currentAddonInstallId: function () {
+            return t7.global.currentAddon ? t7.global.currentAddon.addon_install_id : null;
+        },
+
+        currentActorId: function () {
             return t7.global.currentActorId;
         },
 
-        currentActorOrUserID: function () {
+        currentActorOrUserId: function () {
             return t7.global.currentActorId ? t7.global.currentActorId : config.getCurrentUser().id;
         },
 
