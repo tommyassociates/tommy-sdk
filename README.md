@@ -122,6 +122,7 @@ Each addon may contain multiple views to be exposed on the interface. Views are 
 * **file**: (String) The relative view path to the view HTML file ie. `client/main.html`.
 * **type**: (String) The view type, current supported are `page` and `form`.
 * **framed**: (Boolean) Weather or not the view should be loaded inside an iframe.
+* **visibility**: (String) Can be one of: "everyone", "user", "team", "team_member", "team_manager", "team_owner"
 
 <!--
 * **scope**: (String) The view type, current supported are `client` and `admin`.

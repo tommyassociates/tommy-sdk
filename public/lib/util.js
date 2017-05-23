@@ -1,5 +1,32 @@
-define(['config','cache','i18n!nls/lang','Framework7'],function (config,cache,i18n) {
+define(['config','cache'/*,'i18n!nls/lang'*/,'Framework7'],function (config,cache/*,i18n*/) {
     var $$ = Dom7;
+
+    // Polyfill for Object.assign for older mobile browsers
+    // TODO: Move to more appropriate file
+    if (typeof Object.assign != 'function') {
+      (function () {
+        Object.assign = function (target) {
+          'use strict';
+          // We must check against these specific cases.
+          if (target === undefined || target === null) {
+            throw new TypeError('Cannot convert undefined or null to object');
+          }
+
+          var output = Object(target);
+          for (var index = 1; index < arguments.length; index++) {
+            var source = arguments[index];
+            if (source !== undefined && source !== null) {
+              for (var nextKey in source) {
+                if (source.hasOwnProperty(nextKey)) {
+                  output[nextKey] = source[nextKey];
+                }
+              }
+            }
+          }
+          return output;
+        };
+      })();
+    }
 
     var util = {
 
@@ -57,6 +84,24 @@ define(['config','cache','i18n!nls/lang','Framework7'],function (config,cache,i1
             return false;
         },
 
+        hasRole: function(account, name) {
+            if (account && account.roles && account.roles.length) {
+                for (var x = 0; x < account.roles.length; x++) {
+                    if (account.roles[x] && name)
+                        return true;
+                }
+            }
+            return false;
+        },
+
+        isTeamOwnerOrManager: function(account) {
+            // var account = config.getCurrentAccount();
+            return (account && (
+              account.type == 'Team' || (
+              account.type == 'TeamMember' && 
+              util.hasRole(account, 'TeamManager'))));
+        },
+
         getCharLength: function (str) {
             var iLength = 0;
             for (var i = 0; i < str.length; i++) {
@@ -72,9 +117,25 @@ define(['config','cache','i18n!nls/lang','Framework7'],function (config,cache,i1
         // Remove duplicates from an array of object
         // Usage: `uniq(things.thing, 'place');`
         uniq: function (a, param) {
+            // TODO: use Dom7.unique(array) ?
             return a.filter(function (item, pos, array) {
                 return array.map(function (mapItem){ return mapItem[param]; }).indexOf(item[param]) === pos;
             });
+        },
+
+        // Resolve nested item from object/array
+        // @param {Object|Array} obj
+        // @param {String} path dot separated
+        // @param {*} def default value ( if result undefined )
+        // @returns {*}
+        resolve: function (obj, path, def) {
+            var i, len;
+            for (i = 0,path = path.split('.'), len = path.length; i < len; i++){
+                if (!obj || typeof obj !== 'object') return def;
+                obj = obj[path[i]];
+            }
+            if (obj === undefined) return def;
+            return obj;
         },
 
         //
@@ -111,16 +172,6 @@ define(['config','cache','i18n!nls/lang','Framework7'],function (config,cache,i1
                         .on(bindings[i].event, bindings[i].handler);
                 }
             }
-        },
-
-        // Bind submit buttons that exist outside of form scope such as in the
-        // navbar or toolbar
-
-        bindDynamicSubmitButtons: function () {
-            $$(document).on('click', 'a[data-submit]', function (event) {
-                $$('.view-main .page-on-center').find('form' + $$(this).data('submit')).trigger('submit');
-                event.preventDefault();
-            });
         },
 
         // bindDynamicVisibility: function (scope) {
@@ -231,19 +282,17 @@ define(['config','cache','i18n!nls/lang','Framework7'],function (config,cache,i1
         //
 
         getCurrentAccountUpdateURI: function () {
-            var url = '';
-            switch (config.getCurrentAccount().type) {
+            var account = config.getCurrentAccount();
+            switch (account.type) {
                 case 'Team':
-                    url = 'team';
-                    break;
+                    return 'team';
                 case 'TeamMember':
-                    url = 'team_member';
-                    break;
+                    return 'team/members/' + account.user_id;
                 case 'User':
-                    url = 'user';
-                    break;
+                    return 'user';
+                default:
+                    throw 'Invalid account type: ' + account.type;
             }
-            return url;
         },
 
         matchUrl: function (string) {
@@ -295,49 +344,6 @@ define(['config','cache','i18n!nls/lang','Framework7'],function (config,cache,i1
             return path;
         },
 
-        //
-        // App Helpers
-        // TODO: move to app.js
-        //
-
-        setPageTitle: function (html) {
-           $$('.view-main').find('.navbar-on-center .center').html(html);
-        },
-
-        hideToolbar: function () {
-            tommyApp.hideToolbar('.toolbar');
-        },
-
-        showToolbar: function () {
-            tommyApp.showToolbar('.toolbar');
-        },
-
-        showLoader: function (text, force) {
-            tommyApp.showIndicator();
-        },
-
-        hideLoader: function () {
-            tommyApp.hideIndicator();
-        },
-
-        renderCurrentAvatar: function () {
-            // console.log('renderCurrentAvatar', $$('.current-avatar').length, config.getCurrentAvatar());
-            $$('.current-avatar').attr('src', config.getCurrentAvatar());
-            $$('.current-avatar-background').attr('style', 'background-image: url(' + config.getCurrentAvatar() + ');');
-        },
-
-        handleAPIError: function (err, baseMessage) {
-            if (!err) return false;
-            var message = '';
-            if (baseMessage) {
-                message += baseMessage;
-                message += ': ';
-            }
-            message += err;
-            tommyApp.alert(message);
-            return true;
-        }
-
         // getPageNameInUrl: function (url) {
         //     url = url || '';
         //     var arr = url.split('.');
@@ -362,7 +368,7 @@ define(['config','cache','i18n!nls/lang','Framework7'],function (config,cache,i1
         //     $$('#success').show();
         //     setTimeout(function () {
         //         $$('#success').hide();
-        //         tommyView.router.back();
+        //         window.tommy.view.router.back();
         //      }, 300);
         // },
         //
@@ -373,7 +379,7 @@ define(['config','cache','i18n!nls/lang','Framework7'],function (config,cache,i1
         //     $$('#success').show();
         //     setTimeout(function () {
         //         $$('#success').hide();
-        //         tommyView.router.refreshPage();
+        //         window.tommy.view.router.refreshPage();
         //      }, 300);
         // },
         //

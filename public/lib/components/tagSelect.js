@@ -344,7 +344,7 @@ function (util,api,app) {
                      (useSearchbar ? searchbarHTML : '') +
                 '    <div class="page-content">' +
                        (openIn !== 'picker' && navbarLayout === 'static' ? navbarHTML : '') +
-                '      <div class="list-block no-margin no-line-top ' + (virtualList ? 'virtual-list' : '') + ' tag-select-list-' + id + ' ' + (formTheme ? 'theme-' + formTheme : '') + '">' +
+                '      <div class="list-block no-margin no-border-top ' + (virtualList ? 'virtual-list' : '') + ' tag-select-list-' + id + ' ' + (formTheme ? 'theme-' + formTheme : '') + '">' +
                 '        <ul>' +
                             (virtualList ? '' : inputsHTML) +
                 '        </ul>' +

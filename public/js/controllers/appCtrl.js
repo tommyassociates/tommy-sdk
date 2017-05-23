@@ -10,7 +10,7 @@ function(app,config,api,util,cache,TM,TH,addons) {
                 console.log('starting session');
                 appCtrl.initCurrentAccount(function() {
                     // tommyView.router.loadPage('local-addons.html');
-                    tommyView.router.load({
+                    app.f7view.router.load({
                         url: 'local-addons.html',
                         query: $$.parseUrlQuery(window.location.href),
                         animatePages: false
@@ -51,7 +51,7 @@ function(app,config,api,util,cache,TM,TH,addons) {
             }
 
             // Set the current avatar
-            util.renderCurrentAvatar();
+            // util.renderCurrentAvatar();
 
             // Populate the account menu
             appCtrl.loadUserAccounts();

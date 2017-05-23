@@ -48,6 +48,11 @@ define(['cache'], function (cache) {
             return this.getJSON('user');
         },
 
+        getCurrentUserId: function () {
+            var user = this.getCurrentUser();
+            return user ? user.id : null;
+        },
+
         setCurrentUser: function (user, token) {
             this.setJSON('user', user);
             // this.setCurrentAvatar(user.icon_url);
@@ -80,9 +85,14 @@ define(['cache'], function (cache) {
             return !!this.getCurrentTeam();
         },
 
-        isTeamOwnerOrManager: function () {
+        isCurrentAccount: function (account) {
+            var current = this.getCurrentAccount();
+            return (current && account && current.id == account.id && current.type == account.type);
+        },
+
+        isCurrentAccountType: function (type) {
             var account = this.getCurrentAccount();
-            return (account && (account.team || account.team_manager));
+            return (account && account.type == type);
         },
 
         setCurrentAvatar: function (icon) {
@@ -133,6 +143,14 @@ define(['cache'], function (cache) {
 
         isAuthenticated: function () {
             return !!this.getSessionToken();
+        },
+
+        onboardingComplete: function() {
+            return !!localStorage.getItem('onboarding_complete');
+        },
+
+        setOnboardingComplete: function () {
+            localStorage.setItem('onboarding_complete', true);
         },
 
         destorySession: function () {

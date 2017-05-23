@@ -1,9 +1,8 @@
-define(['util','config','api'], //'views/module','i18n!nls/lang','tplManager'
-function (util,config,api) { //VM,i18n,TM
+define(['app','util','config','api'], //'views/module'/*,'i18n!nls/lang'*/,'tplManager'
+function (app,util,config,api) { //VM/*,i18n*/TM
     var fileSelector;
 
     var photoChanger = {
-
         init: function (settings) {
             if (!settings.url) {
                 throw "'url' endpoint param must be provided";
@@ -35,7 +34,7 @@ function (util,config,api) { //VM,i18n,TM
              }];
 
              var groups = [buttons1, buttons2];
-             tommyApp.actions(groups);
+             window.tommy.app.actions(groups);
         },
 
         capturePhotoEdit: function () {
@@ -112,7 +111,7 @@ function (util,config,api) { //VM,i18n,TM
         },
 
         onPhotoFail: function (message) {
-            tommyApp.alert('Error getting image from device: ' + message);
+            window.tommy.app.alert('Error getting image from device: ' + message);
 
             if (photoChanger.settings.error)
                 photoChanger.settings.error();
@@ -123,16 +122,19 @@ function (util,config,api) { //VM,i18n,TM
             form.append('photo', photo, 'profilephoto.jpg');
 
             api.call({
-                    func: photoChanger.settings.url,
-                    method: 'PUT',
-                    data: form
-                },
-                function (response) {
-                    // console.log('photoChanger', 'onPhotoDataSuccess', response);
+                endpoint: photoChanger.settings.url,
+                method: 'PUT',
+                data: form
+            }).then(function (response) {
+                console.log('photoChanger', 'upload success', response);
+                if (response.icon_url) {
+                    config.setCurrentAvatar(response.icon_url);
+                    app.renderCurrentAvatar();
+                }
 
-                    if (photoChanger.settings.success)
-                        photoChanger.settings.success(response);
-                });
+                if (photoChanger.settings.success)
+                    photoChanger.settings.success(response);
+            }).catch(photoChanger.settings.error);
         }
     };
 

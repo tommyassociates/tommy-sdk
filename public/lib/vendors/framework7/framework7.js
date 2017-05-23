@@ -8001,7 +8001,7 @@
                 if (!state) {
                     state = {
                         viewIndex: app.views.indexOf(mainView),
-                        url : tommyView.history[0]
+                        url : window.tommy.view.history[0]
                     };
                 }
                 if (state.viewIndex < 0) return;

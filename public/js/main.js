@@ -61,7 +61,7 @@
 
                 $$('body').append(GTPL);
 
-                util.bindDynamicSubmitButtons();
+                // util.bindDynamicSubmitButtons();
 
                 TM.initGlobalVariables();
                 TH.init();

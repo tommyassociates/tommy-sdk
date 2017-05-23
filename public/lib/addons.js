@@ -1,48 +1,45 @@
-define(['api','util','config','cache','util','Framework7'],
-function(api,util,config,cache,util) {
+define(['app','api','util','config','cache','util','Framework7'],
+function(app, api,util,config,cache,util) {
     var t7 = Template7;
 
     var addons = {
 
-        /**
-         *  Object containing all addon objects scoped by package name and version.
-         */
-
+        // All addon objects scoped by package name and version.
         addons: {},
 
-        /**
-         *  Object containing all addon view objects scoped by package view name.
-         */
-
+        // All addon view objects scoped by package view name.
         views: {},
 
-        /**
-         *  Object containing all addon asset URLs that have been loaded.
-         */
-
+        // All addon asset URLs that have been loaded.
         loadedAssetURLs: [],
 
-        /**
-         *  Init the addons interface.
-         */
+        // True when addons have been initialized.
+        initialized: false,
 
+        // Initialize the addon manager.
         init: function () {
+            if (this.initialized)
+              return false;
+            this.initialized = true;
+
             if (!t7.global)
                 t7.global = {};
-            // if (!t7.global.addons)
-            //     t7.global.addons = {};
             if (!t7.global.addonViews)
                 t7.global.addonViews = {};
 
             // this.bind();
 
-            tommyApp.onPageInit('*', this.onEnterAddon); //onPageAfterAnimation
-            tommyApp.onPageBeforeAnimation('*', this.onExitAddon);
+            app.f7.onPageInit('*', this.onEnterAddon);
+            app.f7.onPageBeforeAnimation('*', this.onExitAddon);
         },
 
-        /**
-         *  Bind the addons interface.
-         */
+        resetCurrentAddonContext: function () {
+            console.log('reset current addon context', t7.global.currentAddon)
+            t7.global.currentAddon = null;
+            t7.global.currentActorId = null; // unset the API actor override
+
+            window.tommy.addonLoaded = null;
+        },
 
         preprocess: function (content, url) {
             if (!t7.global.currentAddon) {
@@ -59,6 +56,11 @@ function(api,util,config,cache,util) {
                         t7.global.currentAddon = addon;
                         t7.global.currentAddon.pageUrl = url;
 
+                        // Set a global flag to notify the native app that the
+                        // addon is loading. At this point the addon webview
+                        // will pop to front.
+                        window.tommy.addonLoaded = true;
+
                         console.log('entering addon context', t7.global.currentAddon)
                     }
                 }
@@ -68,14 +70,21 @@ function(api,util,config,cache,util) {
         },
 
         onExitAddon: function (page) {
-
             // If we're navigating away form the addon then unset the
             // currentAddon variable
-            if (t7.global.currentAddon &&
-                t7.global.currentAddon.pageUrl === page.fromPage.url && page.from === 'left') {
+            if ((t7.global.currentAddon &&
+                t7.global.currentAddon.pageUrl === page.fromPage.url && page.from === 'left')) {
                 console.log('leaving addon context', page, t7.global.currentAddon)
-                t7.global.currentAddon = null;
-                t7.global.currentActorId = null; // unset the API actor override
+                addons.resetCurrentAddonContext();
+                // t7.global.currentAddon = null;
+                // t7.global.currentActorId = null; // unset the API actor override
+
+                // // Redirect back to native app if operating in proxy mode
+                // console.log('leaving addon context proxy mode', window.tommy.native)
+                // if (window.tommy.native) {
+                //     console.log('redirecting back to main app', window.tommy.native)
+                //     window.location = 'tommy://backToApp';
+                // }
             }
         },
 
@@ -85,6 +94,7 @@ function(api,util,config,cache,util) {
             }
 
             var $page = $$(page.container),
+                $nav = $$(page.navbarInnerContainer),
                 package = $page.data('addon'),
                 viewId = $page.data('view'),
                 view = addons.getView(package, viewId),
@@ -94,16 +104,11 @@ function(api,util,config,cache,util) {
             // Set the actor ID
             if (page.context.actor_id) {
                 console.log('render setting actor id', page.context.actor_id);
-                // t7.global.currentAddon.actorId = page.context.url_query.actor_id;
                 t7.global.currentActorId = page.context.actor_id;
-            // }
-            // else {
-            //     t7.global.currentActorId = config.getCurrentUser().id;
             }
 
             if (view && !view.initialized) {
                 view.initialized = true;
-
                 console.log('render addon view page', page.name, view);
 
                 $page.data('uid', view.uid);
@@ -115,6 +120,9 @@ function(api,util,config,cache,util) {
                         $iframe.contents().find('body').append(view.data);
                     });
                 }
+
+                // Bind native back links (since onAddonExit will not be called)
+                $nav.find('.link.back.external').click(addons.resetCurrentAddonContext)
 
                 // // Bind addon configuration forms
                 // if (view.type == 'form') {
@@ -139,23 +147,25 @@ function(api,util,config,cache,util) {
             }
         },
 
-        loadFile: function (package, version, fileName, callback) {
-            // var viewpath = util.addonAssetPath(package, version, fileName);, local
-            // if (local) {
-            //     $.ajax({
-            //        url: this.viewPath(package, version, fileName),
-            //        type: 'GET',
-            //        success: function (data, status, xhr) {
-            //           callback(null, data);
-            //        },
-            //        error: function (xhr, status, error) {
-            //           callback(error || 'Bad request', null);
-            //        }
-            //     });
-            // } else {
-                api.getAddonFile(package, version, fileName, callback); //'/addons/' + package + '/files/' + fileName
-            // }
-        },
+        // loadFile: function (package, version, fileName, callback) {
+        //     // var viewpath = util.addonAssetPath(package, version, fileName);, local
+        //     // if (local) {
+        //     //     $.ajax({
+        //     //        url: this.viewPath(package, version, fileName),
+        //     //        type: 'GET',
+        //     //        success: function (data, status, xhr) {
+        //     //           callback(null, data);
+        //     //        },
+        //     //        error: function (xhr, status, error) {
+        //     //           callback(error || 'Bad request', null);
+        //     //        }
+        //     //     });
+        //     // } else {
+        //     //     api.getAddonFile(package, version, fileName, callback); //'/addons/' + package + '/files/' + fileName
+        //     // }
+        //
+        //     return api.getAddonFile(package, version, fileName, callback);
+        // },
 
         removeAddon: function (package) {
             var addon = cache.get('addons', package);
@@ -164,20 +174,28 @@ function(api,util,config,cache,util) {
             cache.set('addons', package, null);
 
             // Remove views
-            var replaced = [], removed = [], view;
             for (var uid in t7.global.addonViews) {
-                view = t7.global.addonViews[uid];
-                if (view.package != package)
-                    replaced.push(view);
-                else
-                    removed.push(view);
+                var view = t7.global.addonViews[uid];
+                if (view.package == package) {
+                    delete t7.global.addonViews[uid];
+                    addons.onViewRemoved(addon, view);
+                }
             }
-            t7.global.addonViews = replaced;
+
+            // var replaced = [], removed = [], view;
+            // for (var uid in t7.global.addonViews) {
+            //     view = t7.global.addonViews[uid];
+            //     if (view.package != package)
+            //         replaced.push(view);
+            //     else
+            //         removed.push(view);
+            // }
+            // t7.global.addonViews = replaced;
 
             // Trigger events
-            for (i = 0; i < removed.length; i++) {
-                addons.onViewRemoved(addon, removed[i]);
-            }
+            // for (i = 0; i < removed.length; i++) {
+            //     addons.onViewRemoved(addon, removed[i]);
+            // }
 
             addons.onAddonRemoved(addon);
 
@@ -186,51 +204,34 @@ function(api,util,config,cache,util) {
 
         initAddon: function (addon) {
             var package = addon.package,
-                version = addon.version;
+                version = addon.version,
+                iterable = [];
 
             // addon.path = util.addonAssetPath(package, version, null);
             // addon.url = util.addonAssetUrl(package, version, null, true);
 
-            cache.set('addons', package, addon);
-            this.onAddonLoaded(addon);
-
+            // Loop through views and preload them if they are default views
             if (addon.views && addon.views.length) {
-
-                // Setup template context
-                // if (!t7.global.addons[addon.package])
-                //     t7.global.addons[addon.package] = {};
-                //
-                // t7.global.addons[package].path = addon.basePath;
-                // t7.global.addons[package].url = addon.baseUrl;
-
-                var isManager = config.isTeamOwnerOrManager();
-
-                // Add each of the views to the interface
                 for (var i = 0; i < addon.views.length; i++) {
                     var view = addon.views[i];
-
-                    // NOTE: API now only serves up visible viws so we just
-                    // render everything on the client side
-                    // If `view.manager` is true OR false we conditionally show
-                    // OR hide the view depending on manager status
-                    // if (typeof(view.manager) !== 'undefined' &&
-                    //     view.manager !== isManager) {
-                    //     console.log('skipping view', view.manager, isManager)
-                    //     continue;
-                    // }
 
                     switch(view.type) {
                         // case 'template':
                         //     this.loadTemplate(addon, view);
                         //     break;
                         case 'page':
-                            this.initPageView(addon, view);
+                            iterable.push(this.initPageView(addon, view));
                             break;
                         default:
                             alert('Unknown view type: ' + view.type);
                     }
                 }
             }
+
+            cache.set('addons', package, addon);
+            this.onAddonLoaded(addon);
+
+            return Promise.all(iterable);
         },
 
         initPageView: function (addon, view) {
@@ -242,75 +243,98 @@ function(api,util,config,cache,util) {
             view.uid = package + '-' + view.id;
             view.icon_url = addon.icon_url;
 
-            // if (!view.path)
-            //     view.path = util.joinPath(addon.path, '/files/', view.file);
-            // if (!view.url)
-            //     view.url = util.joinPath(addon.path, '/files/', view.file);
+            // Cache the view object
+            cache.set('addonViews', view.uid, view);
 
-            // if (!view.path)
-            //     view.path = util.addonAssetPath(package, version, view.file);
-            // if (!view.url)
-            //     view.url = util.addonAssetUrl(package, version, view.file);
-
+            // Set global addon view data for Template7
             if (view.default) {
                 t7.global.addonViews[view.uid] = view;
             }
 
-            // Evaluate queued JavaScripts after animation completes
-            // addons.addons.evalPageJavaScript(view);
-            if (view.assets && view.assets.length) {
+            // return new Promise(function(resolve, reject) {
+            return addons.loadViewAssets(addon, view).then(function() {
+                console.log('add addon view', view);
+                addons.onViewLoaded(addon, view);
+            })
+        },
+
+        loadViewAssets: function (addon, view) {
+            var iterable = [];
+
+            if (view && view.assets && view.assets.length) {
+
+                // Sort assets by load preference
+                view.assets.sort(function(a, b){
+                    switch(b.type) {
+                        case 'template':
+                            return 2;
+                        case 'javascript':
+                            return 1;
+                        case 'stylesheet':
+                        default:
+                            return 0;
+                    }
+                });
+
+                // Loop through and load assets
                 for (var i = 0; i < view.assets.length; i++) {
                     var asset = view.assets[i],
-                        url = util.addonAssetUrl(package, version, asset.file, true),
-                        loaded = false;
-                    console.log('loading addon asset', package, asset)
+                        url = util.addonAssetUrl(addon.package, addon.version, asset.file, true);
 
-                    // TODO: use inArray or similar
-                    for (var x = 0; x < addons.loadedAssetURLs.length; x++) {
-                        if (addons.loadedAssetURLs[x] == url)
-                            loaded = true;
-                    }
-
-                    if (loaded) {
-                        console.log('already loaded asset', url);
+                    if (addons.loadedAssetURLs.indexOf(url) != -1) {
+                        console.log('skipping already loaded asset', url);
                         continue;
                     }
+                    addons.loadedAssetURLs.push(url);
+                    console.log('loading addon asset', addon.package, asset);
 
                     switch(asset.type) {
+                        case 'template':
+                            iterable.push(addons.loadTemplate(url));
+                            break;
                         case 'javascript':
-                            var script = document.createElement('script');
-                            script.type = 'text/javascript';
-                            script.src = url; //asset.url;
-                            document.body.appendChild(script);
+                            iterable.push(addons.loadJavaScript(url));
                             break;
                         case 'stylesheet':
-                            var style = document.createElement('link');
-                            style.rel = 'stylesheet';
-                            style.href = url; //asset.url;
-                            document.body.appendChild(style);
-                            break;
-                        case 'template':
-                            this.loadTemplate(url);
+                            iterable.push(addons.loadStylesheet(url));
                             break;
                         default:
                             alert('Unknown asset type: ' + asset.type);
                     }
-
-                    addons.loadedAssetURLs.push(url);
                 }
             }
 
-            cache.set('addonViews', view.uid, view);
+            return Promise.all(iterable);
+        },
 
-            console.log('add addon view', view);
-            this.onViewLoaded(addon, view);
+        loadJavaScript: function (url) {
+            return new Promise(function(resolve, reject) {
+                var script = document.createElement('script');
+                script.type = 'text/javascript';
+                script.src = url;
+                script.onload = function() { resolve(); }
+                document.body.appendChild(script);
+            });
+        },
+
+        loadStylesheet: function (url) {
+            return new Promise(function(resolve, reject) {
+                var style = document.createElement('link');
+                style.rel = 'stylesheet';
+                style.href = url;
+                style.onload = function() { resolve(); }
+                document.body.appendChild(style);
+            });
         },
 
         loadTemplate: function (url) { //addon, view
             // var viewPath = util.addonAssetUrl(addon.package, addon.version, view.file, true); //
             // $$.get(viewPath, function (data) {
-            $$.get(url, function (data) {
-                $$('body').append(data);
+            return new Promise(function(resolve, reject) {
+                $$.get(url, function (data) {
+                    $$('body').append(data);
+                    resolve();
+                });
             });
         },
 
@@ -327,13 +351,33 @@ function(api,util,config,cache,util) {
         //     });
         // },
 
-        loadAddon: function (package, version, callback) {
-            api.getAddonVersion(package, version).then(function (response) {
+        loadAddon: function (package, version) { //, callback
+            return api.getAddonVersion(package, version).then(function (response) {
                 console.log('addon response', response);
-                addons.initAddon(response);
+                return addons.initAddon(response).then(function () {
+                    return response;
+                });
+            });
+        },
 
-                if (callback)
-                    callback(response);
+        showAddonView: function (package, version, viewId) {
+            var addon = addons.getAddon(package, version);
+            if (!addon) {
+                alert("Couldn't show addon: " + package);
+                return;
+            }
+
+            var view = addons.getView(package, viewId);
+            if (!view) {
+                alert("Couldn't show addon view: " + package + ": " + viewId);
+                return;
+            }
+
+            console.log('loading addon view', package, view);
+            app.f7view.router.load({
+                url: view.url,
+                context: addon,
+                animatePages: false // disable for native integration
             });
         },
 
@@ -353,6 +397,20 @@ function(api,util,config,cache,util) {
                 if (callback)
                     callback(response);
             });
+        },
+
+        reloadAllRemote: function (callback) {
+            var addons = this.getAddons();
+            for (var package in addons) {
+                this.removeAddon(package);
+                // var = t7.global.addonViews[uid];
+                // if (view.package != package)
+                //     replaced.push(view);
+                // else
+                //     removed.push(view);
+            }
+
+            return this.loadAllRemote(callback);
         },
 
         getAddons: function () {
@@ -504,11 +562,11 @@ function(api,util,config,cache,util) {
         //     if (!view)
         //         throw 'Unknown view for ' + package + ' and ' + viewId;
         //
-        //     tommyView.router.loadContent(view.html);
+        //     window.tommy.view.router.loadContent(view.html);
         //
         //     // var view = this.views[viewId],
         //     //   addon = cache.get('addons', view.package, 'addon');
-        //     // tommyView.router.load({
+        //     // window.tommy.view.router.load({
         //     //     // template: t7.templates.aboutTemplate, // template already compiled and available as a property of t7.templates
         //     //     content: view.html,
         //     //     context: {
