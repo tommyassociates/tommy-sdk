@@ -1,4 +1,4 @@
-define(['config','util','moment','Framework7'], function (config,util,moment) {
+define(['config','util','moment','i18n'/*,'i18n!nls/lang'*/,'Framework7'], function (config,util,moment,i18n/*,i18n*/) {
     var $$ = Dom7;
     var t7 = Template7;
 
@@ -49,6 +49,16 @@ define(['config','util','moment','Framework7'], function (config,util,moment) {
                     return array.length;
                 return 0;
             });
+
+            t7.registerHelper('t', function (key, options) {
+                // var opts = i18n.i18next.functions.extend(options.hash, context);
+                // if (options.fn) opts.defaultValue = options.fn(context);
+                // console.log(options)
+             
+                var result = i18n.i18next.t(key, options.hash);
+                return result;
+            });
+
 
             //
             // String Manipulation
@@ -117,6 +127,19 @@ define(['config','util','moment','Framework7'], function (config,util,moment) {
             // URL and Paths
             //
 
+            // var backButton = '<a href="#" class="back link icon-only"><i class="material-icons md-36">keyboard_arrow_left</i></a>';
+
+            t7.registerHelper('backButton', function (type) {
+                // console.log('render back button', window.tommy.native, type)
+                // if (window.tommy.native && type == 'native')
+                //     return '<a href="tommy://backToApp" class="back link icon-only external"><i class="material-icons md-36">keyboard_arrow_left</i></a>';
+                return '<a href="#" class="back link icon-only"><i class="material-icons md-36">keyboard_arrow_left</i></a>';
+            });
+
+            // t7.registerHelper('nativeBackButton', function (type) {
+            //     return backButton;
+            // });
+
             // t7.registerHelper('addonAssetPath', function (file) {
             //     if (!t7.global.currentAddon)
             //         throw 'Cannot render addon asset path: ' + file;
@@ -138,6 +161,57 @@ define(['config','util','moment','Framework7'], function (config,util,moment) {
                 if (part1 && typeof part1 !== 'object') { url += ('/' + part1); }
                 if (part2 && typeof part2 !== 'object') { url += ('/' + part2); }
                 return url + '?token=' + config.getSessionToken();
+            });
+
+            // Renders an avatar for a user, account or message object.
+            t7.registerHelper('circleAvatar', function (object, options) {
+                var opts = options.hash;
+
+                // User, Contact or Team Member object
+                var data = {};
+                if (object.first_name) {
+                    data.user_id = object.user_id;
+                    data.initials = object.first_name[0] + object.last_name[0];
+                    data.icon_url = object.icon_url;
+                    data.current = config.getCurrentUserId() == object.id;
+                    data.notification_count = object.notification_count;
+                    data.online = object.online;
+                }
+                // Account object
+                else if (object.name) {
+                    data.user_id = object.user_id;
+                    data.initials = object.name[0] + object.name[1];
+                    data.icon_url = object.icon_url;
+                    data.current = config.isCurrentAccount(object);
+                    data.notification_count = object.notification_count;
+                    data.online = object.online;
+                }
+                // Message object
+                else if (object.sender_first_name) {
+                    data.initials = object.sender_first_name[0] + object.sender_last_name[1];
+                    data.icon_url = object.sender_icon_url;
+                }
+                // Message object without sender (no icon)
+                else if (object.chat_title) {
+                    data.initials = object.chat_title[0] + object.chat_title[1];
+                }
+                else {
+                    data.initials = 'TO'; // Tommy?
+                }
+
+                var html = '<span class="avatar-circle">';
+
+                if (opts.onlineBadge)
+                    html += '<span class="badge ' + (!!data.online ? ' online' : ' offline') + '" data-online-state="' + data.user_id + '">&nbsp;</span>';
+
+                if (opts.notificationBadge)
+                    html += '<span class="badge ' + (!!data.notification_count ? '' : ' hide') + '">' + data.notification_count + '</span>';
+
+                html += '<span class="initials">' + data.initials + '</span>';
+                if (data.icon_url)
+                    html += '<img src="' + data.icon_url + '" class="' + (data.current ? 'current-avatar' : '') + '" />';
+                html += '</span>';
+                return html;
             });
 
             //
@@ -177,7 +251,7 @@ define(['config','util','moment','Framework7'], function (config,util,moment) {
                 }
 
                 // Manage other team members as team owner or manager
-                if ((us.team || us.team_manager) && them.team_member) {
+                if ((util.hasRole(us, 'TeamAdmin') || util.hasRole(us, 'TeamManager')) && util.hasRole(us, 'TeamMember')) {
                     access = true;
                 }
 
@@ -191,7 +265,7 @@ define(['config','util','moment','Framework7'], function (config,util,moment) {
                 var us = config.getCurrentAccount(),
                     user = config.getCurrentUser();
 
-                if (us.team || us.team_manager || (user.id == user_id))
+                if (util.hasRole(us, 'TeamAdmin') || util.hasRole(us, 'TeamManager') || (user.id == user_id))
                     return options.fn(this);
                 else
                     return options.inverse(this);
@@ -202,7 +276,8 @@ define(['config','util','moment','Framework7'], function (config,util,moment) {
                     user = config.getCurrentUser(),
                     team = config.getCurrentTeam();
 
-                if ((us.team || us.team_manager || user.id == user_id) && (team.owner_id != user_id))
+                if ((util.hasRole(us, 'TeamAdmin') || util.hasRole(us, 'TeamManager') || user.id == user_id) && 
+                    (team.user_id != user_id))
                     return options.fn(this);
                 else
                     return options.inverse(this);
@@ -226,11 +301,10 @@ define(['config','util','moment','Framework7'], function (config,util,moment) {
                     return options.inverse(this);
             });
 
-            t7.registerHelper('hideIfdefaultAccount', function (account_id, name, title, location_id) {
-                if (config.getCurrentAccount().id === account_id &&
-                    config.getCurrentAccount().name === name &&
-                    config.getCurrentAccount().title === title) //  &&
-                    // config.getCurrentAccount().location_id === location_id
+            t7.registerHelper('hideIfDefaultAccount', function (account) {
+                var us = config.getCurrentAccount();
+                if (us.id === account.id &&
+                    us.type === account.type)
                     return 'hide';
             });
 

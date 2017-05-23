@@ -8,16 +8,31 @@ function (config) {
             return $$('#' + tid).html();
         },
 
+        // Storage for compiled templates
+        cache: {},
+
         compile: function (markup, context) {
             var compiledTemplate = t7.compile(markup);
             var output = compiledTemplate(context);
             return output;
         },
 
-        render: function (tid, context) {
+        loadAndCompile: function (tid, context) {
+            if (this.cache[tid])
+              return this.cache[tid];
             var markup = this.load(tid);
+            return this.cache[tid] = t7.compile(markup);
+            // return $$('#' + tid).html();
+            // return
+            // var compiledTemplate = t7.compile(markup);
+            // var output = compiledTemplate(context);
+            // return output;
+        },
+
+        render: function (tid, context) {
+            // var markup = this.load(tid);
             // console.log('render', tid, markup)
-            return this.compile(markup, context);
+            return this.loadAndCompile(tid)(context);
         },
 
         renderTarget: function (tid, context, target) {
@@ -35,15 +50,15 @@ function (config) {
             }
         },
 
-        renderRemote: function (tplName, context, callback) {
-            tplName = tplName || '';
-            $$.get('views/' + tplName + '.tpl.html', function (markup) {
-                var compiledTemplate = t7.compile(markup);
-                var output = compiledTemplate(context);
-
-                typeof(callback === 'function') ? callback(output) : null;
-            });
-        },
+        // renderRemote: function (tplName, context, callback) {
+        //     tplName = tplName || '';
+        //     $$.get('views/' + tplName + '.tpl.html', function (markup) {
+        //         var compiledTemplate = t7.compile(markup);
+        //         var output = compiledTemplate(context);
+        //
+        //         typeof(callback === 'function') ? callback(output) : null;
+        //     });
+        // },
 
         initGlobalVariables: function () {
             if (!t7.global)

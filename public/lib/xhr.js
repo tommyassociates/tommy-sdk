@@ -1,5 +1,5 @@
-define(['util','config','i18n!nls/lang','Framework7'], //,'networkStatus'
-function (util,config,i18n) {
+define(['util','app','config'/*,'i18n!nls/lang'*/,'Framework7'], //,'networkStatus'
+function (util,app,config/*,i18n*/) {
     var $$ = Dom7;
 
     var xhr = {
@@ -9,13 +9,13 @@ function (util,config,i18n) {
                 xhr.setRequestHeader('Authorization', 'Token ' + config.getSessionToken());
 
                 // TODO: add hide indicator flag to xhr to prevent
-                tommyApp.showIndicator();
+                app.showLoader();
                 // console.log('Ajax request started', e);
             });
 
             $$(document).on('ajaxComplete', function(e) {
-                tommyApp.hideIndicator();
-                util.hideLoader();
+                // window.tommy.app.hideIndicator();
+                app.hideLoader();
                 // console.log('Ajax request complete', e);
             });
         },
@@ -29,9 +29,8 @@ function (util,config,i18n) {
             if (util.isPhonegap()) {
                 var network = util.checkConnection();
                 if (network === 'NoNetwork') {
-                    tommyApp.alert(i18n.error.no_network, function () {
-                        tommyApp.hideIndicator();
-                        util.hideLoader();
+                    window.tommy.app.alert(i18n.error.no_network, function () {
+                        app.hideLoader();
                     });
 
                     return false;
@@ -43,7 +42,7 @@ function (util,config,i18n) {
             //     url += options.func;
 
             // xhr.getRequestURL(options);
-            console.log('xhr: call', options);
+            console.log('xhr: call: ' + JSON.stringify(options));
 
             return $$.ajax({
                 url: options.url,
@@ -57,7 +56,7 @@ function (util,config,i18n) {
                     try {
                         data = JSON.parse(data);
                     } catch(e) {
-                        // tommyApp.alert('Invalid API JSON response: ' + data);
+                        // window.tommy.app.alert('Invalid API JSON response: ' + data);
                     }
 
                     console.log('xhr: call: success', options.url, data);
@@ -67,8 +66,8 @@ function (util,config,i18n) {
                         successCallback(data);
                     }
 
-                    // tommyApp.hideIndicator();
-                    // util.hideLoader();
+                    // window.tommy.app.hideIndicator();
+                    // app.hideLoader();
 
                     // $$('#overlay-error').hide();
                     // data = data ? JSON.parse(data) : '';
@@ -85,31 +84,34 @@ function (util,config,i18n) {
                     //     (typeof(successCallback) === 'function') ? successCallback(data) : '';
                     // }
                     // else {
-                    //     tommyApp.alert(codeLevel.message,function () {
+                    //     window.tommy.app.alert(codeLevel.message,function () {
                     //         if(codeLevel.path !== '/')
-                    //             tommyView.router.loadPage(codeLevel.path);
+                    //             window.tommy.view.router.loadPage(codeLevel.path);
                     //
-                    //         tommyApp.hideIndicator();
-                    //         util.hideLoader();
+                    //         window.tommy.app.hideIndicator();
+                    //         app.hideLoader();
                     //     });
                     // }
                 },
                 error: function (xhr, status) {
-                    console.log('xhr: call: error', xhr, status);
+                    console.log('xhr: call: error: ' + status + ': ' + xhr.responseText);
                     // console.log(JSON.stringify(data));
 
-                    // tommyApp.hideIndicator();
-                    // util.hideLoader();
+                    // window.tommy.app.hideIndicator();
+                    // app.hideLoader();
 
                     try {
-                        var json = JSON.parse(xhr.responseText);
-                        if (json.message)
-                            tommyApp.alert(json.message);
+                        if (options.showErrorMessages !== false) {
+                            var json = JSON.parse(xhr.responseText);
+                            if (json.message) {
+                                app.handleAPIError(json.message);
+                            }
+                        }
 
                         // switch(json.status) {
                         //     case 422:
                         //     default:
-                        //        tommyApp.alert(json.message);
+                        //        window.tommy.app.alert(json.message);
                         //        break;
                         // }
 
@@ -117,18 +119,22 @@ function (util,config,i18n) {
                             errorCallback(json);
                         }
                     } catch (error) {
-                        if (status === 500) {
-                            tommyApp.alert('Internal server error');
-                            // $$('#overlay-error').html('No Internet Connection');
-                            // $$('#overlay-error').show();
-                        } else {
-                            tommyApp.alert('Invalid API response: ' + xhr.responseText);
+                        if (options.showErrorMessages !== false) {
+                            if (status === 500) {
+                                app.handleAPIError('Internal server error');
+                                // window.tommy.app.alert('Internal server error');
+                                // $$('#overlay-error').html('No Internet Connection');
+                                // $$('#overlay-error').show();
+                            } else {
+                                app.handleAPIError(xhr.responseText, 'Invalid API response');
+                                // window.tommy.app.alert('Invalid API response: ' + xhr.responseText);
+                            }
                         }
                     }
 
-                    setTimeout(function () {
-                        $$('#overlay-error').hide();
-                    }, 2000);
+                    // setTimeout(function () {
+                    //     $$('#overlay-error').hide();
+                    // }, 2000);
 
                     // if(textStatus === 200) {
                     //     var res = JSON.parse(data.response);
@@ -136,7 +142,7 @@ function (util,config,i18n) {
                     //     // if(res.error == 'token_expired')  {
                     //         // $$('#overlay-error').html('Token has expired. Please login again.');
                     //         $$('#overlay-error').show();
-                    //         tommyView.router.loadPage('views/login.html');
+                    //         window.tommy.view.router.loadPage('views/login.html');
                     //     // }
                     //     // else {
                     //         // $$('#overlay-error').html('Oops! Something went wrong.');
@@ -146,14 +152,14 @@ function (util,config,i18n) {
                     // else if(textStatus === 400) {
                     //         // $$('#overlay-error').html('Token has expired. Please login.');
                     //         // $$('#overlay-error').show();
-                    //         tommyView.router.loadPage('views/login.html');
+                    //         window.tommy.view.router.loadPage('views/login.html');
                     // }
                     // else if(textStatus === 404) {
                     //     var data = JSON.parse(data.response);
                     //
                     //     if(data.error == 'user_not_found') {
                     //         config.destorySession();
-                    //         tommyView.router.reloadPage('views/login.html');
+                    //         window.tommy.view.router.reloadPage('views/login.html');
                     //     }
                     //     else{
                     //         $$('#overlay-error').html('No Internet Connection.');
@@ -167,10 +173,10 @@ function (util,config,i18n) {
                     // else {
                     //     // $$('#overlay-error').html('Oops! Something went wrong.');
                     //     // $$('#overlay-error').show();
-                    //     // tommyView.router.loadPage('views/login.html');
+                    //     // window.tommy.view.router.loadPage('views/login.html');
                     //     if(options.func === 'login') {
-                    //         util.hideLoader();
-                    //         tommyApp.alert('Connection Problem. Please verify your internet connection and try again.');
+                    //         app.hideLoader();
+                    //         window.tommy.app.alert('Connection Problem. Please verify your internet connection and try again.');
                     //     }
                     //     else {
                     //         $$('#overlay-error').html('Connection Problem. Please try again.');
