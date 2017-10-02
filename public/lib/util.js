@@ -1,33 +1,6 @@
 define(['config','cache'/*,'i18n!nls/lang'*/,'Framework7'],function (config,cache/*,i18n*/) {
     var $$ = Dom7;
 
-    // Polyfill for Object.assign for older mobile browsers
-    // TODO: Move to more appropriate file
-    if (typeof Object.assign != 'function') {
-      (function () {
-        Object.assign = function (target) {
-          'use strict';
-          // We must check against these specific cases.
-          if (target === undefined || target === null) {
-            throw new TypeError('Cannot convert undefined or null to object');
-          }
-
-          var output = Object(target);
-          for (var index = 1; index < arguments.length; index++) {
-            var source = arguments[index];
-            if (source !== undefined && source !== null) {
-              for (var nextKey in source) {
-                if (source.hasOwnProperty(nextKey)) {
-                  output[nextKey] = source[nextKey];
-                }
-              }
-            }
-          }
-          return output;
-        };
-      })();
-    }
-
     var util = {
 
         //
@@ -53,7 +26,7 @@ define(['config','cache'/*,'i18n!nls/lang'*/,'Framework7'],function (config,cach
 
         isEmpty: function (obj) {
             for (var prop in obj) {
-                if(obj.hasOwnProperty(prop))
+                if (obj.hasOwnProperty(prop))
                     return false;
             }
             return true;
@@ -98,8 +71,8 @@ define(['config','cache'/*,'i18n!nls/lang'*/,'Framework7'],function (config,cach
             // var account = config.getCurrentAccount();
             return (account && (
               account.type == 'Team' || (
-              account.type == 'TeamMember' && 
-              util.hasRole(account, 'TeamManager'))));
+              account.type == 'TeamMember' &&
+              util.hasRole(account, 'Team Manager'))));
         },
 
         getCharLength: function (str) {
@@ -277,6 +250,76 @@ define(['config','cache'/*,'i18n!nls/lang'*/,'Framework7'],function (config,cach
         //       }
         // },
 
+        createDatePicker: function ($input, initialDate) {
+            if (!window.tommy.app) return
+            return window.tommy.app.picker({
+                input: $input,
+                rotateEffect: true,
+                inputReadOnly: true,
+                value: [initialDate.getMonth(), initialDate.getDate(), initialDate.getFullYear(), initialDate.getHours(), (initialDate.getMinutes() < 10 ? '0' + initialDate.getMinutes() : initialDate.getMinutes())],
+                onChange: function (picker, values, displayValues) {
+                    var daysInMonth = new Date(picker.value[2], picker.value[0]*1 + 1, 0).getDate();
+                    if (values[1] > daysInMonth) {
+                        picker.cols[1].setValue(daysInMonth);
+                    }
+                },
+                formatValue: function (p, values, displayValues) {
+                    if (!displayValues[0]) {
+                        displayValues[0] = util.monthNames[initialDate.getMonth()]
+                    }
+                    return displayValues[0] + ' ' + values[1] + ', ' + values[2] + ' ' + values[3] + ':' + values[4];
+                },
+                cols: [
+                    // Months
+                    {
+                        values: ('0 1 2 3 4 5 6 7 8 9 10 11').split(' '),
+                        displayValues: util.monthNames, //('January February March April May June July August September October November December').split(' '),
+                        textAlign: 'left'
+                    },
+                    // Days
+                    {
+                        values: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31],
+                    },
+                    // Years
+                    {
+                        values: (function () {
+                            var year = initialDate.getFullYear()
+                            var arr = [];
+                            for (var i = year; i <= year + 10; i++) { arr.push(i); }
+                            return arr;
+                        })(),
+                    },
+                    // Space divider
+                    {
+                        divider: true,
+                        content: '  '
+                    },
+                    // Hours
+                    {
+                        values: (function () {
+                            var arr = [];
+                            for (var i = 0; i <= 23; i++) { arr.push(i); }
+                            return arr;
+                        })(),
+                    },
+                    // Divider
+                    {
+                        divider: true,
+                        content: ':'
+                    },
+                    // Minutes
+                    {
+                        values: (function () {
+                            var arr = [];
+                            for (var i = 0; i <= 59; i++) { arr.push(i < 10 ? '0' + i : i); }
+                            return arr;
+                        })(),
+                    }
+                ]
+            });
+        },
+
+
         //
         // URL and Query
         //
@@ -344,12 +387,37 @@ define(['config','cache'/*,'i18n!nls/lang'*/,'Framework7'],function (config,cach
             return path;
         },
 
-        // getPageNameInUrl: function (url) {
-        //     url = url || '';
-        //     var arr = url.split('.');
-        //     return arr[0];
-        // },
+        // Human readable invitation status
+        invitationStatus: function (status) {
+            switch (status) {
+                case 'requested':
+                    return 'Sent';
+                case 'accepted':
+                    return 'Added';
+                case 'declined':
+                    return 'Declined';
+                default:
+                    return '';
+            }
+        },
 
+        chatTitle: function (chat) {
+            if (chat && chat.title)
+                return chat.title
+
+            if (chat && chat.users) {
+                var currentUserId = config.getCurrentUserId();
+                var titleUserNames = []
+                for (var i = 0; i < chat.users.length; i++) {
+                    if (currentUserId != chat.users[i].user_id)
+                        titleUserNames.push(chat.users[i].first_name + ' ' + chat.users[i].last_name);
+                }
+
+                return util.formatTags(titleUserNames)
+            }
+
+            return 'Unknown'
+        }
         // optionList : {
         //     shiftRepeats :'None|Daily|Weekly|Monthy|Every Monday|Every Tuesday|Every Wednesday|Every Thursday|Every Friday|Every Saturday|Every Sunday',
         // },

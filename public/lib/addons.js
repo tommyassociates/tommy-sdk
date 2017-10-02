@@ -34,15 +34,15 @@ function(app, api,util,config,cache,util) {
         },
 
         resetCurrentAddonContext: function () {
-            console.log('reset current addon context', t7.global.currentAddon)
-            t7.global.currentAddon = null;
+            console.log('reset current addon context', t7.global.currentAddonInstall)
+            t7.global.currentAddonInstall = null;
             t7.global.currentActorId = null; // unset the API actor override
 
             window.tommy.addonLoaded = null;
         },
 
         preprocess: function (content, url) {
-            if (!t7.global.currentAddon) {
+            // if (!t7.global.currentAddonInstall) {
                 var pos = url.indexOf('/addons');
                 if (pos !== -1) {
                     var parts = url.substring(pos + 1).split('/');
@@ -53,30 +53,30 @@ function(app, api,util,config,cache,util) {
 
                         // Set the last visible addon for template URL helpers
                         // such as `addonAssetUrl`
-                        t7.global.currentAddon = addon;
-                        t7.global.currentAddon.pageUrl = url;
+                        t7.global.currentAddonInstall = addon;
+                        t7.global.currentAddonInstall.pageUrl = url;
 
                         // Set a global flag to notify the native app that the
                         // addon is loading. At this point the addon webview
                         // will pop to front.
                         window.tommy.addonLoaded = true;
 
-                        console.log('entering addon context', t7.global.currentAddon)
+                        console.log('entering addon context', t7.global.currentAddonInstall)
                     }
                 }
-            }
+            // }
 
             return content;
         },
 
         onExitAddon: function (page) {
             // If we're navigating away form the addon then unset the
-            // currentAddon variable
-            if ((t7.global.currentAddon &&
-                t7.global.currentAddon.pageUrl === page.fromPage.url && page.from === 'left')) {
-                console.log('leaving addon context', page, t7.global.currentAddon)
+            // currentAddonInstall variable
+            if ((t7.global.currentAddonInstall &&
+                t7.global.currentAddonInstall.pageUrl === page.fromPage.url && page.from === 'left')) {
+                console.log('leaving addon context', page, t7.global.currentAddonInstall)
                 addons.resetCurrentAddonContext();
-                // t7.global.currentAddon = null;
+                // t7.global.currentAddonInstall = null;
                 // t7.global.currentActorId = null; // unset the API actor override
 
                 // // Redirect back to native app if operating in proxy mode
@@ -89,7 +89,7 @@ function(app, api,util,config,cache,util) {
         },
 
         onEnterAddon: function (page) {
-            if (!t7.global.currentAddon) {
+            if (!t7.global.currentAddonInstall) {
                 return;
             }
 
@@ -98,11 +98,11 @@ function(app, api,util,config,cache,util) {
                 package = $page.data('addon'),
                 viewId = $page.data('view'),
                 view = addons.getView(package, viewId),
-                addon = t7.global.currentAddon,
+                addon = t7.global.currentAddonInstall,
                 version = addon.version;
 
             // Set the actor ID
-            if (page.context.actor_id) {
+            if (page.context && page.context.actor_id) {
                 console.log('render setting actor id', page.context.actor_id);
                 t7.global.currentActorId = page.context.actor_id;
             }
@@ -442,15 +442,15 @@ function(app, api,util,config,cache,util) {
             }
         },
 
-        currentAddon: function () {
-            // NOTE: `currentAddon` will be null while using the SDK in development
+        currentAddonInstall: function () {
+            // NOTE: `currentAddonInstall` will be null while using the SDK in development
             // mode, until the addon is created via the API and installed for the
             // current user account.
-            return t7.global.currentAddon;
+            return t7.global.currentAddonInstall;
         },
 
         currentAddonInstallId: function () {
-            return t7.global.currentAddon ? t7.global.currentAddon.addon_install_id : null;
+            return t7.global.currentAddonInstall ? t7.global.currentAddonInstall.id : null;
         },
 
         currentActorId: function () {

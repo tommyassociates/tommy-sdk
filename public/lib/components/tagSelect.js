@@ -10,44 +10,70 @@ function (util,api,app) {
             api.getCurrentTeamTags({cache: true}).then(function(tagItems) {
 
                 // Populate the tag select
-                var $select = $tagSelect.find('select');
+                var $select = $tagSelect.find('select')
                 for (var i = 0; i < tagItems.length; i++) {
                     var item = tagItems[i],
-                        selected = util.isTagSelected(savedTags, item);
-                    $select.append('<option data-type="' + item[0] + '" data-id="' + item[1] + '" ' + (selected ? 'selected' : '') + '>' + item[2] + '</option>');
+                        selected = util.isTagSelected(savedTags, item)
+                    $select.append('<option data-type="' + item[0] + '" data-id="' + item[2] + '" ' + (selected ? 'selected' : '') + '>' + item[1] + '</option>')
                 }
 
-                tagSelectComponent.init($tagSelect);
+                tagSelectComponent.init($tagSelect)
 
                 // Handle change events
                 $tagSelect.on('change', function() {
-                    var data = []; // [ 'User', 1, 'Kam Low' ]];
+                    var data = []; // [ 'User', 'Kam Low', 1 ]];
                     $select.find('option:checked').each(function() {
-                        var item = $$(this).dataset();
-                        data.push([item.type, item.id, this.value]);
-                    });
+                        var item = $$(this).dataset()
+                        data.push([item.type, this.value, item.id])
+                    })
+
+                    // data = {
+                    //   user_ids: [],
+                    //   roles: [],
+                    //   locations: [],
+                    //   tags: []
+                    // }
+                    //
+                    // $select.find('option:checked').each(function() {
+                    //     var item = $$(this).dataset()
+                    //
+                    //     switch (item.type) {
+                    //         case 'User':
+                    //             data.user_ids.push(item.id)
+                    //             break;
+                    //         case 'Role':
+                    //             data.roles.push(item.value)
+                    //             break;
+                    //         case 'Location':
+                    //             data.locations.push(item.value)
+                    //             break;
+                    //         case 'Tag':
+                    //             data.tags.push(item.value)
+                    //             break;
+                    //     }
+                    // })
 
                     if (onChange)
-                        onChange(data);
-                });
-            });
+                        onChange(data)
+                })
+            })
         },
 
         init: function (pageContainer) {
-            pageContainer = $$(pageContainer);
+            pageContainer = $$(pageContainer)
             var selects;
             if (pageContainer.is('.tag-select')) {
                 selects = pageContainer;
             }
             else {
-                selects = pageContainer.find('.tag-select');
+                selects = pageContainer.find('.tag-select')
             }
             if (selects.length === 0) return;
 
             selects.each(function () {
-                var tagSelect = $$(this);
+                var tagSelect = $$(this)
 
-                var $select = tagSelect.find('select');
+                var $select = tagSelect.find('select')
                 if ($select.length === 0) return;
                 var select = $select[0];
                 if (select.length === 0) return;
@@ -55,55 +81,55 @@ function (util,api,app) {
                 // var valueText = [];
                 for (var i = 0; i < select.length; i++) {
                     if (select[i].selected) {
-                        tagSelectComponent._onOptionSelected(tagSelect, select, select[i]);
-                        // valueText.push(select[i].textContent.trim());
+                        tagSelectComponent._onOptionSelected(tagSelect, select, select[i])
+                        // valueText.push(select[i].textContent.trim())
                     }
                 }
 
-                // var itemAfter = tagSelect.find('.item-after');
+                // var itemAfter = tagSelect.find('.item-after')
                 // if (itemAfter.length === 0) {
-                //     tagSelect.find('.item-inner').append('<div class="item-after">' + valueText.join(', ') + '</div>');
+                //     tagSelect.find('.item-inner').append('<div class="item-after">' + valueText.join(', ') + '</div>')
                 // }
                 // else {
-                //     var selectedText = itemAfter.text();
+                //     var selectedText = itemAfter.text()
                 //     if (itemAfter.hasClass('tag-select-value')) {
                 //         for (i = 0; i < select.length; i++) {
-                //             select[i].selected = select[i].textContent.trim() === selectedText.trim();
+                //             select[i].selected = select[i].textContent.trim() === selectedText.trim()
                 //         }
                 //     } else {
-                //         itemAfter.text(valueText.join(', '));
+                //         itemAfter.text(valueText.join(', '))
                 //     }
                 // }
 
                 tagSelect.find('li.tag-search').click(function() {
-                    tagSelectComponent.open(tagSelect, false);
-                });
-            });
+                    tagSelectComponent.open(tagSelect, false)
+                })
+            })
         },
 
         addOption: function (select, option, index) {
-            select = $$(select);
-            var tagSelect = select.parents('.tag-select');
+            select = $$(select)
+            var tagSelect = select.parents('.tag-select')
             if (typeof index === 'undefined') {
-                select.append(option);
+                select.append(option)
             }
             else {
-                $$(option).insertBefore(select.find('option').eq(index));
+                $$(option).insertBefore(select.find('option').eq(index))
             }
-            tagSelect.init(tagSelect);
-            var selectName = tagSelect.find('select').attr('name');
+            tagSelect.init(tagSelect)
+            var selectName = tagSelect.find('select').attr('name')
             var opened = $$('.page.tag-select-page[data-select-name="' + selectName + '"]').length > 0;
             if (opened) {
-                tagSelect.open(tagSelect, true);
+                tagSelect.open(tagSelect, true)
             }
         },
 
         open: function (tagSelect, reLayout) {
-            tagSelect = $$(tagSelect);
+            tagSelect = $$(tagSelect)
             if (tagSelect.length === 0) return;
 
             // Find related view
-            var view = tagSelect.parents('.' + app.f7.params.viewClass);
+            var view = tagSelect.parents('.' + app.f7.params.viewClass)
             if (view.length === 0) return;
             view = view[0].f7View;
 
@@ -114,7 +140,7 @@ function (util,api,app) {
             }
             else if (openIn === 'picker') {
                 if ($$('.picker-modal.modal-in').length > 0 && !reLayout){
-                    if (tagSelect[0].f7TagSelectPicker !== $$('.picker-modal.modal-in:not(.modal-out)')[0]) app.f7.closeModal($$('.picker-modal.modal-in:not(.modal-out)'));
+                    if (tagSelect[0].f7TagSelectPicker !== $$('.picker-modal.modal-in:not(.modal-out)')[0]) app.f7.closeModal($$('.picker-modal.modal-in:not(.modal-out)'))
                     else return;
                 }
             }
@@ -122,8 +148,8 @@ function (util,api,app) {
                 if (!view) return;
             }
 
-            var tagSelectData = tagSelect.dataset();
-            var pageTitle = tagSelectData.pageTitle || tagSelect.find('.item-title').text();
+            var tagSelectData = tagSelect.dataset()
+            var pageTitle = tagSelectData.pageTitle || tagSelect.find('.item-title').text()
             var backText = tagSelectData.backText || app.f7.params.tagSelectBackText;
             var closeText;
             if (openIn === 'picker') {
@@ -143,21 +169,21 @@ function (util,api,app) {
 
             // Collect all options/values
             var select = tagSelect.find('select')[0];
-            var $select = $$(select);
-            var $selectData = $select.dataset();
+            var $select = $$(select)
+            var $selectData = $select.dataset()
             if (select.disabled || tagSelect.hasClass('disabled') || $select.hasClass('disabled')) {
                 return;
             }
             var values = [];
-            var id = (new Date()).getTime();
+            var id = (new Date()).getTime()
             var inputType = select.multiple ? 'checkbox' : 'radio';
             var inputName = inputType + '-' + id;
-            var maxLength = $select.attr('maxlength');
+            var maxLength = $select.attr('maxlength')
             var selectName = select.name;
             var option, optionHasMedia, optionImage, optionIcon, optionGroup, optionGroupLabel, optionPreviousGroup, optionIsLabel, previousGroup, optionColor, optionClassName, optionData;
             for (var i = 0; i < select.length; i++) {
-                option = $$(select[i]);
-                optionData = option.dataset();
+                option = $$(select[i])
+                optionData = option.dataset()
                 optionImage = optionData.optionImage || $selectData.optionImage || tagSelectData.optionImage;
                 optionIcon = optionData.optionIcon || $selectData.optionIcon || tagSelectData.optionIcon;
                 optionHasMedia = optionImage || optionIcon || inputType === 'checkbox';
@@ -175,11 +201,12 @@ function (util,api,app) {
                         values.push({
                             groupLabel: optionGroupLabel,
                             isLabel: optionIsLabel
-                        });
+                        })
                     }
                 }
                 values.push({
                     value: option[0].value,
+                    type: $$(option).data('type'), // KAM: added
                     text: option[0].textContent.trim(),
                     selected: option[0].selected,
                     group: optionGroup,
@@ -195,7 +222,7 @@ function (util,api,app) {
                     checkbox: inputType === 'checkbox',
                     inputName: inputName,
                     material: app.f7.params.material
-                });
+                })
             }
 
 
@@ -238,19 +265,20 @@ function (util,api,app) {
                                 '{{/if}}' +
                                 '<div class="item-inner">' +
                                     '<div class="item-title{{#if color}} color-{{color}}{{/if}}">{{text}}</div>' +
+                                    '{{#if text}}<div class="item-after">{{type}}</div>{{/if}}' + // KAM: added
                                 '</div>' +
                             '{{/if}}' +
                         '</label>' +
                     '</li>' +
                     '{{/if}}'
-                );
+                )
             }
             var tagSelectItemTemplate = app.f7._compiledTemplates.tagSelectItem;
 
             var inputsHTML = '';
             if (!virtualList) {
                 for (var j = 0; j < values.length; j++) {
-                    inputsHTML += tagSelectItemTemplate(values[j]);
+                    inputsHTML += tagSelectItemTemplate(values[j])
                 }
             }
 
@@ -267,7 +295,7 @@ function (util,api,app) {
                             '<div class="right"><a href="#" class="link close-picker"><span>{{closeText}}</span></a></div>' +
                         '</div>' +
                       '</div>'
-                    );
+                    )
                 }
 
                 toolbarHTML = app.f7._compiledTemplates.tagSelectToolbar({
@@ -276,7 +304,7 @@ function (util,api,app) {
                     openIn: openIn,
                     toolbarTheme: toolbarTheme,
                     inPicker: openIn === 'picker'
-                });
+                })
             }
             else {
                 // Navbar HTML
@@ -288,7 +316,7 @@ function (util,api,app) {
                                 '<div class="center sliding">{{pageTitle}}</div>' +
                             '</div>' +
                         '</div>'
-                    );
+                    )
                 }
                 navbarHTML = app.f7._compiledTemplates.tagSelectNavbar({
                     pageTitle: pageTitle,
@@ -301,7 +329,7 @@ function (util,api,app) {
                     leftTemplate: openIn === 'popup' ? // use smart select values
                         (app.f7.params.smartSelectPopupCloseTemplate || (material ? '<div class="left"><a href="#" class="link close-popup icon-only"><i class="icon icon-back"></i></a></div>' : '<div class="left"><a href="#" class="link close-popup"><i class="icon icon-back"></i><span>{{closeText}}</span></a></div>')).replace(/{{closeText}}/g, closeText) :
                         (app.f7.params.smartSelectBackTemplate || (material ? '<div class="left"><a href="#" class="back link icon-only"><i class="icon icon-back"></i></a></div>' : '<div class="left sliding"><a href="#" class="back link"><i class="icon icon-back"></i><span>{{backText}}</span></a></div>')).replace(/{{backText}}/g, backText)
-                });
+                })
                 // Determine navbar layout type - static/fixed/through
                 if (openIn === 'page') {
                     navbarLayout = 'static';
@@ -319,7 +347,7 @@ function (util,api,app) {
             // Page Layout
             var pageName = 'tag-select-' + inputName;
 
-            var useSearchbar = typeof tagSelect.data('searchbar') === 'undefined' ? app.f7.params.tagSelectSearchbar : (tagSelect.data('searchbar') === 'true' ? true : false);
+            var useSearchbar = typeof tagSelect.data('searchbar') === 'undefined' ? app.f7.params.tagSelectSearchbar : (tagSelect.data('searchbar') === 'true' ? true : false)
             var searchbarPlaceholder, searchbarCancel;
 
             if (useSearchbar) {
@@ -358,7 +386,7 @@ function (util,api,app) {
 
             // Scroll SS Picker To Input
             function scrollToInput() {
-                var pageContent = tagSelect.parents('.page-content');
+                var pageContent = tagSelect.parents('.page-content')
                 if (pageContent.length === 0) return;
                 var paddingTop = parseInt(pageContent.css('padding-top'), 10),
                     paddingBottom = parseInt(pageContent.css('padding-bottom'), 10),
@@ -371,11 +399,11 @@ function (util,api,app) {
                     if (scrollTop + pageHeight > pageScrollHeight) {
                         newPaddingBottom = scrollTop + pageHeight - pageScrollHeight + paddingBottom;
                         if (pageHeight === pageScrollHeight) {
-                            newPaddingBottom = picker.height();
+                            newPaddingBottom = picker.height()
                         }
-                        pageContent.css({'padding-bottom': (newPaddingBottom) + 'px'});
+                        pageContent.css({'padding-bottom': (newPaddingBottom) + 'px'})
                     }
-                    pageContent.scrollTop(scrollTop, 300);
+                    pageContent.scrollTop(scrollTop, 300)
                 }
             }
 
@@ -389,7 +417,7 @@ function (util,api,app) {
                     close = false;
                 }
                 if (close) {
-                    app.f7.closeModal('.tag-select-picker.modal-in');
+                    app.f7.closeModal('.tag-select-picker.modal-in')
                 }
             }
 
@@ -398,21 +426,21 @@ function (util,api,app) {
                 if (select.selectedOptions.length >= maxLength) {
                     container.find('input[type="checkbox"]').each(function () {
                         if (!this.checked) {
-                            $$(this).parents('li').addClass('disabled');
+                            $$(this).parents('li').addClass('disabled')
                         }
                         else {
-                            $$(this).parents('li').removeClass('disabled');
+                            $$(this).parents('li').removeClass('disabled')
                         }
-                    });
+                    })
                 }
                 else {
-                    container.find('.disabled').removeClass('disabled');
+                    container.find('.disabled').removeClass('disabled')
                 }
             }
 
             // Event Listeners on new page
             function handleInputs(container) {
-                container = $$(container);
+                container = $$(container)
                 // if (virtualList) {
                 //     var virtualListInstance = app.f7.virtualList(container.find('.virtual-list'), {
                 //         items: values,
@@ -422,16 +450,16 @@ function (util,api,app) {
                 //             if (item.text.toLowerCase().indexOf(query.trim().toLowerCase()) >=0 ) return true;
                 //             return false;
                 //         }
-                //     });
+                //     })
                 //     container.once(openIn === 'popup' || openIn === 'picker' ? 'closed': 'pageBeforeRemove', function () {
-                //         if (virtualListInstance && virtualListInstance.destroy) virtualListInstance.destroy();
-                //     });
+                //         if (virtualListInstance && virtualListInstance.destroy) virtualListInstance.destroy()
+                //     })
                 // }
                 if (maxLength) {
-                    checkMaxLength(container);
+                    checkMaxLength(container)
                 }
                 container.on('change', 'input[name="' + inputName + '"]', function () {
-                    tagSelectComponent._clearAllSelectedTagItems(tagSelect);
+                    tagSelectComponent._clearAllSelectedTagItems(tagSelect)
 
                     var input = this;
                     var value = input.value;
@@ -444,12 +472,12 @@ function (util,api,app) {
                                 option.selected = input.checked;
                             }
                             if (option.selected) {
-                                // optionText.push(option.textContent.trim());
-                                tagSelectComponent._onOptionSelected(tagSelect, select, option);
+                                // optionText.push(option.textContent.trim())
+                                tagSelectComponent._onOptionSelected(tagSelect, select, option)
                             }
                         }
                         if (maxLength) {
-                            checkMaxLength(container);
+                            checkMaxLength(container)
                         }
                     // }
                     // else {
@@ -457,29 +485,29 @@ function (util,api,app) {
                     //     select.value = value;
                     // }
 
-                    $select.trigger('change');
-                    // tagSelect.find('.item-after').text(optionText.join(', '));
+                    $select.trigger('change')
+                    // tagSelect.find('.item-after').text(optionText.join(', '))
                     if (backOnSelect && inputType === 'radio') {
-                        // if (openIn === 'popup') app.f7.closeModal(popup);
-                        // else if (openIn === 'picker') app.f7.closeModal(picker);
-                        // else view.router.back();
-                        view.router.back();
+                        // if (openIn === 'popup') app.f7.closeModal(popup)
+                        // else if (openIn === 'picker') app.f7.closeModal(picker)
+                        // else view.router.back()
+                        view.router.back()
                     }
-                });
+                })
             }
 
             // Page initialization callback
             function pageInit(e) {
                 var page = e.detail.page;
                 if (page.name === pageName) {
-                    handleInputs(page.container);
+                    handleInputs(page.container)
                 }
             }
 
             // if (openIn === 'popup') {
             //     if (reLayout) {
-            //         popup = $$('.popup.tag-select-popup .view');
-            //         popup.html(pageHTML);
+            //         popup = $$('.popup.tag-select-popup .view')
+            //         popup.html(pageHTML)
             //     }
             //     else {
             //         popup = app.f7.popup(
@@ -488,16 +516,16 @@ function (util,api,app) {
             //                     pageHTML +
             //                 '</div>' +
             //             '</div>'
-            //             );
-            //         popup = $$(popup);
+            //             )
+            //         popup = $$(popup)
             //     }
-            //     app.f7.initPage(popup.find('.page'));
-            //     handleInputs(popup);
+            //     app.f7.initPage(popup.find('.page'))
+            //     handleInputs(popup)
             // }
             // else if (openIn === 'picker') {
             //     if (reLayout) {
-            //         picker = $$('.picker-modal.tag-select-picker .view');
-            //         picker.html(pageHTML);
+            //         picker = $$('.picker-modal.tag-select-picker .view')
+            //         picker.html(pageHTML)
             //     }
             //     else {
             //         picker = app.f7.pickerModal(
@@ -509,14 +537,14 @@ function (util,api,app) {
             //                     '</div>' +
             //                 '</div>' +
             //             '</div>'
-            //             );
-            //         picker = $$(picker);
+            //             )
+            //         picker = $$(picker)
             //
             //         // Scroll To Input
-            //         scrollToInput();
+            //         scrollToInput()
             //
             //         // Close On Click
-            //         $$('html').on('click', closeOnHTMLClick);
+            //         $$('html').on('click', closeOnHTMLClick)
             //
             //         // On Close
             //         picker.once('close', function () {
@@ -524,37 +552,37 @@ function (util,api,app) {
             //             tagSelect[0].f7TagSelectPicker = undefined;
             //
             //             // Detach html click
-            //             $$('html').off('click', closeOnHTMLClick);
+            //             $$('html').off('click', closeOnHTMLClick)
             //
             //             // Restore page padding bottom
-            //             tagSelect.parents('.page-content').css({paddingBottom: ''});
-            //         });
+            //             tagSelect.parents('.page-content').css({paddingBottom: ''})
+            //         })
             //
             //         // Link Picker
             //         tagSelect[0].f7TagSelectPicker = picker[0];
             //     }
             //
             //     // Init Page
-            //     app.f7.initPage(picker.find('.page'));
+            //     app.f7.initPage(picker.find('.page'))
             //
             //     // Attach events
-            //     handleInputs(picker);
+            //     handleInputs(picker)
             // }
             // else {
-                $$(document).once('pageInit', '.tag-select-page', pageInit);
+                $$(document).once('pageInit', '.tag-select-page', pageInit)
                 view.router.load({
                     content: pageHTML,
                     reload: reLayout ? true : undefined
-                });
+                })
             // }
         },
 
         _clearAllSelectedTagItems: function (tagSelect) {
-            tagSelect.find('li.tag-item').remove();
+            tagSelect.find('li.tag-item').remove()
         },
 
         _onOptionSelected: function (tagSelect, select, option) {
-            var text = option.textContent.trim();
+            var text = option.textContent.trim()
             var $item = $$('<li class="tag-item" data-value="' + option.value + '">' +
                 '    <div class="item-content">' +
                 '      <div class="item-inner">' +
@@ -562,18 +590,18 @@ function (util,api,app) {
                 '        <div class="item-after"><a href="#" class="item-link remove"><i class="material-icons">close</i></a></div>' +
                 '      </div>' +
                 '    </div>' +
-                '</li>');
+                '</li>')
 
             $item.find('a').click(function(event) {
-                $item.remove();
+                $item.remove()
                 option.selected = false;
-                $$(option).trigger('change');
-                event.preventDefault();
-            });
+                $$(option).trigger('change')
+                event.preventDefault()
+            })
 
-            tagSelect.find('ul').append($item);
+            tagSelect.find('ul').append($item)
         }
     };
 
     return tagSelectComponent;
-});
+})
