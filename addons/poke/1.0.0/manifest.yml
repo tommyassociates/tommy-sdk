@@ -1,25 +1,23 @@
 ---
-  name: "Poke"
+  title: "Poke"
   package: "poke"
   version: "1.0.0"
   summary: "Unleash your inner mongrel."
   description: "This is a super imaginative long description for the Poke addon."
   author: "Kam Low"
-  homepage: "http://sourcey.com"
+  homepage: "https://sourcey.com"
   private: false
   dependencies: &dependencies
     email: "*"
     message: "*"
     poke: "1.0.0"
   tasks:
-    -
-      module: "default"
+    default:
       name: "Default"
       description: "Task that fires the `poke.triggers.default` trigger."
       execute: "tasks/poke.js"
   triggers:
-    -
-      module: "default"
+    default:
       name: "Default"
       description: "Trigger that contains a single message string parameter."
       parameters:
@@ -27,16 +25,15 @@
           type: "string"
           required: true
   actions:
-    -
-      module: "message"
-      name: "Poke to message"
+    poke_to_message:
+      title: "Poke to message"
       description: "Send a poke message to users at scheduled intervals."
       task: "poke.tasks.default"
       trigger: "poke.triggers.default"
       activity: "message.activities.send"
       mappings:
         message:
-          name: "Message text"
+          title: "Message text"
           type: "variable"
           value: "trigger.message"
       dependencies: *dependencies
@@ -44,20 +41,19 @@
         kind: "interval"
         frequency: "secondly"
         interval: 30
-    -
-      module: "email"
-      name: "Poke to email"
+    poke_to_email:
+      title: "Poke to email"
       description: "Send a poke message to user email addresses at scheduled intervals."
       task: "poke.tasks.default"
       trigger: "poke.triggers.default"
       activity: "email.activities.send"
       mappings:
         subject:
-          name: "Email subject"
+          title: "Email subject"
           type: "text"
           value: "Hello %{user.first_name}"
         body:
-          name: "Email body"
+          title: "Email body"
           type: "variable"
           value: "trigger.message"
       dependencies: *dependencies
@@ -66,8 +62,7 @@
         frequency: "secondly"
         interval: 30
   views:
-    -
-      id: "Poke"
+    main:
       title: "Poke"
       file: "views/main.html"
       type: "page"
