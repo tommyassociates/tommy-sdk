@@ -22,6 +22,24 @@ define(['config','util','moment','i18n'/*,'i18n!nls/lang'*/,'Framework7'], funct
                     return options.inverse(this);
             });
 
+            t7.registerHelper('if_contains', function (value, array, options) {
+                // if non array was passed then attempt to split comma separated string
+                if (!$$.isArray(array))
+                    array = array.split(',');
+                // convert value to string
+                value = value + ''
+                var match = false;
+                if (value && array && array.length) {
+                    for (var i = 0; i < array.length; i++) {
+                      if (array[i] === value) { match = true; break; }
+                    }
+                }
+                if (match)
+                    return options.fn(this);
+                else
+                    return options.inverse(this);
+            });
+
             t7.registerHelper('if_any', function (object, options) {
                 var match = false;
                 if (object) {
@@ -51,10 +69,7 @@ define(['config','util','moment','i18n'/*,'i18n!nls/lang'*/,'Framework7'], funct
             });
 
             t7.registerHelper('t', function (key, options) {
-                // var opts = i18n.i18next.functions.extend(options.hash, context);
-                // if (options.fn) opts.defaultValue = options.fn(context);
                 // console.log(options)
-             
                 var result = i18n.i18next.t(key, options.hash);
                 return result;
             });
@@ -111,12 +126,12 @@ define(['config','util','moment','i18n'/*,'i18n!nls/lang'*/,'Framework7'], funct
 
             t7.registerHelper('tagList', function (array, array1, array2) {
                 var output = '';
-                if ($$.isArray(array)) { output += util.formatTags(array); }
-                if ($$.isArray(array1)) {
+                if ($$.isArray(array) && array.length) { output += util.formatTags(array); }
+                if ($$.isArray(array1) && array1.length) {
                     if (!!output.length) output += ', ';
                     output += util.formatTags(array1);
                 }
-                if ($$.isArray(array2)) {
+                if ($$.isArray(array2) && array2.length) {
                     if (!!output.length) output += ', ';
                     output += util.formatTags(array2);
                 }
@@ -144,16 +159,16 @@ define(['config','util','moment','i18n'/*,'i18n!nls/lang'*/,'Framework7'], funct
             //     if (!t7.global.currentAddon)
             //         throw 'Cannot render addon asset path: ' + file;
             //     return util.addonAssetPath(
-            //         t7.global.currentAddon.package,
-            //         t7.global.currentAddon.version, file);
+            //         t7.global.currentAddonInstall.package,
+            //         t7.global.currentAddonInstall.version, file);
             // });
 
             t7.registerHelper('addonAssetUrl', function (file) {
-                if (!t7.global.currentAddon)
+                if (!t7.global.currentAddonInstall)
                     throw 'Cannot render addon asset URL: ' + file;
                 return util.addonAssetUrl(
-                    t7.global.currentAddon.package,
-                    t7.global.currentAddon.version, file, true);
+                    t7.global.currentAddonInstall.package,
+                    t7.global.currentAddonInstall.version, file, true);
             });
 
             t7.registerHelper('apiUrl', function (part, part1, part2) {
@@ -165,6 +180,7 @@ define(['config','util','moment','i18n'/*,'i18n!nls/lang'*/,'Framework7'], funct
 
             // Renders an avatar for a user, account or message object.
             t7.registerHelper('circleAvatar', function (object, options) {
+                // console.log('circleAvatar', object, options.hash)
                 var opts = options.hash;
 
                 // User, Contact or Team Member object
@@ -187,9 +203,9 @@ define(['config','util','moment','i18n'/*,'i18n!nls/lang'*/,'Framework7'], funct
                     data.online = object.online;
                 }
                 // Message object
-                else if (object.sender_first_name) {
-                    data.initials = object.sender_first_name[0] + object.sender_last_name[1];
-                    data.icon_url = object.sender_icon_url;
+                else if (object.sender) {
+                    data.initials = object.sender.first_name[0] + object.sender.last_name[1];
+                    data.icon_url = object.sender.icon_url;
                 }
                 // Message object without sender (no icon)
                 else if (object.chat_title) {
@@ -214,8 +230,19 @@ define(['config','util','moment','i18n'/*,'i18n!nls/lang'*/,'Framework7'], funct
                 return html;
             });
 
+            // Human readable invitation status
+            t7.registerHelper('invitationStatus', function (status) {
+                return util.invitationStatus(status);
+            });
+
+            // Return or generate the chat title
+            t7.registerHelper('chatTitle', function (chat) {
+                return util.chatTitle(chat);
+            });
+
+
             //
-            // Account Access
+            // == Account Access
             //
 
             t7.registerHelper('ifExistsInArrayOfObjects', function (array, key, value, options) {
@@ -251,7 +278,7 @@ define(['config','util','moment','i18n'/*,'i18n!nls/lang'*/,'Framework7'], funct
                 }
 
                 // Manage other team members as team owner or manager
-                if ((util.hasRole(us, 'TeamAdmin') || util.hasRole(us, 'TeamManager')) && util.hasRole(us, 'TeamMember')) {
+                if ((util.hasRole(us, 'Team Admin') || util.hasRole(us, 'Team Manager')) && util.hasRole(us, 'Team Member')) {
                     access = true;
                 }
 
@@ -265,7 +292,7 @@ define(['config','util','moment','i18n'/*,'i18n!nls/lang'*/,'Framework7'], funct
                 var us = config.getCurrentAccount(),
                     user = config.getCurrentUser();
 
-                if (util.hasRole(us, 'TeamAdmin') || util.hasRole(us, 'TeamManager') || (user.id == user_id))
+                if (util.hasRole(us, 'Team Admin') || util.hasRole(us, 'Team Manager') || (user.id == user_id))
                     return options.fn(this);
                 else
                     return options.inverse(this);
@@ -276,7 +303,7 @@ define(['config','util','moment','i18n'/*,'i18n!nls/lang'*/,'Framework7'], funct
                     user = config.getCurrentUser(),
                     team = config.getCurrentTeam();
 
-                if ((util.hasRole(us, 'TeamAdmin') || util.hasRole(us, 'TeamManager') || user.id == user_id) && 
+                if ((util.hasRole(us, 'Team Admin') || util.hasRole(us, 'Team Manager') || user.id == user_id) &&
                     (team.user_id != user_id))
                     return options.fn(this);
                 else

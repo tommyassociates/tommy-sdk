@@ -9,10 +9,10 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
                 // typeof(success) !== 'undefined' &&
 
                 // Get the cached object if available
-                if (options.cache && options.endpoint) {
+                if (options.method == 'GET' && options.cache && options.endpoint) {
                     var cachedResponse = cache.get('api', options.endpoint);
                     if (cachedResponse) {
-                        console.log('api: returning cached response', cachedResponse);
+                        console.log('[READ CACHE] api response', options.endpoint, cachedResponse);
                         resolve(cachedResponse);
                         return;
                     }
@@ -44,6 +44,7 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
                     // Cache the value for next time
                     if (options.cache && options.endpoint) {
                         cache.set('api', options.endpoint, response);
+                        console.log('[SET CACHE] api response', options.endpoint, response);
                     }
                     resolve(response);
                     // if (showLoader !== false)
@@ -99,7 +100,6 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
         },
 
         createUser: function(data, options) {
-            console.log('api.createUser: ' + JSON.stringify(data))
             return this.call(Object.assign({
                 endpoint: 'users',
                 method: 'POST',
@@ -141,22 +141,29 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
 
         getAccounts: function(options) {
             return this.call(Object.assign({
-                endpoint: 'user/accounts',
+                endpoint: 'me/accounts',
+                method: 'GET'
+            }, options));
+        },
+
+        getAssociates: function(options) {
+            return this.call(Object.assign({
+                endpoint: 'me/associates',
                 method: 'GET'
             }, options));
         },
 
         getCurrentUser: function(options) {
             return this.call(Object.assign({
-                endpoint: 'user',
+                endpoint: 'me',
                 method: 'GET'
             }, options));
         },
 
         updateCurrentUser: function(data, options) {
-            this.resetCache('user');
+            this.resetCache('me');
             return this.call(Object.assign({
-                endpoint: 'user',
+                endpoint: 'me',
                 method: 'PUT',
                 data: data
             }, options));
@@ -164,8 +171,26 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
 
         getCurrentAccount: function(options) {
             return this.call(Object.assign({
-                endpoint: 'user/current_account',
+                endpoint: 'me/current_account',
                 method: 'GET'
+            }, options));
+        },
+
+        getCurrentUserSettings: function(options) {
+            return this.call(Object.assign({
+                endpoint: 'me/settings',
+                method: 'GET'
+            }, options));
+        },
+
+        updateCurrentUserSetting: function(key, value, options) {
+            this.resetCache('me/settings');
+            return this.call(Object.assign({
+                endpoint: 'me/settings/' + key,
+                method: 'PUT',
+                data: {
+                    data: value
+                }
             }, options));
         },
 
@@ -207,7 +232,10 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
         getCurrentTeamMember: function(user_id, options) {
             return this.call(Object.assign({
                 endpoint: 'team/members/' + user_id,
-                method: 'GET'
+                method: 'GET',
+                data: {
+                    with_addon_links: true
+                }
             }, options));
         },
 
@@ -257,7 +285,7 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
         updateCurrentAccount: function(account_id, account_type, location_id, options) {
             this.resetCache('user');
             return this.call(Object.assign({
-                endpoint: 'user/current_account',
+                endpoint: 'me/current_account',
                 method: 'PUT',
                 data: {
                     current_account_id: account_id,
@@ -267,9 +295,59 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
             }, options));
         },
 
+        getInvitations: function(options) {
+            return this.call(Object.assign({
+                endpoint: 'invitations',
+                method: 'GET'
+            }, options));
+        },
+
         getContacts: function(options) {
             return this.call(Object.assign({
                 endpoint: 'contacts',
+                method: 'GET',
+                data: {
+                    team_id: config.getCurrentTeamId()
+                }
+            }, options));
+        },
+
+        createContact: function(data, options) {
+            return this.call(Object.assign({
+                endpoint: 'contacts',
+                method: 'POST',
+                data: data
+            }, options));
+        },
+
+        addContact: function(friend_id, data, options) {
+            return this.call(Object.assign({
+                endpoint: 'contacts/' + friend_id + '/add',
+                method: 'POST',
+                data: data
+            }, options));
+        },
+
+        acceptContactRequest: function(friend_id, team_ids, options) {
+            return this.call(Object.assign({
+                endpoint: 'contacts/' + friend_id + '/accept',
+                method: 'POST',
+                data: {
+                    team_ids: team_ids
+                }
+            }, options));
+        },
+
+        declineContactRequest: function(friend_id, options) {
+            return this.call(Object.assign({
+                endpoint: 'contacts/' + friend_id + '/decline',
+                method: 'POST'
+            }, options));
+        },
+
+        getContactRequests: function(options) {
+            return this.call(Object.assign({
+                endpoint: 'contacts/requests',
                 method: 'GET',
                 data: {
                     team_id: config.getCurrentTeamId()
@@ -305,7 +383,18 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
         getChat: function(chat_id, options) {
             return this.call(Object.assign({
                 endpoint: 'chats/' + chat_id,
-                method: 'GET'
+                method: 'GET',
+                data: {
+                    with_users: true
+                }
+            }, options));
+        },
+
+        updateChat: function(chat_id, data, options) {
+            return this.call(Object.assign({
+                endpoint: 'chats/' + chat_id,
+                method: 'PUT',
+                data: data
             }, options));
         },
 
@@ -374,17 +463,25 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
             }, options));
         },
 
-        sendMessage: function(chat_id, message, send_at, via, options) {
+        sendMessage: function(chat_id, body, send_at, via, options) {
             this.resetCache('messages');
             return this.call(Object.assign({
                 endpoint: 'messages',
                 method: 'POST',
                 data: {
                     chat_id: chat_id,
-                    message: message,
+                    body: body,
                     send_at: send_at,
                     via: via
                 }
+            }, options));
+        },
+
+        deleteMessage: function(message_id, options) {
+            this.resetCache('messages');
+            return this.call(Object.assign({
+                endpoint: 'messages/' + message_id,
+                method: 'DELETE'
             }, options));
         },
 
@@ -484,21 +581,34 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
         getInstalledAddonPermissions: function(package, options) {
             return this.call(Object.assign({
                 endpoint: 'addons/' + package + '/permissions',
-                method: 'GET'
+                method: 'GET',
+                data: {
+                    with_filters: true
+                }
             }, options));
         },
 
-        getInstalledAddonPermission: function(package, id, options) {
+        getInstalledAddonPermission: function(package, name, options) {
             return this.call(Object.assign({
-                endpoint: 'addons/' + package + '/permissions/' + id,
+                endpoint: 'addons/' + package + '/permissions/' + name,
+                method: 'GET',
+                data: {
+                    with_filters: true
+                }
+            }, options));
+        },
+
+        getInstalledAddonPremissionFilters: function(package, name, options) {
+            return this.call(Object.assign({
+                endpoint: 'addons/' + action_id + '/permissions/' + name + '/filters',
                 method: 'GET'
             }, options));
         },
 
-        updateInstalledAddonPermission: function(package, id, data, options) {
+        updateInstalledAddonPermission: function(package, name, data, options) {
             this.resetCache('addons/' + package);
             return this.call(Object.assign({
-                endpoint: 'addons/' + package + '/permissions/' + id,
+                endpoint: 'addons/' + package + '/permissions/' + name,
                 method: 'PUT',
                 data: data
             }, options));
@@ -630,6 +740,41 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
         updateInstalledActionSetting: function(action_id, scope, data, options) {
             return this.call(Object.assign({
                 endpoint: 'actions/' + action_id + '/settings/' + scope,
+                method: 'PUT',
+                data: data
+            }, options));
+        },
+
+        getInstalledActionPremissions: function(action_id, options) {
+            return this.call(Object.assign({
+                endpoint: 'actions/' + action_id + '/permissions',
+                method: 'GET',
+                data: {
+                    with_filters: true
+                }
+            }, options));
+        },
+
+        getInstalledActionPremission: function(action_id, name, options) {
+            return this.call(Object.assign({
+                endpoint: 'actions/' + action_id + '/permissions/' + name,
+                method: 'GET',
+                data: {
+                    with_filters: true
+                }
+            }, options));
+        },
+
+        getInstalledActionPremissionFilters: function(action_id, name, options) {
+            return this.call(Object.assign({
+                endpoint: 'actions/' + action_id + '/permissions/' + name + '/filters',
+                method: 'GET'
+            }, options));
+        },
+
+        updateInstalledActionPremission: function(action_id, name, data, options) {
+            return this.call(Object.assign({
+                endpoint: 'actions/' + action_id + '/permissions/' + name,
                 method: 'PUT',
                 data: data
             }, options));
