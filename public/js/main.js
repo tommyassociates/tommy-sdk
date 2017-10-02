@@ -10,7 +10,7 @@
         waitSeconds: 200,
         paths: {
             text: '/lib/vendors/require/text',
-            i18n: '/lib/vendors/require/i18n',
+            //i18n: '/lib/vendors/require/i18n',
             config: '/lib/config',
             app: '/lib/app',
             api: '/lib/api',
@@ -24,51 +24,61 @@
             tagSelect: '/lib/components/tagSelect',
             moment: '/lib/vendors/moment.min',
             Framework7: '/lib/vendors/framework7/framework7',
-            GTPL: '/global.tpl.html'
+            GTPL: '/global.tpl.html',
+            i18next: '../lib/vendors/i18next.min',
+            i18n: '../lib/i18n'
         },
         shim: {
             'Framework7': {exports: 'Framework7'}
         }
     });
 
-    require(['Framework7','app','router','api','util','config','addons','tplManager','tplHelpers','controllers/module','i18n!nls/lang','text!GTPL'],
+    require(['Framework7','app','router','api','util','config','addons','tplManager','tplHelpers','controllers/module','i18n','text!GTPL'],
     function(Framework7,app,router,api,util,config,addons,TM,TH,CM,i18n,GTPL) {
         var main = {
             init: function() {
-                app.init({
-                    pushState: false,
-                    // preroute: preroute,
-                    // preprocess: preprocess,
-                    modalTitle: '',
-                    precompileTemplates: true,
-                    template7Pages: true,
-                    // template7Data: {
-                    //     'page:settings': function() { return T.env.data; }
-                    // }
-                    // pushState: config.environment == 'development', //false, // breaks controller initialization
-                    // popupCloseByOutside: false,
-                    // animateNavBackIcon: true,
-                    // cache: true, //config.environment == 'production',
-                    // template7Pages: true,
-                    // modalTitle: i18n.global.modal_title,
-                    // modalButtonOk: i18n.global.modal_button_ok,
-                    // modalButtonCancel: i18n.global.cancel,
-                    preprocess: router.preprocess,
-                    // tapHold: true,
-                    // swipeBackPage: false,
-                    // smartSelectBackTemplate: '<div class="left sliding"><a href="#" class="back link icon-only"><i class="material-icons md-36">keyboard_arrow_left</i></a></div>'
-                });
+                window.$$ = Dom7;
 
-                $$('body').append(GTPL);
+                i18n.init({
+                    lng: 'dev', //config.getLocale(), // 'zh-CN'
+                    load: 'currentOnly',
+                }, function(err, t) {
 
-                // util.bindDynamicSubmitButtons();
+                    app.init({
+                        pushState: false,
+                        // preroute: preroute,
+                        // preprocess: preprocess,
+                        modalTitle: '',
+                        precompileTemplates: true,
+                        template7Pages: true,
+                        // template7Data: {
+                        //     'page:settings': function() { return T.env.data; }
+                        // }
+                        // pushState: config.environment == 'development', //false, // breaks controller initialization
+                        // popupCloseByOutside: false,
+                        // animateNavBackIcon: true,
+                        // cache: true, //config.environment == 'production',
+                        // template7Pages: true,
+                        // modalTitle: i18n.global.modal_title,
+                        // modalButtonOk: i18n.global.modal_button_ok,
+                        // modalButtonCancel: i18n.global.cancel,
+                        preprocess: router.preprocess,
+                        // tapHold: true,
+                        // swipeBackPage: false,
+                        // smartSelectBackTemplate: '<div class="left sliding"><a href="#" class="back link icon-only"><i class="material-icons md-36">keyboard_arrow_left</i></a></div>'
+                    });
 
-                TM.initGlobalVariables();
-                TH.init();
-                router.init();
+                    $$('body').append(GTPL);
 
-                main.authenticate();
-                main.initLocalAddons();
+                    // util.bindDynamicSubmitButtons();
+
+                    TM.initGlobalVariables();
+                    TH.init();
+                    router.init();
+
+                    main.authenticate();
+                    main.initLocalAddons();
+                })
             },
 
             authenticate: function() {
