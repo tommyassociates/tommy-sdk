@@ -16,13 +16,7 @@ function(util,xhr,app,config,api,addons,TM) {
                 return false;
             });
 
-            // Autoload timesheets addon view
-            if (page.query.addon && page.query.view) {
-                console.log('Force loading addon', page.query)
-                setTimeout(function() {
-                    $$('#addon-views-local-nav').find('a[data-addon="' + page.query.addon + '"][data-view-id="' + page.query.view + '"]').click();
-                }, 100);
-            }
+            addonCtrl.loadLastAddonView(page)
         },
 
         // viewAddon: function(package, viewId) {
@@ -32,12 +26,36 @@ function(util,xhr,app,config,api,addons,TM) {
         //     });
         // },
 
+        loadLastAddonView: function(page) {
+            // Autoload last addon view
+            var addon = page.query.addon //localStorage.getItem('lastAddon') // ||
+            var view = page.query.view //localStorage.getItem('lastAddonView') // ||
+            if (addon && view) {
+                console.log('Force loading addon', addon, view)
+                setTimeout(function() {
+                    $$('#addon-views-local-nav').find('a[data-addon="' + addon + '"][data-view-id="' + view + '"]').click();
+                }, 0);
+            }
+        },
+
         onViewLoaded: function(addon, view) {
             // console.log('addonCtrl', 'onViewLoaded', addon, view);
         },
 
         onAddonLoaded: function(addon) {
             // console.log('addonCtrl', 'onAddonLoaded', addon);
+        },
+
+        //
+        // Addon Page
+        //
+
+        initAddon: function(page) {
+            var $page = $$(page.container);
+            var addon = $page.data('addon');
+            var view = $page.data('view');
+            localStorage.setItem('lastAddon', addon)
+            localStorage.setItem('lastAddonView', view)
         },
 
         //

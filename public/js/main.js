@@ -54,7 +54,7 @@
                         // template7Data: {
                         //     'page:settings': function() { return T.env.data; }
                         // }
-                        // pushState: config.environment == 'development', //false, // breaks controller initialization
+                        // pushState: true, //config.environment == 'development', //false, // breaks controller initialization
                         // popupCloseByOutside: false,
                         // animateNavBackIcon: true,
                         // cache: true, //config.environment == 'production',
