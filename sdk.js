@@ -7,7 +7,7 @@ var express = require('express'),
   config = loadConfig('config.json'),
   app = express()
 
-app.set('port', 4000)
+app.set('port', 4001)
 app.set('view engine', 'ejs')
 app.use(express.static('public'))
 app.use(express.static('./'))
@@ -139,6 +139,7 @@ function readLocalAddon(package, version) {
     var views = []
     for (var id in addon.views) {
       var view = addon.views[id]
+      view.id = id
       view.url = url.resolve(addon.url, view.file)
       if (view.assets) {
         for (var x = 0; x < view.assets.length; x++) {
