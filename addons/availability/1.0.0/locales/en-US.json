@@ -1,0 +1,19 @@
+{
+  "main": {
+    "title": "Availabilities"
+  },
+  "word": {
+    "am": "am",
+    "pm": "pm",
+    "ns": "ns"
+  },
+  "title": "Availability",
+  "summary": "Employee availability for rostering and schedule management.",
+  "description": "Enables employees to register availability for rostering and schedule management.",
+  "developer": "Tommy Labs GmbH",
+  "views": {
+    "main": {
+      "title": "Availability"
+    }
+  }
+}
