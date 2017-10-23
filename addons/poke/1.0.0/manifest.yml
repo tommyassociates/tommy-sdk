@@ -4,18 +4,16 @@
   version: "1.0.0"
   summary: "Unleash your inner mongrel."
   description: "This is a super imaginative long description for the Poke addon."
-  author: "Kam Low"
+  developer: "Kam Low"
   homepage: "https://sourcey.com"
   private: false
   dependencies: &dependencies
-    email: "*"
-    message: "*"
-    poke: "1.0.0"
+    chat: "*"
   tasks:
     default:
       name: "Default"
       description: "Task that fires the `poke.triggers.default` trigger."
-      execute: "tasks/poke.js"
+      execute: "tasks/bark.js"
   triggers:
     default:
       name: "Default"
@@ -26,23 +24,21 @@
           required: true
   actions:
     poke_to_message:
-      title: "Poke to message"
+      title: "Poke chat message"
       description: "Send a poke message to users at scheduled intervals."
       task: "poke.tasks.default"
       trigger: "poke.triggers.default"
-      activity: "message.activities.send"
+      activity: "chat.activities.send_message"
       mappings:
         message:
           title: "Message text"
           type: "variable"
           value: "trigger.message"
       dependencies: *dependencies
-      schedule:
-        kind: "interval"
-        frequency: "secondly"
-        interval: 30
+      timer:
+        cron: "0 9 * * *"
     poke_to_email:
-      title: "Poke to email"
+      title: "Poke email message"
       description: "Send a poke message to user email addresses at scheduled intervals."
       task: "poke.tasks.default"
       trigger: "poke.triggers.default"
@@ -57,10 +53,8 @@
           type: "variable"
           value: "trigger.message"
       dependencies: *dependencies
-      schedule:
-        kind: "interval"
-        frequency: "secondly"
-        interval: 30
+      timer:
+        cron: "0 9 * * *"
   views:
     main:
       title: "Poke"
@@ -76,5 +70,5 @@
           type: "javascript"
           file: "views/main.js"
         -
-          file: "views/main.tpl.html"
           type: "template"
+          file: "views/main.tpl.html"
