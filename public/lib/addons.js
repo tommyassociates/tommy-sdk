@@ -242,6 +242,7 @@ function(app, api,util,config,cache,util) {
             view.package = package;
             view.uid = package + '-' + view.id;
             view.icon_url = addon.icon_url;
+            view.url = addon.file_base_url + view.file;
 
             // Cache the view object
             cache.set('addonViews', view.uid, view);
