@@ -260,7 +260,7 @@ const TaskAddForm = {
 //
 /// Board Setting Form
 
-const BoardSettingForm = {
+const BoardSettingsForm = {
 
     init(page) {
         const $page = $$(page.container);
@@ -794,7 +794,7 @@ window.tommy.app.f7.onPageAfterAnimation('tasks__index', Index.invalidate)
 
 /// Board Setting Form
 
-window.tommy.app.f7.onPageInit('tasks__board-setting', BoardSettingForm.init)
+window.tommy.app.f7.onPageInit('tasks__board-settings', BoardSettingsForm.init)
 
 /// List Add Form
 

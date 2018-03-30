@@ -1,4 +1,4 @@
-import TaskAPI from '../api'
+import API from '../api'
 
 const ListAddController = {
   init (page) {
@@ -22,7 +22,7 @@ const ListAddController = {
     //   return
     // }
 
-    TaskAPI.saveList(list).then(ListAddController.afterSave)
+    API.saveList(list).then(ListAddController.afterSave)
   },
 
   afterSave (res) {

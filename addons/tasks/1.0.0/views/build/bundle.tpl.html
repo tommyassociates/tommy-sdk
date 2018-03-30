@@ -14,7 +14,7 @@
             <li>
                 <a href="{{addonAssetUrl "views/list-management.html"}}" class="item-link item-content">
                     <div class="item-inner">
-                        <div class="item-title">List Management</div>
+                        <div class="item-title">{{t "board-setting.list-management" defaultValue="List Management"}}</div>
                     </div>
                 </a>
             </li>
@@ -121,15 +121,15 @@
                     {{#if data.show_fast_add}}
                     <div class="list-footer">
                         <div class="in">
-                            <div class="card-add fast-add-toggle" data-input-focus="true">Add task</div>
+                            <div class="card-add fast-add-toggle" data-input-focus="true">{{t "index.add-task" defaultValue="Add task"}}</div>
                         </div>
                         <div class="">
                             <form class="card-form fast-add-form">
                                 <input name="parent_id" value="{{id}}" type="hidden">
                                 <input name="name" type="text">
                                 <div class="buttons">
-                                    <a href="#" class="button cancel fast-add-toggle">Cancel</a>
-                                    <button type="submit" class="button button-fill color-red save">Done</button>
+                                    <a href="#" class="button cancel fast-add-toggle">{{t "index.cancel" defaultValue="Cancel"}}</a>
+                                    <button type="submit" class="button button-fill color-red save">{{t "index.done" defaultValue="Done"}}</button>
                                 </div>
                             </form>
                         </div>
@@ -176,7 +176,7 @@
                 {{#if data.status}}
                 {{data.status}}
                 {{else}}
-                Unassigned
+                {{t "index.unassigned" defaultValue="Unassigned"}}
                 {{/if}}
             </span>
         </div>
@@ -190,7 +190,7 @@
             <ul>
                 <li class="item-content">
                     <div class="item-inner">
-                        <div class="item-title label">Name</div>
+                        <div class="item-title label">{{t "list-edit.name" defaultValue="Name"}}</div>
                         <div class="item-input">
                             <input type="text" name="name" value="{{name}}" class="right toggle-save">
                         </div>
@@ -211,7 +211,7 @@
                 -->
                 <li class="item-content">
                     <div class="item-inner">
-                        <div class="item-title label-custom">Show Fast Add Task</div>
+                        <div class="item-title label-custom">{{t "list-edit.show-fast-add-task" defaultValue="Show Fast Add Task"}}</div>
                         <div class="item-input">
                             <label class="label-switch">
                                 <input name="show_fast_add" type="checkbox" class="toggle-save" {{#if data.show_fast_add}}checked{{/if}}>
@@ -469,7 +469,7 @@
                 <li class="item-content">
                     <div class="item-inner">
                         <div class="item-input">
-                            <input type="text" name="name" placeholder="Name" class="toggle-save">
+                            <input type="text" name="name" placeholder="{{t "task-add.name" defaultValue="Name"}}" class="toggle-save">
                         </div>
                     </div>
                 </li>
@@ -482,7 +482,7 @@
                      </select>
                      <div class="item-content">
                        <div class="item-inner">
-                         <div class="item-title">List</div>
+                         <div class="item-title">{{t "task-add.list" defaultValue="List"}}</div>
                        </div>
                      </div>
                    </a>
@@ -498,10 +498,12 @@
         <div class="popover-inner">
             <div class="list-block">
                 <ul>
-                    <li><a href="#" data-command="add-checklist" class="list-button item-link">Checklist</a></li>
-                    <li><a href="#" data-command="add-end-time" class="list-button item-link">Deadline</a></li>
-                    <!-- <li><a href="#" class="list-button item-link">Manager</a></li>
-                    <li><a href="#" class="list-button item-link">Others</a></li> -->
+                    <li><a href="#" data-command="add-checklist" class="list-button item-link">{{t "task.checklist" defaultValue="Checklist"}}</a></li>
+                    <li><a href="#" data-command="add-end-time" class="list-button item-link">{{t "task.deadline" defaultValue="Deadline"}}</a></li>
+                    <!--
+                    {{t "task.task_details" defaultValue="Task details"}}
+                    {{t "task.participant" defaultValue="Participant"}}
+                    -->
                 </ul>
             </div>
         </div>
@@ -514,7 +516,7 @@
             </a>
             -->
             <textarea placeholder="Enter comment"></textarea>
-            <a href="#" class="link add-comment">Send</a>
+            <a href="#" class="link add-comment">{{t "task.send" defaultValue="Send"}}</a>
         </div>
     </div>
     <div class="page-content">
@@ -522,7 +524,7 @@
             <h1>
                 <input type="text" name="task[name]" class="unstyled edit-task-name" value="{{name}}">
             </h1>
-            <input type="text" value="{{#if data.status}}{{data.status}}{{else}}Waiting for assignments{{/if}}" readonly="readonly" class="unstyled task-status-picker" />
+            <input type="text" value="{{#if data.status}}{{data.status}}{{else}}{{t "task.waiting_for_assignments" defaultValue="Waiting for assignments"}}{{/if}}" readonly="readonly" class="unstyled task-status-picker" />
         </div>
 
         <!--
@@ -559,7 +561,7 @@
                         </div>
                         <div class="item-inner">
                             <div class="item-input-wrap inline-edit">
-                                <textarea placeholder="Edit the description..." class="unstyled edit-task-description">{{data.description}}</textarea>
+                                <textarea placeholder="{{t "task.edit_description" defaultValue="Edit the description..."}}" class="unstyled edit-task-description">{{data.description}}</textarea>
                                 <span class="input-clear-button"></span>
                             </div>
                         </div>
@@ -607,7 +609,7 @@
 <script id="tasks__taskParticipantsTemplate" type="text/template">
     <div class="list-block list-block-custom media-list participants top-0" data-searchbar="true" data-page-title="Participants">
         <ul>
-            <li class="item-divider">Participant</li>
+            <li class="item-divider">{{t "task.participants" defaultValue="Participants"}}</li>
             <li>
                 <div class="item-content">
                     <div class="item-inner">
@@ -700,7 +702,7 @@
                     </div>
                     <div class="item-inner">
                         <div class="item-input-wrap">
-                          <input type="text" name="time" class="unstyled edit-task-deadline" placeholder="Edit deadline...">
+                          <input type="text" name="time" class="unstyled edit-task-deadline" placeholder="{{t "task.edit_deadline" defaultValue="Edit deadline..."}}">
                         </div>
                         <!-- <div>Tomorrow 12:00 End</div> -->
                         <a href="#" class="icon-only remove-deadline">
@@ -722,7 +724,7 @@
                         <img src="{{addonAssetUrl "views/images/slice17.png"}}" srcset="{{addonAssetUrl "views/images/slice17@2x.png"}} 2x,{{addonAssetUrl "views/images/slice17.png"}} 3x">
                     </div>
                     <div class="item-inner">
-                        <div>Checklist</div>
+                        <div>{{t "task.checklist" defaultValue="Checklist"}}</div>
                         <a href="#" class="icon-only remove-checklist">
                             <img src="{{addonAssetUrl "views/images/slice12.png"}}" srcset="{{addonAssetUrl "views/images/slice12@2x.png"}} 2x,{{addonAssetUrl "views/images/slice12.png"}} 3x">
                         </a>
@@ -779,7 +781,7 @@
                         <img src="{{addonAssetUrl "views/images/slice16.png"}}" srcset="{{addonAssetUrl "views/images/slice16@2x.png"}} 2x,{{addonAssetUrl "views/images/slice16.png"}} 3x">
                     </div>
                     <div class="item-inner">
-                        <input type="text" class="add-checklist-item" placeholder="Add items">
+                        <input type="text" class="add-checklist-item" placeholder="{{t "task.add_items" defaultValue="Add items"}}">
                     </div>
                 </div>
             </li>
@@ -790,7 +792,7 @@
 <script id="tasks__taskActivityTemplate" type="text/template">
     <div class="list-block list-block-custom media-list activity">
         <ul>
-            <li class="item-divider">Activity</li>
+            <li class="item-divider">{{t "task.activity" defaultValue="Activity"}}</li>
             {{#each this}}
             <li>
                 <div class="item-content">

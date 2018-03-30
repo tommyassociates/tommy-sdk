@@ -1,15 +1,15 @@
 ---
   title: "Task Manager"
   package: "tasks"
-  summary: "Task Manager."
-  description: "Task Manager."
+  summary: "Manage your projects & tasks with ease."
+  description: "Manage your projects & tasks with ease."
   version: "1.0.0"
   developer: "Tommy Labs GmbH"
   homepage: "https://mytommy.com"
   private: false
-  # languages:
-  #  - en-US
-  #  - zh-CN
+  languages:
+   - en-US
+   - zh-CN
   # roles:
   #   - Team Member
   #   - Team Manager

@@ -328,11 +328,5 @@ function(Framework7,TH,config) { //,Framework73D
         }
     };
 
-    // KLUDGE: Export as global for ES6 integration
-    // if (!window.tommy) window.tommy = {}
-    // window.$$ = Dom7
-    // window.tommy.app = app.f7
-    // window.tommy.view = app.f7view
-
     return app;
 })

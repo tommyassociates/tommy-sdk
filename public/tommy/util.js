@@ -631,9 +631,5 @@ define(['config','cache','moment'/*,'i18n!nls/lang'*/,'Framework7'],function (co
         // },
     };
 
-    // KLUDGE: Export as global for ES6 integration
-    if (!window.tommy) window.tommy = {}
-    window.tommy.util = util
-
     return util
 });

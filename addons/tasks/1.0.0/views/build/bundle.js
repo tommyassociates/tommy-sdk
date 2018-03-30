@@ -4,34 +4,34 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-var TaskAPI = {
+var API = {
   listsLoaded: false,
   tasksLoaded: false,
   cache: {},
 
   initCache: function initCache() {
-    TaskAPI.cache = {
+    API.cache = {
       lists: {},
       tasks: {}
     };
   },
   addTask: function addTask(item) {
-    TaskAPI.cache['tasks'][item.id] = item;
-    console.log('task added', item);
+    API.cache['tasks'][item.id] = item;
+    // console.log('task added', item)
   },
   addTasks: function addTasks(items) {
-    TaskAPI.tasksLoaded = true;
+    API.tasksLoaded = true;
     if (items && items.length) {
       for (var i = 0; i < items.length; i++) {
-        TaskAPI.addTask(items[i]);
+        API.addTask(items[i]);
       }
     }
   },
   getListTasks: function getListTasks(listId) {
     var tasks = [];
     var task = void 0;
-    for (var taskId in TaskAPI.cache['tasks']) {
-      task = TaskAPI.cache['tasks'][taskId];
+    for (var taskId in API.cache['tasks']) {
+      task = API.cache['tasks'][taskId];
       if (task.parent_id == listId) {
         tasks.push(task);
       }
@@ -45,7 +45,7 @@ var TaskAPI = {
       addon: 'tasks',
       kind: 'Task'
     }, params);
-    return window.tommy.api.getFragments(params).then(TaskAPI.addTasks);
+    return window.tommy.api.getFragments(params).then(API.addTasks);
   },
   addTaskActivity: function addTaskActivity(task, type, text) {
     var currentUser = window.tommy.config.getCurrentUser();
@@ -82,24 +82,24 @@ var TaskAPI = {
     task.addon = 'tasks';
     task.kind = 'Task';
     if (!task.id) {
-      TaskAPI.addTaskActivity(task, 'status', 'Created a task');
+      API.addTaskActivity(task, 'status', 'Created a task');
     }
     var params = Object.assign({}, task, { data: JSON.stringify(task.data) });
     if (task.id) {
-      return window.tommy.api.updateFragment(task.id, params).then(TaskAPI.addTask);
+      return window.tommy.api.updateFragment(task.id, params).then(API.addTask);
     } else {
-      return window.tommy.api.createFragment(params).then(TaskAPI.addTask);
+      return window.tommy.api.createFragment(params).then(API.addTask);
     }
   },
   addList: function addList(item) {
-    TaskAPI.cache['lists'][item.id] = item;
+    API.cache['lists'][item.id] = item;
     console.log('added task list', item);
   },
   addLists: function addLists(items) {
-    TaskAPI.listsLoaded = true;
+    API.listsLoaded = true;
     if (items && items.length) {
       for (var i = 0; i < items.length; i++) {
-        TaskAPI.addList(items[i]);
+        API.addList(items[i]);
       }
     }
   },
@@ -110,10 +110,10 @@ var TaskAPI = {
       addon: 'tasks',
       kind: 'TaskList'
     }, params);
-    return window.tommy.api.getFragments(params).then(TaskAPI.addLists);
+    return window.tommy.api.getFragments(params).then(API.addLists);
   },
   deleteList: function deleteList(listId) {
-    delete TaskAPI.cache['lists'][listId];
+    delete API.cache['lists'][listId];
     console.log('delete list', listId);
     return window.tommy.api.deleteFragment(listId);
   },
@@ -125,7 +125,7 @@ var TaskAPI = {
       list.data = {};
     }
     if (typeof list.data.order === 'undefined') {
-      list.data.order = Object.keys(TaskAPI.cache['lists']).length;
+      list.data.order = Object.keys(API.cache['lists']).length;
     }
     if (typeof list.data.active === 'undefined') {
       list.data.active = true;
@@ -135,15 +135,15 @@ var TaskAPI = {
     }
     var params = Object.assign({}, list, { data: JSON.stringify(list.data) });
     if (list.id) {
-      return window.tommy.api.updateFragment(list.id, params).then(TaskAPI.addList);
+      return window.tommy.api.updateFragment(list.id, params).then(API.addList);
     } else {
-      return window.tommy.api.createFragment(params).then(TaskAPI.addList);
+      return window.tommy.api.createFragment(params).then(API.addList);
     }
     IndexController.invalidateLists = true; // rerender lists
   }
 };
 
-exports.default = TaskAPI;
+exports.default = API;
 
 },{}],2:[function(require,module,exports){
 'use strict';
@@ -158,7 +158,7 @@ var _api2 = _interopRequireDefault(_api);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var BoardSettingController = {
+var BoardSettingsController = {
   init: function init(page) {
     var $page = $$(page.container);
     var $nav = $$(page.navbarInnerContainer);
@@ -174,12 +174,12 @@ var BoardSettingController = {
   saveList: function saveList() {},
   afterSave: function afterSave(res) {
     // console.log('list saved', res)
-    // TaskAPI.addList(res)
+    // API.addList(res)
     // window.tommy.app.f7view.router.back()
   }
 };
 
-exports.default = BoardSettingController;
+exports.default = BoardSettingsController;
 
 },{"../api":1}],3:[function(require,module,exports){
 'use strict';
@@ -572,20 +572,7 @@ var TaskController = {
     window.tommy.tplManager.renderInline('tasks__taskActivityTemplate', items, $page);
   },
   addActivity: function addActivity(page, type, text) {
-    var task = _api2.default.cache['tasks'][page.query.task_fragment_id]; //,
-    //     currentUser = config.getCurrentUser()
-    //
-    // var data = {
-    //     type: type,
-    //     text: text,
-    //     time: new Date,
-    //     user_id: currentUser.id,
-    //     user_name: currentUser.first_name
-    // }
-    //
-    // if (!task.data.activity)
-    //     task.data.activity = []
-    // task.data.activity.unshift(data)
+    var task = _api2.default.cache['tasks'][page.query.task_fragment_id];
     _api2.default.addTaskActivity(task, type, text);
 
     TaskController.renderActivity(page);
@@ -804,9 +791,9 @@ var _listManagement = require('./controllers/list-management');
 
 var _listManagement2 = _interopRequireDefault(_listManagement);
 
-var _boardSetting = require('./controllers/board-setting');
+var _boardSettings = require('./controllers/board-settings');
 
-var _boardSetting2 = _interopRequireDefault(_boardSetting);
+var _boardSettings2 = _interopRequireDefault(_boardSettings);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -816,7 +803,7 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 window.tommy.app.f7.onPageInit('tasks__index', _index2.default.init);
 window.tommy.app.f7.onPageBack('tasks__index', _index2.default.uninit);
 window.tommy.app.f7.onPageAfterAnimation('tasks__index', _index2.default.invalidate);
-window.tommy.app.f7.onPageInit('tasks__board-setting', _boardSetting2.default.init);
+window.tommy.app.f7.onPageInit('tasks__board-settings', _boardSettings2.default.init);
 window.tommy.app.f7.onPageInit('tasks__list-add', _listAdd2.default.init);
 window.tommy.app.f7.onPageInit('tasks__list-edit', _listEdit2.default.init);
 window.tommy.app.f7.onPageInit('tasks__list-management', _listManagement2.default.init);
@@ -841,4 +828,4 @@ window.tommy.app.t7.registerHelper('tasks__checklistNumCompleted', function (che
   return ret;
 });
 
-},{"./controllers/board-setting":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/task":8,"./controllers/task-add":7}]},{},[9]);
+},{"./controllers/board-settings":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/task":8,"./controllers/task-add":7}]},{},[9]);

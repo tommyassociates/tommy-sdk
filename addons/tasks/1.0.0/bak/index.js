@@ -260,7 +260,7 @@
     //
     /// Board Setting Form
 
-    var BoardSettingForm = {
+    var BoardSettingsForm = {
 
         init: function(page) {
             var $page = $$(page.container),
@@ -794,7 +794,7 @@
 
     /// Board Setting Form
 
-    window.tommy.app.f7.onPageInit('tasks__board-setting', BoardSettingForm.init)
+    window.tommy.app.f7.onPageInit('tasks__board-settings', BoardSettingsForm.init)
 
     /// List Add Form
 

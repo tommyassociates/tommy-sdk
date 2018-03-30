@@ -4,7 +4,7 @@
             <ul>
                 <li class="item-content">
                     <div class="item-inner">
-                        <div class="item-title label">Name</div>
+                        <div class="item-title label">{{t "list-edit.name" defaultValue="Name"}}</div>
                         <div class="item-input">
                             <input type="text" name="name" value="{{name}}" class="right toggle-save">
                         </div>
@@ -25,7 +25,7 @@
                 -->
                 <li class="item-content">
                     <div class="item-inner">
-                        <div class="item-title label-custom">Show Fast Add Task</div>
+                        <div class="item-title label-custom">{{t "list-edit.show-fast-add-task" defaultValue="Show Fast Add Task"}}</div>
                         <div class="item-input">
                             <label class="label-switch">
                                 <input name="show_fast_add" type="checkbox" class="toggle-save" {{#if data.show_fast_add}}checked{{/if}}>

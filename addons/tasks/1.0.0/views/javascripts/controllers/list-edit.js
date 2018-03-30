@@ -1,8 +1,8 @@
-import TaskAPI from '../api'
+import API from '../api'
 
 const ListEditController = {
   init (page) {
-    const list = TaskAPI.cache['lists'][page.query.list_fragment_id]
+    const list = API.cache['lists'][page.query.list_fragment_id]
     const $page = $$(page.container)
     const $nav = $$(page.navbarInnerContainer)
 
@@ -16,7 +16,7 @@ const ListEditController = {
     })
 
     $page.find('.delete-list').on('click', ev => {
-      TaskAPI.deleteList(list.id)
+      API.deleteList(list.id)
       IndexController.invalidateLists = true
       window.tommy.app.f7view.router.back()
       ev.preventDefault()
@@ -27,7 +27,7 @@ const ListEditController = {
     list.name = data.name
     list.data.show_fast_add = !!(data.show_fast_add && data.show_fast_add.length)
 
-    TaskAPI.saveList(list).then(ListEditController.afterSave)
+    API.saveList(list).then(ListEditController.afterSave)
   },
 
   afterSave (res) {

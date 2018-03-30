@@ -40,8 +40,10 @@
                 window.$$ = Dom7;
 
                 i18n.init({
-                    lng: 'dev', //config.getLocale(), // 'zh-CN'
-                    load: 'currentOnly',
+                    lng: config.getLocale(), // 'dev', //'zh-CN'
+                    debug: true,
+                    fallbackLng: true,
+                    load: 'all',
                 }, function(err, t) {
 
                     app.init({

@@ -31,9 +31,5 @@ define([], function() {
         }
     };
 
-    // KLUDGE: Export as global for ES6 integration
-    // if (!window.tommy) window.tommy = {}
-    // window.tommy.cache = cache
-
     return cache;
 });

@@ -1,25 +1,25 @@
-const TaskAPI = {
+const API = {
   listsLoaded: false,
   tasksLoaded: false,
   cache: {},
 
   initCache () {
-    TaskAPI.cache = {
+    API.cache = {
       lists: {},
       tasks: {}
     }
   },
 
   addTask (item) {
-    TaskAPI.cache['tasks'][item.id] = item
-    console.log('task added', item)
+    API.cache['tasks'][item.id] = item
+    // console.log('task added', item)
   },
 
   addTasks (items) {
-    TaskAPI.tasksLoaded = true
+    API.tasksLoaded = true
     if (items && items.length) {
       for (let i = 0; i < items.length; i++) {
-        TaskAPI.addTask(items[i])
+        API.addTask(items[i])
       }
     }
   },
@@ -27,8 +27,8 @@ const TaskAPI = {
   getListTasks (listId) {
     const tasks = []
     let task
-    for (const taskId in TaskAPI.cache['tasks']) {
-      task = TaskAPI.cache['tasks'][taskId]
+    for (const taskId in API.cache['tasks']) {
+      task = API.cache['tasks'][taskId]
       if (task.parent_id == listId) { tasks.push(task) }
     }
     return tasks
@@ -41,7 +41,7 @@ const TaskAPI = {
       addon: 'tasks',
       kind: 'Task'
     }, params)
-    return window.tommy.api.getFragments(params).then(TaskAPI.addTasks)
+    return window.tommy.api.getFragments(params).then(API.addTasks)
   },
 
   addTaskActivity (task, type, text) {
@@ -75,21 +75,21 @@ const TaskAPI = {
 
     task.addon = 'tasks'
     task.kind = 'Task'
-    if (!task.id) { TaskAPI.addTaskActivity(task, 'status', 'Created a task') }
+    if (!task.id) { API.addTaskActivity(task, 'status', 'Created a task') }
     const params = Object.assign({}, task, { data: JSON.stringify(task.data) })
-    if (task.id) { return window.tommy.api.updateFragment(task.id, params).then(TaskAPI.addTask) } else { return window.tommy.api.createFragment(params).then(TaskAPI.addTask) }
+    if (task.id) { return window.tommy.api.updateFragment(task.id, params).then(API.addTask) } else { return window.tommy.api.createFragment(params).then(API.addTask) }
   },
 
   addList (item) {
-    TaskAPI.cache['lists'][item.id] = item
+    API.cache['lists'][item.id] = item
     console.log('added task list', item)
   },
 
   addLists (items) {
-    TaskAPI.listsLoaded = true
+    API.listsLoaded = true
     if (items && items.length) {
       for (let i = 0; i < items.length; i++) {
-        TaskAPI.addList(items[i])
+        API.addList(items[i])
       }
     }
   },
@@ -101,11 +101,11 @@ const TaskAPI = {
       addon: 'tasks',
       kind: 'TaskList'
     }, params)
-    return window.tommy.api.getFragments(params).then(TaskAPI.addLists)
+    return window.tommy.api.getFragments(params).then(API.addLists)
   },
 
   deleteList (listId) {
-    delete TaskAPI.cache['lists'][listId]
+    delete API.cache['lists'][listId]
     console.log('delete list', listId)
     return window.tommy.api.deleteFragment(listId)
   },
@@ -115,13 +115,13 @@ const TaskAPI = {
     list.addon = 'tasks'
     list.kind = 'TaskList'
     if (!list.data) { list.data = {} }
-    if (typeof (list.data.order) === 'undefined') { list.data.order = Object.keys(TaskAPI.cache['lists']).length }
+    if (typeof (list.data.order) === 'undefined') { list.data.order = Object.keys(API.cache['lists']).length }
     if (typeof (list.data.active) === 'undefined') { list.data.active = true }
     if (typeof (list.data.show_fast_add) === 'undefined') { list.data.show_fast_add = true }
     const params = Object.assign({}, list, { data: JSON.stringify(list.data) })
-    if (list.id) { return window.tommy.api.updateFragment(list.id, params).then(TaskAPI.addList) } else { return window.tommy.api.createFragment(params).then(TaskAPI.addList) }
+    if (list.id) { return window.tommy.api.updateFragment(list.id, params).then(API.addList) } else { return window.tommy.api.createFragment(params).then(API.addList) }
     IndexController.invalidateLists = true // rerender lists
   }
 }
 
-export default TaskAPI
+export default API

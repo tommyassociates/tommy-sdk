@@ -1,14 +1,14 @@
-import TaskAPI from '../api'
+import API from '../api'
 
 
 const IndexController = {
   init (page) {
-    if (!TaskAPI.listsLoaded || !TaskAPI.tasksLoaded) {
-      TaskAPI.initCache()
-      TaskAPI.loadLists().then(() => {
+    if (!API.listsLoaded || !API.tasksLoaded) {
+      API.initCache()
+      API.loadLists().then(() => {
         IndexController.invalidate(page)
       })
-      TaskAPI.loadTasks().then(() => {
+      API.loadTasks().then(() => {
         IndexController.invalidate(page)
       })
     }
@@ -19,7 +19,7 @@ const IndexController = {
 
   uninit () {
     console.log('tasks uninitialize')
-    TaskAPI.cache = {}
+    API.cache = {}
   },
 
   bind (page) {
@@ -37,7 +37,7 @@ const IndexController = {
       ev.preventDefault()
       const data = window.tommy.app.f7.formToJSON(this)
       $$(this).find('input[name="name"]').val('')
-      TaskAPI.saveTask(data).then(() => {
+      API.saveTask(data).then(() => {
         IndexController.invalidate(page)
       })
     })
@@ -50,7 +50,7 @@ const IndexController = {
     const $page = $$(page.container)
     if (IndexController.invalidateLists || !$page.find('.card').length) {
       IndexController.invalidateLists = false
-      window.tommy.tplManager.renderInline('tasks__listsTemplate', TaskAPI.cache['lists'], page.container)
+      window.tommy.tplManager.renderInline('tasks__listsTemplate', API.cache['lists'], page.container)
 
       const isTablet = window.innerWidth >= 630
       const swiper = window.tommy.app.f7.swiper('.swiper-container', {
@@ -62,9 +62,9 @@ const IndexController = {
       })
     }
 
-    for (const listId in TaskAPI.cache['lists']) {
+    for (const listId in API.cache['lists']) {
       const $e = $$(page.container).find(`[data-list-id="${listId}"] .list-content`)
-      const tasks = TaskAPI.getListTasks(listId)
+      const tasks = API.getListTasks(listId)
       window.tommy.tplManager.renderTarget('tasks__listTasksTemplate', tasks, $e)
     }
   }

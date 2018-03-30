@@ -1,6 +1,6 @@
-import TaskAPI from '../api'
+import API from '../api'
 
-const BoardSettingController = {
+const BoardSettingsController = {
   init (page) {
     const $page = $$(page.container)
     const $nav = $$(page.navbarInnerContainer)
@@ -19,9 +19,9 @@ const BoardSettingController = {
 
   afterSave (res) {
     // console.log('list saved', res)
-    // TaskAPI.addList(res)
+    // API.addList(res)
     // window.tommy.app.f7view.router.back()
   }
 }
 
-export default BoardSettingController
+export default BoardSettingsController

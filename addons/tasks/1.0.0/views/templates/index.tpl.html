@@ -18,15 +18,15 @@
                     {{#if data.show_fast_add}}
                     <div class="list-footer">
                         <div class="in">
-                            <div class="card-add fast-add-toggle" data-input-focus="true">Add task</div>
+                            <div class="card-add fast-add-toggle" data-input-focus="true">{{t "index.add-task" defaultValue="Add task"}}</div>
                         </div>
                         <div class="">
                             <form class="card-form fast-add-form">
                                 <input name="parent_id" value="{{id}}" type="hidden">
                                 <input name="name" type="text">
                                 <div class="buttons">
-                                    <a href="#" class="button cancel fast-add-toggle">Cancel</a>
-                                    <button type="submit" class="button button-fill color-red save">Done</button>
+                                    <a href="#" class="button cancel fast-add-toggle">{{t "index.cancel" defaultValue="Cancel"}}</a>
+                                    <button type="submit" class="button button-fill color-red save">{{t "index.done" defaultValue="Done"}}</button>
                                 </div>
                             </form>
                         </div>
@@ -73,7 +73,7 @@
                 {{#if data.status}}
                 {{data.status}}
                 {{else}}
-                Unassigned
+                {{t "index.unassigned" defaultValue="Unassigned"}}
                 {{/if}}
             </span>
         </div>

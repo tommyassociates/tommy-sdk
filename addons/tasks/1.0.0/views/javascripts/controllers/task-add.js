@@ -1,4 +1,4 @@
-import TaskAPI from '../api'
+import API from '../api'
 
 //
 /// Task Add Controller
@@ -8,7 +8,7 @@ const TaskAddController = {
     const $page = $$(page.container)
     const $nav = $$(page.navbarInnerContainer)
 
-    window.tommy.tplManager.renderInline('tasks__addTaskTemplate', TaskAPI.cache['lists'], $page)
+    window.tommy.tplManager.renderInline('tasks__addTaskTemplate', API.cache['lists'], $page)
 
     $nav.find('a.save').on('click', ev => {
       const data = window.tommy.app.f7.formToJSON($page.find('form'))
@@ -18,7 +18,7 @@ const TaskAddController = {
   },
 
   saveTask (data) {
-    TaskAPI.saveTask(data).then(TaskAddController.afterSave)
+    API.saveTask(data).then(TaskAddController.afterSave)
   },
 
   afterSave (res) {

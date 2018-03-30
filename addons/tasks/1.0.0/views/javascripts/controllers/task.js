@@ -1,8 +1,8 @@
-import TaskAPI from '../api'
+import API from '../api'
 
 const TaskController = {
   init (page) {
-    const task = TaskAPI.cache['tasks'][page.query.task_fragment_id]
+    const task = API.cache['tasks'][page.query.task_fragment_id]
     const $page = $$(page.container)
     const $navbar = $$(page.navbarInnerContainer)
 
@@ -80,14 +80,14 @@ const TaskController = {
   },
 
   invalidate (page) {
-    const task = TaskAPI.cache['tasks'][page.query.task_fragment_id]
+    const task = API.cache['tasks'][page.query.task_fragment_id]
 
     // Page title must be set after animation
     window.tommy.app.setPageTitle(task.name)
   },
 
   renderActivity (page) {
-    const task = TaskAPI.cache['tasks'][page.query.task_fragment_id]
+    const task = API.cache['tasks'][page.query.task_fragment_id]
     const $page = $$(page.container)
 
     let items = []
@@ -96,28 +96,15 @@ const TaskController = {
   },
 
   addActivity (page, type, text) {
-    const task = TaskAPI.cache['tasks'][page.query.task_fragment_id]//,
-        //     currentUser = config.getCurrentUser()
-        //
-        // var data = {
-        //     type: type,
-        //     text: text,
-        //     time: new Date,
-        //     user_id: currentUser.id,
-        //     user_name: currentUser.first_name
-        // }
-        //
-        // if (!task.data.activity)
-        //     task.data.activity = []
-        // task.data.activity.unshift(data)
-    TaskAPI.addTaskActivity(task, type, text)
+    const task = API.cache['tasks'][page.query.task_fragment_id]
+    API.addTaskActivity(task, type, text)
 
     TaskController.renderActivity(page)
     TaskController.saveTask(page)
   },
 
   renderChecklist (page) {
-    const task = TaskAPI.cache['tasks'][page.query.task_fragment_id]
+    const task = API.cache['tasks'][page.query.task_fragment_id]
     const $page = $$(page.container)
 
     let items = []
@@ -138,23 +125,23 @@ const TaskController = {
       })
 
       TaskController.renderChecklist(page)
-            // window.tommy.tplManager.renderInline('tasks__taskChecklistTemplate', task.data.checklist.items, $page)
+      // window.tommy.tplManager.renderInline('tasks__taskChecklistTemplate', task.data.checklist.items, $page)
     })
     $input.on('focusin', () => {
       TaskController.enableSave(page)
-            // if (!task.data.checklist)
-            //     task.data.checklist = {}
-            // if (!task.data.checklist.items)
-            //     task.data.checklist.items = []
-            // task.data.checklist.items.push({
-            //     text: $$(this).val(),
-            //     complete: false
-            // })
-            //
-            // window.tommy.tplManager.renderInline('tasks__taskChecklistTemplate', task.data.checklist.items, $page)
+      // if (!task.data.checklist)
+      //     task.data.checklist = {}
+      // if (!task.data.checklist.items)
+      //     task.data.checklist.items = []
+      // task.data.checklist.items.push({
+      //     text: $$(this).val(),
+      //     complete: false
+      // })
+      //
+      // window.tommy.tplManager.renderInline('tasks__taskChecklistTemplate', task.data.checklist.items, $page)
     })
     $page.find('.remove-checklist').click(() => {
-            // TODO: confirm alert
+      // TODO: confirm alert
       task.data.checklist = {}
       $page.find('[data-template="tasks__taskChecklistTemplate"]').html('')
       TaskController.saveTask(page)
@@ -167,7 +154,7 @@ const TaskController = {
       TaskController.renderChecklist(page)
 
       TaskController.enableSave(page)
-            // TaskController.saveTask(page)
+      // TaskController.saveTask(page)
     })
     $page.find('.checklist-item').click(function () {
       const index = parseInt($$(this).parents('li').data('checklist-item'))
@@ -183,12 +170,12 @@ const TaskController = {
       }
 
       TaskController.enableSave(page)
-            // TaskController.saveTask(page)
+      // TaskController.saveTask(page)
     })
   },
 
   renderDeadline (page) {
-    const task = TaskAPI.cache['tasks'][page.query.task_fragment_id]
+    const task = API.cache['tasks'][page.query.task_fragment_id]
     const $page = $$(page.container)
 
     window.tommy.tplManager.renderInline('tasks__taskDeadlineTemplate', task.data.deadline, $page)
@@ -204,8 +191,8 @@ const TaskController = {
       onFormat (date) {
         console.log('format deadline picker', date)
         return window.tommy.util.humanTime(date)
-                // task.data.deadline = picker.currentDate
-                // TaskController.enableSave(page)
+        // task.data.deadline = picker.currentDate
+        // TaskController.enableSave(page)
       }
     })
 
@@ -222,7 +209,7 @@ const TaskController = {
   },
 
   initStatusPicker (page) {
-    const task = TaskAPI.cache['tasks'][page.query.task_fragment_id]
+    const task = API.cache['tasks'][page.query.task_fragment_id]
     const STATUS = [
       'Unassigned', 'Assigned', 'Processing', 'Completed', 'Closed', 'Archive Task', 'Cancel'
     ]
@@ -248,19 +235,19 @@ const TaskController = {
   },
 
   saveTask (page) {
-    const task = TaskAPI.cache['tasks'][page.query.task_fragment_id]
+    const task = API.cache['tasks'][page.query.task_fragment_id]
 
     console.log('saving task fragment', task)
-    TaskAPI.saveTask(task)
+    API.saveTask(task)
   },
 
   enableEditName (page, flag) {
-    const task = TaskAPI.cache['tasks'][page.query.task_fragment_id]
+    const task = API.cache['tasks'][page.query.task_fragment_id]
     const $page = $$(page.container)
     const $input = $page.find('input.edit-task-name')
 
     if (flag != false) {
-            // $textarea.removeClass('unstyled')
+      // $textarea.removeClass('unstyled')
       TaskController.enableSave(page, true)
 
       $input.on('focusout', () => {
@@ -271,12 +258,12 @@ const TaskController = {
   },
 
   enableEditDescription (page, flag) {
-    const task = TaskAPI.cache['tasks'][page.query.task_fragment_id]
+    const task = API.cache['tasks'][page.query.task_fragment_id]
     const $page = $$(page.container)
     const $textarea = $page.find('textarea.edit-task-description')
 
     if (flag != false) {
-            // $textarea.removeClass('unstyled')
+      // $textarea.removeClass('unstyled')
       TaskController.enableSave(page, true)
 
       $textarea.on('focusout', () => {
