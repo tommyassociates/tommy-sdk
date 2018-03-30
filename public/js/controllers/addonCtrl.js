@@ -69,8 +69,8 @@ function(util,xhr,app,config,api,addons,TM) {
         initAddonDetails: function(page) {
             console.log('addonCtrl', 'initAddonDetails', page);
             var $page = $$(page.container),
-              package = page.query.package,
-              version = page.query.version;
+                package = page.query.package,
+                version = page.query.version;
 
             // Query addon installed status from the sandbox server
             addonCtrl.initAddonDetailsSandbox(package, version);
@@ -78,20 +78,20 @@ function(util,xhr,app,config,api,addons,TM) {
 
             // Sandbox actions
             $page.on('click', 'a[data-command="sandbox-upload"]', function() {
-              addonCtrl.uploadSandboxAddon(package, version);
+                addonCtrl.uploadSandboxAddon(package, version);
             });
 
             $page.on('click', 'a[data-command="sandbox-delete"]', function() {
-              addonCtrl.deleteSandboxAddon(package, version);
+                addonCtrl.deleteSandboxAddon(package, version);
             });
 
             // Store actions
             $page.on('click', 'a[data-command="store-submit"]', function() {
-              addonCtrl.submitStoreAddon(package, version);
+                addonCtrl.submitStoreAddon(package, version);
             });
 
             $page.on('click', 'a[data-command="store-delete"]', function() {
-              addonCtrl.deleteStoreAddon(package, version);
+                addonCtrl.deleteStoreAddon(package, version);
             });
 
             // api.getAddon(package).then(function(addon) {

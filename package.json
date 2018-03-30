@@ -7,7 +7,6 @@
     "archiver": "^1.0.0",
     "ejs": "^2.5.8",
     "express": "^4.16.3",
-    "js-yaml": "^3.11.0",
     "request": "^2.85.0"
   },
   "devDependencies": {
@@ -28,7 +27,11 @@
     "gulp-sourcemaps": "^2.6.4",
     "gulp-streamify": "^1.0.2",
     "gulp-uglify": "^3.0.0",
+    "i18next-scanner": "^2.4.6",
+    "js-yaml": "^3.11.0",
     "jshint": "*",
+    "lodash": "^4.17.5",
+    "vinyl-fs": "^3.0.2",
     "vinyl-source-stream": "^2.0.0"
   },
   "scripts": {

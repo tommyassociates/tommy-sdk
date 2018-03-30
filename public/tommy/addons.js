@@ -1,5 +1,5 @@
-define(['app','api','util','config','cache','util','Framework7'],
-function(app, api,util,config,cache,util) {
+define(['app','api','util','config','cache','util','i18n','Framework7'],
+function(app, api,util,config,cache,util,i18n) {
     var t7 = Template7;
 
     var addons = {
@@ -218,6 +218,12 @@ function(app, api,util,config,cache,util) {
 
             // Loop through views and preload them if they are index views
             if (addon.views && addon.views.length) {
+
+                // If views exist load the locales also
+                if (addon.languages && addon.languages.length) {
+                    i18n.addEndpoint(addon.package, addon.file_base_url + 'locales', addon.languages, true)
+                }
+
                 for (var i = 0; i < addon.views.length; i++) {
                     var view = addon.views[i];
 
@@ -344,6 +350,20 @@ function(app, api,util,config,cache,util) {
                 });
             });
         },
+
+        // loadLanguage: function (baseUrl, locale, package) {
+        //     // alert(url)
+        //     // return new Promise(function(resolve, reject) {
+        //     //     var url = baseUrl + 'locales/' + locale + '.json'
+        //     //     console.log('!!!!!!!!!!!!!!!!! loading addon translation', url)
+        //     //     $$.getJSON(url, function (data) {
+        //     //         // addons.loadLanguage()
+        //     //         i18n.i18next.addResourceBundle(locale, package, data)
+        //     //         console.log('!!!!!!!!!!!!!!!!! adding addon translation', package, locale, data)
+        //     //         resolve();
+        //     //     });
+        //     // });
+        // },
 
         // loadManifest: function (package, version, callback) { //, local
         //     console.log('load addons', package, version); //, local
@@ -605,10 +625,6 @@ function(app, api,util,config,cache,util) {
         //     }
         // },
     };
-
-    // KLUDGE: Export as global for ES6 integration
-    // if (!window.tommy) window.tommy = {}
-    // window.tommy.addons = addons
 
     return addons;
 });

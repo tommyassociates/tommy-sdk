@@ -959,9 +959,5 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
         }
     };
 
-    // KLUDGE: Export as global for ES6 integration
-    // if (!window.tommy) window.tommy = {}
-    // window.tommy.api = api
-
     return api;
 });
