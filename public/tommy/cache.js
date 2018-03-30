@@ -17,9 +17,10 @@ define([], function() {
 
         reset: function (scope, partialKey) {
             if (scope && partialKey) {
-                for (var key in this.data) {
-                    if (key.indexOf(partialKey) !== -1) {
-                        this.data[scope][key] = {};
+                for (var key in this.data[scope]) {
+                    var index = key.indexOf(partialKey);
+                    if (index !== -1) {
+                        delete this.data[scope][key];
                     }
                 }
             }
@@ -29,6 +30,10 @@ define([], function() {
                 this.data = {};
         }
     };
+
+    // KLUDGE: Export as global for ES6 integration
+    // if (!window.tommy) window.tommy = {}
+    // window.tommy.cache = cache
 
     return cache;
 });

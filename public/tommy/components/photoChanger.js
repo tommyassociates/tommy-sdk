@@ -1,5 +1,5 @@
-define(['app','util','config','api'], //'views/module'/*,'i18n!nls/lang'*/,'tplManager'
-function (app,util,config,api) { //VM/*,i18n*/TM
+define(['app','util','config','api'],
+function (app,util,config,api) {
     var fileSelector;
 
     var photoChanger = {

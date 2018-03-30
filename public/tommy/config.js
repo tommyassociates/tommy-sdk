@@ -214,5 +214,9 @@ define(['cache'], function (cache) {
         }
     };
 
+    // KLUDGE: Export as global for ES6 integration
+    if (!window.tommy) window.tommy = {}
+    window.tommy.config = config
+
     return config;
 })

@@ -35,5 +35,9 @@ function(app,config,i18next) {
         }
     };
 
+    // KLUDGE: Export as global for ES6 integration
+    if (!window.tommy) window.tommy = {}
+    window.tommy.i18n = i18n
+
     return i18n;
 })

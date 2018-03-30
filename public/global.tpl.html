@@ -166,10 +166,35 @@
     <li>
       <a href="{{url}}" class="item-link item-content" data-addon="{{package}}" data-view-id="{{id}}">
         <div class="item-inner">
-          <div class="item-title">{{title}}</div>
+          <div class="item-title">{{title}} ({{package}}/{{id}})</div>
           <!-- <div class="item-after"></div> -->
         </div>
       </a>
+    </li>
+    {{/each}}
+  </ul>
+</script>
+
+
+<script id="addonViewsRadioListTemplate" type="text/template">
+  <ul>
+    <li>
+      <label class="label-radio item-content">
+        <input type="radio" name="default-addon-view">
+        <!-- checked="checked" -->
+        <div class="item-inner">
+          <div class="item-title">None</div>
+        </div>
+      </label>
+    </li>
+    {{#each this}}
+    <li>
+      <label class="label-radio item-content">
+        <input type="radio" name="default-addon-view" value="{{package}}/{{id}}">
+        <div class="item-inner">
+          <div class="item-title">{{title}} ({{package}}/{{id}})</div>
+        </div>
+      </label>
     </li>
     {{/each}}
   </ul>

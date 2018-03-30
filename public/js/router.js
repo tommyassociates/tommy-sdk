@@ -57,9 +57,7 @@ function(config,app,util,TM,CM,addons) {
             // url = url.split('?')[0];
 
             console.log('router', 'preprocess', url);
-
             content = addons.preprocess(content, url);
-
             return content;
         }
     };

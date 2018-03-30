@@ -1,4 +1,4 @@
-define(['config','cache'/*,'i18n!nls/lang'*/,'Framework7'],function (config,cache/*,i18n*/) {
+define(['config','cache','moment'/*,'i18n!nls/lang'*/,'Framework7'],function (config,cache,moment/*,i18n*/) {
     var $$ = Dom7;
 
     var util = {
@@ -48,10 +48,12 @@ define(['config','cache'/*,'i18n!nls/lang'*/,'Framework7'],function (config,cach
             if (savedTags && savedTags.length) {
                 for (var x = 0; x < savedTags.length; x++) {
                     if (savedTags[x] &&
-                        savedTags[x][0] == item[0] &&
-                        savedTags[x][1] == item[1] &&
-                        savedTags[x][2] == item[2])
-                        return true;
+                        savedTags[x].type == item.type &&
+                        savedTags[x].name == item.name &&
+                        savedTags[x].id == item.id) {
+                            // console.log('isTagSelected', savedTags[x], item)
+                            return true;
+                        }
                 }
             }
             return false;
@@ -180,35 +182,66 @@ define(['config','cache'/*,'i18n!nls/lang'*/,'Framework7'],function (config,cach
             // return (h > 12) ? (h-12 + ':' + m + ' PM') : (h + ':' + m + ' AM');
         },
 
-        timeFormat: function (ms) {
-            ms = ms * 1000;
+        // timeFormat: function (ms) {
+        //     ms = ms * 1000;
+        //
+        //     var d_second,d_minutes, d_hours, d_days;
+        //     var timeNow = new Date().getTime();
+        //     var d = (timeNow - ms)/1000;
+        //     d_days = Math.round(d / (24*60*60));
+        //     d_hours = Math.round(d / (60*60));
+        //     d_minutes = Math.round(d / 60);
+        //     d_second = Math.round(d);
+        //     if (d_days > 0 && d_days < 2) {
+        //         return d_days + i18n.global.day_ago;
+        //     } else if (d_days <= 0 && d_hours > 0) {
+        //         return d_hours + i18n.global.hour_ago;
+        //     } else if (d_hours <= 0 && d_minutes > 0) {
+        //         return d_minutes + i18n.global.minute_ago;
+        //     } else if (d_minutes <= 0 && d_second >= 0) {
+        //         return i18n.global.just_now;
+        //     } else {
+        //         var s = new Date();
+        //         s.setTime(ms);
+        //         return (s.getFullYear() + '-' + f(s.getMonth() + 1) + '-' + f(s.getDate()) + ' '+ f(s.getHours()) + ':'+ f(s.getMinutes()));
+        //     }
+        //
+        //     function f(n) {
+        //         if (n < 10)
+        //             return '0' + n;
+        //         else
+        //             return n;
+        //     }
+        // },
 
-            var d_second,d_minutes, d_hours, d_days;
-            var timeNow = new Date().getTime();
-            var d = (timeNow - ms)/1000;
-            d_days = Math.round(d / (24*60*60));
-            d_hours = Math.round(d / (60*60));
-            d_minutes = Math.round(d / 60);
-            d_second = Math.round(d);
-            if (d_days > 0 && d_days < 2) {
-                return d_days + i18n.global.day_ago;
-            } else if (d_days <= 0 && d_hours > 0) {
-                return d_hours + i18n.global.hour_ago;
-            } else if (d_hours <= 0 && d_minutes > 0) {
-                return d_minutes + i18n.global.minute_ago;
-            } else if (d_minutes <= 0 && d_second >= 0) {
-                return i18n.global.just_now;
-            } else {
-                var s = new Date();
-                s.setTime(ms);
-                return (s.getFullYear() + '-' + f(s.getMonth() + 1) + '-' + f(s.getDate()) + ' '+ f(s.getHours()) + ':'+ f(s.getMinutes()));
+        humanTime: function (date) {
+            var localTime  = moment.utc(date).toDate()
+            if (moment(localTime).isValid()) {
+                var fromnow = moment(localTime).fromNow(true)
+                var now = moment()
+                var diff = now.diff(moment(localTime), 'days')
+                if (diff === 1)
+                    return 'Yesterday ' + moment(localTime).format("h:mm A")
+                else if (diff === 0) {
+                    // console.log('timeAgo', diff)
+                    return 'Today ' + moment(localTime).format("h:mm A")
+                }
+                else if (diff === -1) {
+                    return 'Yesterday ' + moment(localTime).format("h:mm A")
+                }
+                else if (diff >= 1 && diff <= 8 || diff >= -8 && diff <= -1) {
+                    return moment(localTime).format("ddd h:mm A")
+                }
+                else if (diff >= 365 || diff <= -365)
+                    return moment(localTime).format("MMM D, YYYY h:mm A")
+                else if (diff >= 8 || diff <= -8)
+                    return moment(localTime).format("MMM D h:mm A")
+                // else if (diff < -2) {
+                //     return moment(localTime).format("ddd h:mm A")
+                // }
             }
-
-            function f(n) {
-                if (n < 10)
-                    return '0' + n;
-                else
-                    return n;
+            else {
+                return 'None';
             }
         },
 
@@ -250,24 +283,53 @@ define(['config','cache'/*,'i18n!nls/lang'*/,'Framework7'],function (config,cach
         //       }
         // },
 
-        createDatePicker: function ($input, initialDate) {
+        createDatePicker: function ($input, initialDate, options) {
             if (!window.tommy.app) return
-            return window.tommy.app.picker({
+
+            if (typeof initialDate == 'string')
+                initialDate = new Date(initialDate)
+            if (typeof initialDate != 'date')
+                initialDate = new Date;
+
+            if (!options)
+                options = {}
+            if (!options.dateFormat)
+                options.dateFormat = "dddd, MMM Do YY, h:mm a"
+
+            var initialValue = []
+            if (initialDate) {
+                initialValue = [initialDate.getMonth(), initialDate.getDate(), initialDate.getFullYear(), initialDate.getHours(), (initialDate.getMinutes() < 10 ? '0' + initialDate.getMinutes() : initialDate.getMinutes())]
+            }
+            return window.tommy.f7.picker(Object.assign({
                 input: $input,
                 rotateEffect: true,
                 inputReadOnly: true,
-                value: [initialDate.getMonth(), initialDate.getDate(), initialDate.getFullYear(), initialDate.getHours(), (initialDate.getMinutes() < 10 ? '0' + initialDate.getMinutes() : initialDate.getMinutes())],
+                convertToPopover: false,
+                updateValuesOnMomentum: false,
+                // updateValuesOnTouchmove: false,
+                value: initialValue,
                 onChange: function (picker, values, displayValues) {
                     var daysInMonth = new Date(picker.value[2], picker.value[0]*1 + 1, 0).getDate();
                     if (values[1] > daysInMonth) {
                         picker.cols[1].setValue(daysInMonth);
                     }
+                    // console.log('onChange', values, displayValues)
                 },
-                formatValue: function (p, values, displayValues) {
+                formatValue: function (picker, values, displayValues) {
                     if (!displayValues[0]) {
                         displayValues[0] = util.monthNames[initialDate.getMonth()]
                     }
-                    return displayValues[0] + ' ' + values[1] + ', ' + values[2] + ' ' + values[3] + ':' + values[4];
+                    var str = displayValues[0] + ' ' + values[1] + ', ' + values[2] + ' ' + values[3] + ':' + values[4];
+
+                    // Set the selected date as a public instance member
+                    picker.currentDate = new Date(str)
+                    console.log('formatValue', values, displayValues, str, picker.currentDate)
+
+                    if (options.onFormat)
+                        return options.onFormat(picker.currentDate)
+                    else
+                        return moment(p.currentDate).format(options.dateFormat);
+                    // return displayValues[0] + ' ' + values[1] + ', ' + values[2] + ' ' + values[3] + ':' + values[4];
                 },
                 cols: [
                     // Months
@@ -316,7 +378,7 @@ define(['config','cache'/*,'i18n!nls/lang'*/,'Framework7'],function (config,cach
                         })(),
                     }
                 ]
-            });
+            }, options));
         },
 
 
@@ -332,7 +394,7 @@ define(['config','cache'/*,'i18n!nls/lang'*/,'Framework7'],function (config,cach
                 case 'TeamMember':
                     return 'team/members/' + account.user_id;
                 case 'User':
-                    return 'user';
+                    return 'me';
                 default:
                     throw 'Invalid account type: ' + account.type;
             }
@@ -417,7 +479,15 @@ define(['config','cache'/*,'i18n!nls/lang'*/,'Framework7'],function (config,cach
             }
 
             return 'Unknown'
+        },
+
+        getInitialsFromName: function (name) {
+          var nameSplitted = name.split(' ');
+          var formattedName = name[0];
+          formattedName += nameSplitted.length > 1 ? nameSplitted[1][0] : name[1]
+          return formattedName
         }
+
         // optionList : {
         //     shiftRepeats :'None|Daily|Weekly|Monthy|Every Monday|Every Tuesday|Every Wednesday|Every Thursday|Every Friday|Every Saturday|Every Sunday',
         // },
@@ -561,5 +631,9 @@ define(['config','cache'/*,'i18n!nls/lang'*/,'Framework7'],function (config,cach
         // },
     };
 
-    return util;
+    // KLUDGE: Export as global for ES6 integration
+    if (!window.tommy) window.tommy = {}
+    window.tommy.util = util
+
+    return util
 });

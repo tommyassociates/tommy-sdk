@@ -42,14 +42,16 @@ function(app, api,util,config,cache,util) {
         },
 
         preprocess: function (content, url) {
-            // if (!t7.global.currentAddonInstall) {
-                var pos = url.indexOf('/addons');
-                if (pos !== -1) {
-                    var parts = url.substring(pos + 1).split('/');
-                    if (parts.length >= 4 && parts[0] == 'addons' && parts[2] == 'versions') {
-                        var package = parts[1],
-                            version = parts[3],
-                            addon = cache.get('addons', package);
+            var pos = url.indexOf('/addons');
+            if (pos !== -1) {
+                var parts = url.substring(pos + 1).split('/');
+                if (parts.length >= 4 && parts[0] == 'addons' && parts[2] == 'versions') {
+                    var package = parts[1],
+                        version = parts[3],
+                        addon = cache.get('addons', package);
+
+                    if (!t7.global.currentAddonInstall ||
+                        t7.global.currentAddonInstall.package != package) {
 
                         // Set the last visible addon for template URL helpers
                         // such as `addonAssetUrl`
@@ -62,9 +64,13 @@ function(app, api,util,config,cache,util) {
                         window.tommy.addonLoaded = true;
 
                         console.log('entering addon context', t7.global.currentAddonInstall)
+                        // return
+                    }
+                    else {
+                        console.log('already in addon context', t7.global.currentAddonInstall)
                     }
                 }
-            // }
+            }
 
             return content;
         },
@@ -210,7 +216,7 @@ function(app, api,util,config,cache,util) {
             // addon.path = util.addonAssetPath(package, version, null);
             // addon.url = util.addonAssetUrl(package, version, null, true);
 
-            // Loop through views and preload them if they are default views
+            // Loop through views and preload them if they are index views
             if (addon.views && addon.views.length) {
                 for (var i = 0; i < addon.views.length; i++) {
                     var view = addon.views[i];
@@ -248,7 +254,7 @@ function(app, api,util,config,cache,util) {
             cache.set('addonViews', view.uid, view);
 
             // Set global addon view data for Template7
-            if (view.default) {
+            if (view.index) {
                 t7.global.addonViews[view.uid] = view;
             }
 
@@ -436,7 +442,7 @@ function(app, api,util,config,cache,util) {
             if (addon && addon.views && addon.views.length) {
                 for (var i = 0; i < addon.views.length; i++) {
                     var view = addon.views[i];
-                    if (view.default) {
+                    if (view.index) {
                         return view;
                     }
                 }
@@ -599,6 +605,10 @@ function(app, api,util,config,cache,util) {
         //     }
         // },
     };
+
+    // KLUDGE: Export as global for ES6 integration
+    // if (!window.tommy) window.tommy = {}
+    // window.tommy.addons = addons
 
     return addons;
 });

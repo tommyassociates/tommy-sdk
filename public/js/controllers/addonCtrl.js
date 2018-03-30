@@ -16,7 +16,7 @@ function(util,xhr,app,config,api,addons,TM) {
                 return false;
             });
 
-            addonCtrl.loadLastAddonView(page)
+            addonCtrl.loadDefaultAddonView(page)
         },
 
         // viewAddon: function(package, viewId) {
@@ -26,12 +26,16 @@ function(util,xhr,app,config,api,addons,TM) {
         //     });
         // },
 
-        loadLastAddonView: function(page) {
-            // Autoload last addon view
-            var addon = page.query.addon //localStorage.getItem('lastAddon') // ||
-            var view = page.query.view //localStorage.getItem('lastAddonView') // ||
+        // Autoload default addon view
+        loadDefaultAddonView: function(page) {
+            var defaultView = localStorage.getItem('defaultView')
+            if (!defaultView || defaultView.indexOf('/') === -1)
+                return
+            defaultView = defaultView.split('/')
+            var addon = defaultView[0]
+            var view = defaultView[1]
             if (addon && view) {
-                console.log('Force loading addon', addon, view)
+                console.log('loading default addon view', addon, view)
                 setTimeout(function() {
                     $$('#addon-views-local-nav').find('a[data-addon="' + addon + '"][data-view-id="' + view + '"]').click();
                 }, 0);
@@ -54,8 +58,8 @@ function(util,xhr,app,config,api,addons,TM) {
             var $page = $$(page.container);
             var addon = $page.data('addon');
             var view = $page.data('view');
-            localStorage.setItem('lastAddon', addon)
-            localStorage.setItem('lastAddonView', view)
+            // localStorage.setItem('defaultView', addon)
+            // localStorage.setItem('defaultView', view)
         },
 
         //

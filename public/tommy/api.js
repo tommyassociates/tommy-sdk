@@ -146,6 +146,13 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
             }, options));
         },
 
+        searchAccounts: function(term) {
+            return this.call(Object.assign({
+                endpoint: 'accounts/search/' + term,
+                method: 'GET'
+            }));
+        },
+
         getAssociates: function(options) {
             return this.call(Object.assign({
                 endpoint: 'me/associates',
@@ -302,13 +309,20 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
             }, options));
         },
 
+        createInvitationLink: function(options) {
+            return this.call(Object.assign({
+                endpoint: 'invitations',
+                method: 'POST'
+            }, options));
+        },
+
         getContacts: function(options) {
             return this.call(Object.assign({
                 endpoint: 'contacts',
                 method: 'GET',
-                data: {
-                    team_id: config.getCurrentTeamId()
-                }
+                // data: {
+                //     team_id: config.getCurrentTeamId()
+                // }
             }, options));
         },
 
@@ -404,6 +418,14 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
                 endpoint: 'chats',
                 method: 'POST',
                 data : { user_ids: user_ids }
+            }, options));
+        },
+
+        deleteChat: function(chat_id, options) {
+            this.resetCache('chats');
+            return this.call(Object.assign({
+                endpoint: 'chats/' + chat_id,
+                method: 'DELETE',
             }, options));
         },
 
@@ -564,7 +586,7 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
 
         getInstalledAddonSetting: function(package, name, options) {
             return this.call(Object.assign({
-                endpoint: 'addons/' + package + '/settings/' + name,
+                endpoint: 'addons/' + package + '/install/settings/' + name,
                 method: 'GET'
             }, options));
         },
@@ -572,7 +594,7 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
         updateInstalledAddonSetting: function(package, name, data, options) {
             this.resetCache('addons/' + package);
             return this.call(Object.assign({
-                endpoint: 'addons/' + package + '/settings/' + name,
+                endpoint: 'addons/' + package + '/install/settings/' + name,
                 method: 'PUT',
                 data: data
             }, options));
@@ -580,7 +602,7 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
 
         getInstalledAddonPermissions: function(package, options) {
             return this.call(Object.assign({
-                endpoint: 'addons/' + package + '/permissions',
+                endpoint: 'addons/' + package + '/install/permissions',
                 method: 'GET',
                 data: {
                     with_filters: true
@@ -590,7 +612,7 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
 
         getInstalledAddonPermission: function(package, name, options) {
             return this.call(Object.assign({
-                endpoint: 'addons/' + package + '/permissions/' + name,
+                endpoint: 'addons/' + package + '/install/permissions/' + name,
                 method: 'GET',
                 data: {
                     with_filters: true
@@ -600,7 +622,7 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
 
         getInstalledAddonPremissionFilters: function(package, name, options) {
             return this.call(Object.assign({
-                endpoint: 'addons/' + action_id + '/permissions/' + name + '/filters',
+                endpoint: 'addons/' + action_id + '/install/permissions/' + name + '/filters',
                 method: 'GET'
             }, options));
         },
@@ -608,7 +630,7 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
         updateInstalledAddonPermission: function(package, name, data, options) {
             this.resetCache('addons/' + package);
             return this.call(Object.assign({
-                endpoint: 'addons/' + package + '/permissions/' + name,
+                endpoint: 'addons/' + package + '/install/permissions/' + name,
                 method: 'PUT',
                 data: data
             }, options));
@@ -732,14 +754,14 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
 
         getInstalledActionSetting: function(action_id, scope, options) {
             return this.call(Object.assign({
-                endpoint: 'actions/' + action_id + '/settings/' + scope,
+                endpoint: 'actions/' + action_id + '/install/settings/' + scope,
                 method: 'GET'
             }, options));
         },
 
         updateInstalledActionSetting: function(action_id, scope, data, options) {
             return this.call(Object.assign({
-                endpoint: 'actions/' + action_id + '/settings/' + scope,
+                endpoint: 'actions/' + action_id + '/install/settings/' + scope,
                 method: 'PUT',
                 data: data
             }, options));
@@ -747,7 +769,7 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
 
         getInstalledActionPremissions: function(action_id, options) {
             return this.call(Object.assign({
-                endpoint: 'actions/' + action_id + '/permissions',
+                endpoint: 'actions/' + action_id + '/install/permissions',
                 method: 'GET',
                 data: {
                     with_filters: true
@@ -757,7 +779,7 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
 
         getInstalledActionPremission: function(action_id, name, options) {
             return this.call(Object.assign({
-                endpoint: 'actions/' + action_id + '/permissions/' + name,
+                endpoint: 'actions/' + action_id + '/install/permissions/' + name,
                 method: 'GET',
                 data: {
                     with_filters: true
@@ -767,14 +789,14 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
 
         getInstalledActionPremissionFilters: function(action_id, name, options) {
             return this.call(Object.assign({
-                endpoint: 'actions/' + action_id + '/permissions/' + name + '/filters',
+                endpoint: 'actions/' + action_id + '/install/permissions/' + name + '/filters',
                 method: 'GET'
             }, options));
         },
 
         updateInstalledActionPremission: function(action_id, name, data, options) {
             return this.call(Object.assign({
-                endpoint: 'actions/' + action_id + '/permissions/' + name,
+                endpoint: 'actions/' + action_id + '/install/permissions/' + name,
                 method: 'PUT',
                 data: data
             }, options));
@@ -936,6 +958,10 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
             }, options));
         }
     };
+
+    // KLUDGE: Export as global for ES6 integration
+    // if (!window.tommy) window.tommy = {}
+    // window.tommy.api = api
 
     return api;
 });

@@ -14,17 +14,23 @@ function (util,api,app) {
                 for (var i = 0; i < tagItems.length; i++) {
                     var item = tagItems[i],
                         selected = util.isTagSelected(savedTags, item)
-                    $select.append('<option data-type="' + item[0] + '" data-id="' + item[2] + '" ' + (selected ? 'selected' : '') + '>' + item[1] + '</option>')
+
+                    var attributes = ''
+                    for (var key in item) {
+                        attributes += ' data-' + key + '="' + (item[key]) + '"'
+                    }
+                    $select.append('<option ' + attributes + ' ' + (selected ? ' selected' : '') + '>' + item.name + '</option>')
                 }
 
                 tagSelectComponent.init($tagSelect)
 
                 // Handle change events
                 $tagSelect.on('change', function() {
-                    var data = []; // [ 'User', 'Kam Low', 1 ]];
+                    var data = []; // [ 'Member', 'Kam Low', 1 ]];
                     $select.find('option:checked').each(function() {
                         var item = $$(this).dataset()
-                        data.push([item.type, this.value, item.id])
+                        // console.log($$(this).html(), item)
+                        data.push(item) //[item.type, this.value, item.id])
                     })
 
                     // data = {
@@ -38,7 +44,7 @@ function (util,api,app) {
                     //     var item = $$(this).dataset()
                     //
                     //     switch (item.type) {
-                    //         case 'User':
+                    //         case 'Member':
                     //             data.user_ids.push(item.id)
                     //             break;
                     //         case 'Role':
@@ -101,7 +107,7 @@ function (util,api,app) {
                 //     }
                 // }
 
-                tagSelect.find('li.tag-search').click(function() {
+                tagSelect.on('click', '.tag-search', function() {
                     tagSelectComponent.open(tagSelect, false)
                 })
             })
@@ -150,14 +156,14 @@ function (util,api,app) {
 
             var tagSelectData = tagSelect.dataset()
             var pageTitle = tagSelectData.pageTitle || tagSelect.find('.item-title').text()
-            var backText = tagSelectData.backText || app.f7.params.tagSelectBackText;
-            var closeText;
-            if (openIn === 'picker') {
-                closeText = tagSelectData.pickerCloseText || tagSelectData.backText || app.f7.params.tagSelectPickerCloseText ;
-            }
-            else {
-                closeText = tagSelectData.popupCloseText || tagSelectData.backText || app.f7.params.tagSelectPopupCloseText ;
-            }
+            // var backText = tagSelectData.backText || app.f7.params.tagSelectBackText;
+            // var closeText;
+            // if (openIn === 'picker') {
+            //     closeText = tagSelectData.pickerCloseText || tagSelectData.backText || app.f7.params.tagSelectPickerCloseText ;
+            // }
+            // else {
+            //     closeText = tagSelectData.popupCloseText || tagSelectData.backText || app.f7.params.tagSelectPopupCloseText ;
+            // }
             var backOnSelect = tagSelectData.backOnSelect !== undefined ? tagSelectData.backOnSelect : app.f7.params.tagSelectBackOnSelect;
             var formTheme = tagSelectData.formTheme || app.f7.params.tagSelectFormTheme;
             var navbarTheme = tagSelectData.navbarTheme || app.f7.params.tagSelectNavbarTheme;
@@ -204,6 +210,7 @@ function (util,api,app) {
                         })
                     }
                 }
+
                 values.push({
                     value: option[0].value,
                     type: $$(option).data('type'), // KAM: added
@@ -265,7 +272,7 @@ function (util,api,app) {
                                 '{{/if}}' +
                                 '<div class="item-inner">' +
                                     '<div class="item-title{{#if color}} color-{{color}}{{/if}}">{{text}}</div>' +
-                                    '{{#if text}}<div class="item-after">{{type}}</div>{{/if}}' + // KAM: added
+                                    '{{#if type}}<div class="item-after">{{type}}</div>{{/if}}' + // KAM: added
                                 '</div>' +
                             '{{/if}}' +
                         '</label>' +
@@ -278,6 +285,7 @@ function (util,api,app) {
             var inputsHTML = '';
             if (!virtualList) {
                 for (var j = 0; j < values.length; j++) {
+                    // console.log('VALUE', values[j])
                     inputsHTML += tagSelectItemTemplate(values[j])
                 }
             }
@@ -320,16 +328,18 @@ function (util,api,app) {
                 }
                 navbarHTML = app.f7._compiledTemplates.tagSelectNavbar({
                     pageTitle: pageTitle,
-                    backText: backText,
-                    closeText: closeText,
+                    // backText: backText,
+                    // closeText: closeText,
                     openIn: openIn,
                     navbarTheme: navbarTheme,
                     inPopup: openIn === 'popup',
                     inPage: openIn === 'page',
                     leftTemplate: openIn === 'popup' ? // use smart select values
-                        (app.f7.params.smartSelectPopupCloseTemplate || (material ? '<div class="left"><a href="#" class="link close-popup icon-only"><i class="icon icon-back"></i></a></div>' : '<div class="left"><a href="#" class="link close-popup"><i class="icon icon-back"></i><span>{{closeText}}</span></a></div>')).replace(/{{closeText}}/g, closeText) :
-                        (app.f7.params.smartSelectBackTemplate || (material ? '<div class="left"><a href="#" class="back link icon-only"><i class="icon icon-back"></i></a></div>' : '<div class="left sliding"><a href="#" class="back link"><i class="icon icon-back"></i><span>{{backText}}</span></a></div>')).replace(/{{backText}}/g, backText)
+                        (app.f7.params.smartSelectPopupCloseTemplate || (material ? '<div class="left"><a href="#" class="link close-popup icon-only"><i class="icon icon-back"></i></a></div>' : '<div class="left"><a href="#" class="link close-popup"><i class="material-icons md-36">keyboard_arrow_left</i></a></div>')) :
+                        (app.f7.params.smartSelectBackTemplate || (material ? '<div class="left"><a href="#" class="back link icon-only"><i class="icon icon-back"></i></a></div>' : '<div class="left sliding"><a href="#" class="back link"><i class="material-icons md-36">keyboard_arrow_left</i></a></div>'))
                 })
+                // <a href="#" class="back link icon-only"><i class="material-icons md-36">keyboard_arrow_left</i></a>
+
                 // Determine navbar layout type - static/fixed/through
                 if (openIn === 'page') {
                     navbarLayout = 'static';
@@ -592,14 +602,14 @@ function (util,api,app) {
                 '    </div>' +
                 '</li>')
 
-            $item.find('a').click(function(event) {
+            $item.find('a.remove').click(function(event) {
                 $item.remove()
                 option.selected = false;
                 $$(option).trigger('change')
                 event.preventDefault()
             })
 
-            tagSelect.find('ul').append($item)
+            tagSelect.find('ul.tag-items').append($item)
         }
     };
 

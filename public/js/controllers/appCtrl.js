@@ -9,19 +9,15 @@ function(app,config,api,util,cache,TM,TH,addons) {
             else {
                 console.log('starting session');
 
-
                 appCtrl.initCurrentAccount(function() {
                     app.f7view.router.load({
                         url: 'local-addons.html',
-                        query: {
-                          addon: localStorage.getItem('lastAddon'),
-                          view: localStorage.getItem('lastAddonView')
-                        }, //$$.parseUrlQuery(window.location.href),
+                        // query: {
+                        //   addon: localStorage.getItem('defaultView'),
+                        //   view: localStorage.getItem('defaultView')
+                        // }, //$$.parseUrlQuery(window.location.href),
                         animatePages: false
                     });
-
-                    // localStorage.getItem('lastAddon')
-                    // localStorage.getItem('lastAddonView')
                 }, function() {
                     appCtrl.onInvalidSession();
                 });

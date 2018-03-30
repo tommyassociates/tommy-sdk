@@ -221,5 +221,9 @@ function (util,app,config/*,i18n*/) {
 
     xhr.init()
 
+    // KLUDGE: Export as global for ES6 integration
+    if (!window.tommy) window.tommy = {}
+    window.tommy.xhr = xhr
+
     return xhr;
 })

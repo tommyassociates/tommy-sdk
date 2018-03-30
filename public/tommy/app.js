@@ -29,12 +29,17 @@ function(Framework7,TH,config) { //,Framework73D
         // }
         //
         init: function(options) {
-            window.$$ = Dom7;
-            window.tommy = {}
-            window.tommy.app = this.f7 = new Framework7(options)
-            window.tommy.view = this.f7view = window.tommy.app.addView('.view-main', {
+            // window.$$ = Dom7;
+            if (!window.tommy)
+                window.tommy = {}
+            this.f7 = window.tommy.f7 = new Framework7(options)
+            this.f7view = window.tommy.f7view = this.f7.addView('.view-main', {
                 dynamicNavbar: true,
-                domCache: true
+
+                // NOTE: Setting this to false as multiple instances of pages with
+                // duplicate data-page names were getting inserted into the dom.
+                // If a workaround can be found this can be reenabled.
+                domCache: false
             })
 
             if (!app.t7.global)
@@ -52,10 +57,11 @@ function(Framework7,TH,config) { //,Framework73D
             if (window.device && window.device.platform == 'Android')
                 app.initAndroidHacks()
 
+            app.initToggleSaveNavbarButton()
             app.initDynamicActions()
             app.initDynamicSubmitButtons()
             app.initMobileFirendlyFormTabbing()
-            TH.init()
+            TH.init();
         },
 
         setPageTitle: function (html) {
@@ -167,6 +173,21 @@ function(Framework7,TH,config) { //,Framework73D
                 $element.prop('disabled', false)
                 $element.removeClass('loading disabled')
             }
+        },
+
+        initToggleSaveNavbarButton: function () {
+            app.f7.onPageAfterAnimation('*', function(page){
+                var $page = $$(page.container)
+                if ($page.hasClass('with-toggle-save')) {
+                    $page.once('change', '.toggle-save', function() {
+                        var $button = $$(page.navbarInnerContainer).find('.save')
+                        $button.addClass('active')
+                        $button.once('click', function() {
+                            $button.removeClass('active')
+                        })
+                    })
+                }
+            })
         },
 
         // Bind submit buttons that exist outside of form scope such as in the
@@ -306,6 +327,12 @@ function(Framework7,TH,config) { //,Framework73D
             // })
         }
     };
+
+    // KLUDGE: Export as global for ES6 integration
+    // if (!window.tommy) window.tommy = {}
+    // window.$$ = Dom7
+    // window.tommy.app = app.f7
+    // window.tommy.view = app.f7view
 
     return app;
 })
