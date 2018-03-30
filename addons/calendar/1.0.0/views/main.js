@@ -2,8 +2,7 @@ require(['app','api','util','cache','addons','tplManager'],
 function (app,api,util,cache,addons,tplManager) {
 
     //
-    /// Main Calendar Widget
-    //
+    /// Calendar Context
 
     var Calendar = {
 
@@ -28,7 +27,7 @@ function (app,api,util,cache,addons,tplManager) {
             // }
 
             Calendar.widget = app.f7.calendar({
-                container: $page.find('#calendar_container'),
+                container: $page.find('#calendar__container'),
                 value: [now],
                 weekHeader: false,
                 toolbarTemplate:
@@ -199,7 +198,7 @@ function (app,api,util,cache,addons,tplManager) {
                 events: Calendar.eventsForDate(year, month, day)
             };
 
-            tplManager.renderTarget('calendar_eventListTemplate', context, '#calendar_events');
+            tplManager.renderTarget('calendar__eventListTemplate', context, '#calendar__events');
 
             // Set the `selectedDate` for `selectCurrentDay()` calls
             Calendar.selectedDate = new Date(year, month, day);
@@ -208,7 +207,6 @@ function (app,api,util,cache,addons,tplManager) {
 
     //
     /// Event Form
-    //
 
     var EventForm = {
 
@@ -217,7 +215,7 @@ function (app,api,util,cache,addons,tplManager) {
                 $page = $$(page.container),
                 $nav = $$(page.navbarInnerContainer);
 
-            tplManager.renderTarget('calendar_eventFormTemplate', event, $page.find('.page-content'));
+            tplManager.renderTarget('calendar__eventFormTemplate', event, $page.find('.page-content'));
 
             $nav.find('a.save').on('click', function (ev) {
                 var data = app.f7.formToJSON($page.find('form'));
@@ -315,50 +313,44 @@ function (app,api,util,cache,addons,tplManager) {
 
     //
     /// Event Details
-    //
 
     var EventDetails = {
         init: function (page) {
             var event = Calendar.cache[page.query.event_id],
                 $page = $$(page.container);
 
-            tplManager.renderTarget('calendar_eventDetailsTemplate', event, $page.find('.page-content'));
+            tplManager.renderTarget('calendar__eventDetailsTemplate', event, $page.find('.page-content'));
         }
     }
 
     //
     /// Router
-    //
 
-    //
     /// Calendar
 
-    app.f7.onPageInit('calendar_main', Calendar.init);
-    app.f7.onPageBack('calendar_main', Calendar.uninit);
-    app.f7.onPageAfterAnimation('calendar_main', Calendar.invalidate);
+    app.f7.onPageInit('calendar__main', Calendar.init);
+    app.f7.onPageBack('calendar__main', Calendar.uninit);
+    app.f7.onPageAfterAnimation('calendar__main', Calendar.invalidate);
 
-    //
     /// Event Form
 
-    app.f7.onPageInit('calendar_new-event', EventForm.init);
-    app.f7.onPageInit('calendar_edit-event', EventForm.init);
+    app.f7.onPageInit('calendar__new-event', EventForm.init);
+    app.f7.onPageInit('calendar__edit-event', EventForm.init);
 
-    //
     /// Event Details
 
-    app.f7.onPageInit('calendar_event-details', EventDetails.init);
-    app.f7.onPageAfterAnimation('calendar_event-details', EventDetails.init);
+    app.f7.onPageInit('calendar__event-details', EventDetails.init);
+    app.f7.onPageAfterAnimation('calendar__event-details', EventDetails.init);
 
     //
     /// Template7 Helpers
-    //
 
-    app.t7.registerHelper('calendar_listHeadingDate', function (date) {
+    app.t7.registerHelper('calendar__listHeadingDate', function (date) {
         if (!date) return '';
         return (util.dayNames[date.getDay()] + ', ' + util.monthNames[date.getMonth()] + ' ' + date.getDate());
     });
 
-    app.t7.registerHelper('calendar_humanizeMinutes', function (value) {
+    app.t7.registerHelper('calendar__humanizeMinutes', function (value) {
         if (value > 60) {
             var text = '',
                 hours,

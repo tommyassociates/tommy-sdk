@@ -1,0 +1,18 @@
+---
+name: Bar Bonus
+package: barbonus
+version: "1.0.0"
+developer: "Tommy Labs GmbH"
+homepage: "https://mytommy.com"
+private: false
+views:
+- name: Bonuses
+  file: employee.html
+  type: page
+  index: true
+  # scopes:
+  # - client
+  # - employee
+  # main: false
+  framed: false
+  # permissions: {}

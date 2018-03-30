@@ -1,0 +1,32 @@
+---
+  title: "Blood Measurments"
+  package: "blood"
+  summary: "Blood measurments."
+  description: "Blood measurments."
+  version: "1.0.0"
+  developer: "Tommy Labs GmbH"
+  homepage: "https://mytommy.com"
+  private: false
+  # languages:
+  #  - en-US
+  #  - zh-CN
+  roles:
+    - Team Member
+    - Team Manager
+  views:
+    main:
+      title: "Blood Pressure"
+      file: "views/main.html"
+      type: "page"
+      index: true
+      framed: false
+      roles:
+        - Team Member
+        - Team Manager
+      assets:
+        -
+          type: "javascript"
+          file: "views/main.js"
+        # -
+        #   type: "template"
+        #   file: "views/main.tpl.html"

@@ -1,6 +1,6 @@
-<script type="text/template7" id="calendar_eventListTemplate">
+<script type="text/template7" id="calendar__eventListTemplate">
   {{#if_any events}}
-  <div class="content-block-title">{{calendar_listHeadingDate date}}</div>
+  <div class="content-block-title">{{calendar__listHeadingDate date}}</div>
   <div class="list-block media-list">
     <ul>
       {{#each events}}
@@ -42,8 +42,8 @@
   {{/if_any}}
 </script>
 
-<script type="text/template7" id="calendar_eventFormTemplate">
-  <form id="calendar_event-form">
+<script type="text/template7" id="calendar__eventFormTemplate">
+  <form id="calendar__event-form">
     {{#if id}}
       <input type="hidden" name="id" value="{{id}}">
     {{/if}}
@@ -104,7 +104,7 @@
               <div class="item-input">
                 <a class="reminder-delete" href="#"><i class="material-icons">close</i></a>
                 <input type="hidden" name="reminder" value="{{reminder}}">
-                <input type="text" name="reminder_display" value="{{calendar_humanizeMinutes reminder}} {{t "word.before" ns="calendar" defaultValue="before"}}" readonly>
+                <input type="text" name="reminder_display" value="{{calendar__humanizeMinutes reminder}} {{t "word.before" ns="calendar" defaultValue="before"}}" readonly>
               </div>
             </div>
           </div>
@@ -134,7 +134,7 @@
   </form>
 </script>
 
-<script type="text/template7" id="calendar_eventDetailsTemplate">
+<script type="text/template7" id="calendar__eventDetailsTemplate">
   <div class="list-block form-block media-list inset">
     <ul>
       <li class="item-content">
@@ -219,7 +219,7 @@
         <div class="item-content">
           <div class="item-inner">
             <div class="item-input">
-              {{calendar_humanizeMinutes reminder}} {{t "word.before" ns="calendar" defaultValue="before"}}
+              {{calendar__humanizeMinutes reminder}} {{t "word.before" ns="calendar" defaultValue="before"}}
             </div>
           </div>
         </div>

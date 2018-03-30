@@ -134,6 +134,7 @@ function readLocalAddon(package, version) {
   var base = '/addons/' + addon.package + '/versions/' + addon.version + '/files/'
   addon.url = url.resolve(getSdkUrl(), base)
   addon.icon_url =  url.resolve(addon.url, 'icon.png') //path + '/icon.png'
+  addon.file_base_url = url.resolve(getSdkUrl(), base)
   addon.local = true
   if (addon.views) {
     var views = []

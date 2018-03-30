@@ -1,0 +1,82 @@
+<script id="tasks__listsTemplate" type="text/template">
+    <div class="swiper-container">
+        <div class="swiper-wrapper">
+            {{#each this}}
+            {{#if data.active}}
+            <div class="swiper-slide" data-list-id="{{id}}">
+                <div class="list">
+                    <div class="list-header">
+                        <div>{{name}}</div>
+                        <div>
+                            <a href="{{addonAssetUrl "views/list-edit.html"}}&list_fragment_id={{id}}">
+                                <img src="{{addonAssetUrl "views/images/slice6.png"}}" srcset="{{addonAssetUrl "views/images/slice6@2x.png"}} 2x,{{addonAssetUrl "views/images/slice6@3x.png"}} 3x">
+                            </a>
+                        </div>
+                    </div>
+                    <div class="list-content">
+                    </div>
+                    {{#if data.show_fast_add}}
+                    <div class="list-footer">
+                        <div class="in">
+                            <div class="card-add fast-add-toggle" data-input-focus="true">Add task</div>
+                        </div>
+                        <div class="">
+                            <form class="card-form fast-add-form">
+                                <input name="parent_id" value="{{id}}" type="hidden">
+                                <input name="name" type="text">
+                                <div class="buttons">
+                                    <a href="#" class="button cancel fast-add-toggle">Cancel</a>
+                                    <button type="submit" class="button button-fill color-red save">Done</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    {{/if}}
+                </div>
+            </div>
+            {{/if}}
+            {{/each}}
+        </div>
+    </div>
+</script>
+
+<script id="tasks__listTasksTemplate" type="text/template">
+    {{#each this}}
+
+    {{#if_contains data.status "Completed,Closed,Archive Task,Cancel"}}
+    <a href="{{addonAssetUrl "views/task.html"}}&task_fragment_id={{id}}" class="card color-gray done">
+    {{else}}
+    <a href="{{addonAssetUrl "views/task.html"}}&task_fragment_id={{id}}" class="card">
+    {{/if_contains}}
+        <!-- <a href="#" class="card color-gray done"> -->
+        <div class="card-content">
+            <div class="card-content-inner">
+                <p>{{name}}</p>
+            </div>
+        </div>
+        <div class="card-footer no-border color-gray">
+            {{#if data.deadline}}
+            <span class="badge bg-{{#ifPastDate data.deadline}}red{{else}}blue{{/ifPastDate}}">{{humanTime data.deadline}}</span>
+            {{else}}
+                {{#if data.checklist}}
+                <span class="icon">
+                  <img src="{{addonAssetUrl "views/images/slice1.png"}}" srcset="{{addonAssetUrl "views/images/slice1@2x.png"}} 2x,{{addonAssetUrl "views/images/slice1@3x.png"}} 3x">
+                  {{tasks__checklistNumCompleted data.checklist}}
+                </span>
+                {{else}}
+                <span class="icon">
+                  <img src="{{addonAssetUrl "views/images/slice2.png"}}" srcset="{{addonAssetUrl "views/images/slice2@2x.png"}} 2x,{{addonAssetUrl "views/images/slice2@3x.png"}} 3x">
+                </span>
+                {{/if}}
+            {{/if}}
+            <span>
+                {{#if data.status}}
+                {{data.status}}
+                {{else}}
+                Unassigned
+                {{/if}}
+            </span>
+        </div>
+    </a>
+    {{/each}}
+</script>

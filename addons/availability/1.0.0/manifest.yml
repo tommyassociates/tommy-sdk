@@ -18,7 +18,7 @@
       title: "Availability"
       file: "views/main.html"
       type: "page"
-      default: true
+      index: true
       framed: false
       roles: 
         - Team Member

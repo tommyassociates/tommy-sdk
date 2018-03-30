@@ -1,0 +1,880 @@
+<script id="tasks__listsTemplate" type="text/template">
+    <div class="swiper-container">
+        <div class="swiper-wrapper">
+            {{#each this}}
+            {{#if data.active}}
+            <div class="swiper-slide" data-list-id="{{id}}">
+                <div class="list">
+                    <div class="list-header">
+                        <div>{{name}}</div>
+                        <div>
+                            <a href="{{addonAssetUrl "views/list-edit.html"}}&list_fragment_id={{id}}">
+                                <img src="{{addonAssetUrl "views/images/slice6.png"}}" srcset="{{addonAssetUrl "views/images/slice6@2x.png"}} 2x,{{addonAssetUrl "views/images/slice6@3x.png"}} 3x">
+                            </a>
+                        </div>
+                    </div>
+                    <div class="list-content">
+                    </div>
+                    {{#if data.show_fast_add}}
+                    <div class="list-footer">
+                        <div class="in">
+                            <div class="card-add fast-add-toggle" data-input-focus="true">Add task</div>
+                        </div>
+                        <div class="">
+                            <form class="card-form fast-add-form">
+                                <input name="parent_id" value="{{id}}" type="hidden">
+                                <input name="name" type="text">
+                                <div class="buttons">
+                                    <a href="#" class="button cancel fast-add-toggle">Cancel</a>
+                                    <button type="submit" class="button button-fill color-red save">Done</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    {{/if}}
+                </div>
+            </div>
+            {{/if}}
+            {{/each}}
+        </div>
+    </div>
+</script>
+
+<script id="tasks__listTasksTemplate" type="text/template">
+    {{#each this}}
+
+    {{#if_contains data.status "Completed,Closed,Archive Task,Cancel"}}
+    <a href="{{addonAssetUrl "views/task.html"}}&task_fragment_id={{id}}" class="card color-gray done">
+    {{else}}
+    <a href="{{addonAssetUrl "views/task.html"}}&task_fragment_id={{id}}" class="card">
+    {{/if_contains}}
+        <!-- <a href="#" class="card color-gray done"> -->
+        <div class="card-content">
+            <div class="card-content-inner">
+                <p>{{name}}</p>
+            </div>
+        </div>
+        <div class="card-footer no-border color-gray">
+            {{#if data.deadline}}
+            <span class="badge bg-{{#ifPastDate data.deadline}}red{{else}}blue{{/ifPastDate}}">{{humanTime data.deadline}}</span>
+            {{else}}
+                {{#if data.checklist}}
+                <span class="icon">
+                  <img src="{{addonAssetUrl "views/images/slice1.png"}}" srcset="{{addonAssetUrl "views/images/slice1@2x.png"}} 2x,{{addonAssetUrl "views/images/slice1@3x.png"}} 3x">
+                  {{tasks__checklistNumCompleted data.checklist}}
+                </span>
+                {{else}}
+                <span class="icon">
+                  <img src="{{addonAssetUrl "views/images/slice2.png"}}" srcset="{{addonAssetUrl "views/images/slice2@2x.png"}} 2x,{{addonAssetUrl "views/images/slice2@3x.png"}} 3x">
+                </span>
+                {{/if}}
+            {{/if}}
+            <span>
+                {{#if data.status}}
+                {{data.status}}
+                {{else}}
+                Unassigned
+                {{/if}}
+            </span>
+        </div>
+    </a>
+    {{/each}}
+</script>
+
+<script id="tasks__taskDetailsTemplate" type="text/template">
+    <div class="popover task-menu-popover">
+        <div class="popover-angle"></div>
+        <div class="popover-inner">
+            <div class="list-block">
+                <ul>
+                    <li><a href="#" data-command="add-checklist" class="list-button item-link">Checklist</a></li>
+                    <li><a href="#" data-command="add-end-time" class="list-button item-link">Deadline</a></li>
+                    <!-- <li><a href="#" class="list-button item-link">Manager</a></li>
+                    <li><a href="#" class="list-button item-link">Others</a></li> -->
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="toolbar messagebar">
+        <div class="toolbar-inner">
+            <!--
+            <a href="#" class="icon-only">
+                <img src="{{addonAssetUrl "views/images/Page1.png"}}" srcset="{{addonAssetUrl "views/images/Page1@2x.png"}} 2x,{{addonAssetUrl "views/images/Page1@3x.png"}} 3x">
+            </a>
+            -->
+            <textarea placeholder="Enter comment"></textarea>
+            <a href="#" class="link add-comment">Send</a>
+        </div>
+    </div>
+    <div class="page-content">
+        <div class="content-block subheader">
+            <h1>
+                <input type="text" name="task[name]" class="unstyled edit-task-name" value="{{name}}">
+            </h1>
+            <input type="text" value="{{#if data.status}}{{data.status}}{{else}}Waiting for assignments{{/if}}" readonly="readonly" class="unstyled task-status-picker" />
+        </div>
+
+        <!--
+        What is this section for?
+        <div class="list-block list-block-custom media-list tasks">
+            <ul>
+                <li>
+                    <a href="#" class="item-link item-content">
+                        <div class="item-media">
+                            <img src="{{addonAssetUrl "views/images/Group%208.png"}}" srcset="{{addonAssetUrl "views/images/Group%208@2x.png"}} 2x,{{addonAssetUrl "views/images/Group%208@3x.png"}} 3x">
+                        </div>
+                        <div class="item-inner">
+                            <div class="item-title-row">
+                                <div class="item-title">Meter Reading</div>
+                            </div>
+                            <div class="item-text">2016.01.12</div>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+        </div>
+        -->
+
+        <div class="tag-select">
+          <select multiple></select>
+          <div data-template="tasks__taskParticipantsTemplate"></div>
+        </div>
+        <div class="list-block list-block-custom media-list details bottom-0">
+            <ul>
+                <li>
+                    <div class="item-content item-input">
+                        <div class="item-media">
+                            <img src="{{addonAssetUrl "views/images/slice19.png"}}" srcset="{{addonAssetUrl "views/images/slice19@2x.png"}} 2x,{{addonAssetUrl "views/images/slice19.png"}} 3x">
+                        </div>
+                        <div class="item-inner">
+                            <div class="item-input-wrap inline-edit">
+                                <textarea placeholder="Edit the description..." class="unstyled edit-task-description">{{data.description}}</textarea>
+                                <span class="input-clear-button"></span>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+            </ul>
+        </div>
+        <div data-template="tasks__taskDeadlineTemplate"></div>
+        <div data-template="tasks__taskChecklistTemplate"></div>
+        <div data-template="tasks__taskActivityTemplate"></div>
+
+        <!--
+        <div class="popover task-popover overlay-hidden">
+            <div class="popover-angle"></div>
+            <div class="popover-inner">
+                <div class="content-block">
+                    <div class="list-block list-block-custom media-list tasks">
+                        <ul>
+                            <li>
+                                <a href="#" class="item-link item-content">
+                                    <div class="item-media">
+                                        <img src="https://placeimg.com/52/52/people" class="circle">
+                                    </div>
+                                    <div class="item-inner">
+                                        <div class="item-title-row">
+                                            <div class="item-title">Kevin Liu</div>
+                                        </div>
+                                        <div class="item-text">Creator</div>
+                                    </div>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" class="button">View Profile</a>
+                                <a href="#" class="button">View Tasks</a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        -->
+    </div>
+</script>
+
+<script id="tasks__taskParticipantsTemplate" type="text/template">
+    <div class="list-block list-block-custom media-list participants top-0" data-searchbar="true" data-page-title="Participants">
+        <ul>
+            <li class="item-divider">Participant</li>
+            <li>
+                <div class="item-content">
+                    <div class="item-inner">
+                        <img src="{{@global.user.icon_url}}" class="circle item open-popover" data-popover=".task-popover">
+                        {{#each this}}
+                            {{#if_compare type "==" "Member"}}
+                                <img src="{{icon}}" class="circle item open-popover" data-popover=".task-popover">
+                            {{else}}
+                                <div class="chip item">
+                                    <div class="chip-media">
+                                        <img src="/lib/assets/icons/{{lowerCase type}}.png" srcset="/lib/assets/icons/{{lowerCase type}}@2x.png 2x,/lib/assets/icons/{{lowerCase type}}@3x.png 3x">
+                                    </div>
+                                    <div class="chip-label">{{name}}</div>
+                                </div>
+                            {{/if_compare}}
+                        {{/each}}
+                        <!--
+                        <img src="https://placeimg.com/32/32/people" class="circle item open-popover" data-popover=".task-popover">
+                        <img src="https://placeimg.com/32/32/people" class="circle item open-popover" data-popover=".task-popover">
+                        <div class="chip item">
+                            <div class="chip-media">
+                                <img src="{{addonAssetUrl "views/images/slice22.png"}}" srcset="{{addonAssetUrl "views/images/slice22@2x.png"}} 2x,{{addonAssetUrl "views/images/slice22@3x.png"}} 3x">
+                            </div>
+                            <div class="chip-label">Maintenance Manager</div>
+                        </div>
+                        <img src="https://placeimg.com/32/32/people" class="circle item open-popover" data-popover=".task-popover">
+                        <img src="https://placeimg.com/32/32/people" class="circle item open-popover" data-popover=".task-popover">
+                        <div class="chip item">
+                            <div class="chip-media">
+                                <img src="{{addonAssetUrl "views/images/slice21.png"}}" srcset="{{addonAssetUrl "views/images/slice21@2x.png"}} 2x,{{addonAssetUrl "views/images/slice21@3x.png"}} 3x">
+                            </div>
+                            <div class="chip-label">Apartment location</div>
+                        </div>
+                        <div class="chip item">
+                            <div class="chip-media">
+                                <img src="{{addonAssetUrl "views/images/slice20.png"}}" srcset="{{addonAssetUrl "views/images/slice20@2x.png"}} 2x,{{addonAssetUrl "views/images/slice20@3x.png"}} 3x">
+                            </div>
+                            <div class="chip-label">Maintenance</div>
+                        </div>
+                        <div class="chip item">
+                            <div class="chip-media">
+                                <img src="{{addonAssetUrl "views/images/slice20.png"}}" srcset="{{addonAssetUrl "views/images/slice20@2x.png"}} 2x,{{addonAssetUrl "views/images/slice20@3x.png"}} 3x">
+                            </div>
+                            <div class="chip-label">Maintenance</div>
+                        </div>
+                        -->
+                        <a href="#" class="item icon-only tag-search">
+                            <img src="{{addonAssetUrl "views/images/slice6.png"}}" srcset="{{addonAssetUrl "views/images/slice6@2x.png"}} 2x,{{addonAssetUrl "views/images/slice6.png"}} 3x">
+                        </a>
+                    </div>
+                </div>
+            </li>
+        </ul>
+        <!--
+        <ul>
+          <li>
+            <a href="#" class="item-link tag-search">
+              <select multiple></select>
+              <div class="item-content">
+                <div class="item-media"><i class="material-icons md-36">search</i></div>
+                <div class="item-inner">
+                  <div class="item-title">Search Users, Roles, Locations and Tags</div>
+                </div>
+              </div>
+            </a>
+          </li>
+        </ul>
+        <ul class="tag-items">
+          <li class="tag-search111">
+            <a href="#" class="item-link">
+              <div class="item-content">
+                <div class="item-media"><i class="material-icons md-36">search</i></div>
+                <div class="item-inner">
+                  <div class="item-title">Search Users, Roles, Locations and Tags</div>
+                </div>
+              </div>
+            </a>
+          </li>
+        </ul> -->
+    </div>
+</script>
+
+<script id="tasks__taskDeadlineTemplate" type="text/template">
+    <div class="list-block list-block-custom media-list details top-0 bottom-0">
+        <ul>
+            <li>
+                <div class="item-content">
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice13.png"}}" srcset="{{addonAssetUrl "views/images/slice13@2x.png"}} 2x,{{addonAssetUrl "views/images/slice13.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        <div class="item-input-wrap">
+                          <input type="text" name="time" class="unstyled edit-task-deadline" placeholder="Edit deadline...">
+                        </div>
+                        <!-- <div>Tomorrow 12:00 End</div> -->
+                        <a href="#" class="icon-only remove-deadline">
+                            <img src="{{addonAssetUrl "views/images/slice12.png"}}" srcset="{{addonAssetUrl "views/images/slice12@2x.png"}} 2x,{{addonAssetUrl "views/images/slice12.png"}} 3x">
+                        </a>
+                    </div>
+                </div>
+            </li>
+        </ul>
+    </div>
+</script>
+
+<script id="tasks__taskChecklistTemplate" type="text/template">
+    <div class="list-block list-block-custom media-list checklist top-0">
+        <ul>
+            <li>
+                <div class="item-content">
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice17.png"}}" srcset="{{addonAssetUrl "views/images/slice17@2x.png"}} 2x,{{addonAssetUrl "views/images/slice17.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        <div>Checklist</div>
+                        <a href="#" class="icon-only remove-checklist">
+                            <img src="{{addonAssetUrl "views/images/slice12.png"}}" srcset="{{addonAssetUrl "views/images/slice12@2x.png"}} 2x,{{addonAssetUrl "views/images/slice12.png"}} 3x">
+                        </a>
+                        <!-- <a href="{{addonAssetUrl "views/task-checklist.html"}}" class="icon-only"> -->
+                          <!-- <img src="{{addonAssetUrl "views/images/slice13.png"}}" srcset="{{addonAssetUrl "views/images/slice13@2x.png"}} 2x,{{addonAssetUrl "views/images/slice13.png"}} 3x"> -->
+                          <!-- <img src="{{addonAssetUrl "views/images/slice18.png"}}" srcset="{{addonAssetUrl "views/images/slice18@2x.png"}} 2x,{{addonAssetUrl "views/images/slice18.png"}} 3x"> -->
+                        <!-- </a> -->
+                    </div>
+                </div>
+            </li>
+            {{#each this}}
+            <li data-checklist-item="{{@index}}">
+                <div class="item-content checklist-item{{#if complete}} checked{{/if}}">
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice14.png"}}" srcset="{{addonAssetUrl "views/images/slice14@2x.png"}} 2x,{{addonAssetUrl "views/images/slice14.png"}} 3x">
+                        <img src="{{addonAssetUrl "views/images/slice15.png"}}" srcset="{{addonAssetUrl "views/images/slice15@2x.png"}} 2x,{{addonAssetUrl "views/images/slice15.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        {{this.text}}
+                        <a href="#" class="icon-only remove-checklist-item">
+                            <img src="{{addonAssetUrl "views/images/slice12.png"}}" srcset="{{addonAssetUrl "views/images/slice12@2x.png"}} 2x,{{addonAssetUrl "views/images/slice12.png"}} 3x">
+                        </a>
+                    </div>
+                </div>
+            </li>
+            {{/each}}
+            <!--
+            <li>
+                <div class="item-content checklist-item">
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice14.png"}}" srcset="{{addonAssetUrl "views/images/slice14@2x.png"}} 2x,{{addonAssetUrl "views/images/slice14.png"}} 3x">
+                        <img src="{{addonAssetUrl "views/images/slice15.png"}}" srcset="{{addonAssetUrl "views/images/slice15@2x.png"}} 2x,{{addonAssetUrl "views/images/slice15.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        <div>List itemsList itemsList itemsList itemsList itemsList items</div>
+                    </div>
+                </div>
+            </li>
+            <li>
+                <div class="item-content checklist-item checked">
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice14.png"}}" srcset="{{addonAssetUrl "views/images/slice14@2x.png"}} 2x,{{addonAssetUrl "views/images/slice14.png"}} 3x">
+                        <img src="{{addonAssetUrl "views/images/slice15.png"}}" srcset="{{addonAssetUrl "views/images/slice15@2x.png"}} 2x,{{addonAssetUrl "views/images/slice15.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        <div>List items</div>
+                    </div>
+                </div>
+            </li>
+            -->
+            <li class="add-checklist-item-wrap">
+                <div class="item-content">
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice16.png"}}" srcset="{{addonAssetUrl "views/images/slice16@2x.png"}} 2x,{{addonAssetUrl "views/images/slice16.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        <input type="text" class="add-checklist-item" placeholder="Add items">
+                    </div>
+                </div>
+            </li>
+        </ul>
+    </div>
+</script>
+
+<script id="tasks__taskActivityTemplate" type="text/template">
+    <div class="list-block list-block-custom media-list activity">
+        <ul>
+            <li class="item-divider">Activity</li>
+            {{#each this}}
+            <li>
+                <div class="item-content">
+                {{#if_compare type "==" "comment"}}
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice11.png"}}" srcset="{{addonAssetUrl "views/images/slice11@2x.png"}} 2x,{{addonAssetUrl "views/images/slice11.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        <div class="item-title-row">
+                            <div class="item-title open-popover" data-popover=".task-popover">{{user_name}}</div>
+                            <div class="item-after">{{humanTime time}}</div>
+                        </div>
+                        <div class="item-subtitle">{{text}}</div>
+                    </div>
+                {{else}}
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice7.png"}}" srcset="{{addonAssetUrl "views/images/slice7@2x.png"}} 2x,{{addonAssetUrl "views/images/slice7.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        <div class="item-title-row">
+                            <div class="item-title">{{user_name}} <span>{{text}}</span></div>
+                            <div class="item-after">{{humanTime time}}</div>
+                        </div>
+                    </div>
+                {{/if_compare}}
+                </div>
+            </li>
+            {{/each}}
+            <!--
+            <li>
+                <div class="item-content">
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice11.png"}}" srcset="{{addonAssetUrl "views/images/slice11@2x.png"}} 2x,{{addonAssetUrl "views/images/slice11.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        <div class="item-title-row">
+                            <div class="item-title">Kevin</div>
+                            <div class="item-after">1 minutes ago</div>
+                        </div>
+                        <div class="item-subtitle">This is my comment</div>
+                    </div>
+                </div>
+            </li>
+            <li>
+                <div class="item-content">
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice11.png"}}" srcset="{{addonAssetUrl "views/images/slice11@2x.png"}} 2x,{{addonAssetUrl "views/images/slice11.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        <div class="item-title-row">
+                            <div class="item-title">Kevin</div>
+                            <div class="item-after">5 minutes ago</div>
+                        </div>
+                        <div class="item-text">
+                            <div>
+                                <img src="https://placeimg.com/40/40/nature">
+                                000.png
+                            </div>
+                            <div>
+                                <img src="https://placeimg.com/40/40/animals">
+                                111.png
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </li>
+            <li>
+                <div class="item-content">
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice7.png"}}" srcset="{{addonAssetUrl "views/images/slice7@2x.png"}} 2x,{{addonAssetUrl "views/images/slice7.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        <div class="item-title-row">
+                            <div class="item-title">
+                                Kevin
+                                <span>Created a task</span>
+                            </div>
+                            <div class="item-after">Sep 1, 2017</div>
+                        </div>
+                    </div>
+                </div>
+            </li>
+            -->
+        </ul>
+    </div>
+</script>
+
+<script id="tasks__addTaskTemplate" type="text/template">
+    <form>
+        <div class="list-block top-0">
+            <ul>
+                <li class="item-content">
+                    <div class="item-inner">
+                        <div class="item-input">
+                            <input type="text" name="name" placeholder="Name" class="toggle-save">
+                        </div>
+                    </div>
+                </li>
+                <li>
+                   <a href="#" class="item-link smart-select" data-open-in="picker">
+                     <select name="parent_id">
+                       {{#each this}}
+                          <option value="{{id}}" selected>{{name}}</option>
+                       {{/each}}
+                     </select>
+                     <div class="item-content">
+                       <div class="item-inner">
+                         <div class="item-title">List</div>
+                       </div>
+                     </div>
+                   </a>
+                 </li>
+            </ul>
+        </div>
+    </form>
+</script>
+
+<script id="tasks__listEditTemplate" type="text/template">
+    <form>
+        <div class="list-block">
+            <ul>
+                <li class="item-content">
+                    <div class="item-inner">
+                        <div class="item-title label">Name</div>
+                        <div class="item-input">
+                            <input type="text" name="name" value="{{name}}" class="right toggle-save">
+                        </div>
+                    </div>
+                </li>
+                <!--
+                <li class="item-content">
+                    <div class="item-inner">
+                        <div class="item-title label-custom">Favourite</div>
+                        <div class="item-input">
+                            <label class="label-switch">
+                                <input type="checkbox" checked>
+                                <div class="checkbox"></div>
+                            </label>
+                        </div>
+                    </div>
+                </li>
+                -->
+                <li class="item-content">
+                    <div class="item-inner">
+                        <div class="item-title label-custom">Show Fast Add Task</div>
+                        <div class="item-input">
+                            <label class="label-switch">
+                                <input name="show_fast_add" type="checkbox" class="toggle-save" {{#if data.show_fast_add}}checked{{/if}}>
+                                <div class="checkbox"></div>
+                            </label>
+                        </div>
+                    </div>
+                </li>
+                <!--
+                <li class="item-divider">Filter Tasks</li>
+                <li class="item-content">
+                    <div class="item-inner">
+                        <div class="item-media">
+                            <i class="icon f7-icons color-custom search">search_strong</i>
+                        </div>
+                        <div class="item-input">
+                            <input type="text" placeholder="Search Member, Tags" class="search">
+                        </div>
+                    </div>
+                </li>
+                <li class="item-content">
+                    <div class="item-inner column">
+                        <div class="chip chip-lg">
+                            <div class="chip-media">
+                                <i class="icon f7-icons">person</i>
+                                Role
+                            </div>
+                            <div class="chip-label">Repair Manager</div>
+                            <a href="#" class="delete">
+                                <i class="icon f7-icons color-custom">close</i>
+                            </a>
+                        </div>
+                        <div class="chip chip-lg">
+                            <div class="chip-media">
+                                <i class="icon f7-icons">tags</i>
+                                Tag
+                            </div>
+                            <div class="chip-label">Repair</div>
+                            <a href="#" class="delete">
+                                <i class="icon f7-icons color-custom">close</i>
+                            </a>
+                        </div>
+                    </div>
+                </li>
+                <li class="item-divider">Who Can See List</li>
+                <li class="item-content">
+                    <div class="item-inner">
+                        <div class="item-media">
+                            <i class="icon f7-icons color-custom search">search_strong</i>
+                        </div>
+                        <div class="item-input">
+                            <input type="text" placeholder="Search Member, Tags" class="search">
+                        </div>
+                    </div>
+                </li>
+                <li class="item-content">
+                    <div class="item-inner column">
+                        <div class="chip chip-lg">
+                            <div class="chip-media">
+                                <i class="icon f7-icons">person</i>
+                                Role
+                            </div>
+                            <div class="chip-label">Repair Manager</div>
+                            <a href="#" class="delete">
+                                <i class="icon f7-icons color-custom">close</i>
+                            </a>
+                        </div>
+                        <div class="chip chip-lg">
+                            <div class="chip-media">
+                                <i class="icon f7-icons">tags</i>
+                                Tag
+                            </div>
+                            <div class="chip-label">Repair</div>
+                            <a href="#" class="delete">
+                                <i class="icon f7-icons color-custom">close</i>
+                            </a>
+                        </div>
+                    </div>
+                </li>
+                <li class="item-divider">Who Can Edit List</li>
+                <li class="item-content">
+                    <div class="item-inner">
+                        <div class="item-media">
+                            <i class="icon f7-icons color-custom search">search_strong</i>
+                        </div>
+                        <div class="item-input">
+                            <input type="text" placeholder="Search Member, Tags" class="search">
+                        </div>
+                    </div>
+                </li>
+                <li class="item-content">
+                    <div class="item-inner column">
+                        <div class="chip chip-lg">
+                            <div class="chip-media">
+                                <i class="icon f7-icons">person</i>
+                                Role
+                            </div>
+                            <div class="chip-label">Repair Manager</div>
+                            <a href="#" class="delete">
+                                <i class="icon f7-icons color-custom">close</i>
+                            </a>
+                        </div>
+                        <div class="chip chip-lg">
+                            <div class="chip-media">
+                                <i class="icon f7-icons">tags</i>
+                                Tag
+                            </div>
+                            <div class="chip-label">Repair</div>
+                            <a href="#" class="delete">
+                                <i class="icon f7-icons color-custom">close</i>
+                            </a>
+                        </div>
+                    </div>
+                </li>
+                -->
+            </ul>
+        </div>
+    </form>
+    <div class="list-block list-block-custom">
+        <ul>
+            <li>
+                <a href="#" class="item-link list-button color-custom delete-list">Delete List</a>
+            </li>
+        </ul>
+    </div>
+</script>
+
+<script id="tasks__boardSettingTemplate" type="text/template">
+    <div class="list-block top-0">
+        <ul>
+            <!--
+            <li class="item-content">
+                <div class="item-inner">
+                    <div class="item-title label">Name</div>
+                    <div class="item-input">
+                        <input type="text" value="Task" class="right toggle-save">
+                    </div>
+                </div>
+            </li>
+            -->
+            <li>
+                <a href="{{addonAssetUrl "views/list-management.html"}}" class="item-link item-content">
+                    <div class="item-inner">
+                        <div class="item-title">List Management</div>
+                    </div>
+                </a>
+            </li>
+            <!--
+            <li>
+                <a href="{{addonAssetUrl "views/participant-types.html"}}" class="item-link item-content">
+                    <div class="item-inner">
+                        <div class="item-title">Participant types</div>
+                    </div>
+                </a>
+            </li>
+            <li class="item-divider">Who Can Create Tasks</li>
+            <li class="item-content">
+                <div class="item-inner">
+                    <div class="item-media">
+                        <i class="icon f7-icons color-custom search">search_strong</i>
+                    </div>
+                    <div class="item-input">
+                        <input type="text" placeholder="Search Member, Tags" class="search">
+                    </div>
+                </div>
+            </li>
+            <li class="item-content">
+                <div class="item-inner column">
+                    <div class="chip chip-lg">
+                        <div class="chip-media">
+                            <i class="icon f7-icons">person</i>
+                            Role
+                        </div>
+                        <div class="chip-label">Repair Manager</div>
+                        <a href="#" class="delete">
+                            <i class="icon f7-icons color-custom">close</i>
+                        </a>
+                    </div>
+                    <div class="chip chip-lg">
+                        <div class="chip-media">
+                            <i class="icon f7-icons">tags</i>
+                            Tag
+                        </div>
+                        <div class="chip-label">Repair</div>
+                        <a href="#" class="delete">
+                            <i class="icon f7-icons color-custom">close</i>
+                        </a>
+                    </div>
+                </div>
+            </li>
+            <li class="item-divider">Who Can Edit Tasks</li>
+            <li class="item-content">
+                <div class="item-inner">
+                    <div class="item-media">
+                        <i class="icon f7-icons color-custom search">search_strong</i>
+                    </div>
+                    <div class="item-input">
+                        <input type="text" placeholder="Search Member, Tags" class="search">
+                    </div>
+                </div>
+            </li>
+            <li class="item-content">
+                <div class="item-inner column">
+                    <div class="chip chip-lg">
+                        <div class="chip-media">
+                            <i class="icon f7-icons">person</i>
+                            Role
+                        </div>
+                        <div class="chip-label">Repair Manager</div>
+                        <a href="#" class="delete">
+                            <i class="icon f7-icons color-custom">close</i>
+                        </a>
+                    </div>
+                    <div class="chip chip-lg">
+                        <div class="chip-media">
+                            <i class="icon f7-icons">tags</i>
+                            Tag
+                        </div>
+                        <div class="chip-label">Repair</div>
+                        <a href="#" class="delete">
+                            <i class="icon f7-icons color-custom">close</i>
+                        </a>
+                    </div>
+                </div>
+            </li>
+            -->
+        </ul>
+    </div>
+</script>
+
+<script id="tasks__listManagementTemplate" type="text/template">
+    <div class="list-block inset sortable sortable-opened list-block-custom">
+        <ul>
+            {{#each this}}
+            <li data-list-id={{id}}>
+                <label class="label-checkbox item-content">
+                    <input type="checkbox" name="{{id}}" {{#if data.active}}checked{{/if}}>
+                    <div class="item-media">
+                        <i class="icon icon-form-checkbox"></i>
+                    </div>
+                    <div class="item-inner">
+                        <div class="item-title">{{name}}</div>
+                    </div>
+                </label>
+                <div class="sortable-handler"></div>
+            </li>
+            {{/each}}
+        </ul>
+    </div>
+    <div class="list-block list-block-custom inset">
+        <ul>
+            <!--
+            <li>
+                <a href="#" class="item-link list-button open-picker">View More</a>
+            </li>
+            -->
+            <li>
+                <a href="{{addonAssetUrl "views/list-add.html"}}" class="item-link list-button color-custom">Create New List</a>
+            </li>
+        </ul>
+    </div>
+    <!--
+    <div class="picker-modal list-picker">
+        <div class="toolbar">
+            <div class="toolbar-inner">
+                <div class="left color-gray">Cancel</div>
+                <div class="right">
+                    <a href="#" class="link color-custom close-picker">Done</a>
+                </div>
+            </div>
+        </div>
+        <div class="picker-modal-inner">
+            <div class="list-block">
+                <ul>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="1" checked>
+                            <div class="item-inner">
+                                <div class="item-title">Allen's Task</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="2" checked>
+                            <div class="item-inner">
+                                <div class="item-title">Lili's Task</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="3">
+                            <div class="item-inner">
+                                <div class="item-title">Logistics's Task</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="4">
+                            <div class="item-inner">
+                                <div class="item-title">Services's Task</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="5">
+                            <div class="item-inner">
+                                <div class="item-title">Nick's Task</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="6" checked>
+                            <div class="item-inner">
+                                <div class="item-title">Someone's Task</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="7">
+                            <div class="item-inner">
+                                <div class="item-title">Someone's Task</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="8">
+                            <div class="item-inner">
+                                <div class="item-title">Someone's Task</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="9">
+                            <div class="item-inner">
+                                <div class="item-title">Someone's Task</div>
+                            </div>
+                        </label>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    -->
+</script>

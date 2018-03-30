@@ -9,31 +9,31 @@
         locale: lang,
         waitSeconds: 200,
         paths: {
-            text: '/lib/vendors/require/text',
-            //i18n: '/lib/vendors/require/i18n',
-            config: '/lib/config',
-            app: '/lib/app',
-            api: '/lib/api',
-            addons: '/lib/addons',
-            cache: '/lib/cache',
-            util: '/lib/util',
-            xhr: '/lib/xhr',
-            tplHelpers: '/lib/templates/tplHelpers',
-            tplManager: '/lib/templates/tplManager',
-            photoChanger: '/lib/components/photoChanger',
-            tagSelect: '/lib/components/tagSelect',
-            moment: '/lib/vendors/moment.min',
-            Framework7: '/lib/vendors/framework7/framework7',
+            text: '/tommy/vendors/require/text',
+            //i18n: '/tommy/vendors/require/i18n',
+            config: '/tommy/config',
+            app: '/tommy/app',
+            api: '/tommy/api',
+            addons: '/tommy/addons',
+            cache: '/tommy/cache',
+            util: '/tommy/util',
+            xhr: '/tommy/xhr',
+            tplHelpers: '/tommy/templates/tplHelpers',
+            tplManager: '/tommy/templates/tplManager',
+            photoChanger: '/tommy/components/photoChanger',
+            tagSelect: '/tommy/components/tagSelect',
+            moment: '/tommy/vendors/moment.min',
+            Framework7: '/tommy/vendors/framework7/framework7',
             GTPL: '/global.tpl.html',
-            i18next: '../lib/vendors/i18next.min',
-            i18n: '../lib/i18n'
+            i18next: '../tommy/vendors/i18next.min',
+            i18n: '../tommy/i18n'
         },
         shim: {
             'Framework7': {exports: 'Framework7'}
         }
     });
 
-    require(['Framework7','app','router','api','util','config','addons','tplManager','tplHelpers','controllers/module','i18n','text!GTPL'],
+    require(['Framework7','app','router','api','util','config','addons','tplManager','tplHelpers','controllers/module','i18n','text!GTPL','/tommy/export.js'],
     function(Framework7,app,router,api,util,config,addons,TM,TH,CM,i18n,GTPL) {
         var main = {
             init: function() {
@@ -55,17 +55,18 @@
                         //     'page:settings': function() { return T.env.data; }
                         // }
                         // pushState: true, //config.environment == 'development', //false, // breaks controller initialization
-                        // popupCloseByOutside: false,
+                        popupCloseByOutside: false,
                         // animateNavBackIcon: true,
-                        // cache: true, //config.environment == 'production',
-                        // template7Pages: true,
+                        cache: true, //config.environment == 'production',
+                        template7Pages: true,
                         // modalTitle: i18n.global.modal_title,
                         // modalButtonOk: i18n.global.modal_button_ok,
                         // modalButtonCancel: i18n.global.cancel,
                         preprocess: router.preprocess,
-                        // tapHold: true,
-                        // swipeBackPage: false,
-                        // smartSelectBackTemplate: '<div class="left sliding"><a href="#" class="back link icon-only"><i class="material-icons md-36">keyboard_arrow_left</i></a></div>'
+                        tapHold: true,
+                        swipePanel: 'left',
+                        swipeBackPage: false,
+                        smartSelectBackTemplate: '<div class="left sliding"><a href="#" class="back link icon-only"><i class="material-icons md-36">keyboard_arrow_left</i></a></div>'
                     });
 
                     $$('body').append(GTPL);

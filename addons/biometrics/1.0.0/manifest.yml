@@ -13,7 +13,7 @@
       file: "views/main.html"
       type: "page"
       framed: false
-      default: true
+      index: true
       assets:
         -
           type: "stylesheet"

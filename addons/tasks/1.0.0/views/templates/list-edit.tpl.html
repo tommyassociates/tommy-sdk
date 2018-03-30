@@ -1,0 +1,154 @@
+<script id="tasks__listEditTemplate" type="text/template">
+    <form>
+        <div class="list-block">
+            <ul>
+                <li class="item-content">
+                    <div class="item-inner">
+                        <div class="item-title label">Name</div>
+                        <div class="item-input">
+                            <input type="text" name="name" value="{{name}}" class="right toggle-save">
+                        </div>
+                    </div>
+                </li>
+                <!--
+                <li class="item-content">
+                    <div class="item-inner">
+                        <div class="item-title label-custom">Favourite</div>
+                        <div class="item-input">
+                            <label class="label-switch">
+                                <input type="checkbox" checked>
+                                <div class="checkbox"></div>
+                            </label>
+                        </div>
+                    </div>
+                </li>
+                -->
+                <li class="item-content">
+                    <div class="item-inner">
+                        <div class="item-title label-custom">Show Fast Add Task</div>
+                        <div class="item-input">
+                            <label class="label-switch">
+                                <input name="show_fast_add" type="checkbox" class="toggle-save" {{#if data.show_fast_add}}checked{{/if}}>
+                                <div class="checkbox"></div>
+                            </label>
+                        </div>
+                    </div>
+                </li>
+                <!--
+                <li class="item-divider">Filter Tasks</li>
+                <li class="item-content">
+                    <div class="item-inner">
+                        <div class="item-media">
+                            <i class="icon f7-icons color-custom search">search_strong</i>
+                        </div>
+                        <div class="item-input">
+                            <input type="text" placeholder="Search Member, Tags" class="search">
+                        </div>
+                    </div>
+                </li>
+                <li class="item-content">
+                    <div class="item-inner column">
+                        <div class="chip chip-lg">
+                            <div class="chip-media">
+                                <i class="icon f7-icons">person</i>
+                                Role
+                            </div>
+                            <div class="chip-label">Repair Manager</div>
+                            <a href="#" class="delete">
+                                <i class="icon f7-icons color-custom">close</i>
+                            </a>
+                        </div>
+                        <div class="chip chip-lg">
+                            <div class="chip-media">
+                                <i class="icon f7-icons">tags</i>
+                                Tag
+                            </div>
+                            <div class="chip-label">Repair</div>
+                            <a href="#" class="delete">
+                                <i class="icon f7-icons color-custom">close</i>
+                            </a>
+                        </div>
+                    </div>
+                </li>
+                <li class="item-divider">Who Can See List</li>
+                <li class="item-content">
+                    <div class="item-inner">
+                        <div class="item-media">
+                            <i class="icon f7-icons color-custom search">search_strong</i>
+                        </div>
+                        <div class="item-input">
+                            <input type="text" placeholder="Search Member, Tags" class="search">
+                        </div>
+                    </div>
+                </li>
+                <li class="item-content">
+                    <div class="item-inner column">
+                        <div class="chip chip-lg">
+                            <div class="chip-media">
+                                <i class="icon f7-icons">person</i>
+                                Role
+                            </div>
+                            <div class="chip-label">Repair Manager</div>
+                            <a href="#" class="delete">
+                                <i class="icon f7-icons color-custom">close</i>
+                            </a>
+                        </div>
+                        <div class="chip chip-lg">
+                            <div class="chip-media">
+                                <i class="icon f7-icons">tags</i>
+                                Tag
+                            </div>
+                            <div class="chip-label">Repair</div>
+                            <a href="#" class="delete">
+                                <i class="icon f7-icons color-custom">close</i>
+                            </a>
+                        </div>
+                    </div>
+                </li>
+                <li class="item-divider">Who Can Edit List</li>
+                <li class="item-content">
+                    <div class="item-inner">
+                        <div class="item-media">
+                            <i class="icon f7-icons color-custom search">search_strong</i>
+                        </div>
+                        <div class="item-input">
+                            <input type="text" placeholder="Search Member, Tags" class="search">
+                        </div>
+                    </div>
+                </li>
+                <li class="item-content">
+                    <div class="item-inner column">
+                        <div class="chip chip-lg">
+                            <div class="chip-media">
+                                <i class="icon f7-icons">person</i>
+                                Role
+                            </div>
+                            <div class="chip-label">Repair Manager</div>
+                            <a href="#" class="delete">
+                                <i class="icon f7-icons color-custom">close</i>
+                            </a>
+                        </div>
+                        <div class="chip chip-lg">
+                            <div class="chip-media">
+                                <i class="icon f7-icons">tags</i>
+                                Tag
+                            </div>
+                            <div class="chip-label">Repair</div>
+                            <a href="#" class="delete">
+                                <i class="icon f7-icons color-custom">close</i>
+                            </a>
+                        </div>
+                    </div>
+                </li>
+                -->
+            </ul>
+        </div>
+    </form>
+    <div class="list-block list-block-custom">
+        <ul>
+            <li>
+                <a href="#" class="item-link list-button color-custom delete-list">Delete List</a>
+            </li>
+        </ul>
+    </div>
+</script>
