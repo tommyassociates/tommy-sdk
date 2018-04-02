@@ -1,5 +1,5 @@
-define(['app','util','config','api'],
-function (app,util,config,api) {
+define(['app','util','config','api','i18n'],
+function (app,util,config,api,i18n) {
     var fileSelector;
 
     var photoChanger = {
@@ -34,7 +34,7 @@ function (app,util,config,api) {
              }];
 
              var groups = [buttons1, buttons2];
-             window.tommy.app.actions(groups);
+             window.tommy.f7.actions(groups);
         },
 
         capturePhotoEdit: function () {
@@ -111,13 +111,15 @@ function (app,util,config,api) {
         },
 
         onPhotoFail: function (message) {
-            window.tommy.app.alert('Error getting image from device: ' + message);
+            window.tommy.f7.hidePreloader();
+            window.tommy.f7.alert('Error getting image from device: ' + message);
 
             if (photoChanger.settings.error)
                 photoChanger.settings.error();
         },
 
         upload: function (photo) {
+            window.tommy.f7.showPreloader(i18n.i18next.t('label.uploading_image'))
             var form = new FormData();
             form.append('photo', photo, 'profilephoto.jpg');
 
@@ -126,6 +128,7 @@ function (app,util,config,api) {
                 method: 'PUT',
                 data: form
             }).then(function (response) {
+                window.tommy.f7.hidePreloader();
                 console.log('photoChanger', 'upload success', response);
                 if (response.icon_url) {
                     config.setCurrentAvatar(response.icon_url);

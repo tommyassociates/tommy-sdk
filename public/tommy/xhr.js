@@ -1,5 +1,5 @@
-define(['util','app','config'/*,'i18n!nls/lang'*/,'Framework7'], //,'networkStatus'
-function (util,app,config/*,i18n*/) {
+define(['util','app','config','Framework7'],
+function (util,app,config) {
     var $$ = Dom7;
 
     var xhr = {
@@ -14,7 +14,7 @@ function (util,app,config/*,i18n*/) {
             })
 
             $$(document).on('ajaxComplete', function(e) {
-                // window.tommy.app.hideIndicator()
+                // window.tommy.f7.hideIndicator()
                 app.hideLoader()
                 // console.log('Ajax request complete', e)
             })
@@ -29,7 +29,7 @@ function (util,app,config/*,i18n*/) {
             if (util.isPhonegap()) {
                 var network = util.checkConnection()
                 if (network === 'NoNetwork') {
-                    window.tommy.app.alert(i18n.error.no_network, function () {
+                    window.tommy.f7.alert('No internet connection', function () {
                         app.hideLoader()
                     })
 
@@ -56,7 +56,7 @@ function (util,app,config/*,i18n*/) {
                     try {
                         data = JSON.parse(data)
                     } catch(e) {
-                        // window.tommy.app.alert('Invalid API JSON response: ' + data)
+                        // window.tommy.f7.alert('Invalid API JSON response: ' + data)
                     }
 
                     console.log('xhr: call: success', options.url, data)
@@ -66,157 +66,54 @@ function (util,app,config/*,i18n*/) {
                         successCallback(data)
                     }
 
-                    // window.tommy.app.hideIndicator()
+                    // window.tommy.f7.hideIndicator()
                     // app.hideLoader()
-
-                    // $$('#overlay-error').hide()
-                    // data = data ? JSON.parse(data) : '';
-                    //
-                    // var codes = [
-                    //     {code:10000, message:'Your session is invalid, please login again',path:'/'},
-                    //     {code:10001, message:'Unknown error,please login again',path:'tpl/login.html'},
-                    //     {code:20001, message:'User name or password does not match',path:'/'}
-                    // ];
-                    //
-                    // var codeLevel = xhr.search(data.status,codes)
-                    //
-                    // if(!codeLevel) {
-                    //     (typeof(successCallback) === 'function') ? successCallback(data) : '';
-                    // }
-                    // else {
-                    //     window.tommy.app.alert(codeLevel.message,function () {
-                    //         if(codeLevel.path !== '/')
-                    //             window.tommy.view.router.loadPage(codeLevel.path)
-                    //
-                    //         window.tommy.app.hideIndicator()
-                    //         app.hideLoader()
-                    //     })
-                    // }
                 },
                 error: function (xhr, status) {
                     console.log('xhr: call: error: ' + status + ': ' + xhr.responseText)
                     // console.log(JSON.stringify(data))
 
-                    // window.tommy.app.hideIndicator()
+                    // window.tommy.f7.hideIndicator()
                     // app.hideLoader()
 
-                    try {
-                        if (options.showErrorMessages !== false) {
-                            var json = JSON.parse(xhr.responseText)
-                            if (json.message) {
-                                app.handleAPIError(json.message)
-                            }
-                        }
+                    var json
 
+                    try {
                         switch(status) {
                             case 401:
-                               window.tommy.view.router.loadPage('views/login.html')
+                               window.tommy.f7view.router.loadPage('views/login.html')
                             // default:
-                            //    window.tommy.app.alert(json.message)
+                            //    window.tommy.f7.alert(json.message)
                                break;
                         }
 
-                        if (typeof(errorCallback) === 'function') {
-                            errorCallback(json)
+                        if (options.showErrorMessages !== false) {
+                            json = JSON.parse(xhr.responseText)
+                            if (json.message) {
+                                app.handleAPIError(json.message)
+                            }
                         }
                     } catch (error) {
                         if (options.showErrorMessages !== false) {
                             if (status === 500) {
                                 app.handleAPIError('Internal server error')
-                                // window.tommy.app.alert('Internal server error')
+                                // window.tommy.f7.alert('Internal server error')
                                 // $$('#overlay-error').html('No Internet Connection')
                                 // $$('#overlay-error').show()
                             } else {
                                 app.handleAPIError(xhr.responseText, 'Invalid API response')
-                                // window.tommy.app.alert('Invalid API response: ' + xhr.responseText)
+                                // window.tommy.f7.alert('Invalid API response: ' + xhr.responseText)
                             }
                         }
                     }
-
-                    // setTimeout(function () {
-                    //     $$('#overlay-error').hide()
-                    // }, 2000)
-
-                    // if(textStatus === 200) {
-                    //     var res = JSON.parse(data.response)
-                    //     console.log(res)
-                    //     // if(res.error == 'token_expired')  {
-                    //         // $$('#overlay-error').html('Token has expired. Please login again.')
-                    //         $$('#overlay-error').show()
-                    //         window.tommy.view.router.loadPage('views/login.html')
-                    //     // }
-                    //     // else {
-                    //         // $$('#overlay-error').html('Oops! Something went wrong.')
-                    //         // $$('#overlay-error').show()
-                    //     // }
-                    // }
-                    // else if(textStatus === 400) {
-                    //         // $$('#overlay-error').html('Token has expired. Please login.')
-                    //         // $$('#overlay-error').show()
-                    //         window.tommy.view.router.loadPage('views/login.html')
-                    // }
-                    // else if(textStatus === 404) {
-                    //     var data = JSON.parse(data.response)
-                    //
-                    //     if(data.error == 'user_not_found') {
-                    //         config.destorySession()
-                    //         window.tommy.view.router.reloadPage('views/login.html')
-                    //     }
-                    //     else{
-                    //         $$('#overlay-error').html('No Internet Connection.')
-                    //         $$('#overlay-error').show()
-                    //     }
-                    // }
-                    // else if(textStatus === 500) {
-                    //     $$('#overlay-error').html('Internal Server Error. Please try again.')
-                    //     $$('#overlay-error').show()
-                    // }
-                    // else {
-                    //     // $$('#overlay-error').html('Oops! Something went wrong.')
-                    //     // $$('#overlay-error').show()
-                    //     // window.tommy.view.router.loadPage('views/login.html')
-                    //     if(options.func === 'login') {
-                    //         app.hideLoader()
-                    //         window.tommy.app.alert('Connection Problem. Please verify your internet connection and try again.')
-                    //     }
-                    //     else {
-                    //         $$('#overlay-error').html('Connection Problem. Please try again.')
-                    //         $$('#overlay-error').show()
-                    //     }
-                    // }
+                    
+                    console.log('errorCallback', xhr, status)
+                    if (typeof(errorCallback) === 'function') {
+                        errorCallback(json ? json : status)
+                    }
                 }
             })
         }
-
-        // search: function (code, array) {
-        //     for (var i = 0; i < array.length; i++) {
-        //         if (array[i].code === code) {
-        //             return array[i];
-        //         }
-        //     }
-        //     return false;
-        // },
-        //
-        // getRequestURL: function (options) {
-        //     var query = options.query || {};
-        //     var func = options.func || '';
-        //     var apiServer = (options.url || config.getDeprecatedApiUrl()) + func + (util.isEmpty(query) ? '' : '?')
-        //
-        //     for (var name in query) {
-        //         apiServer += name + '=' + query[name] + '&';
-        //     }
-        //
-        //     var token = config.getSessionToken()
-        //     if (token && util.isEmpty(query)) {
-        //         apiServer += '?token=' + token;
-        //     }
-        //     else if(token) {
-        //         apiServer += 'token=' + token;
-        //     }
-        //
-        //     return apiServer.replace(/&$/gi, '')
-        // },
-
     };
 
     xhr.init()

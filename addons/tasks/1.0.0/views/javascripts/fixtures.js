@@ -1,6 +1,3 @@
-//
-/// Fixtures
-
 const Fixtures = {
   create () {
     window.tommy.api.createFragment({
@@ -28,3 +25,5 @@ const Fixtures = {
 }
 
 // Fixtures.create()
+
+export default Fixtures

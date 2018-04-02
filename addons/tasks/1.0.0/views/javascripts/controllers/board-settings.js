@@ -7,9 +7,12 @@ const BoardSettingsController = {
 
     window.tommy.tplManager.renderInline('tasks__boardSettingTemplate', null, $page)
 
+    API.initPermissionSelects(page, ['task_create_access', 'task_edit_access'])
+
     $nav.find('a.save').on('click', ev => {
       const data = window.tommy.app.f7.formToJSON($page.find('form'))
-      alert('implement me')
+
+      // NOTE: Form not implemented yet
       ev.preventDefault()
     })
   },
@@ -18,8 +21,7 @@ const BoardSettingsController = {
   },
 
   afterSave (res) {
-    // console.log('list saved', res)
-    // API.addList(res)
+    // console.log('board saved', res)
     // window.tommy.app.f7view.router.back()
   }
 }

@@ -8,7 +8,7 @@ function(util,config,api,addons,TM,TH,appCtrl) {
             TM.renderInline('addonViewsRadioListTemplate', addons.getViews(), $page)
 
             $page.on('change', 'select[name="current-user"]', function(event) {
-                var values = $$(this).val().split('/')
+                var values = $$(this).val().split('-')
                 appCtrl.changeCurrentAccount(values[0], values[1])
             })
 

@@ -31,7 +31,7 @@
         shim: {
             'Framework7': {exports: 'Framework7'}
         }
-    });
+    })
 
     require(['Framework7','app','router','api','util','config','addons','tplManager','tplHelpers','controllers/module','i18n','text!GTPL','/tommy/export.js'],
     function(Framework7,app,router,api,util,config,addons,TM,TH,CM,i18n,GTPL) {
@@ -69,47 +69,54 @@
                         swipePanel: 'left',
                         swipeBackPage: false,
                         smartSelectBackTemplate: '<div class="left sliding"><a href="#" class="back link icon-only"><i class="material-icons md-36">keyboard_arrow_left</i></a></div>'
-                    });
+                    })
 
-                    $$('body').append(GTPL);
+                    $$('body').append(GTPL)
 
-                    // util.bindDynamicSubmitButtons();
+                    // Set the API to use the sandbox endpoint by default
+                    api.url = SANDBOX_ENDPOINT
 
-                    TM.initGlobalVariables();
-                    TH.init();
-                    router.init();
+                    TM.initGlobalVariables()
+                    TH.init()
 
-                    main.authenticate();
-                    main.initLocalAddons();
+                    router.init()
+
+                    main.authenticate()
+                    main.initLocalAddons()
                 })
             },
 
             authenticate: function() {
                 api.call({
+                    // url: API_ENDPOINT,
                     endpoint: 'sessions',
                     method: 'POST',
                     data: { api_key: SDK_CONFIG.apiKey }
                 }).then(function(response) {
-                    console.log('authenticated', response);
-                    config.setCurrentUser(response, response.token);
-                    CM.module('appCtrl').init();
-                });
+                    console.log('authenticated', response)
+                    config.setCurrentUser(response, response.token)
+                    CM.module('appCtrl').init()
+                }).catch(function(error) {
+                    console.log('failed', error)
+                    app.f7.alert('Cannot connect to sandbox server: ' + SANDBOX_ENDPOINT + ': ' + error)
+                    // config.setCurrentUser(response, response.token)
+                    // CM.module('appCtrl').init()
+                })
             },
 
             initLocalAddons: function() {
-                addons.init();
+                addons.init()
                 addons.onAddonLoaded = CM.module('addonCtrl').onAddonLoaded;
                 addons.onViewLoaded = CM.module('addonCtrl').onViewLoaded;
 
-                // $$.getJSON('/addons', function (response) {});
-                for (var i = 0; i < SDK_ADDONS.length; i++) {
-                    var addon = SDK_ADDONS[i];
-                    console.log('loaded local addon', addon);
-                    addons.initAddon(addon);
+                for (var i = 0; i < SDK_LOCAL_ADDONS.length; i++) {
+                    var addon = SDK_LOCAL_ADDONS[i];
+                    console.log('loaded local addon', addon)
+                    addons.initAddon(addon)
                 }
             }
         }
 
-        main.init();
-    });
-})();
+        main.init()
+    })
+})()

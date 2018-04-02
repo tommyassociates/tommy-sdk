@@ -1,4 +1,6 @@
 import API from '../api'
+import IndexController from './index'
+
 
 const ListEditController = {
   init (page) {
@@ -8,6 +10,8 @@ const ListEditController = {
 
     console.log('edit list', list)
     window.tommy.tplManager.renderInline('tasks__listEditTemplate', list, $page)
+
+    API.initPermissionSelects(page, ['task_list_read_access', 'task_list_edit_access'])
 
     $nav.find('a.save').on('click', ev => {
       const data = window.tommy.app.f7.formToJSON($page.find('form'))

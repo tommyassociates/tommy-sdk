@@ -142,6 +142,7 @@
                 </li>
                 -->
             </ul>
+            <div data-template="tasks__permissionsTagSelectTemplate"></div>
         </div>
     </form>
     <div class="list-block list-block-custom">
@@ -151,4 +152,27 @@
             </li>
         </ul>
     </div>
+</script>
+
+<script id="tasks__permissionsTagSelectTemplate" type="text/template">
+  {{#each this}}
+  <div class="tag-select" data-searchbar="true" data-permission-name="{{name}}" data-page-title="{{title}}">
+    <ul>
+      <li class="item-divider">{{title}}</li>
+      <li>
+        <select multiple></select>
+        <a href="#" class="item-link tag-search">
+          <div class="item-content">
+            <div class="item-media"><i class="material-icons md-36">search</i></div>
+            <div class="item-inner">
+              <div class="item-title">{{t "common.search_members_tags" defaultValue="Search Members, Tags"}}</div>
+            </div>
+          </div>
+        </a>
+      </li>
+    </ul>
+    <ul class="tag-items">
+    </ul>
+  </div>
+  {{/each}}
 </script>

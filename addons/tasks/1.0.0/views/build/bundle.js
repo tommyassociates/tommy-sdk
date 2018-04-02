@@ -140,6 +140,30 @@ var API = {
       return window.tommy.api.createFragment(params).then(API.addList);
     }
     IndexController.invalidateLists = true; // rerender lists
+  },
+  initPermissionSelects: function initPermissionSelects(page, permissionNames) {
+    window.tommy.api.getInstalledAddonPermissions('tasks', { cache: true }).then(function (permissions) {
+      console.log('installed addon permissions', permissions);
+      permissions = permissions.filter(function (x) {
+        return permissionNames.indexOf(x.name) !== -1;
+      });
+      window.tommy.tplManager.renderInline('tasks__permissionsTagSelectTemplate', permissions, page.container);
+      for (var i = 0; i < permissions.length; i++) {
+        API.initTagSelect(page, permissions[i]);
+      }
+    });
+  },
+  initTagSelect: function initTagSelect(page, permission) {
+    var $tagSelect = $$(page.container).find('.tag-select[data-permission-name="' + permission.name + '"]'); //.find('') //$page.find('#addon-permissions-form .tag-select')
+    console.log('init tag select', permission, $tagSelect);
+    window.tommy.tagSelect.initWidget($tagSelect, permission.filters, function (data) {
+      console.log('save tags', permission, data, $tagSelect.dataset());
+
+      // $tagSelect.data('permission-name')
+      window.tommy.api.updateInstalledAddonPermission('tasks', permission.name, {
+        filters: JSON.stringify(data)
+      });
+    });
   }
 };
 
@@ -165,16 +189,18 @@ var BoardSettingsController = {
 
     window.tommy.tplManager.renderInline('tasks__boardSettingTemplate', null, $page);
 
+    _api2.default.initPermissionSelects(page, ['task_create_access', 'task_edit_access']);
+
     $nav.find('a.save').on('click', function (ev) {
       var data = window.tommy.app.f7.formToJSON($page.find('form'));
-      alert('implement me');
+
+      // NOTE: Form not implemented yet
       ev.preventDefault();
     });
   },
   saveList: function saveList() {},
   afterSave: function afterSave(res) {
-    // console.log('list saved', res)
-    // API.addList(res)
+    // console.log('board saved', res)
     // window.tommy.app.f7view.router.back()
   }
 };
@@ -321,6 +347,10 @@ var _api = require('../api');
 
 var _api2 = _interopRequireDefault(_api);
 
+var _index = require('./index');
+
+var _index2 = _interopRequireDefault(_index);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 var ListEditController = {
@@ -332,6 +362,8 @@ var ListEditController = {
     console.log('edit list', list);
     window.tommy.tplManager.renderInline('tasks__listEditTemplate', list, $page);
 
+    _api2.default.initPermissionSelects(page, ['task_list_read_access', 'task_list_edit_access']);
+
     $nav.find('a.save').on('click', function (ev) {
       var data = window.tommy.app.f7.formToJSON($page.find('form'));
       ListEditController.saveList(list, data);
@@ -340,7 +372,7 @@ var ListEditController = {
 
     $page.find('.delete-list').on('click', function (ev) {
       _api2.default.deleteList(list.id);
-      IndexController.invalidateLists = true;
+      _index2.default.invalidateLists = true;
       window.tommy.app.f7view.router.back();
       ev.preventDefault();
     });
@@ -359,7 +391,7 @@ var ListEditController = {
 
 exports.default = ListEditController;
 
-},{"../api":1}],6:[function(require,module,exports){
+},{"../api":1,"./index":3}],6:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {

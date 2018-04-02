@@ -28,6 +28,19 @@
   "board-setting": {
     "list-management": "List Management"
   },
+  "common": {
+    "search_members_tags": "Search Members, Tags"
+  },
+  "status": {
+    "unassigned": "Unassigned",
+    "assigned": "Assigned",
+    "processing": "Processing",
+    "completed": "Completed",
+    "closed": "Closed",
+    "archive_task": "Archive Task",
+    "unassigned": "Unassigned",
+    "cancel": "Cancel"
+  },
   "task": {
     "checklist": "Checklist",
     "deadline": "Deadline",
@@ -39,12 +52,32 @@
     "participants": "Participants",
     "edit_deadline": "Edit deadline...",
     "add_items": "Add items",
-    "activity": "Activity"
+    "activity": "Activity",
+    "created_a_task": "Created a task",
+    "changed_status_to": "Changed status to {{status}}"
   },
   "title": "Task Manager",
   "summary": "Manage your projects & tasks with ease.",
   "description": "Manage your projects & tasks with ease.",
   "developer": "Tommy Labs GmbH",
+  "permissions": {
+    "task_list_read_access": {
+      "title": "Who Can See List",
+      "hint": "Select who can view this list"
+    },
+    "task_list_edit_access": {
+      "title": "Who Can Edit List",
+      "hint": "Select who can edit this list"
+    },
+    "task_create_access": {
+      "title": "Who Can Create Tasks",
+      "hint": "Select who can create tasks"
+    },
+    "task_edit_access": {
+      "title": "Who Can Edit Tasks",
+      "hint": "Select who can edit tasks"
+    }
+  },
   "views": {
     "index": {
       "title": "Tasks"

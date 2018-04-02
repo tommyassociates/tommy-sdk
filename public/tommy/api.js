@@ -1,6 +1,8 @@
 define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
 
     var api = {
+        url: config.getApiUrl(),
+
         call: function(options) {
             return new Promise(function(resolve, reject) {
                 // if (showLoader !== false)
@@ -20,7 +22,7 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
 
                 // Set the full URL
                 // options.url = options.url ? options.url : config.getApiUrl();
-                options.url = options.url || config.getApiUrl();
+                options.url = options.url || api.url // consig.getApiUrl();
                 if (options.endpoint)
                     options.url += options.endpoint;
 
@@ -557,6 +559,13 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
             return this.call(Object.assign({
                 endpoint: 'addons/' + package + '/versions/' + version,
                 method: 'GET'
+            }, options));
+        },
+
+        deleteAddonVersion: function(package, version, options) {
+            return this.call(Object.assign({
+                endpoint: 'addons/' + package + '/versions/' + version,
+                method: 'DELETE'
             }, options));
         },
 

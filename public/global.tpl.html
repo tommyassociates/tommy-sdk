@@ -144,7 +144,7 @@
   <ul>
     {{#each this}}
     <li>
-      <a href="/addon-details.html?package={{package}}&version={{version}}" data-package="{{package}}" data-version="{{version}}" class="item-link item-content">
+      <a href="/addon-details.html?package={{package}}&version={{version}}" data-addon="{{package}}" data-version="{{version}}" class="item-link item-content">
         <div class="item-media"><img class="icon" width="80" src="{{icon_url}}" /></div>
         <div class="item-inner">
           <div class="item-title-row">
@@ -164,7 +164,7 @@
   <ul>
     {{#each this}}
     <li>
-      <a href="{{url}}" class="item-link item-content" data-addon="{{package}}" data-view-id="{{id}}">
+      <a href="#" class="item-link item-content" data-url="{{url}}" data-addon="{{package}}" data-view-id="{{id}}">
         <div class="item-inner">
           <div class="item-title">{{title}} ({{package}}/{{id}})</div>
           <!-- <div class="item-after"></div> -->
@@ -174,7 +174,6 @@
     {{/each}}
   </ul>
 </script>
-
 
 <script id="addonViewsRadioListTemplate" type="text/template">
   <ul>
@@ -207,13 +206,13 @@
       {{#each this}}
       <li>
         <a href="#" data-command="change-account" data-account-id="{{id}}" data-account-type="{{type}}" class="item-link item-content">
-          <div class="item-media"><img class="icon" width="80" src="{{icon_url}}" /></div>
+          <div class="item-media"><img class="icon" height="40" src="{{icon_url}}" /></div>
           <div class="item-inner">
             <div class="item-title-row">
               <div class="item-title">{{contact_name}}</div>
               <!-- <div class="item-after"></div> -->
             </div>
-            <div class="item-subtitle">{{title}}, {{type}}</div>
+            <div class="item-subtitle">{{type}}, {{kind}}</div>
             <!-- <div class="item-text">{{display_name}}</div> -->
           </div>
         </a>

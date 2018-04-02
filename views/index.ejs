@@ -5,16 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <title>Tommy Addon SDK</title>
-    <!-- <link rel="stylesheet" href="css/framework7.ios.min.css">
-    <link rel="stylesheet" href="css/framework7.ios.colors.min.css">
-    <link rel="stylesheet" href="vendor/material/material-icons.css">
-    <link rel="stylesheet" href="css/tommy.css">
-    <link rel="stylesheet" href="css/addons.css"> -->
+    <title>Tommy SDK</title>
     <link rel="stylesheet" href="tommy/vendors/framework7/framework7.ios.min.css">
     <link rel="stylesheet" href="tommy/vendors/material/material-icons.css">
     <link rel="stylesheet" href="tommy/vendors/framework7-icons.css">
     <link rel="stylesheet" href="tommy/styles/tommy.css">
+    <link rel="stylesheet" href="css/sdk.css">
+
+    <script type="text/javascript">
+      SDK_URL = '<%- url %>';
+      SDK_CONFIG = <%- JSON.stringify(config) %>;
+      SDK_LOCAL_ADDONS = <%- JSON.stringify(localAddons) %>;
+      API_URL = '<%- config.apiEndpoint %>'
+      API_ENDPOINT = '<%- config.apiEndpoint %>/v1/'
+      SANDBOX_URL = '<%- config.apiSandboxEndpoint %>'
+      SANDBOX_ENDPOINT = '<%- config.apiSandboxEndpoint %>/v1/'
+    </script>
   </head>
   <body>
     <div class="statusbar-overlay"></div>
@@ -24,6 +30,13 @@
       <div class="list-block">
         <ul class="addon-views-nav">
           <li>
+            <a href="local-addons.html" class="close-panel item-link">
+              <div class="item-content">
+                <div class="item-inner">
+                  <div class="item-title">Addons</div>
+                </div>
+              </div>
+            </a>
             <a href="settings.html" class="close-panel item-link">
               <div class="item-content">
                 <div class="item-inner">
@@ -54,7 +67,7 @@
               <a href="#" class="link icon-only open-panel"><i class="icon icon-bars"></i></a>
               <!-- <a href="#" class="link icon-only do-switch-account"><img src="" class="current-avatar"></a></a> -->
             </div>
-            <div class="center sliding">Addon Emulator</div>
+            <div class="center sliding">Emulator</div>
             <div class="right">
               <!-- <a href="settings.html" class="link icon-only"><i class="icon icon-bars"></i></a> -->
               <!-- open-panel -->
@@ -68,76 +81,6 @@
         </div>
       </div>
     </div>
-    <!-- <script type="text/javascript" src="js/jquery-2.1.4.min.js"></script>
-    <script type="text/javascript" src="js/js-yaml.js"></script>
-    <script type="text/javascript" src="js/framework7.min.js"></script>
-    <script type="text/javascript" src="js/app.js"></script>
-
-    <script type="text/javascript" src="js/tommy/tommy.js"></script>
-    <script type="text/javascript" src="js/tommy/util.js"></script>
-    <script type="text/javascript" src="js/tommy/api.js"></script>
-    <script type="text/javascript" src="js/tommy/environment.js"></script>
-    <script type="text/javascript" src="js/tommy/addons.js"></script>
-
-    <script type="text/javascript" src="js/sdk.js"></script> -->
-
-    <script type="text/javascript">
-      SDK_URL = '<%- url %>';
-      SDK_CONFIG = <%- JSON.stringify(config) %>;
-      SDK_ADDONS = <%- JSON.stringify(localAddons) %>;
-
-      // // Create the Tommy API instances
-      // T.api = new Tommy.API('<%- config.apiKey %>', 'v1', '<%- config.apiEndpoint %>');
-      // // T.apiAccount = new Tommy.API('<%- config.apiKey %>', 'v1', '<%- config.apiEndpoint %>');
-      // T.apiSandbox = new Tommy.API('<%- config.apiKey %>', 'v1', '<%- config.apiSandboxEndpoint %>');
-      //
-      // // Create the Tommy Environment instance and set the necessary variables
-      // T.env = new Tommy.Environment();
-      // T.env.f7App = myApp;
-      // T.env.f7View = mainView;
-      // T.env.t7 = Template7;
-      //
-      // // Create the Tommy Addons instance and load all installed addons
-      // T.addons = new Tommy.Addons();
-      // // T.addons.loadAllRemote();
-      //
-      // // Initialize the SDK
-      // T.sdk = new Tommy.SDK();
-      // T.sdk.loadLocalAddons();
-      //
-      // // Handle addon created events
-      // $$(document).on('tommy:addon:view:create', function(event) {
-      //   var package = event.detail.package,
-      //     // local = T.addons.get(package, 'local'),
-      //     view = event.detail.view;
-      //
-      //   // Create the sidebar menu item
-      //   var navItem = $('<li><a href="#" data-addon="' + view.package + '" data-view="' + view.id + '" class="item-link">' +
-      //     '<div class="item-content">' +
-      //       '<div class="item-inner">' +
-      //         '<div class="item-title">' + view.title + '</div>' +
-      //         // '<div class="item-after">' + (local ? 'Local' : 'Remote') + '</div>' +
-      //       '</div>' +
-      //     '</div></a></li>');
-      //
-      //   // Add the sidebar menu
-      //   $('.addon-views-nav').append(navItem);
-      //
-      //   // Handle sidebar clicks to display the page
-      //   // TODO: does f7 have a better way to handle this?
-      //   navItem.find('a').unbind('click').click(function() {
-      //     // if ($('.view-main').data('page') == view.id)
-      //     //   return;
-      //
-      //     T.addons.showView(package, view.id);
-      //   });
-      //
-      //   // // Show a specific view on load
-      //   // if (data.package == 'barbonus') {
-      //   //   T.addons.showView('barbonus-bonuses');
-      //   // }
-      // });
-    </script>
 
     <script data-main="js/main" src="tommy/vendors/require/require.js"></script>
   </body>

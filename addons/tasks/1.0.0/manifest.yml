@@ -8,11 +8,37 @@
   homepage: "https://mytommy.com"
   private: false
   languages:
-   - en-US
-   - zh-CN
-  # roles:
-  #   - Team Member
-  #   - Team Manager
+    - en-US
+    - zh-CN
+  permissions:
+    task_list_read_access:
+      title: "Who Can See List"
+      hint: "Select who can view this list"
+      resource_type: "Fragment"
+      resource_kind: "TaskList"
+      operations:
+        - read
+    task_list_edit_access:
+      title: "Who Can Edit List"
+      hint: "Select who can edit this list"
+      resource_type: "Fragment"
+      resource_kind: "TaskList"
+      operations:
+        - edit
+    task_create_access:
+      title: "Who Can Create Tasks"
+      hint: "Select who can create tasks"
+      resource_type: "Fragment"
+      resource_kind: "Task"
+      operations:
+        - create
+    task_edit_access:
+      title: "Who Can Edit Tasks"
+      hint: "Select who can edit tasks"
+      resource_type: "Fragment"
+      resource_kind: "Task"
+      operations:
+        - edit
   views:
     index:
       title: "Tasks"
@@ -20,9 +46,6 @@
       type: "page"
       index: true
       framed: false
-      # roles:
-      #   - Team Member
-      #   - Team Manager
       assets:
         -
           type: "stylesheet"

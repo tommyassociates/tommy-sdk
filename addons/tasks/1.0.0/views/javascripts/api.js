@@ -121,6 +121,30 @@ const API = {
     const params = Object.assign({}, list, { data: JSON.stringify(list.data) })
     if (list.id) { return window.tommy.api.updateFragment(list.id, params).then(API.addList) } else { return window.tommy.api.createFragment(params).then(API.addList) }
     IndexController.invalidateLists = true // rerender lists
+  },
+
+  initPermissionSelects (page, permissionNames) {
+    window.tommy.api.getInstalledAddonPermissions('tasks', { cache: true }).then(permissions => {
+      console.log('installed addon permissions', permissions)
+      permissions = permissions.filter(x => permissionNames.indexOf(x.name) !== -1);
+      window.tommy.tplManager.renderInline('tasks__permissionsTagSelectTemplate', permissions, page.container)
+      for (var i = 0; i < permissions.length; i++) {
+        API.initTagSelect(page, permissions[i])
+      }
+    })
+  },
+
+  initTagSelect (page, permission) {
+    var $tagSelect = $$(page.container).find('.tag-select[data-permission-name="' + permission.name + '"]') //.find('') //$page.find('#addon-permissions-form .tag-select')
+    console.log('init tag select', permission, $tagSelect)
+    window.tommy.tagSelect.initWidget($tagSelect, permission.filters, function(data) {
+      console.log('save tags', permission, data, $tagSelect.dataset())
+
+      // $tagSelect.data('permission-name')
+      window.tommy.api.updateInstalledAddonPermission('tasks', permission.name, {
+        filters: JSON.stringify(data)
+      })
+    })
   }
 }
 
