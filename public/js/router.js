@@ -1,15 +1,9 @@
-define(['config','app','util','tplManager','controllers/module','addons'], //, 'xhr' , 'underscore'
+define(['config','app','util','tplManager','controllers/module','addons'],
 function(config,app,util,TM,CM,addons) {
-    // var $$ = Dom7;
-    // var t7 = Template7;
 
     var router = {
-
         init: function() {
             console.log('router: init');
-
-            // app.f7.onPageInit('settings', router.initSettings);
-            // app.f7.onPageInit('addon-details', router.initAddonDetails);
 
             app.f7.onPageInit('*', router.pageInit);
             // app.f7.onPageBeforeAnimation('*', router.pageBeforeAnimation);
@@ -21,11 +15,11 @@ function(config,app,util,TM,CM,addons) {
         pageAfterAnimation: function(page) {
             console.log('router', 'pageAfterAnimation', page);
             switch (page.name) {
-                case 'local-addons':
-                    // clear last addon cache
-                    localStorage.setItem('lastAddon', null)
-                    localStorage.setItem('lastAddonView', null)
-                    break;
+                // case 'local-addons':
+                //     // clear last addon cache
+                //     localStorage.setItem('lastAddon', null)
+                //     localStorage.setItem('lastAddonView', null)
+                //     break;
             }
         },
 
@@ -45,10 +39,10 @@ function(config,app,util,TM,CM,addons) {
                     CM.module('addonCtrl').initAddonDetails(page);
                     break;
                 default:
-                    var $page = $$(page.container);
-                    if ($page.data('addon')) {
-                        CM.module('addonCtrl').initAddon(page);
-                    }
+                    // var $page = $$(page.container);
+                    // if ($page.data('addon')) {
+                    //     CM.module('addonCtrl').initAddon(page);
+                    // }
             }
         },
 

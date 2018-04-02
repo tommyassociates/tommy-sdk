@@ -15,7 +15,7 @@
             <a href="#" class="item-link smart-select">
               <select name="current-user">
                 {{#each @global.accounts}}
-                <option value="{{id}}-{{type}}" data-account-id="{{id}}" data-account-type="{{type}}" data-option-image="{{icon_url}}" {{#if current}}selected{{/if}}>{{name}} ({{title}})</option>
+                <option value="{{id}}-{{type}}" data-account-id="{{id}}" data-account-type="{{type}}" data-option-image="{{icon_url}}" {{#if current}}selected{{/if}}>{{name}} ({{kind}})</option>
                 {{/each}}
               </select>
               <div class="item-content">

@@ -87,14 +87,14 @@ function(Framework7,TH,config) { //,Framework73D
         },
 
         showLoader: function () { //text, force
-            // window.tommy.app.showIndicator()
+            // window.tommy.f7.showIndicator()
             var $pre = $$('.navbar .left')
             $pre.find('.preloader').remove()
             $pre.append('<span class="preloader"></span>')
         },
 
         hideLoader: function () {
-            // window.tommy.app.hideIndicator()
+            // window.tommy.f7.hideIndicator()
             var $pre = $$('.navbar .left')
             $pre.find('.preloader').remove()
 
@@ -123,7 +123,7 @@ function(Framework7,TH,config) { //,Framework73D
         },
 
         replaceNativeBackButton: function (page) {
-            // var callback = window.tommy.app.onPageBeforeAnimation('*', function(page) {
+            // var callback = window.tommy.f7.onPageBeforeAnimation('*', function(page) {
             console.log('replacing native back button', page)
             var $page = $$(page.container),
                 $navbar = $$(page.navbarInnerContainer)
@@ -154,7 +154,7 @@ function(Framework7,TH,config) { //,Framework73D
                 message += ': ';
             }
             message += err;
-            window.tommy.app.alert(message)
+            window.tommy.f7.alert(message)
             return true;
         },
 
@@ -179,7 +179,7 @@ function(Framework7,TH,config) { //,Framework73D
             app.f7.onPageAfterAnimation('*', function(page){
                 var $page = $$(page.container)
                 if ($page.hasClass('with-toggle-save')) {
-                    $page.once('change', '.toggle-save', function() {
+                    $page.once('input change', '.toggle-save', function() {
                         var $button = $$(page.navbarInnerContainer).find('.save')
                         $button.addClass('active')
                         $button.once('click', function() {

@@ -284,7 +284,7 @@ define(['config','cache','moment'/*,'i18n!nls/lang'*/,'Framework7'],function (co
         // },
 
         createDatePicker: function ($input, initialDate, options) {
-            if (!window.tommy.app) return
+            if (!window.tommy.f7) return
 
             if (typeof initialDate == 'string')
                 initialDate = new Date(initialDate)
@@ -506,7 +506,7 @@ define(['config','cache','moment'/*,'i18n!nls/lang'*/,'Framework7'],function (co
         //     $$('#success').show();
         //     setTimeout(function () {
         //         $$('#success').hide();
-        //         window.tommy.view.router.back();
+        //         window.tommy.f7view.router.back();
         //      }, 300);
         // },
         //
@@ -517,7 +517,7 @@ define(['config','cache','moment'/*,'i18n!nls/lang'*/,'Framework7'],function (co
         //     $$('#success').show();
         //     setTimeout(function () {
         //         $$('#success').hide();
-        //         window.tommy.view.router.refreshPage();
+        //         window.tommy.f7view.router.refreshPage();
         //      }, 300);
         // },
         //

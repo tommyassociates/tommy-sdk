@@ -1,27 +1,33 @@
-define(['addons','app','api','util','config','cache','i18n','xhr','tplManager','tagSelect','Framework7'],
-function(addons,app, api,util,config,cache,i18n,xhr,tplManager,tagSelect) {
+define(['app','api','config','cache','util','i18n','xhr','addons','tplManager','tagSelect','Framework7'],
+function(app, api,config,cache,util,i18n,xhr,addons,tplManager,tagSelect) {
 
-    // KLUDGE: Export as global for temporary ES6 integration
+    var tommy = {
+
+      // Core
+      addons: addons,
+      addons: addons,
+      app: app,
+      api: api,
+      config: config,
+      cache: cache,
+      util: util,
+      i18n: i18n,
+      xhr: xhr,
+      addons: addons,
+
+      // Utilities
+      $$: Dom7,
+      f7: app.f7,
+      f7view: app.f7view,
+      tplManager: tplManager,
+
+      // Components
+      tagSelect: tagSelect,
+    }
+
+    // Export as window global
     if (!window.tommy) window.tommy = {}
+    Object.assign(window.tommy, tommy)
 
-    // Core
-    window.tommy.addons = addons
-    window.tommy.app = app
-    window.tommy.api = api
-    window.tommy.cache = cache
-    window.tommy.config = config
-    window.tommy.i18n = i18n
-    window.tommy.util = util
-    window.tommy.xhr = xhr
-
-    // Utilities
-    window.$$ = Dom7
-    window.tommy.f7 = app.f7
-    window.tommy.f7view = app.f7view
-    window.tommy.tplManager = tplManager
-
-    // Components
-    window.tommy.tagSelect = tagSelect
-
-    return {};
+    return tommy;
 });

@@ -95,6 +95,7 @@ function loadConfig(filepath) {
 }
 
 function createAddon(host, action, package, version, archivePath, callback) {
+  // console.log('Creating addon: ', host, action, package, version, archivePath)
   request.post({
     url: host + '/v1/addons/' + action + '?api_key=' + config.apiKey,
     formData: {
@@ -142,6 +143,7 @@ function readLocalAddon(package, version) {
       var view = addon.views[id]
       view.id = id
       view.url = url.resolve(addon.url, view.file)
+      view.local = true
       if (view.assets) {
         for (var x = 0; x < view.assets.length; x++) {
           var asset = view.assets[x]
