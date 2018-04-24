@@ -16,20 +16,20 @@ function (app,util,config,api,i18n) {
 
             var buttons1 = [
                 {
-                    text: 'Edit Picture',
+                    text: i18n.t('account.photochange_edit_picture'),
                     label: true
                 }, {
-                    text: 'Take Photo',
+                    text: i18n.t('account.photochange_take_photo'),
                     bold: true,
                     onClick: photoChanger.capturePhotoEdit //.bind(self)
                 }, {
-                    text: 'Choose from Library',
+                    text: i18n.t('account.photochange_choose_library'),
                     onClick: photoChanger.uploadPhotoAlbum //.bind(self)
                 }
             ];
 
              var buttons2 = [{
-                 text: 'Cancel',
+                 text: i18n.t('label.cancel'),
                  color: 'red'
              }];
 
@@ -112,14 +112,14 @@ function (app,util,config,api,i18n) {
 
         onPhotoFail: function (message) {
             window.tommy.f7.hidePreloader();
-            window.tommy.f7.alert('Error getting image from device: ' + message);
+            window.tommy.f7.alert(i18n.t('account.photochange_error_getting_image') + message);
 
             if (photoChanger.settings.error)
                 photoChanger.settings.error();
         },
 
         upload: function (photo) {
-            window.tommy.f7.showPreloader(i18n.i18next.t('label.uploading_image'))
+            window.tommy.f7.showPreloader(i18n.t('label.uploading_image'))
             var form = new FormData();
             form.append('photo', photo, 'profilephoto.jpg');
 

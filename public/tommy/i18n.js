@@ -1,38 +1,55 @@
-define(['app','config','i18next'],
-function(app,config,i18next) {
+define(['i18next'],
+function(i18next) {
 
     var i18n = {
         i18next: null,
 
         init: function(options, callback) {
-            this.i18next = i18next; // require('i18next')
-            this.i18next.use(i18n.backend).init(options, callback)
+            i18n.i18next = i18next; // require('i18next')
+            i18n.i18next.use(i18n.backend).init(options, callback)
         },
 
         // A collection of endpoints with translation files to load
         // Each endpoint should define translations for a different namespace
         endpoints: {},
 
+        t: function(key, options) {
+
+            // Translate the addon namespace and fallback to default
+            // namespace if translation is unavailable
+            var keys = []
+            if (Template7 &&
+                Template7.global &&
+                Template7.global.currentAddonInstall &&
+                Template7.global.currentAddonInstall.package)
+                keys.push(Template7.global.currentAddonInstall.package + ':' + key)
+            keys.push(key)
+
+            return i18n.i18next.t(keys, options)
+        },
+
         // Add an endpoint for a namespace
-        addEndpoint: function(namespace, endpoint, languages, loadNow) {
+        addNamespaceEndpoint: function(namespace, endpoint, languages, loadNow) {
             if (!namespace)
                 namespace = 'translation' // default namespace
 
             if (i18n.endpoints[namespace]) {
-                alert('Translation namespace already added for ' + namespace)
+                // alert('Translation namespace already added for ' + namespace)
                 return;
             }
             i18n.endpoints[namespace] = {
                 endpoint: endpoint,
                 languages: languages // TODO: ensure exists before loading
             }
+
+            console.log('added namespace endpoint', namespace, endpoint, languages, loadNow)
             if (loadNow) {
-                return i18n.loadTranslations(namespace)
+                return i18n.loadNamespaceTranslations(namespace)
             }
         },
 
         // Load translations from the endpoint for the given namespace
-        loadTranslations: function(namespace, language) {
+        loadNamespaceTranslations: function(namespace, language) {
             return new Promise(function(resolve, reject) {
                 if (!language) language = i18next.language
                 var context = i18n.endpoints[namespace]
@@ -63,7 +80,7 @@ function(app,config,i18next) {
             var promises = []
             for (var namespace in i18n.endpoints) {
                 var endpoint = i18n.endpoints[namespace].endpoint
-                promises.push(i18n.loadTranslations(namespace, language)) //, endpoint
+                promises.push(i18n.loadNamespaceTranslations(namespace, language)) //, endpoint
             }
             return Promise.all(promises)
         },
