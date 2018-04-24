@@ -3,13 +3,13 @@ function(Framework7,TH,config) { //,Framework73D
     var app = {
 
         // The Framework7 application instance
-        f7: null,
+        // f7: null,
 
         // The Framework7 main view instance
-        f7view: null,
+        // f7view: null,
 
         // The Template7 instance
-        t7: Template7,
+        // t7: Template7,
 
         // Example Options:
         //
@@ -29,28 +29,32 @@ function(Framework7,TH,config) { //,Framework73D
         // }
         //
         init: function(options) {
-            // window.$$ = Dom7;
-            if (!window.tommy)
-                window.tommy = {}
-            this.f7 = window.tommy.f7 = new Framework7(options)
-            this.f7view = window.tommy.f7view = this.f7.addView('.view-main', {
+            app.f7 = new Framework7(options)
+            app.f7view = app.f7.addView('.view-main', {
                 dynamicNavbar: true,
 
                 // NOTE: Setting this to false as multiple instances of pages with
-                // duplicate data-page names were getting inserted into the dom.
+                // duplicate `data-page` names were getting inserted into the DOM.
                 // If a workaround can be found this can be reenabled.
                 domCache: false
             })
 
+            if (!window.tommy)
+                window.tommy = {}
+            window.tommy.f7 = app.f7
+            window.tommy.f7view = app.f7view
+            window.tommy.routerLoading = false
+
+            app.t7 = Template7
             if (!app.t7.global)
-                app.t7.global = {};
+                app.t7.global = {}
 
             // Handle global window errors
             window.onerror = function (msg, url, lineNo, columnNo, error) {
                 console.log('Global error', msg, url, lineNo, columnNo, error)
 
                 // NOTE: should be cleared before page load in router
-                window.tommy.lastError = msg;
+                window.tommy.lastError = msg
                 return false;
             }
 
@@ -61,7 +65,28 @@ function(Framework7,TH,config) { //,Framework73D
             app.initDynamicActions()
             app.initDynamicSubmitButtons()
             app.initMobileFirendlyFormTabbing()
-            TH.init();
+            TH.init()
+
+            // Code used in order to refresh all the app with new language
+            // FIXME: This doesn't belong here
+            $$(document).on('ajaxStart', function(e) {
+                window.tommy.routerLoading = true
+            })
+
+            $$(document).on('ajaxComplete', function(e) {
+                window.tommy.routerLoading = false
+                $$(document).trigger('routerLoaded')
+            })
+
+            // new Framework7({
+            //     onAjaxStart() {
+            //         window.tommy.routerLoading = true;
+            //     },
+            //     onAjaxComplete() {
+            //         window.tommy.routerLoading = false;
+            //         $$(document).trigger('routerLoaded');
+            //     }
+            // })
         },
 
         setPageTitle: function (html) {

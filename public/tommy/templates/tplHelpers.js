@@ -70,16 +70,7 @@ function (config,util,moment,i18n/*,i18n*/) {
             })
 
             t7.registerHelper('t', function (key, options) {
-
-                // Translate the addon namespace and fallback to default
-                // namespace if translation is unavailable
-                var keys = []
-                if (t7.global.currentAddonInstall &&
-                    t7.global.currentAddonInstall.package)
-                    keys.push(t7.global.currentAddonInstall.package + ':' + key)
-                keys.push(key)
-                
-                return i18n.i18next.t(keys, options.hash)
+                return i18n.t(key, options.hash)
             })
 
             //

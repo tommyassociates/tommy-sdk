@@ -1,10 +1,10 @@
-define(['config','cache','moment'/*,'i18n!nls/lang'*/,'Framework7'],function (config,cache,moment/*,i18n*/) {
+define(['config','cache','moment','i18n','Framework7'],function (config,cache,moment,i18n) {
     var $$ = Dom7;
 
     var util = {
 
         //
-        // String, Array and Object manipulation
+        // == String, Array and Object manipulation
         //
 
         replaceWith: function (string, expression, replace) {
@@ -13,6 +13,10 @@ define(['config','cache','moment'/*,'i18n!nls/lang'*/,'Framework7'],function (co
 
         parameterize: function (str) {
             return str.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+        },
+
+        underscore: function (str) {
+            return str.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^_|_$)/g,'');
         },
 
         capitalize: function (str) {
@@ -114,7 +118,7 @@ define(['config','cache','moment'/*,'i18n!nls/lang'*/,'Framework7'],function (co
         },
 
         //
-        // Platform and Environment
+        // == Platform and Environment
         //
 
         isPhonegap: function () {
@@ -149,29 +153,30 @@ define(['config','cache','moment'/*,'i18n!nls/lang'*/,'Framework7'],function (co
             }
         },
 
-        // bindDynamicVisibility: function (scope) {
-        // },
-
         //
-        // Date and Time
+        // == Date and Time
         //
 
         dayNames: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
 
         monthNames: ['January','February','March','April','May','June','July','August','September','October','November','December'],
 
+        // @deprecated: use moment
         getWeekDay: function (date) {
             return util.dayNames[(new Date(date)).getDay()];
         },
 
+        // @deprecated: use moment
         getShortWeekDay: function (date) {
             return 'Sun Mon Tue Wed Thu Fri Sat'.split(' ')[(new Date(date)).getDay()];
         },
 
+        // @deprecated: use moment
         getShortMonth: function (date) {
             return 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ')[(new Date(date)).getMonth()];
         },
 
+        // @deprecated: use moment
         getTimeOfDay: function (date) {
             if (!date) return '';
             var h =  date.getHours(),
@@ -381,9 +386,8 @@ define(['config','cache','moment'/*,'i18n!nls/lang'*/,'Framework7'],function (co
             }, options));
         },
 
-
         //
-        // URL and Query
+        // == URL and Query
         //
 
         getCurrentAccountUpdateURI: function () {
@@ -449,15 +453,19 @@ define(['config','cache','moment'/*,'i18n!nls/lang'*/,'Framework7'],function (co
             return path;
         },
 
+        //
+        // == Miscellaneous
+        //
+
         // Human readable invitation status
         invitationStatus: function (status) {
             switch (status) {
                 case 'requested':
-                    return 'Sent';
+                    return i18n.t('label.sent');
                 case 'accepted':
-                    return 'Added';
+                    return i18n.t('label.added');
                 case 'declined':
-                    return 'Declined';
+                    return i18n.t('label.declined');
                 default:
                     return '';
             }
@@ -487,148 +495,6 @@ define(['config','cache','moment'/*,'i18n!nls/lang'*/,'Framework7'],function (co
           formattedName += nameSplitted.length > 1 ? nameSplitted[1][0] : name[1]
           return formattedName
         }
-
-        // optionList : {
-        //     shiftRepeats :'None|Daily|Weekly|Monthy|Every Monday|Every Tuesday|Every Wednesday|Every Thursday|Every Friday|Every Saturday|Every Sunday',
-        // },
-
-        // // Format date
-        // formatDay: function (d) {
-        //     var date = new Date(d);
-        //     var weekDay = 'Sunday Monday Tuesday Wednesday Thursday Friday Saturday'.split(' ')[date.getDay()];
-        //     var day = date.getDate();
-        //     var month = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' ')[date.getMonth()];
-        //     return weekDay + ', ' + month + ' ' + day;
-        // },
-
-        // showSuccess: function (page) {
-        //     $$('#loading').hide();
-        //     $$('#success').show();
-        //     setTimeout(function () {
-        //         $$('#success').hide();
-        //         window.tommy.f7view.router.back();
-        //      }, 300);
-        // },
-        //
-        // showSuccessAndReload: function (force) {
-        //     if(window.from === 'left' && !force)
-        //         return;
-        //     $$('#loading').hide();
-        //     $$('#success').show();
-        //     setTimeout(function () {
-        //         $$('#success').hide();
-        //         window.tommy.f7view.router.refreshPage();
-        //      }, 300);
-        // },
-        //
-        // showLoader: function (text, force) {
-        //     if((window.from === 'left' || !window.show_loader) && !force)
-        //         return;
-        //     $$('#loading').hide();
-        //     $$('#success').hide();
-        //     if(text)
-        //         $$('#load-text').html(text);
-        //     else
-        //         $$('#load-text').html('Loading');
-        //     $$('#loading').show();
-        // },
-        //
-        // hideLoader: function () {
-        //     $$('#loading').hide();
-        // },
-
-        // getTaxEmploymentStatus: function (id) {
-        //     if(id === '1')
-        //         return 'Skipped';
-        //     else if(id === '2')
-        //         return 'Resident';
-        //     else if(id === '3')
-        //         return 'Temporary Work Visa';
-        //     else if(id === '4')
-        //         return 'Working Holiday Visa';
-        //     else
-        //         return 'Select Employment Status';
-        // },
-        //
-        // getTaxTFNStatus: function (id) {
-        //     if(id === '1')
-        //         return 'I have my TFN';
-        //     else if(id === '2')
-        //         return 'Under age';
-        //     else if(id === '3')
-        //         return 'Pensioner';
-        //     else if(id === '4')
-        //         return 'Made inquiry';
-        //     else
-        //         return 'Select File Tax Status';
-        // },
-        //
-        // setTimePicker: function (el, hour, min, period) {
-        //     time = {
-        //          input: el,
-        //          value: [ hour ,min, period ],
-        //          rotateEffect: true,
-        //          formatValue: function (p, values, displayValues) {
-        //                 return values[0] + ':' + values[1] + ' ' + values[2];
-        //             },
-        //          cols: [// Hours
-        //             {
-        //                 values: (function () {
-        //                     var arr = [];
-        //                     for (var i = 1; i <= 12; i++) { arr.push(i); }
-        //                     return arr;
-        //                 })(),
-        //             },
-        //             // Divider
-        //             {
-        //                 divider: true,
-        //                 content: ':'
-        //             },
-        //             // Minutes
-        //             {
-        //                 values: (function () {
-        //                     var arr = [];
-        //                     for (var i = 0; i <= 59; i++) { arr.push(i < 10 ? '0' + i : i); }
-        //                     return arr;
-        //                 })(),
-        //             },
-        //             // Divider
-        //             {
-        //              values: ('AM PM').split(' ')
-        //             } ]
-        //     };
-        //     return time;
-        // },
-        //
-        // setSimplePicker: function (el, defaultVal, val) {
-        //     list = {
-        //          input: el,
-        //          value: [ defaultVal ],
-        //          rotateEffect: true,
-        //          cols: [
-        //             {
-        //              values: val.split('|')
-        //             }]
-        //     };
-        //     return list;
-        // },
-        //
-        // setNumberPicker: function (el, defaultVal, min, max) {
-        //     list = {
-        //          input: el,
-        //          value: [ defaultVal ],
-        //          rotateEffect: true,
-        //          cols: [
-        //             {
-        //              values: (function () {
-        //                     var arr = [];
-        //                     for (var i = min; i <= max; i++) { arr.push(i); }
-        //                     return arr;
-        //                 })(),
-        //             }]
-        //     };
-        //     return list;
-        // },
     };
 
     return util

@@ -15,25 +15,46 @@ define(['cache'], function (cache) {
             localStorage.setItem('locale', locale)
         },
 
+        getCountry: function () {
+            var countryCode = localStorage.getItem('country')
+            if (!countryCode) {
+              if (window.location.hostname.indexOf('.cn') === -1)
+                countryCode = 'en'
+              else
+                countryCode = 'cn'
+            }
+            return countryCode
+        },
+
+        setCountry: function (country) {
+            localStorage.setItem('country', country)
+        },
+
         // The base server endpoint
         getServerUrl: function () {
             if (this.isDeveloperMode()) {
                 if (this.environment === 'production')
-                    return 'https://sandbox-api.mytommy.com/';
+                    return 'https://sandbox-api.mytommy.com';
                 else
-                    return 'http://localhost:3001/';
+                    return 'http://localhost:3001';
             }
             else {
-                if (this.environment === 'production')
-                    return 'https://api.mytommy.com/';
+                if (localStorage.getItem('serverUrl')) {
+                    return localStorage.getItem('serverUrl')
+                }
+                else if (this.environment === 'production') {
+                    var countryCode = config.getCountry();
+                    // return countryCode === 'cn' ? 'https://api.tuome.com.cn' : 'https://api.mytommy.com';
+                    return countryCode === 'cn' ? 'http://tommy-api-prod.cn-north-1.eb.amazonaws.com.cn' : 'https://api.mytommy.com';
+                }
                 else
-                    return 'http://localhost:3000/';
+                    return 'http://localhost:3000';
             }
         },
 
         // The full API endpoint.
         getApiUrl: function () {
-            return this.getServerUrl() + 'v1/';
+            return this.getServerUrl() + '/v1/';
         },
 
         // The chat server endpoint.
@@ -45,8 +66,14 @@ define(['cache'], function (cache) {
                     return 'http://localhost:4500';
             }
             else {
-                if (this.environment === 'production')
-                    return 'https://chat.mytommy.com';
+                if (localStorage.getItem('chatServerUrl')) {
+                    return localStorage.getItem('chatServerUrl')
+                }
+                else if (this.environment === 'production') {
+                    var countryCode = config.getCountry();
+                    // return countryCode === 'cn' ? 'https://chat.tuome.com.cn' : 'https://chat.mytommy.com';
+                    return countryCode === 'cn' ? 'http://tommy-chat-prod.cn-north-1.eb.amazonaws.com.cn/' : 'https://chat.mytommy.com';
+                }
                 else
                     return 'http://localhost:4500';
             }

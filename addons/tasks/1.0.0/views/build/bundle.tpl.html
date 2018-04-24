@@ -198,7 +198,7 @@
             {{/if}}
             <span>
                 {{#if data.status}}
-                {{data.status}}
+                {{tasks__displayStatus data.status}}
                 {{else}}
                 {{t "index.unassigned" defaultValue="Unassigned"}}
                 {{/if}}
@@ -572,7 +572,7 @@
             <h1>
                 <input type="text" name="task[name]" class="unstyled edit-task-name" value="{{name}}">
             </h1>
-            <input type="text" value="{{#if data.status}}{{data.status}}{{else}}{{t "task.waiting_for_assignments" defaultValue="Waiting for assignments"}}{{/if}}" readonly="readonly" class="unstyled task-status-picker" />
+            <input type="text" value="{{#if data.status}}{{tasks__displayStatus data.status}}{{else}}{{t "task.waiting_for_assignments" defaultValue="Waiting for assignments"}}{{/if}}" readonly="readonly" class="unstyled task-status-picker" />
         </div>
 
         <!--

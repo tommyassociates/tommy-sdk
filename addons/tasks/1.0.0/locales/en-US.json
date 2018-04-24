@@ -7,7 +7,8 @@
     "add-task": "Add task",
     "cancel": "Cancel",
     "done": "Done",
-    "unassigned": "Unassigned"
+    "unassigned": "Unassigned",
+    "default-task-name": "My Tasks"
   },
   "list-add": {
     "title": "Add List"

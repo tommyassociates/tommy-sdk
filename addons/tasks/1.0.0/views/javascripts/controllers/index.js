@@ -1,12 +1,20 @@
 import API from '../api'
 
-
 const IndexController = {
   init (page) {
     if (!API.listsLoaded || !API.tasksLoaded) {
       API.initCache()
       API.loadLists().then(() => {
-        IndexController.invalidate(page)
+        if (API.hasLists()) {
+          IndexController.invalidate(page)
+        }
+        else {
+
+          // Create a default list if none exists
+          API.createDefaultList().then(() => {
+            IndexController.invalidate(page)
+          })
+        }
       })
       API.loadTasks().then(() => {
         IndexController.invalidate(page)

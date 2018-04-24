@@ -7,7 +7,7 @@
   developer: "Tommy Labs GmbH"
   homepage: "https://mytommy.com"
   private: false
-  # languages:
+  # locales:
   #  - en-US
   #  - zh-CN
   roles:

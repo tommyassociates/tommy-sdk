@@ -72,6 +72,11 @@ function (util,app,config) {
                 error: function (xhr, status) {
                     console.log('xhr: call: error: ' + status + ': ' + xhr.responseText)
                     // console.log(JSON.stringify(data))
+                    var emailLogin,
+                        reqParams = xhr.requestParameters;
+                    if (reqParams && reqParams.data && reqParams.data.login) {
+                        emailLogin = reqParams.data.login;
+                    }
 
                     // window.tommy.f7.hideIndicator()
                     // app.hideLoader()
@@ -81,7 +86,11 @@ function (util,app,config) {
                     try {
                         switch(status) {
                             case 401:
-                               window.tommy.f7view.router.loadPage('views/login.html')
+                                var url = 'views/login.html'
+                                if (emailLogin) {
+                                    url += '?login='+ emailLogin
+                                }
+                                window.tommy.f7view.router.loadPage(url)
                             // default:
                             //    window.tommy.f7.alert(json.message)
                                break;

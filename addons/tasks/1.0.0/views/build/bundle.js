@@ -4,6 +4,13 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+
+var _index = require('./controllers/index');
+
+var _index2 = _interopRequireDefault(_index);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
 var API = {
   listsLoaded: false,
   tasksLoaded: false,
@@ -119,6 +126,7 @@ var API = {
   },
   saveList: function saveList(list) {
     console.log('save list', list);
+    _index2.default.invalidateLists = true; // rerender lists
     list.addon = 'tasks';
     list.kind = 'TaskList';
     if (!list.data) {
@@ -139,7 +147,13 @@ var API = {
     } else {
       return window.tommy.api.createFragment(params).then(API.addList);
     }
-    IndexController.invalidateLists = true; // rerender lists
+  },
+  createDefaultList: function createDefaultList() {
+    console.log('creating deafult task list');
+    return API.saveList({ name: window.tommy.i18n.t('index.default-task-name') });
+  },
+  hasLists: function hasLists() {
+    return Object.keys(API.cache['lists']).length > 0;
   },
   initPermissionSelects: function initPermissionSelects(page, permissionNames) {
     window.tommy.api.getInstalledAddonPermissions('tasks', { cache: true }).then(function (permissions) {
@@ -169,7 +183,7 @@ var API = {
 
 exports.default = API;
 
-},{}],2:[function(require,module,exports){
+},{"./controllers/index":3}],2:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -225,7 +239,15 @@ var IndexController = {
     if (!_api2.default.listsLoaded || !_api2.default.tasksLoaded) {
       _api2.default.initCache();
       _api2.default.loadLists().then(function () {
-        IndexController.invalidate(page);
+        if (_api2.default.hasLists()) {
+          IndexController.invalidate(page);
+        } else {
+
+          // Create a default list if none exists
+          _api2.default.createDefaultList().then(function () {
+            IndexController.invalidate(page);
+          });
+        }
       });
       _api2.default.loadTasks().then(function () {
         IndexController.invalidate(page);
@@ -858,6 +880,10 @@ window.tommy.app.t7.registerHelper('tasks__checklistNumCompleted', function (che
     ret += checklist.items.length;
   }
   return ret;
+});
+
+window.tommy.app.t7.registerHelper('tasks__displayStatus', function (status) {
+  return window.tommy.i18n.t('status.' + window.tommy.util.underscore(status), { defaultValue: status });
 });
 
 },{"./controllers/board-settings":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/task":8,"./controllers/task-add":7}]},{},[9]);

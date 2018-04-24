@@ -1,3 +1,5 @@
+import IndexController from './controllers/index'
+
 const API = {
   listsLoaded: false,
   tasksLoaded: false,
@@ -112,6 +114,7 @@ const API = {
 
   saveList (list) {
     console.log('save list', list)
+    IndexController.invalidateLists = true // rerender lists
     list.addon = 'tasks'
     list.kind = 'TaskList'
     if (!list.data) { list.data = {} }
@@ -119,8 +122,21 @@ const API = {
     if (typeof (list.data.active) === 'undefined') { list.data.active = true }
     if (typeof (list.data.show_fast_add) === 'undefined') { list.data.show_fast_add = true }
     const params = Object.assign({}, list, { data: JSON.stringify(list.data) })
-    if (list.id) { return window.tommy.api.updateFragment(list.id, params).then(API.addList) } else { return window.tommy.api.createFragment(params).then(API.addList) }
-    IndexController.invalidateLists = true // rerender lists
+    if (list.id) {
+      return window.tommy.api.updateFragment(list.id, params).then(API.addList)
+    }
+    else {
+      return window.tommy.api.createFragment(params).then(API.addList)
+    }
+  },
+
+  createDefaultList () {
+    console.log('creating deafult task list')
+    return API.saveList({ name: window.tommy.i18n.t('index.default-task-name') })
+  },
+
+  hasLists () {
+    return Object.keys(API.cache['lists']).length > 0
   },
 
   initPermissionSelects (page, permissionNames) {

@@ -14,8 +14,8 @@ function (app,util,config,api) {
 
                 // onComplete
                 if (!navigator.contacts) {
-                    contactSync.onError("Contacts sync not available.")
-                    reject("Contacts sync not available.")
+                    contactSync.onError(i18n.t('contacts.contactsync_not_available'))
+                    reject(i18n.t('contacts.contactsync_not_available'))
                     return
                 }
 
@@ -64,7 +64,7 @@ function (app,util,config,api) {
 
         onError: function (contactError) {
             if (!contactSync.silent)
-                app.f7.alert("Unable to import your contacts: " + contactError)
+                app.f7.alert(i18n.i18next.t('contacts.contactsync_unable_to_import') + ": " + contactError)
         },
 
         sync: function (onComplete) {
@@ -74,12 +74,12 @@ function (app,util,config,api) {
             return new Promise(function(resolve, reject) {
                 contactSync.init().then(function(contacts) {
                     if (!contacts.length) {
-                        reject('No contacts')
+                        reject(i18n.t('contacts.contactsync_no_contacts'))
                         return
                     }
 
                     if (!contactSync.silent)
-                        app.f7.showPreloader("Importing " + contactSync.contactList.length + " contacts")
+                        app.f7.showPreloader(i18n.t('contacts.contactsync_importing') + " " + contactSync.contactList.length + " " + i18n.t('contacts.contactsync_contacts'))
 
                     api.importContacts(JSON.stringify(contacts)).then(function(response) {
                         if (!contactSync.silent)

@@ -1,1 +1,1 @@
-Translations to Mason
+Translations in JS files

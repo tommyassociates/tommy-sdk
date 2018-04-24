@@ -71,7 +71,7 @@
             {{/if}}
             <span>
                 {{#if data.status}}
-                {{data.status}}
+                {{tasks__displayStatus data.status}}
                 {{else}}
                 {{t "index.unassigned" defaultValue="Unassigned"}}
                 {{/if}}

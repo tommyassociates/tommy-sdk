@@ -220,8 +220,9 @@ function(app, api,util,config,cache,util,i18n) {
             if (addon.views && addon.views.length) {
 
                 // If views exist load the locales also
-                if (addon.languages && addon.languages.length) {
-                    i18n.addEndpoint(addon.package, addon.file_base_url + 'locales', addon.languages, true)
+                // console.log(addon.locales)
+                if (addon.locales && addon.locales.length) {
+                    i18n.addNamespaceEndpoint(addon.package, addon.file_base_url + 'locales', addon.locales, true)
                 }
 
                 for (var i = 0; i < addon.views.length; i++) {
