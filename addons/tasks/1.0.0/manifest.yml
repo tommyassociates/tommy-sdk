@@ -11,11 +11,22 @@
     - en-US
     - zh-CN
   permissions:
+    # task_list_filters:
+    #   title: "Filter Tasks"
+    #   hint: "Select which tasks will appear in this list"
+    #   resource_type: "Fragment"
+    #   resource_kind: "TaskList"
+    #   operations:
+    #     - read
     task_list_read_access:
       title: "Who Can See List"
       hint: "Select who can view this list"
       resource_type: "Fragment"
       resource_kind: "TaskList"
+      private: true
+      roles:
+        - Team Manager
+        - Team Admin
       operations:
         - read
     task_list_edit_access:
@@ -23,6 +34,10 @@
       hint: "Select who can edit this list"
       resource_type: "Fragment"
       resource_kind: "TaskList"
+      private: true
+      roles:
+        - Team Manager
+        - Team Admin
       operations:
         - edit
     task_create_access:
@@ -30,6 +45,10 @@
       hint: "Select who can create tasks"
       resource_type: "Fragment"
       resource_kind: "Task"
+      private: true
+      roles:
+        - Team Manager
+        - Team Admin
       operations:
         - create
     task_edit_access:
@@ -37,6 +56,10 @@
       hint: "Select who can edit tasks"
       resource_type: "Fragment"
       resource_kind: "Task"
+      private: true
+      roles:
+        - Team Manager
+        - Team Admin
       operations:
         - edit
   views:

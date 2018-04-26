@@ -73,6 +73,24 @@ function (config,util,moment,i18n/*,i18n*/) {
                 return i18n.t(key, options.hash)
             })
 
+            t7.registerHelper('tScope', function (prefix, middle, suffix, options) {
+                var key = prefix
+                if (middle)
+                    key += '.' + middle
+                if (suffix)
+                    key += '.' + suffix
+                return i18n.t(key, options.hash)
+            })
+
+            t7.registerHelper('localStorage', function (key, defaultValue, options) {
+                if (localStorage.getItem(key))
+                    return localStorage.getItem(key)
+                else if (typeof defaultValue !== 'object')
+                    return defaultValue
+            })
+
+
+
             //
             /// String Manipulation
             //
@@ -81,8 +99,12 @@ function (config,util,moment,i18n/*,i18n*/) {
               return JSON.stringify(this)
             })
 
-            t7.registerHelper('capitalize', function (text) {
-                return util.capitalize(text)
+            t7.registerHelper('capitalize', function (str) {
+                return util.capitalize(str)
+            })
+
+            t7.registerHelper('chop', function (str) {
+                return str.slice(0, -1)
             })
 
             t7.registerHelper('isSelected', function (a, b) {
@@ -178,6 +200,13 @@ function (config,util,moment,i18n/*,i18n*/) {
                 if (part1 && typeof part1 !== 'object') { url += ('/' + part1) }
                 if (part2 && typeof part2 !== 'object') { url += ('/' + part2) }
                 return url + '?token=' + config.getSessionToken()
+            })
+
+            t7.registerHelper('teamMemberIconUrl', function (user_id, options) {
+                if (!user_id) return '#'
+                var path = config.getApiUrl() + 'team/members/' + user_id + '/avatar.png'
+                path += ('?token=' + config.getSessionToken())
+                return path
             })
 
             // Renders an avatar for a user, account or message object.

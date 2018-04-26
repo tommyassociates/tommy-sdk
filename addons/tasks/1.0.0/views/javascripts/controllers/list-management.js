@@ -1,15 +1,11 @@
 import API from '../api'
 
-//
-/// List Management Controller
-
 const ListManagementController = {
   init (page) {
     const $page = $$(page.container)
     const $nav = $$(page.navbarInnerContainer)
 
-        // console.log('edit list', list)
-    window.tommy.tplManager.renderInline('tasks__listManagementTemplate', API.cache['lists'], $page)
+    window.tommy.tplManager.renderInline('tasks__listManagementTemplate', API.getOrderedLists(), $page)
 
     $nav.find('a.save').on('click', ev => {
       const data = window.tommy.app.f7.formToJSON($page.find('form'))
@@ -27,6 +23,7 @@ const ListManagementController = {
       const list = API.cache['lists'][$this.data('list-id')]
       const active = $this.find('input[type="checkbox"]')[0].checked
 
+      console.log('save list order', list.name, list.data.order, index, list.data.active, active)
       if (list.data.order != index || list.data.active != active) {
         list.data.order = index
         list.data.active = active

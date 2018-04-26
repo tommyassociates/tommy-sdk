@@ -1,8 +1,5 @@
 import API from '../api'
 
-//
-/// Task Add Controller
-
 const TaskAddController = {
   init (page) {
     const $page = $$(page.container)

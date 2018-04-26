@@ -1,10 +1,9 @@
-<script id="tasks__permissionsTagSelectTemplate" type="text/template">
-  {{#each this}}
-  <div class="tag-select" data-searchbar="true" data-permission-name="{{name}}" data-page-title="{{title}}">
+<script id="tasks__tagSelectTemplate" type="text/template">
+  <div class="tag-select" data-searchbar="true" data-permission-name="{{name}}" data-page-title="{{tScope "permissions" name "title"}}">
     <ul>
-      <li class="item-divider">{{title}}</li>
+      <li class="item-divider">{{tScope "permissions" name "title"}}</li>
       <li>
-        <select multiple></select>
+        <select multiple class="toggle-save"></select>
         <a href="#" class="item-link tag-search">
           <div class="item-content">
             <div class="item-media"><i class="material-icons md-36">search</i></div>
@@ -18,5 +17,4 @@
     <ul class="tag-items">
     </ul>
   </div>
-  {{/each}}
 </script>

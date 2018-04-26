@@ -1,17 +1,14 @@
 define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
 
     var api = {
-        url: config.getApiUrl(),
-
         call: function(options) {
             return new Promise(function(resolve, reject) {
-                // if (showLoader !== false)
-                //     app.showLoader()
-                // options.url = config.getApiUrl()
-                // typeof(success) !== 'undefined' &&
 
                 // Get the cached object if available
-                if (options.method == 'GET' && options.cache && options.endpoint) {
+                if (typeof options.cache === 'undefined' && options.method == 'GET' && options.endpoint)
+                    options.cache = true
+
+                if (options.cache) {
                     var cachedResponse = cache.get('api', options.endpoint)
                     if (cachedResponse) {
                         console.log('[READ CACHE] api response', options.endpoint, cachedResponse)
@@ -20,9 +17,8 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
                     }
                 }
 
-                // Set the full URL
-                // options.url = options.url ? options.url : config.getApiUrl()
-                options.url = options.url || api.url // consig.getApiUrl()
+                // Set the request URL
+                options.url = options.url || config.getApiUrl() // api.url
                 if (options.endpoint)
                     options.url += options.endpoint
 
@@ -33,26 +29,17 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
                 if (Template7 &&
                     Template7.global &&
                     Template7.global.currentAddonInstall &&
-                    Template7.global.currentAddonInstall.package)
+                    Template7.global.currentAddonInstall.package) {
                     options.data['addon'] = Template7.global.currentAddonInstall.package
 
+                    // Set the Actor ID for managed calls
+                    if (Template7.global.currentActorId)
+                        options.data['actor_id'] = Template7.global.currentActorId
+                }
+
                 // Set the locale
-                // if (!options.locale)
-                //   options.data['locale'] = config.getLocale()
-
-                // Setup the Actor ID for managed calls.
-                // if (api.actorId) {
-                //     if (!options.data)
-                //         options.data = {}
-                //     options.data['actor_id'] = api.actorId
-                // }
-
-                // Setup the Actor ID for managed calls.
-                // if (api.actorId) {
-                //     if (!options.data)
-                //         options.data = {}
-                //     options.data['actor_id'] = api.actorId
-                // }
+                if (!options.locale)
+                    options.data['locale'] = config.getLocale()
 
                 // Make the XHR request
                 // console.log('api: request', options)
@@ -70,8 +57,6 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
                         console.log('[SET CACHE] api response', options.endpoint, response)
                     }
                     resolve(response)
-                    // if (showLoader !== false)
-                    //     app.hideLoader()
                 }, reject)
             })
         },
@@ -225,7 +210,7 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
         },
 
         getCurrentTeam: function(options) {
-            this.resetCache('team')
+            // this.resetCache('team')
             return this.call(Object.assign({
                 endpoint: 'team',
                 method: 'GET'

@@ -4,6 +4,7 @@
   },
   "index": {
     "title": "Tasks",
+    "title_user": "{{user}}'s Tasks",
     "add-task": "Add task",
     "cancel": "Cancel",
     "done": "Done",
@@ -16,7 +17,8 @@
   "list-edit": {
     "title": "Edit List",
     "name": "Name",
-    "show-fast-add-task": "Show Fast Add Task"
+    "show-fast-add-task": "Show Fast Add Task",
+    "delete-list": "Delete List"
   },
   "list-management": {
     "title": "List Management"
@@ -55,13 +57,18 @@
     "add_items": "Add items",
     "activity": "Activity",
     "created_a_task": "Created a task",
-    "changed_status_to": "Changed status to {{status}}"
+    "changed_status_to": "Changed status to {{status}}",
+    "enter_comment": "Enter comment"
   },
   "title": "Task Manager",
   "summary": "Manage your projects & tasks with ease.",
   "description": "Manage your projects & tasks with ease.",
   "developer": "Tommy Labs GmbH",
   "permissions": {
+    "filter_tasks": {
+      "title": "Filter Tasks",
+      "hint": "Select which tasks will appear on the list"
+    },
     "task_list_read_access": {
       "title": "Who Can See List",
       "hint": "Select who can view this list"

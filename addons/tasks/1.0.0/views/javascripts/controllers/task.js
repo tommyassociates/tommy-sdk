@@ -2,15 +2,20 @@ import API from '../api'
 
 const TaskController = {
   init (page) {
-    const task = API.cache['tasks'][page.query.task_fragment_id]
+    let task = API.cache['tasks'][page.query.task_fragment_id]
     const $page = $$(page.container)
     const $navbar = $$(page.navbarInnerContainer)
 
     console.log('init task details', task)
     window.tommy.tplManager.renderInline('tasks__taskDetailsTemplate', task, $page.parent())
 
-    $page.find('.task-menu-popover a').click(function () {
-      const command = $$(this).data('command')
+    $page.find('.task-menu-popover').on('popover:open', () => {
+      // BUG: popover shows offscreen on desktop, this fixes it
+      $$(window).trigger('resize')
+    })
+
+    $page.find('.task-menu-popover a').click(e => {
+      const command = $$(e.target).data('command')
 
       switch (command) {
         case 'add-checklist':
@@ -19,15 +24,21 @@ const TaskController = {
         case 'add-end-time':
           TaskController.renderDeadline(page)
           break
+        default:
+          alert('Unknown command: ' + command)
       }
 
       window.tommy.app.f7.closeModal()
     })
 
-    // Take title area
+    // Task title area
     // TODO: make into a reuasble module
     $page.find('.page-content').scroll(e => {
-      if (e.target.scrollTop > 100) { $navbar.addClass('with-title') } else { $navbar.removeClass('with-title') }
+      if (e.target.scrollTop > 100) {
+        $navbar.addClass('with-title')
+      } else {
+        $navbar.removeClass('with-title')
+      }
     })
 
     // Task status picker
@@ -41,7 +52,7 @@ const TaskController = {
     if (task.data.deadline) { TaskController.renderDeadline(page) }
 
     // Task activity
-    const myMessagebar = window.tommy.app.f7.messagebar('.messagebar', { maxHeight: 200 })
+    let myMessagebar = window.tommy.app.f7.messagebar('.messagebar', { maxHeight: 200 })
     $page.find('.add-comment').click(() => {
       TaskController.addActivity(page, 'comment', myMessagebar.value())
       myMessagebar.clear()
@@ -51,12 +62,13 @@ const TaskController = {
     // Task participants
     const $tagSelect = $page.find('.tag-select')
     let participants = []
-    if (task.data.participants) { participants = task.data.participants }
+    if (task.filters) { participants = task.filters }
+    console.log('init task participants', participants, $tagSelect.length)
     window.tommy.tplManager.renderInline('tasks__taskParticipantsTemplate', participants, $page)
     window.tommy.tagSelect.initWidget($tagSelect, participants, data => {
       console.log('task participants changed', data)
-      task.data.participants = data
-      window.tommy.tplManager.renderInline('tasks__taskParticipantsTemplate', task.data.participants, $page)
+      task.filters = data
+      window.tommy.tplManager.renderInline('tasks__taskParticipantsTemplate', task.filters, page.container)
       TaskController.enableSave(page, true)
     })
 
@@ -77,13 +89,17 @@ const TaskController = {
       TaskController.saveTask(page)
       TaskController.enableSave(page, false)
     })
+
+    TaskController.invalidate(page)
   },
 
   invalidate (page) {
     const task = API.cache['tasks'][page.query.task_fragment_id]
 
     // Page title must be set after animation
-    window.tommy.app.setPageTitle(task.name)
+    // window.tommy.app.setPageTitle(task.name)
+    const $navbar = $$(page.navbarInnerContainer)
+    $navbar.find('.center').text(task.name)
   },
 
   renderActivity (page) {
@@ -125,20 +141,9 @@ const TaskController = {
       })
 
       TaskController.renderChecklist(page)
-      // window.tommy.tplManager.renderInline('tasks__taskChecklistTemplate', task.data.checklist.items, $page)
     })
     $input.on('focusin', () => {
       TaskController.enableSave(page)
-      // if (!task.data.checklist)
-      //     task.data.checklist = {}
-      // if (!task.data.checklist.items)
-      //     task.data.checklist.items = []
-      // task.data.checklist.items.push({
-      //     text: $$(this).val(),
-      //     complete: false
-      // })
-      //
-      // window.tommy.tplManager.renderInline('tasks__taskChecklistTemplate', task.data.checklist.items, $page)
     })
     $page.find('.remove-checklist').click(() => {
       // TODO: confirm alert
@@ -178,6 +183,7 @@ const TaskController = {
     const task = API.cache['tasks'][page.query.task_fragment_id]
     const $page = $$(page.container)
 
+    console.log('render deadline', task.data.deadline)
     window.tommy.tplManager.renderInline('tasks__taskDeadlineTemplate', task.data.deadline, $page)
 
     const $input = $page.find('input.edit-task-deadline')
@@ -208,27 +214,48 @@ const TaskController = {
     })
   },
 
+  STATUS: [ 'Unassigned', 'Assigned', 'Processing', 'Completed', 'Closed', 'Archive Task', 'Cancel' ],
+
+  translateStatus (status) {
+    return window.tommy.i18n.t('status.' + window.tommy.util.underscore(status))
+  },
+
+  untranslateStatus (translatedStatus) {
+    for (let i = 0; i < TaskController.STATUS.length; i++) {
+      if (TaskController.translateStatus(TaskController.STATUS[i]) === translatedStatus)
+        return TaskController.STATUS[i]
+    }
+  },
+
+  translatedStatuses (translatedStatus) {
+    var statuses = []
+    for (let i = 0; i < TaskController.STATUS.length; i++) {
+      statuses.push(TaskController.translateStatus(TaskController.STATUS[i]))
+    }
+    return statuses
+  },
+
   initStatusPicker (page) {
     const task = API.cache['tasks'][page.query.task_fragment_id]
-    const STATUS = [
-      'Unassigned', 'Assigned', 'Processing', 'Completed', 'Closed', 'Archive Task', 'Cancel'
-    ]
+    let initial = task.data.status ? TaskController.translateStatus(task.data.status) : undefined
 
     return window.tommy.app.f7.picker({
       input: $$(page.container).find('.task-status-picker'),
-      value: [ task.data.status ],
+      value: [ initial ],
       convertToPopover: false,
       cols: [
         {
           textAlign: 'center',
-          values: STATUS
+          values: TaskController.translatedStatuses()
         }
       ],
       onClose (p) {
-        const status = p.value[0]
+        const translatedStatus = p.value[0]
+        const status = TaskController.untranslateStatus(p.value[0])
         if (status == task.data.status) { return }
         task.data.status = status
-        TaskController.addActivity(page, 'status', `Changed status to ${task.data.status}`)
+        TaskController.addActivity(page, 'status',
+            window.tommy.i18n.t('task.changed_status_to', {status: translatedStatus}))
         TaskController.saveTask(page)
       }
     })

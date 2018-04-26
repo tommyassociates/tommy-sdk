@@ -26,38 +26,12 @@ function (util,api,app) {
 
                 // Handle change events
                 $tagSelect.on('change', function() {
-                    var data = []; // [ 'Member', 'Kam Low', 1 ]];
+                    var data = [];
                     $select.find('option:checked').each(function() {
                         var item = $$(this).dataset()
-                        // console.log($$(this).html(), item)
-                        data.push(item) //[item.type, this.value, item.id])
+                        // console.log('tag select item', $$(this).html(), item)
+                        data.push(item)
                     })
-
-                    // data = {
-                    //   user_ids: [],
-                    //   roles: [],
-                    //   locations: [],
-                    //   tags: []
-                    // }
-                    //
-                    // $select.find('option:checked').each(function() {
-                    //     var item = $$(this).dataset()
-                    //
-                    //     switch (item.type) {
-                    //         case 'Member':
-                    //             data.user_ids.push(item.id)
-                    //             break;
-                    //         case 'Role':
-                    //             data.roles.push(item.value)
-                    //             break;
-                    //         case 'Location':
-                    //             data.locations.push(item.value)
-                    //             break;
-                    //         case 'Tag':
-                    //             data.tags.push(item.value)
-                    //             break;
-                    //     }
-                    // })
 
                     if (onChange)
                         onChange(data)
@@ -136,8 +110,11 @@ function (util,api,app) {
 
             // Find related view
             var view = tagSelect.parents('.' + app.f7.params.viewClass)
-            if (view.length === 0) return;
-            view = view[0].f7View;
+            // if (view.length === 0) return;
+            if (view.length === 0)
+                view = window.tommy.f7view
+            else
+                view = view[0].f7View;
 
             // Parameters
             var openIn = tagSelect.attr('data-open-in') || app.f7.params.openIn;
@@ -146,7 +123,8 @@ function (util,api,app) {
             }
             else if (openIn === 'picker') {
                 if ($$('.picker-modal.modal-in').length > 0 && !reLayout){
-                    if (tagSelect[0].f7TagSelectPicker !== $$('.picker-modal.modal-in:not(.modal-out)')[0]) app.f7.closeModal($$('.picker-modal.modal-in:not(.modal-out)'))
+                    if (tagSelect[0].f7TagSelectPicker !== $$('.picker-modal.modal-in:not(.modal-out)')[0])
+                        app.f7.closeModal($$('.picker-modal.modal-in:not(.modal-out)'))
                     else return;
                 }
             }
@@ -156,22 +134,22 @@ function (util,api,app) {
 
             var tagSelectData = tagSelect.dataset()
             var pageTitle = tagSelectData.pageTitle || tagSelect.find('.item-title').text()
-            // var backText = tagSelectData.backText || app.f7.params.tagSelectBackText;
-            // var closeText;
-            // if (openIn === 'picker') {
-            //     closeText = tagSelectData.pickerCloseText || tagSelectData.backText || app.f7.params.tagSelectPickerCloseText ;
-            // }
-            // else {
-            //     closeText = tagSelectData.popupCloseText || tagSelectData.backText || app.f7.params.tagSelectPopupCloseText ;
-            // }
-            var backOnSelect = tagSelectData.backOnSelect !== undefined ? tagSelectData.backOnSelect : app.f7.params.tagSelectBackOnSelect;
-            var formTheme = tagSelectData.formTheme || app.f7.params.tagSelectFormTheme;
-            var navbarTheme = tagSelectData.navbarTheme || app.f7.params.tagSelectNavbarTheme;
-            var toolbarTheme = tagSelectData.toolbarTheme || app.f7.params.tagSelectToolbarTheme;
+            var backText = tagSelectData.backText || app.f7.params.smartSelectBackText;
+            var closeText;
+            if (openIn === 'picker') {
+                closeText = tagSelectData.pickerCloseText || tagSelectData.backText || app.f7.params.smartSelectPickerCloseText ;
+            }
+            else {
+                closeText = tagSelectData.popupCloseText || tagSelectData.backText || app.f7.params.smartSelectPopupCloseText ;
+            }
+            var backOnSelect = tagSelectData.backOnSelect !== undefined ? tagSelectData.backOnSelect : app.f7.params.smartSelectBackOnSelect;
+            var formTheme = tagSelectData.formTheme || app.f7.params.smartSelectFormTheme;
+            var navbarTheme = tagSelectData.navbarTheme || app.f7.params.smartSelectNavbarTheme;
+            var toolbarTheme = tagSelectData.toolbarTheme || app.f7.params.smartSelectToolbarTheme;
             var virtualList = tagSelectData.virtualList;
             var virtualListHeight = tagSelectData.virtualListHeight;
             var material = app.f7.params.material;
-            var pickerHeight = tagSelectData.pickerHeight || app.f7.params.tagSelectPickerHeight;
+            var pickerHeight = tagSelectData.pickerHeight || app.f7.params.smartSelectPickerHeight;
 
             // Collect all options/values
             var select = tagSelect.find('select')[0];
@@ -213,7 +191,8 @@ function (util,api,app) {
 
                 values.push({
                     value: option[0].value,
-                    type: $$(option).data('type'), // KAM: added
+                    context: $$(option).data('context'), // KAM: added
+                    label: $$(option).data('label'), // KAM: added
                     text: option[0].textContent.trim(),
                     selected: option[0].selected,
                     group: optionGroup,
@@ -272,7 +251,7 @@ function (util,api,app) {
                                 '{{/if}}' +
                                 '<div class="item-inner">' +
                                     '<div class="item-title{{#if color}} color-{{color}}{{/if}}">{{text}}</div>' +
-                                    '{{#if type}}<div class="item-after">{{type}}</div>{{/if}}' + // KAM: added
+                                    '{{#if label}}<div class="item-after">{{label}}</div>{{/if}}' + // KAM: added
                                 '</div>' +
                             '{{/if}}' +
                         '</label>' +
@@ -285,7 +264,6 @@ function (util,api,app) {
             var inputsHTML = '';
             if (!virtualList) {
                 for (var j = 0; j < values.length; j++) {
-                    // console.log('VALUE', values[j])
                     inputsHTML += tagSelectItemTemplate(values[j])
                 }
             }
@@ -296,7 +274,7 @@ function (util,api,app) {
 
             if (openIn === 'picker') {
                 if (!app.f7._compiledTemplates.tagSelectToolbar) {
-                    app.f7._compiledTemplates.tagSelectToolbar = app.t7.compile(app.f7.params.tagSelectToolbarTemplate ||
+                    app.f7._compiledTemplates.tagSelectToolbar = app.t7.compile(app.f7.params.smartSelectToolbarTemplate ||
                         '<div class="toolbar {{#if toolbarTheme}}theme-{{toolbarTheme}}{{/if}}">' +
                           '<div class="toolbar-inner">' +
                             '<div class="left"></div>' +
@@ -317,7 +295,7 @@ function (util,api,app) {
             else {
                 // Navbar HTML
                 if (!app.f7._compiledTemplates.tagSelectNavbar) {
-                    app.f7._compiledTemplates.tagSelectNavbar = app.t7.compile(app.f7.params.tagSelectNavbarTemplate ||
+                    app.f7._compiledTemplates.tagSelectNavbar = app.t7.compile(app.f7.params.smartSelectNavbarTemplate ||
                         '<div class="navbar {{#if navbarTheme}}theme-{{navbarTheme}}{{/if}}">' +
                             '<div class="navbar-inner">' +
                                 '{{leftTemplate}}' +
@@ -328,8 +306,8 @@ function (util,api,app) {
                 }
                 navbarHTML = app.f7._compiledTemplates.tagSelectNavbar({
                     pageTitle: pageTitle,
-                    // backText: backText,
-                    // closeText: closeText,
+                    backText: backText,
+                    closeText: closeText,
                     openIn: openIn,
                     navbarTheme: navbarTheme,
                     inPopup: openIn === 'popup',
@@ -357,7 +335,7 @@ function (util,api,app) {
             // Page Layout
             var pageName = 'tag-select-' + inputName;
 
-            var useSearchbar = typeof tagSelect.data('searchbar') === 'undefined' ? app.f7.params.tagSelectSearchbar : (tagSelect.data('searchbar') === 'true' ? true : false)
+            var useSearchbar = typeof tagSelect.data('searchbar') === 'undefined' ? app.f7.params.smartSelectSearchbar : (tagSelect.data('searchbar') === 'true' ? true : false)
             var searchbarPlaceholder, searchbarCancel;
 
             if (useSearchbar) {
@@ -498,10 +476,10 @@ function (util,api,app) {
                     $select.trigger('change')
                     // tagSelect.find('.item-after').text(optionText.join(', '))
                     if (backOnSelect && inputType === 'radio') {
-                        // if (openIn === 'popup') app.f7.closeModal(popup)
-                        // else if (openIn === 'picker') app.f7.closeModal(picker)
-                        // else view.router.back()
-                        view.router.back()
+                        if (openIn === 'popup') app.f7.closeModal(popup)
+                        else if (openIn === 'picker') app.f7.closeModal(picker)
+                        else view.router.back()
+                        // view.router.back()
                     }
                 })
             }
@@ -514,77 +492,77 @@ function (util,api,app) {
                 }
             }
 
-            // if (openIn === 'popup') {
-            //     if (reLayout) {
-            //         popup = $$('.popup.tag-select-popup .view')
-            //         popup.html(pageHTML)
-            //     }
-            //     else {
-            //         popup = app.f7.popup(
-            //             '<div class="popup tag-select-popup tag-select-popup-' + inputName + '">' +
-            //                 '<div class="view navbar-fixed">' +
-            //                     pageHTML +
-            //                 '</div>' +
-            //             '</div>'
-            //             )
-            //         popup = $$(popup)
-            //     }
-            //     app.f7.initPage(popup.find('.page'))
-            //     handleInputs(popup)
-            // }
-            // else if (openIn === 'picker') {
-            //     if (reLayout) {
-            //         picker = $$('.picker-modal.tag-select-picker .view')
-            //         picker.html(pageHTML)
-            //     }
-            //     else {
-            //         picker = app.f7.pickerModal(
-            //             '<div class="picker-modal tag-select-picker tag-select-picker-' + inputName + '"' + (pickerHeight ? ' style="height:' + pickerHeight + '"' : '') + '>' +
-            //                 toolbarHTML +
-            //                 '<div class="picker-modal-inner">' +
-            //                     '<div class="view">' +
-            //                         pageHTML +
-            //                     '</div>' +
-            //                 '</div>' +
-            //             '</div>'
-            //             )
-            //         picker = $$(picker)
-            //
-            //         // Scroll To Input
-            //         scrollToInput()
-            //
-            //         // Close On Click
-            //         $$('html').on('click', closeOnHTMLClick)
-            //
-            //         // On Close
-            //         picker.once('close', function () {
-            //             // Reset linked picker
-            //             tagSelect[0].f7TagSelectPicker = undefined;
-            //
-            //             // Detach html click
-            //             $$('html').off('click', closeOnHTMLClick)
-            //
-            //             // Restore page padding bottom
-            //             tagSelect.parents('.page-content').css({paddingBottom: ''})
-            //         })
-            //
-            //         // Link Picker
-            //         tagSelect[0].f7TagSelectPicker = picker[0];
-            //     }
-            //
-            //     // Init Page
-            //     app.f7.initPage(picker.find('.page'))
-            //
-            //     // Attach events
-            //     handleInputs(picker)
-            // }
-            // else {
+            if (openIn === 'popup') {
+                if (reLayout) {
+                    popup = $$('.popup.tag-select-popup .view')
+                    popup.html(pageHTML)
+                }
+                else {
+                    popup = app.f7.popup(
+                        '<div class="popup tag-select-popup tag-select-popup-' + inputName + '">' +
+                            '<div class="view navbar-fixed">' +
+                                pageHTML +
+                            '</div>' +
+                        '</div>'
+                        )
+                    popup = $$(popup)
+                }
+                app.f7.initPage(popup.find('.page'))
+                handleInputs(popup)
+            }
+            else if (openIn === 'picker') {
+                if (reLayout) {
+                    picker = $$('.picker-modal.tag-select-picker .view')
+                    picker.html(pageHTML)
+                }
+                else {
+                    picker = app.f7.pickerModal(
+                        '<div class="picker-modal tag-select-picker tag-select-picker-' + inputName + '"' + (pickerHeight ? ' style="height:' + pickerHeight + '"' : '') + '>' +
+                            toolbarHTML +
+                            '<div class="picker-modal-inner">' +
+                                '<div class="view">' +
+                                    pageHTML +
+                                '</div>' +
+                            '</div>' +
+                        '</div>'
+                        )
+                    picker = $$(picker)
+
+                    // Scroll To Input
+                    scrollToInput()
+
+                    // Close On Click
+                    $$('html').on('click', closeOnHTMLClick)
+
+                    // On Close
+                    picker.once('close', function () {
+                        // Reset linked picker
+                        tagSelect[0].f7TagSelectPicker = undefined;
+
+                        // Detach html click
+                        $$('html').off('click', closeOnHTMLClick)
+
+                        // Restore page padding bottom
+                        tagSelect.parents('.page-content').css({paddingBottom: ''})
+                    })
+
+                    // Link Picker
+                    tagSelect[0].f7TagSelectPicker = picker[0];
+                }
+
+                // Init Page
+                app.f7.initPage(picker.find('.page'))
+
+                // Attach events
+                handleInputs(picker)
+            }
+            else {
                 $$(document).once('pageInit', '.tag-select-page', pageInit)
                 view.router.load({
                     content: pageHTML,
                     reload: reLayout ? true : undefined
                 })
-            // }
+            }
         },
 
         _clearAllSelectedTagItems: function (tagSelect) {

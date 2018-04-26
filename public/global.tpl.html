@@ -221,3 +221,9 @@
     </ul>
   </div>
 </script>
+
+<script id="teamMemberSelectOptionsTemplate" type="text/template">
+  {{#each this}}
+  <option value="{{user_id}}" data-option-image="{{icon_url}}" {{#if selected}}selected{{/if}}>{{first_name}} {{last_name}} ({{user_id}})</option>
+  {{/each}}
+</script>

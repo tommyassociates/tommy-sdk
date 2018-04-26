@@ -204,13 +204,17 @@ function(Framework7,TH,config) { //,Framework73D
             app.f7.onPageAfterAnimation('*', function(page){
                 var $page = $$(page.container)
                 if ($page.hasClass('with-toggle-save')) {
-                    $page.once('input change', '.toggle-save', function() {
+                    var enableSave = function() {
                         var $button = $$(page.navbarInnerContainer).find('.save')
+                        if ($button.hasClass('active'))
+                            return
                         $button.addClass('active')
                         $button.once('click', function() {
                             $button.removeClass('active')
                         })
-                    })
+                    }
+                    $page.on('input change', '.toggle-save', enableSave)
+                    $page.on('sortable:sort', enableSave)
                 }
             })
         },

@@ -12,39 +12,101 @@ const API = {
     }
   },
 
+  getOrderedLists () {
+    const lists = Object.values(API.cache['lists'])
+    if (!lists.length) return []
+    return lists.sort(function(a, b) {
+      return a.data.order - b.data.order // ascending order
+    })
+  },
+
   addTask (item) {
     API.cache['tasks'][item.id] = item
-    // console.log('task added', item)
+    console.log('task added', item)
   },
 
   addTasks (items) {
     API.tasksLoaded = true
     if (items && items.length) {
       for (let i = 0; i < items.length; i++) {
-        API.addTask(items[i])
+        if (Array.isArray(items[i]))
+          API.addTasks(items[i])
+        else
+          API.addTask(items[i])
       }
     }
   },
 
   getListTasks (listId) {
+    const list = API.cache['lists'][listId]
     const tasks = []
-    let task
     for (const taskId in API.cache['tasks']) {
-      task = API.cache['tasks'][taskId]
-      if (task.parent_id == listId) { tasks.push(task) }
+      let task = API.cache['tasks'][taskId]
+
+      if (list.filters && task.filters) {
+        let taskTags = task.filters.map(x => x.name)
+        let listTags = list.filters.map(x => x.name)
+        let matches = taskTags.filter(x => listTags.indexOf(x) !== -1)
+        console.log('should add task to list', task.name, list.name, matches)
+
+        if (matches.length) {
+          tasks.push(task)
+        }
+      }
     }
+
+    // Back when life was simple:
+    // let task
+    // for (const taskId in API.cache['tasks']) {
+    //   task = API.cache['tasks'][taskId]
+    //   if (task.parent_id == listId) { tasks.push(task) }
+    // }
     return tasks
   },
 
-  loadTasks (params) {
-    console.log('load tasks', params)
+  loadTasks () { // params
+    console.log('load tasks') // params
 
-    params = Object.assign({
-      addon: 'tasks',
-      kind: 'Task'
-    }, params)
-    return window.tommy.api.getFragments(params).then(API.addTasks)
+    let name, tags, params, request, promises = []
+    for (const listId in API.cache['lists']) {
+      const list = API.cache['lists'][listId]
+      name = window.tommy.config.getCurrentUserName()
+      tags = [ name ]
+      console.log(window.tommy.config.getCurrentUser())
+      if (list.data && list.filters) {
+        for (let i = 0; i < list.filters.length; i++) {
+          tags.push(list.filters[i].name)
+        }
+      }
+
+      params = {
+        addon: 'tasks',
+        kind: 'Task',
+        tags: tags
+      }
+      request = window.tommy.api.getFragments(params) //.then(API.addTasks)
+      promises.push(request)
+    }
+
+    return Promise.all(promises).then(API.addTasks)
+
+    // Back when life was simple:
+    // params = Object.assign({
+    //   addon: 'tasks',
+    //   kind: 'Task'
+    // }, params)
+    // return window.tommy.api.getFragments(params).then(API.addTasks)
   },
+
+  // loadTasks (params) {
+  //   console.log('load tasks', params)
+  //
+  //   params = Object.assign({
+  //     addon: 'tasks',
+  //     kind: 'Task'
+  //   }, params)
+  //   return window.tommy.api.getFragments(params).then(API.addTasks)
+  // },
 
   addTaskActivity (task, type, text) {
     const currentUser = window.tommy.config.getCurrentUser()
@@ -57,7 +119,6 @@ const API = {
     }
 
     if (!task.data) { task.data = {} }
-    console.log(task)
     if (!task.data.activity) { task.data.activity = [] }
     task.data.activity.unshift(activity)
 
@@ -70,14 +131,14 @@ const API = {
       alert('Task name must be set')
       return
     }
-    if (!task.parent_id) {
-      alert('Task must belong to a list')
-      return
-    }
+    // if (!task.parent_id) {
+    //   alert('Task must belong to a list')
+    //   return
+    // }
 
     task.addon = 'tasks'
     task.kind = 'Task'
-    if (!task.id) { API.addTaskActivity(task, 'status', 'Created a task') }
+    if (!task.id) { API.addTaskActivity(task, 'status', window.tommy.i18n.t('task.created_a_task')) }
     const params = Object.assign({}, task, { data: JSON.stringify(task.data) })
     if (task.id) { return window.tommy.api.updateFragment(task.id, params).then(API.addTask) } else { return window.tommy.api.createFragment(params).then(API.addTask) }
   },
@@ -132,7 +193,22 @@ const API = {
 
   createDefaultList () {
     console.log('creating deafult task list')
-    return API.saveList({ name: window.tommy.i18n.t('index.default-task-name') })
+    var list = {
+      name: window.tommy.i18n.t('index.default-task-name'),
+      data: {
+        default: true
+      },
+      // Default list filters show tasks tagged with current user
+      filters: [
+        {
+          context: 'members',
+          name: window.tommy.config.getCurrentUserName(),
+          resource_type: 'User',
+          resource_id: window.tommy.config.getCurrentUserId()
+        }
+      ]
+    }
+    return API.saveList(list)
   },
 
   hasLists () {
@@ -143,8 +219,10 @@ const API = {
     window.tommy.api.getInstalledAddonPermissions('tasks', { cache: true }).then(permissions => {
       console.log('installed addon permissions', permissions)
       permissions = permissions.filter(x => permissionNames.indexOf(x.name) !== -1);
-      window.tommy.tplManager.renderInline('tasks__permissionsTagSelectTemplate', permissions, page.container)
+      // window.tommy.tplManager.renderInline('tasks__tagSelectTemplate', permissions, page.container)
       for (var i = 0; i < permissions.length; i++) {
+        console.log('init permissions', permissions[i])
+        window.tommy.tplManager.appendInline('tasks__tagSelectTemplate', permissions[i], page.container)
         API.initTagSelect(page, permissions[i])
       }
     })
@@ -161,6 +239,10 @@ const API = {
         filters: JSON.stringify(data)
       })
     })
+  },
+
+  isTablet () {
+    return window.innerWidth >= 630
   }
 }
 

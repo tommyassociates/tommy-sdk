@@ -98,17 +98,16 @@
             </li>
             -->
         </ul>
-        <div data-template="tasks__permissionsTagSelectTemplate"></div>
+        <div data-template="tasks__tagSelectTemplate"></div>
     </div>
 </script>
 
-<script id="tasks__permissionsTagSelectTemplate" type="text/template">
-  {{#each this}}
-  <div class="tag-select" data-searchbar="true" data-permission-name="{{name}}" data-page-title="{{title}}">
+<script id="tasks__tagSelectTemplate" type="text/template">
+  <div class="tag-select" data-searchbar="true" data-permission-name="{{name}}" data-page-title="{{tScope "permissions" name "title"}}">
     <ul>
-      <li class="item-divider">{{title}}</li>
+      <li class="item-divider">{{tScope "permissions" name "title"}}</li>
       <li>
-        <select multiple></select>
+        <select multiple class="toggle-save"></select>
         <a href="#" class="item-link tag-search">
           <div class="item-content">
             <div class="item-media"><i class="material-icons md-36">search</i></div>
@@ -122,7 +121,6 @@
     <ul class="tag-items">
     </ul>
   </div>
-  {{/each}}
 </script>
 
 <script id="tasks__listsTemplate" type="text/template">
@@ -171,9 +169,9 @@
     {{#each this}}
 
     {{#if_contains data.status "Completed,Closed,Archive Task,Cancel"}}
-    <a href="{{addonAssetUrl "views/task.html"}}&task_fragment_id={{id}}" class="card color-gray done">
+    <a data-href="{{addonAssetUrl "views/task.html"}}&task_fragment_id={{id}}" class="card task-card color-gray done">
     {{else}}
-    <a href="{{addonAssetUrl "views/task.html"}}&task_fragment_id={{id}}" class="card">
+    <a data-href="{{addonAssetUrl "views/task.html"}}&task_fragment_id={{id}}" class="card task-card">
     {{/if_contains}}
         <!-- <a href="#" class="card color-gray done"> -->
         <div class="card-content">
@@ -352,39 +350,19 @@
                 </li>
                 -->
             </ul>
-            <div data-template="tasks__permissionsTagSelectTemplate"></div>
+            <div data-template="tasks__tagSelectTemplate"></div>
         </div>
     </form>
-    <div class="list-block list-block-custom">
-        <ul>
-            <li>
-                <a href="#" class="item-link list-button color-custom delete-list">Delete List</a>
-            </li>
-        </ul>
-    </div>
-</script>
 
-<script id="tasks__permissionsTagSelectTemplate" type="text/template">
-  {{#each this}}
-  <div class="tag-select" data-searchbar="true" data-permission-name="{{name}}" data-page-title="{{title}}">
-    <ul>
-      <li class="item-divider">{{title}}</li>
-      <li>
-        <select multiple></select>
-        <a href="#" class="item-link tag-search">
-          <div class="item-content">
-            <div class="item-media"><i class="material-icons md-36">search</i></div>
-            <div class="item-inner">
-              <div class="item-title">{{t "common.search_members_tags" defaultValue="Search Members, Tags"}}</div>
-            </div>
-          </div>
-        </a>
-      </li>
-    </ul>
-    <ul class="tag-items">
-    </ul>
-  </div>
-  {{/each}}
+    {{#if_compare data.default "!==" true}}
+        <div class="list-block list-block-custom">
+            <ul>
+                <li>
+                    <a href="#" class="item-link list-button color-custom delete-list">{{t "list-edit.delete-list" defaultValue="Delete List"}}</a>
+                </li>
+            </ul>
+        </div>
+    {{/if_compare}}
 </script>
 
 <script id="tasks__listManagementTemplate" type="text/template">
@@ -563,7 +541,7 @@
                 <img src="{{addonAssetUrl "views/images/Page1.png"}}" srcset="{{addonAssetUrl "views/images/Page1@2x.png"}} 2x,{{addonAssetUrl "views/images/Page1@3x.png"}} 3x">
             </a>
             -->
-            <textarea placeholder="Enter comment"></textarea>
+            <textarea placeholder="{{t "task.enter_comment" defaultValue="Enter comment"}}"></textarea>
             <a href="#" class="link add-comment">{{t "task.send" defaultValue="Send"}}</a>
         </div>
     </div>
@@ -596,7 +574,7 @@
         </div>
         -->
 
-        <div class="tag-select">
+        <div class="tag-select" data-searchbar="true" data-open-in="picker">
           <select multiple></select>
           <div data-template="tasks__taskParticipantsTemplate"></div>
         </div>
@@ -652,6 +630,7 @@
         </div>
         -->
     </div>
+
 </script>
 
 <script id="tasks__taskParticipantsTemplate" type="text/template">
@@ -663,12 +642,12 @@
                     <div class="item-inner">
                         <img src="{{@global.user.icon_url}}" class="circle item open-popover" data-popover=".task-popover">
                         {{#each this}}
-                            {{#if_compare type "==" "Member"}}
-                                <img src="{{icon}}" class="circle item open-popover" data-popover=".task-popover">
+                            {{#if_compare context "==" "members"}}
+                                <img src="{{teamMemberIconUrl resource_id}}" class="circle item open-popover" data-popover=".task-popover">
                             {{else}}
                                 <div class="chip item">
                                     <div class="chip-media">
-                                        <img src="/lib/assets/icons/{{lowerCase type}}.png" srcset="/lib/assets/icons/{{lowerCase type}}@2x.png 2x,/lib/assets/icons/{{lowerCase type}}@3x.png 3x">
+                                        <img src="/tommy/assets/icons/{{chop context}}.png" srcset="/tommy/assets/icons/{{chop context}}@2x.png 2x,/tommy/assets/icons/{{chop context}}@3x.png 3x">
                                     </div>
                                     <div class="chip-label">{{name}}</div>
                                 </div>
@@ -773,30 +752,6 @@
                 </div>
             </li>
             {{/each}}
-            <!--
-            <li>
-                <div class="item-content checklist-item">
-                    <div class="item-media">
-                        <img src="{{addonAssetUrl "views/images/slice14.png"}}" srcset="{{addonAssetUrl "views/images/slice14@2x.png"}} 2x,{{addonAssetUrl "views/images/slice14.png"}} 3x">
-                        <img src="{{addonAssetUrl "views/images/slice15.png"}}" srcset="{{addonAssetUrl "views/images/slice15@2x.png"}} 2x,{{addonAssetUrl "views/images/slice15.png"}} 3x">
-                    </div>
-                    <div class="item-inner">
-                        <div>List itemsList itemsList itemsList itemsList itemsList items</div>
-                    </div>
-                </div>
-            </li>
-            <li>
-                <div class="item-content checklist-item checked">
-                    <div class="item-media">
-                        <img src="{{addonAssetUrl "views/images/slice14.png"}}" srcset="{{addonAssetUrl "views/images/slice14@2x.png"}} 2x,{{addonAssetUrl "views/images/slice14.png"}} 3x">
-                        <img src="{{addonAssetUrl "views/images/slice15.png"}}" srcset="{{addonAssetUrl "views/images/slice15@2x.png"}} 2x,{{addonAssetUrl "views/images/slice15.png"}} 3x">
-                    </div>
-                    <div class="item-inner">
-                        <div>List items</div>
-                    </div>
-                </div>
-            </li>
-            -->
             <li class="add-checklist-item-wrap">
                 <div class="item-content">
                     <div class="item-media">
@@ -843,62 +798,6 @@
                 </div>
             </li>
             {{/each}}
-            <!--
-            <li>
-                <div class="item-content">
-                    <div class="item-media">
-                        <img src="{{addonAssetUrl "views/images/slice11.png"}}" srcset="{{addonAssetUrl "views/images/slice11@2x.png"}} 2x,{{addonAssetUrl "views/images/slice11.png"}} 3x">
-                    </div>
-                    <div class="item-inner">
-                        <div class="item-title-row">
-                            <div class="item-title">Kevin</div>
-                            <div class="item-after">1 minutes ago</div>
-                        </div>
-                        <div class="item-subtitle">This is my comment</div>
-                    </div>
-                </div>
-            </li>
-            <li>
-                <div class="item-content">
-                    <div class="item-media">
-                        <img src="{{addonAssetUrl "views/images/slice11.png"}}" srcset="{{addonAssetUrl "views/images/slice11@2x.png"}} 2x,{{addonAssetUrl "views/images/slice11.png"}} 3x">
-                    </div>
-                    <div class="item-inner">
-                        <div class="item-title-row">
-                            <div class="item-title">Kevin</div>
-                            <div class="item-after">5 minutes ago</div>
-                        </div>
-                        <div class="item-text">
-                            <div>
-                                <img src="https://placeimg.com/40/40/nature">
-                                000.png
-                            </div>
-                            <div>
-                                <img src="https://placeimg.com/40/40/animals">
-                                111.png
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-            </li>
-            <li>
-                <div class="item-content">
-                    <div class="item-media">
-                        <img src="{{addonAssetUrl "views/images/slice7.png"}}" srcset="{{addonAssetUrl "views/images/slice7@2x.png"}} 2x,{{addonAssetUrl "views/images/slice7.png"}} 3x">
-                    </div>
-                    <div class="item-inner">
-                        <div class="item-title-row">
-                            <div class="item-title">
-                                Kevin
-                                <span>Created a task</span>
-                            </div>
-                            <div class="item-after">Sep 1, 2017</div>
-                        </div>
-                    </div>
-                </div>
-            </li>
-            -->
         </ul>
     </div>
 </script>

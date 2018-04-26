@@ -44,9 +44,9 @@
     {{#each this}}
 
     {{#if_contains data.status "Completed,Closed,Archive Task,Cancel"}}
-    <a href="{{addonAssetUrl "views/task.html"}}&task_fragment_id={{id}}" class="card color-gray done">
+    <a data-href="{{addonAssetUrl "views/task.html"}}&task_fragment_id={{id}}" class="card task-card color-gray done">
     {{else}}
-    <a href="{{addonAssetUrl "views/task.html"}}&task_fragment_id={{id}}" class="card">
+    <a data-href="{{addonAssetUrl "views/task.html"}}&task_fragment_id={{id}}" class="card task-card">
     {{/if_contains}}
         <!-- <a href="#" class="card color-gray done"> -->
         <div class="card-content">

@@ -1,7 +1,6 @@
 import API from '../api'
 import IndexController from './index'
 
-
 const ListEditController = {
   init (page) {
     const list = API.cache['lists'][page.query.list_fragment_id]
@@ -11,6 +10,7 @@ const ListEditController = {
     console.log('edit list', list)
     window.tommy.tplManager.renderInline('tasks__listEditTemplate', list, $page)
 
+    ListEditController.initListFilters(page, list)
     API.initPermissionSelects(page, ['task_list_read_access', 'task_list_edit_access'])
 
     $nav.find('a.save').on('click', ev => {
@@ -24,6 +24,21 @@ const ListEditController = {
       IndexController.invalidateLists = true
       window.tommy.app.f7view.router.back()
       ev.preventDefault()
+    })
+  },
+
+  initListFilters (page, list) {
+    // if (!list.filters)
+    //     list.filters = []
+    let object = {
+      title: window.tommy.i18n.t('parmissions.filter_tasks.title'),
+      name: 'filter_tasks'
+    }
+    var $tagSelect = window.tommy.tplManager.appendInline('tasks__tagSelectTemplate', object, page.container)
+    console.log('init filter select', list.filters)
+    window.tommy.tagSelect.initWidget($tagSelect, list.filters, function(data) {
+      console.log('save filter tags', data)
+      list.filters = data
     })
   },
 
