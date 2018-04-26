@@ -34,6 +34,9 @@ function(util,xhr,app,config,api,addons,TM) {
         launchAddonView: function(url, package, view) {
             var addon = addons.getAddon(package)
 
+            // Set the currentActorId so API requests come from the right user.
+            Template7.global.currentActorId = localStorage.getItem('actorId')
+
             // The addon needs to be uploaded to the sandbox and installed for
             // the current account in order for many API methods to function.
             // Run the necessary checks and try to install the addon not already

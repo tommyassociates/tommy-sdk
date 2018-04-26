@@ -17,6 +17,27 @@ function(util,config,api,addons,TM,TH,appCtrl) {
                 localStorage.setItem('defaultView', value)
                 console.log('set default addon view', value)
             })
+
+            api.getCurrentTeamMembers().then(function(response) {
+                console.log('settingsCtrl: loadTeamMembers: ', response)
+                var currentActorId = localStorage.getItem('actorId')
+                if (currentActorId) {
+                    for (var i = 0; i < response.length; i++) {
+                        if (response[i].user_id == currentActorId)
+                            response[i].selected = true
+                    }
+                }
+
+                // , $page.find('select[name="actor-select"]')
+                TM.renderInline('teamMemberSelectOptionsTemplate', response)
+
+                // $page.on('change', 'select[name="team-member"]', function(event) {
+                //     var value = $$(this).val()
+                //     localStorage.setItem('actorId', value)
+                //     console.log('set current actor', value)
+                // })
+            })
+            // actor-select
         },
 
     };

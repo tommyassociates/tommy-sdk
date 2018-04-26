@@ -1,5 +1,5 @@
-define(['app','config','api','util','cache','tplManager','tplHelpers','addons'],
-function(app,config,api,util,cache,TM,TH,addons) {
+define(['app','config','api','util','cache','preload','addons','tplManager','tplHelpers'],
+function(app,config,api,util,cache,preload,addons,TM,TH) {
 
     var appCtrl = {
         init: function() {
@@ -9,18 +9,14 @@ function(app,config,api,util,cache,TM,TH,addons) {
             else {
                 console.log('starting session')
 
-                appCtrl.initCurrentAccount(function() {
-                    app.f7view.router.load({
-                        url: 'local-addons.html',
-                        // query: {
-                        //   addon: localStorage.getItem('defaultView'),
-                        //   view: localStorage.getItem('defaultView')
-                        // }, //$$.parseUrlQuery(window.location.href),
-                        animatePages: false
+                appCtrl.initCurrentAccount()
+                    .then(function() {
+                        console.log('session loaded')
+                        app.f7view.router.load({
+                            url: 'local-addons.html',
+                            animatePages: false
+                        })
                     })
-                }, function() {
-                    appCtrl.onInvalidSession()
-                })
             }
         },
 
@@ -38,26 +34,20 @@ function(app,config,api,util,cache,TM,TH,addons) {
             config.setCurrentAvatar(account.icon_url)
 
             // Update the current team if required
-            if (account.team_id) {
-                api.getCurrentTeam().then(function(response) {
-                    config.setCurrentTeam(response)
-                    // appCtrl.renderAccountHeader(account)
-                    // VM.module('appView').renderAccountHeader(account)
-                    // VM.module('appView').renderMainMenu(account)
-                })
-            }
-            else {
-                config.setCurrentTeam(null)
-                // appCtrl.renderAccountHeader(account)
-                // VM.module('appView').renderAccountHeader(account)
-                // VM.module('appView').renderMainMenu(account)
-            }
+            // if (account.team_id) {
+            //     api.getCurrentTeam().then(function(response) {
+            //         config.setCurrentTeam(response)
+            //     })
+            // }
+            // else {
+            //     config.setCurrentTeam(null)
+            // }
 
             // Set the current avatar
             // util.renderCurrentAvatar()
 
             // Populate the account menu
-            appCtrl.loadUserAccounts()
+            // appCtrl.loadUserAccounts()
 
             // // // Reload all addons
             // addons.init()
@@ -68,46 +58,49 @@ function(app,config,api,util,cache,TM,TH,addons) {
             // }
 
             // Get installed addons
-            api.getInstalledAddons({ url: SANDBOX_ENDPOINT, cache: true })
-            // .then(success).catch(error)
+            // api.getInstalledAddons({ url: SANDBOX_ENDPOINT, cache: true })
         },
 
-        initCurrentAccount: function(success, error) {
+        initCurrentAccount: function() { //success, error
             console.log('appCtrl', 'initCurrentAccount')
 
             // Always reload on initialization
-            api.getCurrentAccount()
-              .then(function(response) {
-                  appCtrl.onCurrentAccountChanged(response)
-                  // addons.loadAllRemote().then(success)
-
-                  // TODO: Should wait for API callbacks to return
-                  if (success)
-                      success()
-              }).catch(error)
+            return api.getCurrentAccount()
+                .then(appCtrl.onCurrentAccountChanged)
+                .then(preload.load)
+                .catch(appCtrl.onInvalidSession)
+                // .then(success)
+                // .catch(error)
         },
 
-        loadAddons: function() {
-            addons.init()
-            addons.onAddonLoaded = CM.module('addonCtrl').onAddonLoaded;
-            addons.onViewLoaded = CM.module('addonCtrl').onViewLoaded;
-
-            for (var i = 0; i < SDK_LOCAL_ADDONS.length; i++) {
-                var addon = SDK_LOCAL_ADDONS[i];
-                console.log('loaded local addon', addon)
-                addons.initAddon(addon)
-            }
-
-            // return addons.loadAllRemote()
-            // (function (addons) {
-
-            // })
-
-            // addons.onViewLoaded = function (manifest, view) {
-            //     // console.log('on view loaded', manifest, view)
-            //     // alert('virtual method')
-            // }
+        changeCurrentAccount: function(accountID, accountType, locationId) {
+            api.resetCache()
+            api.updateCurrentAccount(accountID, accountType, locationId)
+                .then(onCurrentAccountChanged)
+                .then(preload.load)
         },
+
+        // loadAddons: function() {
+        //     addons.init()
+        //     addons.onAddonLoaded = CM.module('addonCtrl').onAddonLoaded;
+        //     addons.onViewLoaded = CM.module('addonCtrl').onViewLoaded;
+        //
+        //     for (var i = 0; i < SDK_LOCAL_ADDONS.length; i++) {
+        //         var addon = SDK_LOCAL_ADDONS[i];
+        //         console.log('loaded local addon', addon)
+        //         addons.initAddon(addon)
+        //     }
+        //
+        //     // return addons.loadAllRemote()
+        //     // (function (addons) {
+        //
+        //     // })
+        //
+        //     // addons.onViewLoaded = function (manifest, view) {
+        //     //     // console.log('on view loaded', manifest, view)
+        //     //     // alert('virtual method')
+        //     // }
+        // },
 
         // loadRecommendedAddons: function() {
         //     api.getRecommendedAddons().then(function(response) {
@@ -115,18 +108,11 @@ function(app,config,api,util,cache,TM,TH,addons) {
         //     })
         // },
 
-        loadUserAccounts: function() {
-            api.getAccounts().then(function(response) {
-                app.t7.global.accounts = response;
-            })
-        },
-
-        changeCurrentAccount: function(accountID, accountType, locationId) {
-            api.updateCurrentAccount(accountID, accountType, locationId).then(function(response) {
-                api.resetCache()
-                appCtrl.onCurrentAccountChanged(response)
-            })
-        },
+        // loadUserAccounts: function() {
+        //     api.getAccounts().then(function(response) {
+        //         app.t7.global.accounts = response;
+        //     })
+        // },
 
     };
 

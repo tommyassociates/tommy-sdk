@@ -32,8 +32,8 @@ define(['cache'], function (cache) {
 
         // The base server endpoint
         getServerUrl: function () {
-            if (this.isDeveloperMode()) {
-                if (this.environment === 'production')
+            if (config.isDeveloperMode()) {
+                if (config.environment === 'production')
                     return 'https://sandbox-api.mytommy.com';
                 else
                     return 'http://localhost:3001';
@@ -42,10 +42,10 @@ define(['cache'], function (cache) {
                 if (localStorage.getItem('serverUrl')) {
                     return localStorage.getItem('serverUrl')
                 }
-                else if (this.environment === 'production') {
+                else if (config.environment === 'production') {
                     var countryCode = config.getCountry();
                     // return countryCode === 'cn' ? 'https://api.tuome.com.cn' : 'https://api.mytommy.com';
-                    return countryCode === 'cn' ? 'http://tommy-api-prod.cn-north-1.eb.amazonaws.com.cn' : 'https://api.mytommy.com';
+                    return countryCode === 'cn' ? 'http://tommy-api-prod-mitdxzkkbk.cn-north-1.eb.amazonaws.com.cn' : 'https://api.mytommy.com';
                 }
                 else
                     return 'http://localhost:3000';
@@ -54,13 +54,13 @@ define(['cache'], function (cache) {
 
         // The full API endpoint.
         getApiUrl: function () {
-            return this.getServerUrl() + '/v1/';
+            return config.getServerUrl() + '/v1/';
         },
 
         // The chat server endpoint.
         getChatServerUrl: function () {
-            if (this.isDeveloperMode()) {
-                if (this.environment === 'production')
+            if (config.isDeveloperMode()) {
+                if (config.environment === 'production')
                     return 'https://sandbox-chat.mytommy.com';
                 else
                     return 'http://localhost:4500';
@@ -69,10 +69,10 @@ define(['cache'], function (cache) {
                 if (localStorage.getItem('chatServerUrl')) {
                     return localStorage.getItem('chatServerUrl')
                 }
-                else if (this.environment === 'production') {
+                else if (config.environment === 'production') {
                     var countryCode = config.getCountry();
                     // return countryCode === 'cn' ? 'https://chat.tuome.com.cn' : 'https://chat.mytommy.com';
-                    return countryCode === 'cn' ? 'http://tommy-chat-prod.cn-north-1.eb.amazonaws.com.cn/' : 'https://chat.mytommy.com';
+                    return countryCode === 'cn' ? 'http://chat.tommy-api-prod-mitdxzkkbk.cn-north-1.eb.amazonaws.com.cn/' : 'https://chat.mytommy.com';
                 }
                 else
                     return 'http://localhost:4500';
@@ -85,7 +85,7 @@ define(['cache'], function (cache) {
         //
         // // Local path for loading local files
         // getLocalPath: function (path) {
-        //     // if (this.isPhonegap()) {
+        //     // if (config.isPhonegap()) {
         //     //     return 'file://www' + path
         //     // }
         //     // else {
@@ -94,62 +94,67 @@ define(['cache'], function (cache) {
         // },
 
         getCurrentUser: function () {
-            return this.getJSON('user')
+            return config.getJSON('user')
         },
 
         getCurrentUserId: function () {
-            var user = this.getCurrentUser()
+            var user = config.getCurrentUser()
             return user ? user.id : null;
         },
 
+        getCurrentUserName: function () {
+            var user = config.getCurrentUser()
+            return user ? (user.first_name + ' ' + user.last_name) : null;
+        },
+
         setCurrentUser: function (user, token) {
-            this.setJSON('user', user)
-            // this.setCurrentAvatar(user.icon_url)
+            config.setJSON('user', user)
+            // config.setCurrentAvatar(user.icon_url)
             localStorage.setItem('token', token)
         },
 
         getCurrentAccount: function () {
-            return this.getJSON('account')
+            return config.getJSON('account')
         },
 
         setCurrentAccount: function (account) {
-            this.setJSON('account', account)
-            this.setCurrentAvatar(account.icon_url)
+            config.setJSON('account', account)
+            config.setCurrentAvatar(account.icon_url)
         },
 
         setCurrentTeam: function (team) {
-            this.setJSON('team', team)
+            config.setJSON('team', team)
         },
 
         getCurrentTeam: function () {
-            return this.getJSON('team')
+            return config.getJSON('team')
         },
 
         getCurrentTeamId: function () {
-            var team = this.getCurrentTeam()
+            var team = config.getCurrentTeam()
             return team ? team.id : null;
         },
 
         isCurrentTeam: function () {
-            return !!this.getCurrentTeam()
+            return !!config.getCurrentTeam()
         },
 
         isCurrentAccount: function (account) {
-            var current = this.getCurrentAccount()
+            var current = config.getCurrentAccount()
             return (current && account && current.id == account.id && current.type == account.type)
         },
 
         isCurrentAccountType: function (type) {
-            var account = this.getCurrentAccount()
+            var account = config.getCurrentAccount()
             return (account && account.type == type)
         },
 
         setCurrentAvatar: function (icon) {
             localStorage.setItem('icon_url', icon)
-            // var account = this.getCurrentAccount()
+            // var account = config.getCurrentAccount()
             // if (account) {
             //     account.icon_url = icon;
-            //     this.setCurrentAccount(account)
+            //     config.setCurrentAccount(account)
             // }
         },
 
@@ -174,7 +179,7 @@ define(['cache'], function (cache) {
                         alert('Previous account must not be a developer account')
                         return false;
                     }
-                    this.setJSON('previous_account', previousAccount)
+                    config.setJSON('previous_account', previousAccount)
                 }
             }
             else {
@@ -187,11 +192,11 @@ define(['cache'], function (cache) {
         },
 
         getPreviousAccount: function () {
-            return this.getJSON('previous_account')
+            return config.getJSON('previous_account')
         },
 
         isAuthenticated: function () {
-            return !!this.getSessionToken()
+            return !!config.getSessionToken()
         },
 
         onboardingComplete: function() {

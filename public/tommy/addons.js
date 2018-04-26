@@ -482,6 +482,17 @@ function(app, api,util,config,cache,util,i18n) {
             return t7.global.currentActorId;
         },
 
+        getCurrentActor: function () {
+            if (t7.global.currentActorId && t7.global.teamMembers && t7.global.teamMembers.length) {
+                for (var i = 0; i < t7.global.teamMembers.length; i++) {
+                    var teamMember = t7.global.teamMembers[i];
+                    if (teamMember.user_id == t7.global.currentActorId) {
+                        return teamMember;
+                    }
+                }
+            }
+        },
+
         currentActorOrUserId: function () {
             return t7.global.currentActorId ? t7.global.currentActorId : config.getCurrentUser().id;
         },

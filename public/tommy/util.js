@@ -16,7 +16,7 @@ define(['config','cache','moment','i18n','Framework7'],function (config,cache,mo
         },
 
         underscore: function (str) {
-            return str.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^_|_$)/g,'');
+            return str.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/(^_|_$)/g,'');
         },
 
         capitalize: function (str) {
@@ -291,10 +291,12 @@ define(['config','cache','moment','i18n','Framework7'],function (config,cache,mo
         createDatePicker: function ($input, initialDate, options) {
             if (!window.tommy.f7) return
 
-            if (typeof initialDate == 'string')
+            if (typeof initialDate === 'string') {
                 initialDate = new Date(initialDate)
-            if (typeof initialDate != 'date')
+            }
+            if (typeof initialDate !== 'object') {
                 initialDate = new Date;
+            }
 
             if (!options)
                 options = {}
@@ -305,6 +307,8 @@ define(['config','cache','moment','i18n','Framework7'],function (config,cache,mo
             if (initialDate) {
                 initialValue = [initialDate.getMonth(), initialDate.getDate(), initialDate.getFullYear(), initialDate.getHours(), (initialDate.getMinutes() < 10 ? '0' + initialDate.getMinutes() : initialDate.getMinutes())]
             }
+
+            console.log('create date picker', initialDate)
             return window.tommy.f7.picker(Object.assign({
                 input: $input,
                 rotateEffect: true,
