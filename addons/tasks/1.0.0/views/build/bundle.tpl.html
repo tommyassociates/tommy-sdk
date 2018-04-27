@@ -643,7 +643,7 @@
                         <img src="{{@global.user.icon_url}}" class="circle item open-popover" data-popover=".task-popover">
                         {{#each this}}
                             {{#if_compare context "==" "members"}}
-                                <img src="{{teamMemberIconUrl resource_id}}" class="circle item open-popover" data-popover=".task-popover">
+                                <img src="{{teamMemberIconUrl user_id}}" class="circle item open-popover" data-popover=".task-popover">
                             {{else}}
                                 <div class="chip item">
                                     <div class="chip-media">

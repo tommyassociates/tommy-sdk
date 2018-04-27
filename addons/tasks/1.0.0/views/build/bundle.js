@@ -225,12 +225,12 @@ var API = {
       data: {
         default: true
       },
+
       // Default list filters show tasks tagged with current user
       filters: [{
         context: 'members',
         name: window.tommy.config.getCurrentUserName(),
-        resource_type: 'User',
-        resource_id: window.tommy.config.getCurrentUserId()
+        user_id: window.tommy.config.getCurrentUserId()
       }]
     };
     return API.saveList(list);

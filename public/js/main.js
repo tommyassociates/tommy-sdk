@@ -76,7 +76,8 @@
                     $$('body').append(GTPL)
 
                     // Set the API to use the sandbox endpoint by default
-                    api.url = SANDBOX_ENDPOINT
+                    localStorage.setItem('serverUrl', SANDBOX_ENDPOINT)
+                    // api.url = SANDBOX_ENDPOINT
 
                     TM.initGlobalVariables()
                     TH.init()

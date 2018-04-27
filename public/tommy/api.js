@@ -9,7 +9,9 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
                     options.cache = true
 
                 if (options.cache) {
-                    var cachedResponse = cache.get('api', options.endpoint)
+                    if (!options.cacheKey)
+                        options.cacheKey = options.endpoint + JSON.stringify(options.data)
+                    var cachedResponse = cache.get('api', options.cacheKey)
                     if (cachedResponse) {
                         console.log('[READ CACHE] api response', options.endpoint, cachedResponse)
                         resolve(cachedResponse)
@@ -52,8 +54,8 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
                     }
 
                     // Cache the value for next time
-                    if (options.cache && options.endpoint) {
-                        cache.set('api', options.endpoint, response)
+                    if (options.cache && options.cacheKey) { // && cacheKey
+                        cache.set('api', options.cacheKey, response)
                         console.log('[SET CACHE] api response', options.endpoint, response)
                     }
                     resolve(response)

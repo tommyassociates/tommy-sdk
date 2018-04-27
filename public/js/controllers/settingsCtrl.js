@@ -31,11 +31,13 @@ function(util,config,api,addons,TM,TH,appCtrl) {
                 // , $page.find('select[name="actor-select"]')
                 TM.renderInline('teamMemberSelectOptionsTemplate', response)
 
-                // $page.on('change', 'select[name="team-member"]', function(event) {
-                //     var value = $$(this).val()
-                //     localStorage.setItem('actorId', value)
-                //     console.log('set current actor', value)
-                // })
+                $page.on('change', 'select[name="actor-select"]', function(event) {
+                    var value = parseInt($$(this).val())
+                    if (value === config.getCurrentUserId())
+                        value = null
+                    localStorage.setItem('actorId', value)
+                    console.log('set current actor', value)
+                })
             })
             // actor-select
         },
