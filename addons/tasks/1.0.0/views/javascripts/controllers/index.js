@@ -3,6 +3,7 @@ import TaskController from './task'
 
 const IndexController = {
   init (page) {
+    console.log('initialize tasks addon')
     if (!API.listsLoaded || !API.tasksLoaded) {
       API.initCache()
       API.loadLists().then(() => {
@@ -22,13 +23,15 @@ const IndexController = {
         }
       })
     }
+    else {
+      IndexController.invalidate(page)
+    }
 
-    // IndexController.invalidate(page)
     IndexController.bind(page)
   },
 
   uninit () {
-    console.log('tasks uninitialize')
+    console.log('uninitialize tasks addon')
     API.cache = {}
   },
 
@@ -124,8 +127,8 @@ const IndexController = {
 
     const actor = window.tommy.addons.getCurrentActor()
     if (actor) {
-        window.tommy.app.setPageTitle(
-          window.tommy.i18n.t('index.title_user', {user: actor.first_name}))
+      window.tommy.app.setPageTitle(
+        window.tommy.i18n.t('index.title_user', {user: actor.first_name}))
     }
   }
 }

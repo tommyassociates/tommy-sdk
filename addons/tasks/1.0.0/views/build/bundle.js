@@ -328,6 +328,7 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 var IndexController = {
   init: function init(page) {
+    console.log('initialize tasks addon');
     if (!_api2.default.listsLoaded || !_api2.default.tasksLoaded) {
       _api2.default.initCache();
       _api2.default.loadLists().then(function () {
@@ -345,13 +346,14 @@ var IndexController = {
           });
         }
       });
+    } else {
+      IndexController.invalidate(page);
     }
 
-    // IndexController.invalidate(page)
     IndexController.bind(page);
   },
   uninit: function uninit() {
-    console.log('tasks uninitialize');
+    console.log('uninitialize tasks addon');
     _api2.default.cache = {};
   },
   bind: function bind(page) {
@@ -641,7 +643,7 @@ var TaskAddController = {
     var $page = $$(page.container);
     var $nav = $$(page.navbarInnerContainer);
 
-    window.tommy.tplManager.renderInline('tasks__addTaskTemplate', _api2.default.cache['lists'], $page);
+    window.tommy.tplManager.renderInline('tasks__addTaskTemplate', {}, $page); //API.cache['lists']
 
     $nav.find('a.save').on('click', function (ev) {
       var data = window.tommy.app.f7.formToJSON($page.find('form'));

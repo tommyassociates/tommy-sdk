@@ -72,7 +72,7 @@ define(['cache'], function (cache) {
                 else if (config.environment === 'production') {
                     var countryCode = config.getCountry();
                     // return countryCode === 'cn' ? 'https://chat.tuome.com.cn' : 'https://chat.mytommy.com';
-                    return countryCode === 'cn' ? 'http://chat.tommy-api-prod-mitdxzkkbk.cn-north-1.eb.amazonaws.com.cn/' : 'https://chat.mytommy.com';
+                    return countryCode === 'cn' ? 'http://chat.tommy-chat-prod.cn-north-1.eb.amazonaws.com.cn' : 'https://chat.mytommy.com';
                 }
                 else
                     return 'http://localhost:4500';
