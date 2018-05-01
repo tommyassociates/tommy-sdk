@@ -5,10 +5,11 @@ const TaskAddController = {
     const $page = $$(page.container)
     const $nav = $$(page.navbarInnerContainer)
 
-    window.tommy.tplManager.renderInline('tasks__addTaskTemplate', {}, $page) //API.cache['lists']
+    window.tommy.tplManager.renderInline('tasks__addTaskTemplate', {}, $page) // API.cache['lists']
 
     $nav.find('a.save').on('click', ev => {
       const data = window.tommy.app.f7.formToJSON($page.find('form'))
+      data.filters = [ API.currentUserTag() ] // tag the current user
       TaskAddController.saveTask(data)
       ev.preventDefault()
     })

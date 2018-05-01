@@ -78,6 +78,7 @@ const IndexController = {
 
     $page.on('click', 'a.task-card', function () {
       const href = $$(this).data('href')
+      
       if (API.isTablet()) {
         $$.get(href, function(response) {
           let $popup = $$('<div class="popup" data-page="tasks__task" id="tasks__tasks"></div>')
@@ -109,9 +110,8 @@ const IndexController = {
       IndexController.invalidateLists = false
       window.tommy.tplManager.renderInline('tasks__listsTemplate', API.getOrderedLists(), page.container)
 
-      const isTablet = window.innerWidth >= 630
       const swiper = window.tommy.app.f7.swiper('.swiper-container', {
-        centeredSlides: !isTablet,
+        centeredSlides: !API.isTablet(),
         spaceBetween: 0,
         freeMode: false,
         freeModeSticky: true,

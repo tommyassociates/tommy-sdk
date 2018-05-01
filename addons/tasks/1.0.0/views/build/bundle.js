@@ -161,6 +161,9 @@ var API = {
     if (!task.id) {
       API.addTaskActivity(task, 'status', window.tommy.i18n.t('task.created_a_task'));
     }
+    if (!task.start_at) {
+      task.start_at = new Date().getTime();
+    }
     var params = Object.assign({}, task, { data: JSON.stringify(task.data) });
     if (task.id) {
       return window.tommy.api.updateFragment(task.id, params).then(API.addTask);
@@ -218,6 +221,13 @@ var API = {
       return window.tommy.api.createFragment(params).then(API.addList);
     }
   },
+  currentUserTag: function currentUserTag() {
+    return {
+      context: 'members',
+      name: window.tommy.config.getCurrentUserName(),
+      user_id: window.tommy.config.getCurrentUserId()
+    };
+  },
   createDefaultList: function createDefaultList() {
     console.log('creating deafult task list');
     var list = {
@@ -227,11 +237,7 @@ var API = {
       },
 
       // Default list filters show tasks tagged with current user
-      filters: [{
-        context: 'members',
-        name: window.tommy.config.getCurrentUserName(),
-        user_id: window.tommy.config.getCurrentUserId()
-      }]
+      filters: [API.currentUserTag()]
     };
     return API.saveList(list);
   },
@@ -254,9 +260,9 @@ var API = {
   },
   initTagSelect: function initTagSelect(page, permission) {
     var $tagSelect = $$(page.container).find('.tag-select[data-permission-name="' + permission.name + '"]'); //.find('') //$page.find('#addon-permissions-form .tag-select')
-    console.log('init tag select', permission, $tagSelect);
+    console.log('init tag select', permission, $tagSelect.dataset());
     window.tommy.tagSelect.initWidget($tagSelect, permission.filters, function (data) {
-      console.log('save tags', permission, data, $tagSelect.dataset());
+      console.log('save tags', permission, data);
 
       // $tagSelect.data('permission-name')
       window.tommy.api.updateInstalledAddonPermission('tasks', permission.name, {
@@ -403,6 +409,7 @@ var IndexController = {
 
     $page.on('click', 'a.task-card', function () {
       var href = $$(this).data('href');
+
       if (_api2.default.isTablet()) {
         $$.get(href, function (response) {
           var $popup = $$('<div class="popup" data-page="tasks__task" id="tasks__tasks"></div>');
@@ -433,9 +440,8 @@ var IndexController = {
       IndexController.invalidateLists = false;
       window.tommy.tplManager.renderInline('tasks__listsTemplate', _api2.default.getOrderedLists(), page.container);
 
-      var isTablet = window.innerWidth >= 630;
       var swiper = window.tommy.app.f7.swiper('.swiper-container', {
-        centeredSlides: !isTablet,
+        centeredSlides: !_api2.default.isTablet(),
         spaceBetween: 0,
         freeMode: false,
         freeModeSticky: true,
@@ -537,12 +543,26 @@ var ListEditController = {
       ev.preventDefault();
     });
 
+    $page.find('.date-range-select').on('click', function (ev) {
+      ListEditController.showDateRangePopup(page, list);
+      ev.preventDefault();
+    });
+
     $page.find('.delete-list').on('click', function (ev) {
       _api2.default.deleteList(list.id);
       _index2.default.invalidateLists = true;
       window.tommy.app.f7view.router.back();
       ev.preventDefault();
     });
+  },
+  showDateRangePopup: function showDateRangePopup(page, list) {
+    var html = window.tommy.tplManager.render('tasks__dateRangeSelectTemplate', list.data);
+    // let $popup = $$('<div class="popup" data-page="tasks__date-range-select"></div>')
+    // $popup.append(html)
+    // $popup.append(html)
+    // console.log('POPUP', $popup)
+    // window.tommy.f7.popup($popup)
+    window.tommy.f7.popup(html);
   },
   initListFilters: function initListFilters(page, list) {
     // if (!list.filters)
@@ -643,10 +663,11 @@ var TaskAddController = {
     var $page = $$(page.container);
     var $nav = $$(page.navbarInnerContainer);
 
-    window.tommy.tplManager.renderInline('tasks__addTaskTemplate', {}, $page); //API.cache['lists']
+    window.tommy.tplManager.renderInline('tasks__addTaskTemplate', {}, $page); // API.cache['lists']
 
     $nav.find('a.save').on('click', function (ev) {
       var data = window.tommy.app.f7.formToJSON($page.find('form'));
+      data.filters = [_api2.default.currentUserTag()]; // tag the current user
       TaskAddController.saveTask(data);
       ev.preventDefault();
     });
@@ -684,11 +705,13 @@ var TaskController = {
     console.log('init task details', task);
     window.tommy.tplManager.renderInline('tasks__taskDetailsTemplate', task, $page.parent());
 
+    // let $menuPopover = $page.find('.task-menu-popover')
     $page.find('.task-menu-popover').on('popover:open', function () {
       // BUG: popover shows offscreen on desktop, this fixes it
       $$(window).trigger('resize');
     });
 
+    // const $editTaskName = $page.find('input.edit-task-name')
     $page.find('.task-menu-popover a').click(function (e) {
       var command = $$(e.target).data('command');
 
@@ -703,7 +726,7 @@ var TaskController = {
           alert('Unknown command: ' + command);
       }
 
-      window.tommy.app.f7.closeModal();
+      window.tommy.app.f7.closeModal('.task-menu-popover');
     });
 
     // Task title area
@@ -725,7 +748,7 @@ var TaskController = {
     }
 
     // Task deadline
-    if (task.data.deadline) {
+    if (task.end_at) {
       TaskController.renderDeadline(page);
     }
 
@@ -867,32 +890,30 @@ var TaskController = {
     var task = _api2.default.cache['tasks'][page.query.task_fragment_id];
     var $page = $$(page.container);
 
-    console.log('render deadline', task.data.deadline);
-    window.tommy.tplManager.renderInline('tasks__taskDeadlineTemplate', task.data.deadline, $page);
+    console.log('render deadline', task.end_at);
+    window.tommy.tplManager.renderInline('tasks__taskDeadlineTemplate', task.end_at, $page);
 
     var $input = $page.find('input.edit-task-deadline');
     var format = 'dddd, MMM Do YY, h:mm a';
-    var picker = window.tommy.util.createDatePicker($input, task.data.deadline, {
+    var picker = window.tommy.util.createDatePicker($input, task.end_at, {
       onClose: function onClose() {
         console.log('closing deadline picker', picker.currentDate);
-        task.data.deadline = picker.currentDate;
+        task.end_at = picker.currentDate;
         TaskController.enableSave(page);
       },
       onFormat: function onFormat(date) {
         console.log('format deadline picker', date);
         return window.tommy.util.humanTime(date);
-        // task.data.deadline = picker.currentDate
-        // TaskController.enableSave(page)
       }
     });
 
-    if (!task.data.deadline) {
+    if (!task.end_at) {
       $input.val('');
     }
 
     $page.on('click', '.remove-deadline', function () {
       // TODO: confirm alert
-      delete task.data.deadline;
+      delete task.end_at;
       $page.find('[data-template="tasks__taskDeadlineTemplate"]').html('');
       TaskController.saveTask(page);
     });
@@ -918,7 +939,7 @@ var TaskController = {
   },
   initStatusPicker: function initStatusPicker(page) {
     var task = _api2.default.cache['tasks'][page.query.task_fragment_id];
-    var initial = task.data.status ? TaskController.translateStatus(task.data.status) : undefined;
+    var initial = task.status ? TaskController.translateStatus(task.status) : undefined;
 
     return window.tommy.app.f7.picker({
       input: $$(page.container).find('.task-status-picker'),
@@ -931,10 +952,10 @@ var TaskController = {
       onClose: function onClose(p) {
         var translatedStatus = p.value[0];
         var status = TaskController.untranslateStatus(p.value[0]);
-        if (status == task.data.status) {
+        if (status == task.status) {
           return;
         }
-        task.data.status = status;
+        task.status = status;
         TaskController.addActivity(page, 'status', window.tommy.i18n.t('task.changed_status_to', { status: translatedStatus }));
         TaskController.saveTask(page);
       }
@@ -1059,6 +1080,10 @@ window.tommy.app.t7.registerHelper('tasks__checklistNumCompleted', function (che
 
 window.tommy.app.t7.registerHelper('tasks__displayStatus', function (status) {
   return window.tommy.i18n.t('status.' + window.tommy.util.underscore(status), { defaultValue: status });
+});
+
+window.tommy.app.t7.registerHelper('tasks__displayDateRange', function (range) {
+  return range;
 });
 
 },{"./controllers/board-settings":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/task":8,"./controllers/task-add":7}]},{},[9]);

@@ -139,6 +139,7 @@ const API = {
     task.addon = 'tasks'
     task.kind = 'Task'
     if (!task.id) { API.addTaskActivity(task, 'status', window.tommy.i18n.t('task.created_a_task')) }
+    if (!task.start_at) { task.start_at = (new Date).getTime() }
     const params = Object.assign({}, task, { data: JSON.stringify(task.data) })
     if (task.id) { return window.tommy.api.updateFragment(task.id, params).then(API.addTask) } else { return window.tommy.api.createFragment(params).then(API.addTask) }
   },
@@ -191,22 +192,24 @@ const API = {
     }
   },
 
+  currentUserTag () {
+    return {
+      context: 'members',
+      name: window.tommy.config.getCurrentUserName(),
+      user_id: window.tommy.config.getCurrentUserId()
+    }
+  },
+
   createDefaultList () {
     console.log('creating deafult task list')
-    var list = {
+    let list = {
       name: window.tommy.i18n.t('index.default-task-name'),
       data: {
         default: true
       },
-      
+
       // Default list filters show tasks tagged with current user
-      filters: [
-        {
-          context: 'members',
-          name: window.tommy.config.getCurrentUserName(),
-          user_id: window.tommy.config.getCurrentUserId()
-        }
-      ]
+      filters: [ API.currentUserTag() ]
     }
     return API.saveList(list)
   },
@@ -229,10 +232,10 @@ const API = {
   },
 
   initTagSelect (page, permission) {
-    var $tagSelect = $$(page.container).find('.tag-select[data-permission-name="' + permission.name + '"]') //.find('') //$page.find('#addon-permissions-form .tag-select')
-    console.log('init tag select', permission, $tagSelect)
+    const $tagSelect = $$(page.container).find('.tag-select[data-permission-name="' + permission.name + '"]') //.find('') //$page.find('#addon-permissions-form .tag-select')
+    console.log('init tag select', permission, $tagSelect.dataset())
     window.tommy.tagSelect.initWidget($tagSelect, permission.filters, function(data) {
-      console.log('save tags', permission, data, $tagSelect.dataset())
+      console.log('save tags', permission, data)
 
       // $tagSelect.data('permission-name')
       window.tommy.api.updateInstalledAddonPermission('tasks', permission.name, {

@@ -3,7 +3,7 @@ import IndexController from './index'
 
 const ListEditController = {
   init (page) {
-    const list = API.cache['lists'][page.query.list_fragment_id]
+    let list = API.cache['lists'][page.query.list_fragment_id]
     const $page = $$(page.container)
     const $nav = $$(page.navbarInnerContainer)
 
@@ -19,12 +19,27 @@ const ListEditController = {
       ev.preventDefault()
     })
 
+    $page.find('.date-range-select').on('click', ev => {
+      ListEditController.showDateRangePopup(page, list)
+      ev.preventDefault()
+    })
+
     $page.find('.delete-list').on('click', ev => {
       API.deleteList(list.id)
       IndexController.invalidateLists = true
       window.tommy.app.f7view.router.back()
       ev.preventDefault()
     })
+  },
+
+  showDateRangePopup (page, list) {
+    var html = window.tommy.tplManager.render('tasks__dateRangeSelectTemplate', list.data)
+    // let $popup = $$('<div class="popup" data-page="tasks__date-range-select"></div>')
+    // $popup.append(html)
+    // $popup.append(html)
+    // console.log('POPUP', $popup)
+    // window.tommy.f7.popup($popup)
+    window.tommy.f7.popup(html)
   },
 
   initListFilters (page, list) {

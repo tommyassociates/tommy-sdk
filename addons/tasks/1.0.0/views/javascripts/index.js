@@ -40,3 +40,7 @@ window.tommy.app.t7.registerHelper('tasks__checklistNumCompleted', checklist => 
 window.tommy.app.t7.registerHelper('tasks__displayStatus', status => {
   return window.tommy.i18n.t('status.' + window.tommy.util.underscore(status), { defaultValue: status })
 })
+
+window.tommy.app.t7.registerHelper('tasks__displayDateRange', range => {
+  return range
+})

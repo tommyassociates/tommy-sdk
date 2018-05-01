@@ -9,11 +9,13 @@ const TaskController = {
     console.log('init task details', task)
     window.tommy.tplManager.renderInline('tasks__taskDetailsTemplate', task, $page.parent())
 
+    // let $menuPopover = $page.find('.task-menu-popover')
     $page.find('.task-menu-popover').on('popover:open', () => {
       // BUG: popover shows offscreen on desktop, this fixes it
       $$(window).trigger('resize')
     })
 
+    // const $editTaskName = $page.find('input.edit-task-name')
     $page.find('.task-menu-popover a').click(e => {
       const command = $$(e.target).data('command')
 
@@ -28,7 +30,7 @@ const TaskController = {
           alert('Unknown command: ' + command)
       }
 
-      window.tommy.app.f7.closeModal()
+      window.tommy.app.f7.closeModal('.task-menu-popover')
     })
 
     // Task title area
@@ -49,7 +51,7 @@ const TaskController = {
             task.data.checklist.items) { TaskController.renderChecklist(page) }
 
     // Task deadline
-    if (task.data.deadline) { TaskController.renderDeadline(page) }
+    if (task.end_at) { TaskController.renderDeadline(page) }
 
     // Task activity
     let myMessagebar = window.tommy.app.f7.messagebar('.messagebar', { maxHeight: 200 })
@@ -120,8 +122,8 @@ const TaskController = {
   },
 
   renderChecklist (page) {
-    const task = API.cache['tasks'][page.query.task_fragment_id]
-    const $page = $$(page.container)
+    let task = API.cache['tasks'][page.query.task_fragment_id]
+    let $page = $$(page.container)
 
     let items = []
     if (task.data.checklist &&
@@ -180,35 +182,33 @@ const TaskController = {
   },
 
   renderDeadline (page) {
-    const task = API.cache['tasks'][page.query.task_fragment_id]
-    const $page = $$(page.container)
+    let task = API.cache['tasks'][page.query.task_fragment_id]
+    let $page = $$(page.container)
 
-    console.log('render deadline', task.data.deadline)
-    window.tommy.tplManager.renderInline('tasks__taskDeadlineTemplate', task.data.deadline, $page)
+    console.log('render deadline', task.end_at)
+    window.tommy.tplManager.renderInline('tasks__taskDeadlineTemplate', task.end_at, $page)
 
     const $input = $page.find('input.edit-task-deadline')
     const format = 'dddd, MMM Do YY, h:mm a'
-    const picker = window.tommy.util.createDatePicker($input, task.data.deadline, {
+    const picker = window.tommy.util.createDatePicker($input, task.end_at, {
       onClose () {
         console.log('closing deadline picker', picker.currentDate)
-        task.data.deadline = picker.currentDate
+        task.end_at = picker.currentDate
         TaskController.enableSave(page)
       },
       onFormat (date) {
         console.log('format deadline picker', date)
         return window.tommy.util.humanTime(date)
-        // task.data.deadline = picker.currentDate
-        // TaskController.enableSave(page)
       }
     })
 
-    if (!task.data.deadline) {
+    if (!task.end_at) {
       $input.val('')
     }
 
     $page.on('click', '.remove-deadline', () => {
       // TODO: confirm alert
-      delete task.data.deadline
+      delete task.end_at
       $page.find('[data-template="tasks__taskDeadlineTemplate"]').html('')
       TaskController.saveTask(page)
     })
@@ -228,7 +228,7 @@ const TaskController = {
   },
 
   translatedStatuses (translatedStatus) {
-    var statuses = []
+    const statuses = []
     for (let i = 0; i < TaskController.STATUS.length; i++) {
       statuses.push(TaskController.translateStatus(TaskController.STATUS[i]))
     }
@@ -236,8 +236,8 @@ const TaskController = {
   },
 
   initStatusPicker (page) {
-    const task = API.cache['tasks'][page.query.task_fragment_id]
-    let initial = task.data.status ? TaskController.translateStatus(task.data.status) : undefined
+    let task = API.cache['tasks'][page.query.task_fragment_id]
+    const initial = task.status ? TaskController.translateStatus(task.status) : undefined
 
     return window.tommy.app.f7.picker({
       input: $$(page.container).find('.task-status-picker'),
@@ -252,8 +252,8 @@ const TaskController = {
       onClose (p) {
         const translatedStatus = p.value[0]
         const status = TaskController.untranslateStatus(p.value[0])
-        if (status == task.data.status) { return }
-        task.data.status = status
+        if (status == task.status) { return }
+        task.status = status
         TaskController.addActivity(page, 'status',
             window.tommy.i18n.t('task.changed_status_to', {status: translatedStatus}))
         TaskController.saveTask(page)
@@ -269,7 +269,7 @@ const TaskController = {
   },
 
   enableEditName (page, flag) {
-    const task = API.cache['tasks'][page.query.task_fragment_id]
+    let task = API.cache['tasks'][page.query.task_fragment_id]
     const $page = $$(page.container)
     const $input = $page.find('input.edit-task-name')
 
@@ -285,7 +285,7 @@ const TaskController = {
   },
 
   enableEditDescription (page, flag) {
-    const task = API.cache['tasks'][page.query.task_fragment_id]
+    let task = API.cache['tasks'][page.query.task_fragment_id]
     const $page = $$(page.container)
     const $textarea = $page.find('textarea.edit-task-description')
 

@@ -32,7 +32,14 @@
     "list-management": "列表管理"
   },
   "common": {
-    "search_members_tags": "搜索成员，标签"
+    "search_members_tags": "搜索成员，标签",
+    "date_range": "Date Range",
+    "today": "Today",
+    "this_week": "This Week",
+    "this_month": "This Month",
+    "choose_range": "Choose Range",
+    "start_date": "Start Date",
+    "deadline": "Deadline"
   },
   "status": {
     "unassigned": "未分配",
