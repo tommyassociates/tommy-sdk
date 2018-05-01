@@ -7,7 +7,7 @@ var express = require('express'),
   config = loadConfig('config.json'),
   app = express()
 
-app.set('port', 4001)
+app.set('port', 4002)
 app.set('view engine', 'ejs')
 app.use(express.static('public'))
 app.use(express.static('./'))

@@ -48,7 +48,7 @@
                 }, function(err, t) {
 
                     app.init({
-                        pushState: false,
+                        pushState: true,
                         // preroute: preroute,
                         // preprocess: preprocess,
                         modalTitle: '',
@@ -76,7 +76,7 @@
                     $$('body').append(GTPL)
 
                     // Set the API to use the sandbox endpoint by default
-                    localStorage.setItem('serverUrl', SANDBOX_ENDPOINT)
+                    localStorage.setItem('serverUrl', SANDBOX_URL)
                     // api.url = SANDBOX_ENDPOINT
 
                     TM.initGlobalVariables()

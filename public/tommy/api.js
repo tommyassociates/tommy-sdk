@@ -40,7 +40,7 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
                 }
 
                 // Set the locale
-                if (!options.locale)
+                if (!options.data.locale)
                     options.data['locale'] = config.getLocale()
 
                 // Make the XHR request

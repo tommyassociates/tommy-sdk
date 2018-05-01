@@ -69,7 +69,7 @@ for (const addon of addons) {
 
 gulp.task('browser-sync', ['nodemon'], () => {
   browserSync({
-    proxy: 'localhost:4001',  // local node app address
+    proxy: 'localhost:4002',  // local node app address
     port: 5000,  // use *different* port than above
     notify: true
   })
