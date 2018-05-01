@@ -294,25 +294,26 @@ define(['config','cache','moment','i18n','Framework7'],function (config,cache,mo
             if (typeof initialDate === 'string') {
                 initialDate = new Date(initialDate)
             }
-            if (typeof initialDate !== 'object') {
-                initialDate = new Date;
+            if (!initialDate || (typeof initialDate !== 'object')) {
+                initialDate = new Date
             }
 
             if (!options)
                 options = {}
             if (!options.dateFormat)
-                options.dateFormat = "dddd, MMM Do YY, h:mm a"
+                options.dateFormat = 'dddd, MMM Do YY, h:mm a'
 
             var initialValue = []
             if (initialDate) {
                 initialValue = [initialDate.getMonth(), initialDate.getDate(), initialDate.getFullYear(), initialDate.getHours(), (initialDate.getMinutes() < 10 ? '0' + initialDate.getMinutes() : initialDate.getMinutes())]
             }
 
-            console.log('create date picker', initialDate)
+            console.log('create date picker', initialDate, initialValue)
             return window.tommy.f7.picker(Object.assign({
                 input: $input,
                 rotateEffect: true,
                 inputReadOnly: true,
+                // onlyOnPopover: true,
                 convertToPopover: false,
                 updateValuesOnMomentum: false,
                 // updateValuesOnTouchmove: false,
