@@ -42,7 +42,7 @@ function(util,config,api,addons,TM,TH,appCtrl) {
             // actor-select
         },
 
-    };
+    }
 
-    return settingsCtrl;
+    return settingsCtrl
 });
