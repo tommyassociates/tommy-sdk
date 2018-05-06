@@ -16,6 +16,9 @@ const ListAddController = {
     let list = {}
     list.name = data.name
 
+    // Default list filters show tasks tagged with current user
+    list.filters = [ API.currentUserTag() ]
+
     // console.log('create list', list, data)
     // if (!list.name) {
     //   alert('List name must be set')

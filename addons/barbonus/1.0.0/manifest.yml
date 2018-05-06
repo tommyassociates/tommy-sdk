@@ -10,9 +10,4 @@ views:
   file: employee.html
   type: page
   index: true
-  # scopes:
-  # - client
-  # - employee
-  # main: false
   framed: false
-  # permissions: {}

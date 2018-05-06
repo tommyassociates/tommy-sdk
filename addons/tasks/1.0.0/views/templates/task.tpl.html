@@ -30,7 +30,7 @@
             <h1>
                 <input type="text" name="task[name]" class="unstyled edit-task-name" value="{{name}}">
             </h1>
-            <input type="text" value="{{#if data.status}}{{tasks__displayStatus data.status}}{{else}}{{t "task.waiting_for_assignments" defaultValue="Waiting for assignments"}}{{/if}}" readonly="readonly" class="unstyled task-status-picker" />
+            <input type="text" value="{{#if_compare status "==" "Unassigned"}}{{t "task.waiting_for_assignments" defaultValue="Waiting for assignments"}}{{else}}{{tasks__displayStatus status}}{{/if_compare}}" readonly="readonly" class="unstyled task-status-picker" />
         </div>
 
         <!--
@@ -120,7 +120,7 @@
             <li>
                 <div class="item-content">
                     <div class="item-inner">
-                        <img src="{{@global.user.icon_url}}" class="circle item open-popover" data-popover=".task-popover">
+                        <!-- <img src="{{@global.user.icon_url}}" class="circle item open-popover" data-popover=".task-popover"> -->
                         {{#each this}}
                             {{#if_compare context "==" "members"}}
                                 <img src="{{teamMemberIconUrl user_id}}" class="circle item open-popover" data-popover=".task-popover">

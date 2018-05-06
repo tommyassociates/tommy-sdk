@@ -8,10 +8,15 @@ const ListEditController = {
     const $nav = $$(page.navbarInnerContainer)
 
     console.log('edit list', list)
+
+    // NOTE: we should probably check that the current user has
+    // `task_list_edit_access` permission before rendering the page.
+
     window.tommy.tplManager.renderInline('tasks__listEditTemplate', list, $page)
 
     ListEditController.initListFilters(page, list)
-    API.initPermissionSelects(page, ['task_list_read_access', 'task_list_edit_access'])
+    API.initAccessPolicySelect(page, 'task_list_read_access', list.id)
+    API.initAccessPolicySelect(page, 'task_list_edit_access', list.id)
 
     $nav.find('a.save').on('click', ev => {
       const data = window.tommy.app.f7.formToJSON($page.find('form'))
@@ -24,9 +29,13 @@ const ListEditController = {
       ev.preventDefault()
     })
 
+    $page.find('select[name="statuses"]').on('change', ev => {
+      list.data.statuses = $$(ev.target).val()
+      console.log('update statuses', list.data.statuses)
+    })
+
     $page.find('.delete-list').on('click', ev => {
       API.deleteList(list.id)
-      IndexController.invalidateLists = true
       window.tommy.app.f7view.router.back()
       ev.preventDefault()
     })

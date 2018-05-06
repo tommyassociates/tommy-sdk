@@ -66,7 +66,7 @@ define(['config','cache','moment','i18n','Framework7'],function (config,cache,mo
         hasRole: function(account, name) {
             if (account && account.roles && account.roles.length) {
                 for (var x = 0; x < account.roles.length; x++) {
-                    if (account.roles[x] && name)
+                    if (account.roles[x] == name)
                         return true;
                 }
             }
@@ -500,7 +500,7 @@ define(['config','cache','moment','i18n','Framework7'],function (config,cache,mo
           formattedName += nameSplitted.length > 1 ? nameSplitted[1][0] : name[1]
           return formattedName
         }
-    };
+    }
 
     return util
 });

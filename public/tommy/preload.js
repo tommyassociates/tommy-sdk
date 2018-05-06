@@ -19,7 +19,7 @@ function(app,api,config) {
         },
 
         loadAccounts: function() {
-            return api.getCurrentTeam().then(function(response) {
+            return api.getAccounts().then(function(response) {
                 app.t7.global.accounts = response
             })
         },

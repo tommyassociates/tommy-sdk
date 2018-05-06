@@ -18,7 +18,8 @@
     "title": "编辑列表",
     "name": "名称",
     "show-fast-add-task": "显示快速添加任务",
-    "delete-list": "删除列表"
+    "delete-list": "删除列表",
+    "filter-status": "Filter Status"
   },
   "list-management": {
     "title": "列表管理"

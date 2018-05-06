@@ -69,6 +69,17 @@ function (config,util,moment,i18n/*,i18n*/) {
                 return 0;
             })
 
+            t7.registerHelper('localStorage', function (key, defaultValue, options) {
+                if (localStorage.getItem(key))
+                    return localStorage.getItem(key)
+                else if (typeof defaultValue !== 'object')
+                    return defaultValue
+            })
+
+            //
+            // == Translations / i18n
+            //
+
             t7.registerHelper('t', function (key, options) {
                 return i18n.t(key, options.hash)
             })
@@ -82,17 +93,8 @@ function (config,util,moment,i18n/*,i18n*/) {
                 return i18n.t(key, options.hash)
             })
 
-            t7.registerHelper('localStorage', function (key, defaultValue, options) {
-                if (localStorage.getItem(key))
-                    return localStorage.getItem(key)
-                else if (typeof defaultValue !== 'object')
-                    return defaultValue
-            })
-
-
-
             //
-            /// String Manipulation
+            // == String Manipulation
             //
 
             t7.registerHelper('json', function (object, options) {
@@ -163,7 +165,7 @@ function (config,util,moment,i18n/*,i18n*/) {
             })
 
             //
-            /// URL and Paths
+            // == URL and Paths
             //
 
             // var backButton = '<a href="#" class="back link icon-only"><i class="material-icons md-36">keyboard_arrow_left</i></a>';
@@ -272,7 +274,7 @@ function (config,util,moment,i18n/*,i18n*/) {
             })
 
             //
-            /// Account Access
+            // == Account Access
             //
 
             t7.registerHelper('ifExistsInArrayOfObjects', function (array, key, value, options) {
@@ -365,8 +367,22 @@ function (config,util,moment,i18n/*,i18n*/) {
                     return 'hide';
             })
 
+            t7.registerHelper('isActorUser', function (options) {
+                if (Template7.global && Template7.global.currentActorId)
+                    return options.fn(this)
+                else
+                    return options.inverse(this)
+            })
+
+            t7.registerHelper('isNotActorUser', function (options) {
+                if (!Template7.global || !Template7.global.currentActorId)
+                    return options.fn(this)
+                else
+                    return options.inverse(this)
+            })
+
             //
-            /// Date and Time
+            // == Date and Time
             //
 
             t7.registerHelper('timeOfDay', function (date) {
@@ -462,7 +478,7 @@ function (config,util,moment,i18n/*,i18n*/) {
                     return options.inverse(this)
             })
         }
-    };
+    }
 
-    return tplHelpers;
+    return tplHelpers
 })

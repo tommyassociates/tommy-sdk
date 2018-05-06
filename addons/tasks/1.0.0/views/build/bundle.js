@@ -23,13 +23,15 @@ var API = {
     };
   },
   getOrderedLists: function getOrderedLists() {
+    if (!API.cache['lists']) return [];
     var lists = Object.values(API.cache['lists']);
     if (!lists.length) return [];
     return lists.sort(function (a, b) {
-      return a.data.order - b.data.order; // ascending order
+      return a.data.position - b.data.position; // ascending order
     });
   },
   addTask: function addTask(item) {
+    _index2.default.invalidateLists = true; // rerender lists
     API.cache['tasks'][item.id] = item;
     console.log('task added', item);
   },
@@ -49,82 +51,78 @@ var API = {
 
       if (list.filters && task.filters) {
         (function () {
+
+          // Filter on tags
           var taskTags = task.filters.map(function (x) {
             return x.name;
           });
           var listTags = list.filters.map(function (x) {
             return x.name;
           });
-          var matches = taskTags.filter(function (x) {
+          var matchTags = taskTags.filter(function (x) {
             return listTags.indexOf(x) !== -1;
           });
-          console.log('should add task to list', task.name, list.name, matches);
+          var matches = !!matchTags.length || !taskTags.length && !listTags.length;
+          console.log('task matches list tags', task.name, task.filters, list.name, list.filters, matches);
 
-          if (matches.length) {
+          // Filter on status
+          if (matches && list.data.statuses) {
+            matches = list.data.statuses.indexOf(task.status) !== -1;
+            console.log('task matches list statuses', task.name, task.status, list.name, list.statuses, matches);
+          }
+
+          if (matches) {
             tasks.push(task);
           }
         })();
       }
     }
 
-    // Back when life was simple:
-    // let task
-    // for (const taskId in API.cache['tasks']) {
-    //   task = API.cache['tasks'][taskId]
-    //   if (task.parent_id == listId) { tasks.push(task) }
-    // }
     return tasks;
   },
-  loadTasks: function loadTasks() {
-    // params
-    console.log('load tasks'); // params
-
-    var name = void 0,
-        tags = void 0,
-        params = void 0,
-        request = void 0,
-        promises = [];
-    for (var listId in API.cache['lists']) {
-      var list = API.cache['lists'][listId];
-      name = window.tommy.config.getCurrentUserName();
-      tags = [name];
-      console.log(window.tommy.config.getCurrentUser());
-      if (list.data && list.filters) {
-        for (var i = 0; i < list.filters.length; i++) {
-          tags.push(list.filters[i].name);
-        }
-      }
-
-      params = {
-        addon: 'tasks',
-        kind: 'Task',
-        tags: tags
-      };
-      request = window.tommy.api.getFragments(params); //.then(API.addTasks)
-      promises.push(request);
+  loadListTasks: function loadListTasks(list) {
+    if (list._tasksLoaded) {
+      console.log('tasks already loaded', list); // params
+      return;
     }
 
-    return Promise.all(promises).then(API.addTasks);
+    // Set the internal `_tasksLoaded` flag.
+    // Tasks won't be reloaded until this is set to false
+    list._tasksLoaded = true;
 
-    // Back when life was simple:
-    // params = Object.assign({
-    //   addon: 'tasks',
-    //   kind: 'Task'
-    // }, params)
-    // return window.tommy.api.getFragments(params).then(API.addTasks)
+    // let name, tags, params, request, requests = []
+    var name = window.tommy.config.getCurrentUserName();
+    var tags = [name];
+    if (list.data && list.filters) {
+      for (var i = 0; i < list.filters.length; i++) {
+        tags.push(list.filters[i].name);
+      }
+    }
+
+    var params = {
+      addon: 'tasks',
+      kind: 'Task',
+      tags: tags,
+      include_filters: true,
+      include_permission_to: true
+    };
+
+    if (list.data.statuses) params.status = list.data.statuses;
+
+    return window.tommy.api.getFragments(params);
   },
+  loadTasks: function loadTasks() {
+    console.log('load tasks');
 
+    var requests = [];
+    for (var listId in API.cache['lists']) {
+      var list = API.cache['lists'][listId];
+      var request = API.loadListTasks(list);
+      if (request) requests.push(request);
+    }
 
-  // loadTasks (params) {
-  //   console.log('load tasks', params)
-  //
-  //   params = Object.assign({
-  //     addon: 'tasks',
-  //     kind: 'Task'
-  //   }, params)
-  //   return window.tommy.api.getFragments(params).then(API.addTasks)
-  // },
-
+    return Promise.all(requests).then(API.addTasks);
+  },
   addTaskActivity: function addTaskActivity(task, type, text) {
     var currentUser = window.tommy.config.getCurrentUser();
     var activity = {
@@ -151,19 +149,26 @@ var API = {
       alert('Task name must be set');
       return;
     }
-    // if (!task.parent_id) {
-    //   alert('Task must belong to a list')
-    //   return
-    // }
+
+    _index2.default.invalidateLists = true; // rerender lists
 
     task.addon = 'tasks';
     task.kind = 'Task';
+    task.include_filters = true;
+    task.include_permission_to = true;
     if (!task.id) {
       API.addTaskActivity(task, 'status', window.tommy.i18n.t('task.created_a_task'));
+    }
+    if (!task.status) {
+      task.status = API.STATUSES[0];
     }
     if (!task.start_at) {
       task.start_at = new Date().getTime();
     }
+
+    // Specify the access policies this resource will belong to
+    if (!task.id) task.with_access_policies = ['task_create_access', 'task_edit_access'];
+
     var params = Object.assign({}, task, { data: JSON.stringify(task.data) });
     if (task.id) {
       return window.tommy.api.updateFragment(task.id, params).then(API.addTask);
@@ -188,25 +193,35 @@ var API = {
 
     params = Object.assign({
       addon: 'tasks',
-      kind: 'TaskList'
+      kind: 'TaskList',
+      include_filters: true,
+      include_permission_to: true
     }, params);
     return window.tommy.api.getFragments(params).then(API.addLists);
   },
   deleteList: function deleteList(listId) {
+    _index2.default.invalidateLists = true;
     delete API.cache['lists'][listId];
     console.log('delete list', listId);
     return window.tommy.api.deleteFragment(listId);
   },
   saveList: function saveList(list) {
     console.log('save list', list);
+
+    // Set the internal flags to reload tasks for this list
+    API.tasksLoaded = false;
+    list._tasksLoaded = false;
     _index2.default.invalidateLists = true; // rerender lists
+
     list.addon = 'tasks';
     list.kind = 'TaskList';
+    list.include_filters = true;
+    list.include_permission_to = true;
     if (!list.data) {
       list.data = {};
     }
-    if (typeof list.data.order === 'undefined') {
-      list.data.order = Object.keys(API.cache['lists']).length;
+    if (typeof list.data.position === 'undefined') {
+      list.data.position = Object.keys(API.cache['lists']).length;
     }
     if (typeof list.data.active === 'undefined') {
       list.data.active = true;
@@ -214,7 +229,14 @@ var API = {
     if (typeof list.data.show_fast_add === 'undefined') {
       list.data.show_fast_add = true;
     }
-    var params = Object.assign({}, list, { data: JSON.stringify(list.data) });
+
+    // Specify the access policies this resource will belong to
+    if (!list.id) list.with_access_policies = ['task_list_read_access', 'task_list_edit_access'];
+
+    var params = Object.assign({}, list, {
+      data: JSON.stringify(list.data),
+      filters: JSON.stringify(list.filters)
+    });
     if (list.id) {
       return window.tommy.api.updateFragment(list.id, params).then(API.addList);
     } else {
@@ -241,37 +263,80 @@ var API = {
     };
     return API.saveList(list);
   },
-  hasLists: function hasLists() {
-    return Object.keys(API.cache['lists']).length > 0;
+  hasDefaultList: function hasDefaultList() {
+    return API.cache['lists'] && Object.values(API.cache['lists']).filter(function (x) {
+      return x.data.default;
+    }).length > 0;
   },
-  initPermissionSelects: function initPermissionSelects(page, permissionNames) {
-    window.tommy.api.getInstalledAddonPermissions('tasks', { cache: true }).then(function (permissions) {
-      console.log('installed addon permissions', permissions);
-      permissions = permissions.filter(function (x) {
-        return permissionNames.indexOf(x.name) !== -1;
-      });
-      // window.tommy.tplManager.renderInline('tasks__tagSelectTemplate', permissions, page.container)
-      for (var i = 0; i < permissions.length; i++) {
-        console.log('init permissions', permissions[i]);
-        window.tommy.tplManager.appendInline('tasks__tagSelectTemplate', permissions[i], page.container);
-        API.initTagSelect(page, permissions[i]);
-      }
+
+
+  // initAccessPolicySelects (page, wantedAccessPolicies) {
+  //   console.log('init permission selects', wantedAccessPolicies)
+  //   window.tommy.api.getInstalledAddonAccessPolicies('tasks').then(permissions => {
+  //     console.log('installed addon permissions', permissions)
+  //     for (var i = 0; i < permissions.length; i++) {
+  //       const wantedAccessPolicy = wantedAccessPolicies.filter(x => x.name == permissions[i].name)[0]
+  //       if (!wantedAccessPolicy) continue
+  //       const permission = Object.assign({}, permissions[i], wantedAccessPolicy)
+  //       console.log('init permissions', permission)
+  //       window.tommy.tplManager.appendInline('tasks__tagSelectTemplate', permission, page.container)
+  //       API.initTagSelect(page, permission)
+  //     }
+  //   })
+  // },
+
+  initAccessPolicySelect: function initAccessPolicySelect(page, name, resource_id) {
+    console.log('init permission selects', name, resource_id);
+    var params = {
+      resource_id: resource_id,
+      include_filters: true
+    };
+    window.tommy.api.getInstalledAddonAccessPolicy('tasks', name, params).then(function (permission) {
+      console.log('installed addon permission', permission);
+      // for (var i = 0; i < permissions.length; i++) {
+      // const wantedAccessPolicy = wantedAccessPolicies.filter(x => x.name == permissions[i].name)[0]
+      // if (!wantedAccessPolicy) continue
+      // const permission = Object.assign({}, permissions[i], wantedAccessPolicy)
+      // console.log('init permissions', permission)
+      permission.resource_id = resource_id;
+      window.tommy.tplManager.appendInline('tasks__tagSelectTemplate', permission, page.container);
+      API.initTagSelect(page, permission);
+      // }
     });
   },
   initTagSelect: function initTagSelect(page, permission) {
     var $tagSelect = $$(page.container).find('.tag-select[data-permission-name="' + permission.name + '"]'); //.find('') //$page.find('#addon-permissions-form .tag-select')
     console.log('init tag select', permission, $tagSelect.dataset());
     window.tommy.tagSelect.initWidget($tagSelect, permission.filters, function (data) {
-      console.log('save tags', permission, data);
-
-      // $tagSelect.data('permission-name')
-      window.tommy.api.updateInstalledAddonPermission('tasks', permission.name, {
-        filters: JSON.stringify(data)
+      console.log('save permission tags', permission, data);
+      window.tommy.api.updateInstalledAddonAccessPolicy('tasks', permission.name, {
+        resource_id: permission.resource_id, // pass the resource_id for resource specific permissions
+        include_filters: true,
+        filters: JSON.stringify(data) // data
       });
     });
   },
   isTablet: function isTablet() {
     return window.innerWidth >= 630;
+  },
+
+
+  STATUSES: ['Unassigned', 'Assigned', 'Processing', 'Completed', 'Closed', 'Archive Task', 'Cancel'],
+
+  translateStatus: function translateStatus(status) {
+    if (status) return window.tommy.i18n.t('status.' + window.tommy.util.underscore(status), { defaultValue: status });
+  },
+  untranslateStatus: function untranslateStatus(translatedStatus) {
+    for (var i = 0; i < API.STATUSES.length; i++) {
+      if (API.translateStatus(API.STATUSES[i]) === translatedStatus) return API.STATUSES[i];
+    }
+  },
+  translatedStatuses: function translatedStatuses() {
+    var statuses = [];
+    for (var i = 0; i < API.STATUSES.length; i++) {
+      statuses.push(API.translateStatus(API.STATUSES[i]));
+    }
+    return statuses;
   }
 };
 
@@ -297,19 +362,18 @@ var BoardSettingsController = {
 
     window.tommy.tplManager.renderInline('tasks__boardSettingTemplate', null, $page);
 
-    _api2.default.initPermissionSelects(page, ['task_create_access', 'task_edit_access']);
+    // Team manager only settings
+    if (window.tommy.util.isTeamOwnerOrManager()) {
+      _api2.default.initAccessPolicySelect(page, 'task_create_access');
+      _api2.default.initAccessPolicySelect(page, 'task_edit_access');
+    }
 
-    $nav.find('a.save').on('click', function (ev) {
-      var data = window.tommy.app.f7.formToJSON($page.find('form'));
-
-      // NOTE: Form not implemented yet
-      ev.preventDefault();
-    });
-  },
-  saveList: function saveList() {},
-  afterSave: function afterSave(res) {
-    // console.log('board saved', res)
-    // window.tommy.app.f7view.router.back()
+    // $nav.find('a.save').on('click', ev => {
+    //   const data = window.tommy.app.f7.formToJSON($page.find('form'))
+    //
+    //   // NOTE: Form not implemented yet
+    //   ev.preventDefault()
+    // })
   }
 };
 
@@ -335,28 +399,32 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 var IndexController = {
   init: function init(page) {
     console.log('initialize tasks addon');
-    if (!_api2.default.listsLoaded || !_api2.default.tasksLoaded) {
+    if (!_api2.default.listsLoaded) {
+      // || !API.tasksLoaded
       _api2.default.initCache();
       _api2.default.loadLists().then(function () {
-        if (_api2.default.hasLists()) {
-          _api2.default.loadTasks().then(function () {
-            IndexController.invalidate(page);
-          });
+        if (_api2.default.hasDefaultList()) {
+          IndexController.loadTasks(page);
         } else {
 
           // Create a default list if none exists
           _api2.default.createDefaultList().then(function () {
-            _api2.default.loadTasks().then(function () {
-              IndexController.invalidate(page);
-            });
+            IndexController.loadTasks(page);
           });
         }
       });
+    } else if (!_api2.default.tasksLoaded) {
+      IndexController.loadTasks(page);
     } else {
       IndexController.invalidate(page);
     }
 
     IndexController.bind(page);
+  },
+  loadTasks: function loadTasks(page) {
+    _api2.default.loadTasks().then(function () {
+      IndexController.invalidate(page);
+    });
   },
   uninit: function uninit() {
     console.log('uninitialize tasks addon');
@@ -385,7 +453,7 @@ var IndexController = {
       var list = _api2.default.cache['lists'][$$(this).parents('[data-list-id]').data('list-id')];
       var data = window.tommy.app.f7.formToJSON(this);
 
-      // FIXME: Inherit task filters from list when quick adding tasks
+      // Inherit list filters from list when quick adding tasks
       data.filters = list.filters;
 
       $$(this).find('input[name="name"]').val('');
@@ -410,25 +478,29 @@ var IndexController = {
     $page.on('click', 'a.task-card', function () {
       var href = $$(this).data('href');
 
-      if (_api2.default.isTablet()) {
-        $$.get(href, function (response) {
-          var $popup = $$('<div class="popup" data-page="tasks__task" id="tasks__tasks"></div>');
-          $popup.append(response);
-          $popup.find('.back').removeClass('back');
-          $popup.find('.page').addClass('navbar-fixed');
-          window.tommy.f7.popup($popup);
-          _task2.default.init({
-            container: $popup.find('.page')[0],
-            navbarInnerContainer: $popup.find('.navbar-inner')[0],
-            query: $$.parseUrlQuery(href)
-          });
-
-          // window.tommy.f7.initPage($popup.find('.page'))
+      // if (API.isTablet()) {
+      $$.get(href, function (response) {
+        var $popup = $$('<div class="popup" data-page="tasks__task" id="tasks__tasks"></div>');
+        $popup.append(response);
+        $popup.find('.back').removeClass('back');
+        $popup.find('.page').addClass('navbar-fixed');
+        window.tommy.f7.popup($popup);
+        _task2.default.init({
+          container: $popup.find('.page')[0],
+          navbarInnerContainer: $popup.find('.navbar-inner')[0],
+          query: $$.parseUrlQuery(href)
         });
-        // window.tommy.f7view.router.load({url: $$(this).data('href'), animatePages: false})
-      } else {
-        window.tommy.f7view.router.loadPage($$(this).data('href'));
-      }
+
+        $popup.on('popup:close', function () {
+          IndexController.invalidate(page);
+        });
+
+        // window.tommy.f7.initPage($popup.find('.page'))
+      });
+      // window.tommy.f7view.router.load({url: $$(this).data('href'), animatePages: false})
+      // } else {
+      //   window.tommy.f7view.router.loadPage($$(this).data('href'))
+      // }
     });
   },
   invalidate: function invalidate(page) {
@@ -437,6 +509,7 @@ var IndexController = {
     console.log('invalidating tasks index');
     var $page = $$(page.container);
     if (IndexController.invalidateLists || !$page.find('.card').length) {
+      console.log('rendering task lists');
       IndexController.invalidateLists = false;
       window.tommy.tplManager.renderInline('tasks__listsTemplate', _api2.default.getOrderedLists(), page.container);
 
@@ -492,6 +565,9 @@ var ListAddController = {
     var list = {};
     list.name = data.name;
 
+    // Default list filters show tasks tagged with current user
+    list.filters = [_api2.default.currentUserTag()];
+
     // console.log('create list', list, data)
     // if (!list.name) {
     //   alert('List name must be set')
@@ -532,10 +608,15 @@ var ListEditController = {
     var $nav = $$(page.navbarInnerContainer);
 
     console.log('edit list', list);
+
+    // NOTE: we should probably check that the current user has
+    // `task_list_edit_access` permission before rendering the page.
+
     window.tommy.tplManager.renderInline('tasks__listEditTemplate', list, $page);
 
     ListEditController.initListFilters(page, list);
-    _api2.default.initPermissionSelects(page, ['task_list_read_access', 'task_list_edit_access']);
+    _api2.default.initAccessPolicySelect(page, 'task_list_read_access', list.id);
+    _api2.default.initAccessPolicySelect(page, 'task_list_edit_access', list.id);
 
     $nav.find('a.save').on('click', function (ev) {
       var data = window.tommy.app.f7.formToJSON($page.find('form'));
@@ -548,9 +629,13 @@ var ListEditController = {
       ev.preventDefault();
     });
 
+    $page.find('select[name="statuses"]').on('change', function (ev) {
+      list.data.statuses = $$(ev.target).val();
+      console.log('update statuses', list.data.statuses);
+    });
+
     $page.find('.delete-list').on('click', function (ev) {
       _api2.default.deleteList(list.id);
-      _index2.default.invalidateLists = true;
       window.tommy.app.f7view.router.back();
       ev.preventDefault();
     });
@@ -627,9 +712,9 @@ var ListManagementController = {
       var list = _api2.default.cache['lists'][$this.data('list-id')];
       var active = $this.find('input[type="checkbox"]')[0].checked;
 
-      console.log('save list order', list.name, list.data.order, index, list.data.active, active);
-      if (list.data.order != index || list.data.active != active) {
-        list.data.order = index;
+      console.log('save list order', list.name, list.data.position, index, list.data.active, active);
+      if (list.data.position != index || list.data.active != active) {
+        list.data.position = index;
         list.data.active = active;
         _api2.default.saveList(list);
         console.log('updated list', list);
@@ -705,13 +790,11 @@ var TaskController = {
     console.log('init task details', task);
     window.tommy.tplManager.renderInline('tasks__taskDetailsTemplate', task, $page.parent());
 
-    // let $menuPopover = $page.find('.task-menu-popover')
     $page.find('.task-menu-popover').on('popover:open', function () {
       // BUG: popover shows offscreen on desktop, this fixes it
       $$(window).trigger('resize');
     });
 
-    // const $editTaskName = $page.find('input.edit-task-name')
     $page.find('.task-menu-popover a').click(function (e) {
       var command = $$(e.target).data('command');
 
@@ -918,28 +1001,9 @@ var TaskController = {
       TaskController.saveTask(page);
     });
   },
-
-
-  STATUS: ['Unassigned', 'Assigned', 'Processing', 'Completed', 'Closed', 'Archive Task', 'Cancel'],
-
-  translateStatus: function translateStatus(status) {
-    return window.tommy.i18n.t('status.' + window.tommy.util.underscore(status));
-  },
-  untranslateStatus: function untranslateStatus(translatedStatus) {
-    for (var i = 0; i < TaskController.STATUS.length; i++) {
-      if (TaskController.translateStatus(TaskController.STATUS[i]) === translatedStatus) return TaskController.STATUS[i];
-    }
-  },
-  translatedStatuses: function translatedStatuses(translatedStatus) {
-    var statuses = [];
-    for (var i = 0; i < TaskController.STATUS.length; i++) {
-      statuses.push(TaskController.translateStatus(TaskController.STATUS[i]));
-    }
-    return statuses;
-  },
   initStatusPicker: function initStatusPicker(page) {
     var task = _api2.default.cache['tasks'][page.query.task_fragment_id];
-    var initial = task.status ? TaskController.translateStatus(task.status) : undefined;
+    var initial = task.status === 'Unassigned' ? window.tommy.i18n.t('task.waiting_for_assignments') : _api2.default.translateStatus(task.status);
 
     return window.tommy.app.f7.picker({
       input: $$(page.container).find('.task-status-picker'),
@@ -947,11 +1011,11 @@ var TaskController = {
       convertToPopover: false,
       cols: [{
         textAlign: 'center',
-        values: TaskController.translatedStatuses()
+        values: _api2.default.translatedStatuses()
       }],
       onClose: function onClose(p) {
         var translatedStatus = p.value[0];
-        var status = TaskController.untranslateStatus(p.value[0]);
+        var status = _api2.default.untranslateStatus(p.value[0]);
         if (status == task.status) {
           return;
         }
@@ -1017,6 +1081,10 @@ exports.default = TaskController;
 },{"../api":1}],9:[function(require,module,exports){
 'use strict';
 
+var _api = require('./api');
+
+var _api2 = _interopRequireDefault(_api);
+
 var _index = require('./controllers/index');
 
 var _index2 = _interopRequireDefault(_index);
@@ -1079,11 +1147,45 @@ window.tommy.app.t7.registerHelper('tasks__checklistNumCompleted', function (che
 });
 
 window.tommy.app.t7.registerHelper('tasks__displayStatus', function (status) {
-  return window.tommy.i18n.t('status.' + window.tommy.util.underscore(status), { defaultValue: status });
+  return _api2.default.translateStatus(status);
+});
+
+window.tommy.app.t7.registerHelper('tasks__displayStatuses', function (statuses) {
+  if (statuses) {
+    return statuses.map(function (x) {
+      return _api2.default.translateStatus(x);
+    }).join(', ');
+  } else {
+    return '';
+  }
+});
+
+window.tommy.app.t7.registerHelper('tasks__statusSelectOptions', function (statuses) {
+  var ret = '';
+  for (var i = 0; i < _api2.default.STATUSES.length; i++) {
+    var status = _api2.default.STATUSES[i];
+    var selected = statuses && statuses.indexOf(status) !== -1;
+    ret += '<option value="' + status + '" ' + (selected ? 'selected' : '') + '>' + _api2.default.translateStatus(status) + '</option>';
+  }
+  return ret;
+});
+
+window.tommy.app.t7.registerHelper('tasks__ifCanEditList', function (list, options) {
+  var account = window.tommy.config.getCurrentAccount();
+
+  // BUG: Due to some unknown bug `this` is undefined in this function,
+  // so substituting with the `list` variable for return variables
+  // console.log('tasks__canEditList', this, list, options)
+
+  // Default lists (the list automatically created for each team member) can
+  // only be edited by admins
+  if (list.data.default && !window.tommy.util.isTeamOwnerOrManager(account)) return options.inverse(list, options.data);
+
+  if (list.permission_to.indexOf('update') !== -1) return options.fn(list, options.data);else return options.inverse(list, options.data);
 });
 
 window.tommy.app.t7.registerHelper('tasks__displayDateRange', function (range) {
   return range;
 });
 
-},{"./controllers/board-settings":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/task":8,"./controllers/task-add":7}]},{},[9]);
+},{"./api":1,"./controllers/board-settings":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/task":8,"./controllers/task-add":7}]},{},[9]);

@@ -23,9 +23,9 @@ const ListManagementController = {
       const list = API.cache['lists'][$this.data('list-id')]
       const active = $this.find('input[type="checkbox"]')[0].checked
 
-      console.log('save list order', list.name, list.data.order, index, list.data.active, active)
-      if (list.data.order != index || list.data.active != active) {
-        list.data.order = index
+      console.log('save list order', list.name, list.data.position, index, list.data.active, active)
+      if (list.data.position != index || list.data.active != active) {
+        list.data.position = index
         list.data.active = active
         API.saveList(list)
         console.log('updated list', list)

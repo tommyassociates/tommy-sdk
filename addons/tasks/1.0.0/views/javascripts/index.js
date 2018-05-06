@@ -1,3 +1,4 @@
+import API from './api'
 import IndexController from './controllers/index'
 import TaskController from './controllers/task'
 import TaskAddController from './controllers/task-add'
@@ -38,7 +39,43 @@ window.tommy.app.t7.registerHelper('tasks__checklistNumCompleted', checklist => 
 })
 
 window.tommy.app.t7.registerHelper('tasks__displayStatus', status => {
-  return window.tommy.i18n.t('status.' + window.tommy.util.underscore(status), { defaultValue: status })
+  return API.translateStatus(status)
+})
+
+window.tommy.app.t7.registerHelper('tasks__displayStatuses', statuses => {
+  if (statuses) {
+    return statuses.map(x => API.translateStatus(x)).join(', ')
+  } else {
+    return ''
+  }
+})
+
+window.tommy.app.t7.registerHelper('tasks__statusSelectOptions', statuses => {
+  let ret = ''
+  for (let i = 0; i < API.STATUSES.length; i++) {
+    const status = API.STATUSES[i]
+    const selected = statuses && statuses.indexOf(status) !== -1
+    ret += '<option value="' + status + '" ' + (selected ? 'selected' : '') + '>' + (API.translateStatus(status)) + '</option>'
+  }
+  return ret
+})
+
+window.tommy.app.t7.registerHelper('tasks__ifCanEditList', (list, options) => {
+    var account = window.tommy.config.getCurrentAccount()
+
+    // BUG: Due to some unknown bug `this` is undefined in this function,
+    // so substituting with the `list` variable for return variables
+    // console.log('tasks__canEditList', this, list, options)
+
+    // Default lists (the list automatically created for each team member) can
+    // only be edited by admins
+    if (list.data.default && !window.tommy.util.isTeamOwnerOrManager(account))
+      return options.inverse(list, options.data)
+
+    if (list.permission_to.indexOf('update') !== -1)
+      return options.fn(list, options.data)
+    else
+      return options.inverse(list, options.data)
 })
 
 window.tommy.app.t7.registerHelper('tasks__displayDateRange', range => {

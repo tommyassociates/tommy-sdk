@@ -10,58 +10,51 @@
   locales:
     - en-US
     - zh-CN
-  permissions:
-    # task_list_filters:
-    #   title: "Filter Tasks"
-    #   hint: "Select which tasks will appear in this list"
-    #   resource_type: "Fragment"
-    #   resource_kind: "TaskList"
-    #   operations:
-    #     - read
-    task_list_read_access:
-      title: "Who Can See List"
-      hint: "Select who can view this list"
-      resource_type: "Fragment"
-      resource_kind: "TaskList"
-      private: true
-      roles:
-        - Team Manager
-        - Team Admin
-      operations:
-        - read
-    task_list_edit_access:
-      title: "Who Can Edit List"
-      hint: "Select who can edit this list"
-      resource_type: "Fragment"
-      resource_kind: "TaskList"
-      private: true
-      roles:
-        - Team Manager
-        - Team Admin
-      operations:
-        - edit
-    task_create_access:
+  access_policies:
+    tasks_task_create_access:
       title: "Who Can Create Tasks"
       hint: "Select who can create tasks"
+      policy: true
       resource_type: "Fragment"
       resource_kind: "Task"
-      private: true
-      roles:
+      default_roles:
         - Team Manager
         - Team Admin
       operations:
         - create
-    task_edit_access:
+    tasks_task_edit_access:
       title: "Who Can Edit Tasks"
       hint: "Select who can edit tasks"
+      policy: true
       resource_type: "Fragment"
       resource_kind: "Task"
-      private: true
-      roles:
+      default_roles:
         - Team Manager
         - Team Admin
       operations:
-        - edit
+        - update
+    tasks_task_list_read_access:
+      title: "Who Can See List"
+      hint: "Select who can view this list"
+      resource_type: "Fragment"
+      resource_kind: "TaskList"
+      default_roles:
+        - Team Manager
+        - Team Admin
+        - Creator
+      operations:
+        - read
+    tasks_task_list_edit_access:
+      title: "Who Can Edit List"
+      hint: "Select who can edit this list"
+      resource_type: "Fragment"
+      resource_kind: "TaskList"
+      default_roles:
+        - Team Manager
+        - Team Admin
+        - Creator
+      operations:
+        - update
   views:
     index:
       title: "Tasks"

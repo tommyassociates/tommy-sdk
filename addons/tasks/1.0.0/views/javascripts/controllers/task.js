@@ -9,13 +9,11 @@ const TaskController = {
     console.log('init task details', task)
     window.tommy.tplManager.renderInline('tasks__taskDetailsTemplate', task, $page.parent())
 
-    // let $menuPopover = $page.find('.task-menu-popover')
     $page.find('.task-menu-popover').on('popover:open', () => {
       // BUG: popover shows offscreen on desktop, this fixes it
       $$(window).trigger('resize')
     })
 
-    // const $editTaskName = $page.find('input.edit-task-name')
     $page.find('.task-menu-popover a').click(e => {
       const command = $$(e.target).data('command')
 
@@ -214,30 +212,11 @@ const TaskController = {
     })
   },
 
-  STATUS: [ 'Unassigned', 'Assigned', 'Processing', 'Completed', 'Closed', 'Archive Task', 'Cancel' ],
-
-  translateStatus (status) {
-    return window.tommy.i18n.t('status.' + window.tommy.util.underscore(status))
-  },
-
-  untranslateStatus (translatedStatus) {
-    for (let i = 0; i < TaskController.STATUS.length; i++) {
-      if (TaskController.translateStatus(TaskController.STATUS[i]) === translatedStatus)
-        return TaskController.STATUS[i]
-    }
-  },
-
-  translatedStatuses (translatedStatus) {
-    const statuses = []
-    for (let i = 0; i < TaskController.STATUS.length; i++) {
-      statuses.push(TaskController.translateStatus(TaskController.STATUS[i]))
-    }
-    return statuses
-  },
-
   initStatusPicker (page) {
     let task = API.cache['tasks'][page.query.task_fragment_id]
-    const initial = task.status ? TaskController.translateStatus(task.status) : undefined
+    let initial = task.status === 'Unassigned' ?
+      window.tommy.i18n.t('task.waiting_for_assignments') :
+      API.translateStatus(task.status)
 
     return window.tommy.app.f7.picker({
       input: $$(page.container).find('.task-status-picker'),
@@ -246,12 +225,12 @@ const TaskController = {
       cols: [
         {
           textAlign: 'center',
-          values: TaskController.translatedStatuses()
+          values: API.translatedStatuses()
         }
       ],
       onClose (p) {
         const translatedStatus = p.value[0]
-        const status = TaskController.untranslateStatus(p.value[0])
+        const status = API.untranslateStatus(p.value[0])
         if (status == task.status) { return }
         task.status = status
         TaskController.addActivity(page, 'status',

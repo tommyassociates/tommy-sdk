@@ -44,12 +44,12 @@
       title: "Event ID"
       type: "integer"
       required: true
-  permissions:
-    team_member_events_access:
+  access_policies:
+    calendar_team_member_events_access:
       title: "Allow Team Members to View Each Others Events"
       hint: "Select Team Members who can view events created by others"
       resource_type: "Event"
-      roles:
+      default_roles:
         - Team Manager
         - Team Admin
       operations:

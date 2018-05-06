@@ -4,30 +4,35 @@ import TaskController from './task'
 const IndexController = {
   init (page) {
     console.log('initialize tasks addon')
-    if (!API.listsLoaded || !API.tasksLoaded) {
+    if (!API.listsLoaded) { // || !API.tasksLoaded
       API.initCache()
       API.loadLists().then(() => {
-        if (API.hasLists()) {
-          API.loadTasks().then(() => {
-            IndexController.invalidate(page)
-          })
+        if (API.hasDefaultList()) {
+          IndexController.loadTasks(page)
         }
         else {
 
           // Create a default list if none exists
           API.createDefaultList().then(() => {
-            API.loadTasks().then(() => {
-              IndexController.invalidate(page)
-            })
+            IndexController.loadTasks(page)
           })
         }
       })
+    }
+    else if(!API.tasksLoaded) {
+      IndexController.loadTasks(page)
     }
     else {
       IndexController.invalidate(page)
     }
 
     IndexController.bind(page)
+  },
+
+  loadTasks (page) {
+    API.loadTasks().then(() => {
+      IndexController.invalidate(page)
+    })
   },
 
   uninit () {
@@ -54,7 +59,7 @@ const IndexController = {
       const list = API.cache['lists'][$$(this).parents('[data-list-id]').data('list-id')]
       const data = window.tommy.app.f7.formToJSON(this)
 
-      // FIXME: Inherit task filters from list when quick adding tasks
+      // Inherit list filters from list when quick adding tasks
       data.filters = list.filters
 
       $$(this).find('input[name="name"]').val('')
@@ -78,8 +83,8 @@ const IndexController = {
 
     $page.on('click', 'a.task-card', function () {
       const href = $$(this).data('href')
-      
-      if (API.isTablet()) {
+
+      // if (API.isTablet()) {
         $$.get(href, function(response) {
           let $popup = $$('<div class="popup" data-page="tasks__task" id="tasks__tasks"></div>')
           $popup.append(response)
@@ -92,12 +97,16 @@ const IndexController = {
             query: $$.parseUrlQuery(href)
           })
 
+          $popup.on('popup:close', () => {
+            IndexController.invalidate(page)
+          })
+
           // window.tommy.f7.initPage($popup.find('.page'))
         })
         // window.tommy.f7view.router.load({url: $$(this).data('href'), animatePages: false})
-      } else {
-        window.tommy.f7view.router.loadPage($$(this).data('href'))
-      }
+      // } else {
+      //   window.tommy.f7view.router.loadPage($$(this).data('href'))
+      // }
     })
   },
 
@@ -107,6 +116,7 @@ const IndexController = {
     console.log('invalidating tasks index')
     const $page = $$(page.container)
     if (IndexController.invalidateLists || !$page.find('.card').length) {
+      console.log('rendering task lists')
       IndexController.invalidateLists = false
       window.tommy.tplManager.renderInline('tasks__listsTemplate', API.getOrderedLists(), page.container)
 

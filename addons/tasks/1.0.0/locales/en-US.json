@@ -18,7 +18,8 @@
     "title": "Edit List",
     "name": "Name",
     "show-fast-add-task": "Show Fast Add Task",
-    "delete-list": "Delete List"
+    "delete-list": "Delete List",
+    "filter-status": "Filter Status"
   },
   "list-management": {
     "title": "List Management"

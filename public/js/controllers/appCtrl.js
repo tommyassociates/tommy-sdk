@@ -76,7 +76,7 @@ function(app,config,api,util,cache,preload,addons,TM,TH) {
         changeCurrentAccount: function(accountID, accountType, locationId) {
             api.resetCache()
             api.updateCurrentAccount(accountID, accountType, locationId)
-                .then(onCurrentAccountChanged)
+                .then(appCtrl.onCurrentAccountChanged)
                 .then(preload.load)
         },
 
