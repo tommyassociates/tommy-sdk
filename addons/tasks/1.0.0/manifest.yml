@@ -10,7 +10,7 @@
   locales:
     - en-US
     - zh-CN
-  access_policies:
+  policies:
     tasks_task_create_access:
       title: "Who Can Create Tasks"
       hint: "Select who can create tasks"
