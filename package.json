@@ -30,6 +30,7 @@
     "i18next-scanner": "^2.4.6",
     "js-yaml": "^3.11.0",
     "jshint": "*",
+    "junk": "^2.1.0",
     "lodash": "^4.17.5",
     "vinyl-fs": "^3.0.2",
     "vinyl-source-stream": "^2.0.0"

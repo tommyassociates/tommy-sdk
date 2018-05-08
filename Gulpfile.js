@@ -13,16 +13,22 @@ const rename = require('gulp-rename');
 const streamify = require('gulp-streamify');
 const browserSync = require('browser-sync')
 const fs = require('fs')
+const junk = require('junk')
 const path = require('path')
 const reload = browserSync.reload;
 
+const getFilteredFiles = ((folder, package) => {
+  let files = fs.readdirSync(folder, package);
+  files = files.filter(junk.not);
+  return files;
+});
 
 // Get all addons
 const addons = (() => {
   const addons = [];
-  const packages = fs.readdirSync(path.join(__dirname, 'addons'));
+  let packages = getFilteredFiles(path.join(__dirname, 'addons'));
   for (let i = 0; i < packages.length; i++) {
-    addons.push(`${packages[i]}/${fs.readdirSync(path.join(__dirname, 'addons', packages[i]))}`)
+    addons.push(`${packages[i]}/${getFilteredFiles(path.join(__dirname, 'addons', packages[i]))}`)
   }
   return addons
 })()
