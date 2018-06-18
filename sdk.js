@@ -1,5 +1,6 @@
 var express = require('express'),
   fs = require('fs'),
+  junk = require('junk'),
   yaml = require('js-yaml'),
   path = require('path'),
   url = require('url'),
@@ -85,6 +86,12 @@ app.listen(app.get('port'), function() {
 //
 /// Helpers
 
+function getFilteredFiles (folder, package) {
+  let files = fs.readdirSync(folder, package);
+  files = files.filter(junk.not);
+  return files;
+}
+
 function loadConfig(filepath) {
   return JSON.parse(
     fs.readFileSync(filepath).toString().replace( //
@@ -114,9 +121,9 @@ function createAddon(host, action, package, version, archivePath, callback) {
 
 function readLocalAddonVersions() {
   var addons = {}
-  var packages = fs.readdirSync(path.join(__dirname, 'addons'))
+  var packages = getFilteredFiles(path.join(__dirname, 'addons'))
   for (var i = 0; i < packages.length; i++) {
-    addons[packages[i]] = fs.readdirSync(path.join(__dirname, 'addons', packages[i]))
+    addons[packages[i]] = getFilteredFiles(path.join(__dirname, 'addons', packages[i]))
   }
   return addons
 }

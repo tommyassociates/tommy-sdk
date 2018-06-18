@@ -1,9 +1,10 @@
 node_modules/
 vendor/
-archives/
+archives/*
 backup
 bak
 config*
 .sass-cache
 *.log
 *~
+!/**/.gitkeep
