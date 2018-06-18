@@ -1,0 +1,26 @@
+---
+  title: "Pedometer"
+  package: "pedometer"
+  version: "1.0.0"
+  summary: "Pedometer demo."
+  description: "This addon provides demo integration with biofeedback devices."
+  developer: "Tommy Labs GmbH"
+  homepage: "http://mytommy.com"
+  private: false
+  views:
+    index:
+      title: "Pedometer"
+      file: "views/index.html"
+      type: "page"
+      framed: false
+      index: true
+      assets:
+        -
+          type: "stylesheet"
+          file: "views/build/bundle.css"
+        -
+          type: "javascript"
+          file: "views/build/bundle.js"
+        -
+          type: "template"
+          file: "views/build/bundle.tpl.html"
