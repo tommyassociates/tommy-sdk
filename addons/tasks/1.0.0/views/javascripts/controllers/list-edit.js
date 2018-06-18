@@ -15,8 +15,8 @@ const ListEditController = {
     window.tommy.tplManager.renderInline('tasks__listEditTemplate', list, $page)
 
     ListEditController.initListFilters(page, list)
-    API.initPolicySelect(page, 'task_list_read_access', list.id)
-    API.initPolicySelect(page, 'task_list_edit_access', list.id)
+    API.initPermissionSelect(page, 'task_list_read_access', list.id)
+    API.initPermissionSelect(page, 'task_list_edit_access', list.id)
 
     $nav.find('a.save').on('click', ev => {
       const data = window.tommy.app.f7.formToJSON($page.find('form'))

@@ -3,7 +3,7 @@ vendor/
 archives/
 backup
 bak
-config.json
+config*
 .sass-cache
 *.log
 *~

@@ -9,8 +9,8 @@ const BoardSettingsController = {
 
     // Team manager only settings
     if (window.tommy.util.isTeamOwnerOrManager()) {
-      API.initPolicySelect(page, 'task_create_access')
-      API.initPolicySelect(page, 'task_edit_access')
+      API.initPermissionSelect(page, 'task_create_access')
+      API.initPermissionSelect(page, 'task_edit_access')
     }
 
     // $nav.find('a.save').on('click', ev => {

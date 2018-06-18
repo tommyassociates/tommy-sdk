@@ -10,11 +10,10 @@
   locales:
     - en-US
     - zh-CN
-  policies:
+  permissions:
     tasks_task_create_access:
       title: "Who Can Create Tasks"
       hint: "Select who can create tasks"
-      policy: true
       resource_type: "Fragment"
       resource_kind: "Task"
       default_roles:
@@ -25,7 +24,6 @@
     tasks_task_edit_access:
       title: "Who Can Edit Tasks"
       hint: "Select who can edit tasks"
-      policy: true
       resource_type: "Fragment"
       resource_kind: "Task"
       default_roles:

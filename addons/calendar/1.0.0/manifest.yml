@@ -44,7 +44,7 @@
       title: "Event ID"
       type: "integer"
       required: true
-  policies:
+  permissions:
     calendar_team_member_events_access:
       title: "Allow Team Members to View Each Others Events"
       hint: "Select Team Members who can view events created by others"

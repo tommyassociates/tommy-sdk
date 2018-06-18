@@ -166,8 +166,8 @@ var API = {
       task.start_at = new Date().getTime();
     }
 
-    // Specify the access policies this resource will belong to
-    if (!task.id) task.with_policies = ['task_create_access', 'task_edit_access'];
+    // Specify the access permissions this resource will belong to
+    if (!task.id) task.with_permissions = ['task_create_access', 'task_edit_access'];
 
     var params = Object.assign({}, task, { data: JSON.stringify(task.data) });
     if (task.id) {
@@ -230,8 +230,8 @@ var API = {
       list.data.show_fast_add = true;
     }
 
-    // Specify the access policies this resource will belong to
-    if (!list.id) list.with_policies = ['task_list_read_access', 'task_list_edit_access'];
+    // Specify the access permissions this resource will belong to
+    if (!list.id) list.with_permissions = ['task_list_read_access', 'task_list_edit_access'];
 
     var params = Object.assign({}, list, {
       data: JSON.stringify(list.data),
@@ -270,14 +270,14 @@ var API = {
   },
 
 
-  // initPolicySelects (page, wantedPolicies) {
-  //   console.log('init permission selects', wantedPolicies)
-  //   window.tommy.api.getInstalledAddonPolicies('tasks').then(permissions => {
+  // initPermissionSelects (page, wantedPermissions) {
+  //   console.log('init permission selects', wantedPermissions)
+  //   window.tommy.api.getInstalledAddonPermissions('tasks').then(permissions => {
   //     console.log('installed addon permissions', permissions)
   //     for (var i = 0; i < permissions.length; i++) {
-  //       const wantedPolicy = wantedPolicies.filter(x => x.name == permissions[i].name)[0]
-  //       if (!wantedPolicy) continue
-  //       const permission = Object.assign({}, permissions[i], wantedPolicy)
+  //       const wantedPermission = wantedPermissions.filter(x => x.name == permissions[i].name)[0]
+  //       if (!wantedPermission) continue
+  //       const permission = Object.assign({}, permissions[i], wantedPermission)
   //       console.log('init permissions', permission)
   //       window.tommy.tplManager.appendInline('tasks__tagSelectTemplate', permission, page.container)
   //       API.initTagSelect(page, permission)
@@ -285,18 +285,18 @@ var API = {
   //   })
   // },
 
-  initPolicySelect: function initPolicySelect(page, name, resource_id) {
+  initPermissionSelect: function initPermissionSelect(page, name, resource_id) {
     console.log('init permission selects', name, resource_id);
     var params = {
       resource_id: resource_id,
       include_filters: true
     };
-    window.tommy.api.getInstalledAddonPolicy('tasks', name, params).then(function (permission) {
+    window.tommy.api.getInstalledAddonPermission('tasks', name, params).then(function (permission) {
       console.log('installed addon permission', permission);
       // for (var i = 0; i < permissions.length; i++) {
-      // const wantedPolicy = wantedPolicies.filter(x => x.name == permissions[i].name)[0]
-      // if (!wantedPolicy) continue
-      // const permission = Object.assign({}, permissions[i], wantedPolicy)
+      // const wantedPermission = wantedPermissions.filter(x => x.name == permissions[i].name)[0]
+      // if (!wantedPermission) continue
+      // const permission = Object.assign({}, permissions[i], wantedPermission)
       // console.log('init permissions', permission)
       permission.resource_id = resource_id;
       window.tommy.tplManager.appendInline('tasks__tagSelectTemplate', permission, page.container);
@@ -309,7 +309,7 @@ var API = {
     console.log('init tag select', permission, $tagSelect.dataset());
     window.tommy.tagSelect.initWidget($tagSelect, permission.filters, function (data) {
       console.log('save permission tags', permission, data);
-      window.tommy.api.updateInstalledAddonPolicy('tasks', permission.name, {
+      window.tommy.api.updateInstalledAddonPermission('tasks', permission.name, {
         resource_id: permission.resource_id, // pass the resource_id for resource specific permissions
         include_filters: true,
         filters: JSON.stringify(data) // data
@@ -364,8 +364,8 @@ var BoardSettingsController = {
 
     // Team manager only settings
     if (window.tommy.util.isTeamOwnerOrManager()) {
-      _api2.default.initPolicySelect(page, 'task_create_access');
-      _api2.default.initPolicySelect(page, 'task_edit_access');
+      _api2.default.initPermissionSelect(page, 'task_create_access');
+      _api2.default.initPermissionSelect(page, 'task_edit_access');
     }
 
     // $nav.find('a.save').on('click', ev => {
@@ -615,8 +615,8 @@ var ListEditController = {
     window.tommy.tplManager.renderInline('tasks__listEditTemplate', list, $page);
 
     ListEditController.initListFilters(page, list);
-    _api2.default.initPolicySelect(page, 'task_list_read_access', list.id);
-    _api2.default.initPolicySelect(page, 'task_list_edit_access', list.id);
+    _api2.default.initPermissionSelect(page, 'task_list_read_access', list.id);
+    _api2.default.initPermissionSelect(page, 'task_list_edit_access', list.id);
 
     $nav.find('a.save').on('click', function (ev) {
       var data = window.tommy.app.f7.formToJSON($page.find('form'));
