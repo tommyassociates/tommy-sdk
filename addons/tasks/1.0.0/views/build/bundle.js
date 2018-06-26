@@ -400,7 +400,7 @@ var IndexController = {
   init: function init(page) {
     console.log('initialize tasks addon');
     if (!_api2.default.listsLoaded) {
-      // || !API.tasksLoaded
+      // || !API.tasksLoaded 
       _api2.default.initCache();
       _api2.default.loadLists().then(function () {
         if (_api2.default.hasDefaultList()) {

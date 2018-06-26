@@ -45,8 +45,8 @@
       type: "integer"
       required: true
   permissions:
-    calendar_team_member_events_access:
-      title: "Allow Team Members to View Each Others Events"
+    calendar_manager_access:
+      title: "Who Can View Other Team Members' Events"
       hint: "Select Team Members who can view events created by others"
       resource_type: "Event"
       default_roles:
@@ -118,6 +118,7 @@
       type: "page"
       framed: false
       index: true
+      actor_permission: calendar_manager_access
       assets:
         -
           type: "stylesheet"

@@ -17,12 +17,12 @@ function (app,api,util,cache,addons,tplManager) {
 
         init: function (page) {
             var $page = $$(page.container),
-                now = new Date();
+                now = new Date()
 
-            console.log('calendar initialize');
+            console.log('calendar initialize')
             // if (Calendar.widget) {
-            //     console.log('calendar already initialized');
-            //     Calendar.loadCurrentMonthAndSelectToday();
+            //     console.log('calendar already initialized')
+            //     Calendar.loadCurrentMonthAndSelectToday()
             //     return;
             // }
 
@@ -43,17 +43,17 @@ function (app,api,util,cache,addons,tplManager) {
                         '</div>' +
                     '</div>',
                 onOpen: function (p) {
-                    $page.find('.calendar-custom-toolbar .center').text(util.monthNames[p.currentMonth] +', ' + p.currentYear);
+                    $page.find('.calendar-custom-toolbar .center').text(util.monthNames[p.currentMonth] +', ' + p.currentYear)
                     $page.find('.calendar-custom-toolbar .left .link').on('click', function () {
                         // Calendar.widget
-                        p.prevMonth();
-                    });
+                        p.prevMonth()
+                    })
                     $page.find('.calendar-custom-toolbar .right .link').on('click', function () {
                         // Calendar.widget
-                        p.nextMonth();
-                    });
+                        p.nextMonth()
+                    })
                     // setTimeout(Calendar.loadCurrentMonthAndSelectToday)
-                    // Calendar.selectDay(year, month, day);
+                    // Calendar.selectDay(year, month, day)
 
                     var year = p.currentYear,
                         month = p.currentMonth;
@@ -63,123 +63,127 @@ function (app,api,util,cache,addons,tplManager) {
                         Calendar.loadMonth(year, month, function (res) {
 
                             // Select the current day
-                            Calendar.selectDay(year, month, now.getDate());
-                            // Calendar.getDayElement(year, month, now.getDate()).trigger('click');
-                        });
+                            Calendar.selectDay(year, month, now.getDate())
+                            // Calendar.getDayElement(year, month, now.getDate()).trigger('click')
+                        })
                     }
 
                 },
                 onDayClick: function (p, dayContainer, year, month, day) {
-                    console.log('onDayClick', p, dayContainer, year, month, day);
-                    // calendarLoadDate(p.currentYear, p.currentMonth, p.currentDay);
+                    console.log('onDayClick', p, dayContainer, year, month, day)
+                    // calendarLoadDate(p.currentYear, p.currentMonth, p.currentDay)
 
-                    Calendar.selectDay(year, month, day);
+                    Calendar.selectDay(year, month, day)
                 },
                 onMonthYearChangeStart: function (p, year, month) {
                     console.log('onMonthYearChangeStart', p, year, month)
-                    $page.find('.calendar-custom-toolbar .center').text(util.monthNames[month] +', ' + year);
+                    $page.find('.calendar-custom-toolbar .center').text(util.monthNames[month] +', ' + year)
                     if (!Calendar.eventsForDate(year, month).length) {
-                        Calendar.loadMonth(year, month);
+                        Calendar.loadMonth(year, month)
                     }
                 }
-            });
+            })
         },
 
         uninit: function () {
-            console.log('calendar uninitialize');
+            console.log('calendar uninitialize')
             Calendar.cache = {};
         },
 
         invalidate: function () {
-            console.log('calendar invalidate');
+            console.log('calendar invalidate')
 
             // May be null during startup
             if (Calendar.widget &&
                 Calendar.widget.container)
-                $$(Calendar.widget.container).find('.picker-calendar-day').removeClass('has-events');
+                $$(Calendar.widget.container).find('.picker-calendar-day').removeClass('has-events')
 
             for (var id in Calendar.cache) {
                 var event = Calendar.cache[id];
-                Calendar.getDayElement(event.year, event.month, event.startDay).addClass('has-events');
+                Calendar.getDayElement(event.year, event.month, event.startDay).addClass('has-events')
 
                 // TODO: Add event to days between start and end
                 if (event.startDay != event.endDay) {
-                    Calendar.getDayElement(event.year, event.month, event.endDay).addClass('has-events');
+                    Calendar.getDayElement(event.year, event.month, event.endDay).addClass('has-events')
                 }
             }
 
-            // Calendar.selectCurrentDay();
+            if (Calendar.invalidateEvents) {
+              Calendar.invalidateEvents = false
+              Calendar.selectCurrentDay()
+            }
         },
 
         // loadCurrentMonthAndSelectToday: function () {
-        //     console.log('calendar loadCurrentMonthAndSelectToday', Calendar.widget);
+        //     console.log('calendar loadCurrentMonthAndSelectToday', Calendar.widget)
         //     var year = Calendar.widget.currentYear,
         //         month = Calendar.widget.currentMonth,
-        //         day = (new Date()).getDate();
+        //         day = (new Date()).getDate()
         //
         //     Calendar.loadMonth(year, month, function (res) {
-        //         Calendar.selectDay(year, month, day);
-        //     });
+        //         Calendar.selectDay(year, month, day)
+        //     })
         // },
 
         getDayElement: function (year, month, day) {
-            return $$(Calendar.widget.container).find('[data-year="' + year + '"][data-month="' + month + '"][data-day="' + day + '"]');
+            return $$(Calendar.widget.container).find('[data-year="' + year + '"][data-month="' + month + '"][data-day="' + day + '"]')
         },
 
         eventsForDate: function (year, month, day) {
-            var events = [];
+            var events = []
             for (var id in Calendar.cache) {
                 var event = Calendar.cache[id];
                 if (event.year == year &&
                     event.month == month &&
                     (event.startDay == day || event.endDay == day || !day)) {
-                    events.push(event);
+                    events.push(event)
                 }
             }
             return events;
         },
 
         addEvent: function (event) {
-            event.startAt = new Date(event.start_at);
-            event.year = event.startAt.getFullYear();
-            event.month = event.startAt.getMonth();
-            // event.zeroMonth = event.startAt.getMonth() - 1; // zero based month index for JS
-            event.startDay = event.startAt.getDate();
+            // Add some helper members to the event object
+            event.startAt = new Date(event.start_at)
+            event.year = event.startAt.getFullYear()
+            event.month = event.startAt.getMonth()
+            event.startDay = event.startAt.getDate()
             if (event.end_at) {
-                event.endAt = new Date(event.end_at);
-                event.endDay = event.endAt.getDate();
+                event.endAt = new Date(event.end_at)
+                event.endDay = event.endAt.getDate()
             }
 
             console.log('event added', event)
-            Calendar.cache[event.id] = event;
+            Calendar.cache[event.id] = event
+            Calendar.invalidateEvents = true // rerender lists
         },
 
         loadMonth: function (year, month, callback) {
             if (month)
-                month += 1;
+                month += 1
 
-            var params = { year: year, month: month };
+            var params = { year: year, month: month }
 
             // Always query actor events at user scope for now
-            params.actor_id = addons.currentActorId();
-            params.user_id = addons.currentActorOrUserId();
-            params.owner_type = 'AddonInstall';
-            params.owner_id = addons.currentAddonInstallId();
+            // params.actor_id = addons.currentActorId()
+            params.user_id = addons.currentActorOrUserId()
+            // params.owner_type = 'AddonInstall';
+            // params.owner_id = addons.currentAddonInstallId()
 
-            console.log('load events', params);
+            console.log('load events', params)
 
             api.getEvents(params).then(function (res) {
-                console.log('events response', res);
+                console.log('events response', res)
                 if (res.length) {
                     for (var i = 0; i < res.length; i++) {
-                        Calendar.addEvent(res[i]);
+                        Calendar.addEvent(res[i])
                     }
                 }
                 if (callback)
-                    callback(res);
+                    callback(res)
 
-                Calendar.invalidate();
-            });
+                Calendar.invalidate()
+            })
         },
 
         selectCurrentDay: function () {
@@ -188,7 +192,7 @@ function (app,api,util,cache,addons,tplManager) {
                     Calendar.selectedDate.getFullYear(),
                     Calendar.selectedDate.getMonth(),
                     Calendar.selectedDate.getDate()
-                );
+                )
             }
         },
 
@@ -196,12 +200,13 @@ function (app,api,util,cache,addons,tplManager) {
             var context = {
                 date: new Date(year, month, day),
                 events: Calendar.eventsForDate(year, month, day)
-            };
+            }
 
-            tplManager.renderTarget('calendar__eventListTemplate', context, '#calendar__events');
+            // alert('selectDay')
+            tplManager.renderTarget('calendar__eventListTemplate', context, '#calendar__events')
 
             // Set the `selectedDate` for `selectCurrentDay()` calls
-            Calendar.selectedDate = new Date(year, month, day);
+            Calendar.selectedDate = new Date(year, month, day)
         }
     };
 
@@ -213,26 +218,28 @@ function (app,api,util,cache,addons,tplManager) {
         init: function(page) {
             var event = Calendar.cache[page.query.event_id] || {},
                 $page = $$(page.container),
-                $nav = $$(page.navbarInnerContainer);
+                $nav = $$(page.navbarInnerContainer)
 
-            tplManager.renderTarget('calendar__eventFormTemplate', event, $page.find('.page-content'));
+            tplManager.renderTarget('calendar__eventFormTemplate', event, $page.find('.page-content'))
 
             $nav.find('a.save').on('click', function (ev) {
-                var data = app.f7.formToJSON($page.find('form'));
-                EventForm.saveEvent(data);
-                ev.preventDefault();
-            });
+                var data = app.f7.formToJSON($page.find('form'))
+                data.start_at = $page.find('input[name="start_at"]').data('datetime')
+                data.end_at = $page.find('input[name="end_at"]').data('datetime')
+                EventForm.saveEvent(data)
+                ev.preventDefault()
+            })
 
-            // $form = $page.find('form');
+            // $form = $page.find('form')
             // $form.on('submit', function (ev) {
-            //     var data = app.f7.formToJSON($form);
-            //     saveEvent(data);
-            //     ev.preventDefault();
-            // });
+            //     var data = app.f7.formToJSON($form)
+            //     saveEvent(data)
+            //     ev.preventDefault()
+            // })
 
-            util.createDatePicker($page.find('input[name="start_at"]'), event.startAt || new Date);
-            util.createDatePicker($page.find('input[name="end_at"]'), event.endAt || event.startAt || new Date);
-            EventForm.createReminderWidget($page.find('.reminder'));
+            util.createDatePicker($page.find('input[name="start_at"]'), event.start_at) // || new Date
+            util.createDatePicker($page.find('input[name="end_at"]'), event.end_at) // || event.startAt || new Date
+            EventForm.createReminderWidget($page.find('.reminder'))
         },
 
         createReminderWidget: function($element) {
@@ -242,8 +249,8 @@ function (app,api,util,cache,addons,tplManager) {
                 inputReadOnly: true,
                 onChange: function (p, values, displayValues) {
                     // console.log('set reminder', values, displayValues)
-                    $element.find('input[name="reminder"]').val(values[0]);
-                    $element.addClass('has-reminder');
+                    $element.find('input[name="reminder"]').val(values[0])
+                    $element.addClass('has-reminder')
                 },
                 formatValue: function (p, values, displayValues) {
                     return displayValues[0];
@@ -261,53 +268,54 @@ function (app,api,util,cache,addons,tplManager) {
                             '2 hours before']
                     }
                 ]
-            });
+            })
 
             $element.find('.reminder-add').click(function (event) {
-                picker.open();
-                event.preventDefault();
-            });
+                picker.open()
+                event.preventDefault()
+            })
 
             $element.find('.reminder-delete').click(function (event) {
-                $element.find('input[name="reminder"]').val('');
-                $element.find('input[name="reminder_display"]').val('');
-                $element.removeClass('has-reminder');
-                event.preventDefault();
-            });
+                $element.find('input[name="reminder"]').val('')
+                $element.find('input[name="reminder_display"]').val('')
+                $element.removeClass('has-reminder')
+                event.preventDefault()
+            })
 
             if ($element.find('input[name="reminder"]').val()) {
-                $element.addClass('has-reminder');
+                $element.addClass('has-reminder')
             }
         },
 
         saveEvent: function(data) {
             // data.kind = 'calendar';
-            data.start_at = new Date(data.start_at).toUTCString();
-            if (data.end_at && data.end_at.length)
-                data.end_at = new Date(data.end_at).toUTCString();
+            // if (data.start_at && data.start_at.length)
+            //     data.start_at = new Date(data.start_at).toUTCString()
+            // if (data.end_at && data.end_at.length)
+            //     data.end_at = new Date(data.end_at).toUTCString()
 
             // For now always save events at actor user scope.
             // Later we may also save account events.
-            data.actor_id = addons.currentActorId();
-            data.user_id = addons.currentActorOrUserId();
-            // data.account_type = 'User';
-            // data.account_id = addons.currentActorOrUserId();
-            data.owner_type = 'AddonInstall';
-            data.owner_id = addons.currentAddonInstallId();
-            console.log('save event', data);
+            // data.actor_id = addons.currentActorId()
+            data.user_id = addons.currentActorOrUserId()
+            // data.account_type = 'User'
+            // data.account_id = addons.currentActorOrUserId()
+            // data.owner_type = 'AddonInstall'
+            // data.owner_id = addons.currentAddonInstallId()
+            console.log('save event', data)
 
             if (data.id) {
-                api.updateEvent(data.id, data).then(EventForm.onSave);
+                api.updateEvent(data.id, data).then(EventForm.onSave)
             }
             else {
-                api.createEvent(data).then(EventForm.onSave);
+                api.createEvent(data).then(EventForm.onSave)
             }
         },
 
         onSave: function(res) {
-            console.log('event saved', res);
-            Calendar.addEvent(res);
-            app.f7view.router.back();
+            console.log('event saved', res)
+            Calendar.addEvent(res)
+            app.f7view.router.back()
         }
     }
 
@@ -317,9 +325,9 @@ function (app,api,util,cache,addons,tplManager) {
     var EventDetails = {
         init: function (page) {
             var event = Calendar.cache[page.query.event_id],
-                $page = $$(page.container);
+                $page = $$(page.container)
 
-            tplManager.renderTarget('calendar__eventDetailsTemplate', event, $page.find('.page-content'));
+            tplManager.renderTarget('calendar__eventDetailsTemplate', event, $page.find('.page-content'))
         }
     }
 
@@ -328,43 +336,43 @@ function (app,api,util,cache,addons,tplManager) {
 
     /// Calendar
 
-    app.f7.onPageInit('calendar__main', Calendar.init);
-    app.f7.onPageBack('calendar__main', Calendar.uninit);
-    app.f7.onPageAfterAnimation('calendar__main', Calendar.invalidate);
+    app.f7.onPageInit('calendar__main', Calendar.init)
+    app.f7.onPageBack('calendar__main', Calendar.uninit)
+    app.f7.onPageAfterAnimation('calendar__main', Calendar.invalidate)
 
     /// Event Form
 
-    app.f7.onPageInit('calendar__new-event', EventForm.init);
-    app.f7.onPageInit('calendar__edit-event', EventForm.init);
+    app.f7.onPageInit('calendar__new-event', EventForm.init)
+    app.f7.onPageInit('calendar__edit-event', EventForm.init)
 
     /// Event Details
 
-    app.f7.onPageInit('calendar__event-details', EventDetails.init);
-    app.f7.onPageAfterAnimation('calendar__event-details', EventDetails.init);
+    app.f7.onPageInit('calendar__event-details', EventDetails.init)
+    app.f7.onPageAfterAnimation('calendar__event-details', EventDetails.init)
 
     //
     /// Template7 Helpers
 
     app.t7.registerHelper('calendar__listHeadingDate', function (date) {
         if (!date) return '';
-        return (util.dayNames[date.getDay()] + ', ' + util.monthNames[date.getMonth()] + ' ' + date.getDate());
-    });
+        return (util.dayNames[date.getDay()] + ', ' + util.monthNames[date.getMonth()] + ' ' + date.getDate())
+    })
 
     app.t7.registerHelper('calendar__humanizeMinutes', function (value) {
         if (value > 60) {
             var text = '',
                 hours,
-                minutes;
-            hours = Math.trunc(value / 60);
+                minutes
+            hours = Math.trunc(value / 60)
             minutes = value % 60;
-            text += (hours + ' hours');
+            text += (hours + ' hours')
             if (minutes > 0) {
-                text += (' and ' + minutes + ' minutes');
+                text += (' and ' + minutes + ' minutes')
             }
-            return text;
+            return text
         }
         else {
-            return value + ' minutes';
+            return value + ' minutes'
         }
-    });
-});
+    })
+})
