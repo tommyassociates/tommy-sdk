@@ -4,7 +4,7 @@ import TaskController from './task'
 const IndexController = {
   init (page) {
     console.log('initialize tasks addon')
-    if (!API.listsLoaded) { // || !API.tasksLoaded
+    if (!API.listsLoaded) { // || !API.tasksLoaded 
       API.initCache()
       API.loadLists().then(() => {
         if (API.hasDefaultList()) {

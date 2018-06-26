@@ -11,6 +11,17 @@
     - en-US
     - zh-CN
   permissions:
+    tasks_manager_access:
+      title: "Who Can View Other Team Members' Tasks"
+      hint: "Select who can view tasks on behalf of other users"
+      resource_type: "Fragment"
+      resource_kind: "Task"
+      default_roles:
+        - Team Manager
+        - Team Admin
+      operations:
+        - read
+        - create
     tasks_task_create_access:
       title: "Who Can Create Tasks"
       hint: "Select who can create tasks"
@@ -60,6 +71,7 @@
       type: "page"
       index: true
       framed: false
+      actor_permission: tasks_manager_access
       assets:
         -
           type: "stylesheet"

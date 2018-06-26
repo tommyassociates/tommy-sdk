@@ -291,22 +291,27 @@ define(['config','cache','moment','i18n','Framework7'],function (config,cache,mo
         createDatePicker: function ($input, initialDate, options) {
             if (!window.tommy.f7) return
 
+            // Parse the date if a string was provided
             if (typeof initialDate === 'string') {
                 initialDate = new Date(initialDate)
             }
-            if (!initialDate || (typeof initialDate !== 'object')) {
+
+            // Initialize an empty start date if none was provided
+            var wasDateProvided = !!initialDate // || (typeof initialDate !== 'object')
+            if (!wasDateProvided) { // if (!initialDate || (typeof initialDate !== 'object')) {
                 initialDate = new Date
             }
+
+            // If a date was provided set the initial value
+            // var initialValue = false
+            // if (initialDate) {
+                initialValue = [initialDate.getMonth(), initialDate.getDate(), initialDate.getFullYear(), initialDate.getHours(), (initialDate.getMinutes() < 10 ? '0' + initialDate.getMinutes() : initialDate.getMinutes())]
+            // }
 
             if (!options)
                 options = {}
             if (!options.dateFormat)
                 options.dateFormat = 'dddd, MMM Do YY, h:mm a'
-
-            var initialValue = []
-            if (initialDate) {
-                initialValue = [initialDate.getMonth(), initialDate.getDate(), initialDate.getFullYear(), initialDate.getHours(), (initialDate.getMinutes() < 10 ? '0' + initialDate.getMinutes() : initialDate.getMinutes())]
-            }
 
             console.log('create date picker', initialDate, initialValue)
             return window.tommy.f7.picker(Object.assign({
@@ -317,11 +322,21 @@ define(['config','cache','moment','i18n','Framework7'],function (config,cache,mo
                 convertToPopover: false,
                 updateValuesOnMomentum: false,
                 // updateValuesOnTouchmove: false,
-                value: initialValue,
+                value: wasDateProvided ? initialValue : false,
+                onOpen: function (picker) {
+                    // Set the initial date the first time the picker is opened
+                    // if none was set at startup
+                    if (!wasDateProvided) {
+                        wasDateProvided = true
+                        picker.setValue(initialValue)
+                    }
+                },
+                onClose: function (picker) {
+                },
                 onChange: function (picker, values, displayValues) {
                     var daysInMonth = new Date(picker.value[2], picker.value[0]*1 + 1, 0).getDate();
                     if (values[1] > daysInMonth) {
-                        picker.cols[1].setValue(daysInMonth);
+                        picker.cols[1].setValue(daysInMonth)
                     }
                     // console.log('onChange', values, displayValues)
                 },
@@ -330,15 +345,21 @@ define(['config','cache','moment','i18n','Framework7'],function (config,cache,mo
                         displayValues[0] = util.monthNames[initialDate.getMonth()]
                     }
                     var str = displayValues[0] + ' ' + values[1] + ', ' + values[2] + ' ' + values[3] + ':' + values[4];
+                    var date = new Date(str)
+
+                    // Skip if date is invalid
+                    if (isNaN(date.getTime())) {
+                        return false
+                    }
 
                     // Set the selected date as a public instance member
-                    picker.currentDate = new Date(str)
-                    console.log('formatValue', values, displayValues, str, picker.currentDate)
+                    picker.currentDate = date
+                    $input.data('datetime', picker.currentDate.toUTCString())
 
                     if (options.onFormat)
                         return options.onFormat(picker.currentDate)
                     else
-                        return moment(p.currentDate).format(options.dateFormat);
+                        return moment(picker.currentDate).format(options.dateFormat);
                     // return displayValues[0] + ' ' + values[1] + ', ' + values[2] + ' ' + values[3] + ':' + values[4];
                 },
                 cols: [

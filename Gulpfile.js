@@ -40,31 +40,37 @@ for (const addon of addons) {
   const outdir = `./addons/${addon}/views/build`
   console.log('Registering addon tasks', addon)
 
-  gulp.task(`addon-scss-${addon}`, () => {
-    return sass(`${viewdir}stylesheets/index.scss`)
-      .on('error', sass.logError)
-      .pipe(concat('bundle.css'))
-      .pipe(gulp.dest(outdir))
-  })
+  if (fs.existsSync(`${viewdir}stylesheets/index.scss`)) {
+    gulp.task(`addon-scss-${addon}`, () => {
+      return sass(`${viewdir}stylesheets/index.scss`)
+        .on('error', sass.logError)
+        .pipe(concat('bundle.css'))
+        .pipe(gulp.dest(outdir))
+    })
+  }
 
-  gulp.task(`addon-js-${addon}`, () => {
-    return browserify(`${viewdir}javascripts/index.js`)
-      .transform(babelify, {presets: [es2015]})
-      .bundle()
-      .pipe(source('bundle.js'))
-      .pipe(gulp.dest(`${viewdir}build`))
-      .pipe(rename('bundle.min.js'))
-      .pipe(streamify(concat('bundle.min.js')))
-      .pipe(streamify(uglify()))
-      .pipe(sourcemaps.write('.'))
-      .pipe(gulp.dest(outdir))
-  })
+  if (fs.existsSync(`${viewdir}javascripts/index.js`)) {
+    gulp.task(`addon-js-${addon}`, () => {
+      return browserify(`${viewdir}javascripts/index.js`)
+        .transform(babelify, {presets: [es2015]})
+        .bundle()
+        .pipe(source('bundle.js'))
+        .pipe(gulp.dest(`${viewdir}build`))
+        .pipe(rename('bundle.min.js'))
+        .pipe(streamify(concat('bundle.min.js')))
+        .pipe(streamify(uglify()))
+        .pipe(sourcemaps.write('.'))
+        .pipe(gulp.dest(outdir))
+    })
+  }
 
-  gulp.task(`addon-tpl-${addon}`, () => {
-    return gulp.src(`${viewdir}templates/*.tpl.html`)
-      .pipe(concat('bundle.tpl.html'))
-      .pipe(gulp.dest(outdir))
-  })
+  if (fs.existsSync(`${viewdir}templates/`)) {
+    gulp.task(`addon-tpl-${addon}`, () => {
+      return gulp.src(`${viewdir}templates/*.tpl.html`)
+        .pipe(concat('bundle.tpl.html'))
+        .pipe(gulp.dest(outdir))
+    })
+  }
 }
 
 // gulp.task('stylesheets', function () {
