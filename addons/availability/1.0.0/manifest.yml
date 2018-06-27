@@ -7,12 +7,23 @@
   developer: "Tommy Labs GmbH"
   homepage: "https://mytommy.com"
   private: false
-  locales: 
+  locales:
     - en-US
     - zh-CN
-  roles: 
+  roles:
     - Team Member
     - Team Manager
+  permissions:
+    availability_manager_access:
+      title: "Who Can View Other Team Members' Availabilities"
+      hint: "Select who can view availabilities on behalf of other users"
+      resource_type: "Fragment"
+      resource_kind: "Availability"
+      default_roles:
+        - Team Manager
+        - Team Admin
+      operations:
+        - read
   views:
     main:
       title: "Availability"
@@ -20,7 +31,8 @@
       type: "page"
       index: true
       framed: false
-      roles: 
+      actor_permission: availability_manager_access
+      roles:
         - Team Member
         - Team Manager
       assets:

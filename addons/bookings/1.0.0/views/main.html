@@ -1,0 +1,15 @@
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="left sliding">{{backButton "native"}}</div>
+    <div class="center sliding">{{t "main.title" ns="bookings" defaultValue="Bookings"}}</div>
+  </div>
+</div>
+<div class="page" id="bookings__main"
+    data-page="bookings__main"
+    data-addon="bookings"
+    data-view="main"
+    data-path="{{addonAssetUrl}}">
+  <div class="page-content">
+    <div data-template="bookings__bookingListGroupTemplate"></div>
+  </div>
+</div>

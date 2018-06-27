@@ -1,0 +1,43 @@
+{
+  "label": {
+    "cancel": "取消",
+    "details": "详情",
+    "title": "标题",
+    "location": "位置",
+    "start": "开始",
+    "date": "日期",
+    "time": "时间",
+    "end": "结束"
+  },
+  "booking_details": {
+    "title": "预约详情"
+  },
+  "main": {
+    "title": "预约"
+  },
+  "no_bookings": "未分配预约",
+  "no_bookings_hint": "请稍后再核对......",
+  "title": "代理预约",
+  "summary": "代理和员工预约管理。",
+  "description": "一个简单的代理和员工预约管理系统。",
+  "developer": "杭州托秘网络科技有限公司",
+  "triggers": {
+    "booking_created": {
+      "title": "预约创建"
+    },
+    "booking_updated": {
+      "title": "预约修改"
+    },
+    "booking_deleted": {
+      "title": "预约删除"
+    },
+    "booking_viewed": {
+      "title": "预约查看"
+    }
+  },
+  "views": {
+    "main": {
+      "title": "预约"
+    }
+  }
+}

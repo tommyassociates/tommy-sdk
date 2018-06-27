@@ -1,0 +1,43 @@
+{
+  "label": {
+    "cancel": "Cancel",
+    "details": "Details",
+    "title": "Title",
+    "location": "Location",
+    "start": "Start",
+    "date": "Date",
+    "time": "Time",
+    "end": "End"
+  },
+  "booking_details": {
+    "title": "Booking Details"
+  },
+  "main": {
+    "title": "Bookings"
+  },
+  "no_bookings": "No bookings have been assigned",
+  "no_bookings_hint": "Please check again later...",
+  "title": "Agent Bookings",
+  "summary": "Booking management for agencies and employees.",
+  "description": "A simple booking management system for agencies and employees.",
+  "developer": "Tommy Labs GmbH",
+  "triggers": {
+    "booking_created": {
+      "title": "Booking created"
+    },
+    "booking_updated": {
+      "title": "Booking updated"
+    },
+    "booking_deleted": {
+      "title": "Booking deleted"
+    },
+    "booking_viewed": {
+      "title": "Booking viewed"
+    }
+  },
+  "views": {
+    "main": {
+      "title": "Bookings"
+    }
+  }
+}
