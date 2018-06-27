@@ -467,15 +467,12 @@ a.bg-green {
 }
 
 .right a, .left a {
-	/*color: #fff;*/
-	/* padding-left: 7px; */ /* total 15px */
-	/* padding-right: 7px; */ /* total 15px */
 }
 .right a.link {
-	/*padding: 10px 0 10px 30px;*/
+  min-width: 44px;
 }
-.left a.link {
-	/*padding: 10px 30px 10px 0;*/
+.right a.link.icon-only {
+  min-width: 0;
 }
 
 
