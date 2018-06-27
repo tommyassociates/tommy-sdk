@@ -48,8 +48,7 @@ function (app,api,addons,util,cache,tplManager,moment) {
             params = Object.assign({
                 addon: 'availability',
                 kind: 'Availability',
-                user_id: addons.currentActorOrUserId() // ,
-                // only_owned: true
+                user_id: addons.currentActorOrUserId()
             }, params)
             return api.getFragments(params).then(Availability.addAvailabilities)
         }
@@ -128,8 +127,8 @@ function (app,api,addons,util,cache,tplManager,moment) {
     //
     /// Router
 
-    app.f7.onPageInit('availability__IndexController', IndexController.init)
-    app.f7.onPageAfterAnimation('availability__IndexController', IndexController.invalidate)
+    app.f7.onPageInit('availability__main', IndexController.init)
+    app.f7.onPageAfterAnimation('availability__main', IndexController.invalidate)
 
     //
     /// Template7 Helpers

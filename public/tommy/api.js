@@ -621,9 +621,9 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
             }, options))
         },
 
-        getInstalledAddonPolicies: function(package, options) {
+        getInstalledAddonPermissions: function(package, options) {
             return this.call(Object.assign({
-                endpoint: 'addons/' + package + '/install/policies',
+                endpoint: 'addons/' + package + '/install/permissions',
                 method: 'GET',
                 data: {
                     with_filters: true
@@ -631,9 +631,9 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
             }, options))
         },
 
-        getInstalledAddonPolicy: function(package, name, data, options) {
+        getInstalledAddonPermission: function(package, name, data, options) {
             return this.call(Object.assign({
-                endpoint: 'addons/' + package + '/install/policies/' + name,
+                endpoint: 'addons/' + package + '/install/permissions/' + name,
                 method: 'GET',
                 data: data
                 // {
@@ -642,17 +642,17 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
             }, options))
         },
 
-        getInstalledAddonPolicyFilters: function(package, name, options) {
+        getInstalledAddonPermissionFilters: function(package, name, options) {
             return this.call(Object.assign({
-                endpoint: 'addons/' + action_id + '/install/policies/' + name + '/filters',
+                endpoint: 'addons/' + action_id + '/install/permissions/' + name + '/filters',
                 method: 'GET'
             }, options))
         },
 
-        updateInstalledAddonPolicy: function(package, name, data, options) {
+        updateInstalledAddonPermission: function(package, name, data, options) {
             this.resetCache('addons/' + package)
             return this.call(Object.assign({
-                endpoint: 'addons/' + package + '/install/policies/' + name,
+                endpoint: 'addons/' + package + '/install/permissions/' + name,
                 method: 'PUT',
                 data: data
             }, options))
@@ -789,9 +789,9 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
             }, options))
         },
 
-        getInstalledActionPolicies: function(action_id, options) {
+        getInstalledActionPermissions: function(action_id, options) {
             return this.call(Object.assign({
-                endpoint: 'actions/' + action_id + '/install/policies',
+                endpoint: 'actions/' + action_id + '/install/permissions',
                 method: 'GET',
                 data: {
                     with_filters: true
@@ -799,9 +799,9 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
             }, options))
         },
 
-        getInstalledActionPolicy: function(action_id, name, options) {
+        getInstalledActionPermission: function(action_id, name, options) {
             return this.call(Object.assign({
-                endpoint: 'actions/' + action_id + '/install/policies/' + name,
+                endpoint: 'actions/' + action_id + '/install/permissions/' + name,
                 method: 'GET',
                 data: {
                     with_filters: true
@@ -809,16 +809,16 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
             }, options))
         },
 
-        getInstalledActionPolicyFilters: function(action_id, name, options) {
+        getInstalledActionPermissionFilters: function(action_id, name, options) {
             return this.call(Object.assign({
-                endpoint: 'actions/' + action_id + '/install/policies/' + name + '/filters',
+                endpoint: 'actions/' + action_id + '/install/permissions/' + name + '/filters',
                 method: 'GET'
             }, options))
         },
 
-        updateInstalledActionPolicy: function(action_id, name, data, options) {
+        updateInstalledActionPermission: function(action_id, name, data, options) {
             return this.call(Object.assign({
-                endpoint: 'actions/' + action_id + '/install/policies/' + name,
+                endpoint: 'actions/' + action_id + '/install/permissions/' + name,
                 method: 'PUT',
                 data: data
             }, options))
