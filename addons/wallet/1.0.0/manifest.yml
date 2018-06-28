@@ -7,13 +7,16 @@
   developer: "Tommy Labs GmbH"
   homepage: "http://mytommy.com"
   private: false
+  locales:
+    - en-US
+    - zh-CN
   views:
     index:
       title: "Wallet"
       file: "views/index.html"
       type: "page"
-      framed: false
       index: true
+      framed: false
       assets:
         -
           type: "stylesheet"
