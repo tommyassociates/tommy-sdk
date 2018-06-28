@@ -1,2 +1,147 @@
 [data-page="wallet__index"] .navbar {
-  display: none !important; }
+  background-color: #555; }
+
+.wallet-index-navbar-inner {
+  color: #fff; }
+  .wallet-index-navbar-inner a.link {
+    color: #fff; }
+    .wallet-index-navbar-inner a.link i {
+      color: inherit; }
+  .wallet-index-navbar-inner .right a.link.icon-only {
+    min-width: 44px; }
+
+.wallet-tabs-links {
+  background: #555;
+  display: flex;
+  height: 132px;
+  color: #fff;
+  text-align: center; }
+  .wallet-tabs-links .wallet-tab-link-wrap {
+    width: 100%;
+    flex-shrink: 1;
+    min-width: 0;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start; }
+  .wallet-tabs-links a.tab-link {
+    padding-top: 16px;
+    padding-bottom: 16px;
+    display: block;
+    color: #fff; }
+    .wallet-tabs-links a.tab-link.active {
+      font-weight: 500; }
+  .wallet-tabs-links .wallet-tab-link-label {
+    display: block;
+    font-size: 16px;
+    margin-top: 4px; }
+  .wallet-tabs-links i.wallet-tab-link-icon {
+    width: 55px;
+    height: 50px;
+    display: block;
+    background-position: center;
+    background-repeat: no-repeat;
+    margin-left: auto;
+    margin-right: auto; }
+  .wallet-tabs-links i.wallet-tab-link-icon-wallet {
+    background-image: url(../images/icon-wallet-outline.svg); }
+  .wallet-tabs-links a.active i.wallet-tab-link-icon-wallet {
+    background-image: url(../images/icon-wallet-fill.svg); }
+  .wallet-tabs-links i.wallet-tab-link-icon-balance {
+    background-image: url(../images/icon-balance-outline.svg); }
+  .wallet-tabs-links a.active i.wallet-tab-link-icon-balance {
+    background-image: url(../images/icon-balance-fill.svg); }
+  .wallet-tabs-links i.wallet-tab-link-icon-transactions {
+    background-image: url(../images/icon-transactions-outline.svg); }
+  .wallet-tabs-links a.active i.wallet-tab-link-icon-transactions {
+    background-image: url(../images/icon-transactions-fill.svg); }
+  .wallet-tabs-links .wallet-balance-value {
+    font-size: 14px; }
+
+.wallet-tabs .content-block-title {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #999;
+  text-transform: none; }
+
+.list-block.wallet-settings-list-block {
+  margin: 0; }
+
+.list-block.wallet-list-block {
+  color: #333;
+  margin: 0; }
+  .list-block.wallet-list-block ul {
+    background: #fff; }
+  .list-block.wallet-list-block .item-media {
+    align-self: flex-start; }
+    .list-block.wallet-list-block .item-media img {
+      width: 58px;
+      height: 58px;
+      border-radius: 4px;
+      border: none;
+      outline: 0;
+      background: #eee; }
+  .list-block.wallet-list-block .item-title, .list-block.wallet-list-block .item-subtitle {
+    font-size: 18px;
+    color: inherit; }
+  .list-block.wallet-list-block .item-text {
+    font-size: 14px;
+    color: #999; }
+  .list-block.wallet-list-block .item-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start; }
+  .list-block.wallet-list-block .item-details {
+    flex-shrink: 10;
+    width: 100%;
+    min-width: 0; }
+  .list-block.wallet-list-block .item-after {
+    flex-shrink: 0;
+    align-self: center;
+    color: #333;
+    margin-right: 0;
+    font-size: 22px; }
+
+.wallet-transaction-header {
+  background: #fff;
+  padding: 20px 20px 10px;
+  border-bottom: 1px solid #eee; }
+  .wallet-transaction-header .wallet-transaction-header-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start; }
+  .wallet-transaction-header .wallet-transaction-app {
+    flex-shrink: 0;
+    margin-right: 20px; }
+    .wallet-transaction-header .wallet-transaction-app img {
+      width: 58px;
+      height: 58px;
+      border-radius: 4px;
+      background: #eee; }
+  .wallet-transaction-header .wallet-transaction-service-amount {
+    flex-shrink: 10;
+    min-width: 0;
+    color: #333; }
+  .wallet-transaction-header .wallet-transaction-service-name {
+    font-size: 18px;
+    line-height: 1; }
+  .wallet-transaction-header .wallet-transaction-amount {
+    font-size: 36px;
+    font-weight: 300;
+    line-height: 1.2; }
+  .wallet-transaction-header .wallet-transaction-status {
+    color: #999;
+    text-align: center;
+    font-size: 16px;
+    margin-top: 10px; }
+
+.list-block.wallet-transaction-details-list {
+  margin: 0; }
+  .list-block.wallet-transaction-details-list ul {
+    background: #fff; }
+  .list-block.wallet-transaction-details-list .item-title {
+    font-size: 18px;
+    color: #333; }
+  .list-block.wallet-transaction-details-list .item-after {
+    font-size: 16px;
+    color: #999; }

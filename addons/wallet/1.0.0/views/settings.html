@@ -1,0 +1,41 @@
+<div class="navbar no-border">
+  <div class="navbar-inner">
+    <div class="left">
+      <a href="#" class="back link icon-only"><i class="icon f7-icons">chevron_left</i></a>
+    </div>
+    <div class="center sliding">{{t "settings.title" defaultValue="Settings"}}</div>
+  </div>
+</div>
+
+<div class="pages navbar-through">
+  <div data-page="wallet__settings" id="wallet__settings" class="page">
+    <div class="page-content">
+      <div class="list-block wallet-settings-list-block">
+        <ul>
+          <li class="item-content">
+            <div class="item-inner">
+              <div class="item-title">{{t "settings.balance_label" defaultValue="Show Balance"}}</div>
+              <div class="item-after">
+                <label class="label-switch">
+                  <input type="checkbox">
+                  <div class="checkbox"></div>
+                </label>
+              </div>
+            </div>
+          </li>
+          <li class="item-content">
+            <div class="item-inner">
+              <div class="item-title">{{t "settings.inform_label" defaultValue="Inform"}}</div>
+              <div class="item-after">
+                <label class="label-switch">
+                  <input type="checkbox">
+                  <div class="checkbox"></div>
+                </label>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

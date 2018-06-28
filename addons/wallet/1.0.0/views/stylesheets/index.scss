@@ -1,5 +1,191 @@
 [data-page="wallet__index"] {
   .navbar {
-      display: none !important;
+    background-color: #555;
+  }
+}
+
+.wallet-index-navbar-inner {
+  color: #fff;
+  a.link {
+    color: #fff;
+    i {
+      color: inherit
+    }
+  }
+  .right a.link.icon-only {
+    min-width: 44px;
+  }
+}
+.wallet-tabs-links {
+  background: #555;
+  display: flex;
+  height: 132px;
+  color: #fff;
+  text-align: center;
+  .wallet-tab-link-wrap {
+    width: 100%;
+    flex-shrink: 1;
+    min-width: 0;
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  a.tab-link {
+    padding-top: 16px;
+    padding-bottom: 16px;
+    display: block;
+    color: #fff;
+    &.active {
+      font-weight: 500;
+    }
+  }
+
+  .wallet-tab-link-label {
+    display: block;
+    font-size: 16px;
+    margin-top: 4px;
+  }
+  i.wallet-tab-link-icon {
+    width: 55px;
+    height: 50px;
+    display: block;
+    background-position: center;
+    background-repeat: no-repeat;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  i.wallet-tab-link-icon-wallet {
+    background-image: url(../images/icon-wallet-outline.svg);
+  }
+  a.active i.wallet-tab-link-icon-wallet {
+    background-image: url(../images/icon-wallet-fill.svg);
+  }
+  i.wallet-tab-link-icon-balance {
+    background-image: url(../images/icon-balance-outline.svg);
+  }
+  a.active i.wallet-tab-link-icon-balance {
+    background-image: url(../images/icon-balance-fill.svg);
+  }
+  i.wallet-tab-link-icon-transactions {
+    background-image: url(../images/icon-transactions-outline.svg);
+  }
+  a.active i.wallet-tab-link-icon-transactions {
+    background-image: url(../images/icon-transactions-fill.svg);
+  }
+  .wallet-balance-value {
+    font-size: 14px;
+  }
+}
+.wallet-tabs {
+  .content-block-title {
+    margin-top: 10px;
+    font-size: 14px;
+    color: #999;
+    text-transform: none;
+  }
+}
+// Settings List
+.list-block.wallet-settings-list-block {
+  margin: 0;
+}
+// Transactions List + Accounts List
+.list-block.wallet-list-block {
+  color: #333;
+  margin: 0;
+  ul {
+    background: #fff;
+  }
+  .item-media {
+    align-self: flex-start;
+    img {
+      width: 58px;
+      height: 58px;
+      border-radius: 4px;
+      border: none;
+      outline: 0;
+      background: #eee;
+    }
+  }
+  .item-title, .item-subtitle {
+    font-size: 18px;
+    color: inherit;
+  }
+  .item-text {
+    font-size: 14px;
+    color: #999;
+  }
+  .item-inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .item-details {
+    flex-shrink: 10;
+    width: 100%;
+    min-width: 0;
+  }
+  .item-after {
+    flex-shrink: 0;
+    align-self: center;
+    color: #333;
+    margin-right: 0;
+    font-size: 22px;
+  }
+}
+
+// Transaction Details Page
+.wallet-transaction-header {
+  background: #fff;
+  padding: 20px 20px 10px;
+  border-bottom: 1px solid #eee;
+  .wallet-transaction-header-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .wallet-transaction-app {
+    flex-shrink: 0;
+    margin-right: 20px;
+    img {
+      width: 58px;
+      height: 58px;
+      border-radius: 4px;
+      background: #eee;
+    }
+  }
+  .wallet-transaction-service-amount {
+    flex-shrink: 10;
+    min-width: 0;
+    color: #333;
+  }
+  .wallet-transaction-service-name {
+    font-size: 18px;
+    line-height: 1;
+  }
+  .wallet-transaction-amount {
+    font-size: 36px;
+    font-weight: 300;
+    line-height: 1.2;
+  }
+  .wallet-transaction-status {
+    color: #999;
+    text-align: center;
+    font-size: 16px;
+    margin-top: 10px;
+  }
+}
+.list-block.wallet-transaction-details-list {
+  margin: 0;
+  ul {
+    background: #fff;
+  }
+  .item-title {
+    font-size: 18px;
+    color: #333;
+  }
+  .item-after {
+    font-size: 16px;
+    color: #999;
   }
 }

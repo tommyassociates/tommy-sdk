@@ -7,7 +7,7 @@ Object.defineProperty(exports, "__esModule", {
 var IndexController = {
   init: function init(page) {
     console.log('initialize vitals demo addon', page);
-    window.tommy.tplManager.renderInline('wallet__sliderTemplate', null, page.container);
+    window.tommy.tplManager.renderInline('wallet__walletsListTemplate', null, page.container);
 
     var lastTapTime = 0;
     $$(page.container).click(function (e) {

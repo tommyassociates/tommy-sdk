@@ -1,7 +1,7 @@
 const IndexController = {
   init (page) {
     console.log('initialize vitals demo addon', page)
-    window.tommy.tplManager.renderInline('wallet__sliderTemplate', null, page.container)
+    window.tommy.tplManager.renderInline('wallet__walletsListTemplate', null, page.container)
 
     let lastTapTime = 0
     $$(page.container).click(function(e) {

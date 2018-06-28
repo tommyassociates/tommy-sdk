@@ -1,6 +1,145 @@
-<div class="pages navbar-fixed">
+<div class="navbar no-border">
+  <div class="navbar-inner wallet-index-navbar-inner">
+    <div class="left">
+      <a href="#" class="back link icon-only"><i class="icon framework7-icons">bars</i></a>
+    </div>
+    <div class="center sliding">{{t "index.title" defaultValue="Tommy Wallet"}}</div>
+    <div class="right">
+      <a href="{{addonAssetUrl "views/settings.html"}}" class="link icon-only"><i class="icon f7-icons">gear</i></a>
+    </div>
+  </div>
+</div>
+
+<div class="pages navbar-through">
   <div data-page="wallet__index" id="wallet__index" class="page">
-    <div data-template="wallet__sliderTemplate"></div>
-    <!-- class="page-content"  -->
+    <div class="page-content">
+      <div class="wallet-tabs-links">
+        <div class="wallet-tab-link-wrap">
+          <a href="#wallet-tab-wallets" class="tab-link active">
+            <i class="wallet-tab-link-icon wallet-tab-link-icon-wallet"></i>
+            <span class="wallet-tab-link-label">{{t "index.tab_link_wallets" defaultValue="Wallets"}}</span>
+          </a>
+        </div>
+        <div class="wallet-tab-link-wrap">
+          <a href="#wallet-tab-balance" class="tab-link">
+            <i class="wallet-tab-link-icon wallet-tab-link-icon-balance"></i>
+            <span class="wallet-tab-link-label">{{t "index.tab_link_balance" defaultValue="Balance"}}</span>
+            <span class="wallet-balance-value">888.8</span>
+          </a>
+        </div>
+        <div class="wallet-tab-link-wrap">
+          <a href="#wallet-tab-transactions" class="tab-link">
+            <i class="wallet-tab-link-icon wallet-tab-link-icon-transactions"></i>
+            <span class="wallet-tab-link-label">{{t "index.tab_link_transactions" defaultValue="Transactions"}}</span>
+          </a>
+        </div>
+      </div>
+      <div class="tabs wallet-tabs">
+        <div class="tab active" id="wallet-tab-wallets">
+          <div class="content-block-title">{{t "index.tab_wallets_title" defaultValue="Wallets"}}</div>
+          <div class="list-block media-list wallet-list-block wallets-list">
+            <ul>
+              <li>
+                <a href="{{addonAssetUrl "views/account-details.html"}}" class="item-content item-link">
+                  <div class="item-media"><img></div>
+                  <div class="item-inner">
+                    <div class="item-details">
+                      <div class="item-title-row">
+                        <div class="item-title">Mountion Elders</div>
+                      </div>
+                    </div>
+                    <div class="item-after">888.88</div>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a href="{{addonAssetUrl "views/account-details.html"}}" class="item-content item-link">
+                  <div class="item-media"><img></div>
+                  <div class="item-inner">
+                    <div class="item-details">
+                      <div class="item-title-row">
+                        <div class="item-title">WeChat</div>
+                      </div>
+                      <div class="item-text">Quick Pay</div>
+                    </div>
+                    <div class="item-after"></div>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a href="{{addonAssetUrl "views/account-details.html"}}" class="item-content item-link">
+                  <div class="item-media"><img></div>
+                  <div class="item-inner">
+                    <div class="item-details">
+                      <div class="item-title-row">
+                        <div class="item-title">Alipay</div>
+                      </div>
+                      <div class="item-text">Quick Pay</div>
+                    </div>
+                    <div class="item-after"></div>
+                  </div>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="tab" id="wallet-tab-balance">
+          <div class="content-block-title">{{t "index.tab_balance_title" defaultValue="History"}}</div>
+
+        </div>
+        <div class="tab" id="wallet-tab-transactions">
+          <div class="content-block-title">{{t "index.tab_transactions_title" defaultValue="Transactions"}}</div>
+          <div class="list-block media-list wallet-list-block transactions-list">
+            <ul>
+              <li>
+                <a href="{{addonAssetUrl "views/transaction-details.html"}}" class="item-content item-link">
+                  <div class="item-media"><img></div>
+                  <div class="item-inner">
+                    <div class="item-details">
+                      <div class="item-title-row">
+                        <div class="item-title">Food Delivery</div>
+                      </div>
+                      <div class="item-subtitle">Order 123</div>
+                      <div class="item-text">1 day ago</div>
+                    </div>
+                    <div class="item-after">-8.88</div>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a href="{{addonAssetUrl "views/transaction-details.html"}}" class="item-content item-link">
+                  <div class="item-media"><img></div>
+                  <div class="item-inner">
+                    <div class="item-details">
+                      <div class="item-title-row">
+                        <div class="item-title">Room Cleaning</div>
+                      </div>
+                      <div class="item-subtitle"></div>
+                      <div class="item-text">1 day ago</div>
+                    </div>
+                    <div class="item-after">-8.88</div>
+                  </div>
+                </a>
+              </li>
+              <li>
+                <a href="{{addonAssetUrl "views/transaction-details.html"}}" class="item-content item-link">
+                  <div class="item-media"><img></div>
+                  <div class="item-inner">
+                    <div class="item-details">
+                      <div class="item-title-row">
+                        <div class="item-title">Cash Payment</div>
+                      </div>
+                      <div class="item-subtitle">Thank you</div>
+                      <div class="item-text">1 day ago</div>
+                    </div>
+                    <div class="item-after">+88.88</div>
+                  </div>
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
