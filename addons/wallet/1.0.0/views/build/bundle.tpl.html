@@ -1,3 +1,134 @@
+<script id="wallet__settingsTemplate" type="text/template">
+  <div class="list-block wallet-settings-list-block">
+    <ul>
+      <li class="item-content">
+        <div class="item-inner">
+          <div class="item-title">{{t "settings.balance_label" defaultValue="Show Balance"}}</div>
+          <div class="item-after">
+            <label class="label-switch">
+              <input type="checkbox" name="show_balance" {{#if show_balance}}checked{{/if}}>
+              <div class="checkbox"></div>
+            </label>
+          </div>
+        </div>
+      </li>
+      <li class="item-content">
+        <div class="item-inner">
+          <div class="item-title">{{t "settings.inform_label" defaultValue="Inform"}}</div>
+          <div class="item-after">
+            <label class="label-switch">
+              <input type="checkbox" name="enable_notifications" {{#if enable_notifications}}checked{{/if}}>
+              <div class="checkbox"></div>
+            </label>
+          </div>
+        </div>
+      </li>
+    </ul>
+  </div>
+</script>
+<script id="wallet__transactionDetailsTemplate" type="text/template">
+  <div class="wallet-transaction-header">
+    <div class="wallet-transaction-header-wrap">
+      <div class="wallet-transaction-icon">
+        {{#if icon_url}}
+          <img src="{{icon_url}}">
+        {{else}}
+          <i class="wallet-transaction-icon-placeholder"></i>
+        {{/if}}
+      </div>
+      <div class="wallet-transaction-payment-info">
+        <div class="wallet-transaction-payment-name">Food Delivery</div>
+        <div class="wallet-transaction-payment-amount">{{wallet__formatTransactionAmount this}}</div>
+      </div>
+    </div>
+    <div class="wallet-transaction-status">{{wallet__formatTransactionStatus status}}</div>
+  </div>
+
+  <div class="wallet-transaction-details-list list-block">
+    <ul>
+      <li class="item-content">
+        <div class="item-inner">
+          <div class="item-title">{{t "transaction_details.payment_label" defaultValue="Payment"}}</div>
+          <div class="item-after">Mountain Elders</div>
+        </div>
+      </li>
+      <li class="item-content">
+        <div class="item-inner">
+          <div class="item-title">{{t "transaction_details.time_label" defaultValue="Time"}}</div>
+          <div class="item-after">{{wallet__formatTransactionDate paid_at}}</div>
+        </div>
+      </li>
+      <li class="item-content">
+        <div class="item-inner">
+          <div class="item-title">{{t "transaction_details.payee_label" defaultValue="Payee"}}</div>
+          <div class="item-after">{{payee_name}}</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+</script>
+
+<script id="wallet__transactionsListTemplate" type="text/template">
+  {{#if items.length}}
+  <div class="content-block-title">{{t "index.tab_transactions_title" defaultValue="Transactions"}}</div>
+  <div class="list-block media-list wallet-list-block transactions-list">
+    <ul>
+      {{#each items}}
+      <li>
+        <a href="{{addonAssetUrl "views/transaction-details.html"}}?id={{id}}" class="item-content item-link">
+          <div class="item-media">
+            {{#if icon_url}}
+            <img src="{{icon_url}}">
+            {{else}}
+            <img>
+            {{/if}}
+          </div>
+          <div class="item-inner">
+            <div class="item-details">
+              <div class="item-title-row">
+                <div class="item-title">{{payee_name}}</div>
+              </div>
+              <div class="item-text">{{wallet__formatTransactionDate paid_at}}</div>
+            </div>
+            <div class="item-after">{{wallet__formatTransactionAmount this}}</div>
+          </div>
+        </a>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+  {{else}}
+    <div class="wallet-transactions-empty-message">
+      <img src="{{addonAssetUrl "views/images/empty-transactions.svg"}}">
+      <div>{{t "index.no_transactions_message" defaultValue="Sorry. You do not have any transactions history yet."}}</div>
+    </div>
+  {{/if}}
+</script>
+
 <script id="wallet__walletsListTemplate" type="text/template">
-  <img src="{{addonAssetUrl "assets/wallet.png"}}">
+  <div class="content-block-title">{{t "index.tab_wallets_title" defaultValue="Wallets"}}</div>
+  <div class="list-block media-list wallet-list-block wallets-list">
+    <ul>
+      {{#each items}}
+      <li>
+        <a href="{{addonAssetUrl "views/card-details.html"}}?id={{id}}&name={{name}}" class="item-content item-link">
+          <div class="item-media">
+            <img src="{{icon_url}}">
+          </div>
+          <div class="item-inner">
+            <div class="item-details">
+              <div class="item-title-row">
+                <div class="item-title">{{name}}</div>
+              </div>
+              {{#if type}}
+              <div class="item-text">{{type}}</div>
+              {{/if}}
+            </div>
+            <div class="item-after">{{balance}}</div>
+          </div>
+        </a>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
 </script>

@@ -8,43 +8,7 @@
 </div>
 
 <div class="pages navbar-through">
-  <div data-page="wallet__transaction" id="wallet__transaction" class="page">
-    <div class="page-content">
-      <div class="wallet-transaction-header">
-        <div class="wallet-transaction-header-wrap">
-          <div class="wallet-transaction-app">
-            <img>
-          </div>
-          <div class="wallet-transaction-service-amount">
-            <div class="wallet-transaction-service-name">Food Delivery</div>
-            <div class="wallet-transaction-amount">- ¥ 8.88</div>
-          </div>
-        </div>
-        <div class="wallet-transaction-status">Successful</div>
-      </div>
-
-      <div class="wallet-transaction-details-list list-block">
-        <ul>
-          <li class="item-content">
-            <div class="item-inner">
-              <div class="item-title">{{t "transaction_details.payment_label" defaultValue="Payment"}}</div>
-              <div class="item-after">Mountain Elders</div>
-            </div>
-          </li>
-          <li class="item-content">
-            <div class="item-inner">
-              <div class="item-title">{{t "transaction_details.time_label" defaultValue="Time"}}</div>
-              <div class="item-after">2017-10-10 17:23</div>
-            </div>
-          </li>
-          <li class="item-content">
-            <div class="item-inner">
-              <div class="item-title">{{t "transaction_details.payee_label" defaultValue="Payee"}}</div>
-              <div class="item-after">Food Delivery Inc</div>
-            </div>
-          </li>
-        </ul>
-      </div>
-    </div>
+  <div data-page="wallet__transaction_details" id="wallet__transaction_details" class="page">
+    <div class="page-content" data-template="wallet__transactionDetailsTemplate"></div>
   </div>
 </div>

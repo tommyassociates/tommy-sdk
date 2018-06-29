@@ -144,7 +144,7 @@
     justify-content: center;
     align-items: flex-start;
   }
-  .wallet-transaction-app {
+  .wallet-transaction-icon {
     flex-shrink: 0;
     margin-right: 20px;
     img {
@@ -153,17 +153,24 @@
       border-radius: 4px;
       background: #eee;
     }
+    i.wallet-transaction-icon-placeholder {
+      width: 58px;
+      height: 58px;
+      border-radius: 4px;
+      background: #eee;
+      display: block;
+    }
   }
-  .wallet-transaction-service-amount {
+  .wallet-transaction-payment-info {
     flex-shrink: 10;
     min-width: 0;
     color: #333;
   }
-  .wallet-transaction-service-name {
+  .wallet-transaction-payment-name {
     font-size: 18px;
     line-height: 1;
   }
-  .wallet-transaction-amount {
+  .wallet-transaction-payment-amount {
     font-size: 36px;
     font-weight: 300;
     line-height: 1.2;
@@ -187,5 +194,14 @@
   .item-after {
     font-size: 16px;
     color: #999;
+  }
+}
+.wallet-transactions-empty-message {
+  text-align: center;
+  font-size: 18px;
+  color: #999;
+  img + div {
+    margin-top: 15px;
+    padding: 0 20px;
   }
 }
