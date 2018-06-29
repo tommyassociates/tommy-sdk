@@ -27,12 +27,12 @@ function (app,api,addons,util,cache,tplManager,moment) {
         },
 
         loadEvents: function (params) {
-            console.log('load bookings', params)
             params = Object.assign({
                 addon: 'bookings',
                 kind: 'Booking',
                 user_id: addons.currentActorOrUserId()
             }, params)
+            console.log('load bookings', params)
             return api.getEvents(params).then(Bookings.addEvents)
         },
 
@@ -63,6 +63,8 @@ function (app,api,addons,util,cache,tplManager,moment) {
         loaded: false,
 
         init: function (page) {
+            IndexController.loaded = false
+            Bookings.cache = {}
             Bookings.loadEvents().then(function() {
                 IndexController.loaded = true;
                 IndexController.invalidate(page)
@@ -72,7 +74,7 @@ function (app,api,addons,util,cache,tplManager,moment) {
         invalidate: function (page) {
             if (!IndexController.loaded) return;
 
-            console.log('invalidating IndexController bookings')
+            console.log('invalidating bookings index', Bookings.groupByCategory())
             tplManager.renderInline('bookings__bookingListGroupTemplate', Bookings.groupByCategory(), page.container)
         }
     }

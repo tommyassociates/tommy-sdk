@@ -4,6 +4,25 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
         call: function(options) {
             return new Promise(function(resolve, reject) {
 
+                if (!options.data)
+                    options.data = {}
+
+                // Set the current addon for the request
+                if (Template7 &&
+                    Template7.global &&
+                    Template7.global.currentAddonInstall &&
+                    Template7.global.currentAddonInstall.package) {
+                    options.data['addon'] = Template7.global.currentAddonInstall.package
+
+                // Set the Actor ID for managed calls
+                if (Template7.global.currentActorId)
+                    options.data['actor_id'] = Template7.global.currentActorId
+                }
+
+                // Set the locale
+                if (!options.data.locale)
+                    options.data['locale'] = config.getLocale()
+
                 // Get the cached object if available
                 if (typeof options.cache === 'undefined' && options.method === 'GET' && options.endpoint)
                     options.cache = true
@@ -13,7 +32,7 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
                         options.cacheKey = options.endpoint + JSON.stringify(options.data)
                     var cachedResponse = cache.get('api', options.cacheKey)
                     if (cachedResponse) {
-                        console.log('[READ CACHE] api response', options.endpoint, cachedResponse)
+                        console.log('[READ CACHE] api response', options.cacheKey, cachedResponse)
                         resolve(cachedResponse)
                         return
                     }
@@ -28,25 +47,6 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
                 if (options.endpoint)
                     options.url += options.endpoint
 
-                if (!options.data)
-                    options.data = {}
-
-                // Set the current addon for the request
-                if (Template7 &&
-                    Template7.global &&
-                    Template7.global.currentAddonInstall &&
-                    Template7.global.currentAddonInstall.package) {
-                    options.data['addon'] = Template7.global.currentAddonInstall.package
-
-                    // Set the Actor ID for managed calls
-                    if (Template7.global.currentActorId)
-                        options.data['actor_id'] = Template7.global.currentActorId
-                }
-
-                // Set the locale
-                if (!options.data.locale)
-                    options.data['locale'] = config.getLocale()
-
                 // Make the XHR request
                 // console.log('api: request', options)
                 return xhr.call(options, function(response) {
@@ -60,7 +60,7 @@ define(['xhr','config','cache','util'], function(xhr,config,cache,util) {
                     // Cache the value for next time
                     if (options.cache && options.cacheKey) { // && cacheKey
                         cache.set('api', options.cacheKey, response)
-                        console.log('[SET CACHE] api response', options.endpoint, response)
+                        console.log('[SET CACHE] api response', options.cacheKey, response)
                     }
                     resolve(response)
                 }, reject)
