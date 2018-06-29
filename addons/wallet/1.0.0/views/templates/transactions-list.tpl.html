@@ -1,0 +1,36 @@
+<script id="wallet__transactionsListTemplate" type="text/template">
+  {{#if items.length}}
+  <div class="content-block-title">{{t "index.tab_transactions_title" defaultValue="Transactions"}}</div>
+  <div class="list-block media-list wallet-list-block transactions-list">
+    <ul>
+      {{#each items}}
+      <li>
+        <a href="{{addonAssetUrl "views/transaction-details.html"}}?id={{id}}" class="item-content item-link">
+          <div class="item-media">
+            {{#if icon_url}}
+            <img src="{{icon_url}}">
+            {{else}}
+            <img>
+            {{/if}}
+          </div>
+          <div class="item-inner">
+            <div class="item-details">
+              <div class="item-title-row">
+                <div class="item-title">{{payee_name}}</div>
+              </div>
+              <div class="item-text">{{wallet__formatTransactionDate paid_at}}</div>
+            </div>
+            <div class="item-after">{{wallet__formatTransactionAmount this}}</div>
+          </div>
+        </a>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+  {{else}}
+    <div class="wallet-transactions-empty-message">
+      <img src="{{addonAssetUrl "views/images/empty-transactions.svg"}}">
+      <div>{{t "index.no_transactions_message" defaultValue="Sorry. You do not have any transactions history yet."}}</div>
+    </div>
+  {{/if}}
+</script>
