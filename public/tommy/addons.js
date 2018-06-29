@@ -79,7 +79,7 @@ function(app, api,util,config,cache,util,i18n) {
             // If we're navigating away form the addon then unset the
             // currentAddonInstall variable
             if ((t7.global.currentAddonInstall &&
-                t7.global.currentAddonInstall.pageUrl === page.fromPage.url && page.from === 'left')) {
+                page.fromPage.url.indexOf(t7.global.currentAddonInstall.pageUrl) === 0 && page.from === 'left')) {
                 console.log('leaving addon context', page, t7.global.currentAddonInstall)
                 addons.resetCurrentAddonContext()
                 // t7.global.currentAddonInstall = null;
@@ -105,12 +105,13 @@ function(app, api,util,config,cache,util,i18n) {
                 viewId = $page.data('view'),
                 view = addons.getView(package, viewId),
                 addon = t7.global.currentAddonInstall,
-                version = addon.version;
+                version = addon.version,
+                actorId = page.query.actor_id;
 
             // Set the actor ID
-            if (page.context && page.context.actor_id) {
-                console.log('render setting actor id', page.context.actor_id)
-                t7.global.currentActorId = page.context.actor_id;
+            if (actorId) {
+                console.log('render setting actor id', actorId)
+                t7.global.currentActorId = actorId;
             }
 
             if (view && !view.initialized) {
