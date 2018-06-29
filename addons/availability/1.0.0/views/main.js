@@ -43,13 +43,12 @@ function (app,api,addons,util,cache,tplManager,moment) {
         },
 
         loadAvailabilities: function (params) {
-            console.log('load availabilities', params)
-
             params = Object.assign({
                 addon: 'availability',
                 kind: 'Availability',
                 user_id: addons.currentActorOrUserId()
             }, params)
+            console.log('load availabilities', params)
             return api.getFragments(params).then(Availability.addAvailabilities)
         }
     }
@@ -62,6 +61,7 @@ function (app,api,addons,util,cache,tplManager,moment) {
         loaded: false,
 
         init: function (page) {
+            IndexController.loaded = false
             Availability.initCache()
             Availability.loadAvailabilities().then(function() {
                 IndexController.loaded = true
@@ -107,7 +107,7 @@ function (app,api,addons,util,cache,tplManager,moment) {
         invalidate: function (page) {
             if (!IndexController.loaded) return;
 
-            console.log('invalidating IndexController availability')
+            console.log('invalidating availability index', Availability.cache)
             tplManager.renderInline('availability__availabilityListGroupTemplate', Availability.cache, page.container)
 
             $$(page.container).find('.list-block a.availability__toggle-availability').click(function(event) {
