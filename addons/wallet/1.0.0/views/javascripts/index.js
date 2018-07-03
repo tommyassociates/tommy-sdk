@@ -2,28 +2,32 @@ import IndexController from './controllers/index'
 import CardDetailsController from './controllers/card-details';
 import TransactionDetailsController from './controllers/transaction-details';
 import SettingsController from './controllers/settings';
+import initWalletTransaction from './init-wallet-transaction';
+
+const { f7, t7 } = window.tommy.app;
 
 // == Router
-window.tommy.app.f7.onPageInit('wallet__index', IndexController.init)
-window.tommy.app.f7.onPageBeforeRemove('wallet__index', IndexController.uninit)
+f7.onPageInit('wallet__index', IndexController.init)
+f7.onPageBeforeRemove('wallet__index', IndexController.uninit)
 
-window.tommy.app.f7.onPageBeforeInit('wallet__card_details', CardDetailsController.init)
-window.tommy.app.f7.onPageBeforeRemove('wallet__card_details', CardDetailsController.uninit)
+f7.onPageBeforeInit('wallet__card_details', CardDetailsController.init)
+f7.onPageBeforeRemove('wallet__card_details', CardDetailsController.uninit)
 
-window.tommy.app.f7.onPageInit('wallet__transaction_details', TransactionDetailsController.init)
-window.tommy.app.f7.onPageBeforeRemove('wallet__transaction_details', TransactionDetailsController.uninit)
+f7.onPageInit('wallet__transaction_details', TransactionDetailsController.init)
+f7.onPageBeforeRemove('wallet__transaction_details', TransactionDetailsController.uninit)
 
-window.tommy.app.f7.onPageInit('wallet__settings', SettingsController.init)
-window.tommy.app.f7.onPageBeforeRemove('wallet__settings', SettingsController.uninit)
+f7.onPageInit('wallet__settings', SettingsController.init)
+f7.onPageBeforeRemove('wallet__settings', SettingsController.uninit)
 
 // Helpers
-window.tommy.app.t7.registerHelper('wallet__formatTransactionAmount', item => {
-  return `${item.status === 'paid' ? '-' : '+'} ${item.amount_cents / 100}`;
+t7.registerHelper('wallet__formatTransactionAmount', item => {
+  return `${item.status === 'paid' ? '-' : '+'} ${item.amount}`;
 });
-window.tommy.app.t7.registerHelper('wallet__formatTransactionStatus', status => {
+t7.registerHelper('wallet__formatTransactionStatus', status => {
   return status[0].toUpperCase() + status.substr(1);
 });
-window.tommy.app.t7.registerHelper('wallet__formatTransactionDate', date => {
+t7.registerHelper('wallet__formatTransactionDate', date => {
+  if (!date) return '';
   const d = new Date(date);
   const year = d.getFullYear();
 
@@ -41,3 +45,6 @@ window.tommy.app.t7.registerHelper('wallet__formatTransactionDate', date => {
 
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 });
+
+// Pay Popup
+window.tommy.initWalletTransaction = initWalletTransaction;

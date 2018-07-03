@@ -1,0 +1,27 @@
+<script id="wallet__transactionPopupDetails" type="text/template">
+  <div class="page navbar-fixed">
+    <div class="navbar">
+      <div class="navbar-inner">
+        <div class="left">
+          <i class="transaction-popup-logo"></i>
+        </div>
+        <div class="right">
+          <a href="#" class="link icon-only close-popup" data-popup=".wallet__transaction-popup">
+            <i class="icon f7-icons">close</i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <a class="transaction-popup-confirm-button transaction-popup-fade-in">{{t "transaction_popup.confirm_button" defaultValue="Confirm"}}</a>
+    <div class="page-content">
+      <i class="transaction-popup-wallet-icon transaction-popup-fade-in"></i>
+      <div class="transaction-popup-list transaction-popup-fade-in">
+        <div class="transaction-popup-list-item">{{t "transaction_popup.pay_label" defaultValue="Pay"}}</div>
+        <div class="transaction-popup-list-item">{{payee_name}}</div>
+        <div class="transaction-popup-list-item">{{amount}}</div>
+        <div class="transaction-popup-list-item">{{t "transaction_popup.using_label" defaultValue="Using"}}</div>
+        <div class="transaction-popup-list-item">{{card_name}}</div>
+      </div>
+    </div>
+  </div>
+</script>
