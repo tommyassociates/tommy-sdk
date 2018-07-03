@@ -37,7 +37,7 @@
         {{/if}}
       </div>
       <div class="wallet-transaction-payment-info">
-        <div class="wallet-transaction-payment-name">Food Delivery</div>
+        <!-- <div class="wallet-transaction-payment-name">Food Delivery</div> -->
         <div class="wallet-transaction-payment-amount">{{wallet__formatTransactionAmount this}}</div>
       </div>
     </div>
@@ -46,12 +46,12 @@
 
   <div class="wallet-transaction-details-list list-block">
     <ul>
-      <li class="item-content">
+      <!-- <li class="item-content">
         <div class="item-inner">
           <div class="item-title">{{t "transaction_details.payment_label" defaultValue="Payment"}}</div>
           <div class="item-after">Mountain Elders</div>
         </div>
-      </li>
+      </li> -->
       <li class="item-content">
         <div class="item-inner">
           <div class="item-title">{{t "transaction_details.time_label" defaultValue="Time"}}</div>
@@ -68,6 +68,55 @@
   </div>
 </script>
 
+<script id="wallet__transactionPopupDetails" type="text/template">
+  <div class="page navbar-fixed">
+    <div class="navbar">
+      <div class="navbar-inner">
+        <div class="left">
+          <i class="transaction-popup-logo"></i>
+        </div>
+        <div class="right">
+          <a href="#" class="link icon-only close-popup" data-popup=".wallet__transaction-popup">
+            <i class="icon f7-icons">close</i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <a class="transaction-popup-confirm-button transaction-popup-fade-in">{{t "transaction_popup.confirm_button" defaultValue="Confirm"}}</a>
+    <div class="page-content">
+      <i class="transaction-popup-wallet-icon transaction-popup-fade-in"></i>
+      <div class="transaction-popup-list transaction-popup-fade-in">
+        <div class="transaction-popup-list-item">{{t "transaction_popup.pay_label" defaultValue="Pay"}}</div>
+        <div class="transaction-popup-list-item">{{payee_name}}</div>
+        <div class="transaction-popup-list-item">{{amount}}</div>
+        <div class="transaction-popup-list-item">{{t "transaction_popup.using_label" defaultValue="Using"}}</div>
+        <div class="transaction-popup-list-item">{{card_name}}</div>
+      </div>
+    </div>
+  </div>
+</script>
+<script id="wallet__transactionPopupStatus" type="text/template">
+  <div class="page navbar-fixed">
+    <div class="navbar">
+      <div class="navbar-inner">
+        <div class="left">
+          <i class="transaction-popup-logo"></i>
+        </div>
+        <div class="right">
+          <a href="#" class="link icon-only close-popup" data-popup=".wallet__transaction-popup">
+            <i class="icon f7-icons">close</i>
+          </a>
+        </div>
+      </div>
+    </div>
+    <a class="transaction-popup-report-button transaction-popup-fade-in">{{t "transaction_popup.report_button" defaultValue="View Report"}}</a>
+    <div class="page-content">
+      <i class="transaction-popup-status-icon transaction-popup-{{status}}-icon"></i>
+      <div class="transaction-popup-status-title">{{title}}</div>
+      <div class="transaction-popup-status-message">{{message}}</div>
+    </div>
+  </div>
+</script>
 <script id="wallet__transactionsListTemplate" type="text/template">
   {{#if items.length}}
   <div class="content-block-title">{{t "index.tab_transactions_title" defaultValue="Transactions"}}</div>
@@ -80,7 +129,7 @@
             {{#if icon_url}}
             <img src="{{icon_url}}">
             {{else}}
-            <img>
+            <i class="wallet-icon-placeholder"></i>
             {{/if}}
           </div>
           <div class="item-inner">
@@ -113,7 +162,11 @@
       <li>
         <a href="{{addonAssetUrl "views/card-details.html"}}?id={{id}}&name={{name}}" class="item-content item-link">
           <div class="item-media">
+            {{#if icon_url}}
             <img src="{{icon_url}}">
+            {{else}}
+            <i class="wallet-icon-placeholder"></i>
+            {{/if}}
           </div>
           <div class="item-inner">
             <div class="item-details">

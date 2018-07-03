@@ -6,7 +6,11 @@
       <li>
         <a href="{{addonAssetUrl "views/card-details.html"}}?id={{id}}&name={{name}}" class="item-content item-link">
           <div class="item-media">
+            {{#if icon_url}}
             <img src="{{icon_url}}">
+            {{else}}
+            <i class="wallet-icon-placeholder"></i>
+            {{/if}}
           </div>
           <div class="item-inner">
             <div class="item-details">

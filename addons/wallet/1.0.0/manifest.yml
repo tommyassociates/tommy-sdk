@@ -3,7 +3,7 @@
   package: "wallet"
   version: "1.0.0"
   summary: "Wallet demo."
-  description: "This addon provides demo integration with biofeedback devices."
+  description: "This addon provides wallet integration."
   developer: "Tommy Labs GmbH"
   homepage: "http://mytommy.com"
   private: false
