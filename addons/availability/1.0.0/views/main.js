@@ -1,5 +1,5 @@
-require(['app','api','addons','util','cache','tplManager','moment'],
-function (app,api,addons,util,cache,tplManager,moment) {
+require(['app','api','addons','util','cache','tplManager','moment','refreshPanel'],
+function (app,api,addons,util,cache,tplManager,moment,refreshPanel) {
 
     //
     /// Availability Context
@@ -9,23 +9,34 @@ function (app,api,addons,util,cache,tplManager,moment) {
         // Item cache
         cache: {},
 
-        initCache: function () {
-            var today = moment().startOf('day'),
-                current = today.clone().subtract(1, 'day'), // added back on by iterator
-                end = today.clone().add(1, 'week').endOf('week')
+        // Data loaded boolean
+        loaded: false,
 
-            // while (current.add(1, 'day').diff(end) < 0) {
-            while (current.add(1, 'day') < end) {
+        // Last updated timestamp
+        lastUpdated: false,
+
+        // Date range for availabilities
+        startAt: false,
+        endAt: false,
+
+        init: function () {
+            Availability.cache = {}
+            Availability.startAt = moment().subtract(1, 'day').startOf('day')
+            Availability.endAt = moment().add(2, 'weeks').endOf('week')
+            var current = Availability.startAt.clone()
+            while (current.add(1, 'day') < Availability.endAt) {
                 var date = current.format('YYYY-MM-DD')
                 if (!Availability.cache[date]) {
                     Availability.cache[date] = {
                         start_at: current.format()
                     }
-                    // Availability.addAvailability({
-                    //     start_at: current.format()
-                    // })
                 }
             }
+        },
+
+        uninit: function () {
+            Availability.loaded = false
+            Availability.cache = {}
         },
 
         addAvailability: function (item) {
@@ -34,7 +45,10 @@ function (app,api,addons,util,cache,tplManager,moment) {
             console.log('availability added', item)
         },
 
-        addAvailabilities: function (items) {
+        onAvailabilities: function (items) {
+            Availability.loaded = true
+            Availability.lastUpdated = new Date
+
             if (items && items.length) {
                 for (var i = 0; i < items.length; i++) {
                     Availability.addAvailability(items[i])
@@ -46,10 +60,14 @@ function (app,api,addons,util,cache,tplManager,moment) {
             params = Object.assign({
                 addon: 'availability',
                 kind: 'Availability',
-                user_id: addons.currentActorOrUserId()
+                user_id: addons.currentActorOrUserId(),
+                date_range: [
+                    Availability.startAt.utc().format(),
+                    Availability.endAt.utc().format()
+                ]
             }, params)
             console.log('load availabilities', params)
-            return api.getFragments(params).then(Availability.addAvailabilities)
+            return api.getFragments(params, {cache: false}).then(Availability.onAvailabilities)
         }
     }
 
@@ -58,28 +76,38 @@ function (app,api,addons,util,cache,tplManager,moment) {
     /// Index Controller
 
     var IndexController = {
-        loaded: false,
-
         init: function (page) {
-            IndexController.loaded = false
-            Availability.initCache()
-            Availability.loadAvailabilities().then(function() {
-                IndexController.loaded = true
-                IndexController.invalidate(page)
-            })
-
+            Availability.init()
             IndexController.bind(page)
+            IndexController.refresh(page)
+        },
+
+        uninit: function (page) {
+            var $page = $$(page.container)
+            console.log('uninitialize availability addon')
+            Availability.uninit()
+            refreshPanel.uninit($page.find('[data-last-updated]'))
+        },
+
+        refresh: function (page) {
+            return Availability.loadAvailabilities().then(function() {
+                IndexController.invalidate(page)
+
+                $$(page.container).find('[data-last-updated]').data('last-updated', Availability.lastUpdated)
+            })
         },
 
         bind: function (page) {
+            var $page = $$(page.container)
             var $nav = $$(page.navbarInnerContainer)
+
             $nav.find('.save').on('click', function() {
                 $$(page.container).find('form[data-changed]').removeAttr('data-changed').each(function() {
                     var json = app.f7.formToJSON(this),
                         date = json.start_at,
                         item = Availability.cache[date]
 
-                    console.log('availability', item, Availability.cache, json)
+                    // console.log('availability', item, Availability.cache, json)
                     item = Object.assign(item, {
                         addon: 'availability',
                         kind: 'Availability',
@@ -102,10 +130,18 @@ function (app,api,addons,util,cache,tplManager,moment) {
                     }
                 })
             })
+
+            var $lastUpdated = $page.find('[data-last-updated]')
+            refreshPanel.init($lastUpdated)
+            $lastUpdated.find('.refresh').click(function() {
+                IndexController.refresh(page).catch(function(){}).then(function() {
+                    refreshPanel.onRefreshComplete($lastUpdated)
+                })
+            })
         },
 
         invalidate: function (page) {
-            if (!IndexController.loaded) return;
+            if (!Availability.loaded) return;
 
             console.log('invalidating availability index', Availability.cache)
             tplManager.renderInline('availability__availabilityListGroupTemplate', Availability.cache, page.container)
@@ -128,6 +164,7 @@ function (app,api,addons,util,cache,tplManager,moment) {
     /// Router
 
     app.f7.onPageInit('availability__main', IndexController.init)
+    app.f7.onPageBack('availability__main', IndexController.uninit)
     app.f7.onPageAfterAnimation('availability__main', IndexController.invalidate)
 
     //
