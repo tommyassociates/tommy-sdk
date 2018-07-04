@@ -33,6 +33,7 @@ const IndexController = {
             addon_id: 26,
             addon_install_id: 8430,
             payee_name: 'Apple / iMac Pro',
+            currency: 'CNY',
             amount: 100,
           });
         })
@@ -41,6 +42,7 @@ const IndexController = {
             addon_id: 26,
             addon_install_id: 8430,
             payee_name: 'Mercedes S600',
+            currency: 'USD',
             amount: 100000,
           });
         })

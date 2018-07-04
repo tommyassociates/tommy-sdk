@@ -27,7 +27,7 @@
     "report_button": "View Report",
     "error_title": "Fail",
     "success_title": "Success",
-    "success_message": "You sent {{amount}}.<br>To {{to}}.<br>From {{from}}.",
+    "success_message": "You sent {{currency}}{{amount}}.<br>To {{to}}.<br>From {{from}}.",
     "error_insufficient": "Sorry. Your Tommy account balance is insufficient. Please use other payment methods"
   }
 }

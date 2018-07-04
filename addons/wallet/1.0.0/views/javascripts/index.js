@@ -2,7 +2,9 @@ import IndexController from './controllers/index'
 import CardDetailsController from './controllers/card-details';
 import TransactionDetailsController from './controllers/transaction-details';
 import SettingsController from './controllers/settings';
+
 import initWalletTransaction from './init-wallet-transaction';
+import currencyMap from './currency-map';
 
 const { f7, t7 } = window.tommy.app;
 
@@ -21,7 +23,10 @@ f7.onPageBeforeRemove('wallet__settings', SettingsController.uninit)
 
 // Helpers
 t7.registerHelper('wallet__formatTransactionAmount', item => {
-  return `${item.status === 'paid' || item.status === 'failed' ? '-' : '+'} ${item.amount}`;
+  return `${item.status === 'paid' || item.status === 'failed' ? '-' : '+'} ${currencyMap(item.currency)}${item.amount}`;
+});
+t7.registerHelper('wallet__currencySymbol', code => {
+  return currencyMap(code);
 });
 t7.registerHelper('wallet__formatTransactionStatus', status => {
   return status[0].toUpperCase() + status.substr(1);
