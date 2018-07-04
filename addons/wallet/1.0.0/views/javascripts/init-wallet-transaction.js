@@ -1,3 +1,4 @@
+import currencyMap from './currency-map';
 import api from './api';
 
 const tommy = window.tommy;
@@ -42,12 +43,13 @@ const transaction = {
   },
   renderSuccess(data) {
     const { $popup } = transaction.cache;
-    const { payee_name, card_name, amount } = data;
+    const { payee_name, card_name, amount, currency } = data;
     const html = tommy.tplManager.render('wallet__transactionPopupStatus', {
       title: tommy.i18n.t('transaction_popup.success_title', { defaultValue: 'Success' }),
       status: 'success',
       message: tommy.i18n.t('transaction_popup.success_message', {
-        defaultValue: 'You sent ¥{{amount}}.<br>To {{to}}<br>From {{from}}',
+        defaultValue: 'You sent {{amount}}{{amount}}.<br>To {{to}}<br>From {{from}}',
+        currency: currencyMap(currency),
         amount,
         to: payee_name,
         from: card_name,
@@ -108,8 +110,9 @@ const transaction = {
     f7.sizeNavbars($popup);
   },
   render() {
+    const { f7 } = tommy.app;
     const { $popup, params } = transaction.cache;
-    const { addon_id, addon_install_id, payee_name, amount } = params;
+    const { addon_id, addon_install_id, payee_name, amount, currency } = params;
 
     transaction.showLoader();
 
@@ -117,9 +120,9 @@ const transaction = {
     api.getWalletCards().then((cards) => {
       const multiple = cards.length > 1;
       let { id: wallet_card_id, wallet_account_id, name: card_name } = cards[0];
-
       const html = tommy.tplManager.render('wallet__transactionPopupDetails', {
         payee_name,
+        currency: currencyMap(currency),
         amount,
         card_name,
         multiple,
@@ -142,6 +145,7 @@ const transaction = {
           addon_id,
           addon_install_id,
           payee_name,
+          currency,
           amount,
           wallet_card_id,
           wallet_account_id,
@@ -155,6 +159,8 @@ const transaction = {
       $popup.on('click', '.transaction-popup-report-back', () => {
         if (transaction.cache.onReportBack) transaction.cache.onReportBack();
       });
+    }).catch((error) => {
+      f7.closeModal('.wallet__transaction-popup');
     });
   },
   init(params = {}, onSuccess, onError) {

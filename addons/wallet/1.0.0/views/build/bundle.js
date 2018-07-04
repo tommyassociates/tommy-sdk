@@ -146,6 +146,7 @@ var IndexController = {
             addon_id: 26,
             addon_install_id: 8430,
             payee_name: 'Apple / iMac Pro',
+            currency: 'CNY',
             amount: 100
           });
         });
@@ -154,6 +155,7 @@ var IndexController = {
             addon_id: 26,
             addon_install_id: 8430,
             payee_name: 'Mercedes S600',
+            currency: 'USD',
             amount: 100000
           });
         });
@@ -263,6 +265,195 @@ exports.default = TransactionDetailsController;
 },{"../api":1}],6:[function(require,module,exports){
 'use strict';
 
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+exports.default = function (code) {
+  if (!code) return '';
+  if (map[code]) return map[code];
+  return '';
+};
+
+var map = {
+  'AED': 'د.إ',
+  'AFN': '؋',
+  'ALL': 'L',
+  'AMD': '֏',
+  'ANG': 'ƒ',
+  'AOA': 'Kz',
+  'ARS': '$',
+  'AUD': '$',
+  'AWG': 'ƒ',
+  'AZN': '₼',
+  'BAM': 'KM',
+  'BBD': '$',
+  'BDT': '৳',
+  'BGN': 'лв',
+  'BHD': '.د.ب',
+  'BIF': 'FBu',
+  'BMD': '$',
+  'BND': '$',
+  'BOB': '$b',
+  'BRL': 'R$',
+  'BSD': '$',
+  'BTC': '฿',
+  'BTN': 'Nu.',
+  'BWP': 'P',
+  'BYR': 'Br',
+  'BYN': 'Br',
+  'BZD': 'BZ$',
+  'CAD': '$',
+  'CDF': 'FC',
+  'CHF': 'CHF',
+  'CLP': '$',
+  'CNY': '¥',
+  'COP': '$',
+  'CRC': '₡',
+  'CUC': '$',
+  'CUP': '₱',
+  'CVE': '$',
+  'CZK': 'Kč',
+  'DJF': 'Fdj',
+  'DKK': 'kr',
+  'DOP': 'RD$',
+  'DZD': 'دج',
+  'EEK': 'kr',
+  'EGP': '£',
+  'ERN': 'Nfk',
+  'ETB': 'Br',
+  'ETH': 'Ξ',
+  'EUR': '€',
+  'FJD': '$',
+  'FKP': '£',
+  'GBP': '£',
+  'GEL': '₾',
+  'GGP': '£',
+  'GHC': '₵',
+  'GHS': 'GH₵',
+  'GIP': '£',
+  'GMD': 'D',
+  'GNF': 'FG',
+  'GTQ': 'Q',
+  'GYD': '$',
+  'HKD': '$',
+  'HNL': 'L',
+  'HRK': 'kn',
+  'HTG': 'G',
+  'HUF': 'Ft',
+  'IDR': 'Rp',
+  'ILS': '₪',
+  'IMP': '£',
+  'INR': '₹',
+  'IQD': 'ع.د',
+  'IRR': '﷼',
+  'ISK': 'kr',
+  'JEP': '£',
+  'JMD': 'J$',
+  'JOD': 'JD',
+  'JPY': '¥',
+  'KES': 'KSh',
+  'KGS': 'лв',
+  'KHR': '៛',
+  'KMF': 'CF',
+  'KPW': '₩',
+  'KRW': '₩',
+  'KWD': 'KD',
+  'KYD': '$',
+  'KZT': 'лв',
+  'LAK': '₭',
+  'LBP': '£',
+  'LKR': '₨',
+  'LRD': '$',
+  'LSL': 'M',
+  'LTC': 'Ł',
+  'LTL': 'Lt',
+  'LVL': 'Ls',
+  'LYD': 'LD',
+  'MAD': 'MAD',
+  'MDL': 'lei',
+  'MGA': 'Ar',
+  'MKD': 'ден',
+  'MMK': 'K',
+  'MNT': '₮',
+  'MOP': 'MOP$',
+  'MRO': 'UM',
+  'MRU': 'UM',
+  'MUR': '₨',
+  'MVR': 'Rf',
+  'MWK': 'MK',
+  'MXN': '$',
+  'MYR': 'RM',
+  'MZN': 'MT',
+  'NAD': '$',
+  'NGN': '₦',
+  'NIO': 'C$',
+  'NOK': 'kr',
+  'NPR': '₨',
+  'NZD': '$',
+  'OMR': '﷼',
+  'PAB': 'B/.',
+  'PEN': 'S/.',
+  'PGK': 'K',
+  'PHP': '₱',
+  'PKR': '₨',
+  'PLN': 'zł',
+  'PYG': 'Gs',
+  'QAR': '﷼',
+  'RMB': '￥',
+  'RON': 'lei',
+  'RSD': 'Дин.',
+  'RUB': '₽',
+  'RWF': 'R₣',
+  'SAR': '﷼',
+  'SBD': '$',
+  'SCR': '₨',
+  'SDG': 'ج.س.',
+  'SEK': 'kr',
+  'SGD': '$',
+  'SHP': '£',
+  'SLL': 'Le',
+  'SOS': 'S',
+  'SRD': '$',
+  'SSP': '£',
+  'STD': 'Db',
+  'STN': 'Db',
+  'SVC': '$',
+  'SYP': '£',
+  'SZL': 'E',
+  'THB': '฿',
+  'TJS': 'SM',
+  'TMT': 'T',
+  'TND': 'د.ت',
+  'TOP': 'T$',
+  'TRL': '₤',
+  'TRY': '₺',
+  'TTD': 'TT$',
+  'TVD': '$',
+  'TWD': 'NT$',
+  'TZS': 'TSh',
+  'UAH': '₴',
+  'UGX': 'USh',
+  'USD': '$',
+  'UYU': '$U',
+  'UZS': 'лв',
+  'VEF': 'Bs',
+  'VND': '₫',
+  'VUV': 'VT',
+  'WST': 'WS$',
+  'XAF': 'FCFA',
+  'XBT': 'Ƀ',
+  'XCD': '$',
+  'XOF': 'CFA',
+  'XPF': '₣',
+  'YER': '﷼',
+  'ZAR': 'R',
+  'ZWD': 'Z$'
+};
+
+},{}],7:[function(require,module,exports){
+'use strict';
+
 var _index = require('./controllers/index');
 
 var _index2 = _interopRequireDefault(_index);
@@ -282,6 +473,10 @@ var _settings2 = _interopRequireDefault(_settings);
 var _initWalletTransaction = require('./init-wallet-transaction');
 
 var _initWalletTransaction2 = _interopRequireDefault(_initWalletTransaction);
+
+var _currencyMap = require('./currency-map');
+
+var _currencyMap2 = _interopRequireDefault(_currencyMap);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -305,7 +500,10 @@ f7.onPageBeforeRemove('wallet__settings', _settings2.default.uninit);
 
 // Helpers
 t7.registerHelper('wallet__formatTransactionAmount', function (item) {
-  return (item.status === 'paid' || item.status === 'failed' ? '-' : '+') + ' ' + item.amount;
+  return (item.status === 'paid' || item.status === 'failed' ? '-' : '+') + ' ' + (0, _currencyMap2.default)(item.currency) + item.amount;
+});
+t7.registerHelper('wallet__currencySymbol', function (code) {
+  return (0, _currencyMap2.default)(code);
 });
 t7.registerHelper('wallet__formatTransactionStatus', function (status) {
   return status[0].toUpperCase() + status.substr(1);
@@ -333,7 +531,7 @@ t7.registerHelper('wallet__formatTransactionDate', function (date) {
 // Pay Popup
 window.tommy.initWalletTransaction = _initWalletTransaction2.default;
 
-},{"./controllers/card-details":2,"./controllers/index":3,"./controllers/settings":4,"./controllers/transaction-details":5,"./init-wallet-transaction":7}],7:[function(require,module,exports){
+},{"./controllers/card-details":2,"./controllers/index":3,"./controllers/settings":4,"./controllers/transaction-details":5,"./currency-map":6,"./init-wallet-transaction":8}],8:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -344,6 +542,10 @@ exports.default = function (params, onSuccess, onError) {
   if (transaction.cache.popup) return;
   transaction.init(params, onSuccess, onError);
 };
+
+var _currencyMap = require('./currency-map');
+
+var _currencyMap2 = _interopRequireDefault(_currencyMap);
 
 var _api = require('./api');
 
@@ -399,13 +601,15 @@ var transaction = {
     var $popup = transaction.cache.$popup;
     var payee_name = data.payee_name,
         card_name = data.card_name,
-        amount = data.amount;
+        amount = data.amount,
+        currency = data.currency;
 
     var html = tommy.tplManager.render('wallet__transactionPopupStatus', {
       title: tommy.i18n.t('transaction_popup.success_title', { defaultValue: 'Success' }),
       status: 'success',
       message: tommy.i18n.t('transaction_popup.success_message', {
-        defaultValue: 'You sent ¥{{amount}}.<br>To {{to}}<br>From {{from}}',
+        defaultValue: 'You sent {{amount}}{{amount}}.<br>To {{to}}<br>From {{from}}',
+        currency: (0, _currencyMap2.default)(currency),
         amount: amount,
         to: payee_name,
         from: card_name
@@ -453,13 +657,15 @@ var transaction = {
     f7.sizeNavbars($popup);
   },
   render: function render() {
+    var f7 = tommy.app.f7;
     var _transaction$cache2 = transaction.cache,
         $popup = _transaction$cache2.$popup,
         params = _transaction$cache2.params;
     var addon_id = params.addon_id,
         addon_install_id = params.addon_install_id,
         payee_name = params.payee_name,
-        amount = params.amount;
+        amount = params.amount,
+        currency = params.currency;
 
 
     transaction.showLoader();
@@ -472,9 +678,9 @@ var transaction = {
           wallet_account_id = _cards$.wallet_account_id,
           card_name = _cards$.name;
 
-
       var html = tommy.tplManager.render('wallet__transactionPopupDetails', {
         payee_name: payee_name,
+        currency: (0, _currencyMap2.default)(currency),
         amount: amount,
         card_name: card_name,
         multiple: multiple
@@ -497,6 +703,7 @@ var transaction = {
           addon_id: addon_id,
           addon_install_id: addon_install_id,
           payee_name: payee_name,
+          currency: currency,
           amount: amount,
           wallet_card_id: wallet_card_id,
           wallet_account_id: wallet_account_id,
@@ -510,6 +717,8 @@ var transaction = {
       $popup.on('click', '.transaction-popup-report-back', function () {
         if (transaction.cache.onReportBack) transaction.cache.onReportBack();
       });
+    }).catch(function (error) {
+      f7.closeModal('.wallet__transaction-popup');
     });
   },
   init: function init() {
@@ -537,4 +746,4 @@ var transaction = {
   }
 };
 
-},{"./api":1}]},{},[6]);
+},{"./api":1,"./currency-map":6}]},{},[7]);
