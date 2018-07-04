@@ -37,7 +37,7 @@
         {{/if}}
       </div>
       <div class="wallet-transaction-payment-info">
-        <!-- <div class="wallet-transaction-payment-name">Food Delivery</div> -->
+        <div class="wallet-transaction-payment-name">{{payee_name}}</div>
         <div class="wallet-transaction-payment-amount">{{wallet__formatTransactionAmount this}}</div>
       </div>
     </div>
@@ -46,12 +46,14 @@
 
   <div class="wallet-transaction-details-list list-block">
     <ul>
-      <!-- <li class="item-content">
+      {{#if card_name}}
+      <li class="item-content">
         <div class="item-inner">
           <div class="item-title">{{t "transaction_details.payment_label" defaultValue="Payment"}}</div>
-          <div class="item-after">Mountain Elders</div>
+          <div class="item-after">{{card_name}}</div>
         </div>
-      </li> -->
+      </li>
+      {{/if}}
       <li class="item-content">
         <div class="item-inner">
           <div class="item-title">{{t "transaction_details.time_label" defaultValue="Time"}}</div>
@@ -90,7 +92,11 @@
         <div class="transaction-popup-list-item">{{payee_name}}</div>
         <div class="transaction-popup-list-item">{{amount}}</div>
         <div class="transaction-popup-list-item">{{t "transaction_popup.using_label" defaultValue="Using"}}</div>
+        {{#if multiple}}
+        <div class="transaction-popup-list-item transaction-popup-list-item-link transaction-popup-select-wallet">{{card_name}}</div>
+        {{else}}
         <div class="transaction-popup-list-item">{{card_name}}</div>
+        {{/if}}
       </div>
     </div>
   </div>
@@ -184,4 +190,15 @@
       {{/each}}
     </ul>
   </div>
+  {{#if showTestButton}}
+  <div class="content-block">
+    <p>
+      <a href="#" class="button button-big button-round button-fill" id="wallet__createTestTransaction">Test</a>
+    </p>
+    <p>
+      <a href="#" class="button button-big button-round button-fill" id="wallet__createTestErrorTransaction">Test insufficient funds</a>
+    </p>
+
+  </div>
+  {{/if}}
 </script>

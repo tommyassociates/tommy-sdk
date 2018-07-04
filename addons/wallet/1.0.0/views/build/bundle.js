@@ -135,7 +135,29 @@ var IndexController = {
   },
   loadWallets: function loadWallets() {
     _api2.default.getWalletCards().then(function (items) {
-      window.tommy.tplManager.renderInline('wallet__walletsListTemplate', { items: items }, IndexController.page.container);
+      var showTestButton = window.localStorage.env === 'development';
+      window.tommy.tplManager.renderInline('wallet__walletsListTemplate', {
+        items: items,
+        showTestButton: showTestButton
+      }, IndexController.page.container);
+      if (showTestButton) {
+        $$('#wallet__createTestTransaction').on('click', function () {
+          window.tommy.initWalletTransaction({
+            addon_id: 26,
+            addon_install_id: 8430,
+            payee_name: 'Apple / iMac Pro',
+            amount: 100
+          });
+        });
+        $$('#wallet__createTestErrorTransaction').on('click', function () {
+          window.tommy.initWalletTransaction({
+            addon_id: 26,
+            addon_install_id: 8430,
+            payee_name: 'Mercedes S600',
+            amount: 100000
+          });
+        });
+      }
     });
   },
   loadTransactions: function loadTransactions() {
@@ -283,7 +305,7 @@ f7.onPageBeforeRemove('wallet__settings', _settings2.default.uninit);
 
 // Helpers
 t7.registerHelper('wallet__formatTransactionAmount', function (item) {
-  return (item.status === 'paid' ? '-' : '+') + ' ' + item.amount;
+  return (item.status === 'paid' || item.status === 'failed' ? '-' : '+') + ' ' + item.amount;
 });
 t7.registerHelper('wallet__formatTransactionStatus', function (status) {
   return status[0].toUpperCase() + status.substr(1);
@@ -319,7 +341,7 @@ Object.defineProperty(exports, "__esModule", {
 });
 
 exports.default = function (params, onSuccess, onError) {
-  if (transaction.popup) return;
+  if (transaction.cache.popup) return;
   transaction.init(params, onSuccess, onError);
 };
 
@@ -331,67 +353,109 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 var tommy = window.tommy;
 var transaction = {
-  popup: null,
-  params: null,
+  cache: {
+    popup: null,
+    params: null
+  },
+  selectWallet: function selectWallet(cards, callback) {
+    var f7 = tommy.app.f7;
+
+    var walletButtons = cards.map(function (card) {
+      return {
+        text: card.name,
+        onClick: function onClick() {
+          if (callback) callback(card);
+        }
+      };
+    });
+    f7.actions(walletButtons);
+  },
   showLoader: function showLoader() {
-    if (transaction.$popup.find('.transaction-preloader').length) return;
-    transaction.$popup.append('<div class="transaction-preloader"></div>');
+    if (transaction.cache.$popup.find('.transaction-preloader').length) return;
+    transaction.cache.$popup.append('<div class="transaction-preloader"></div>');
   },
   hideLoader: function hideLoader() {
-    transaction.$popup.find('.transaction-preloader').remove();
+    transaction.cache.$popup.find('.transaction-preloader').remove();
   },
   clear: function clear() {
-    transaction.$popup.remove();
-    transaction.popup = null;
-    transaction.$popup = null;
-    transaction.params = null;
-    transaction.onSuccess = null;
-    transaction.onError = null;
-  },
-  create: function create(data) {
-    var card_name = data.card_name;
-
-    transaction.showLoader();
-    _api2.default.createWalletTransaction(data).then(function (response) {
-      transaction.renderSuccess(Object.assign({}, response || {}, { card_name: card_name }));
-      if (transaction.onSuccess) transaction.onSuccess();
-    }).catch(function (error) {
-      transaction.hideLoader();
-      transaction.renderError(error);
-      if (transaction.onError) transaction.onError();
-    });
+    transaction.cache.$popup.remove();
+    transaction.cache = {};
   },
   renderError: function renderError(error) {
-    var $popup = transaction.$popup;
+    var $popup = transaction.cache.$popup;
 
+    var message = typeof error === 'string' ? message : error && error.message || '';
     var html = tommy.tplManager.render('wallet__transactionPopupStatus', {
-      title: window.tommy.i18n.t('transaction_popup.error_title', { defaultValue: 'Fail' }),
+      title: tommy.i18n.t('transaction_popup.error_title', { defaultValue: 'Fail' }),
       status: 'error',
-      message: error.message || ''
+      message: message
     });
-    transaction.$popup.html(html);
+    transaction.cache.onReportBack = function () {
+      return $popup.html(html);
+    };
+    $popup.html(html);
   },
   renderSuccess: function renderSuccess(data) {
-    var $popup = transaction.$popup;
+    var $popup = transaction.cache.$popup;
     var payee_name = data.payee_name,
         card_name = data.card_name,
         amount = data.amount;
 
     var html = tommy.tplManager.render('wallet__transactionPopupStatus', {
-      title: window.tommy.i18n.t('transaction_popup.success_title', { defaultValue: 'Success' }),
+      title: tommy.i18n.t('transaction_popup.success_title', { defaultValue: 'Success' }),
       status: 'success',
-      message: window.tommy.i18n.t('transaction_popup.success_message', {
+      message: tommy.i18n.t('transaction_popup.success_message', {
         defaultValue: 'You sent ¥{{amount}}.<br>To {{to}}<br>From {{from}}',
         amount: amount,
         to: payee_name,
         from: card_name
       })
     });
-    transaction.$popup.html(html);
+    transaction.cache.onReportBack = function () {
+      return $popup.html(html);
+    };
+    $popup.html(html);
+  },
+  createTransaction: function createTransaction(data) {
+    var card_name = data.card_name;
+
+    transaction.showLoader();
+    _api2.default.createWalletTransaction(data).then(function (response) {
+      transaction.hideLoader();
+      var transactionDetails = Object.assign({}, response || {}, { card_name: card_name });
+      transaction.cache.transactionDetails = transactionDetails;
+
+      if (transactionDetails.status && transactionDetails.status !== 'failed') {
+        transaction.renderSuccess(transactionDetails);
+        if (transaction.cache.onSuccess) transaction.cache.onSuccess();
+      } else if (transactionDetails.status === 'failed') {
+        transaction.renderError(Object.assign(transactionDetails, {
+          message: tommy.i18n.t('transaction_popup.error_insufficient', { defaultValue: 'Sorry. Your Tommy account balance is insufficient. Please use other payment methods' })
+        }));
+        if (transaction.cache.onError) transaction.cache.onError();
+      }
+    }).catch(function (error) {
+      var transactionDetails = Object.assign({}, data, { status: 'failed' });
+      transaction.hideLoader();
+      transaction.cache.transactionDetails = transactionDetails;
+      transaction.renderError(error);
+      if (transaction.cache.onError) transaction.cache.onError();
+    });
+  },
+  viewReport: function viewReport() {
+    var f7 = tommy.app.f7;
+    var _transaction$cache = transaction.cache,
+        $popup = _transaction$cache.$popup,
+        transactionDetails = _transaction$cache.transactionDetails;
+
+    var html = '\n      <div class="page navbar-fixed">\n        <div class="navbar no-border">\n          <div class="navbar-inner">\n            <div class="left">\n              <a href="#" class="link icon-only transaction-popup-report-back"><i class="icon f7-icons">chevron_left</i></a>\n            </div>\n            <div class="center">' + tommy.i18n.t('transaction_details.title', { defaultValue: 'Transaction Details' }) + '</div>\n            <div class="right">\n              <a href="#" class="link icon-only close-popup" data-popup=".wallet__transaction-popup">\n                <i class="icon f7-icons">close</i>\n              </a>\n            </div>\n          </div>\n        </div>\n        <div class="page-content transaction-popup-fade-in">\n         ' + tommy.tplManager.render('wallet__transactionDetailsTemplate', transactionDetails) + '\n        </div>\n      </div>\n    ';
+    $popup.html(html);
+    f7.sizeNavbars($popup);
   },
   render: function render() {
-    var $popup = transaction.$popup,
-        params = transaction.params;
+    var _transaction$cache2 = transaction.cache,
+        $popup = _transaction$cache2.$popup,
+        params = _transaction$cache2.params;
     var addon_id = params.addon_id,
         addon_install_id = params.addon_install_id,
         payee_name = params.payee_name,
@@ -402,6 +466,7 @@ var transaction = {
 
     // get wallet cards
     _api2.default.getWalletCards().then(function (cards) {
+      var multiple = cards.length > 1;
       var _cards$ = cards[0],
           wallet_card_id = _cards$.id,
           wallet_account_id = _cards$.wallet_account_id,
@@ -411,18 +476,24 @@ var transaction = {
       var html = tommy.tplManager.render('wallet__transactionPopupDetails', {
         payee_name: payee_name,
         amount: amount,
-        card_name: card_name
+        card_name: card_name,
+        multiple: multiple
       });
 
       transaction.hideLoader();
-      transaction.$popup.append(html);
+      $popup.append(html);
 
-      // send transaction
-      function onConfirmClick(e) {
-        e.preventDefault();
-        $popup.find('.transaction-popup-confirm-button').off('click', onConfirmClick);
-
-        transaction.create({
+      $popup.on('click', '.transaction-popup-select-wallet', function () {
+        if (!multiple) return;
+        transaction.selectWallet(cards, function (card) {
+          card_name = card.name;
+          wallet_card_id = card.id;
+          wallet_account_id = card.wallet_account_id;
+          $popup.find('.transaction-popup-select-wallet').text(card_name);
+        });
+      });
+      $popup.once('click', '.transaction-popup-confirm-button', function () {
+        transaction.createTransaction({
           addon_id: addon_id,
           addon_install_id: addon_install_id,
           payee_name: payee_name,
@@ -431,27 +502,31 @@ var transaction = {
           wallet_account_id: wallet_account_id,
           card_name: card_name
         });
-      }
-      $popup.find('.transaction-popup-confirm-button').on('click', onConfirmClick);
+      });
+      $popup.on('click', '.transaction-popup-report-button', function () {
+        $popup.addClass('transaction-popup-status-rendered');
+        transaction.viewReport();
+      });
+      $popup.on('click', '.transaction-popup-report-back', function () {
+        if (transaction.cache.onReportBack) transaction.cache.onReportBack();
+      });
     });
   },
   init: function init() {
     var params = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
     var onSuccess = arguments[1];
     var onError = arguments[2];
-    var _tommy$app = tommy.app,
-        f7 = _tommy$app.f7,
-        t7 = _tommy$app.t7;
+    var f7 = tommy.app.f7;
 
-    transaction.params = params;
-    transaction.onSuccess = onSuccess;
-    transaction.onError = onError;
+    transaction.cache.params = params;
+    transaction.cache.onSuccess = onSuccess;
+    transaction.cache.onError = onError;
 
     var popup = f7.popup('\n      <div class="popup tablet-fullscreen wallet__transaction-popup"></div>\n    ');
     var $popup = $$(popup);
 
-    transaction.popup = popup;
-    transaction.$popup = $popup;
+    transaction.cache.popup = popup;
+    transaction.cache.$popup = $popup;
 
     $popup.on('popup:opened', function () {
       transaction.render();
