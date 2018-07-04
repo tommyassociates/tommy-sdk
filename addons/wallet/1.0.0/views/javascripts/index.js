@@ -21,7 +21,7 @@ f7.onPageBeforeRemove('wallet__settings', SettingsController.uninit)
 
 // Helpers
 t7.registerHelper('wallet__formatTransactionAmount', item => {
-  return `${item.status === 'paid' ? '-' : '+'} ${item.amount}`;
+  return `${item.status === 'paid' || item.status === 'failed' ? '-' : '+'} ${item.amount}`;
 });
 t7.registerHelper('wallet__formatTransactionStatus', status => {
   return status[0].toUpperCase() + status.substr(1);

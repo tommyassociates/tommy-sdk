@@ -18,7 +18,33 @@ const IndexController = {
   },
   loadWallets() {
     API.getWalletCards().then((items) => {
-      window.tommy.tplManager.renderInline('wallet__walletsListTemplate', { items }, IndexController.page.container);
+      const showTestButton = window.localStorage.env === 'development';
+      window.tommy.tplManager.renderInline(
+        'wallet__walletsListTemplate',
+        {
+          items,
+          showTestButton,
+        },
+        IndexController.page.container
+      );
+      if (showTestButton) {
+        $$('#wallet__createTestTransaction').on('click', () => {
+          window.tommy.initWalletTransaction({
+            addon_id: 26,
+            addon_install_id: 8430,
+            payee_name: 'Apple / iMac Pro',
+            amount: 100,
+          });
+        })
+        $$('#wallet__createTestErrorTransaction').on('click', () => {
+          window.tommy.initWalletTransaction({
+            addon_id: 26,
+            addon_install_id: 8430,
+            payee_name: 'Mercedes S600',
+            amount: 100000,
+          });
+        })
+      }
     });
   },
   loadTransactions() {

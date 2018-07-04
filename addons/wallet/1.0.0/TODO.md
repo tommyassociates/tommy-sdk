@@ -1,4 +1,0 @@
-- set up english locales
-- "view report" functionality
-- select wallet on pay popup
-- order transactions by date DESC

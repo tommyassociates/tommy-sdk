@@ -28,4 +28,15 @@
       {{/each}}
     </ul>
   </div>
+  {{#if showTestButton}}
+  <div class="content-block">
+    <p>
+      <a href="#" class="button button-big button-round button-fill" id="wallet__createTestTransaction">Test</a>
+    </p>
+    <p>
+      <a href="#" class="button button-big button-round button-fill" id="wallet__createTestErrorTransaction">Test insufficient funds</a>
+    </p>
+
+  </div>
+  {{/if}}
 </script>

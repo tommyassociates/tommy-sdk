@@ -20,7 +20,11 @@
         <div class="transaction-popup-list-item">{{payee_name}}</div>
         <div class="transaction-popup-list-item">{{amount}}</div>
         <div class="transaction-popup-list-item">{{t "transaction_popup.using_label" defaultValue="Using"}}</div>
+        {{#if multiple}}
+        <div class="transaction-popup-list-item transaction-popup-list-item-link transaction-popup-select-wallet">{{card_name}}</div>
+        {{else}}
         <div class="transaction-popup-list-item">{{card_name}}</div>
+        {{/if}}
       </div>
     </div>
   </div>

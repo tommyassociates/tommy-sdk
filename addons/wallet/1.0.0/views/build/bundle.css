@@ -205,16 +205,15 @@
     padding-bottom: 56px; }
   .popup.wallet__transaction-popup .navbar a.link.icon-only {
     min-width: 44px; }
-  .popup.wallet__transaction-popup .navbar .left {
-    padding-left: 12px; }
-    .popup.wallet__transaction-popup .navbar .left .preloader {
-      display: none !important; }
+  .popup.wallet__transaction-popup .navbar .left .preloader {
+    display: none !important; }
   .popup.wallet__transaction-popup .transaction-popup-logo {
     width: 93px;
     background: url(../images/logo.png) no-repeat left center;
     background-size: 90% auto;
     display: block;
-    height: 41px; }
+    height: 41px;
+    margin-left: 12px; }
   .popup.wallet__transaction-popup .transaction-popup-confirm-button,
   .popup.wallet__transaction-popup .transaction-popup-report-button {
     z-index: 500;
@@ -249,12 +248,30 @@
     background: url(../images/icon-wallet-outline.svg) no-repeat center;
     background-size: 100% auto; }
   .popup.wallet__transaction-popup .transaction-popup-list {
-    font-size: 36px; }
+    font-size: 32px; }
   .popup.wallet__transaction-popup .transaction-popup-list-item {
     padding: 8px 15px;
     line-height: 1; }
     .popup.wallet__transaction-popup .transaction-popup-list-item:nth-child(2n - 1) {
       font-weight: bold; }
+  .popup.wallet__transaction-popup .transaction-popup-list-item-link {
+    position: relative;
+    padding-right: 28px;
+    transition-duration: 200ms; }
+    .popup.wallet__transaction-popup .transaction-popup-list-item-link.active-state {
+      background-color: rgba(255, 255, 255, 0.1); }
+    .popup.wallet__transaction-popup .transaction-popup-list-item-link:after {
+      content: 'right';
+      font-family: 'Framework7 Icons';
+      position: absolute;
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      text-align: center;
+      line-height: 18px;
+      right: 8px;
+      top: 50%;
+      margin-top: -9px; }
   .popup.wallet__transaction-popup .transaction-popup-status-icon {
     width: 160px;
     height: 160px;
@@ -291,8 +308,25 @@
   .popup.wallet__transaction-popup .transaction-popup-status-title,
   .popup.wallet__transaction-popup .transaction-popup-status-message {
     animation: wallet-status-text-in 400ms forwards; }
+  .popup.wallet__transaction-popup.transaction-popup-status-rendered .transaction-popup-status-icon,
+  .popup.wallet__transaction-popup.transaction-popup-status-rendered .transaction-popup-status-title,
+  .popup.wallet__transaction-popup.transaction-popup-status-rendered .transaction-popup-status-message {
+    animation: none; }
   .popup.wallet__transaction-popup .transaction-popup-fade-in {
     animation: wallet-fade-in 400ms forwards; }
+  .popup.wallet__transaction-popup .wallet-transaction-header {
+    background: none;
+    border-bottom-color: rgba(255, 255, 255, 0.1); }
+  .popup.wallet__transaction-popup .wallet-transaction-header,
+  .popup.wallet__transaction-popup .wallet-transaction-status,
+  .popup.wallet__transaction-popup .wallet-transaction-payment-info {
+    color: #fff; }
+  .popup.wallet__transaction-popup .wallet-transaction-details-list ul {
+    background: none; }
+  .popup.wallet__transaction-popup .wallet-transaction-details-list .item-title {
+    color: #fff; }
+  .popup.wallet__transaction-popup .wallet-transaction-details-list .item-after {
+    color: rgba(255, 255, 255, 0.8); }
 
 @keyframes wallet-preloader-in {
   from {
