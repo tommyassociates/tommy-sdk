@@ -111,7 +111,7 @@ function(app, api,util,config,cache,util,i18n) {
             // Set the actor ID
             if (actorId) {
                 console.log('render setting actor id', actorId)
-                t7.global.currentActorId = actorId;
+                t7.global.currentActorId = actorId
             }
 
             if (view && !view.initialized) {
@@ -389,7 +389,7 @@ function(app, api,util,config,cache,util,i18n) {
             })
         },
 
-        showAddonView: function (package, version, viewId) {
+        showAddonView: function (package, version, viewId, actorId) {
             var addon = addons.getAddon(package, version)
             if (!addon) {
                 alert("Couldn't show addon: " + package)
@@ -402,10 +402,17 @@ function(app, api,util,config,cache,util,i18n) {
                 return;
             }
 
-            console.log('loading addon view', package, view)
+            console.log('loading addon view', package, view, actorId)
+            addons.resetCurrentAddonContext()
+
+            // Set the actor ID if provided
+            if (actorId)
+                t7.global.currentActorId = actorId
+
             app.f7view.router.load({
                 url: view.url,
                 context: addon,
+                reload: true, // required when loading same addon for different actor for pageInit callback
                 animatePages: false // disable for native integration
             })
         },
