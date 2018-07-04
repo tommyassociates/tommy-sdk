@@ -1,0 +1,33 @@
+{
+  "index": {
+    "title": "Tommy Wallet",
+    "tab_link_wallets": "Wallets",
+    "tab_link_balance": "Balance",
+    "tab_link_transactions": "Transactions",
+    "tab_balance_title": "History",
+    "tab_transactions_title": "Transactions",
+    "no_transactions_message": "Sorry. You do not have any transactions history yet.",
+    "tab_wallets_title": "Wallets"
+  },
+  "settings": {
+    "title": "Settings",
+    "balance_label": "Show Balance",
+    "inform_label": "Inform"
+  },
+  "transaction_details": {
+    "title": "Transaction Details",
+    "payment_label": "Payment",
+    "time_label": "Time",
+    "payee_label": "Payee"
+  },
+  "transaction_popup": {
+    "confirm_button": "Confirm",
+    "pay_label": "Pay",
+    "using_label": "Using",
+    "report_button": "View Report",
+    "error_title": "Fail",
+    "success_title": "Success",
+    "success_message": "You sent {{currency}}{{amount}}.<br>To {{to}}.<br>From {{from}}.",
+    "error_insufficient": "Sorry. Your Tommy account balance is insufficient. Please use other payment methods"
+  }
+}
