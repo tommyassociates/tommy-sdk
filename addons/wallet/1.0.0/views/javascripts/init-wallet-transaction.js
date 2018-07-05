@@ -68,6 +68,7 @@ const transaction = {
 
       if (transactionDetails.status && transactionDetails.status !== 'failed') {
         transaction.renderSuccess(transactionDetails);
+        $$(document).trigger('wallet:transaction');
         if (transaction.cache.onSuccess) transaction.cache.onSuccess();
       } else if (transactionDetails.status === 'failed'){
         transaction.renderError(Object.assign(transactionDetails, {
