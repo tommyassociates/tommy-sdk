@@ -625,7 +625,7 @@ var ListEditController = {
     });
 
     $page.find('.date-range-select').on('click', function (ev) {
-      ListEditController.showDateRangePopup(page, list);
+      ListEditController.showDateRangePage(page, list);
       ev.preventDefault();
     });
 
@@ -640,14 +640,71 @@ var ListEditController = {
       ev.preventDefault();
     });
   },
-  showDateRangePopup: function showDateRangePopup(page, list) {
+  showDateRangePage: function showDateRangePage(settingsPage, list) {
+    list.data.date_range = 'today';
     var html = window.tommy.tplManager.render('tasks__dateRangeSelectTemplate', list.data);
-    // let $popup = $$('<div class="popup" data-page="tasks__date-range-select"></div>')
-    // $popup.append(html)
-    // $popup.append(html)
-    // console.log('POPUP', $popup)
-    // window.tommy.f7.popup($popup)
-    window.tommy.f7.popup(html);
+
+    function handleDateRangePage(page) {
+      var $page = $$(page.container);
+      var date_range = list.data.date_range;
+      var dateFrom = void 0;
+      var dateTo = void 0;
+      var range = date_range;
+
+      var $radios = $page.find('input[name="time_or_created_between"]');
+      var $switch = $page.find('.label-switch input');
+
+      function onSwitchChange(e) {
+        if (e.target.checked) {
+          $page.find('.date-range-custom-item').show();
+          $radios.prop('checked', false);
+          range = [];
+        } else {
+          range = '';
+          $page.find('.date-range-custom-item').hide();
+        }
+      }
+      function onRadioChange(e) {
+        if (e.target.checked) {
+          range = e.target.value;
+          $switch.prop('checked', false).trigger('change');
+        }
+      }
+
+      if (typeof range === 'string') {
+        $page.find('input[name="time_or_created_between"][value="' + range + '"]').prop('checked', true);
+        $page.find('.date-range-custom-item').hide();
+      }
+      if (Array.isArray(range)) {
+        $switch.prop('checked', true);
+      }
+
+      var calendarFrom = window.tommy.app.f7.calendar({
+        input: $page.find('input[name="start_at"]'),
+        closeOnSelect: true,
+        value: Array.isArray(range) ? [range[0]] : [],
+        onChange: function onChange(c, values) {
+          dateFrom = values[1];
+        }
+      });
+      var calendarTo = window.tommy.app.f7.calendar({
+        input: $page.find('input[name="end_at"]'),
+        closeOnSelect: true,
+        value: Array.isArray(range) ? [range[1]] : [],
+        onChange: function onChange(c, values) {
+          dateTo = values[1];
+        }
+      });
+
+      $switch.on('change', onSwitchChange);
+      $radios.on('change', onRadioChange);
+    }
+
+    $$(window.tommy.f7.views.main.container).once('page:init', '[data-page="tasks__date-range-select"]', function (e) {
+      var page = e.detail.page;
+      handleDateRangePage(page);
+    });
+    window.tommy.f7.views.main.loadContent(html);
   },
   initListFilters: function initListFilters(page, list) {
     // if (!list.filters)
@@ -1200,7 +1257,7 @@ window.tommy.app.t7.registerHelper('tasks__ifCanEditList', function (list, optio
 });
 
 window.tommy.app.t7.registerHelper('tasks__displayDateRange', function (range) {
-  return range;
+  return range || '';
 });
 
 },{"./api":1,"./controllers/board-settings":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/task":8,"./controllers/task-add":7}]},{},[9]);

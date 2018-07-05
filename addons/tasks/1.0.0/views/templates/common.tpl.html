@@ -20,105 +20,99 @@
 </script>
 
 <script id="tasks__dateRangeSelectTemplate" type="text/template">
-  <div class="popup" data-page="tasks__date-range-select">
-    <div class="view">
-      <div class="pages">
-        <div data-page="index" class="page">
-          <div class="page-content">
-
-            <div class="navbar">
-              <div class="navbar-inner task-navbar-inner">
-                <div class="left">
-                  <a href="#" class="link icon-only close-popup"><i class="icon f7-icons">left</i></a>
+  <div class="navbar">
+    <div class="navbar-inner task-navbar-inner">
+      <div class="left">
+        <a href="#" class="link icon-only back"><i class="icon f7-icons">left</i></a>
+      </div>
+      <div class="center sliding">{{t "common.date_range" defaultValue="Date Range"}}</div>
+      <div class="right">
+        <a href="#" class="link icon-only save toggle">
+          <i class="icon f7-icons">check</i>
+        </a>
+      </div>
+    </div>
+  </div>
+  <div class="pages">
+    <div class="page" id="tasks__tasks" data-page="tasks__date-range-select">
+      <div class="page-content">
+        <div class="list-block">
+          <ul>
+            <li>
+              <label class="label-checkbox item-content">
+                <input type="radio" name="time_or_created_between" value="today">
+                <div class="item-media">
+                  <i class="icon icon-form-checkbox"></i>
                 </div>
-                <div class="center sliding">{{t "common.date_range" defaultValue="Date Range"}}</div>
-                <div class="right">
-                  <a href="#" class="link icon-only save toggle">
-                    <i class="icon f7-icons">check</i>
-                  </a>
+                <div class="item-inner">
+                  <div class="item-title">{{t "common.today" defaultValue="Today"}}</div>
+                </div>
+              </label>
+            </li>
+            <li>
+              <label class="label-checkbox item-content">
+                <input type="radio" name="time_or_created_between" value="week">
+                <div class="item-media">
+                  <i class="icon icon-form-checkbox"></i>
+                </div>
+                <div class="item-inner">
+                  <div class="item-title">{{t "common.this_week" defaultValue="This Week"}}</div>
+                </div>
+              </label>
+            </li>
+            <li>
+              <label class="label-checkbox item-content">
+                <input type="radio" name="time_or_created_between" value="month">
+                <div class="item-media">
+                  <i class="icon icon-form-checkbox"></i>
+                </div>
+                <div class="item-inner">
+                  <div class="item-title">{{t "common.this_month" defaultValue="This Month"}}</div>
+                </div>
+              </label>
+            </li>
+          </ul>
+        </div>
+
+        <div class="list-block top-10">
+          <ul>
+            <li>
+              <div class="item-content">
+                <!-- <div class="item-media"><i class="icon f7-icons">check</i></div> -->
+                <div class="item-inner">
+                  <div class="item-title label">{{t "common.choose_range" defaultValue="Choose Range"}}</div>
+                  <div class="item-input">
+                    <label class="label-switch">
+                      <input type="checkbox">
+                      <div class="checkbox"></div>
+                    </label>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div class="list-block">
-              <ul>
-                <li>
-                  <label class="label-checkbox item-content">
-                    <input type="checkbox" name="time_or_created_between" value="today">
-                    <div class="item-media">
-                      <i class="icon icon-form-checkbox"></i>
-                    </div>
-                    <div class="item-inner">
-                      <div class="item-title">{{t "common.today" defaultValue="Today"}}</div>
-                    </div>
-                  </label>
-                </li>
-                <li>
-                  <label class="label-checkbox item-content">
-                    <input type="checkbox" name="time_or_created_between" value="this_week">
-                    <div class="item-media">
-                      <i class="icon icon-form-checkbox"></i>
-                    </div>
-                    <div class="item-inner">
-                      <div class="item-title">{{t "common.this_week" defaultValue="This Week"}}</div>
-                    </div>
-                  </label>
-                </li>
-                <li>
-                  <label class="label-checkbox item-content">
-                    <input type="checkbox" name="time_or_created_between" value="this_month">
-                    <div class="item-media">
-                      <i class="icon icon-form-checkbox"></i>
-                    </div>
-                    <div class="item-inner">
-                      <div class="item-title">{{t "common.this_month" defaultValue="This Month"}}</div>
-                    </div>
-                  </label>
-                </li>
-              </ul>
-            </div>
-
-            <div class="list-block">
-              <ul>
-                <li>
-                  <div class="item-content">
-                    <!-- <div class="item-media"><i class="icon f7-icons">check</i></div> -->
-                    <div class="item-inner">
-                      <div class="item-title label">{{t "common.choose_range" defaultValue="Choose Range"}}</div>
-                      <div class="item-input">
-                        <label class="label-switch">
-                          <input type="checkbox">
-                          <div class="checkbox"></div>
-                        </label>
-                      </div>
-                    </div>
+            </li>
+            <li class="date-range-custom-item">
+              <div class="item-content">
+                <!-- <div class="item-media"><i class="icon f7-icons">person</i></div> -->
+                <div class="item-inner">
+                  <div class="item-title label">{{t "common.start_date" defaultValue="Start Date"}}</div>
+                  <div class="item-input">
+                    <input type="text" name="start_at">
                   </div>
-                </li>
-                <li>
-                  <div class="item-content">
-                    <!-- <div class="item-media"><i class="icon f7-icons">person</i></div> -->
-                    <div class="item-inner">
-                      <div class="item-title label">{{t "common.start_date" defaultValue="Start Date"}}</div>
-                      <div class="item-input">
-                        <input type="date" name="start_at">
-                      </div>
-                    </div>
+                </div>
+              </div>
+            </li>
+            <li class="date-range-custom-item">
+              <div class="item-content">
+                <!-- <div class="item-media"><i class="icon f7-icons">person</i></div> -->
+                <div class="item-inner">
+                  <div class="item-title label">{{t "common.end_date" defaultValue="End Date"}}</div>
+                  <div class="item-input">
+                    <input type="text" name="end_at">
                   </div>
-                </li>
-                <li>
-                  <div class="item-content">
-                    <!-- <div class="item-media"><i class="icon f7-icons">person</i></div> -->
-                    <div class="item-inner">
-                      <div class="item-title label">{{t "common.deadline" defaultValue="Deadline"}}</div>
-                      <div class="item-input">
-                        <input type="date" name="end_at">
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              </ul>
-            </div>
-          </div>
+                </div>
+              </div>
+            </li>
+          </ul>
         </div>
       </div>
     </div>

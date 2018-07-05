@@ -79,5 +79,5 @@ window.tommy.app.t7.registerHelper('tasks__ifCanEditList', (list, options) => {
 })
 
 window.tommy.app.t7.registerHelper('tasks__displayDateRange', range => {
-  return range
+  return range || '';
 })
