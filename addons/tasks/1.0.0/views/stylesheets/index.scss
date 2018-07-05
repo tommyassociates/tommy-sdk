@@ -8,7 +8,13 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
 @mixin encoded-svg-background($svg){
     background-image: url("data:image/svg+xml;charset=utf-8,#{$svg}");
 }
-
+.tasks-navbar-inner {
+    .right {
+        .link.icon-only {
+            min-width: 44px;
+        }
+    }
+}
 #tasks__tasks {
     // body { font-family: "Helvetica Neue" }
     .chip {
