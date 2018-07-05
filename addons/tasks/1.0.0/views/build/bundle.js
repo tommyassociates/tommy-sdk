@@ -44,14 +44,16 @@ var API = {
     }
   },
   getListTasks: function getListTasks(listId) {
+    console.log(API.cache['lists']);
     var list = API.cache['lists'][listId];
     var tasks = [];
+
     for (var taskId in API.cache['tasks']) {
       var task = API.cache['tasks'][taskId];
-
+      console.log(list.filters);
+      console.log(task.filters);
       if (list.filters && task.filters) {
         (function () {
-
           // Filter on tags
           var taskTags = task.filters.map(function (x) {
             return x.name;
@@ -400,13 +402,12 @@ var IndexController = {
   init: function init(page) {
     console.log('initialize tasks addon');
     if (!_api2.default.listsLoaded) {
-      // || !API.tasksLoaded 
+      // || !API.tasksLoaded
       _api2.default.initCache();
       _api2.default.loadLists().then(function () {
         if (_api2.default.hasDefaultList()) {
           IndexController.loadTasks(page);
         } else {
-
           // Create a default list if none exists
           _api2.default.createDefaultList().then(function () {
             IndexController.loadTasks(page);
@@ -525,6 +526,7 @@ var IndexController = {
     for (var listId in _api2.default.cache['lists']) {
       var $e = $$(page.container).find('[data-list-id="' + listId + '"] .list-content');
       var tasks = _api2.default.getListTasks(listId);
+      console.log(tasks);
       window.tommy.tplManager.renderTarget('tasks__listTasksTemplate', tasks, $e);
     }
 
