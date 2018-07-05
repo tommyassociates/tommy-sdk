@@ -44,16 +44,14 @@ var API = {
     }
   },
   getListTasks: function getListTasks(listId) {
-    console.log(API.cache['lists']);
     var list = API.cache['lists'][listId];
     var tasks = [];
-
     for (var taskId in API.cache['tasks']) {
       var task = API.cache['tasks'][taskId];
-      console.log(list.filters);
-      console.log(task.filters);
+
       if (list.filters && task.filters) {
         (function () {
+
           // Filter on tags
           var taskTags = task.filters.map(function (x) {
             return x.name;
@@ -402,12 +400,13 @@ var IndexController = {
   init: function init(page) {
     console.log('initialize tasks addon');
     if (!_api2.default.listsLoaded) {
-      // || !API.tasksLoaded
+      // || !API.tasksLoaded 
       _api2.default.initCache();
       _api2.default.loadLists().then(function () {
         if (_api2.default.hasDefaultList()) {
           IndexController.loadTasks(page);
         } else {
+
           // Create a default list if none exists
           _api2.default.createDefaultList().then(function () {
             IndexController.loadTasks(page);
@@ -526,7 +525,6 @@ var IndexController = {
     for (var listId in _api2.default.cache['lists']) {
       var $e = $$(page.container).find('[data-list-id="' + listId + '"] .list-content');
       var tasks = _api2.default.getListTasks(listId);
-      console.log(tasks);
       window.tommy.tplManager.renderTarget('tasks__listTasksTemplate', tasks, $e);
     }
 
@@ -789,6 +787,8 @@ var TaskController = {
     var $page = $$(page.container);
     var $navbar = $$(page.navbarInnerContainer);
 
+    var f7 = window.tommy.app.f7;
+
     console.log('init task details', task);
     window.tommy.tplManager.renderInline('tasks__taskDetailsTemplate', task, $page.parent());
 
@@ -811,7 +811,7 @@ var TaskController = {
           alert('Unknown command: ' + command);
       }
 
-      window.tommy.app.f7.closeModal('.task-menu-popover');
+      f7.closeModal('.task-menu-popover');
     });
 
     // Task title area
@@ -838,8 +838,14 @@ var TaskController = {
     }
 
     // Task activity
-    var myMessagebar = window.tommy.app.f7.messagebar('.messagebar', { maxHeight: 200 });
+    var myMessagebar = f7.messagebar('.messagebar', { maxHeight: 200 });
+    myMessagebar.textarea.on('change input', function (e) {
+      var value = myMessagebar.value().trim();
+      if (value) myMessagebar.textarea.addClass('with-value');else myMessagebar.textarea.removeClass('with-value');
+    });
     $page.find('.add-comment').click(function () {
+      var value = myMessagebar.value().trim();
+      if (!value) return;
       TaskController.addActivity(page, 'comment', myMessagebar.value());
       myMessagebar.clear();
     });
@@ -857,20 +863,24 @@ var TaskController = {
       console.log('task participants changed', data);
       task.filters = data;
       window.tommy.tplManager.renderInline('tasks__taskParticipantsTemplate', task.filters, page.container);
-      TaskController.enableSave(page, true);
+      TaskController.saveTask(page);
     });
 
     // Task name inline editing
-    var $editTaskName = $page.find('input.edit-task-name');
-    $editTaskName.on('click', function () {
+    var $editTaskName = $page.find('textarea.edit-task-name');
+    $editTaskName.on('focus', function () {
       TaskController.enableEditName(page, true);
     });
+    f7.resizableTextarea('textarea.edit-task-name');
+    f7.resizeTextarea('textarea.edit-task-name');
 
     // Task description inline editing
     var $editTaskDescription = $page.find('textarea.edit-task-description');
-    $editTaskDescription.on('click', function () {
+    $editTaskDescription.on('focus', function () {
       TaskController.enableEditDescription(page, true);
     });
+    f7.resizableTextarea('textarea.edit-task-description');
+    f7.resizeTextarea('textarea.edit-task-description');
 
     // Save button
     $navbar.find('a.save').on('click', function () {
@@ -916,8 +926,9 @@ var TaskController = {
     window.tommy.tplManager.renderInline('tasks__taskChecklistTemplate', items, $page);
 
     var $input = $page.find('input.add-checklist-item');
-    $input.on('focusout', function () {
+    $input.on('blur', function () {
       var text = $$(this).val();
+      task = _api2.default.cache['tasks'][page.query.task_fragment_id];
       if (!text || !text.length) {
         return;
       }
@@ -932,32 +943,34 @@ var TaskController = {
         text: text,
         complete: false
       });
-
       TaskController.renderChecklist(page);
-    });
-    $input.on('focusin', function () {
-      TaskController.enableSave(page);
+      TaskController.saveTask(page);
     });
     $page.find('.remove-checklist').click(function () {
+      task = _api2.default.cache['tasks'][page.query.task_fragment_id];
       // TODO: confirm alert
       task.data.checklist = {};
       $page.find('[data-template="tasks__taskChecklistTemplate"]').html('');
       TaskController.saveTask(page);
     });
     $page.find('.remove-checklist-item').click(function () {
+      task = _api2.default.cache['tasks'][page.query.task_fragment_id];
       var index = parseInt($$(this).parents('li').data('checklist-item'));
 
       console.log('removing checklist item', index);
       task.data.checklist.items.splice(index, 1);
       TaskController.renderChecklist(page);
 
-      TaskController.enableSave(page);
-      // TaskController.saveTask(page)
+      TaskController.saveTask(page);
     });
-    $page.find('.checklist-item').click(function () {
+    $page.find('.checklist-item').click(function (e) {
+      var $target = $$(e.target);
+      if ($target.hasClass('remove-checklist-item') || $target.parents('.remove-checklist-item').length) {
+        return;
+      }
       var index = parseInt($$(this).parents('li').data('checklist-item'));
       var isChecked = $$(this).hasClass('checked');
-
+      task = _api2.default.cache['tasks'][page.query.task_fragment_id];
       console.log('toggle checklist item', index);
       if (isChecked) {
         $$(this).removeClass('checked');
@@ -967,8 +980,7 @@ var TaskController = {
         task.data.checklist.items[index].complete = true;
       }
 
-      TaskController.enableSave(page);
-      // TaskController.saveTask(page)
+      TaskController.saveTask(page);
     });
   },
   renderDeadline: function renderDeadline(page) {
@@ -984,7 +996,7 @@ var TaskController = {
       onClose: function onClose() {
         console.log('closing deadline picker', picker.currentDate);
         task.end_at = picker.currentDate;
-        TaskController.enableSave(page);
+        TaskController.saveTask(page);
       },
       onFormat: function onFormat(date) {
         console.log('format deadline picker', date);
@@ -1036,15 +1048,16 @@ var TaskController = {
   enableEditName: function enableEditName(page, flag) {
     var task = _api2.default.cache['tasks'][page.query.task_fragment_id];
     var $page = $$(page.container);
-    var $input = $page.find('input.edit-task-name');
+    var $textarea = $page.find('textarea.edit-task-name');
 
     if (flag != false) {
-      // $textarea.removeClass('unstyled')
-      TaskController.enableSave(page, true);
-
-      $input.on('focusout', function () {
-        task.name = $input.val();
-        console.log('set task name', task.name);
+      $textarea.once('focusout', function () {
+        var newValue = $textarea.val();
+        if (task.name !== newValue) {
+          task.name = newValue;
+          TaskController.saveTask(page);
+          console.log('set task name', task.name);
+        }
       });
     }
   },
@@ -1054,13 +1067,13 @@ var TaskController = {
     var $textarea = $page.find('textarea.edit-task-description');
 
     if (flag != false) {
-      // $textarea.removeClass('unstyled')
-      TaskController.enableSave(page, true);
-
-      $textarea.on('focusout', function () {
-        task.data.description = $textarea.val();
-        console.log('set task description', task.data.description);
-        TaskController.enableEditDescription(page, false);
+      $textarea.once('focusout', function () {
+        var newValue = $textarea.val();
+        if (task.data.description !== newValue) {
+          task.data.description = newValue;
+          TaskController.saveTask(page);
+          console.log('set task description', task.data.description);
+        }
       });
     }
   },

@@ -28,7 +28,7 @@
     <div class="page-content">
         <div class="content-block subheader">
             <h1>
-                <input type="text" name="task[name]" class="unstyled edit-task-name" value="{{name}}">
+                <textarea name="task[name]" class="unstyled edit-task-name resizable">{{name}}</textarea>
             </h1>
             <input type="text" value="{{#if_compare status "==" "Unassigned"}}{{t "task.waiting_for_assignments" defaultValue="Waiting for assignments"}}{{else}}{{tasks__displayStatus status}}{{/if_compare}}" readonly="readonly" class="unstyled task-status-picker" />
         </div>
@@ -67,7 +67,7 @@
                         </div>
                         <div class="item-inner">
                             <div class="item-input-wrap inline-edit">
-                                <textarea placeholder="{{t "task.edit_description" defaultValue="Edit the description..."}}" class="unstyled edit-task-description">{{data.description}}</textarea>
+                                <textarea placeholder="{{t "task.edit_description" defaultValue="Edit the description..."}}" class="unstyled edit-task-description resizable">{{data.description}}</textarea>
                                 <span class="input-clear-button"></span>
                             </div>
                         </div>
