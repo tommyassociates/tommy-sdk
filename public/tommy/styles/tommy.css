@@ -472,7 +472,7 @@ a.bg-green {
   min-width: 44px;
 }
 .right a.link.icon-only {
-  min-width: 0;
+  /* min-width: 0; */
 }
 
 
@@ -933,6 +933,24 @@ html.pixel-ratio-3 .centered-title:after {
 	margin: 17px 0 3px;
 	color: #505050;
 }
+
+
+/*
+  Refresh Panel
+*/
+
+.refresh-panel {
+  display:none;
+  text-align: center;
+  padding: 12px 10px;
+  background: white;
+  border-bottom: 1px solid #D9D9D9;
+}
+
+.refresh-panel .refresh {
+  margin-left: 10px;
+}
+
 
 /*
   Tage Select Component

@@ -105,8 +105,8 @@ var API = {
       addon: 'tasks',
       kind: 'Task',
       tags: tags,
-      include_filters: true,
-      include_permission_to: true
+      with_filters: true,
+      with_permission_to: true
     };
 
     if (list.data.statuses) params.status = list.data.statuses;
@@ -156,8 +156,8 @@ var API = {
 
     task.addon = 'tasks';
     task.kind = 'Task';
-    task.include_filters = true;
-    task.include_permission_to = true;
+    task.with_filters = true;
+    task.with_permission_to = true;
     if (!task.id) {
       API.addTaskActivity(task, 'status', window.tommy.i18n.t('task.created_a_task'));
     }
@@ -196,8 +196,8 @@ var API = {
     params = Object.assign({
       addon: 'tasks',
       kind: 'TaskList',
-      include_filters: true,
-      include_permission_to: true
+      with_filters: true,
+      with_permission_to: true
     }, params);
     return window.tommy.api.getFragments(params).then(API.addLists);
   },
@@ -217,8 +217,8 @@ var API = {
 
     list.addon = 'tasks';
     list.kind = 'TaskList';
-    list.include_filters = true;
-    list.include_permission_to = true;
+    list.with_filters = true;
+    list.with_permission_to = true;
     if (!list.data) {
       list.data = {};
     }
@@ -291,7 +291,7 @@ var API = {
     console.log('init permission selects', name, resource_id);
     var params = {
       resource_id: resource_id,
-      include_filters: true
+      with_filters: true
     };
     window.tommy.api.getInstalledAddonPermission('tasks', name, params).then(function (permission) {
       console.log('installed addon permission', permission);
@@ -313,7 +313,7 @@ var API = {
       console.log('save permission tags', permission, data);
       window.tommy.api.updateInstalledAddonPermission('tasks', permission.name, {
         resource_id: permission.resource_id, // pass the resource_id for resource specific permissions
-        include_filters: true,
+        with_filters: true,
         filters: JSON.stringify(data) // data
       });
     });

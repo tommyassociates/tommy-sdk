@@ -22,6 +22,7 @@
             tplHelpers: '/tommy/templates/tplHelpers',
             tplManager: '/tommy/templates/tplManager',
             photoChanger: '/tommy/components/photoChanger',
+            refreshPanel: '/tommy/components/refreshPanel',
             tagSelect: '/tommy/components/tagSelect',
             moment: '/tommy/vendors/moment.min',
             Framework7: '/tommy/vendors/framework7/framework7',

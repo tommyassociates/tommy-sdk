@@ -5,7 +5,7 @@
   summary: "Display biometrics assessment data."
   description: "This addon displays biometrics assessment data."
   developer: "Tommy Labs GmbH"
-  homepage: "http://mytommy.com"
+  homepage: "https://mytommy.com"
   private: false
   views:
     main:
