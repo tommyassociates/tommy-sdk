@@ -8,6 +8,13 @@ const IndexController = {
     IndexController.loadWallets();
     IndexController.loadTransactions();
     IndexController.loadBalanceHistory();
+    $$(document).on('wallet:transaction', IndexController.refresh)
+  },
+  refresh() {
+    IndexController.loadWalletInfo();
+    IndexController.loadWallets();
+    IndexController.loadTransactions();
+    IndexController.loadBalanceHistory();
   },
   loadWalletInfo() {
     API.getWallet().then((data) => {
@@ -63,6 +70,7 @@ const IndexController = {
   uninit () {
     IndexController.page = null;
     delete IndexController.page;
+    $$(document).off('wallet:transaction', IndexController.refresh)
     console.log('uninitialize wallet addon')
   },
 };
