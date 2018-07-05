@@ -25,7 +25,7 @@ const ListEditController = {
     })
 
     $page.find('.date-range-select').on('click', ev => {
-      ListEditController.showDateRangePopup(page, list)
+      ListEditController.showDateRangePage(page, list)
       ev.preventDefault()
     })
 
@@ -41,14 +41,73 @@ const ListEditController = {
     })
   },
 
-  showDateRangePopup (page, list) {
-    var html = window.tommy.tplManager.render('tasks__dateRangeSelectTemplate', list.data)
-    // let $popup = $$('<div class="popup" data-page="tasks__date-range-select"></div>')
-    // $popup.append(html)
-    // $popup.append(html)
-    // console.log('POPUP', $popup)
-    // window.tommy.f7.popup($popup)
-    window.tommy.f7.popup(html)
+  showDateRangePage (settingsPage, list) {
+    list.data.date_range = 'today';
+    var html = window.tommy.tplManager.render('tasks__dateRangeSelectTemplate', list.data);
+
+    function handleDateRangePage(page) {
+      const $page = $$(page.container);
+      const date_range = list.data.date_range;
+      let dateFrom;
+      let dateTo;
+      let range = date_range;
+
+      const $radios = $page.find('input[name="time_or_created_between"]')
+      const $switch = $page.find('.label-switch input');
+
+      function onSwitchChange(e) {
+        if (e.target.checked) {
+          $page.find('.date-range-custom-item').show();
+          $radios.prop('checked', false);
+          range = [];
+        } else {
+          range = '';
+          $page.find('.date-range-custom-item').hide();
+        }
+      }
+      function onRadioChange(e) {
+        if (e.target.checked) {
+          range = e.target.value;
+          $switch.prop('checked', false).trigger('change');
+        }
+      }
+
+      if (typeof range === 'string') {
+        $page.find(`input[name="time_or_created_between"][value="${range}"]`).prop('checked', true);
+        $page.find('.date-range-custom-item').hide();
+      }
+      if (Array.isArray(range)) {
+        $switch.prop('checked', true);
+      }
+
+      const calendarFrom = window.tommy.app.f7.calendar({
+        input: $page.find('input[name="start_at"]'),
+        closeOnSelect: true,
+        value: Array.isArray(range) ? [range[0]] : [],
+        onChange(c, values) {
+          dateFrom = values[1]
+        }
+      })
+      const calendarTo = window.tommy.app.f7.calendar({
+        input: $page.find('input[name="end_at"]'),
+        closeOnSelect: true,
+        value: Array.isArray(range) ? [range[1]] : [],
+        onChange(c, values) {
+          dateTo = values[1]
+        }
+      })
+
+
+      $switch.on('change', onSwitchChange);
+      $radios.on('change', onRadioChange);
+
+    }
+
+    $$(window.tommy.f7.views.main.container).once('page:init', '[data-page="tasks__date-range-select"]', (e) => {
+      const page = e.detail.page;
+      handleDateRangePage(page)
+    })
+    window.tommy.f7.views.main.loadContent(html)
   },
 
   initListFilters (page, list) {
