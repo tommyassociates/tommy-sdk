@@ -2,7 +2,7 @@
   <div class="navbar-inner">
     <div class="left sliding">{{backButton "native"}}</div>
     <div class="center sliding">{{t "main.title" ns="availability" defaultValue="Availabilities"}}</div>
-    <div class="right"><a href="#" class="save link">Save</a></div>
+    <div class="right"><a href="#" class="save link">{{t "common.save" ns="availability" defaultValue="Save"}}</a></div>
   </div>
 </div>
 <div class="page" id="availability__main"
@@ -11,6 +11,11 @@
     data-view="main"
     data-path="{{addonAssetUrl}}">
   <div class="page-content">
+    <div class="refresh-panel" data-last-updated>
+        {{t "common.last_updated" ns="availability" defaultValue="Last updated"}}:
+        <span class="time">1 min ago</span>
+        <a href="#" class="refresh">{{t "common.save" ns="availability" defaultValue="Refresh"}}</a>
+    </div>
     <div data-template="availability__availabilityListGroupTemplate"></div>
   </div>
 </div>
