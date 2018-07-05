@@ -1337,14 +1337,11 @@ textarea.unstyled {
     color: inherit !important;
     padding: 0 !important;
     margin: 0 !important;
-    height: auto !important;
     min-height: 0;
     border: 0;
     outline: 0;
     background: transparent;
-}
-textarea.unstyled {
-    height: 22px !important;
+    height: auto;
 }
 
 /*body.scan-qr .views {

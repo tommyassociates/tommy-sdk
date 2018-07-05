@@ -10,6 +10,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
 }
 .tasks-navbar-inner {
     .right {
+        padding-right: 8px;
         .link.icon-only {
             min-width: 44px;
         }
@@ -181,7 +182,8 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
             background-color: #f8f8f8; border-color: #f2f2f2; font-size: 14px; font-weight: 400;
             &::placeholder { color: #ccc; }
         }
-        textarea+.link { font-size: 16px; color: #ccc; font-weight: 400 }
+        textarea + .link { font-size: 16px; font-weight: 400 }
+        textarea:not(.with-value) + .link { color: #ccc; pointer-events: none }
     }
     .navbar {
         background: #fafafa;
@@ -291,6 +293,11 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
             margin: 0; padding-top: 10px; padding-bottom: 10px; color: #fff; background-image: linear-gradient(-270deg, #FF4500 0%, #FF7B00 100%);
             h1 { margin: 0 0 15px; font-weight: 500; font-size: 20px }
             a { font-size: 14px; color: #F1F1F1; }
+            .edit-task-name {
+                width: 100%;
+                resize: none;
+                height: 28px;
+            }
         }
         .media-list {
             .item-divider { background: transparent !important; color: #999 !important; }
@@ -383,11 +390,15 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
                     .item-inner {
                         &::after { display: none; }
                         .item-title {
+                            white-space: normal;
                             font-size: 14px;
                             span { color: #999999  }
                         }
                         .item-after { color: #999; font-size: 12px; }
-                        .item-subtitle { font-size: 16px; }
+                        .item-subtitle {
+                            font-size: 16px;
+                            white-space: normal;
+                        }
                         .item-text {
                             div { margin: 6px 0 0 0; }
                             img { margin: 0 5px 0 0; vertical-align: middle }
