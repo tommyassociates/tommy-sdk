@@ -5,7 +5,7 @@
   summary: "Heart Rate demo."
   description: "This addon provides demo integration with biofeedback devices."
   developer: "Tommy Labs GmbH"
-  homepage: "http://mytommy.com"
+  homepage: "https://mytommy.com"
   private: false
   views:
     index:
