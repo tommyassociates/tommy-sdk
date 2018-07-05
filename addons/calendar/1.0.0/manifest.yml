@@ -5,7 +5,7 @@
   description: "Calendar for managing personal and team schedules."
   version: "1.0.0"
   developer: "Tommy Labs GmbH"
-  homepage: "http://mytommy.com"
+  homepage: "https://mytommy.com"
   private: false
   locales:
     - en-US
