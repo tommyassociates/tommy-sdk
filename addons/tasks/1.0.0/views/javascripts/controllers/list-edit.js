@@ -1,5 +1,5 @@
 import API from '../api'
-import IndexController from './index'
+import formatDateRange from '../format-date-range';
 
 const ListEditController = {
   init (page) {
@@ -42,65 +42,99 @@ const ListEditController = {
   },
 
   showDateRangePage (settingsPage, list) {
-    list.data.date_range = 'today';
     var html = window.tommy.tplManager.render('tasks__dateRangeSelectTemplate', list.data);
 
     function handleDateRangePage(page) {
       const $page = $$(page.container);
+      const $nav = $$(page.navbarInnerContainer);
       const date_range = list.data.date_range;
-      let dateFrom;
-      let dateTo;
       let range = date_range;
+      let dateFrom = Array.isArray(range) && range[0] ? range : new Date().getTime();
+      let dateTo = Array.isArray(range) && range[1] ? range : new Date().getTime();
 
       const $radios = $page.find('input[name="time_or_created_between"]')
       const $switch = $page.find('.label-switch input');
+
+      function enableSave() {
+        $nav.find('.toggle.save').addClass('active');
+      }
+
+      function save() {
+        list.data.date_range = range;
+        API.saveList(list).then((res) => {
+          $$(settingsPage.container).find('.date-range-select .item-after').text(formatDateRange(range));
+          ListEditController.afterSave(res);
+        });
+      }
 
       function onSwitchChange(e) {
         if (e.target.checked) {
           $page.find('.date-range-custom-item').show();
           $radios.prop('checked', false);
-          range = [];
+          range = [dateFrom, dateTo];
         } else {
           range = '';
           $page.find('.date-range-custom-item').hide();
         }
+        enableSave()
       }
       function onRadioChange(e) {
         if (e.target.checked) {
-          range = e.target.value;
           $switch.prop('checked', false).trigger('change');
+          range = e.target.value;
         }
+        enableSave()
       }
 
-      if (typeof range === 'string') {
+      if (typeof range === 'string' && range) {
         $page.find(`input[name="time_or_created_between"][value="${range}"]`).prop('checked', true);
         $page.find('.date-range-custom-item').hide();
       }
-      if (Array.isArray(range)) {
+      else if (!range) {
+        $page.find(`input[name="time_or_created_between"][value=""]`).prop('checked', true);
+        $page.find('.date-range-custom-item').hide();
+      }
+      else if (Array.isArray(range)) {
         $switch.prop('checked', true);
       }
-
+      let fromInitialChange;
+      let toInitialChange;
       const calendarFrom = window.tommy.app.f7.calendar({
         input: $page.find('input[name="start_at"]'),
         closeOnSelect: true,
-        value: Array.isArray(range) ? [range[0]] : [],
+        value: [dateFrom],
         onChange(c, values) {
-          dateFrom = values[1]
+          if (fromInitialChange) {
+            enableSave();
+          }
+          fromInitialChange = true;
+          dateFrom = new Date(values[0]).getTime();
+          if (Array.isArray(range) && range[0]) range[0] = dateFrom;
+          if (dateFrom > dateTo) {
+            calendarTo.setValue([dateFrom]);
+          }
         }
       })
       const calendarTo = window.tommy.app.f7.calendar({
         input: $page.find('input[name="end_at"]'),
         closeOnSelect: true,
-        value: Array.isArray(range) ? [range[1]] : [],
+        value: [dateTo],
         onChange(c, values) {
-          dateTo = values[1]
+          if (toInitialChange) {
+            enableSave();
+          }
+          toInitialChange = true;
+          dateTo = new Date(values[0]).getTime();
+          if (Array.isArray(range) && range[1]) range[1] = dateTo;
+          if (dateTo < dateFrom) {
+            calendarFrom.setValue([dateTo]);
+          }
         }
       })
 
-
       $switch.on('change', onSwitchChange);
       $radios.on('change', onRadioChange);
-
+      $nav.find('.toggle.save').on('click', save);
     }
 
     $$(window.tommy.f7.views.main.container).once('page:init', '[data-page="tasks__date-range-select"]', (e) => {

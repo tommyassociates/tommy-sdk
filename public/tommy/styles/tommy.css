@@ -1431,10 +1431,15 @@ textarea.unstyled {
   /*display: none;*/
   /*visibility: hidden;*/
   opacity: 0;
+  pointer-events: none;
+}
+.navbar .save.toggle.active-state {
+  opacity: 0;
 }
 .navbar .save.toggle.active {
   /*visibility: visible;*/
   opacity: 1;
+  pointer-events: auto;
   /*display: -webkit-box;
   display: -ms-flexbox;
   display: -webkit-flex;

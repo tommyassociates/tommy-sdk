@@ -106,7 +106,9 @@ var API = {
       with_filters: true,
       with_permission_to: true
     };
-
+    if (list.data.date_range) {
+      params.date_range = list.data.date_range;
+    }
     if (list.data.statuses) params.status = list.data.statuses;
 
     return window.tommy.api.getFragments(params);
@@ -595,9 +597,9 @@ var _api = require('../api');
 
 var _api2 = _interopRequireDefault(_api);
 
-var _index = require('./index');
+var _formatDateRange = require('../format-date-range');
 
-var _index2 = _interopRequireDefault(_index);
+var _formatDateRange2 = _interopRequireDefault(_formatDateRange);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -641,63 +643,97 @@ var ListEditController = {
     });
   },
   showDateRangePage: function showDateRangePage(settingsPage, list) {
-    list.data.date_range = 'today';
     var html = window.tommy.tplManager.render('tasks__dateRangeSelectTemplate', list.data);
 
     function handleDateRangePage(page) {
       var $page = $$(page.container);
+      var $nav = $$(page.navbarInnerContainer);
       var date_range = list.data.date_range;
-      var dateFrom = void 0;
-      var dateTo = void 0;
       var range = date_range;
+      var dateFrom = Array.isArray(range) && range[0] ? range : new Date().getTime();
+      var dateTo = Array.isArray(range) && range[1] ? range : new Date().getTime();
 
       var $radios = $page.find('input[name="time_or_created_between"]');
       var $switch = $page.find('.label-switch input');
+
+      function enableSave() {
+        $nav.find('.toggle.save').addClass('active');
+      }
+
+      function save() {
+        list.data.date_range = range;
+        _api2.default.saveList(list).then(function (res) {
+          $$(settingsPage.container).find('.date-range-select .item-after').text((0, _formatDateRange2.default)(range));
+          ListEditController.afterSave(res);
+        });
+      }
 
       function onSwitchChange(e) {
         if (e.target.checked) {
           $page.find('.date-range-custom-item').show();
           $radios.prop('checked', false);
-          range = [];
+          range = [dateFrom, dateTo];
         } else {
           range = '';
           $page.find('.date-range-custom-item').hide();
         }
+        enableSave();
       }
       function onRadioChange(e) {
         if (e.target.checked) {
-          range = e.target.value;
           $switch.prop('checked', false).trigger('change');
+          range = e.target.value;
         }
+        enableSave();
       }
 
-      if (typeof range === 'string') {
+      if (typeof range === 'string' && range) {
         $page.find('input[name="time_or_created_between"][value="' + range + '"]').prop('checked', true);
         $page.find('.date-range-custom-item').hide();
-      }
-      if (Array.isArray(range)) {
+      } else if (!range) {
+        $page.find('input[name="time_or_created_between"][value=""]').prop('checked', true);
+        $page.find('.date-range-custom-item').hide();
+      } else if (Array.isArray(range)) {
         $switch.prop('checked', true);
       }
-
+      var fromInitialChange = void 0;
+      var toInitialChange = void 0;
       var calendarFrom = window.tommy.app.f7.calendar({
         input: $page.find('input[name="start_at"]'),
         closeOnSelect: true,
-        value: Array.isArray(range) ? [range[0]] : [],
+        value: [dateFrom],
         onChange: function onChange(c, values) {
-          dateFrom = values[1];
+          if (fromInitialChange) {
+            enableSave();
+          }
+          fromInitialChange = true;
+          dateFrom = new Date(values[0]).getTime();
+          if (Array.isArray(range) && range[0]) range[0] = dateFrom;
+          if (dateFrom > dateTo) {
+            calendarTo.setValue([dateFrom]);
+          }
         }
       });
       var calendarTo = window.tommy.app.f7.calendar({
         input: $page.find('input[name="end_at"]'),
         closeOnSelect: true,
-        value: Array.isArray(range) ? [range[1]] : [],
+        value: [dateTo],
         onChange: function onChange(c, values) {
-          dateTo = values[1];
+          if (toInitialChange) {
+            enableSave();
+          }
+          toInitialChange = true;
+          dateTo = new Date(values[0]).getTime();
+          if (Array.isArray(range) && range[1]) range[1] = dateTo;
+          if (dateTo < dateFrom) {
+            calendarFrom.setValue([dateTo]);
+          }
         }
       });
 
       $switch.on('change', onSwitchChange);
       $radios.on('change', onRadioChange);
+      $nav.find('.toggle.save').on('click', save);
     }
 
     $$(window.tommy.f7.views.main.container).once('page:init', '[data-page="tasks__date-range-select"]', function (e) {
@@ -734,7 +770,7 @@ var ListEditController = {
 
 exports.default = ListEditController;
 
-},{"../api":1,"./index":3}],6:[function(require,module,exports){
+},{"../api":1,"../format-date-range":9}],6:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1153,6 +1189,34 @@ exports.default = TaskController;
 },{"../api":1}],9:[function(require,module,exports){
 'use strict';
 
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+exports.default = function (range) {
+  if (!range) return '';
+  if (typeof range === 'string') {
+    return window.tommy.i18n.t('date_range.' + range);
+  }
+  if (Array.isArray(range)) {
+    return formatDate(range[0]) + ' - ' + formatDate(range[1]);
+  }
+  return range || '';
+};
+
+function formatDate(date) {
+  var d = new Date();
+  var year = d.getFullYear();
+  var month = d.getMonth() + 1;
+  var day = d.getDate();
+  if (month < 10) month = '0' + month;
+  if (day < 10) day = '0' + day;
+  return year + '-' + month + '-' + day;
+}
+
+},{}],10:[function(require,module,exports){
+'use strict';
+
 var _api = require('./api');
 
 var _api2 = _interopRequireDefault(_api);
@@ -1184,6 +1248,10 @@ var _listManagement2 = _interopRequireDefault(_listManagement);
 var _boardSettings = require('./controllers/board-settings');
 
 var _boardSettings2 = _interopRequireDefault(_boardSettings);
+
+var _formatDateRange = require('./format-date-range');
+
+var _formatDateRange2 = _interopRequireDefault(_formatDateRange);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -1257,7 +1325,7 @@ window.tommy.app.t7.registerHelper('tasks__ifCanEditList', function (list, optio
 });
 
 window.tommy.app.t7.registerHelper('tasks__displayDateRange', function (range) {
-  return range || '';
+  return (0, _formatDateRange2.default)(range);
 });
 
-},{"./api":1,"./controllers/board-settings":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/task":8,"./controllers/task-add":7}]},{},[9]);
+},{"./api":1,"./controllers/board-settings":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/task":8,"./controllers/task-add":7,"./format-date-range":9}]},{},[10]);
