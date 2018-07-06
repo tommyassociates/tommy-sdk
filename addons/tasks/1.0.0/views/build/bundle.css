@@ -573,3 +573,5 @@
   background: transparent; }
 #tasks__tasks[data-page="tasks__task"] .item-input-wrap {
   width: 100%; }
+#tasks__tasks .date-range-select .item-inner {
+  padding-right: 15px; }

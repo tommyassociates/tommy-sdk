@@ -95,7 +95,9 @@ const API = {
       with_filters: true,
       with_permission_to: true
     }
-
+    if (list.data.date_range) {
+      params.date_range = list.data.date_range;
+    }
     if (list.data.statuses)
       params.status = list.data.statuses
 

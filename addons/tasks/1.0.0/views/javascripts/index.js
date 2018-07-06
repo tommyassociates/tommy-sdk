@@ -7,6 +7,7 @@ import ListEditController from './controllers/list-edit'
 import ListManagementController from './controllers/list-management'
 import BoardSettingsController from './controllers/board-settings'
 
+import formatDateRange from './format-date-range';
 
 //
 // == Router
@@ -79,5 +80,5 @@ window.tommy.app.t7.registerHelper('tasks__ifCanEditList', (list, options) => {
 })
 
 window.tommy.app.t7.registerHelper('tasks__displayDateRange', range => {
-  return range || '';
+  return formatDateRange(range);
 })
