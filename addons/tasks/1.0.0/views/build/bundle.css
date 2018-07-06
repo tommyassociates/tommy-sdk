@@ -505,6 +505,8 @@
       display: block;
       width: inherit;
       height: inherit; }
+#tasks__tasks[data-page="tasks__task"] .media-list.details textarea.edit-task-description {
+  height: 22px; }
 #tasks__tasks[data-page="tasks__task"] .media-list.checklist .item-content .item-media {
   width: 32px; }
   #tasks__tasks[data-page="tasks__task"] .media-list.checklist .item-content .item-media img {
