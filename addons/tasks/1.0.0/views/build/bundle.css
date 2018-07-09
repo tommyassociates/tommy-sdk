@@ -1,3 +1,10 @@
+.tasks-navbar-inner .right {
+  padding-right: 8px; }
+  .tasks-navbar-inner .right .link.icon-only {
+    min-width: 44px; }
+
+#tasks__tasks .item-input-full-width {
+  width: 100%; }
 #tasks__tasks .chip.chip-lg {
   display: flex;
   width: 100%;
@@ -266,8 +273,10 @@
       color: #ccc; }
   #tasks__tasks .messagebar textarea + .link {
     font-size: 16px;
-    color: #ccc;
     font-weight: 400; }
+  #tasks__tasks .messagebar textarea:not(.with-value) + .link {
+    color: #ccc;
+    pointer-events: none; }
 #tasks__tasks .navbar {
   background: #fafafa; }
   #tasks__tasks .navbar .center {
@@ -425,6 +434,10 @@
   #tasks__tasks[data-page="tasks__task"] .subheader a {
     font-size: 14px;
     color: #F1F1F1; }
+  #tasks__tasks[data-page="tasks__task"] .subheader .edit-task-name {
+    width: 100%;
+    resize: none;
+    height: 28px; }
 #tasks__tasks[data-page="tasks__task"] .media-list .item-divider {
   background: transparent !important;
   color: #999 !important; }
@@ -494,6 +507,8 @@
       display: block;
       width: inherit;
       height: inherit; }
+#tasks__tasks[data-page="tasks__task"] .media-list.details textarea.edit-task-description {
+  height: 22px; }
 #tasks__tasks[data-page="tasks__task"] .media-list.checklist .item-content .item-media {
   width: 32px; }
   #tasks__tasks[data-page="tasks__task"] .media-list.checklist .item-content .item-media img {
@@ -536,6 +551,7 @@
 #tasks__tasks[data-page="tasks__task"] .media-list.activity .item-content .item-inner::after {
   display: none; }
 #tasks__tasks[data-page="tasks__task"] .media-list.activity .item-content .item-inner .item-title {
+  white-space: normal;
   font-size: 14px; }
   #tasks__tasks[data-page="tasks__task"] .media-list.activity .item-content .item-inner .item-title span {
     color: #999999; }
@@ -543,7 +559,8 @@
   color: #999;
   font-size: 12px; }
 #tasks__tasks[data-page="tasks__task"] .media-list.activity .item-content .item-inner .item-subtitle {
-  font-size: 16px; }
+  font-size: 16px;
+  white-space: normal; }
 #tasks__tasks[data-page="tasks__task"] .media-list.activity .item-content .item-inner .item-text div {
   margin: 6px 0 0 0; }
 #tasks__tasks[data-page="tasks__task"] .media-list.activity .item-content .item-inner .item-text img {
@@ -560,3 +577,5 @@
   background: transparent; }
 #tasks__tasks[data-page="tasks__task"] .item-input-wrap {
   width: 100%; }
+#tasks__tasks .date-range-select .item-inner {
+  padding-right: 15px; }

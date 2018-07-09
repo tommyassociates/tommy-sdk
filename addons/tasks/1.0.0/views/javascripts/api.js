@@ -95,7 +95,9 @@ const API = {
       with_filters: true,
       with_permission_to: true
     }
-
+    if (list.data.date_range) {
+      params.date_range = list.data.date_range;
+    }
     if (list.data.statuses)
       params.status = list.data.statuses
 
@@ -151,8 +153,18 @@ const API = {
     if (!task.start_at) { task.start_at = (new Date).getTime() }
 
     // Specify the access permissions this resource will belong to
-    if (!task.id)
+    if (!task.id) {
       task.with_permissions = [ 'task_create_access', 'task_edit_access' ]
+      const actor = window.tommy.addons.getCurrentActor()
+      if (actor) {
+        if (!task.filters) task.filters = [];
+        task.filters.push({
+          context: 'members',
+          name: `${actor.first_name} ${actor.last_name}`,
+          user_id: actor.user_id
+        })
+      }
+    }
 
     const params = Object.assign({}, task, { data: JSON.stringify(task.data) })
     if (task.id) {

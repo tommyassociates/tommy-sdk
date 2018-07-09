@@ -6,8 +6,11 @@ const TaskController = {
     const $page = $$(page.container)
     const $navbar = $$(page.navbarInnerContainer)
 
+    const f7 = window.tommy.app.f7;
+
     console.log('init task details', task)
     window.tommy.tplManager.renderInline('tasks__taskDetailsTemplate', task, $page.parent())
+
 
     $page.find('.task-menu-popover').on('popover:open', () => {
       // BUG: popover shows offscreen on desktop, this fixes it
@@ -28,7 +31,7 @@ const TaskController = {
           alert('Unknown command: ' + command)
       }
 
-      window.tommy.app.f7.closeModal('.task-menu-popover')
+      f7.closeModal('.task-menu-popover')
     })
 
     // Task title area
@@ -52,8 +55,15 @@ const TaskController = {
     if (task.end_at) { TaskController.renderDeadline(page) }
 
     // Task activity
-    let myMessagebar = window.tommy.app.f7.messagebar('.messagebar', { maxHeight: 200 })
+    let myMessagebar = f7.messagebar('.messagebar', { maxHeight: 200 })
+    myMessagebar.textarea.on('change input', (e) => {
+      const value = myMessagebar.value().trim();
+      if (value) myMessagebar.textarea.addClass('with-value');
+      else myMessagebar.textarea.removeClass('with-value');
+    })
     $page.find('.add-comment').click(() => {
+      const value = myMessagebar.value().trim();
+      if (!value) return;
       TaskController.addActivity(page, 'comment', myMessagebar.value())
       myMessagebar.clear()
     })
@@ -69,20 +79,24 @@ const TaskController = {
       console.log('task participants changed', data)
       task.filters = data
       window.tommy.tplManager.renderInline('tasks__taskParticipantsTemplate', task.filters, page.container)
-      TaskController.enableSave(page, true)
+      TaskController.saveTask(page);
     })
 
     // Task name inline editing
-    const $editTaskName = $page.find('input.edit-task-name')
-    $editTaskName.on('click', () => {
+    const $editTaskName = $page.find('textarea.edit-task-name')
+    $editTaskName.on('focus', () => {
       TaskController.enableEditName(page, true)
     })
+    f7.resizableTextarea('textarea.edit-task-name');
+    f7.resizeTextarea('textarea.edit-task-name');
 
     // Task description inline editing
     const $editTaskDescription = $page.find('textarea.edit-task-description')
-    $editTaskDescription.on('click', () => {
+    $editTaskDescription.on('focus', () => {
       TaskController.enableEditDescription(page, true)
     })
+    f7.resizableTextarea('textarea.edit-task-description');
+    f7.resizeTextarea('textarea.edit-task-description');
 
     // Save button
     $navbar.find('a.save').on('click', () => {
@@ -121,16 +135,18 @@ const TaskController = {
 
   renderChecklist (page) {
     let task = API.cache['tasks'][page.query.task_fragment_id]
-    let $page = $$(page.container)
+    const $page = $$(page.container)
 
     let items = []
-    if (task.data.checklist &&
-            task.data.checklist.items) { items = task.data.checklist.items }
+    if (task.data.checklist && task.data.checklist.items) {
+      items = task.data.checklist.items
+    }
     window.tommy.tplManager.renderInline('tasks__taskChecklistTemplate', items, $page)
 
     const $input = $page.find('input.add-checklist-item')
-    $input.on('focusout', function () {
+    $input.on('blur', function () {
       const text = $$(this).val()
+      task = API.cache['tasks'][page.query.task_fragment_id]
       if (!text || !text.length) { return }
 
       if (!task.data.checklist) { task.data.checklist = {} }
@@ -139,32 +155,34 @@ const TaskController = {
         text,
         complete: false
       })
-
       TaskController.renderChecklist(page)
-    })
-    $input.on('focusin', () => {
-      TaskController.enableSave(page)
+      TaskController.saveTask(page);
     })
     $page.find('.remove-checklist').click(() => {
+      task = API.cache['tasks'][page.query.task_fragment_id]
       // TODO: confirm alert
       task.data.checklist = {}
       $page.find('[data-template="tasks__taskChecklistTemplate"]').html('')
       TaskController.saveTask(page)
     })
     $page.find('.remove-checklist-item').click(function () {
+      task = API.cache['tasks'][page.query.task_fragment_id]
       const index = parseInt($$(this).parents('li').data('checklist-item'))
 
       console.log('removing checklist item', index)
       task.data.checklist.items.splice(index, 1)
       TaskController.renderChecklist(page)
 
-      TaskController.enableSave(page)
-      // TaskController.saveTask(page)
+      TaskController.saveTask(page)
     })
-    $page.find('.checklist-item').click(function () {
+    $page.find('.checklist-item').click(function (e) {
+      const $target = $$(e.target);
+      if ($target.hasClass('remove-checklist-item') || $target.parents('.remove-checklist-item').length) {
+        return;
+      }
       const index = parseInt($$(this).parents('li').data('checklist-item'))
       const isChecked = $$(this).hasClass('checked')
-
+      task = API.cache['tasks'][page.query.task_fragment_id]
       console.log('toggle checklist item', index)
       if (isChecked) {
         $$(this).removeClass('checked')
@@ -174,8 +192,7 @@ const TaskController = {
         task.data.checklist.items[index].complete = true
       }
 
-      TaskController.enableSave(page)
-      // TaskController.saveTask(page)
+      TaskController.saveTask(page)
     })
   },
 
@@ -192,7 +209,7 @@ const TaskController = {
       onClose () {
         console.log('closing deadline picker', picker.currentDate)
         task.end_at = picker.currentDate
-        TaskController.enableSave(page)
+        TaskController.saveTask(page);
       },
       onFormat (date) {
         console.log('format deadline picker', date)
@@ -250,15 +267,16 @@ const TaskController = {
   enableEditName (page, flag) {
     let task = API.cache['tasks'][page.query.task_fragment_id]
     const $page = $$(page.container)
-    const $input = $page.find('input.edit-task-name')
+    const $textarea = $page.find('textarea.edit-task-name')
 
     if (flag != false) {
-      // $textarea.removeClass('unstyled')
-      TaskController.enableSave(page, true)
-
-      $input.on('focusout', () => {
-        task.name = $input.val()
-        console.log('set task name', task.name)
+      $textarea.once('focusout', () => {
+        const newValue = $textarea.val();
+        if (task.name !== newValue) {
+          task.name = newValue;
+          TaskController.saveTask(page);
+          console.log('set task name', task.name)
+        }
       })
     }
   },
@@ -269,13 +287,13 @@ const TaskController = {
     const $textarea = $page.find('textarea.edit-task-description')
 
     if (flag != false) {
-      // $textarea.removeClass('unstyled')
-      TaskController.enableSave(page, true)
-
-      $textarea.on('focusout', () => {
-        task.data.description = $textarea.val()
-        console.log('set task description', task.data.description)
-        TaskController.enableEditDescription(page, false)
+      $textarea.once('focusout', () => {
+        const newValue = $textarea.val();
+        if (task.data.description !== newValue) {
+          task.data.description = newValue;
+          TaskController.saveTask(page);
+          console.log('set task description', task.data.description)
+        }
       })
     }
   },
