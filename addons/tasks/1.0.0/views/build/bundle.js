@@ -106,7 +106,9 @@ var API = {
       with_filters: true,
       with_permission_to: true
     };
-
+    if (list.data.date_range) {
+      params.date_range = list.data.date_range;
+    }
     if (list.data.statuses) params.status = list.data.statuses;
 
     return window.tommy.api.getFragments(params);
@@ -167,7 +169,18 @@ var API = {
     }
 
     // Specify the access permissions this resource will belong to
-    if (!task.id) task.with_permissions = ['task_create_access', 'task_edit_access'];
+    if (!task.id) {
+      task.with_permissions = ['task_create_access', 'task_edit_access'];
+      var actor = window.tommy.addons.getCurrentActor();
+      if (actor) {
+        if (!task.filters) task.filters = [];
+        task.filters.push({
+          context: 'members',
+          name: actor.first_name + ' ' + actor.last_name,
+          user_id: actor.user_id
+        });
+      }
+    }
 
     var params = Object.assign({}, task, { data: JSON.stringify(task.data) });
     if (task.id) {
@@ -400,7 +413,7 @@ var IndexController = {
   init: function init(page) {
     console.log('initialize tasks addon');
     if (!_api2.default.listsLoaded) {
-      // || !API.tasksLoaded 
+      // || !API.tasksLoaded
       _api2.default.initCache();
       _api2.default.loadLists().then(function () {
         if (_api2.default.hasDefaultList()) {
@@ -595,9 +608,9 @@ var _api = require('../api');
 
 var _api2 = _interopRequireDefault(_api);
 
-var _index = require('./index');
+var _formatDateRange = require('../format-date-range');
 
-var _index2 = _interopRequireDefault(_index);
+var _formatDateRange2 = _interopRequireDefault(_formatDateRange);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -625,7 +638,7 @@ var ListEditController = {
     });
 
     $page.find('.date-range-select').on('click', function (ev) {
-      ListEditController.showDateRangePopup(page, list);
+      ListEditController.showDateRangePage(page, list);
       ev.preventDefault();
     });
 
@@ -640,14 +653,105 @@ var ListEditController = {
       ev.preventDefault();
     });
   },
-  showDateRangePopup: function showDateRangePopup(page, list) {
+  showDateRangePage: function showDateRangePage(settingsPage, list) {
     var html = window.tommy.tplManager.render('tasks__dateRangeSelectTemplate', list.data);
-    // let $popup = $$('<div class="popup" data-page="tasks__date-range-select"></div>')
-    // $popup.append(html)
-    // $popup.append(html)
-    // console.log('POPUP', $popup)
-    // window.tommy.f7.popup($popup)
-    window.tommy.f7.popup(html);
+
+    function handleDateRangePage(page) {
+      var $page = $$(page.container);
+      var $nav = $$(page.navbarInnerContainer);
+      var date_range = list.data.date_range;
+      var range = date_range;
+      var dateFrom = Array.isArray(range) && range[0] ? range : new Date().getTime();
+      var dateTo = Array.isArray(range) && range[1] ? range : new Date().getTime();
+
+      var $radios = $page.find('input[name="time_or_created_between"]');
+      var $switch = $page.find('.label-switch input');
+
+      function enableSave() {
+        $nav.find('.toggle.save').addClass('active');
+      }
+
+      function save() {
+        list.data.date_range = range;
+        _api2.default.saveList(list).then(function (res) {
+          $$(settingsPage.container).find('.date-range-select .item-after').text((0, _formatDateRange2.default)(range));
+          ListEditController.afterSave(res);
+        });
+      }
+
+      function onSwitchChange(e) {
+        if (e.target.checked) {
+          $page.find('.date-range-custom-item').show();
+          $radios.prop('checked', false);
+          range = [dateFrom, dateTo];
+        } else {
+          range = '';
+          $page.find('.date-range-custom-item').hide();
+        }
+        enableSave();
+      }
+      function onRadioChange(e) {
+        if (e.target.checked) {
+          $switch.prop('checked', false).trigger('change');
+          range = e.target.value;
+        }
+        enableSave();
+      }
+
+      if (typeof range === 'string' && range) {
+        $page.find('input[name="time_or_created_between"][value="' + range + '"]').prop('checked', true);
+        $page.find('.date-range-custom-item').hide();
+      } else if (!range) {
+        $page.find('input[name="time_or_created_between"][value=""]').prop('checked', true);
+        $page.find('.date-range-custom-item').hide();
+      } else if (Array.isArray(range)) {
+        $switch.prop('checked', true);
+      }
+      var fromInitialChange = void 0;
+      var toInitialChange = void 0;
+      var calendarFrom = window.tommy.app.f7.calendar({
+        input: $page.find('input[name="start_at"]'),
+        closeOnSelect: true,
+        value: [dateFrom],
+        onChange: function onChange(c, values) {
+          if (fromInitialChange) {
+            enableSave();
+          }
+          fromInitialChange = true;
+          dateFrom = new Date(values[0]).getTime();
+          if (Array.isArray(range) && range[0]) range[0] = dateFrom;
+          if (dateFrom > dateTo) {
+            calendarTo.setValue([dateFrom]);
+          }
+        }
+      });
+      var calendarTo = window.tommy.app.f7.calendar({
+        input: $page.find('input[name="end_at"]'),
+        closeOnSelect: true,
+        value: [dateTo],
+        onChange: function onChange(c, values) {
+          if (toInitialChange) {
+            enableSave();
+          }
+          toInitialChange = true;
+          dateTo = new Date(values[0]).getTime();
+          if (Array.isArray(range) && range[1]) range[1] = dateTo;
+          if (dateTo < dateFrom) {
+            calendarFrom.setValue([dateTo]);
+          }
+        }
+      });
+
+      $switch.on('change', onSwitchChange);
+      $radios.on('change', onRadioChange);
+      $nav.find('.toggle.save').on('click', save);
+    }
+
+    $$(window.tommy.f7.views.main.container).once('page:init', '[data-page="tasks__date-range-select"]', function (e) {
+      var page = e.detail.page;
+      handleDateRangePage(page);
+    });
+    window.tommy.f7.views.main.loadContent(html);
   },
   initListFilters: function initListFilters(page, list) {
     // if (!list.filters)
@@ -677,7 +781,7 @@ var ListEditController = {
 
 exports.default = ListEditController;
 
-},{"../api":1,"./index":3}],6:[function(require,module,exports){
+},{"../api":1,"../format-date-range":9}],6:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -753,6 +857,7 @@ var TaskAddController = {
     $nav.find('a.save').on('click', function (ev) {
       var data = window.tommy.app.f7.formToJSON($page.find('form'));
       data.filters = [_api2.default.currentUserTag()]; // tag the current user
+
       TaskAddController.saveTask(data);
       ev.preventDefault();
     });
@@ -787,6 +892,8 @@ var TaskController = {
     var $page = $$(page.container);
     var $navbar = $$(page.navbarInnerContainer);
 
+    var f7 = window.tommy.app.f7;
+
     console.log('init task details', task);
     window.tommy.tplManager.renderInline('tasks__taskDetailsTemplate', task, $page.parent());
 
@@ -809,7 +916,7 @@ var TaskController = {
           alert('Unknown command: ' + command);
       }
 
-      window.tommy.app.f7.closeModal('.task-menu-popover');
+      f7.closeModal('.task-menu-popover');
     });
 
     // Task title area
@@ -836,8 +943,14 @@ var TaskController = {
     }
 
     // Task activity
-    var myMessagebar = window.tommy.app.f7.messagebar('.messagebar', { maxHeight: 200 });
+    var myMessagebar = f7.messagebar('.messagebar', { maxHeight: 200 });
+    myMessagebar.textarea.on('change input', function (e) {
+      var value = myMessagebar.value().trim();
+      if (value) myMessagebar.textarea.addClass('with-value');else myMessagebar.textarea.removeClass('with-value');
+    });
     $page.find('.add-comment').click(function () {
+      var value = myMessagebar.value().trim();
+      if (!value) return;
       TaskController.addActivity(page, 'comment', myMessagebar.value());
       myMessagebar.clear();
     });
@@ -855,20 +968,24 @@ var TaskController = {
       console.log('task participants changed', data);
       task.filters = data;
       window.tommy.tplManager.renderInline('tasks__taskParticipantsTemplate', task.filters, page.container);
-      TaskController.enableSave(page, true);
+      TaskController.saveTask(page);
     });
 
     // Task name inline editing
-    var $editTaskName = $page.find('input.edit-task-name');
-    $editTaskName.on('click', function () {
+    var $editTaskName = $page.find('textarea.edit-task-name');
+    $editTaskName.on('focus', function () {
       TaskController.enableEditName(page, true);
     });
+    f7.resizableTextarea('textarea.edit-task-name');
+    f7.resizeTextarea('textarea.edit-task-name');
 
     // Task description inline editing
     var $editTaskDescription = $page.find('textarea.edit-task-description');
-    $editTaskDescription.on('click', function () {
+    $editTaskDescription.on('focus', function () {
       TaskController.enableEditDescription(page, true);
     });
+    f7.resizableTextarea('textarea.edit-task-description');
+    f7.resizeTextarea('textarea.edit-task-description');
 
     // Save button
     $navbar.find('a.save').on('click', function () {
@@ -914,8 +1031,9 @@ var TaskController = {
     window.tommy.tplManager.renderInline('tasks__taskChecklistTemplate', items, $page);
 
     var $input = $page.find('input.add-checklist-item');
-    $input.on('focusout', function () {
+    $input.on('blur', function () {
       var text = $$(this).val();
+      task = _api2.default.cache['tasks'][page.query.task_fragment_id];
       if (!text || !text.length) {
         return;
       }
@@ -930,32 +1048,34 @@ var TaskController = {
         text: text,
         complete: false
       });
-
       TaskController.renderChecklist(page);
-    });
-    $input.on('focusin', function () {
-      TaskController.enableSave(page);
+      TaskController.saveTask(page);
     });
     $page.find('.remove-checklist').click(function () {
+      task = _api2.default.cache['tasks'][page.query.task_fragment_id];
       // TODO: confirm alert
       task.data.checklist = {};
       $page.find('[data-template="tasks__taskChecklistTemplate"]').html('');
       TaskController.saveTask(page);
     });
     $page.find('.remove-checklist-item').click(function () {
+      task = _api2.default.cache['tasks'][page.query.task_fragment_id];
       var index = parseInt($$(this).parents('li').data('checklist-item'));
 
       console.log('removing checklist item', index);
       task.data.checklist.items.splice(index, 1);
       TaskController.renderChecklist(page);
 
-      TaskController.enableSave(page);
-      // TaskController.saveTask(page)
+      TaskController.saveTask(page);
     });
-    $page.find('.checklist-item').click(function () {
+    $page.find('.checklist-item').click(function (e) {
+      var $target = $$(e.target);
+      if ($target.hasClass('remove-checklist-item') || $target.parents('.remove-checklist-item').length) {
+        return;
+      }
       var index = parseInt($$(this).parents('li').data('checklist-item'));
       var isChecked = $$(this).hasClass('checked');
-
+      task = _api2.default.cache['tasks'][page.query.task_fragment_id];
       console.log('toggle checklist item', index);
       if (isChecked) {
         $$(this).removeClass('checked');
@@ -965,8 +1085,7 @@ var TaskController = {
         task.data.checklist.items[index].complete = true;
       }
 
-      TaskController.enableSave(page);
-      // TaskController.saveTask(page)
+      TaskController.saveTask(page);
     });
   },
   renderDeadline: function renderDeadline(page) {
@@ -982,7 +1101,7 @@ var TaskController = {
       onClose: function onClose() {
         console.log('closing deadline picker', picker.currentDate);
         task.end_at = picker.currentDate;
-        TaskController.enableSave(page);
+        TaskController.saveTask(page);
       },
       onFormat: function onFormat(date) {
         console.log('format deadline picker', date);
@@ -1034,15 +1153,16 @@ var TaskController = {
   enableEditName: function enableEditName(page, flag) {
     var task = _api2.default.cache['tasks'][page.query.task_fragment_id];
     var $page = $$(page.container);
-    var $input = $page.find('input.edit-task-name');
+    var $textarea = $page.find('textarea.edit-task-name');
 
     if (flag != false) {
-      // $textarea.removeClass('unstyled')
-      TaskController.enableSave(page, true);
-
-      $input.on('focusout', function () {
-        task.name = $input.val();
-        console.log('set task name', task.name);
+      $textarea.once('focusout', function () {
+        var newValue = $textarea.val();
+        if (task.name !== newValue) {
+          task.name = newValue;
+          TaskController.saveTask(page);
+          console.log('set task name', task.name);
+        }
       });
     }
   },
@@ -1052,13 +1172,13 @@ var TaskController = {
     var $textarea = $page.find('textarea.edit-task-description');
 
     if (flag != false) {
-      // $textarea.removeClass('unstyled')
-      TaskController.enableSave(page, true);
-
-      $textarea.on('focusout', function () {
-        task.data.description = $textarea.val();
-        console.log('set task description', task.data.description);
-        TaskController.enableEditDescription(page, false);
+      $textarea.once('focusout', function () {
+        var newValue = $textarea.val();
+        if (task.data.description !== newValue) {
+          task.data.description = newValue;
+          TaskController.saveTask(page);
+          console.log('set task description', task.data.description);
+        }
       });
     }
   },
@@ -1079,6 +1199,34 @@ var TaskController = {
 exports.default = TaskController;
 
 },{"../api":1}],9:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+exports.default = function (range) {
+  if (!range) return '';
+  if (typeof range === 'string') {
+    return window.tommy.i18n.t('date_range.' + range);
+  }
+  if (Array.isArray(range)) {
+    return formatDate(range[0]) + ' - ' + formatDate(range[1]);
+  }
+  return range || '';
+};
+
+function formatDate(date) {
+  var d = new Date();
+  var year = d.getFullYear();
+  var month = d.getMonth() + 1;
+  var day = d.getDate();
+  if (month < 10) month = '0' + month;
+  if (day < 10) day = '0' + day;
+  return year + '-' + month + '-' + day;
+}
+
+},{}],10:[function(require,module,exports){
 'use strict';
 
 var _api = require('./api');
@@ -1112,6 +1260,10 @@ var _listManagement2 = _interopRequireDefault(_listManagement);
 var _boardSettings = require('./controllers/board-settings');
 
 var _boardSettings2 = _interopRequireDefault(_boardSettings);
+
+var _formatDateRange = require('./format-date-range');
+
+var _formatDateRange2 = _interopRequireDefault(_formatDateRange);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -1185,7 +1337,7 @@ window.tommy.app.t7.registerHelper('tasks__ifCanEditList', function (list, optio
 });
 
 window.tommy.app.t7.registerHelper('tasks__displayDateRange', function (range) {
-  return range;
+  return (0, _formatDateRange2.default)(range);
 });
 
-},{"./api":1,"./controllers/board-settings":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/task":8,"./controllers/task-add":7}]},{},[9]);
+},{"./api":1,"./controllers/board-settings":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/task":8,"./controllers/task-add":7,"./format-date-range":9}]},{},[10]);

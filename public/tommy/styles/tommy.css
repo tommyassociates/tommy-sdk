@@ -1337,14 +1337,11 @@ textarea.unstyled {
     color: inherit !important;
     padding: 0 !important;
     margin: 0 !important;
-    height: auto !important;
     min-height: 0;
     border: 0;
     outline: 0;
     background: transparent;
-}
-textarea.unstyled {
-    height: 22px !important;
+    height: auto;
 }
 
 /*body.scan-qr .views {
@@ -1434,10 +1431,15 @@ textarea.unstyled {
   /*display: none;*/
   /*visibility: hidden;*/
   opacity: 0;
+  pointer-events: none;
+}
+.navbar .save.toggle.active-state {
+  opacity: 0;
 }
 .navbar .save.toggle.active {
   /*visibility: visible;*/
   opacity: 1;
+  pointer-events: auto;
   /*display: -webkit-box;
   display: -ms-flexbox;
   display: -webkit-flex;
