@@ -169,7 +169,18 @@ var API = {
     }
 
     // Specify the access permissions this resource will belong to
-    if (!task.id) task.with_permissions = ['task_create_access', 'task_edit_access'];
+    if (!task.id) {
+      task.with_permissions = ['task_create_access', 'task_edit_access'];
+      var actor = window.tommy.addons.getCurrentActor();
+      if (actor) {
+        if (!task.filters) task.filters = [];
+        task.filters.push({
+          context: 'members',
+          name: actor.first_name + ' ' + actor.last_name,
+          user_id: actor.user_id
+        });
+      }
+    }
 
     var params = Object.assign({}, task, { data: JSON.stringify(task.data) });
     if (task.id) {
@@ -402,7 +413,7 @@ var IndexController = {
   init: function init(page) {
     console.log('initialize tasks addon');
     if (!_api2.default.listsLoaded) {
-      // || !API.tasksLoaded 
+      // || !API.tasksLoaded
       _api2.default.initCache();
       _api2.default.loadLists().then(function () {
         if (_api2.default.hasDefaultList()) {
@@ -846,6 +857,7 @@ var TaskAddController = {
     $nav.find('a.save').on('click', function (ev) {
       var data = window.tommy.app.f7.formToJSON($page.find('form'));
       data.filters = [_api2.default.currentUserTag()]; // tag the current user
+
       TaskAddController.saveTask(data);
       ev.preventDefault();
     });

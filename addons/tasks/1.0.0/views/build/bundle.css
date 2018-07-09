@@ -3,6 +3,8 @@
   .tasks-navbar-inner .right .link.icon-only {
     min-width: 44px; }
 
+#tasks__tasks .item-input-full-width {
+  width: 100%; }
 #tasks__tasks .chip.chip-lg {
   display: flex;
   width: 100%;
