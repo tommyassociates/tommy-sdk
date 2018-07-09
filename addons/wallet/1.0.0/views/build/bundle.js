@@ -125,6 +125,13 @@ var IndexController = {
     IndexController.loadWallets();
     IndexController.loadTransactions();
     IndexController.loadBalanceHistory();
+    $$(document).on('wallet:transaction', IndexController.refresh);
+  },
+  refresh: function refresh() {
+    IndexController.loadWalletInfo();
+    IndexController.loadWallets();
+    IndexController.loadTransactions();
+    IndexController.loadBalanceHistory();
   },
   loadWalletInfo: function loadWalletInfo() {
     _api2.default.getWallet().then(function (data) {
@@ -174,6 +181,7 @@ var IndexController = {
   uninit: function uninit() {
     IndexController.page = null;
     delete IndexController.page;
+    $$(document).off('wallet:transaction', IndexController.refresh);
     console.log('uninitialize wallet addon');
   }
 };
@@ -631,6 +639,7 @@ var transaction = {
 
       if (transactionDetails.status && transactionDetails.status !== 'failed') {
         transaction.renderSuccess(transactionDetails);
+        $$(document).trigger('wallet:transaction');
         if (transaction.cache.onSuccess) transaction.cache.onSuccess();
       } else if (transactionDetails.status === 'failed') {
         transaction.renderError(Object.assign(transactionDetails, {
