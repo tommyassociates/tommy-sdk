@@ -529,3 +529,99 @@ $orange: #FF5413;
     padding-bottom: 80px;
   }
 }
+.nurse_booking-coupon-picker-modal {
+  width: 300px;
+  margin-left: -150px;
+  .modal-button-bold {
+    background: rgba(255,255,255,.95);
+    color: $red;
+    font-weight: bold;
+    &.active-state {
+      background: rgba(230,230,230,.95);
+    }
+  }
+}
+.nurse_booking-coupon-picker {
+  margin-bottom: -15px;
+  .coupon-picker-text {
+    font-size: 17px;
+    font-weight: 500;
+    margin: 10px 0;
+    line-height: 1.2;
+  }
+  .coupon-picker-items {
+    max-height: 200px;
+    overflow: auto;
+    text-align: left;
+    box-sizing: border-box;
+    padding-bottom: 15px;
+    input {
+      display: none;
+    }
+    label {
+      display: block;
+      color: #fff;
+      border-radius: 8px;
+      border: 1px solid #333;
+      background: linear-gradient(to right, #FF9340, #FE6550);
+      position: relative;
+      display: flex;
+      &:before, &:after {
+        content: '';
+        background: #fff;
+        width: 20px;
+        height: 30px;
+        position: absolute;
+        top: 50%;
+        margin-top: -15px;
+        box-sizing: border-box;
+        border: 1px solid #333;
+        pointer-events: none;
+        border-radius: 50%;
+      }
+      &:before {
+        left: -12px;
+      }
+      &:after {
+        right: -12px;
+      }
+      + label {
+        margin-top: 6px;
+      }
+    }
+  }
+  .coupon-item-content {
+    flex-shrink: 10;
+    min-width: 0;
+    padding: 8px 5px 8px 12px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .coupon-item-title {
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .coupon-item-date {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .coupon-item-label {
+    flex-shrink: 0;
+    color: #333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 23px;
+    font-weight: 600;
+    background: #fff;
+    width: 65px;
+    text-align: center;
+    border-radius: 0 8px 8px 0;
+  }
+  input:checked ~ .coupon-item-label {
+    background-color: #FFE187;
+    color: $red;
+  }
+
+}

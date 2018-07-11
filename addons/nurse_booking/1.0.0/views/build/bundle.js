@@ -121,6 +121,52 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
+exports.default = function () {
+  // TODO: get API request for avialable coupons first
+
+  var f7 = window.tommy.app.f7;
+  var html = tommy.tplManager.render('nurse_bookink__couponPickerTemplate', {
+    items: [{
+      title: 'Title 1',
+      date: '13.07.2018 - 15.07.2018',
+      id: 1
+    }, {
+      title: 'Title 2',
+      date: '13.07.2018 - 15.07.2018',
+      id: 2
+    }, {
+      title: 'Title 3',
+      date: '13.07.2018 - 15.07.2018',
+      id: 3
+    }]
+  });
+  var modalEl = f7.modal({
+    afterText: html,
+    buttons: [{
+      text: 'Skip',
+      onClick: function onClick() {
+        // TODO: skip callback
+      }
+    }, {
+      text: 'Confirm',
+      bold: true,
+      onClick: function onClick() {
+        // TODO: confirm callback, return selected item ID
+      }
+    }]
+  });
+  $$(modalEl).addClass('nurse_booking-coupon-picker-modal');
+  // TODO: disable confirm button if nothing selected
+  // TODO: handle radios change to get selected item ID
+};
+
+},{}],6:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
 exports.default = function (code) {
   if (!code) return '';
   if (map[code]) return map[code];
@@ -303,8 +349,16 @@ var map = {
   'ZWD': 'Z$'
 };
 
-},{}],6:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 'use strict';
+
+var _currencyMap = require('./currency-map');
+
+var _currencyMap2 = _interopRequireDefault(_currencyMap);
+
+var _couponPicker = require('./coupon-picker');
+
+var _couponPicker2 = _interopRequireDefault(_couponPicker);
 
 var _index = require('./controllers/index');
 
@@ -318,11 +372,10 @@ var _packageDetails = require('./controllers/package-details');
 
 var _packageDetails2 = _interopRequireDefault(_packageDetails);
 
-var _currencyMap = require('./currency-map');
-
-var _currencyMap2 = _interopRequireDefault(_currencyMap);
-
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+// TODO: remove that after testing
+window.couponPicker = _couponPicker2.default;
 
 var _window$tommy$app = window.tommy.app,
     f7 = _window$tommy$app.f7,
@@ -343,4 +396,4 @@ t7.registerHelper('nurse_booking__currencySymbol', function (code) {
   return (0, _currencyMap2.default)(code);
 });
 
-},{"./controllers/index":2,"./controllers/package-details":3,"./controllers/package-list":4,"./currency-map":5}]},{},[6]);
+},{"./controllers/index":2,"./controllers/package-details":3,"./controllers/package-list":4,"./coupon-picker":5,"./currency-map":6}]},{},[7]);

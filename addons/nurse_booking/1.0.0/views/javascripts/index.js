@@ -1,7 +1,12 @@
+import currencyMap from './currency-map';
+import couponPicker from './coupon-picker';
+
 import IndexController from './controllers/index'
 import PackageListController from './controllers/package-list';
 import PackageDetailsController from './controllers/package-details';
-import currencyMap from './currency-map';
+
+// TODO: remove that after testing
+window.couponPicker = couponPicker;
 
 const { f7, t7 } = window.tommy.app;
 
