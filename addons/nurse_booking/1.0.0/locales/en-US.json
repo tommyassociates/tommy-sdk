@@ -20,5 +20,9 @@
   },
   "package_list": {
     "nursing_title": "Nursing"
+  },
+  "package_details": {
+    "service_details_label": "Service details",
+    "book_button": "Book now"
   }
 }
