@@ -1,3 +1,4 @@
+$red: #ff4500;
 $orange: #FF5413;
 [data-page="nurse_booking__index"] {
   .navbar {
@@ -282,5 +283,76 @@ $orange: #FF5413;
     .item-link .item-inner {
       background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg%20viewBox%3D'0%200%2060%20120'%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%3E%3Cpath%20d%3D'm60%2061.5-38.25%2038.25-9.75-9.75%2029.25-28.5-29.25-28.5%209.75-9.75z'%20fill%3D'%23c7c7cc'%2F%3E%3C%2Fsvg%3E");
     }
+  }
+}
+.page#nurse_booking__package-list {
+  .page-content {
+    display: flex;
+    align-items: center;
+    @media (orientation: landscape) {
+      display: block;
+    }
+  }
+  .package-cards.swiper-container {
+    padding-top: 10px;
+    padding-bottom: 20px;
+    .swiper-slide {
+      width: 300px;
+    }
+  }
+  .package-card {
+    display: block;
+    position: relative;
+    overflow: hidden;
+    border-radius: 4px;
+    box-shadow: 0 10px 20px 0 rgba(0,0,0,0.16);
+    background: #fff;
+    transition: 300ms;
+    transform: scale(0.85);
+  }
+  .swiper-slide-active .package-card {
+    transform: scale(1);
+  }
+  .package-card-pic {
+    height: 270px;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+  .package-card-content {
+    padding: 15px 12px 15px;
+    color: #333;
+  }
+  .package-card-title {
+    font-size: 30px;
+    font-weight: 500;
+    line-height: 1.25;
+  }
+  .package-card-duration {
+    font-size: 20px;
+    font-weight: 600;
+    padding-left: 12px + 27px;
+    background: url(../images/icon-time.svg) no-repeat left;
+    background-size: 27px auto;
+    margin: 10px 0;
+  }
+  .package-card-coupons,
+  .package-card-price {
+    color: $red;
+    font-weight: bold;
+    line-height: 40px;
+    margin-top: 5px;
+  }
+  .package-card-coupons {
+    font-size: 36px;
+    padding-left: 19px + 37px;
+    background: url(../images/icon-coupon.svg) no-repeat left;
+    background-size: 37px auto;
+  }
+  .package-card-price {
+    font-size: 40px;
+    padding-left: 19px + 35px;
+    background: url(../images/icon-money.svg) no-repeat left;
+    background-size: 35px auto;
   }
 }
