@@ -237,3 +237,61 @@
     color: #FF5413; }
   .page#nurse_booking__vip-details .list-block.vip-details-list-block .item-link .item-inner {
     background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg%20viewBox%3D'0%200%2060%20120'%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%3E%3Cpath%20d%3D'm60%2061.5-38.25%2038.25-9.75-9.75%2029.25-28.5-29.25-28.5%209.75-9.75z'%20fill%3D'%23c7c7cc'%2F%3E%3C%2Fsvg%3E"); }
+
+.page#nurse_booking__package-list .page-content {
+  display: flex;
+  align-items: center; }
+  @media (orientation: landscape) {
+    .page#nurse_booking__package-list .page-content {
+      display: block; } }
+.page#nurse_booking__package-list .package-cards.swiper-container {
+  padding-top: 10px;
+  padding-bottom: 20px; }
+  .page#nurse_booking__package-list .package-cards.swiper-container .swiper-slide {
+    width: 300px; }
+.page#nurse_booking__package-list .package-card {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+  box-shadow: 0 10px 20px 0 rgba(0, 0, 0, 0.16);
+  background: #fff;
+  transition: 300ms;
+  transform: scale(0.85); }
+.page#nurse_booking__package-list .swiper-slide-active .package-card {
+  transform: scale(1); }
+.page#nurse_booking__package-list .package-card-pic {
+  height: 270px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat; }
+.page#nurse_booking__package-list .package-card-content {
+  padding: 15px 12px 15px;
+  color: #333; }
+.page#nurse_booking__package-list .package-card-title {
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.25; }
+.page#nurse_booking__package-list .package-card-duration {
+  font-size: 20px;
+  font-weight: 600;
+  padding-left: 39px;
+  background: url(../images/icon-time.svg) no-repeat left;
+  background-size: 27px auto;
+  margin: 10px 0; }
+.page#nurse_booking__package-list .package-card-coupons,
+.page#nurse_booking__package-list .package-card-price {
+  color: #ff4500;
+  font-weight: bold;
+  line-height: 40px;
+  margin-top: 5px; }
+.page#nurse_booking__package-list .package-card-coupons {
+  font-size: 36px;
+  padding-left: 56px;
+  background: url(../images/icon-coupon.svg) no-repeat left;
+  background-size: 37px auto; }
+.page#nurse_booking__package-list .package-card-price {
+  font-size: 40px;
+  padding-left: 54px;
+  background: url(../images/icon-money.svg) no-repeat left;
+  background-size: 35px auto; }

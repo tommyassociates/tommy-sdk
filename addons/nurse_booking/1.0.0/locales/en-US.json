@@ -17,5 +17,8 @@
     "plan_platinum": "Platinum",
     "details_plan_inclusion": "Plan Inclusion",
     "details_administration": "Administration"
+  },
+  "package_list": {
+    "nursing_title": "Nursing"
   }
 }
