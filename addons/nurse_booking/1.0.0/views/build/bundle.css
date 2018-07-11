@@ -295,3 +295,145 @@
   padding-left: 54px;
   background: url(../images/icon-money.svg) no-repeat left;
   background-size: 35px auto; }
+
+.nurse_booking__toolbar-button {
+  background: #FF5413;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 500;
+  width: 100%;
+  height: 80px;
+  line-height: 80px;
+  font-size: 24px;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #fff;
+  transition: 200ms;
+  text-align: center;
+  cursor: pointer; }
+  .nurse_booking__toolbar-button.active-state {
+    color: rgba(255, 255, 255, 0.5); }
+
+.page#nurse_booking__package-details .package-details-header .swiper-container {
+  height: 66vw;
+  max-height: 500px;
+  background: #fff; }
+  .page#nurse_booking__package-details .package-details-header .swiper-container .swiper-slide {
+    background-size: cover;
+    background-position: center top; }
+  .page#nurse_booking__package-details .package-details-header .swiper-container .swiper-pagination-bullet {
+    background: #fff;
+    border: 1px solid #979797;
+    opacity: 0.8;
+    box-sizing: border-box; }
+  .page#nurse_booking__package-details .package-details-header .swiper-container .swiper-pagination-bullet-active {
+    background: #FF5413;
+    border: none;
+    opacity: 1; }
+.page#nurse_booking__package-details .package-details-meta {
+  background: #fff;
+  padding: 15px 12px 15px;
+  color: #333; }
+  .page#nurse_booking__package-details .package-details-meta .package-details-meta-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start; }
+  .page#nurse_booking__package-details .package-details-meta .package-details-meta-left {
+    flex-shrink: 10;
+    min-width: 0; }
+  .page#nurse_booking__package-details .package-details-meta .package-details-title {
+    font-size: 30px;
+    font-weight: 500;
+    line-height: 1.25;
+    position: relative;
+    overflow: hidden;
+    text-overflow: ellipsis; }
+  .page#nurse_booking__package-details .package-details-meta .package-details-duration {
+    font-size: 22px;
+    font-weight: 600;
+    padding-left: 39px;
+    background: url(../images/icon-time.svg) no-repeat left;
+    background-size: 27px auto;
+    margin: 10px 0 0; }
+  .page#nurse_booking__package-details .package-details-meta .package-details-price {
+    color: #ff4500;
+    font-weight: bold;
+    line-height: 1;
+    font-size: 40px;
+    flex-shrink: 0;
+    margin-left: 5px; }
+  .page#nurse_booking__package-details .package-details-meta .package-details-coupons {
+    font-weight: 600;
+    display: block;
+    color: inherit;
+    box-sizing: border-box;
+    width: 100%;
+    font-size: 22px;
+    line-height: 1;
+    position: relative;
+    margin-top: 12px;
+    margin-bottom: -15px; }
+    .page#nurse_booking__package-details .package-details-meta .package-details-coupons span {
+      border-top: 1px solid #E9EAEB;
+      padding-left: 39px;
+      padding-top: 15px;
+      padding-bottom: 15px;
+      padding-right: 35px;
+      display: block;
+      background: url(../images/icon-coupon.svg) no-repeat left;
+      background-size: 27px auto;
+      position: relative;
+      z-index: 1; }
+    .page#nurse_booking__package-details .package-details-meta .package-details-coupons:before {
+      content: '';
+      position: absolute;
+      left: -12px;
+      right: -12px;
+      top: 0;
+      bottom: 0;
+      background: #eee;
+      opacity: 0;
+      transition: 200ms;
+      z-index: 0; }
+    .page#nurse_booking__package-details .package-details-meta .package-details-coupons:after {
+      content: '';
+      position: absolute;
+      width: 10px;
+      height: 20px;
+      top: 50%;
+      margin-top: -10px;
+      right: 5px;
+      background-image: url("data:image/svg+xml;charset=utf-8,<svg viewBox='0 0 60 120' xmlns='http://www.w3.org/2000/svg'><path d='m60 61.5-38.25 38.25-9.75-9.75 29.25-28.5-29.25-28.5 9.75-9.75z' fill='#c7c7cc'/></svg>");
+      background-size: 10px 20px;
+      background-repeat: no-repeat; }
+    .page#nurse_booking__package-details .package-details-meta .package-details-coupons.active-state:before {
+      opacity: 1; }
+.page#nurse_booking__package-details .package-details-content {
+  background: #fff;
+  color: #333;
+  padding: 12px;
+  font-size: 22px;
+  line-height: 1.5;
+  margin-top: 8px; }
+  .page#nurse_booking__package-details .package-details-content .package-details-label {
+    font-size: 24px;
+    font-weight: bold;
+    position: relative;
+    padding-left: 12px;
+    margin-bottom: 12px; }
+    .page#nurse_booking__package-details .package-details-content .package-details-label:before {
+      content: '';
+      width: 6px;
+      height: 24px;
+      position: absolute;
+      left: 0;
+      top: 50%;
+      margin-top: -12px;
+      background: #ff4500; }
+  .page#nurse_booking__package-details .package-details-content .package-details-text ul:first-child, .page#nurse_booking__package-details .package-details-content .package-details-text ol:first-child, .page#nurse_booking__package-details .package-details-content .package-details-text p:first-child, .page#nurse_booking__package-details .package-details-content .package-details-text h1:first-child, .page#nurse_booking__package-details .package-details-content .package-details-text h2:first-child, .page#nurse_booking__package-details .package-details-content .package-details-text h3:first-child, .page#nurse_booking__package-details .package-details-content .package-details-text h4:first-child {
+    margin-top: 0; }
+  .page#nurse_booking__package-details .package-details-content .package-details-text ul:last-child, .page#nurse_booking__package-details .package-details-content .package-details-text ol:last-child, .page#nurse_booking__package-details .package-details-content .package-details-text p:last-child, .page#nurse_booking__package-details .package-details-content .package-details-text h1:last-child, .page#nurse_booking__package-details .package-details-content .package-details-text h2:last-child, .page#nurse_booking__package-details .package-details-content .package-details-text h3:last-child, .page#nurse_booking__package-details .package-details-content .package-details-text h4:last-child {
+    margin-bottom: 0; }
+.page#nurse_booking__package-details .page-content {
+  padding-bottom: 80px; }

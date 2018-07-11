@@ -58,12 +58,46 @@ var _api2 = _interopRequireDefault(_api);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+var PackageDetailsController = {
+  init: function init(page) {
+    PackageDetailsController.bind(page);
+
+    var $page = $$(page.container);
+    var f7 = window.tommy.app.f7;
+    f7.swiper($page.find('.swiper-container'), {
+      pagination: '.swiper-pagination'
+    });
+  },
+  bind: function bind(page) {
+    PackageDetailsController.page = page;
+  },
+  uninit: function uninit() {
+    PackageDetailsController.page = null;
+    delete PackageDetailsController.page;
+  }
+};
+
+exports.default = PackageDetailsController;
+
+},{"../api":1}],4:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _api = require('../api');
+
+var _api2 = _interopRequireDefault(_api);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
 var PackageListController = {
   init: function init(page) {
     PackageListController.bind(page);
     var $page = $$(page.container);
     var f7 = window.tommy.app.f7;
-    console.log('init package list'.toUpperCase());
+
     f7.swiper($page.find('.swiper-container'), {
       centeredSlides: true,
       slidesPerView: 'auto'
@@ -80,7 +114,7 @@ var PackageListController = {
 
 exports.default = PackageListController;
 
-},{"../api":1}],4:[function(require,module,exports){
+},{"../api":1}],5:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -269,7 +303,7 @@ var map = {
   'ZWD': 'Z$'
 };
 
-},{}],5:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 'use strict';
 
 var _index = require('./controllers/index');
@@ -279,6 +313,10 @@ var _index2 = _interopRequireDefault(_index);
 var _packageList = require('./controllers/package-list');
 
 var _packageList2 = _interopRequireDefault(_packageList);
+
+var _packageDetails = require('./controllers/package-details');
+
+var _packageDetails2 = _interopRequireDefault(_packageDetails);
 
 var _currencyMap = require('./currency-map');
 
@@ -298,8 +336,11 @@ f7.onPageBeforeRemove('nurse_booking__index', _index2.default.uninit);
 f7.onPageInit('nurse_booking__package-list', _packageList2.default.init);
 f7.onPageBeforeRemove('nurse_booking__package-list', _packageList2.default.uninit);
 
+f7.onPageInit('nurse_booking__package-details', _packageDetails2.default.init);
+f7.onPageBeforeRemove('nurse_booking__package-details', _packageDetails2.default.uninit);
+
 t7.registerHelper('nurse_booking__currencySymbol', function (code) {
   return (0, _currencyMap2.default)(code);
 });
 
-},{"./controllers/index":2,"./controllers/package-list":3,"./currency-map":4}]},{},[5]);
+},{"./controllers/index":2,"./controllers/package-details":3,"./controllers/package-list":4,"./currency-map":5}]},{},[6]);
