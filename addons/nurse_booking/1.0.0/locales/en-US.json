@@ -24,5 +24,9 @@
   "package_details": {
     "service_details_label": "Service details",
     "book_button": "Book now"
+  },
+  "coupon_picker": {
+    "text": "You have available coupons that you can choose to use.",
+    "label": "Use"
   }
 }
