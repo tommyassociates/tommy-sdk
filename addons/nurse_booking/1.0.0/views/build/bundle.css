@@ -66,11 +66,23 @@
 .page#nurse_booking__vip .vip-header,
 .page#nurse_booking__vip-details .vip-header {
   height: 170px;
-  background: #EB7C83;
+  background: #EB7C83 url(../images/vip-header.svg) no-repeat center;
+  background-size: cover;
   color: #fff;
   box-sizing: border-box;
   padding-top: 44px;
-  text-align: center; }
+  text-align: center;
+  position: relative; }
+  .page#nurse_booking__vip .vip-header:after,
+  .page#nurse_booking__vip-details .vip-header:after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 26px;
+    background: url(../images/vip-header-mask.png) no-repeat center bottom;
+    background-size: 100% 100%; }
   .page#nurse_booking__vip .vip-header .avatar,
   .page#nurse_booking__vip-details .vip-header .avatar {
     width: 60px;
@@ -79,7 +91,10 @@
     margin-left: auto;
     margin-right: auto;
     border: 3px solid #fff;
-    position: relative; }
+    position: relative;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover; }
   .page#nurse_booking__vip .vip-header .name,
   .page#nurse_booking__vip-details .vip-header .name {
     margin-top: 5px;
