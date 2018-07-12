@@ -5,9 +5,6 @@ import IndexController from './controllers/index'
 import PackageListController from './controllers/package-list';
 import PackageDetailsController from './controllers/package-details';
 
-// TODO: remove that after testing
-window.couponPicker = couponPicker;
-
 const { f7, t7 } = window.tommy.app;
 
 // == Router

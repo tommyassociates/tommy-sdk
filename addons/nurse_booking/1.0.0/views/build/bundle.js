@@ -381,9 +381,6 @@ var _packageDetails2 = _interopRequireDefault(_packageDetails);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-// TODO: remove that after testing
-window.couponPicker = _couponPicker2.default;
-
 var _window$tommy$app = window.tommy.app,
     f7 = _window$tommy$app.f7,
     t7 = _window$tommy$app.t7;
