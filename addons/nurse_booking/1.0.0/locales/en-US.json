@@ -27,6 +27,8 @@
   },
   "coupon_picker": {
     "text": "You have available coupons that you can choose to use.",
-    "label": "Use"
+    "use_label": "Use",
+    "skip_button": "Skip",
+    "confirm_button": "Confirm"
   }
 }
