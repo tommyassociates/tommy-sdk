@@ -1,0 +1,43 @@
+<div class="navbar no-border">
+  <div class="navbar-inner">
+    <div class="left">
+      <a href="#" class="back link icon-only"><i class="icon framework7-icons">chevron_left</i></a>
+    </div>
+    <div class="center sliding">{{t "location.title"}}</div>
+  </div>
+</div>
+
+<div class="pages navbar-through">
+  <div data-page="nurse_booking__location" id="nurse_booking__location" class="page">
+    <div class="page-content">
+      <div class="location-card">
+        <i class="location-card-icon"></i>
+        <div class="location-card-title">
+          <span class="location-card-default-badge">[{{t "location.default_label"}}]</span>
+          Dream Town Building 6 Unit 1 201
+        </div>
+        <a href="#" class="location-card-delete-button"></a>
+        <a href="{{addonAssetUrl "views/date-time.html"}}" class="location-card-button">{{t "location.select_button"}}</a>
+      </div>
+      <div class="location-card">
+        <i class="location-card-icon"></i>
+        <div class="location-card-title">
+          Dream Town Building 6 Unit 1 201
+        </div>
+        <a href="#" class="location-card-delete-button"></a>
+        <a href="{{addonAssetUrl "views/date-time.html"}}" class="location-card-button">{{t "location.select_button"}}</a>
+      </div>
+      <div class="location-card location-add-form">
+        <input type="text" name="city" placeholder="{{t "location.city_placeholder"}}" />
+        <textarea type="text" name="address" placeholder="{{t "location.address_placeholder"}}"></textarea>
+        <label>
+          <input type="checkbox" name="default">
+          <i class="framework7-icons">check</i>
+          <span>{{t "location.set_default_label"}}</span>
+        </label>
+        <a href="#" class="location-card-button">{{t "location.save_button"}}</a>
+      </div>
+      <a href="#" class="location-add-button">{{t "location.add_button"}}</a>
+    </div>
+  </div>
+</div>
