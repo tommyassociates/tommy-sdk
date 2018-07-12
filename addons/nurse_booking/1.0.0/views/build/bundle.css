@@ -447,6 +447,9 @@
     font-weight: bold; }
     .nurse_booking-coupon-picker-modal .modal-button-bold.active-state {
       background: rgba(230, 230, 230, 0.95); }
+  .nurse_booking-coupon-picker-modal .modal-button-disabled {
+    pointer-events: none;
+    color: rgba(0, 0, 0, 0.5); }
 
 .nurse_booking-coupon-picker {
   margin-bottom: -15px; }

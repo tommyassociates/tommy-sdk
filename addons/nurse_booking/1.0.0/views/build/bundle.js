@@ -121,10 +121,11 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-exports.default = function () {
+exports.default = function (confirm, skip) {
   // TODO: get API request for avialable coupons first
 
   var f7 = window.tommy.app.f7;
+  var currentCouponId = void 0;
   var html = tommy.tplManager.render('nurse_bookink__couponPickerTemplate', {
     items: [{
       title: 'Title 1',
@@ -143,21 +144,27 @@ exports.default = function () {
   var modalEl = f7.modal({
     afterText: html,
     buttons: [{
-      text: 'Skip',
+      text: tommy.i18n.t('coupon_picker.skip_button', { defaultValue: 'Skip' }),
       onClick: function onClick() {
-        // TODO: skip callback
+        if (skip) skip();
       }
     }, {
-      text: 'Confirm',
+      text: tommy.i18n.t('coupon_picker.confirm_button', { defaultValue: 'Confirm' }),
       bold: true,
       onClick: function onClick() {
-        // TODO: confirm callback, return selected item ID
+        if (confirm) confirm(currentCouponId);
       }
     }]
   });
-  $$(modalEl).addClass('nurse_booking-coupon-picker-modal');
-  // TODO: disable confirm button if nothing selected
-  // TODO: handle radios change to get selected item ID
+  var $modalEl = $$(modalEl);
+  $modalEl.addClass('nurse_booking-coupon-picker-modal');
+  $modalEl.find('.modal-button-bold').addClass('modal-button-disabled');
+  $modalEl.find('input').on('change', function (e) {
+    $modalEl.find('.modal-button-bold').removeClass('modal-button-disabled');
+    if (e.target.checked) {
+      currentCouponId = e.target.value;
+    }
+  });
 };
 
 },{}],6:[function(require,module,exports){
