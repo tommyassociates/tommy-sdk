@@ -42,6 +42,7 @@
     "save_button": "Save"
   },
   "date_time": {
-    "title": "Date & Time"
+    "title": "Date & Time",
+    "determine_button": "Determine"
   }
 }
