@@ -44,5 +44,8 @@
   "date_time": {
     "title": "Date & Time",
     "determine_button": "Determine"
+  },
+  "nurse_list": {
+    "title": "Nurse"
   }
 }
