@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64px" height="64px" viewBox="0 0 64 64" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 50.2 (55047) - http://www.bohemiancoding.com/sketch -->
+    <title>Group 4</title>
+    <desc>Created with Sketch.</desc>
+    <defs>
+        <rect id="path-1" x="0" y="0" width="64" height="69"></rect>
+    </defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="6_1_Nurse(VIP)" transform="translate(-299.000000, -204.000000)">
+            <g id="Group-6" transform="translate(15.000000, 204.000000)">
+                <g id="Group-4" transform="translate(284.000000, 0.000000)">
+                    <mask id="mask-2" fill="white">
+                        <use xlink:href="#path-1"></use>
+                    </mask>
+                    <g id="Mask"></g>
+                    <g mask="url(#mask-2)" id="delux">
+                        <g transform="translate(43.000000, 21.000000) rotate(45.000000) translate(-43.000000, -21.000000) translate(-2.000000, 5.000000)">
+                            <g transform="translate(0.000000, -0.000000)">
+                                <polygon id="Rectangle-12" fill="#9013FE" transform="translate(45.112039, 16.010487) scale(-1, 1) translate(-45.112039, -16.010487) " points="30.4273164 1.13694692 59.8860997 0.93418888 89.746601 31 0.477477275 31.0867861"></polygon>
+                                <text id="Delux" font-family="HelveticaNeue, Helvetica Neue" font-size="20" font-weight="normal" fill="#FFFFFF">
+                                    <tspan x="20" y="23">Delux</tspan>
+                                </text>
+                            </g>
+                        </g>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

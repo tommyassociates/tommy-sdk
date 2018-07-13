@@ -878,3 +878,117 @@ $yellow: #FF7B00;
     }
   }
 }
+.page#nurse_booking__nurse-list {
+  .nurse-list {
+    margin: 12px;
+    color: #333;
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    li {
+      border-radius: 6px;
+      position: relative;
+      box-shadow: 0 2px 8px 0 rgba(0,0,0,0.10);
+      background: #fff;
+      + li {
+        margin-top: 8px;
+      }
+      a {
+        color: inherit;
+        transition: 200ms;
+        &.active-state {
+          background-color: rgba(0,0,0,0.1);
+        }
+      }
+    }
+    .nurse-content-wrap {
+      display: flex;
+      justify-content: space-between;
+      padding: 20px 15px 20px 22px;
+      align-items: flex-start;
+      position: relative;
+    }
+    .nurse-inactive {
+      opacity: 0.5;
+      pointer-events: none;
+      background-color: #ddd;
+      box-shadow: none;
+    }
+    .nurse-media {
+      flex-shrink: 0;
+      width: 80px;
+      height: 80px;
+      align-self: flex-start;
+      position: relative;
+      img {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        border-radius: 50%;
+      }
+    }
+    .nurse-content {
+      flex-shrink: 1;
+      min-width: 0;
+      margin-left: 12px;
+      align-self: center;
+    }
+    .nurse-name {
+      font-size: 24px;
+      font-weight: bold;
+      line-height: 1.2;
+    }
+    .nurse-level {
+      font-size: 20px;
+    }
+    .nurse-extra {
+      margin-left: auto;
+      padding-left: 5px;
+      align-self: center;
+      text-align: right;
+    }
+    .nurse-percentage {
+      font-size: 36px;
+      color: $orange;
+      line-height: 1;
+    }
+    .nurse-bonus {
+      color: #2EC8A1;
+      font-size: 24px;
+      font-weight: bold;
+      line-height: 1.1;
+      margin-top: 4px;
+    }
+    .nurse-delux-badge {
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: 64px;
+      height: 64px;
+      background: url(../images/deluxe-badge.svg) no-repeat right top;
+    }
+    .nurse-crown-badge {
+      position: absolute;
+      background: url(../images/nurse-crown.svg) no-repeat center;
+      width: 41px;
+      height: 41px;
+      left: -16px;
+      top: -15px;
+    }
+    .nurse-busy {
+      margin-top: 4px;
+      min-height: 23px;
+      padding-left: 26px;
+      font-size: 16px;
+      background: url(../images/icon-busy.svg) no-repeat left top;
+      line-height: 23px;
+      position: relative;
+      // overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+  }
+}
