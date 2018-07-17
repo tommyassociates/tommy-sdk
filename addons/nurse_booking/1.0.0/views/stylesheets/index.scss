@@ -289,7 +289,7 @@ $yellow: #FF7B00;
     }
   }
 }
-.page#nurse_booking__package-list {
+.page#nurse_booking__service-list {
   .page-content {
     display: flex;
     align-items: center;
@@ -297,14 +297,15 @@ $yellow: #FF7B00;
       display: block;
     }
   }
-  .package-cards.swiper-container {
+  .service-cards.swiper-container {
     padding-top: 10px;
     padding-bottom: 20px;
+    width: 100%;
     .swiper-slide {
       width: 300px;
     }
   }
-  .package-card {
+  .service-card {
     display: block;
     position: relative;
     overflow: hidden;
@@ -314,25 +315,25 @@ $yellow: #FF7B00;
     transition: 300ms;
     transform: scale(0.85);
   }
-  .swiper-slide-active .package-card {
+  .swiper-slide-active .service-card {
     transform: scale(1);
   }
-  .package-card-pic {
+  .service-card-pic {
     height: 270px;
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
   }
-  .package-card-content {
+  .service-card-content {
     padding: 15px 12px 15px;
     color: #333;
   }
-  .package-card-title {
+  .service-card-title {
     font-size: 30px;
     font-weight: 500;
     line-height: 1.25;
   }
-  .package-card-duration {
+  .service-card-duration {
     font-size: 20px;
     font-weight: 600;
     padding-left: 12px + 27px;
@@ -340,20 +341,20 @@ $yellow: #FF7B00;
     background-size: 27px auto;
     margin: 10px 0;
   }
-  .package-card-coupons,
-  .package-card-price {
+  .service-card-coupons,
+  .service-card-price {
     color: $red;
     font-weight: bold;
     line-height: 40px;
     margin-top: 5px;
   }
-  .package-card-coupons {
+  .service-card-coupons {
     font-size: 36px;
     padding-left: 19px + 37px;
     background: url(../images/icon-coupon.svg) no-repeat left;
     background-size: 37px auto;
   }
-  .package-card-price {
+  .service-card-price {
     font-size: 40px;
     padding-left: 19px + 35px;
     background: url(../images/icon-money.svg) no-repeat left;
@@ -382,8 +383,8 @@ $yellow: #FF7B00;
     padding-bottom: 80px;
   }
 }
-.page#nurse_booking__package-details {
-  .package-details-header .swiper-container {
+.page#nurse_booking__service-details {
+  .service-details-header .swiper-container {
     height: 66vw;
     max-height: 500px;
     background: #fff;
@@ -403,20 +404,20 @@ $yellow: #FF7B00;
       opacity: 1;
     }
   }
-  .package-details-meta {
+  .service-details-meta {
     background: #fff;
     padding: 15px 12px 15px;
     color: #333;
-    .package-details-meta-flex {
+    .service-details-meta-flex {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
     }
-    .package-details-meta-left {
+    .service-details-meta-left {
       flex-shrink: 10;
       min-width: 0;
     }
-    .package-details-title {
+    .service-details-title {
       font-size: 30px;
       font-weight: 500;
       line-height: 1.25;
@@ -424,7 +425,7 @@ $yellow: #FF7B00;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .package-details-duration {
+    .service-details-duration {
       font-size: 22px;
       font-weight: 600;
       padding-left: 12px + 27px;
@@ -432,7 +433,7 @@ $yellow: #FF7B00;
       background-size: 27px auto;
       margin: 10px 0 0;
     }
-    .package-details-price {
+    .service-details-price {
       color: $red;
       font-weight: bold;
       line-height: 1;
@@ -440,7 +441,7 @@ $yellow: #FF7B00;
       flex-shrink: 0;
       margin-left: 5px;
     }
-    .package-details-coupons {
+    .service-details-coupons {
       font-weight: 600;
       display: block;
       color: inherit;
@@ -493,14 +494,14 @@ $yellow: #FF7B00;
       }
     }
   }
-  .package-details-content {
+  .service-details-content {
     background: #fff;
     color: #333;
     padding: 12px;
     font-size: 22px;
     line-height: 1.5;
     margin-top: 8px;
-    .package-details-label {
+    .service-details-label {
       font-size: 24px;
       font-weight: bold;
       position: relative;
@@ -517,7 +518,7 @@ $yellow: #FF7B00;
         background: $red;
       }
     }
-    .package-details-text {
+    .service-details-text {
       ul, ol, p, h1, h2, h3, h4 {
         &:first-child {
           margin-top: 0;
@@ -653,7 +654,7 @@ $yellow: #FF7B00;
       margin-right: 5px;
     }
   }
-  .location-card-delete-button {
+  .location-delete-button {
     position: absolute;
     width: 27px;
     height: 27px;
@@ -782,7 +783,7 @@ $yellow: #FF7B00;
       width: 58px;
       flex-shrink: 0;
       text-align: center;
-      font-size: 20px;
+      font-size: 18px;
       color: #333;
       input {
         display: none;
