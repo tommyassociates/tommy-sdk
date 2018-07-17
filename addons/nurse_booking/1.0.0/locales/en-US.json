@@ -18,10 +18,12 @@
     "details_plan_inclusion": "Plan Inclusion",
     "details_administration": "Administration"
   },
-  "package_list": {
-    "nursing_title": "Nursing"
+  "service_list": {
+    "nursing_title": "Nursing",
+    "cleaning_title": "Cleaning",
+    "massage_title": "Massage"
   },
-  "package_details": {
+  "service_details": {
     "service_details_label": "Service details",
     "book_button": "Book now"
   },
@@ -39,11 +41,13 @@
     "city_placeholder": "Enter your city",
     "address_placeholder": "Enter your address",
     "set_default_label": "Set as default address",
-    "save_button": "Save"
+    "save_button": "Save",
+    "not_available": "Tuome is not available in your area yet. Invite your friends to install Tuome. The more who express interest the quicker we will open new regions."
   },
   "date_time": {
     "title": "Date & Time",
-    "determine_button": "Determine"
+    "determine_button": "Determine",
+    "week_days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
   },
   "nurse_list": {
     "title": "Nurse"
