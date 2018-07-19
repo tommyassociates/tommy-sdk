@@ -337,7 +337,7 @@
   background: #fff;
   padding: 15px 12px 15px;
   color: #333; }
-  .page#nurse_booking__service-details .service-details-meta .service-details-meta-flex {
+  .page#nurse_booking__service-details .service-details-meta .service-details-meta-wrap {
     display: flex;
     justify-content: space-between;
     align-items: flex-start; }
@@ -365,7 +365,7 @@
     font-size: 40px;
     flex-shrink: 0;
     margin-left: 5px; }
-  .page#nurse_booking__service-details .service-details-meta .service-details-coupons {
+  .page#nurse_booking__service-details .service-details-meta .service-details-coupons-link {
     font-weight: 600;
     display: block;
     color: inherit;
@@ -376,7 +376,7 @@
     position: relative;
     margin-top: 12px;
     margin-bottom: -15px; }
-    .page#nurse_booking__service-details .service-details-meta .service-details-coupons span {
+    .page#nurse_booking__service-details .service-details-meta .service-details-coupons-link span {
       border-top: 1px solid #E9EAEB;
       padding-left: 39px;
       padding-top: 15px;
@@ -387,7 +387,7 @@
       background-size: 27px auto;
       position: relative;
       z-index: 1; }
-    .page#nurse_booking__service-details .service-details-meta .service-details-coupons:before {
+    .page#nurse_booking__service-details .service-details-meta .service-details-coupons-link:before {
       content: '';
       position: absolute;
       left: -12px;
@@ -398,7 +398,7 @@
       opacity: 0;
       transition: 200ms;
       z-index: 0; }
-    .page#nurse_booking__service-details .service-details-meta .service-details-coupons:after {
+    .page#nurse_booking__service-details .service-details-meta .service-details-coupons-link:after {
       content: '';
       position: absolute;
       width: 10px;
@@ -409,7 +409,7 @@
       background-image: url("data:image/svg+xml;charset=utf-8,<svg viewBox='0 0 60 120' xmlns='http://www.w3.org/2000/svg'><path d='m60 61.5-38.25 38.25-9.75-9.75 29.25-28.5-29.25-28.5 9.75-9.75z' fill='#c7c7cc'/></svg>");
       background-size: 10px 20px;
       background-repeat: no-repeat; }
-    .page#nurse_booking__service-details .service-details-meta .service-details-coupons.active-state:before {
+    .page#nurse_booking__service-details .service-details-meta .service-details-coupons-link.active-state:before {
       opacity: 1; }
 .page#nurse_booking__service-details .service-details-content {
   background: #fff;
@@ -502,7 +502,8 @@
     font-size: 24px;
     font-weight: 600;
     line-height: 1.1; }
-  .nurse_booking-coupon-picker .coupon-item-date {
+  .nurse_booking-coupon-picker .coupon-item-date,
+  .nurse_booking-coupon-picker .coupon-item-name {
     font-size: 15px;
     font-weight: 600; }
   .nurse_booking-coupon-picker .coupon-item-label {
@@ -819,3 +820,61 @@
     position: relative;
     white-space: nowrap;
     text-overflow: ellipsis; }
+
+.page#nurse_booking__order-confirm {
+  color: #333; }
+  .page#nurse_booking__order-confirm .service-details-block {
+    padding: 12px;
+    display: flex;
+    background: #fff; }
+  .page#nurse_booking__order-confirm .service-image {
+    width: 100px;
+    height: 100px;
+    border-radius: 4px;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
+    margin-right: 20px;
+    flex-shrink: 0; }
+  .page#nurse_booking__order-confirm .service-details {
+    flex-shrink: 10;
+    min-width: 0;
+    width: 100%;
+    padding-top: 5px; }
+    .page#nurse_booking__order-confirm .service-details .service-title {
+      font-size: 30px;
+      font-weight: bold;
+      line-height: 1.2; }
+    .page#nurse_booking__order-confirm .service-details .service-price {
+      color: #FF5413;
+      font-size: 42px;
+      line-height: 1; }
+  .page#nurse_booking__order-confirm .location-default-badge {
+    color: #5FA81A;
+    margin-right: 5px; }
+  .page#nurse_booking__order-confirm .list-block ul:before, .page#nurse_booking__order-confirm .list-block ul:after {
+    display: none; }
+  .page#nurse_booking__order-confirm .list-block .item-inner {
+    padding-top: 12px;
+    padding-bottom: 12px; }
+  .page#nurse_booking__order-confirm .list-block .item-media {
+    width: 36px;
+    text-align: center;
+    justify-content: center; }
+  .page#nurse_booking__order-confirm .list-block .item-title {
+    font-size: 24px;
+    font-weight: 500;
+    white-space: normal;
+    line-height: 1.2; }
+  .page#nurse_booking__order-confirm .list-block-prices .item-title {
+    font-size: 32px;
+    font-weight: bold; }
+  .page#nurse_booking__order-confirm .list-block-prices .item-after {
+    font-size: 32px;
+    font-weight: bold;
+    color: #FF7B00;
+    max-height: none; }
+  .page#nurse_booking__order-confirm .list-block-prices .item-total-price .item-after {
+    font-size: 46px;
+    color: #FF5413; }

@@ -107,9 +107,9 @@ var DateTimeController = {
       var date = $page.find('input[name="date-time-date"]:checked').val();
       var hours = $page.find('input[name="date-time-hours"]:checked').val();
 
-      _api2.default.cache.booking.date_time = new Date(parseInt(date, 10)).getTime() + hours * 60 * 60 * 1000;
+      _api2.default.cache.booking.date = new Date(parseInt(date, 10)).getTime() + hours * 60 * 60 * 1000;
 
-      var url = tommy.util.addonAssetUrl(Template7.global.currentAddonInstall.package, Template7.global.currentAddonInstall.version, 'views/nurse-list.html', true);
+      var url = tommy.util.addonAssetUrl(Template7.global.currentAddonInstall.package, Template7.global.currentAddonInstall.version, 'views/order-confirm.html', true);
       tommy.app.f7.views.main.loadPage({ url: url });
     });
   },
@@ -314,6 +314,58 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 var tommy = window.tommy;
 
+var OrderConfirmController = {
+  init: function init(page) {
+    OrderConfirmController.bind(page);
+    OrderConfirmController.render();
+  },
+  bind: function bind(page) {
+    OrderConfirmController.page = page;
+    var $page = $$(page.container);
+  },
+  render: function render() {
+    var _API$cache$booking = _api2.default.cache.booking,
+        service = _API$cache$booking.service,
+        coupon = _API$cache$booking.coupon,
+        location = _API$cache$booking.location,
+        date = _API$cache$booking.date;
+
+    tommy.tplManager.renderInline('nurse_booking__orderConfirmTemplate', {
+      user: window.tommy.config.getCurrentUser(),
+      service: service,
+      coupon: coupon,
+      total: service.price - (coupon ? coupon.amount : 0),
+      location: location,
+      date: date
+    });
+  },
+  uninit: function uninit() {
+    OrderConfirmController.page = null;
+    delete OrderConfirmController.page;
+  }
+};
+
+exports.default = OrderConfirmController;
+
+},{"../api":1}],6:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _api = require('../api');
+
+var _api2 = _interopRequireDefault(_api);
+
+var _couponPicker = require('../coupon-picker');
+
+var _couponPicker2 = _interopRequireDefault(_couponPicker);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var tommy = window.tommy;
+
 var ServiceDetailsController = {
   init: function init(page) {
     ServiceDetailsController.bind(page);
@@ -326,6 +378,7 @@ var ServiceDetailsController = {
     var id = page.query.id;
 
     var service = {};
+    var selectedCoupon = void 0;
     (_api2.default.cache.services || []).forEach(function (serviceData) {
       if (serviceData.id === parseInt(id, 10)) {
         service = serviceData;
@@ -340,6 +393,9 @@ var ServiceDetailsController = {
 
     f7.sizeNavbars();
 
+    // Next Url
+    var nextUrl = tommy.util.addonAssetUrl(Template7.global.currentAddonInstall.package, Template7.global.currentAddonInstall.version, 'views/location.html', true);
+
     // Template
     tommy.tplManager.renderTarget('nurse_booking__serviceDetailsTemplate', { service: service }, page.container);
 
@@ -348,8 +404,38 @@ var ServiceDetailsController = {
       pagination: '.swiper-pagination'
     });
 
+    $$(page.container).on('click', '.service-details-coupons-link', function () {
+      (0, _couponPicker2.default)(service.coupons, function (coupon) {
+        selectedCoupon = coupon;
+        _api2.default.cache.booking.service = service;
+        _api2.default.cache.booking.coupon = selectedCoupon;
+        f7.views.main.loadPage({ url: nextUrl });
+      }, function () {
+        selectedCoupon = undefined;
+      });
+    });
+
     $$(page.container).on('click', '.service-book-button', function () {
       _api2.default.cache.booking.service = service;
+
+      if (service.coupons && service.coupons.length) {
+        (0, _couponPicker2.default)(service.coupons, function (coupon) {
+          selectedCoupon = coupon;
+          _api2.default.cache.booking.service = service;
+          _api2.default.cache.booking.coupon = selectedCoupon;
+          f7.views.main.loadPage({ url: nextUrl });
+        }, function () {
+          _api2.default.cache.booking.coupon = null;
+          delete _api2.default.cache.booking.coupon;
+          selectedCoupon = undefined;
+          f7.views.main.loadPage({ url: nextUrl });
+        });
+      } else {
+        _api2.default.cache.booking.coupon = null;
+        delete _api2.default.cache.booking.coupon;
+        selectedCoupon = undefined;
+        f7.views.main.loadPage({ url: nextUrl });
+      }
     });
   },
   uninit: function uninit() {
@@ -360,7 +446,7 @@ var ServiceDetailsController = {
 
 exports.default = ServiceDetailsController;
 
-},{"../api":1}],6:[function(require,module,exports){
+},{"../api":1,"../coupon-picker":8}],7:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -430,32 +516,19 @@ var ServiceListController = {
 
 exports.default = ServiceListController;
 
-},{"../api":1}],7:[function(require,module,exports){
+},{"../api":1}],8:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
-exports.default = function (confirm, skip) {
-  // TODO: get API request for avialable coupons first
-
+exports.default = function (coupons, confirm, skip) {
   var f7 = window.tommy.app.f7;
   var currentCouponId = void 0;
+  var currentCoupon = void 0;
   var html = tommy.tplManager.render('nurse_bookink__couponPickerTemplate', {
-    items: [{
-      title: 'Title 1',
-      date: '13.07.2018 - 15.07.2018',
-      id: 1
-    }, {
-      title: 'Title 2',
-      date: '13.07.2018 - 15.07.2018',
-      id: 2
-    }, {
-      title: 'Title 3',
-      date: '13.07.2018 - 15.07.2018',
-      id: 3
-    }]
+    coupons: coupons
   });
   var modalEl = f7.modal({
     afterText: html,
@@ -468,7 +541,7 @@ exports.default = function (confirm, skip) {
       text: tommy.i18n.t('coupon_picker.confirm_button', { defaultValue: 'Confirm' }),
       bold: true,
       onClick: function onClick() {
-        if (confirm) confirm(currentCouponId);
+        if (confirm) confirm(currentCoupon);
       }
     }]
   });
@@ -479,11 +552,16 @@ exports.default = function (confirm, skip) {
     $modalEl.find('.modal-button-bold').removeClass('modal-button-disabled');
     if (e.target.checked) {
       currentCouponId = e.target.value;
+      coupons.forEach(function (coupon) {
+        if (coupon.id == parseInt(currentCouponId, 10)) {
+          currentCoupon = coupon;
+        }
+      });
     }
   });
 };
 
-},{}],8:[function(require,module,exports){
+},{}],9:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -672,7 +750,7 @@ var map = {
   'ZWD': 'Z$'
 };
 
-},{}],9:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 'use strict';
 
 var _currencyMap = require('./currency-map');
@@ -703,6 +781,10 @@ var _dateTime = require('./controllers/date-time');
 
 var _dateTime2 = _interopRequireDefault(_dateTime);
 
+var _orderConfirm = require('./controllers/order-confirm');
+
+var _orderConfirm2 = _interopRequireDefault(_orderConfirm);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 var _window$tommy$app = window.tommy.app,
@@ -726,8 +808,11 @@ f7.onPageBeforeRemove('nurse_booking__location', _location2.default.uninit);
 f7.onPageInit('nurse_booking__date-time', _dateTime2.default.init);
 f7.onPageBeforeRemove('nurse_booking__date-time', _dateTime2.default.uninit);
 
+f7.onPageInit('nurse_booking__order-confirm', _orderConfirm2.default.init);
+f7.onPageBeforeRemove('nurse_booking__order-confirm', _orderConfirm2.default.uninit);
+
 t7.registerHelper('nurse_booking__currencySymbol', function (code) {
   return (0, _currencyMap2.default)(code);
 });
 
-},{"./controllers/date-time":2,"./controllers/index":3,"./controllers/location":4,"./controllers/service-details":5,"./controllers/service-list":6,"./coupon-picker":7,"./currency-map":8}]},{},[9]);
+},{"./controllers/date-time":2,"./controllers/index":3,"./controllers/location":4,"./controllers/order-confirm":5,"./controllers/service-details":6,"./controllers/service-list":7,"./coupon-picker":8,"./currency-map":9}]},{},[10]);

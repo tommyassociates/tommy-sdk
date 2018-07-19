@@ -51,5 +51,11 @@
   },
   "nurse_list": {
     "title": "Nurse"
+  },
+  "order_confirm": {
+    "title": "Confirm Order",
+    "coupons_label": "Coupons",
+    "total_label": "Total",
+    "pay_button": "Payment now"
   }
 }
