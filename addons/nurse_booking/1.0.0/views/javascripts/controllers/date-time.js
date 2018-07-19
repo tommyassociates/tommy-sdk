@@ -19,12 +19,12 @@ const DateTimeController = {
       const date = $page.find('input[name="date-time-date"]:checked').val();
       const hours = $page.find('input[name="date-time-hours"]:checked').val();
 
-      API.cache.booking.date_time = new Date(parseInt(date, 10)).getTime() + hours * 60 * 60 * 1000;
+      API.cache.booking.date = new Date(parseInt(date, 10)).getTime() + hours * 60 * 60 * 1000;
 
       const url = tommy.util.addonAssetUrl(
         Template7.global.currentAddonInstall.package,
         Template7.global.currentAddonInstall.version,
-        'views/nurse-list.html',
+        'views/order-confirm.html',
         true
       );
       tommy.app.f7.views.main.loadPage({ url });

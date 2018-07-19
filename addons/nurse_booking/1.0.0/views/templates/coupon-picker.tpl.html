@@ -5,12 +5,13 @@
     </div>
     <div class="coupon-picker-text">{{t "coupon_picker.text"}}</div>
     <div class="coupon-picker-items">
-      {{#each items}}
+      {{#each coupons}}
         <label>
           <input type="radio" name="nurse_booking-coupon-picker-radio" value="{{id}}">
           <div class="coupon-item-content">
-            <div class="coupon-item-title">{{title}}</div>
-            <div class="coupon-item-date">{{date}}</div>
+            <div class="coupon-item-title">¥ {{amount}}</div>
+            <div class="coupon-item-name">{{name}}</div>
+            <div class="coupon-item-date">{{formatDate expires_at "D MMM YYYY"}}</div>
           </div>
           <div class="coupon-item-label">{{t "coupon_picker.use_label"}}</div>
         </label>

@@ -1,0 +1,72 @@
+<script id="nurse_booking__orderConfirmTemplate" type="text/template">
+  <a class="nurse_booking__toolbar-button service-book-button">{{t "order_confirm.pay_button"}}</a>
+  <div class="page-content">
+    <div class="service-details-block">
+      <div class="service-image" style="background-image: url({{addonAssetUrl "views/images/demo-package.png"}})"></div>
+      <div class="service-details">
+        <div class="service-title">{{service.name}}</div>
+        <div class="service-price">¥{{service.price}}</div>
+      </div>
+    </div>
+    <div class="list-block">
+      <ul>
+        <li class="item-content">
+          <div class="item-media">
+            <img src="{{addonAssetUrl "views/images/icon-time.svg"}}" alt="">
+          </div>
+          <div class="item-inner">
+            <div class="item-title">{{formatDate date "MMMM D, YYYY HH:mm"}}</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="list-block">
+      <ul>
+        <li class="item-content">
+          <div class="item-media">
+            <img src="{{addonAssetUrl "views/images/icon-user.svg"}}" alt="">
+          </div>
+          <div class="item-inner">
+            <div class="item-title">{{user.first_name}} {{user.last_name}}</div>
+          </div>
+        </li>
+        {{#if user.mobile}}
+        <li class="item-content">
+          <div class="item-media">
+            <img src="{{addonAssetUrl "views/images/icon-phone.svg"}}" alt="">
+          </div>
+          <div class="item-inner">
+            <div class="item-title">{{user.mobile}}</div>
+          </div>
+        </li>
+        {{/if}}
+        <li class="item-content">
+          <div class="item-media">
+            <img src="{{addonAssetUrl "views/images/icon-location.svg"}}" alt="">
+          </div>
+          <div class="item-inner">
+            <div class="item-title">{{#if location.default}}<span class="location-default-badge">[{{t "location.default_label"}}]</span>{{/if}}{{location.city}} {{location.address}}</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="list-block list-block-prices">
+      <ul>
+        {{#if coupon}}
+        <li class="item-content">
+          <div class="item-inner">
+            <div class="item-title">{{t "order_confirm.coupons_label"}}</div>
+            <div class="item-after">-¥{{coupon.amount}}</div>
+          </div>
+        </li>
+        {{/if}}
+        <li class="item-content item-total-price">
+          <div class="item-inner">
+              <div class="item-title">{{t "order_confirm.total_label"}}:</div>
+            <div class="item-after">¥{{total}}</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+</script>

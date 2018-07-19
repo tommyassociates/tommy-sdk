@@ -1,4 +1,5 @@
 import API from '../api';
+import couponPicker from '../coupon-picker';
 
 const tommy = window.tommy;
 
@@ -14,6 +15,7 @@ const ServiceDetailsController = {
     const id = page.query.id;
 
     let service = {};
+    let selectedCoupon;
     (API.cache.services || []).forEach((serviceData) => {
       if (serviceData.id === parseInt(id, 10)) {
         service = serviceData;
@@ -28,6 +30,14 @@ const ServiceDetailsController = {
 
     f7.sizeNavbars();
 
+    // Next Url
+    const nextUrl = tommy.util.addonAssetUrl(
+      Template7.global.currentAddonInstall.package,
+      Template7.global.currentAddonInstall.version,
+      'views/location.html',
+      true
+    );
+
     // Template
     tommy.tplManager.renderTarget(
       'nurse_booking__serviceDetailsTemplate',
@@ -40,8 +50,38 @@ const ServiceDetailsController = {
       pagination: '.swiper-pagination'
     });
 
+    $$(page.container).on('click', '.service-details-coupons-link', () => {
+      couponPicker(service.coupons, (coupon) => {
+        selectedCoupon = coupon;
+        API.cache.booking.service = service;
+        API.cache.booking.coupon = selectedCoupon;
+        f7.views.main.loadPage({ url: nextUrl });
+      }, () => {
+        selectedCoupon = undefined;
+      })
+    });
+
     $$(page.container).on('click', '.service-book-button', () => {
       API.cache.booking.service = service;
+
+      if (service.coupons && service.coupons.length) {
+        couponPicker(service.coupons, (coupon) => {
+          selectedCoupon = coupon;
+          API.cache.booking.service = service;
+          API.cache.booking.coupon = selectedCoupon;
+          f7.views.main.loadPage({ url: nextUrl });
+        }, () => {
+          API.cache.booking.coupon = null;
+          delete API.cache.booking.coupon;
+          selectedCoupon = undefined;
+          f7.views.main.loadPage({ url: nextUrl });
+        })
+      } else {
+        API.cache.booking.coupon = null;
+        delete API.cache.booking.coupon;
+        selectedCoupon = undefined;
+        f7.views.main.loadPage({ url: nextUrl });
+      }
     });
   },
   uninit () {

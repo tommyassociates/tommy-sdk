@@ -408,7 +408,7 @@ $yellow: #FF7B00;
     background: #fff;
     padding: 15px 12px 15px;
     color: #333;
-    .service-details-meta-flex {
+    .service-details-meta-wrap {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
@@ -441,7 +441,7 @@ $yellow: #FF7B00;
       flex-shrink: 0;
       margin-left: 5px;
     }
-    .service-details-coupons {
+    .service-details-coupons-link {
       font-weight: 600;
       display: block;
       color: inherit;
@@ -607,7 +607,8 @@ $yellow: #FF7B00;
     font-weight: 600;
     line-height: 1.1;
   }
-  .coupon-item-date {
+  .coupon-item-date,
+  .coupon-item-name {
     font-size: 15px;
     font-weight: 600;
   }
@@ -990,6 +991,83 @@ $yellow: #FF7B00;
       // overflow: hidden;
       white-space: nowrap;
       text-overflow: ellipsis;
+    }
+  }
+}
+.page#nurse_booking__order-confirm {
+  color: #333;
+  .service-details-block {
+    padding: 12px;
+    display: flex;
+    background: #fff;
+  }
+  .service-image {
+    width: 100px;
+    height: 100px;
+    border-radius: 4px;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    box-shadow: 0px 2px 5px rgba(0,0,0,0.3);
+    margin-right: 20px;
+    flex-shrink: 0;
+  }
+  .service-details {
+    flex-shrink: 10;
+    min-width: 0;
+    width: 100%;
+    padding-top: 5px;
+    .service-title {
+      font-size: 30px;
+      font-weight: bold;
+      line-height: 1.2;
+    }
+    .service-price {
+      color: $orange;
+      font-size: 42px;
+      line-height: 1;
+    }
+  }
+  .location-default-badge {
+    color: #5FA81A;
+    margin-right: 5px;
+  }
+  .list-block {
+    ul {
+      &:before, &:after {
+        display: none;
+      }
+    }
+    .item-inner {
+      padding-top: 12px;
+      padding-bottom: 12px;
+    }
+    .item-media {
+      width: 36px;
+      text-align: center;
+      justify-content: center;
+    }
+    .item-title {
+      font-size: 24px;
+      font-weight: 500;
+      white-space: normal;
+      line-height: 1.2;
+    }
+  }
+  .list-block-prices {
+    .item-title {
+      font-size: 32px;
+      font-weight: bold;
+    }
+    .item-after {
+      font-size: 32px;
+      font-weight: bold;
+      color: $yellow;
+      max-height: none;
+    }
+    .item-total-price .item-after {
+      font-size: 46px;
+      color: $orange;
     }
   }
 }
