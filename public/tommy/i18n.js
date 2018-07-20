@@ -23,6 +23,9 @@ function(i18next) {
                 Template7.global.currentAddonInstall &&
                 Template7.global.currentAddonInstall.package)
                 keys.push(Template7.global.currentAddonInstall.package + ':' + key)
+
+            // Add global addons here ie. wallet
+            keys.push('wallet:' + key)
             keys.push(key)
 
             return i18n.i18next.t(keys, options)
