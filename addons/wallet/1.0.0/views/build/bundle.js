@@ -612,11 +612,12 @@ var transaction = {
         amount = data.amount,
         currency = data.currency;
 
+
     var html = tommy.tplManager.render('wallet__transactionPopupStatus', {
       title: tommy.i18n.t('transaction_popup.success_title', { defaultValue: 'Success' }),
       status: 'success',
       message: tommy.i18n.t('transaction_popup.success_message', {
-        defaultValue: 'You sent {{amount}}{{amount}}.<br>To {{to}}<br>From {{from}}',
+        defaultValue: 'You sent {{currency}}{{amount}}.<br>To {{to}}.<br>From {{from}}.',
         currency: (0, _currencyMap2.default)(currency),
         amount: amount,
         to: payee_name,
@@ -647,7 +648,7 @@ var transaction = {
         }));
         if (transaction.cache.onError) transaction.cache.onError(transactionDetails);
       }
-    }).catch(function (error) {
+    }, function (error) {
       var transactionDetails = Object.assign({}, data, { status: 'failed' });
       transaction.hideLoader();
       transaction.cache.transactionDetails = transactionDetails;
