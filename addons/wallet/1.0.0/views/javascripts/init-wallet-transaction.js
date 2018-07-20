@@ -116,7 +116,7 @@ const transaction = {
   render() {
     const { f7 } = tommy.app;
     const { $popup, params } = transaction.cache;
-    const { addon_id, addon_install_id, payee_name, amount, currency } = params;
+    const { addon, addon_id, addon_install_id, payee_name, amount, currency } = params;
 
     transaction.showLoader();
 
@@ -146,6 +146,7 @@ const transaction = {
       });
       $popup.once('click', '.transaction-popup-confirm-button', () => {
         transaction.createTransaction({
+          addon,
           addon_id,
           addon_install_id,
           payee_name,
