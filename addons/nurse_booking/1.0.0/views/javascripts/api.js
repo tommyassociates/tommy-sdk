@@ -9,7 +9,7 @@ const API = {
   },
   getServiceList(categoryId) {
     return api.call({
-      endpoint: 'vendors/1/products',
+      endpoint: `vendors/${window.tommy.config.getCurrentTeamId()}/products`,
       method: 'GET',
       data: {}
     }).then((data) => {
@@ -19,7 +19,7 @@ const API = {
   },
   getCouponList(categoryId) {
     return api.call({
-      endpoint: 'vendors/1/coupons',
+      endpoint: `vendors/${window.tommy.config.getCurrentTeamId()}/coupons`,
       method: 'GET',
       data: {}
     }).then((data) => {
@@ -64,6 +64,13 @@ const API = {
   removeLocation(index) {
     API.cache.locations.splice(index, 1);
     return API.saveLocations(API.cache.locations);
+  },
+  sendOrder(data) {
+    return api.call({
+      endpoint: `vendors/${window.tommy.config.getCurrentTeamId()}/orders`,
+      method: 'POST',
+      data,
+    });
   }
 }
 

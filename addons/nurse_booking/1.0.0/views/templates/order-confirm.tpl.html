@@ -1,5 +1,5 @@
 <script id="nurse_booking__orderConfirmTemplate" type="text/template">
-  <a class="nurse_booking__toolbar-button service-book-button">{{t "order_confirm.pay_button"}}</a>
+  <a class="nurse_booking__toolbar-button service-book-button order-confirm-pay-button">{{t "order_confirm.pay_button"}}</a>
   <div class="page-content">
     <div class="service-details-block">
       <div class="service-image" style="background-image: url({{addonAssetUrl "views/images/demo-package.png"}})"></div>
@@ -40,24 +40,28 @@
           </div>
         </li>
         {{/if}}
-        <li class="item-content">
-          <div class="item-media">
-            <img src="{{addonAssetUrl "views/images/icon-location.svg"}}" alt="">
-          </div>
-          <div class="item-inner">
-            <div class="item-title">{{#if location.default}}<span class="location-default-badge">[{{t "location.default_label"}}]</span>{{/if}}{{location.city}} {{location.address}}</div>
-          </div>
+        <li>
+          <a href="#" class="item-content item-link order-confirm-select-location">
+            <div class="item-media">
+              <img src="{{addonAssetUrl "views/images/icon-location.svg"}}" alt="">
+            </div>
+            <div class="item-inner">
+              <div class="item-title">{{#if location.default}}<span class="location-default-badge">[{{t "location.default_label"}}]</span>{{/if}}{{location.city}} {{location.address}}</div>
+            </div>
+          </a>
         </li>
       </ul>
     </div>
     <div class="list-block list-block-prices">
       <ul>
         {{#if coupon}}
-        <li class="item-content">
-          <div class="item-inner">
-            <div class="item-title">{{t "order_confirm.coupons_label"}}</div>
-            <div class="item-after">-¥{{coupon.amount}}</div>
-          </div>
+        <li>
+          <a href="#" class="item-content item-link order-confirm-select-coupon">
+            <div class="item-inner">
+              <div class="item-title">{{t "order_confirm.coupons_label"}}</div>
+              <div class="item-after">-¥{{coupon.amount}}</div>
+            </div>
+          </a>
         </li>
         {{/if}}
         <li class="item-content item-total-price">

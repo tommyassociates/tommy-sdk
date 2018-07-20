@@ -31,7 +31,7 @@ const ServiceDetailsController = {
     f7.sizeNavbars();
 
     // Next Url
-    const nextUrl = tommy.util.addonAssetUrl(
+    const locationUrl = tommy.util.addonAssetUrl(
       Template7.global.currentAddonInstall.package,
       Template7.global.currentAddonInstall.version,
       'views/location.html',
@@ -55,7 +55,7 @@ const ServiceDetailsController = {
         selectedCoupon = coupon;
         API.cache.booking.service = service;
         API.cache.booking.coupon = selectedCoupon;
-        f7.views.main.loadPage({ url: nextUrl });
+        f7.views.main.loadPage({ url: locationUrl });
       }, () => {
         selectedCoupon = undefined;
       })
@@ -69,18 +69,18 @@ const ServiceDetailsController = {
           selectedCoupon = coupon;
           API.cache.booking.service = service;
           API.cache.booking.coupon = selectedCoupon;
-          f7.views.main.loadPage({ url: nextUrl });
+          f7.views.main.loadPage({ url: locationUrl });
         }, () => {
           API.cache.booking.coupon = null;
           delete API.cache.booking.coupon;
           selectedCoupon = undefined;
-          f7.views.main.loadPage({ url: nextUrl });
+          f7.views.main.loadPage({ url: locationUrl });
         })
       } else {
         API.cache.booking.coupon = null;
         delete API.cache.booking.coupon;
         selectedCoupon = undefined;
-        f7.views.main.loadPage({ url: nextUrl });
+        f7.views.main.loadPage({ url: locationUrl });
       }
     });
   },

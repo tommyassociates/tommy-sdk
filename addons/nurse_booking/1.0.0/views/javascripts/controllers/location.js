@@ -64,14 +64,21 @@ const LocationController = {
         f7.alert(tommy.i18n.t('location.not_available'));
         return;
       }
-      const url = tommy.util.addonAssetUrl(
-        Template7.global.currentAddonInstall.package,
-        Template7.global.currentAddonInstall.version,
-        'views/date-time.html',
-        true
-      );
+
       API.cache.booking.location = location;
-      f7.views.main.loadPage({ url });
+
+      if (page.query.back) {
+        f7.views.main.back();
+      } else {
+        const url = tommy.util.addonAssetUrl(
+          Template7.global.currentAddonInstall.package,
+          Template7.global.currentAddonInstall.version,
+          'views/date-time.html',
+          true
+        );
+        f7.views.main.loadPage({ url });
+      }
+
     });
   },
   loadLocations() {
