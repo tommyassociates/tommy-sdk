@@ -1,9 +1,15 @@
-export default function(coupons, confirm, skip) {
+export default function(coupons, onConfirm, onSkip, selectedCoupon) {
   const f7 = window.tommy.app.f7;
   let currentCouponId;
   let currentCoupon;
+
+  const renderCoupons = coupons.map((c) => {
+    return Object.assign({}, c, {
+      checked: selectedCoupon ? c.id === selectedCoupon.id : false
+    });
+  });
   const html = tommy.tplManager.render('nurse_bookink__couponPickerTemplate', {
-    coupons,
+    coupons: renderCoupons,
   });
   const modalEl = f7.modal({
     afterText: html,
@@ -11,14 +17,14 @@ export default function(coupons, confirm, skip) {
       {
         text: tommy.i18n.t('coupon_picker.skip_button', { defaultValue: 'Skip' }),
         onClick() {
-          if (skip) skip();
+          if (onSkip) onSkip();
         }
       },
       {
         text: tommy.i18n.t('coupon_picker.confirm_button', { defaultValue: 'Confirm' }),
         bold: true,
         onClick() {
-          if (confirm) confirm(currentCoupon);
+          if (onConfirm) onConfirm(currentCoupon);
         }
       }
     ]

@@ -1,0 +1,40 @@
+<script id="nurse_booking__orderDetailsTemplate" type="text/template">
+  <div class="page-content">
+    <div class="list-block">
+      <ul>
+        <li class="item-content">
+          <div class="item-inner">
+            <div class="item-title">{{t "order_details.service_label"}}:</div>
+            <div class="item-after">{{service.name}}</div>
+          </div>
+        </li>
+        <li class="item-content">
+          <div class="item-inner">
+            <div class="item-title">{{t "order_details.time_label"}}:</div>
+            <div class="item-after">{{formatDate date "MMMM D, YYYY HH:mm"}}</div>
+          </div>
+        </li>
+        {{#if coupon}}
+        <li class="item-content">
+          <div class="item-inner">
+            <div class="item-title">{{t "order_details.coupons_label"}}:</div>
+            <div class="item-after price">-¥{{coupon.amount}}</div>
+          </div>
+        </li>
+        {{/if}}
+        <li class="item-content item-total-price">
+          <div class="item-inner">
+              <div class="item-title">{{t "order_details.total_label"}}:</div>
+            <div class="item-after price">¥{{total}}</div>
+          </div>
+        </li>
+        <li class="item-content item-total-price">
+          <div class="item-inner">
+              <div class="item-title">{{t "order_details.payment_label"}}:</div>
+            <div class="item-after">{{transaction.card_name}}</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+</script>

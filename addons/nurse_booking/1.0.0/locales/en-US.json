@@ -57,5 +57,18 @@
     "coupons_label": "Coupons",
     "total_label": "Total",
     "pay_button": "Payment now"
+  },
+  "order_success": {
+    "title": "Appointment is successful",
+    "details_button": "Check order details",
+    "home_button": "Return to home page "
+  },
+  "order_details": {
+    "title": "Order Details",
+    "service_label": "Service",
+    "time_label": "Time",
+    "coupons_label": "Coupons",
+    "total_label": "Total",
+    "payment_label": "Payment"
   }
 }

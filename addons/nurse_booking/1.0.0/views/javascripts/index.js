@@ -7,8 +7,7 @@ import ServiceDetailsController from './controllers/service-details';
 import LocationController from './controllers/location';
 import DateTimeController from './controllers/date-time';
 import OrderConfirmController from './controllers/order-confirm';
-
-
+import OrderDetailsController from './controllers/order-details';
 
 const { f7, t7 } = window.tommy.app;
 
@@ -29,7 +28,11 @@ f7.onPageInit('nurse_booking__date-time', DateTimeController.init)
 f7.onPageBeforeRemove('nurse_booking__date-time', DateTimeController.uninit)
 
 f7.onPageInit('nurse_booking__order-confirm', OrderConfirmController.init)
+f7.onPageBeforeAnimation('nurse_booking__order-confirm', OrderConfirmController.onBeforeIn)
 f7.onPageBeforeRemove('nurse_booking__order-confirm', OrderConfirmController.uninit)
+
+f7.onPageInit('nurse_booking__order-details', OrderDetailsController.init)
+f7.onPageBeforeRemove('nurse_booking__order-details', OrderDetailsController.uninit)
 
 
 t7.registerHelper('nurse_booking__currencySymbol', code => {

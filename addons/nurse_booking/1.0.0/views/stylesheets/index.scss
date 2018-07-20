@@ -994,7 +994,8 @@ $yellow: #FF7B00;
     }
   }
 }
-.page#nurse_booking__order-confirm {
+.page#nurse_booking__order-confirm,
+.page#nurse_booking__order-details {
   color: #333;
   .service-details-block {
     padding: 12px;
@@ -1032,7 +1033,7 @@ $yellow: #FF7B00;
     color: #5FA81A;
     margin-right: 5px;
   }
-  .list-block {
+  .list-block:not(.list-block-prices) {
     ul {
       &:before, &:after {
         display: none;
@@ -1053,8 +1054,25 @@ $yellow: #FF7B00;
       white-space: normal;
       line-height: 1.2;
     }
+    .item-link .item-inner {
+      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg%20viewBox%3D'0%200%2060%20120'%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%3E%3Cpath%20d%3D'm60%2061.5-38.25%2038.25-9.75-9.75%2029.25-28.5-29.25-28.5%209.75-9.75z'%20fill%3D'%23c7c7cc'%2F%3E%3C%2Fsvg%3E");
+    }
   }
-  .list-block-prices {
+  .list-block:not(.list-block-prices) {
+    .item-after {
+      font-size: 24px;
+      font-weight: 500;
+      line-height: 1.2;
+      max-height: none;
+      color: #333;
+      text-align: right;
+      &.price {
+        font-weight: bold;
+        color: $yellow;
+      }
+    }
+  }
+  .list-block.list-block-prices {
     .item-title {
       font-size: 32px;
       font-weight: bold;
@@ -1068,6 +1086,47 @@ $yellow: #FF7B00;
     .item-total-price .item-after {
       font-size: 46px;
       color: $orange;
+    }
+  }
+}
+.page#nurse_booking__order-success {
+  background: #fff;
+  .order-success-title {
+    font-size: 36px;
+    font-weight: bold;
+    text-align: center;
+    line-height: 1.15;
+    margin-bottom: 20px;
+    margin-top: 44px;
+  }
+  .order-success-img {
+    text-align: center;
+    img {
+      width: auto;
+      height: 200px;
+    }
+  }
+  .order-success-buttons {
+    padding: 12px;
+    box-sizing: border-box;
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    a {
+      display: flex;
+      text-align: center;
+      width: 100%;
+      justify-content: center;
+      align-items: center;
+      height: 60px;
+      border-radius: 6px;
+      border: 1px solid #999;
+      color: #999;
+      font-size: 22px;
+      + a {
+        margin-top: 12px;
+      }
     }
   }
 }
