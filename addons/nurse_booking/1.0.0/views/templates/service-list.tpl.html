@@ -1,0 +1,22 @@
+<script id="nurse_booking__serviceListTemplate" type="text/template">
+  <div class="service-cards swiper-container">
+    <div class="swiper-wrapper">
+      {{#each services}}
+      <div class="swiper-slide">
+        <a href="{{addonAssetUrl "views/service-details.html"}}?id={{id}}" class="service-card">
+          <div class="service-card-pic" style="background-image:url({{addonAssetUrl "views/images/demo-package.png"}})"></div>
+          <div class="service-card-content">
+            <div class="service-card-title">{{name}}</div>
+            <div class="service-card-duration">{{data.duration}}min</div>
+            {{#if coupons.length}}
+            <div class="service-card-coupons">{{coupons.length}} Coupons</div>
+            {{else}}
+            <div class="service-card-price">¥ {{price}}</div>
+            {{/if}}
+          </div>
+        </a>
+      </div>
+      {{/each}}
+    </div>
+  </div>
+</script>

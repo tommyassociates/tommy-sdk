@@ -1,0 +1,35 @@
+<script id="nurse_booking__serviceDetailsTemplate" type="text/template">
+  <a class="nurse_booking__toolbar-button service-book-button" data-service-id="{{service.id}}">{{t "service_details.book_button"}}</a>
+  <div class="page-content">
+    <div class="service-details-header">
+      <div class="swiper-container">
+        <div class="swiper-wrapper">
+          <div class="swiper-slide" style="background-image: url({{addonAssetUrl "views/images/demo-package.png"}})"></div>
+          <div class="swiper-slide" style="background-image: url({{addonAssetUrl "views/images/demo-package.png"}})"></div>
+          <div class="swiper-slide" style="background-image: url({{addonAssetUrl "views/images/demo-package.png"}})"></div>
+        </div>
+        <div class="swiper-pagination"></div>
+      </div>
+    </div>
+    <div class="service-details-meta">
+      <div class="service-details-meta-wrap">
+        <div class="service-details-meta-left">
+          <div class="service-details-title">{{service.name}}</div>
+          <div class="service-details-duration">{{service.data.duration}}min</div>
+        </div>
+        <div class="service-details-price">¥ {{service.price}}</div>
+      </div>
+      {{#if service.coupons.length}}
+      <a class="service-details-coupons-link" data-service-id="{{service.id}}"><span>{{service.coupons.length}} coupons available</span></a>
+      {{/if}}
+    </div>
+    <div class="service-details-content">
+      <div class="service-details-label">{{t "service_details.service_details_label"}}:</div>
+      <div class="service-details-text">
+        <p>
+          {{service.description}}
+        </p>
+      </div>
+    </div>
+  </div>
+</script>

@@ -612,11 +612,12 @@ var transaction = {
         amount = data.amount,
         currency = data.currency;
 
+
     var html = tommy.tplManager.render('wallet__transactionPopupStatus', {
       title: tommy.i18n.t('transaction_popup.success_title', { defaultValue: 'Success' }),
       status: 'success',
       message: tommy.i18n.t('transaction_popup.success_message', {
-        defaultValue: 'You sent {{amount}}{{amount}}.<br>To {{to}}<br>From {{from}}',
+        defaultValue: 'You sent {{currency}}{{amount}}.<br>To {{to}}.<br>From {{from}}.',
         currency: (0, _currencyMap2.default)(currency),
         amount: amount,
         to: payee_name,
@@ -640,19 +641,19 @@ var transaction = {
       if (transactionDetails.status && transactionDetails.status !== 'failed') {
         transaction.renderSuccess(transactionDetails);
         $$(document).trigger('wallet:transaction');
-        if (transaction.cache.onSuccess) transaction.cache.onSuccess();
+        if (transaction.cache.onSuccess) transaction.cache.onSuccess(transactionDetails);
       } else if (transactionDetails.status === 'failed') {
         transaction.renderError(Object.assign(transactionDetails, {
           message: tommy.i18n.t('transaction_popup.error_insufficient', { defaultValue: 'Sorry. Your Tommy account balance is insufficient. Please use other payment methods' })
         }));
-        if (transaction.cache.onError) transaction.cache.onError();
+        if (transaction.cache.onError) transaction.cache.onError(transactionDetails);
       }
-    }).catch(function (error) {
+    }, function (error) {
       var transactionDetails = Object.assign({}, data, { status: 'failed' });
       transaction.hideLoader();
       transaction.cache.transactionDetails = transactionDetails;
       transaction.renderError(error);
-      if (transaction.cache.onError) transaction.cache.onError();
+      if (transaction.cache.onError) transaction.cache.onError(error);
     });
   },
   viewReport: function viewReport() {

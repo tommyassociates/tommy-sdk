@@ -1,5 +1,5 @@
 import currencyMap from './currency-map';
-import api from './api';
+import API from './api';
 
 const tommy = window.tommy;
 const transaction = {
@@ -44,11 +44,12 @@ const transaction = {
   renderSuccess(data) {
     const { $popup } = transaction.cache;
     const { payee_name, card_name, amount, currency } = data;
+
     const html = tommy.tplManager.render('wallet__transactionPopupStatus', {
       title: tommy.i18n.t('transaction_popup.success_title', { defaultValue: 'Success' }),
       status: 'success',
       message: tommy.i18n.t('transaction_popup.success_message', {
-        defaultValue: 'You sent {{amount}}{{amount}}.<br>To {{to}}<br>From {{from}}',
+        defaultValue: 'You sent {{currency}}{{amount}}.<br>To {{to}}.<br>From {{from}}.',
         currency: currencyMap(currency),
         amount,
         to: payee_name,
@@ -61,28 +62,30 @@ const transaction = {
   createTransaction(data) {
     const { card_name } = data;
     transaction.showLoader();
-    api.createWalletTransaction(data).then((response) => {
-      transaction.hideLoader();
-      const transactionDetails = Object.assign({}, response || {}, { card_name });
-      transaction.cache.transactionDetails = transactionDetails;
+    API.createWalletTransaction(data).then(
+        (response) => {
+        transaction.hideLoader();
+        const transactionDetails = Object.assign({}, response || {}, { card_name });
+        transaction.cache.transactionDetails = transactionDetails;
 
-      if (transactionDetails.status && transactionDetails.status !== 'failed') {
-        transaction.renderSuccess(transactionDetails);
-        $$(document).trigger('wallet:transaction');
-        if (transaction.cache.onSuccess) transaction.cache.onSuccess();
-      } else if (transactionDetails.status === 'failed'){
-        transaction.renderError(Object.assign(transactionDetails, {
-          message: tommy.i18n.t('transaction_popup.error_insufficient', { defaultValue: 'Sorry. Your Tommy account balance is insufficient. Please use other payment methods' }),
-        }));
-        if (transaction.cache.onError) transaction.cache.onError();
+        if (transactionDetails.status && transactionDetails.status !== 'failed') {
+          transaction.renderSuccess(transactionDetails);
+          $$(document).trigger('wallet:transaction');
+          if (transaction.cache.onSuccess) transaction.cache.onSuccess(transactionDetails);
+        } else if (transactionDetails.status === 'failed'){
+          transaction.renderError(Object.assign(transactionDetails, {
+            message: tommy.i18n.t('transaction_popup.error_insufficient', { defaultValue: 'Sorry. Your Tommy account balance is insufficient. Please use other payment methods' }),
+          }));
+          if (transaction.cache.onError) transaction.cache.onError(transactionDetails);
+        }
+      }, (error) => {
+        const transactionDetails = Object.assign({}, data, { status: 'failed' });
+        transaction.hideLoader();
+        transaction.cache.transactionDetails = transactionDetails;
+        transaction.renderError(error);
+        if (transaction.cache.onError) transaction.cache.onError(error);
       }
-    }).catch((error) => {
-      const transactionDetails = Object.assign({}, data, { status: 'failed' });
-      transaction.hideLoader();
-      transaction.cache.transactionDetails = transactionDetails;
-      transaction.renderError(error);
-      if (transaction.cache.onError) transaction.cache.onError();
-    });
+    );
   },
   viewReport() {
     const { f7 } = tommy.app;
@@ -113,12 +116,12 @@ const transaction = {
   render() {
     const { f7 } = tommy.app;
     const { $popup, params } = transaction.cache;
-    const { addon_id, addon_install_id, payee_name, amount, currency } = params;
+    const { addon, addon_id, addon_install_id, payee_name, amount, currency } = params;
 
     transaction.showLoader();
 
     // get wallet cards
-    api.getWalletCards().then((cards) => {
+    API.getWalletCards().then((cards) => {
       const multiple = cards.length > 1;
       let { id: wallet_card_id, wallet_account_id, name: card_name } = cards[0];
       const html = tommy.tplManager.render('wallet__transactionPopupDetails', {
@@ -143,6 +146,7 @@ const transaction = {
       });
       $popup.once('click', '.transaction-popup-confirm-button', () => {
         transaction.createTransaction({
+          addon,
           addon_id,
           addon_install_id,
           payee_name,

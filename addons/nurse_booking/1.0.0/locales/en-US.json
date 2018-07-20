@@ -1,0 +1,74 @@
+{
+  "index": {
+    "title": "Nurse Booking",
+    "vip_label": "VIP",
+    "nursing_label": "Nursing",
+    "cleaning_label": "Cleaning",
+    "massage_label": "Massage",
+    "booking_label": "Booking",
+    "wallet_label": "Wallet"
+  },
+  "vip": {
+    "info": "Upgrade to a VIP package for great value extrude",
+    "current_plan_badge": "Current Plan",
+    "recommended_plan_badge": "Recommended",
+    "plan_green": "Green",
+    "plan_gold": "Gold",
+    "plan_platinum": "Platinum",
+    "details_plan_inclusion": "Plan Inclusion",
+    "details_administration": "Administration"
+  },
+  "service_list": {
+    "nursing_title": "Nursing",
+    "cleaning_title": "Cleaning",
+    "massage_title": "Massage"
+  },
+  "service_details": {
+    "service_details_label": "Service details",
+    "book_button": "Book now"
+  },
+  "coupon_picker": {
+    "text": "You have available coupons that you can choose to use.",
+    "use_label": "Use",
+    "skip_button": "Skip",
+    "confirm_button": "Confirm"
+  },
+  "location": {
+    "title": "Address",
+    "default_label": "default",
+    "select_button": "Select",
+    "add_button": "Add New Address",
+    "city_placeholder": "Enter your city",
+    "address_placeholder": "Enter your address",
+    "set_default_label": "Set as default address",
+    "save_button": "Save",
+    "not_available": "Tuome is not available in your area yet. Invite your friends to install Tuome. The more who express interest the quicker we will open new regions."
+  },
+  "date_time": {
+    "title": "Date & Time",
+    "determine_button": "Determine",
+    "week_days": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  },
+  "nurse_list": {
+    "title": "Nurse"
+  },
+  "order_confirm": {
+    "title": "Confirm Order",
+    "coupons_label": "Coupons",
+    "total_label": "Total",
+    "pay_button": "Payment now"
+  },
+  "order_success": {
+    "title": "Appointment is successful",
+    "details_button": "Check order details",
+    "home_button": "Return to home page "
+  },
+  "order_details": {
+    "title": "Order Details",
+    "service_label": "Service",
+    "time_label": "Time",
+    "coupons_label": "Coupons",
+    "total_label": "Total",
+    "payment_label": "Payment"
+  }
+}
