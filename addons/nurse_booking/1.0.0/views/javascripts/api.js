@@ -1,4 +1,5 @@
-const api = window.tommy.api;
+const tommy = window.tommy;
+const api = tommy.api;
 
 const API = {
   cache: {
@@ -9,7 +10,7 @@ const API = {
   },
   getServiceList(categoryId) {
     return api.call({
-      endpoint: `vendors/${window.tommy.config.getCurrentTeamId()}/products`,
+      endpoint: `vendors/${tommy.config.getCurrentTeamId()}/products`,
       method: 'GET',
       data: {}
     }).then((data) => {
@@ -19,7 +20,7 @@ const API = {
   },
   getCouponList(categoryId) {
     return api.call({
-      endpoint: `vendors/${window.tommy.config.getCurrentTeamId()}/coupons`,
+      endpoint: `vendors/${tommy.config.getCurrentTeamId()}/coupons`,
       method: 'GET',
       data: {}
     }).then((data) => {
@@ -32,7 +33,7 @@ const API = {
       endpoint: 'addons/nurse_booking/install/settings/locations',
       method: 'GET',
     }).then((res) => {
-      API.cache.locations = res.data && res.data.locations ? res.data.locations : [];
+      API.cache.locations = res && res.data && res.data.locations ? res.data.locations : [];
       return API.cache.locations;
     });
   },
@@ -67,7 +68,7 @@ const API = {
   },
   sendOrder(data) {
     return api.call({
-      endpoint: `vendors/${window.tommy.config.getCurrentTeamId()}/orders`,
+      endpoint: `vendors/${tommy.config.getCurrentTeamId()}/orders`,
       method: 'POST',
       data,
     });
