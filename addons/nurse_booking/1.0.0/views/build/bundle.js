@@ -4,7 +4,8 @@
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-var api = window.tommy.api;
+var tommy = window.tommy;
+var api = tommy.api;
 
 var API = {
   cache: {
@@ -15,7 +16,7 @@ var API = {
   },
   getServiceList: function getServiceList(categoryId) {
     return api.call({
-      endpoint: 'vendors/' + window.tommy.config.getCurrentTeamId() + '/products',
+      endpoint: 'vendors/' + tommy.config.getCurrentTeamId() + '/products',
       method: 'GET',
       data: {}
     }).then(function (data) {
@@ -25,7 +26,7 @@ var API = {
   },
   getCouponList: function getCouponList(categoryId) {
     return api.call({
-      endpoint: 'vendors/' + window.tommy.config.getCurrentTeamId() + '/coupons',
+      endpoint: 'vendors/' + tommy.config.getCurrentTeamId() + '/coupons',
       method: 'GET',
       data: {}
     }).then(function (data) {
@@ -38,7 +39,7 @@ var API = {
       endpoint: 'addons/nurse_booking/install/settings/locations',
       method: 'GET'
     }).then(function (res) {
-      API.cache.locations = res.data && res.data.locations ? res.data.locations : [];
+      API.cache.locations = res && res.data && res.data.locations ? res.data.locations : [];
       return API.cache.locations;
     });
   },
@@ -73,7 +74,7 @@ var API = {
   },
   sendOrder: function sendOrder(data) {
     return api.call({
-      endpoint: 'vendors/' + window.tommy.config.getCurrentTeamId() + '/orders',
+      endpoint: 'vendors/' + tommy.config.getCurrentTeamId() + '/orders',
       method: 'POST',
       data: data
     });
@@ -362,7 +363,9 @@ var OrderConfirmController = {
   },
   onBeforeIn: function onBeforeIn(page) {
     if (page.from === 'left') {
-      OrderConfirmController.render();
+      setTimeout(function () {
+        OrderConfirmController.render();
+      }, 0);
     }
   },
   render: function render() {
@@ -392,6 +395,7 @@ var OrderConfirmController = {
     var total = service.price - (coupon ? coupon.amount : 0);
 
     tommy.initWalletTransaction({
+      addon: 'nurse_booking',
       addon_id: 33,
       addon_install_id: 8640,
       payee_name: service.name,

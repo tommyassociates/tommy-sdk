@@ -38,7 +38,9 @@ const OrderConfirmController = {
   },
   onBeforeIn(page) {
     if (page.from === 'left') {
-      OrderConfirmController.render();
+      setTimeout(() => {
+        OrderConfirmController.render();
+      }, 0);
     }
   },
   render() {
