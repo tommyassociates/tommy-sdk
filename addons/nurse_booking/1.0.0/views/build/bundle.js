@@ -396,8 +396,8 @@ var OrderConfirmController = {
 
     tommy.initWalletTransaction({
       addon: 'nurse_booking',
-      addon_id: 33,
-      addon_install_id: 8640,
+      // addon_id: 33,
+      // addon_install_id: 8640,
       payee_name: service.name,
       currency: 'CNY',
       amount: total
