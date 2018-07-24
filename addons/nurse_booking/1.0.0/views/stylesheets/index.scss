@@ -1033,7 +1033,7 @@ $yellow: #FF7B00;
     color: #5FA81A;
     margin-right: 5px;
   }
-  .list-block:not(.list-block-prices) {
+  .list-block {
     ul {
       &:before, &:after {
         display: none;
