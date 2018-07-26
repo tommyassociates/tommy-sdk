@@ -37,6 +37,15 @@ const API = {
       data: {
         card_id: cardId,
       }
+    }).then((items) => {
+      return items.sort((a, b) => {
+        const aDate = new Date(a.paid_at).getTime();
+        const bDate = new Date(b.paid_at).getTime();
+        if (bDate > aDate) {
+          return 1;
+        }
+        return -1;
+      })
     });
   },
   getWalletTransaction(transactionId) {
