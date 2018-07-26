@@ -22,14 +22,14 @@
 <script id="nurse_booking__dateTimeDatesTemplate" type="text/template">
   {{#each dates}}
     {{#if today}}
-      <label class="date-time-date">
-        <input type="radio" value="{{value}}" name="date-time-date" checked>
+      <label class="date-time-date {{#if disabled}}date-time-date-disabled{{/if}}">
+        <input type="radio" value="{{value}}" name="date-time-date" {{#if checked}}checked{{/if}} {{#if disabled}}disabled{{/if}}>
         <div class="date-time-date-num">{{day}}.{{month}}</div>
         <div class="date-time-date-day">Today</div>
       </label>
     {{else}}
       <label class="date-time-date">
-        <input type="radio" value={{value}} name="date-time-date">
+        <input type="radio" value={{value}} name="date-time-date" {{#if checked}}checked{{/if}}>
         <div class="date-time-date-num">{{day}}.{{month}}</div>
         <div class="date-time-date-day">{{weekDay}}</div>
       </label>

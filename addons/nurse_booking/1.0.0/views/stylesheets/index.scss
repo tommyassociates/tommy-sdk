@@ -49,6 +49,10 @@ $yellow: #FF7B00;
       background-position: center;
       background-repeat: no-repeat;
     }
+    .swiper-pagination {
+      z-index: 100;
+      -webkit-backface-visibility: hidden;
+    }
     .swiper-pagination-bullet {
       background: rgba(255,255,255,1);
       border: 1px solid #999;
@@ -391,6 +395,10 @@ $yellow: #FF7B00;
     .swiper-slide {
       background-size: cover;
       background-position: center top;
+    }
+    .swiper-pagination {
+      z-index: 100;
+      -webkit-backface-visibility: hidden;
     }
     .swiper-pagination-bullet {
       background: #fff;
@@ -792,6 +800,10 @@ $yellow: #FF7B00;
       + .date-time-date {
         margin-left: 22px;
       }
+    }
+    .date-time-date-disabled {
+      pointer-events: none;
+      opacity: 0.5;
     }
     .date-time-date-num {
       width: 58px;
