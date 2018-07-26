@@ -33,10 +33,6 @@ const LocationController = {
       (service.data.available_in || service.data.availabile_in || []).forEach((availableCity) => {
         if (availableCity.toLowerCase() === city.toLowerCase()) available = true;
       });
-      if (!available) {
-        f7.alert(tommy.i18n.t('location.not_available'));
-        return;
-      }
       API.addLocation({ city, address, default: isDefault }).then(() => {
         LocationController.render();
       });

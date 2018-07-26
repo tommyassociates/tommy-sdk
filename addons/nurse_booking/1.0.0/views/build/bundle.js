@@ -122,9 +122,11 @@ var DateTimeController = {
     });
   },
   renderDates: function renderDates() {
-    var now = new Date().getTime();
+    var nowDate = new Date();
+    var now = nowDate.getTime();
     var dates = [];
 
+    var todayDisabled = void 0;
     for (var i = 0; i <= 13; i += 1) {
       var date = new Date(now + i * 24 * 60 * 60 * 1000);
       var month = date.getMonth() + 1;
@@ -132,14 +134,23 @@ var DateTimeController = {
       if (day < 10) day = '0' + day;
       if (month < 10) month = '0' + month;
       var weekDay = date.getDay();
+      var today = i === 0;
+      var disabled = today ? nowDate.getHours() >= 19 : false;
+      if (disabled) {
+        todayDisabled = true;
+      }
+      var checked = todayDisabled ? i === 1 : today;
       dates.push({
+        disabled: disabled,
         value: new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime(),
         day: day,
         month: month,
         weekDay: tommy.i18n.t('date_time.week_days.' + weekDay),
-        today: i === 0
+        today: today,
+        checked: checked
       });
     };
+
     tommy.tplManager.renderInline('nurse_booking__dateTimeDatesTemplate', { dates: dates });
   },
   renderHours: function renderHours() {
@@ -151,6 +162,10 @@ var DateTimeController = {
     var wasChecked = void 0;
     if (today.getFullYear() === date.getFullYear() && today.getMonth() === date.getMonth() && today.getDate() === date.getDate()) {
       isToday = true;
+    }
+    if (isToday && today.getHours() >= 19) {
+      DateTimeController.renderHours(new Date(today.getTime() + 24 * 60 * 60 * 1000));
+      return;
     }
     for (var i = 10; i <= 19; i += 1) {
       var disabled = isToday ? today.getHours() >= i : false;
@@ -257,10 +272,6 @@ var LocationController = {
       (service.data.available_in || service.data.availabile_in || []).forEach(function (availableCity) {
         if (availableCity.toLowerCase() === city.toLowerCase()) available = true;
       });
-      if (!available) {
-        f7.alert(tommy.i18n.t('location.not_available'));
-        return;
-      }
       _api2.default.addLocation({ city: city, address: address, default: isDefault }).then(function () {
         LocationController.render();
       });
