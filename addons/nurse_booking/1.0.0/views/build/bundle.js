@@ -392,6 +392,7 @@ var OrderConfirmController = {
     var total = service.price - (coupon ? coupon.amount : 0);
 
     tommy.initWalletTransaction({
+      addon: 'nurse_booking',
       addon_id: 33,
       addon_install_id: 8640,
       payee_name: service.name,

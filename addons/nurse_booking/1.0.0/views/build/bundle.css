@@ -36,6 +36,9 @@
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat; }
+    .page#nurse_booking__index .swiper-container .swiper-pagination {
+      z-index: 100;
+      -webkit-backface-visibility: hidden; }
     .page#nurse_booking__index .swiper-container .swiper-pagination-bullet {
       background: white;
       border: 1px solid #999;
@@ -324,6 +327,9 @@
   .page#nurse_booking__service-details .service-details-header .swiper-container .swiper-slide {
     background-size: cover;
     background-position: center top; }
+  .page#nurse_booking__service-details .service-details-header .swiper-container .swiper-pagination {
+    z-index: 100;
+    -webkit-backface-visibility: hidden; }
   .page#nurse_booking__service-details .service-details-header .swiper-container .swiper-pagination-bullet {
     background: #fff;
     border: 1px solid #979797;
@@ -656,6 +662,9 @@
       display: none; }
     .page#nurse_booking__date-time .date-time-dates .date-time-date + .date-time-date {
       margin-left: 22px; }
+  .page#nurse_booking__date-time .date-time-dates .date-time-date-disabled {
+    pointer-events: none;
+    opacity: 0.5; }
   .page#nurse_booking__date-time .date-time-dates .date-time-date-num {
     width: 58px;
     height: 58px;
@@ -860,27 +869,27 @@
   .page#nurse_booking__order-details .location-default-badge {
     color: #5FA81A;
     margin-right: 5px; }
-  .page#nurse_booking__order-confirm .list-block:not(.list-block-prices) ul:before, .page#nurse_booking__order-confirm .list-block:not(.list-block-prices) ul:after,
-  .page#nurse_booking__order-details .list-block:not(.list-block-prices) ul:before,
-  .page#nurse_booking__order-details .list-block:not(.list-block-prices) ul:after {
+  .page#nurse_booking__order-confirm .list-block ul:before, .page#nurse_booking__order-confirm .list-block ul:after,
+  .page#nurse_booking__order-details .list-block ul:before,
+  .page#nurse_booking__order-details .list-block ul:after {
     display: none; }
-  .page#nurse_booking__order-confirm .list-block:not(.list-block-prices) .item-inner,
-  .page#nurse_booking__order-details .list-block:not(.list-block-prices) .item-inner {
+  .page#nurse_booking__order-confirm .list-block .item-inner,
+  .page#nurse_booking__order-details .list-block .item-inner {
     padding-top: 12px;
     padding-bottom: 12px; }
-  .page#nurse_booking__order-confirm .list-block:not(.list-block-prices) .item-media,
-  .page#nurse_booking__order-details .list-block:not(.list-block-prices) .item-media {
+  .page#nurse_booking__order-confirm .list-block .item-media,
+  .page#nurse_booking__order-details .list-block .item-media {
     width: 36px;
     text-align: center;
     justify-content: center; }
-  .page#nurse_booking__order-confirm .list-block:not(.list-block-prices) .item-title,
-  .page#nurse_booking__order-details .list-block:not(.list-block-prices) .item-title {
+  .page#nurse_booking__order-confirm .list-block .item-title,
+  .page#nurse_booking__order-details .list-block .item-title {
     font-size: 24px;
     font-weight: 500;
     white-space: normal;
     line-height: 1.2; }
-  .page#nurse_booking__order-confirm .list-block:not(.list-block-prices) .item-link .item-inner,
-  .page#nurse_booking__order-details .list-block:not(.list-block-prices) .item-link .item-inner {
+  .page#nurse_booking__order-confirm .list-block .item-link .item-inner,
+  .page#nurse_booking__order-details .list-block .item-link .item-inner {
     background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg%20viewBox%3D'0%200%2060%20120'%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%3E%3Cpath%20d%3D'm60%2061.5-38.25%2038.25-9.75-9.75%2029.25-28.5-29.25-28.5%209.75-9.75z'%20fill%3D'%23c7c7cc'%2F%3E%3C%2Fsvg%3E"); }
   .page#nurse_booking__order-confirm .list-block:not(.list-block-prices) .item-after,
   .page#nurse_booking__order-details .list-block:not(.list-block-prices) .item-after {
