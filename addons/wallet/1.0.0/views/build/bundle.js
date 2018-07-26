@@ -671,7 +671,8 @@ var transaction = {
     var _transaction$cache2 = transaction.cache,
         $popup = _transaction$cache2.$popup,
         params = _transaction$cache2.params;
-    var addon_id = params.addon_id,
+    var addon = params.addon,
+        addon_id = params.addon_id,
         addon_install_id = params.addon_install_id,
         payee_name = params.payee_name,
         amount = params.amount,
@@ -710,6 +711,7 @@ var transaction = {
       });
       $popup.once('click', '.transaction-popup-confirm-button', function () {
         transaction.createTransaction({
+          addon: addon,
           addon_id: addon_id,
           addon_install_id: addon_install_id,
           payee_name: payee_name,
