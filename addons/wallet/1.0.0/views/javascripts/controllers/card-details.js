@@ -6,8 +6,8 @@ const CardDetailsController = {
     if (name) {
       $$(page.navbarInnerContainer).find('.center').text(name);
     }
-    API.getWalletTransactions(id).then((data) => {
-      window.tommy.tplManager.renderInline('wallet__transactionsListTemplate', { items: data }, page.container);
+    API.getWalletTransactions(id).then((items) => {
+      window.tommy.tplManager.renderInline('wallet__transactionsListTemplate', { items }, page.container);
     });
   },
   uninit () {},

@@ -50,6 +50,15 @@ var API = {
       data: {
         card_id: cardId
       }
+    }).then(function (items) {
+      return items.sort(function (a, b) {
+        var aDate = new Date(a.paid_at).getTime();
+        var bDate = new Date(b.paid_at).getTime();
+        if (bDate > aDate) {
+          return 1;
+        }
+        return -1;
+      });
     });
   },
   getWalletTransaction: function getWalletTransaction(transactionId) {
@@ -95,8 +104,8 @@ var CardDetailsController = {
     if (name) {
       $$(page.navbarInnerContainer).find('.center').text(name);
     }
-    _api2.default.getWalletTransactions(id).then(function (data) {
-      window.tommy.tplManager.renderInline('wallet__transactionsListTemplate', { items: data }, page.container);
+    _api2.default.getWalletTransactions(id).then(function (items) {
+      window.tommy.tplManager.renderInline('wallet__transactionsListTemplate', { items: items }, page.container);
     });
   },
   uninit: function uninit() {}
@@ -671,7 +680,8 @@ var transaction = {
     var _transaction$cache2 = transaction.cache,
         $popup = _transaction$cache2.$popup,
         params = _transaction$cache2.params;
-    var addon_id = params.addon_id,
+    var addon = params.addon,
+        addon_id = params.addon_id,
         addon_install_id = params.addon_install_id,
         payee_name = params.payee_name,
         amount = params.amount,
@@ -710,6 +720,7 @@ var transaction = {
       });
       $popup.once('click', '.transaction-popup-confirm-button', function () {
         transaction.createTransaction({
+          addon: addon,
           addon_id: addon_id,
           addon_install_id: addon_install_id,
           payee_name: payee_name,
