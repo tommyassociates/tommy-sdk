@@ -1,0 +1,248 @@
+<script id="nurse_bookink__couponPickerTemplate" type="text/template">
+  <div class="nurse_booking-coupon-picker">
+    <div class="coupon-picker-img">
+      <img src="{{addonAssetUrl "views/images/coupon-picker.svg"}}">
+    </div>
+    <div class="coupon-picker-text">{{t "coupon_picker.text"}}</div>
+    <div class="coupon-picker-items">
+      {{#each coupons}}
+        <label>
+          <input type="radio" name="nurse_booking-coupon-picker-radio" value="{{id}}" {{#if checked}}checked{{/if}}>
+          <div class="coupon-item-content">
+            <div class="coupon-item-title">¥ {{amount}}</div>
+            <div class="coupon-item-name">{{name}}</div>
+            <div class="coupon-item-date">{{formatDate expires_at "D MMM YYYY"}}</div>
+          </div>
+          <div class="coupon-item-label">{{t "coupon_picker.use_label"}}</div>
+        </label>
+      {{/each}}
+    </div>
+  </div>
+</script>
+<script id="nurse_booking__dateTimeDatesTemplate" type="text/template">
+  {{#each dates}}
+    {{#if today}}
+      <label class="date-time-date {{#if disabled}}date-time-date-disabled{{/if}}">
+        <input type="radio" value="{{value}}" name="date-time-date" {{#if checked}}checked{{/if}} {{#if disabled}}disabled{{/if}}>
+        <div class="date-time-date-num">{{day}}.{{month}}</div>
+        <div class="date-time-date-day">Today</div>
+      </label>
+    {{else}}
+      <label class="date-time-date">
+        <input type="radio" value={{value}} name="date-time-date" {{#if checked}}checked{{/if}}>
+        <div class="date-time-date-num">{{day}}.{{month}}</div>
+        <div class="date-time-date-day">{{weekDay}}</div>
+      </label>
+    {{/if}}
+  {{/each}}
+</script>
+<script id="nurse_booking__dateTimeHoursTemplate" type="text/template">
+  {{#each hours}}
+    <label class="date-time-hour {{#if disabled}}disabled{{/if}}">
+      <input type="radio" value="{{value}}" name="date-time-hours" {{#if checked}}checked{{/if}} {{#if disabled}}disabled{{/if}}>
+      <span>{{hour}}</span>
+    </label>
+  {{/each}}
+</script>
+<script id="nurse_booking__locationsTemplate" type="text/template">
+  {{#if locations.length}}
+    {{#each locations}}
+      <div class="location-card">
+        <i class="location-card-icon"></i>
+        <div class="location-card-title">
+          {{#if default}}
+          <span class="location-card-default-badge">[{{t "location.default_label"}}]</span>
+          {{/if}}
+          {{city}} {{address}}
+        </div>
+        <a href="#" class="location-delete-button" data-location-index="{{@index}}"></a>
+        <a href="#" class="location-card-button location-select-button" data-location-index="{{@index}}">{{t "location.select_button"}}</a>
+      </div>
+    {{/each}}
+    <a href="#" class="location-add-button">{{t "location.add_button"}}</a>
+  {{else}}
+    <div class="location-card location-add-form">
+      <input type="text" name="city" placeholder="{{t "location.city_placeholder"}}" />
+      <textarea type="text" name="address" placeholder="{{t "location.address_placeholder"}}"></textarea>
+      <label>
+        <input type="checkbox" name="default">
+        <i class="framework7-icons">check</i>
+        <span>{{t "location.set_default_label"}}</span>
+      </label>
+      <a href="#" class="location-card-button location-save-button">{{t "location.save_button"}}</a>
+    </div>
+  {{/if}}
+</script>
+<script id="nurse_booking__orderConfirmTemplate" type="text/template">
+  <a class="nurse_booking__toolbar-button service-book-button order-confirm-pay-button">{{t "order_confirm.pay_button"}}</a>
+  <div class="page-content">
+    <div class="service-details-block">
+      <div class="service-image" style="background-image: url({{addonAssetUrl "views/images/demo-package.png"}})"></div>
+      <div class="service-details">
+        <div class="service-title">{{service.name}}</div>
+        <div class="service-price">¥{{service.price}}</div>
+      </div>
+    </div>
+    <div class="list-block">
+      <ul>
+        <li class="item-content">
+          <div class="item-media">
+            <img src="{{addonAssetUrl "views/images/icon-time.svg"}}" alt="">
+          </div>
+          <div class="item-inner">
+            <div class="item-title">{{formatDate date "MMMM D, YYYY HH:mm"}}</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="list-block">
+      <ul>
+        <li class="item-content">
+          <div class="item-media">
+            <img src="{{addonAssetUrl "views/images/icon-user.svg"}}" alt="">
+          </div>
+          <div class="item-inner">
+            <div class="item-title">{{user.first_name}} {{user.last_name}}</div>
+          </div>
+        </li>
+        {{#if user.mobile}}
+        <li class="item-content">
+          <div class="item-media">
+            <img src="{{addonAssetUrl "views/images/icon-phone.svg"}}" alt="">
+          </div>
+          <div class="item-inner">
+            <div class="item-title">{{user.mobile}}</div>
+          </div>
+        </li>
+        {{/if}}
+        <li>
+          <a href="#" class="item-content item-link order-confirm-select-location">
+            <div class="item-media">
+              <img src="{{addonAssetUrl "views/images/icon-location.svg"}}" alt="">
+            </div>
+            <div class="item-inner">
+              <div class="item-title">{{#if location.default}}<span class="location-default-badge">[{{t "location.default_label"}}]</span>{{/if}}{{location.city}} {{location.address}}</div>
+            </div>
+          </a>
+        </li>
+      </ul>
+    </div>
+    <div class="list-block list-block-prices">
+      <ul>
+        {{#if coupon}}
+        <li>
+          <a href="#" class="item-content item-link order-confirm-select-coupon">
+            <div class="item-inner">
+              <div class="item-title">{{t "order_confirm.coupons_label"}}</div>
+              <div class="item-after">-¥{{coupon.amount}}</div>
+            </div>
+          </a>
+        </li>
+        {{/if}}
+        <li class="item-content item-total-price">
+          <div class="item-inner">
+              <div class="item-title">{{t "order_confirm.total_label"}}:</div>
+            <div class="item-after">¥{{total}}</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+</script>
+<script id="nurse_booking__orderDetailsTemplate" type="text/template">
+  <div class="page-content">
+    <div class="list-block">
+      <ul>
+        <li class="item-content">
+          <div class="item-inner">
+            <div class="item-title">{{t "order_details.service_label"}}:</div>
+            <div class="item-after">{{service.name}}</div>
+          </div>
+        </li>
+        <li class="item-content">
+          <div class="item-inner">
+            <div class="item-title">{{t "order_details.time_label"}}:</div>
+            <div class="item-after">{{formatDate date "MMMM D, YYYY HH:mm"}}</div>
+          </div>
+        </li>
+        {{#if coupon}}
+        <li class="item-content">
+          <div class="item-inner">
+            <div class="item-title">{{t "order_details.coupons_label"}}:</div>
+            <div class="item-after price">-¥{{coupon.amount}}</div>
+          </div>
+        </li>
+        {{/if}}
+        <li class="item-content item-total-price">
+          <div class="item-inner">
+              <div class="item-title">{{t "order_details.total_label"}}:</div>
+            <div class="item-after price">¥{{total}}</div>
+          </div>
+        </li>
+        <li class="item-content item-total-price">
+          <div class="item-inner">
+              <div class="item-title">{{t "order_details.payment_label"}}:</div>
+            <div class="item-after">{{transaction.card_name}}</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+</script>
+<script id="nurse_booking__serviceDetailsTemplate" type="text/template">
+  <a class="nurse_booking__toolbar-button service-book-button" data-service-id="{{service.id}}">{{t "service_details.book_button"}}</a>
+  <div class="page-content">
+    <div class="service-details-header">
+      <div class="swiper-container">
+        <div class="swiper-wrapper">
+          <div class="swiper-slide" style="background-image: url({{addonAssetUrl "views/images/demo-package.png"}})"></div>
+          <div class="swiper-slide" style="background-image: url({{addonAssetUrl "views/images/demo-package.png"}})"></div>
+          <div class="swiper-slide" style="background-image: url({{addonAssetUrl "views/images/demo-package.png"}})"></div>
+        </div>
+        <div class="swiper-pagination"></div>
+      </div>
+    </div>
+    <div class="service-details-meta">
+      <div class="service-details-meta-wrap">
+        <div class="service-details-meta-left">
+          <div class="service-details-title">{{service.name}}</div>
+          <div class="service-details-duration">{{service.data.duration}}min</div>
+        </div>
+        <div class="service-details-price">¥ {{service.price}}</div>
+      </div>
+      {{#if service.coupons.length}}
+      <a class="service-details-coupons-link" data-service-id="{{service.id}}"><span>{{service.coupons.length}} coupons available</span></a>
+      {{/if}}
+    </div>
+    <div class="service-details-content">
+      <div class="service-details-label">{{t "service_details.service_details_label"}}:</div>
+      <div class="service-details-text">
+        <p>
+          {{service.description}}
+        </p>
+      </div>
+    </div>
+  </div>
+</script>
+<script id="nurse_booking__serviceListTemplate" type="text/template">
+  <div class="service-cards swiper-container">
+    <div class="swiper-wrapper">
+      {{#each services}}
+      <div class="swiper-slide">
+        <a href="{{addonAssetUrl "views/service-details.html"}}?id={{id}}" class="service-card">
+          <div class="service-card-pic" style="background-image:url({{addonAssetUrl "views/images/demo-package.png"}})"></div>
+          <div class="service-card-content">
+            <div class="service-card-title">{{name}}</div>
+            <div class="service-card-duration">{{data.duration}}min</div>
+            {{#if coupons.length}}
+            <div class="service-card-coupons">{{coupons.length}} Coupons</div>
+            {{else}}
+            <div class="service-card-price">¥ {{price}}</div>
+            {{/if}}
+          </div>
+        </a>
+      </div>
+      {{/each}}
+    </div>
+  </div>
+</script>
