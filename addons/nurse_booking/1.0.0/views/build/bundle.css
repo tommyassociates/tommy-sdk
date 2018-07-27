@@ -36,6 +36,9 @@
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat; }
+    .page#nurse_booking__index .swiper-container .swiper-pagination {
+      z-index: 100;
+      -webkit-backface-visibility: hidden; }
     .page#nurse_booking__index .swiper-container .swiper-pagination-bullet {
       background: white;
       border: 1px solid #999;
@@ -324,6 +327,9 @@
   .page#nurse_booking__service-details .service-details-header .swiper-container .swiper-slide {
     background-size: cover;
     background-position: center top; }
+  .page#nurse_booking__service-details .service-details-header .swiper-container .swiper-pagination {
+    z-index: 100;
+    -webkit-backface-visibility: hidden; }
   .page#nurse_booking__service-details .service-details-header .swiper-container .swiper-pagination-bullet {
     background: #fff;
     border: 1px solid #979797;
@@ -656,6 +662,9 @@
       display: none; }
     .page#nurse_booking__date-time .date-time-dates .date-time-date + .date-time-date {
       margin-left: 22px; }
+  .page#nurse_booking__date-time .date-time-dates .date-time-date-disabled {
+    pointer-events: none;
+    opacity: 0.5; }
   .page#nurse_booking__date-time .date-time-dates .date-time-date-num {
     width: 58px;
     height: 58px;
