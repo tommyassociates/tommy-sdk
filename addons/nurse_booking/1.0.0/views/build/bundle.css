@@ -37,14 +37,17 @@
       background-position: center;
       background-repeat: no-repeat; }
     .page#nurse_booking__index .swiper-container .swiper-pagination {
-      z-index: 100;
+      z-index: 100 !important;
       -webkit-backface-visibility: hidden; }
     .page#nurse_booking__index .swiper-container .swiper-pagination-bullet {
       background: white;
       border: 1px solid #999;
-      opacity: 0.5; }
+      opacity: 0.5 !important;
+      width: 10px !important;
+      height: 10px !important;
+      margin: 0 5px !important; }
     .page#nurse_booking__index .swiper-container .swiper-pagination-bullet-active {
-      opacity: 1; }
+      opacity: 1 !important; }
   .page#nurse_booking__index .sections {
     overflow: hidden;
     font-size: 0;
@@ -328,17 +331,20 @@
     background-size: cover;
     background-position: center top; }
   .page#nurse_booking__service-details .service-details-header .swiper-container .swiper-pagination {
-    z-index: 100;
+    z-index: 100 !important;
     -webkit-backface-visibility: hidden; }
   .page#nurse_booking__service-details .service-details-header .swiper-container .swiper-pagination-bullet {
     background: #fff;
+    width: 10px !important;
+    height: 10px !important;
+    margin: 0 5px !important;
     border: 1px solid #979797;
-    opacity: 0.8;
+    opacity: 0.8 !important;
     box-sizing: border-box; }
   .page#nurse_booking__service-details .service-details-header .swiper-container .swiper-pagination-bullet-active {
     background: #FF5413;
     border: none;
-    opacity: 1; }
+    opacity: 1 !important; }
 .page#nurse_booking__service-details .service-details-meta {
   background: #fff;
   padding: 15px 12px 15px;
