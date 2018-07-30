@@ -31,7 +31,9 @@
         <li class="item-content item-total-price">
           <div class="item-inner">
               <div class="item-title">{{t "order_details.payment_label"}}:</div>
+            {{#if transaction}}
             <div class="item-after">{{transaction.card_name}}</div>
+            {{/if}}
           </div>
         </li>
       </ul>

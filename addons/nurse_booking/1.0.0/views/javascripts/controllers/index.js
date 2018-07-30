@@ -17,7 +17,7 @@ const IndexController = {
   uninit () {
     IndexController.page = null;
     delete IndexController.page;
-    console.log('uninitialize wallet addon')
+    console.log('uninitialize nurse booking addon')
   },
 };
 

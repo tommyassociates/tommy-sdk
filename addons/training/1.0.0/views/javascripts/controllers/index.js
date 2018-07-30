@@ -1,5 +1,3 @@
-import API from '../api'
-
 const IndexController = {
   init (page) {
     console.log('initialize training addon')
@@ -11,7 +9,7 @@ const IndexController = {
   uninit () {
     IndexController.page = null;
     delete IndexController.page;
-    console.log('uninitialize wallet addon')
+    console.log('uninitialize training addon')
   },
 };
 
