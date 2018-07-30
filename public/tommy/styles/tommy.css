@@ -1434,7 +1434,7 @@ textarea.unstyled {
   pointer-events: none;
 }
 .navbar .save.toggle.active-state {
-  opacity: 0;
+  opacity: 0.3;
 }
 .navbar .save.toggle.active {
   /*visibility: visible;*/
