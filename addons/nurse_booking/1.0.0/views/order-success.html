@@ -12,7 +12,7 @@
         <img src="{{addonAssetUrl "views/images/order-success.svg"}}">
       </div>
       <div class="order-success-buttons">
-        <a class="open-order-details" href="{{addonAssetUrl "views/order-details.html"}}">{{t "order_success.details_button"}}</a>
+        <a class="open-order-details" href="{{addonAssetUrl "views/order-details.html"}}&backToHome=true&id={{url_query.id}}">{{t "order_success.details_button"}}</a>
         <a class="open-home-page" href="{{addonAssetUrl "views/index.html"}}">{{t "order_success.home_button"}}</a>
       </div>
     </div>
