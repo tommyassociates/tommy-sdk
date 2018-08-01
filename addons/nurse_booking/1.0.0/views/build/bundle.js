@@ -613,6 +613,7 @@ var OrderDetailsController = {
     // pay as usual
     var order = OrderDetailsController.order;
     (0, _payOrder3.default)({
+      orderId: order.id,
       productName: order.name,
       productId: order.vendor_product_id,
       total: order.total,
@@ -1127,6 +1128,7 @@ Object.defineProperty(exports, "__esModule", {
 
 exports.default = function (data) {
   var createNewOrder = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : true;
+  var query = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : '';
   var productName = data.productName,
       productId = data.productId,
       total = data.total,
@@ -1134,7 +1136,8 @@ exports.default = function (data) {
       discount = _data$discount === undefined ? 0 : _data$discount,
       location = data.location,
       date = data.date,
-      couponId = data.couponId;
+      couponId = data.couponId,
+      orderId = data.orderId;
 
   var f7 = tommy.app.f7;
 
@@ -1167,7 +1170,7 @@ exports.default = function (data) {
       });
     } else {
       _api2.default.cache.booking.transaction = transaction;
-      f7.views.main.loadPage({ url: successUrl + '&id=' + response.id });
+      f7.views.main.loadPage({ url: successUrl + '&id=' + orderId });
     }
   }, function (transaction) {
     if (!transaction.id) return;
@@ -1194,7 +1197,7 @@ exports.default = function (data) {
       });
     } else {
       _api2.default.cache.booking.transaction = transaction;
-      f7.views.main.loadPage({ url: errorUrl + '&id=' + response.id });
+      f7.views.main.loadPage({ url: errorUrl + '&id=' + orderId });
     }
   });
 };

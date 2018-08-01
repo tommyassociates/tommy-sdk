@@ -94,6 +94,7 @@ const OrderDetailsController = {
     // pay as usual
     const order = OrderDetailsController.order;
     payOrder({
+      orderId: order.id,
       productName: order.name,
       productId: order.vendor_product_id,
       total: order.total,
