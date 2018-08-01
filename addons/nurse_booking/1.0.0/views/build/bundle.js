@@ -24,6 +24,14 @@ var API = {
       return data;
     });
   },
+  getServiceDetails: function getServiceDetails(id) {
+    return api.call({
+      endpoint: 'vendors/' + tommy.config.getCurrentTeamId() + '/products/' + id,
+      method: 'GET'
+    }).then(function (data) {
+      return data;
+    });
+  },
   getCouponList: function getCouponList(categoryId) {
     return api.call({
       endpoint: 'vendors/' + tommy.config.getCurrentTeamId() + '/coupons',
@@ -78,6 +86,23 @@ var API = {
       method: 'POST',
       data: data
     });
+  },
+  getOrdersHistory: function getOrdersHistory() {
+    return api.call({
+      endpoint: 'vendors/' + tommy.config.getCurrentTeamId() + '/orders/',
+      method: 'GET'
+    }).then(function (data) {
+      API.cache.orders = data;
+      return data;
+    });
+  },
+  getOrderDetails: function getOrderDetails(id) {
+    return api.call({
+      endpoint: 'vendors/' + tommy.config.getCurrentTeamId() + '/orders/' + id + '?with_wallet_transaction=true ',
+      method: 'GET'
+    }).then(function (data) {
+      return data;
+    });
   }
 };
 
@@ -107,6 +132,7 @@ var DateTimeController = {
   bind: function bind(page) {
     DateTimeController.page = page;
     var $page = $$(page.container);
+    var f7 = tommy.app.f7;
 
     $page.on('change', 'input[name="date-time-date"]', function (e) {
       DateTimeController.renderHours(new Date(parseInt(e.target.value, 10)));
@@ -117,8 +143,12 @@ var DateTimeController = {
 
       _api2.default.cache.booking.date = new Date(parseInt(date, 10)).getTime() + hours * 60 * 60 * 1000;
 
-      var url = tommy.util.addonAssetUrl(Template7.global.currentAddonInstall.package, Template7.global.currentAddonInstall.version, 'views/order-confirm.html', true);
-      tommy.app.f7.views.main.loadPage({ url: url });
+      if (page.query.back) {
+        f7.views.main.back();
+      } else {
+        var url = tommy.util.addonAssetUrl(Template7.global.currentAddonInstall.package, Template7.global.currentAddonInstall.version, 'views/order-confirm.html', true);
+        tommy.app.f7.views.main.loadPage({ url: url });
+      }
     });
   },
   renderDates: function renderDates() {
@@ -204,6 +234,59 @@ var _api2 = _interopRequireDefault(_api);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+var tommy = window.tommy;
+
+var HistoryController = {
+  init: function init(page) {
+    HistoryController.bind(page);
+    HistoryController.loadHistory();
+  },
+  bind: function bind(page) {
+    HistoryController.page = page;
+  },
+  loadHistory: function loadHistory() {
+    var page = HistoryController.page;
+    var $page = $$(page.container);
+    var f7 = tommy.app.f7;
+
+    _api2.default.getOrdersHistory().then(function (orders) {
+      orders.forEach(function (order) {
+        order.statusKey = 'history.status_' + order.status;
+        if (order.data && order.data.date) {
+          if (!Number.isNaN(parseInt(order.data.date, 10))) {
+            order.data.date = parseInt(order.data.date, 10);
+          }
+        }
+      });
+      var ordersSorted = orders.sort(function (a, b) {
+        if (b.id > a.id) return 1;
+        if (b.id < a.id) return -1;
+        return 0;
+      });
+      tommy.tplManager.renderInline('nurse_booking__historyTemplate', { orders: ordersSorted });
+    });
+  },
+  uninit: function uninit() {
+    HistoryController.page = null;
+    delete HistoryController.page;
+  }
+};
+
+exports.default = HistoryController;
+
+},{"../api":1}],4:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _api = require('../api');
+
+var _api2 = _interopRequireDefault(_api);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
 var IndexController = {
   init: function init(page) {
     console.log('initialize nurse booking addon');
@@ -226,7 +309,7 @@ var IndexController = {
 
 exports.default = IndexController;
 
-},{"../api":1}],4:[function(require,module,exports){
+},{"../api":1}],5:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -324,7 +407,7 @@ var LocationController = {
 
 exports.default = LocationController;
 
-},{"../api":1}],5:[function(require,module,exports){
+},{"../api":1}],6:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -338,6 +421,10 @@ var _api2 = _interopRequireDefault(_api);
 var _couponPicker = require('../coupon-picker');
 
 var _couponPicker2 = _interopRequireDefault(_couponPicker);
+
+var _payOrder = require('../pay-order');
+
+var _payOrder2 = _interopRequireDefault(_payOrder);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -355,11 +442,6 @@ var OrderConfirmController = {
 
     var service = _api2.default.cache.booking.service;
 
-
-    var locationUrl = tommy.util.addonAssetUrl(Template7.global.currentAddonInstall.package, Template7.global.currentAddonInstall.version, 'views/location.html', true);
-    $page.on('click', 'a.order-confirm-select-location', function () {
-      f7.views.main.loadPage({ url: locationUrl + '&back=true' });
-    });
 
     $page.on('click', 'a.order-confirm-select-coupon', function () {
       (0, _couponPicker2.default)(service.coupons, function (coupon) {
@@ -402,37 +484,16 @@ var OrderConfirmController = {
         location = _API$cache$booking2.location,
         date = _API$cache$booking2.date;
 
-    var f7 = tommy.app.f7;
     var total = service.price - (coupon ? coupon.amount : 0);
 
-    tommy.initWalletTransaction({
-      addon: 'nurse_booking',
-      // addon_id: 33,
-      // addon_install_id: 8640,
-      payee_name: service.name,
-      currency: 'CNY',
-      amount: total
-    }, function (transaction) {
-
-      var order = {
-        vendor_product_id: service.id,
-        vendor_coupon_id: coupon ? coupon.id : null,
-        wallet_transaction_id: transaction.id,
-        name: service.name,
-        comment: '',
-        data: {
-          location: location,
-          date: date
-        },
-        discount: coupon ? coupon.amount : 0,
-        total: total
-      };
-      _api2.default.sendOrder(order);
-
-      _api2.default.cache.booking.transaction = transaction;
-
-      var successUrl = tommy.util.addonAssetUrl(Template7.global.currentAddonInstall.package, Template7.global.currentAddonInstall.version, 'views/order-success.html', true);
-      f7.views.main.loadPage({ url: successUrl });
+    (0, _payOrder2.default)({
+      productName: service.name,
+      productId: service.id,
+      total: total,
+      couponId: coupon ? coupon.id : null,
+      discount: coupon ? coupon.amount : 0,
+      location: location,
+      date: date
     });
   },
   uninit: function uninit() {
@@ -443,7 +504,7 @@ var OrderConfirmController = {
 
 exports.default = OrderConfirmController;
 
-},{"../api":1,"../coupon-picker":9}],6:[function(require,module,exports){
+},{"../api":1,"../coupon-picker":10,"../pay-order":13}],7:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -454,6 +515,10 @@ var _api = require('../api');
 
 var _api2 = _interopRequireDefault(_api);
 
+var _payOrder2 = require('../pay-order');
+
+var _payOrder3 = _interopRequireDefault(_payOrder2);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 var tommy = window.tommy;
@@ -461,27 +526,104 @@ var tommy = window.tommy;
 var OrderDetailsController = {
   init: function init(page) {
     OrderDetailsController.bind(page);
-    OrderDetailsController.render();
+    OrderDetailsController.loadOrder();
   },
   bind: function bind(page) {
     OrderDetailsController.page = page;
-  },
-  render: function render() {
-    var _API$cache$booking = _api2.default.cache.booking,
-        transaction = _API$cache$booking.transaction,
-        service = _API$cache$booking.service,
-        coupon = _API$cache$booking.coupon,
-        location = _API$cache$booking.location,
-        date = _API$cache$booking.date;
-
-    tommy.tplManager.renderInline('nurse_booking__orderDetailsTemplate', {
-      service: service,
-      coupon: coupon,
-      total: service.price - (coupon ? coupon.amount : 0),
-      location: location,
-      date: date,
-      transaction: transaction
+    var $page = $$(page.container);
+    $page.on('click', '.order-details-pay-button', function () {
+      OrderDetailsController.payOrder();
     });
+    $page.on('click', '.order-details-repeat-button', function () {
+      OrderDetailsController.repeatOrder();
+    });
+    $page.on('click', '.order-details-cancel-button', function () {
+      OrderDetailsController.cancelOrder();
+    });
+  },
+  loadOrder: function loadOrder() {
+    var page = OrderDetailsController.page;
+
+    if (!page.query.id) {
+      var _API$cache$booking = _api2.default.cache.booking,
+          transaction = _API$cache$booking.transaction,
+          service = _API$cache$booking.service,
+          coupon = _API$cache$booking.coupon,
+          location = _API$cache$booking.location,
+          date = _API$cache$booking.date;
+
+      OrderDetailsController.render({
+        service: service,
+        coupon: coupon,
+        total: service.price - (coupon ? coupon.amount : 0),
+        location: location,
+        date: date,
+        transaction: transaction
+      });
+    } else {
+      _api2.default.getOrderDetails(page.query.id).then(function (order) {
+        OrderDetailsController.order = order;
+        var data = {
+          id: order.id,
+          status: {
+            pending: order.status === 'pending',
+            canceled: order.canceled,
+            progress: order.status === 'paid' || order.status === 'processing',
+            complete: order.status === 'complete'
+          },
+          date: parseInt(order.data.date, 10),
+          service: {
+            name: order.name,
+            id: order.vendor_product_id
+          },
+          total: order.total,
+          transaction: {
+            card_name: order.wallet_transaction.card_name
+          }
+        };
+        if (order.vendor_coupon_id) {
+          data.coupon = {
+            id: order.vendor_coupon_id,
+            amount: order.discount
+          };
+        }
+        OrderDetailsController.render(data);
+      });
+    }
+  },
+  render: function render(data) {
+    tommy.tplManager.renderInline('nurse_booking__orderDetailsTemplate', data);
+  },
+  repeatOrder: function repeatOrder() {
+    var order = OrderDetailsController.order;
+    if (!order) return;
+
+    _api2.default.cache.booking.date = parseInt(order.data.date, 10);
+    _api2.default.cache.booking.location = order.data.location;
+    delete _api2.default.cache.booking.coupon;
+
+    _api2.default.getServiceDetails(order.vendor_product_id).then(function (service) {
+      _api2.default.cache.booking.service = service;
+
+      var confirmUrl = tommy.util.addonAssetUrl(Template7.global.currentAddonInstall.package, Template7.global.currentAddonInstall.version, 'views/order-confirm.html', true);
+      tommy.f7.views.main.loadPage({ url: confirmUrl });
+    });
+  },
+  payOrder: function payOrder() {
+    // pay as usual
+    var order = OrderDetailsController.order;
+    (0, _payOrder3.default)({
+      productName: order.name,
+      productId: order.vendor_product_id,
+      total: order.total,
+      couponId: order.vendor_coupon_id,
+      discount: order.discount,
+      location: order.data.location,
+      date: order.data.date
+    }, false);
+  },
+  cancelOrder: function cancelOrder() {
+    // cancel and move to cancel status page
   },
   uninit: function uninit() {
     OrderDetailsController.page = null;
@@ -491,7 +633,7 @@ var OrderDetailsController = {
 
 exports.default = OrderDetailsController;
 
-},{"../api":1}],7:[function(require,module,exports){
+},{"../api":1,"../pay-order":13}],8:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -590,7 +732,7 @@ var ServiceDetailsController = {
 
 exports.default = ServiceDetailsController;
 
-},{"../api":1,"../coupon-picker":9}],8:[function(require,module,exports){
+},{"../api":1,"../coupon-picker":10}],9:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -660,7 +802,7 @@ var ServiceListController = {
 
 exports.default = ServiceListController;
 
-},{"../api":1}],9:[function(require,module,exports){
+},{"../api":1}],10:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -711,7 +853,7 @@ exports.default = function (coupons, onConfirm, onSkip, selectedCoupon) {
   });
 };
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -900,16 +1042,12 @@ var map = {
   'ZWD': 'Z$'
 };
 
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 'use strict';
 
 var _currencyMap = require('./currency-map');
 
 var _currencyMap2 = _interopRequireDefault(_currencyMap);
-
-var _couponPicker = require('./coupon-picker');
-
-var _couponPicker2 = _interopRequireDefault(_couponPicker);
 
 var _index = require('./controllers/index');
 
@@ -938,6 +1076,10 @@ var _orderConfirm2 = _interopRequireDefault(_orderConfirm);
 var _orderDetails = require('./controllers/order-details');
 
 var _orderDetails2 = _interopRequireDefault(_orderDetails);
+
+var _history = require('./controllers/history');
+
+var _history2 = _interopRequireDefault(_history);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -969,8 +1111,100 @@ f7.onPageBeforeRemove('nurse_booking__order-confirm', _orderConfirm2.default.uni
 f7.onPageInit('nurse_booking__order-details', _orderDetails2.default.init);
 f7.onPageBeforeRemove('nurse_booking__order-details', _orderDetails2.default.uninit);
 
+f7.onPageInit('nurse_booking__history', _history2.default.init);
+f7.onPageBeforeRemove('nurse_booking__history', _history2.default.uninit);
+
 t7.registerHelper('nurse_booking__currencySymbol', function (code) {
   return (0, _currencyMap2.default)(code);
 });
 
-},{"./controllers/date-time":2,"./controllers/index":3,"./controllers/location":4,"./controllers/order-confirm":5,"./controllers/order-details":6,"./controllers/service-details":7,"./controllers/service-list":8,"./coupon-picker":9,"./currency-map":10}]},{},[11]);
+},{"./controllers/date-time":2,"./controllers/history":3,"./controllers/index":4,"./controllers/location":5,"./controllers/order-confirm":6,"./controllers/order-details":7,"./controllers/service-details":8,"./controllers/service-list":9,"./currency-map":11}],13:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+exports.default = function (data) {
+  var createNewOrder = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : true;
+  var productName = data.productName,
+      productId = data.productId,
+      total = data.total,
+      _data$discount = data.discount,
+      discount = _data$discount === undefined ? 0 : _data$discount,
+      location = data.location,
+      date = data.date,
+      couponId = data.couponId;
+
+  var f7 = tommy.app.f7;
+
+  tommy.initWalletTransaction({
+    addon: 'nurse_booking',
+    payee_name: productName,
+    currency: 'CNY',
+    amount: total
+  }, function (transaction) {
+    var order = {
+      vendor_product_id: productId,
+      vendor_coupon_id: couponId || null,
+      wallet_transaction_id: transaction.id,
+      name: productName,
+      status: 'paid',
+      comment: '',
+      data: {
+        location: location,
+        date: date
+      },
+      discount: discount,
+      total: total
+    };
+
+    var successUrl = tommy.util.addonAssetUrl(Template7.global.currentAddonInstall.package, Template7.global.currentAddonInstall.version, 'views/order-success.html', true);
+    if (createNewOrder) {
+      _api2.default.sendOrder(order).then(function (response) {
+        _api2.default.cache.booking.transaction = transaction;
+        f7.views.main.loadPage({ url: successUrl + '&id=' + response.id });
+      });
+    } else {
+      _api2.default.cache.booking.transaction = transaction;
+      f7.views.main.loadPage({ url: successUrl + '&id=' + response.id });
+    }
+  }, function (transaction) {
+    if (!transaction.id) return;
+    var order = {
+      vendor_product_id: productId,
+      vendor_coupon_id: couponId || null,
+      wallet_transaction_id: transaction.id,
+      name: productName,
+      status: 'pending',
+      comment: '',
+      data: {
+        location: location,
+        date: date
+      },
+      discount: discount,
+      total: total
+    };
+
+    var errorUrl = tommy.util.addonAssetUrl(Template7.global.currentAddonInstall.package, Template7.global.currentAddonInstall.version, 'views/order-error.html', true);
+    if (createNewOrder) {
+      _api2.default.sendOrder(order).then(function (response) {
+        _api2.default.cache.booking.transaction = transaction;
+        f7.views.main.loadPage({ url: errorUrl + '&id=' + response.id });
+      });
+    } else {
+      _api2.default.cache.booking.transaction = transaction;
+      f7.views.main.loadPage({ url: errorUrl + '&id=' + response.id });
+    }
+  });
+};
+
+var _api = require('./api');
+
+var _api2 = _interopRequireDefault(_api);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var tommy = window.tommy;
+
+},{"./api":1}]},{},[12]);

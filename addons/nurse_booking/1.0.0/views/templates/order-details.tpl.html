@@ -1,6 +1,36 @@
 <script id="nurse_booking__orderDetailsTemplate" type="text/template">
   <div class="page-content">
-    <div class="list-block">
+    {{#if status}}
+      {{#if status.canceled}}
+        <div class="order-details-status">
+          <div class="order-details-status-title">{{t "order_details.status_canceled"}}</div>
+          <div class="order-details-status-date">{{formatDate date "D MMM. YYYY"}}</div>
+          <img src="{{addonAssetUrl "views/images/icon-status-canceled.svg"}}">
+        </div>
+      {{/if}}
+      {{#if status.pending}}
+        <div class="order-details-status">
+          <div class="order-details-status-title">{{t "order_details.status_pending"}}</div>
+          <div class="order-details-status-date">{{formatDate date "D MMM. YYYY"}}</div>
+          <img src="{{addonAssetUrl "views/images/icon-status-pending.svg"}}">
+        </div>
+      {{/if}}
+      {{#if status.progress}}
+        <div class="order-details-status">
+          <div class="order-details-status-title">{{t "order_details.status_progress"}}</div>
+          <div class="order-details-status-date">{{formatDate date "D MMM. YYYY"}}</div>
+          <img src="{{addonAssetUrl "views/images/icon-status-progress.svg"}}">
+        </div>
+      {{/if}}
+      {{#if status.complete}}
+        <div class="order-details-status">
+          <div class="order-details-status-title">{{t "order_details.status_complete"}}</div>
+          <div class="order-details-status-date">{{formatDate date "D MMM. YYYY"}}</div>
+          <img src="{{addonAssetUrl "views/images/icon-status-complete.svg"}}">
+        </div>
+      {{/if}}
+    {{/if}}
+    <div class="list-block order-details-list">
       <ul>
         <li class="item-content">
           <div class="item-inner">
@@ -37,6 +67,20 @@
           </div>
         </li>
       </ul>
+      {{#if status}}
+        {{#if status.progress}}
+          <a href="#" class="order-details-white-button order-details-cancel-button">{{t "order_details.cancel_button"}}</a>
+        {{/if}}
+        {{#if status.pending}}
+          <a href="#" class="order-details-red-button order-details-pay-button">{{t "order_details.pay_button"}}</a>
+        {{/if}}
+        {{#if status.complete}}
+          <a href="#" class="order-details-red-button order-details-repeat-button">{{t "order_details.repeat_button"}}</a>
+        {{/if}}
+        {{#if status.canceled}}
+          <a href="#" class="order-details-red-button order-details-repeat-button">{{t "order_details.repeat_button"}}</a>
+        {{/if}}
+      {{/if}}
     </div>
   </div>
 </script>

@@ -923,6 +923,63 @@
   .page#nurse_booking__order-details .list-block.list-block-prices .item-total-price .item-after {
     font-size: 46px;
     color: #FF5413; }
+  .page#nurse_booking__order-confirm .order-details-status,
+  .page#nurse_booking__order-details .order-details-status {
+    background: #FF684F;
+    border-radius: 6px;
+    margin: 12px;
+    padding: 20px 90px 20px 12px;
+    color: #fff;
+    position: relative; }
+    .page#nurse_booking__order-confirm .order-details-status .order-details-status-title,
+    .page#nurse_booking__order-details .order-details-status .order-details-status-title {
+      font-size: 28px;
+      line-height: 1.1;
+      margin-bottom: 10px; }
+    .page#nurse_booking__order-confirm .order-details-status .order-details-status-date,
+    .page#nurse_booking__order-details .order-details-status .order-details-status-date {
+      font-size: 20px;
+      line-height: 1; }
+    .page#nurse_booking__order-confirm .order-details-status img,
+    .page#nurse_booking__order-details .order-details-status img {
+      position: absolute;
+      top: 50%;
+      right: 40px;
+      transform: translate(50%, -50%); }
+  .page#nurse_booking__order-confirm .order-details-list,
+  .page#nurse_booking__order-details .order-details-list {
+    margin: 12px;
+    background: #FFFFFF;
+    box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    overflow: hidden; }
+  .page#nurse_booking__order-confirm .order-details-white-button,
+  .page#nurse_booking__order-confirm .order-details-red-button,
+  .page#nurse_booking__order-details .order-details-white-button,
+  .page#nurse_booking__order-details .order-details-red-button {
+    display: block;
+    border-radius: 6px;
+    font-size: 24px;
+    height: 56px;
+    margin: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box; }
+    .page#nurse_booking__order-confirm .order-details-white-button.active-state,
+    .page#nurse_booking__order-confirm .order-details-red-button.active-state,
+    .page#nurse_booking__order-details .order-details-white-button.active-state,
+    .page#nurse_booking__order-details .order-details-red-button.active-state {
+      opacity: 0.7; }
+  .page#nurse_booking__order-confirm .order-details-red-button,
+  .page#nurse_booking__order-details .order-details-red-button {
+    background: #FF5413;
+    color: #fff; }
+  .page#nurse_booking__order-confirm .order-details-white-button,
+  .page#nurse_booking__order-details .order-details-white-button {
+    background: #fff;
+    border: 1px solid #999999;
+    color: #999; }
 
 .page#nurse_booking__order-success {
   background: #fff; }
@@ -958,3 +1015,54 @@
       font-size: 22px; }
       .page#nurse_booking__order-success .order-success-buttons a + a {
         margin-top: 12px; }
+
+.page#nurse_booking__history .orders-list {
+  color: #333;
+  margin-top: 12px;
+  margin-bottom: 12px; }
+  .page#nurse_booking__history .orders-list .order-item {
+    display: block;
+    color: inherit;
+    background: #FFFFFF;
+    box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.1);
+    border-radius: 6px;
+    margin: 0 12px; }
+    .page#nurse_booking__history .orders-list .order-item + .order-item {
+      margin-top: 12px; }
+  .page#nurse_booking__history .orders-list .order-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    margin-left: 12px;
+    margin-right: 12px;
+    border-bottom: 1px solid #E9EAEB;
+    font-size: 20px; }
+  .page#nurse_booking__history .orders-list .order-item-status {
+    font-weight: bold;
+    color: #666666;
+    background-image: url("data:image/svg+xml;charset=utf-8,<svg viewBox='0 0 60 120' xmlns='http://www.w3.org/2000/svg'><path d='m60 61.5-38.25 38.25-9.75-9.75 29.25-28.5-29.25-28.5 9.75-9.75z' fill='#c7c7cc'/></svg>");
+    background-size: 10px 20px;
+    background-repeat: no-repeat;
+    background-position: right center;
+    padding-right: 15px; }
+  .page#nurse_booking__history .orders-list .order-item-content {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 12px; }
+  .page#nurse_booking__history .orders-list .order-item-details {
+    flex-shrink: 10;
+    min-width: 0; }
+  .page#nurse_booking__history .orders-list .order-item-amount {
+    flex-shrink: 0;
+    color: #FF5413;
+    font-size: 42px;
+    margin-left: 10px;
+    line-height: 1; }
+  .page#nurse_booking__history .orders-list .order-item-details-row {
+    font-size: 24px;
+    font-weight: 500;
+    line-height: 1.2; }
+    .page#nurse_booking__history .orders-list .order-item-details-row + .order-item-details-row {
+      margin-top: 10px; }

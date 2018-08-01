@@ -18,6 +18,14 @@ const API = {
       return data;
     });
   },
+  getServiceDetails(id) {
+    return api.call({
+      endpoint: `vendors/${tommy.config.getCurrentTeamId()}/products/${id}`,
+      method: 'GET',
+    }).then((data) => {
+      return data;
+    });
+  },
   getCouponList(categoryId) {
     return api.call({
       endpoint: `vendors/${tommy.config.getCurrentTeamId()}/coupons`,
@@ -71,6 +79,23 @@ const API = {
       endpoint: `vendors/${tommy.config.getCurrentTeamId()}/orders`,
       method: 'POST',
       data,
+    });
+  },
+  getOrdersHistory() {
+    return api.call({
+      endpoint: `vendors/${tommy.config.getCurrentTeamId()}/orders/`,
+      method: 'GET',
+    }).then((data) => {
+      API.cache.orders = data;
+      return data;
+    });
+  },
+  getOrderDetails(id) {
+    return api.call({
+      endpoint: `vendors/${tommy.config.getCurrentTeamId()}/orders/${id}?with_wallet_transaction=true `,
+      method: 'GET',
+    }).then((data) => {
+      return data;
     });
   }
 }
