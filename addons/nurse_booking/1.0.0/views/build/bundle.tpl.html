@@ -44,6 +44,31 @@
     </label>
   {{/each}}
 </script>
+<script id="nurse_booking__historyTemplate" type="text/template">
+  <div class="page-content">
+    {{#if orders}}
+      <div class="orders-list">
+      {{#each orders}}
+        <a href="{{addonAssetUrl "views/order-details.html"}}?id={{id}}" class="order-item">
+          <div class="order-item-header">
+            <div class="order-item-date">{{formatDate data.date "D MMM YYYY"}}</div>
+            <div class="order-item-status">{{t statusKey}}</div>
+          </div>
+          <div class="order-item-content">
+            <div class="order-item-details">
+              <div class="order-item-details-row">{{name}}</div>
+              <div class="order-item-details-row order-item-details-date">{{formatDate data.date "MMM D, YYYY H:m"}}</div>
+            </div>
+            <div class="order-item-amount">¥{{total}}</div>
+          </div>
+        </a>
+      {{/each}}
+      </div>
+    {{/else}}
+
+    {{/if}}
+  </div>
+</script>
 <script id="nurse_booking__locationsTemplate" type="text/template">
   {{#if locations.length}}
     {{#each locations}}
@@ -85,13 +110,15 @@
     </div>
     <div class="list-block">
       <ul>
-        <li class="item-content">
-          <div class="item-media">
-            <img src="{{addonAssetUrl "views/images/icon-time.svg"}}" alt="">
-          </div>
-          <div class="item-inner">
-            <div class="item-title">{{formatDate date "MMMM D, YYYY HH:mm"}}</div>
-          </div>
+        <li>
+          <a href="{{addonAssetUrl "views/date-time.html"}}&back=true" class="item-content item-link">
+            <div class="item-media">
+              <img src="{{addonAssetUrl "views/images/icon-time.svg"}}" alt="">
+            </div>
+            <div class="item-inner">
+              <div class="item-title">{{formatDate date "MMMM D, YYYY HH:mm"}}</div>
+            </div>
+          </a>
         </li>
       </ul>
     </div>
@@ -116,7 +143,7 @@
         </li>
         {{/if}}
         <li>
-          <a href="#" class="item-content item-link order-confirm-select-location">
+          <a href="{{addonAssetUrl "views/location.html"}}&back=true" class="item-content item-link order-confirm-select-location">
             <div class="item-media">
               <img src="{{addonAssetUrl "views/images/icon-location.svg"}}" alt="">
             </div>
@@ -151,7 +178,37 @@
 </script>
 <script id="nurse_booking__orderDetailsTemplate" type="text/template">
   <div class="page-content">
-    <div class="list-block">
+    {{#if status}}
+      {{#if status.canceled}}
+        <div class="order-details-status">
+          <div class="order-details-status-title">{{t "order_details.status_canceled"}}</div>
+          <div class="order-details-status-date">{{formatDate date "D MMM. YYYY"}}</div>
+          <img src="{{addonAssetUrl "views/images/icon-status-canceled.svg"}}">
+        </div>
+      {{/if}}
+      {{#if status.pending}}
+        <div class="order-details-status">
+          <div class="order-details-status-title">{{t "order_details.status_pending"}}</div>
+          <div class="order-details-status-date">{{formatDate date "D MMM. YYYY"}}</div>
+          <img src="{{addonAssetUrl "views/images/icon-status-pending.svg"}}">
+        </div>
+      {{/if}}
+      {{#if status.progress}}
+        <div class="order-details-status">
+          <div class="order-details-status-title">{{t "order_details.status_progress"}}</div>
+          <div class="order-details-status-date">{{formatDate date "D MMM. YYYY"}}</div>
+          <img src="{{addonAssetUrl "views/images/icon-status-progress.svg"}}">
+        </div>
+      {{/if}}
+      {{#if status.complete}}
+        <div class="order-details-status">
+          <div class="order-details-status-title">{{t "order_details.status_complete"}}</div>
+          <div class="order-details-status-date">{{formatDate date "D MMM. YYYY"}}</div>
+          <img src="{{addonAssetUrl "views/images/icon-status-complete.svg"}}">
+        </div>
+      {{/if}}
+    {{/if}}
+    <div class="list-block order-details-list">
       <ul>
         <li class="item-content">
           <div class="item-inner">
@@ -188,6 +245,20 @@
           </div>
         </li>
       </ul>
+      {{#if status}}
+        {{#if status.progress}}
+          <a href="#" class="order-details-white-button order-details-cancel-button">{{t "order_details.cancel_button"}}</a>
+        {{/if}}
+        {{#if status.pending}}
+          <a href="#" class="order-details-red-button order-details-pay-button">{{t "order_details.pay_button"}}</a>
+        {{/if}}
+        {{#if status.complete}}
+          <a href="#" class="order-details-red-button order-details-repeat-button">{{t "order_details.repeat_button"}}</a>
+        {{/if}}
+        {{#if status.canceled}}
+          <a href="#" class="order-details-red-button order-details-repeat-button">{{t "order_details.repeat_button"}}</a>
+        {{/if}}
+      {{/if}}
     </div>
   </div>
 </script>

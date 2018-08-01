@@ -9,6 +9,15 @@ const IndexController = {
     IndexController.loadTransactions();
     IndexController.loadBalanceHistory();
     $$(document).on('wallet:transaction', IndexController.refresh)
+    if (page.query.back) {
+      $$(page.navbarInnerContainer)
+        .find('.left a.open-panel')
+        .removeClass('open-panel')
+        .addClass('back')
+        .html(`
+          <i class="icon f7-icons">chevron_left</i>
+        `);
+    }
   },
   refresh() {
     IndexController.loadWalletInfo();
