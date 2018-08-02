@@ -60,9 +60,18 @@
   },
   "order_success": {
     "title": "Appointment is successful",
-    "title_error": "Error occured. Order is waiting for the payment",
     "details_button": "Check order details",
     "home_button": "Return to home page "
+  },
+  "order_error": {
+    "title": "Error occured. Order is waiting for the payment",
+    "details_button": "Check order details",
+    "home_button": "Return to home page "
+  },
+  "order_canceled": {
+    "title": "Cancel order successfully",
+    "message": "The refund will be returned to your payment account in the same way as 1-2 business days. Please pay attention to the check.",
+    "home_button": "Return to home page"
   },
   "order_details": {
     "title": "Order Details",
@@ -77,7 +86,8 @@
     "status_pending": "Need to be paid",
     "cancel_button": "Cancel",
     "repeat_button": "Repeat",
-    "pay_button": "Pay Now"
+    "pay_button": "Pay Now",
+    "cancel_confirm": "Cancel the order will not be able to enjoy the on-site service, whether to confirm the cancellations"
   },
   "history": {
     "title": "History",

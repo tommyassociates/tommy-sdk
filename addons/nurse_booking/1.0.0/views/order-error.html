@@ -5,15 +5,15 @@
 </div>
 
 <div class="pages navbar-through">
-  <div data-page="nurse_booking__order-success" id="nurse_booking__order-success" class="page no-navbar">
+  <div data-page="nurse_booking__order-error" id="nurse_booking__order-error" class="page no-navbar">
     <div class="page-content">
-      <div class="order-success-title">{{t "order_success.error_title"}}</div>
-      <div class="order-success-img">
+      <div class="order-status-title">{{t "order_error.title"}}</div>
+      <div class="order-status-img">
         <img src="{{addonAssetUrl "views/images/order-success.svg"}}">
       </div>
-      <div class="order-success-buttons">
-        <a class="open-order-details" href="{{addonAssetUrl "views/order-details.html"}}">{{t "order_success.details_button"}}</a>
-        <a class="open-home-page" href="{{addonAssetUrl "views/index.html"}}">{{t "order_success.home_button"}}</a>
+      <div class="order-status-buttons">
+        <a href="{{addonAssetUrl "views/order-details.html"}}">{{t "order_error.details_button"}}</a>
+        <a href="{{addonAssetUrl "views/index.html"}}">{{t "order_error.home_button"}}</a>
       </div>
     </div>
   </div>

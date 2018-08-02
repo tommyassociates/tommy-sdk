@@ -36,13 +36,14 @@ const OrderDetailsController = {
     } else {
       API.getOrderDetails(page.query.id).then((order) => {
         OrderDetailsController.order = order;
+        const canceled = order.canceled;
         const data = {
           id: order.id,
           status: {
-            pending: order.status === 'pending',
-            canceled: order.canceled,
-            progress: order.status === 'paid' || order.status === 'processing',
-            complete: order.status === 'complete',
+            pending: !canceled && order.status === 'pending',
+            canceled,
+            progress: !canceled && (order.status === 'paid' || order.status === 'processing'),
+            complete: !canceled && order.status === 'complete',
           },
           date: parseInt(order.data.date, 10),
           service: {
@@ -106,6 +107,35 @@ const OrderDetailsController = {
   },
   cancelOrder() {
     // cancel and move to cancel status page
+    const order = OrderDetailsController.order;
+    if (!order) return;
+    if (OrderDetailsController.preventCancel) return;
+    OrderDetailsController.preventCancel = true;
+    tommy.f7.confirm(
+      `
+      <div class="order-details-cancel-order-icon"></div>
+      <div>${tommy.i18n.t('order_details.cancel_confirm')}</div>
+      `,
+      () => {
+        API.cancelOrder(order.id)
+          .then(() => {
+            OrderDetailsController.preventCancel = false;
+            const canceledUrl = tommy.util.addonAssetUrl(
+              Template7.global.currentAddonInstall.package,
+              Template7.global.currentAddonInstall.version,
+              'views/order-canceled.html',
+              true
+            );
+            tommy.f7.views.main.loadPage({ url: canceledUrl });
+          })
+          .catch(() => {
+            OrderDetailsController.preventCancel = false;
+          })
+      },
+      () => {
+        OrderDetailsController.preventCancel = false;
+      }
+    );
   },
   uninit () {
     OrderDetailsController.page = null;

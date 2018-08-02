@@ -92,10 +92,16 @@ const API = {
   },
   getOrderDetails(id) {
     return api.call({
-      endpoint: `vendors/${tommy.config.getCurrentTeamId()}/orders/${id}?with_wallet_transaction=true `,
+      endpoint: `vendors/${tommy.config.getCurrentTeamId()}/orders/${id}?with_wallet_transaction=true`,
       method: 'GET',
     }).then((data) => {
       return data;
+    });
+  },
+  cancelOrder(id) {
+    return api.call({
+      endpoint: `vendors/${tommy.config.getCurrentTeamId()}/orders/${id}`,
+      method: 'DELETE',
     });
   }
 }

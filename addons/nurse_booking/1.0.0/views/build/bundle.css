@@ -981,28 +981,50 @@
     border: 1px solid #999999;
     color: #999; }
 
-.page#nurse_booking__order-success {
+.page#nurse_booking__order-success,
+.page#nurse_booking__order-canceled,
+.page#nurse_booking__order-error {
   background: #fff; }
-  .page#nurse_booking__order-success .order-success-title {
+  .page#nurse_booking__order-success .order-status-title,
+  .page#nurse_booking__order-canceled .order-status-title,
+  .page#nurse_booking__order-error .order-status-title {
     font-size: 36px;
     font-weight: bold;
     text-align: center;
     line-height: 1.15;
     margin-bottom: 20px;
     margin-top: 44px; }
-  .page#nurse_booking__order-success .order-success-img {
+  .page#nurse_booking__order-success .order-status-img,
+  .page#nurse_booking__order-canceled .order-status-img,
+  .page#nurse_booking__order-error .order-status-img {
     text-align: center; }
-    .page#nurse_booking__order-success .order-success-img img {
+    .page#nurse_booking__order-success .order-status-img img,
+    .page#nurse_booking__order-canceled .order-status-img img,
+    .page#nurse_booking__order-error .order-status-img img {
       width: auto;
       height: 200px; }
-  .page#nurse_booking__order-success .order-success-buttons {
+  .page#nurse_booking__order-success .order-status-message,
+  .page#nurse_booking__order-canceled .order-status-message,
+  .page#nurse_booking__order-error .order-status-message {
+    font-size: 18px;
+    color: #666;
+    margin: 12px;
+    text-align: center;
+    max-width: 320px;
+    margin-left: auto;
+    margin-right: auto; }
+  .page#nurse_booking__order-success .order-status-buttons,
+  .page#nurse_booking__order-canceled .order-status-buttons,
+  .page#nurse_booking__order-error .order-status-buttons {
     padding: 12px;
     box-sizing: border-box;
     position: absolute;
     left: 0;
     bottom: 0;
     width: 100%; }
-    .page#nurse_booking__order-success .order-success-buttons a {
+    .page#nurse_booking__order-success .order-status-buttons a,
+    .page#nurse_booking__order-canceled .order-status-buttons a,
+    .page#nurse_booking__order-error .order-status-buttons a {
       display: flex;
       text-align: center;
       width: 100%;
@@ -1013,7 +1035,9 @@
       border: 1px solid #999;
       color: #999;
       font-size: 22px; }
-      .page#nurse_booking__order-success .order-success-buttons a + a {
+      .page#nurse_booking__order-success .order-status-buttons a + a,
+      .page#nurse_booking__order-canceled .order-status-buttons a + a,
+      .page#nurse_booking__order-error .order-status-buttons a + a {
         margin-top: 12px; }
 
 .page#nurse_booking__history .orders-list {
@@ -1066,3 +1090,11 @@
     line-height: 1.2; }
     .page#nurse_booking__history .orders-list .order-item-details-row + .order-item-details-row {
       margin-top: 10px; }
+
+.order-details-cancel-order-icon {
+  background: url(../images/icon-canceled.svg) no-repeat center;
+  width: 153px;
+  height: 86px;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 10px; }
