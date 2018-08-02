@@ -98,10 +98,16 @@ var API = {
   },
   getOrderDetails: function getOrderDetails(id) {
     return api.call({
-      endpoint: 'vendors/' + tommy.config.getCurrentTeamId() + '/orders/' + id + '?with_wallet_transaction=true ',
+      endpoint: 'vendors/' + tommy.config.getCurrentTeamId() + '/orders/' + id + '?with_wallet_transaction=true',
       method: 'GET'
     }).then(function (data) {
       return data;
+    });
+  },
+  cancelOrder: function cancelOrder(id) {
+    return api.call({
+      endpoint: 'vendors/' + tommy.config.getCurrentTeamId() + '/orders/' + id,
+      method: 'DELETE'
     });
   }
 };
@@ -251,7 +257,7 @@ var HistoryController = {
 
     _api2.default.getOrdersHistory().then(function (orders) {
       orders.forEach(function (order) {
-        order.statusKey = 'history.status_' + order.status;
+        order.statusKey = 'history.status_' + (order.canceled ? 'canceled' : order.status);
         if (order.data && order.data.date) {
           if (!Number.isNaN(parseInt(order.data.date, 10))) {
             order.data.date = parseInt(order.data.date, 10);
@@ -563,13 +569,14 @@ var OrderDetailsController = {
     } else {
       _api2.default.getOrderDetails(page.query.id).then(function (order) {
         OrderDetailsController.order = order;
+        var canceled = order.canceled;
         var data = {
           id: order.id,
           status: {
-            pending: order.status === 'pending',
-            canceled: order.canceled,
-            progress: order.status === 'paid' || order.status === 'processing',
-            complete: order.status === 'complete'
+            pending: !canceled && order.status === 'pending',
+            canceled: canceled,
+            progress: !canceled && (order.status === 'paid' || order.status === 'processing'),
+            complete: !canceled && order.status === 'complete'
           },
           date: parseInt(order.data.date, 10),
           service: {
@@ -625,6 +632,21 @@ var OrderDetailsController = {
   },
   cancelOrder: function cancelOrder() {
     // cancel and move to cancel status page
+    var order = OrderDetailsController.order;
+    if (!order) return;
+    if (OrderDetailsController.preventCancel) return;
+    OrderDetailsController.preventCancel = true;
+    tommy.f7.confirm('\n      <div class="order-details-cancel-order-icon"></div>\n      <div>' + tommy.i18n.t('order_details.cancel_confirm') + '</div>\n      ', function () {
+      _api2.default.cancelOrder(order.id).then(function () {
+        OrderDetailsController.preventCancel = false;
+        var canceledUrl = tommy.util.addonAssetUrl(Template7.global.currentAddonInstall.package, Template7.global.currentAddonInstall.version, 'views/order-canceled.html', true);
+        tommy.f7.views.main.loadPage({ url: canceledUrl });
+      }).catch(function () {
+        OrderDetailsController.preventCancel = false;
+      });
+    }, function () {
+      OrderDetailsController.preventCancel = false;
+    });
   },
   uninit: function uninit() {
     OrderDetailsController.page = null;

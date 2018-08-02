@@ -17,7 +17,7 @@ const HistoryController = {
 
     API.getOrdersHistory().then((orders) => {
       orders.forEach((order) => {
-        order.statusKey = `history.status_${order.status}`;
+        order.statusKey = `history.status_${order.canceled ? 'canceled' : order.status}`;
         if (order.data && order.data.date) {
           if (!Number.isNaN(parseInt(order.data.date, 10))) {
             order.data.date = parseInt(order.data.date, 10);
