@@ -31,6 +31,18 @@ function(app, api,util,config,cache,util,i18n) {
 
             app.f7.onPageInit('*', this.onEnterAddon)
             app.f7.onPageBeforeAnimation('*', this.onExitAddon)
+
+            $$(document).on('click', 'a[href^="tommy://addon"]', function() {
+                const params = $$.parseUrlQuery($$(this).attr('href'));
+                if (params && params.package) {
+                    const defaultView = addons.getDefaultAddonView(params.package);
+                    let url = defaultView.url;
+                    if (!url) return;
+                    if (url.indexOf('?') >= 0) url += '&' + $$.serializeObject(params);
+                    else url += '?' + $$.serializeObject(params);
+                    app.f7.views.main.router.load({ url: url });
+                }
+            });
         },
 
         resetCurrentAddonContext: function () {
