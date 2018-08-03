@@ -11,6 +11,7 @@ const DateTimeController = {
   bind (page) {
     DateTimeController.page = page;
     const $page = $$(page.container);
+    const f7 = tommy.app.f7;
 
     $page.on('change', 'input[name="date-time-date"]', function (e) {
       DateTimeController.renderHours(new Date(parseInt(e.target.value, 10)));
@@ -21,13 +22,17 @@ const DateTimeController = {
 
       API.cache.booking.date = new Date(parseInt(date, 10)).getTime() + hours * 60 * 60 * 1000;
 
-      const url = tommy.util.addonAssetUrl(
-        Template7.global.currentAddonInstall.package,
-        Template7.global.currentAddonInstall.version,
-        'views/order-confirm.html',
-        true
-      );
-      tommy.app.f7.views.main.loadPage({ url });
+      if (page.query.back) {
+        f7.views.main.back();
+      } else {
+        const url = tommy.util.addonAssetUrl(
+          Template7.global.currentAddonInstall.package,
+          Template7.global.currentAddonInstall.version,
+          'views/order-confirm.html',
+          true
+        );
+        tommy.app.f7.views.main.loadPage({ url });
+      }
     });
   },
   renderDates() {
