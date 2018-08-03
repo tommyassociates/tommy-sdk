@@ -1,5 +1,6 @@
 import API from '../api';
 import couponPicker from '../coupon-picker';
+import payOrder from '../pay-order';
 
 const tommy = window.tommy;
 
@@ -14,16 +15,6 @@ const OrderConfirmController = {
     const f7 = tommy.app.f7;
 
     const { service } = API.cache.booking;
-
-    const locationUrl = tommy.util.addonAssetUrl(
-      Template7.global.currentAddonInstall.package,
-      Template7.global.currentAddonInstall.version,
-      'views/location.html',
-      true
-    );
-    $page.on('click', 'a.order-confirm-select-location', () => {
-      f7.views.main.loadPage({ url: `${locationUrl}&back=true` })
-    });
 
     $page.on('click', 'a.order-confirm-select-coupon', () => {
       couponPicker(service.coupons, (coupon) => {
@@ -59,42 +50,16 @@ const OrderConfirmController = {
   },
   pay() {
     const { service, coupon, location, date} = API.cache.booking;
-    const f7 = tommy.app.f7;
     const total = service.price - (coupon ? coupon.amount : 0);
 
-    tommy.initWalletTransaction({
-      addon: 'nurse_booking',
-      // addon_id: 33,
-      // addon_install_id: 8640,
-      payee_name: service.name,
-      currency: 'CNY',
-      amount: total,
-    }, (transaction) => {
-
-      const order = {
-        vendor_product_id: service.id,
-        vendor_coupon_id: coupon ? coupon.id : null,
-        wallet_transaction_id: transaction.id,
-        name: service.name,
-        comment: '',
-        data: {
-          location,
-          date,
-        },
-        discount: coupon ? coupon.amount : 0,
-        total,
-      };
-      API.sendOrder(order);
-
-      API.cache.booking.transaction = transaction;
-
-      const successUrl = tommy.util.addonAssetUrl(
-        Template7.global.currentAddonInstall.package,
-        Template7.global.currentAddonInstall.version,
-        'views/order-success.html',
-        true
-      );
-      f7.views.main.loadPage({ url: successUrl });
+    payOrder({
+      productName: service.name,
+      productId: service.id,
+      total,
+      couponId: coupon ? coupon.id : null,
+      discount: coupon ? coupon.amount : 0,
+      location,
+      date,
     });
   },
   uninit () {
