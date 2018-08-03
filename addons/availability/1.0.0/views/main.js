@@ -111,7 +111,10 @@ function (app,api,addons,util,cache,tplManager,moment,refreshPanel) {
                     item = Object.assign(item, {
                         addon: 'availability',
                         kind: 'Availability',
-                        data: JSON.stringify({ am: !!json.am.length, pm: !!json.pm.length, ns: !!json.ns.length }),
+                        data: JSON.stringify({
+                          am: (json.am.length ? -1 : 1),
+                          pm: (json.pm.length ? -1 : 1),
+                          ns: (json.ns.length ? -1 : 1) }),
                         start_at: date,
                         user_id: addons.currentActorOrUserId()
                     })
@@ -171,7 +174,7 @@ function (app,api,addons,util,cache,tplManager,moment,refreshPanel) {
     /// Template7 Helpers
 
     app.t7.registerHelper('availability__unavailableProperty', function (shift, data, prop) {
-        if (data && data[shift] == true)
+        if (data && data[shift] === -1)
             return prop
         return ''
     })

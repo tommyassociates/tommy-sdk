@@ -268,6 +268,8 @@ function(app, api,util,config,cache,util,i18n) {
 
             // return new Promise(function(resolve, reject) {
             return addons.loadViewAssets(addon, view).then(function() {
+                if (window.tommy.canceledAddonsLoading &&
+                    window.tommy.canceledAddonsLoading[package]) return false;
                 console.log('add addon view', view)
                 addons.onViewLoaded(addon, view)
             })
@@ -382,8 +384,12 @@ function(app, api,util,config,cache,util,i18n) {
 
         loadAddon: function (package, version) { //, callback
             return api.getAddonVersion(package, version).then(function (response) {
+                if (window.tommy.canceledAddonsLoading &&
+                    window.tommy.canceledAddonsLoading[package]) return false;
                 console.log('addon response', response)
                 return addons.initAddon(response).then(function () {
+                    if (window.tommy.canceledAddonsLoading &&
+                        window.tommy.canceledAddonsLoading[package]) return false;
                     return response;
                 })
             })
