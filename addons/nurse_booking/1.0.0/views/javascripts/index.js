@@ -1,5 +1,4 @@
 import currencyMap from './currency-map';
-import couponPicker from './coupon-picker';
 
 import IndexController from './controllers/index'
 import ServiceListController from './controllers/service-list';
@@ -8,6 +7,7 @@ import LocationController from './controllers/location';
 import DateTimeController from './controllers/date-time';
 import OrderConfirmController from './controllers/order-confirm';
 import OrderDetailsController from './controllers/order-details';
+import HistoryController from './controllers/history';
 
 const { f7, t7 } = window.tommy.app;
 
@@ -34,6 +34,8 @@ f7.onPageBeforeRemove('nurse_booking__order-confirm', OrderConfirmController.uni
 f7.onPageInit('nurse_booking__order-details', OrderDetailsController.init)
 f7.onPageBeforeRemove('nurse_booking__order-details', OrderDetailsController.uninit)
 
+f7.onPageInit('nurse_booking__history', HistoryController.init)
+f7.onPageBeforeRemove('nurse_booking__history', HistoryController.uninit)
 
 t7.registerHelper('nurse_booking__currencySymbol', code => {
   return currencyMap(code);
