@@ -5,13 +5,21 @@ const ListManagementController = {
     const $page = $$(page.container)
     const $nav = $$(page.navbarInnerContainer)
 
-    window.tommy.tplManager.renderInline('tasks__listManagementTemplate', API.getOrderedLists(), $page)
+    ListManagementController.render(page);
 
     $nav.find('a.save').on('click', ev => {
       const data = window.tommy.app.f7.formToJSON($page.find('form'))
       ListManagementController.save(page, data)
       ev.preventDefault()
     })
+
+    $page.on('change', 'input[type="checkbox"]', () => {
+      $nav.find('a.save').addClass('active');
+    });
+  },
+  render(page) {
+    const $page = $$(page.container)
+    window.tommy.tplManager.renderInline('tasks__listManagementTemplate', API.getOrderedLists(), $page)
   },
 
   save (page, data) {

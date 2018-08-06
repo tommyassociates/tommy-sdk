@@ -19,7 +19,7 @@ window.tommy.app.f7.onPageInit('tasks__board-settings', BoardSettingsController.
 window.tommy.app.f7.onPageInit('tasks__list-add', ListAddController.init)
 window.tommy.app.f7.onPageInit('tasks__list-edit', ListEditController.init)
 window.tommy.app.f7.onPageInit('tasks__list-management', ListManagementController.init)
-window.tommy.app.f7.onPageAfterAnimation('tasks__list-management', ListManagementController.init)
+window.tommy.app.f7.onPageAfterAnimation('tasks__list-management', ListManagementController.render)
 window.tommy.app.f7.onPageInit('tasks__task-add', TaskAddController.init)
 window.tommy.app.f7.onPageInit('tasks__task', TaskController.init)
 window.tommy.app.f7.onPageAfterAnimation('tasks__task', TaskController.invalidate)
