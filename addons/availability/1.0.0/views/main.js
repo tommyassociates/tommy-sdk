@@ -112,9 +112,10 @@ function (app,api,addons,util,cache,tplManager,moment,refreshPanel) {
                         addon: 'availability',
                         kind: 'Availability',
                         data: JSON.stringify({
-                          am: (json.am.length ? -1 : 1),
-                          pm: (json.pm.length ? -1 : 1),
-                          ns: (json.ns.length ? -1 : 1) }),
+                          am: json.am || 0,
+                          pm: json.pm || 0,
+                          ns: json.ns || 0,
+                        }),
                         start_at: date,
                         user_id: addons.currentActorOrUserId()
                     })
@@ -153,9 +154,19 @@ function (app,api,addons,util,cache,tplManager,moment,refreshPanel) {
                 var $link = $$(this),
                     availability = $link.data('availability'),
                     $form = $link.parent().find('form'),
-                    $input = $form.find('input[name="' + availability + '"]')
-                $link.toggleClass('unavailable')
-                $input.prop('checked', !$input.prop('checked'))
+                    $input = $form.find('input[name="' + availability + '"]');
+
+                if (!$link.hasClass('available') && !$link.hasClass('unavailable')) {
+                    $link.addClass('available');
+                    $input.val(1)
+                } else if ($link.hasClass('available')) {
+                    $link.removeClass('available').addClass('unavailable');
+                    $input.val(-1)
+                } else if ($link.hasClass('unavailable')) {
+                    $link.removeClass('unavailable')
+                    $input.val(0)
+                }
+
                 $form.attr('data-changed', true)
 
                 return false;
@@ -173,9 +184,13 @@ function (app,api,addons,util,cache,tplManager,moment,refreshPanel) {
     //
     /// Template7 Helpers
 
-    app.t7.registerHelper('availability__unavailableProperty', function (shift, data, prop) {
-        if (data && data[shift] === -1)
-            return prop
+    app.t7.registerHelper('availability__class', function (shift, data) {
+        if (data && (data[shift] === -1 || data[shift] === '-1')) return 'unavailable'
+        if (data && (data[shift] === 1 || data[shift] === '1')) return 'available'
         return ''
+    })
+    app.t7.registerHelper('availability__value', function (shift, data) {
+        if (data && data[shift]) return data[shift];
+        return 0
     })
 })
