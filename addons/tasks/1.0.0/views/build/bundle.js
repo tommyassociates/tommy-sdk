@@ -1108,7 +1108,8 @@ var TaskController = {
     var picker = window.tommy.util.createDatePicker($input, task.end_at, {
       onClose: function onClose() {
         console.log('closing deadline picker', picker.currentDate);
-        task.end_at = picker.currentDate;
+        task.end_at = new Date(picker.currentDate).toJSON();
+
         TaskController.saveTask(page);
       },
       onFormat: function onFormat(date) {
