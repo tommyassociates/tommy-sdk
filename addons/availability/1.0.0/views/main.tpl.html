@@ -10,14 +10,20 @@
         <div class="item-inner">
           <div class="availability__toggle-container">
             <!-- item-title -->
-            <a href="#" class="availability__toggle-availability {{availability__unavailableProperty "am" data "unavailable"}}" data-availability="am"><span>{{t "word.am" ns="availability" defaultValue="am"}}<span></a>
-            <a href="#" class="availability__toggle-availability {{availability__unavailableProperty "pm" data "unavailable"}}" data-availability="pm"><span>{{t "word.pm" ns="availability" defaultValue="pm"}}<span></a>
-            <a href="#" class="availability__toggle-availability {{availability__unavailableProperty "ns" data "unavailable"}}" data-availability="ns"><span>{{t "word.ns" ns="availability" defaultValue="ns"}}<span></a>
+            <a href="#" class="availability__toggle-availability {{availability__class "am" data}}" data-availability="am">
+              <span>{{t "word.am" ns="availability" defaultValue="am"}}</span>
+            </a>
+            <a href="#" class="availability__toggle-availability {{availability__class "pm" data}}" data-availability="pm">
+              <span>{{t "word.pm" ns="availability" defaultValue="pm"}}</span>
+            </a>
+            <a href="#" class="availability__toggle-availability {{availability__class "ns" data}}" data-availability="ns">
+              <span>{{t "word.ns" ns="availability" defaultValue="ns"}}</span>
+            </a>
             <form>
               <input type="hidden" name="start_at" value="{{formatDate start_at "YYYY-MM-DD"}}" />
-              <input type="checkbox" name="am" {{availability__unavailableProperty "am" data "checked"}} />
-              <input type="checkbox" name="pm" {{availability__unavailableProperty "pm" data "checked"}} />
-              <input type="checkbox" name="ns" {{availability__unavailableProperty "ns" data "checked"}} />
+              <input type="text" name="am" value="{{availability__value "am" data}}"/>
+              <input type="text" name="pm" value="{{availability__value "pm" data}}"/>
+              <input type="text" name="ns" value="{{availability__value "ns" data}}"/>
             </form>
           </div>
         </div>
