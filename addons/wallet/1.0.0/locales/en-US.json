@@ -29,5 +29,10 @@
     "success_title": "Success",
     "success_message": "You sent {{currency}}{{amount}}.<br>To {{to}}.<br>From {{from}}.",
     "error_insufficient": "Sorry. Your Tommy account balance is insufficient. Please use other payment methods"
+  },
+  "views": {
+    "main": {
+      "title": "Wallet"
+    }
   }
 }
