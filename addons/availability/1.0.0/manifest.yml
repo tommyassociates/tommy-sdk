@@ -38,7 +38,7 @@
       assets:
         -
           type: "stylesheet"
-          file: "views/main.css"
+          file: "views/build/bundle.css"
         -
           type: "javascript"
           file: "views/main.js"

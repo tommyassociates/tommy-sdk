@@ -70,5 +70,10 @@
     "coupons_label": "优惠券",
     "total_label": "总计",
     "payment_label": "付款"
+  },
+  "views": {
+    "main": {
+      "title": "山缘老人公寓"
+    }
   }
 }

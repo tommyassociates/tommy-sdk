@@ -799,13 +799,21 @@ var ListManagementController = {
     var $page = $$(page.container);
     var $nav = $$(page.navbarInnerContainer);
 
-    window.tommy.tplManager.renderInline('tasks__listManagementTemplate', _api2.default.getOrderedLists(), $page);
+    ListManagementController.render(page);
 
     $nav.find('a.save').on('click', function (ev) {
       var data = window.tommy.app.f7.formToJSON($page.find('form'));
       ListManagementController.save(page, data);
       ev.preventDefault();
     });
+
+    $page.on('change', 'input[type="checkbox"]', function () {
+      $nav.find('a.save').addClass('active');
+    });
+  },
+  render: function render(page) {
+    var $page = $$(page.container);
+    window.tommy.tplManager.renderInline('tasks__listManagementTemplate', _api2.default.getOrderedLists(), $page);
   },
   save: function save(page, data) {
     var $page = $$(page.container);
@@ -1100,7 +1108,8 @@ var TaskController = {
     var picker = window.tommy.util.createDatePicker($input, task.end_at, {
       onClose: function onClose() {
         console.log('closing deadline picker', picker.currentDate);
-        task.end_at = picker.currentDate;
+        task.end_at = new Date(picker.currentDate).toJSON();
+
         TaskController.saveTask(page);
       },
       onFormat: function onFormat(date) {
@@ -1277,7 +1286,7 @@ window.tommy.app.f7.onPageInit('tasks__board-settings', _boardSettings2.default.
 window.tommy.app.f7.onPageInit('tasks__list-add', _listAdd2.default.init);
 window.tommy.app.f7.onPageInit('tasks__list-edit', _listEdit2.default.init);
 window.tommy.app.f7.onPageInit('tasks__list-management', _listManagement2.default.init);
-window.tommy.app.f7.onPageAfterAnimation('tasks__list-management', _listManagement2.default.init);
+window.tommy.app.f7.onPageAfterAnimation('tasks__list-management', _listManagement2.default.render);
 window.tommy.app.f7.onPageInit('tasks__task-add', _taskAdd2.default.init);
 window.tommy.app.f7.onPageInit('tasks__task', _task2.default.init);
 window.tommy.app.f7.onPageAfterAnimation('tasks__task', _task2.default.invalidate);
