@@ -82,6 +82,16 @@
       box-sizing: border-box;
       border: 1px solid #333;
     }
+    &:before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      width: 34px;
+      height: 34px;
+      margin-left: -17px;
+      margin-bottom: -5px;
+    }
     &.unavailable:after {
       border: none;
       background: #FF4500 url(../images/icon-no.svg) no-repeat center;

@@ -16,14 +16,14 @@
             <a href="#" class="availability__toggle-availability {{availability__class "pm" data}}" data-availability="pm">
               <span>{{t "word.pm" ns="availability" defaultValue="pm"}}</span>
             </a>
-            <a href="#" class="availability__toggle-availability {{availability__class "ns" data}}" data-availability="ns">
-              <span>{{t "word.ns" ns="availability" defaultValue="ns"}}</span>
+            <a href="#" class="availability__toggle-availability {{availability__class "nd" data}}" data-availability="nd">
+              <span>{{t "word.nd" ns="availability" defaultValue="nd"}}</span>
             </a>
             <form>
               <input type="hidden" name="start_at" value="{{formatDate start_at "YYYY-MM-DD"}}" />
               <input type="text" name="am" value="{{availability__value "am" data}}"/>
               <input type="text" name="pm" value="{{availability__value "pm" data}}"/>
-              <input type="text" name="ns" value="{{availability__value "ns" data}}"/>
+              <input type="text" name="nd" value="{{availability__value "nd" data}}"/>
             </form>
           </div>
         </div>

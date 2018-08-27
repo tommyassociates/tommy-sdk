@@ -54,6 +54,15 @@
   margin-right: auto;
   box-sizing: border-box;
   border: 1px solid #333; }
+.page#availability__main .list-block a.availability__toggle-availability:before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 34px;
+  height: 34px;
+  margin-left: -17px;
+  margin-bottom: -5px; }
 .page#availability__main .list-block a.availability__toggle-availability.unavailable:after {
   border: none;
   background: #FF4500 url(../images/icon-no.svg) no-repeat center; }
