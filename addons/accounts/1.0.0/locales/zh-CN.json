@@ -1,0 +1,105 @@
+{
+  "board-settings": {
+    "title": "设置"
+  },
+  "index": {
+    "title": "任务",
+    "title_user": "{{user}} 任务",
+    "add-transaction": "添加任务",
+    "cancel": "取消",
+    "done": "完成",
+    "unassigned": "未分配",
+    "default-transaction-name": "我的任务"
+  },
+  "list-add": {
+    "title": "添加列表"
+  },
+  "list-edit": {
+    "title": "编辑列表",
+    "name": "名称",
+    "show-fast-add-transaction": "显示快速添加任务",
+    "delete-list": "删除列表",
+    "filter-status": "Filter Status"
+  },
+  "list-management": {
+    "title": "列表管理"
+  },
+  "transaction-add": {
+    "title": "添加任务",
+    "name": "名称",
+    "list": "列表"
+  },
+  "board-setting": {
+    "list-management": "列表管理"
+  },
+  "date_range": {
+    "none": "None",
+    "today": "Today",
+    "week": "This Week",
+    "month": "This Month"
+  },
+  "common": {
+    "search_members_tags": "搜索成员，标签",
+    "date_range": "Date Range",
+    "choose_range": "Choose Range",
+    "start_date": "Start Date",
+    "end_date": "End Date",
+    "deadline": "Deadline"
+  },
+  "status": {
+    "unassigned": "未分配",
+    "assigned": "已分配",
+    "processing": "处理中",
+    "completed": "已完成",
+    "closed": "关闭",
+    "archive_transaction": "归档任务",
+    "cancel": "取消"
+  },
+  "transaction": {
+    "checklist": "查看列表",
+    "deadline": "截止日期",
+    "transaction_details": "任务详情",
+    "participant": "参与人",
+    "send": "发送",
+    "waiting_for_assignments": "等待分配",
+    "edit_description": "编辑描述...",
+    "participants": "参与人",
+    "edit_deadline": "编辑截止日期.",
+    "add_items": "添加项目",
+    "activity": "活动",
+    "created_a_transaction": "创建任务",
+    "changed_status_to": "改变状态至 {{status}}",
+    "enter_comment": "输入评论"
+  },
+  "title": "任务管理员",
+  "summary": "轻松管理你的项目&任务",
+  "description": "轻松管理你的项目&任务",
+  "developer": "托秘网络有限公司",
+  "permissions": {
+    "filter_transactions": {
+      "title": "过滤任务",
+      "hint": "选择列表中显示的任务 "
+    },
+    "transaction_list_read_access": {
+      "title": "查看列表权限",
+      "hint": "选择谁可以查看列表"
+    },
+    "transaction_list_edit_access": {
+      "title": "编辑列表权限",
+      "hint": "选择谁可以编辑列表"
+    },
+    "transaction_create_access": {
+      "title": "创建任务权限",
+      "hint": "选择谁可以创建任务"
+    },
+    "transaction_edit_access": {
+      "title": "编辑任务权限",
+      "hint": "选择谁可以编辑任务"
+    }
+  },
+  "views": {
+    "index": {
+      "title": "任务"
+    }
+  }
+}
