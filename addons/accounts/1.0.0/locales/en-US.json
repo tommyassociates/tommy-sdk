@@ -1,0 +1,106 @@
+{
+  "board-settings": {
+    "title": "Settings"
+  },
+  "index": {
+    "title": "Account",
+    "title_user": "{{user}}'s Transactions",
+    "add-transaction": "Add transaction",
+    "cancel": "Cancel",
+    "done": "Done",
+    "unassigned": "Unassigned",
+    "default-transaction-name": "My Transactions"
+  },
+  "list-add": {
+    "title": "Add List"
+  },
+  "list-edit": {
+    "title": "Edit List",
+    "name": "Name",
+    "show-fast-add-transaction": "Show Fast Add Transaction",
+    "delete-list": "Delete List",
+    "filter-status": "Filter Status"
+  },
+  "list-management": {
+    "title": "List Management"
+  },
+  "transaction-add": {
+    "title": "Add Transaction",
+    "name": "Name",
+    "list": "List"
+  },
+  "board-setting": {
+    "list-management": "List Management"
+  },
+  "date_range": {
+    "none": "None",
+    "today": "Today",
+    "week": "This Week",
+    "month": "This Month"
+  },
+  "common": {
+    "search_members_tags": "Search Members, Tags",
+    "date_range": "Date Range",
+    "choose_range": "Choose Range",
+    "start_date": "Start Date",
+    "end_date": "End Date",
+    "deadline": "Deadline"
+  },
+  "status": {
+    "unassigned": "Unassigned",
+    "assigned": "Assigned",
+    "processing": "Processing",
+    "completed": "Completed",
+    "closed": "Closed",
+    "archive_transaction": "Archive Transaction",
+    "unassigned": "Unassigned",
+    "cancel": "Cancel"
+  },
+  "transaction": {
+    "checklist": "Checklist",
+    "deadline": "Deadline",
+    "transaction_details": "Transaction details",
+    "participant": "Participant",
+    "send": "Send",
+    "waiting_for_assignments": "Waiting for assignments",
+    "edit_description": "Edit the description...",
+    "participants": "Participants",
+    "edit_deadline": "Edit deadline...",
+    "add_items": "Add items",
+    "activity": "Activity",
+    "created_a_transaction": "Created a transaction",
+    "changed_status_to": "Changed status to {{status}}",
+    "enter_comment": "Enter comment"
+  },
+  "title": "Transaction Manager",
+  "summary": "Manage your projects & transactions with ease.",
+  "description": "Manage your projects & transactions with ease.",
+  "developer": "Tommy Labs GmbH",
+  "permissions": {
+    "filter_transactions": {
+      "title": "Filter Transactions",
+      "hint": "Select which transactions will appear on the list"
+    },
+    "transaction_list_read_access": {
+      "title": "Who Can See List",
+      "hint": "Select who can view this list"
+    },
+    "transaction_list_edit_access": {
+      "title": "Who Can Edit List",
+      "hint": "Select who can edit this list"
+    },
+    "transaction_create_access": {
+      "title": "Who Can Create Transactions",
+      "hint": "Select who can create transactions"
+    },
+    "transaction_edit_access": {
+      "title": "Who Can Edit Transactions",
+      "hint": "Select who can edit transactions"
+    }
+  },
+  "views": {
+    "index": {
+      "title": "Transactions"
+    }
+  }
+}
