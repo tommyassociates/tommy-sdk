@@ -1,0 +1,43 @@
+<script id="accounts__transactionDetailsTemplate" type="text/template">
+  <div class="accounts-transaction-header">
+    <div class="accounts-transaction-header-wrap">
+      <div class="accounts-transaction-icon">
+        {{#if icon_url}}
+          <img src="{{icon_url}}">
+        {{else}}
+          <i class="accounts-transaction-icon-placeholder"></i>
+        {{/if}}
+      </div>
+      <div class="accounts-transaction-payment-info">
+        <div class="accounts-transaction-payment-name">{{payee_name}}</div>
+        <div class="accounts-transaction-payment-amount">{{accounts__formatTransactionAmount this}}</div>
+      </div>
+    </div>
+    <div class="accounts-transaction-status">{{accounts__formatTransactionStatus status}}</div>
+  </div>
+
+  <div class="accounts-transaction-details-list list-block">
+    <ul>
+      {{#if card_name}}
+      <li class="item-content">
+        <div class="item-inner">
+          <div class="item-title">{{t "transaction_details.payment_label" defaultValue="Payment"}}</div>
+          <div class="item-after">{{card_name}}</div>
+        </div>
+      </li>
+      {{/if}}
+      <li class="item-content">
+        <div class="item-inner">
+          <div class="item-title">{{t "transaction_details.time_label" defaultValue="Time"}}</div>
+          <div class="item-after">{{accounts__formatTransactionDate paid_at}}</div>
+        </div>
+      </li>
+      <li class="item-content">
+        <div class="item-inner">
+          <div class="item-title">{{t "transaction_details.payee_label" defaultValue="Payee"}}</div>
+          <div class="item-after">{{payee_name}}</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+</script>
