@@ -9,7 +9,7 @@
     "cancel": "取消",
     "done": "完成",
     "unassigned": "未分配",
-    "default-transaction-name": "我的任务"
+    "default-list-name": "我的任务"
   },
   "list-add": {
     "title": "添加列表"

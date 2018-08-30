@@ -41,9 +41,12 @@ const API = {
 
   getListTransactions (listId) {
     const list = API.cache['lists'][listId]
+    return list.transactions;
+    /*
     const transactions = []
     for (const transactionId in API.cache['transactions']) {
       const transaction = API.cache['transactions'][transactionId]
+      console.error({list, transaction});
 
       if (list.filters && transaction.filters) {
 
@@ -67,6 +70,7 @@ const API = {
     }
 
     return transactions
+    */
   },
 
   loadListTransactions (list) {
@@ -98,10 +102,16 @@ const API = {
     if (list.data.date_range) {
       params.date_range = list.data.date_range;
     }
-    if (list.data.statuses)
+    if (list.data.statuses) {
       params.status = list.data.statuses
+    }
 
-    return window.tommy.api.getFragments(params)
+    return window.tommy.api.call({
+      endpoint: 'wallet/manager/transactions'
+    }).then((transactions) => {
+      API.addTransactions(transactions);
+      list.transactions = transactions;
+    });
   },
 
   loadTransactions () {
@@ -110,12 +120,12 @@ const API = {
     const requests = []
     for (const listId in API.cache['lists']) {
       const list = API.cache['lists'][listId]
-      const request = API.loadListTransactions(list)
+      const request = API.loadListTransactions(list);
       if (request)
         requests.push(request)
     }
 
-    return Promise.all(requests).then(API.addTransactions)
+    return Promise.all(requests).then(API.addTasks)
   },
 
   addTransactionActivity (transaction, type, text) {
@@ -251,7 +261,7 @@ const API = {
   createDefaultList () {
     console.log('creating deafult transaction list')
     let list = {
-      name: window.tommy.i18n.t('index.default-transaction-name'),
+      name: window.tommy.i18n.t('index.default-list-name'),
       data: {
         default: true
       },

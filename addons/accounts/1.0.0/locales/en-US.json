@@ -9,7 +9,14 @@
     "cancel": "Cancel",
     "done": "Done",
     "unassigned": "Unassigned",
-    "default-transaction-name": "My Transactions"
+    "default-list-name": "My Account",
+    "transactions": "Transactions"
+  },
+  "transaction_details": {
+    "title": "Transaction Details",
+    "payment_label": "Payment",
+    "time_label": "Time",
+    "payee_label": "Payee"
   },
   "list-add": {
     "title": "Add List"

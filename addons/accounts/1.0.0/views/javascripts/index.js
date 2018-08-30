@@ -1,6 +1,6 @@
 import API from './api'
 import IndexController from './controllers/index'
-import TransactionController from './controllers/transaction'
+import TransactionDetailsController from './controllers/transaction-details'
 import TransactionAddController from './controllers/transaction-add'
 import ListAddController from './controllers/list-add'
 import ListEditController from './controllers/list-edit'
@@ -8,6 +8,7 @@ import ListManagementController from './controllers/list-management'
 import BoardSettingsController from './controllers/board-settings'
 
 import formatDateRange from './format-date-range';
+import currencyMap from './currency-map';
 
 //
 // == Router
@@ -21,8 +22,8 @@ window.tommy.app.f7.onPageInit('accounts__list-edit', ListEditController.init)
 window.tommy.app.f7.onPageInit('accounts__list-management', ListManagementController.init)
 window.tommy.app.f7.onPageAfterAnimation('accounts__list-management', ListManagementController.render)
 window.tommy.app.f7.onPageInit('accounts__transaction-add', TransactionAddController.init)
-window.tommy.app.f7.onPageInit('accounts__transaction', TransactionController.init)
-window.tommy.app.f7.onPageAfterAnimation('accounts__transaction', TransactionController.invalidate)
+window.tommy.app.f7.onPageInit('accounts__transaction_details', TransactionDetailsController.init)
+window.tommy.app.f7.onPageBeforeRemove('accounts__transaction_details', TransactionDetailsController.uninit)
 
 
 //
@@ -63,16 +64,12 @@ window.tommy.app.t7.registerHelper('accounts__statusSelectOptions', statuses => 
 
 window.tommy.app.t7.registerHelper('accounts__ifCanEditList', (list, options) => {
     var account = window.tommy.config.getCurrentAccount()
-
     // BUG: Due to some unknown bug `this` is undefined in this function,
     // so substituting with the `list` variable for return variables
     // console.log('accounts__canEditList', this, list, options)
 
     // Default lists (the list automatically created for each team member) can
     // only be edited by admins
-    if (list.data.default && !window.tommy.util.isTeamOwnerOrManager(account))
-      return options.inverse(list, options.data)
-
     if (list.permission_to.indexOf('update') !== -1)
       return options.fn(list, options.data)
     else
@@ -82,3 +79,32 @@ window.tommy.app.t7.registerHelper('accounts__ifCanEditList', (list, options) =>
 window.tommy.app.t7.registerHelper('accounts__displayDateRange', range => {
   return formatDateRange(range);
 })
+
+window.tommy.app.t7.registerHelper('accounts__formatTransactionAmount', item => {
+  return `${item.status === 'paid' || item.status === 'failed' ? '-' : '+'} ${currencyMap(item.currency)}${item.amount}`;
+});
+window.tommy.app.t7.registerHelper('accounts__currencySymbol', code => {
+  return currencyMap(code);
+});
+window.tommy.app.t7.registerHelper('accounts__formatTransactionStatus', status => {
+  return status[0].toUpperCase() + status.substr(1);
+});
+window.tommy.app.t7.registerHelper('accounts__formatTransactionDate', date => {
+  if (!date) return '';
+  const d = new Date(date);
+  const year = d.getFullYear();
+
+  let month = d.getMonth() + 1;
+  if (month < 10) month = `0${month}`;
+
+  let day = d.getDate();
+  if (day < 10) day = `0${day}`;
+
+  let hours = d.getHours();
+  if (hours < 10) hours = `0${hours}`;
+
+  let minutes = d.getMinutes();
+  if (minutes < 10) minutes = `0${minutes}`;
+
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+});

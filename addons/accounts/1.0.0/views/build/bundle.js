@@ -45,40 +45,31 @@ var API = {
   },
   getListTransactions: function getListTransactions(listId) {
     var list = API.cache['lists'][listId];
-    var transactions = [];
-    for (var transactionId in API.cache['transactions']) {
-      var transaction = API.cache['transactions'][transactionId];
-
-      if (list.filters && transaction.filters) {
-        (function () {
-
-          // Filter on tags
-          var transactionTags = transaction.filters.map(function (x) {
-            return x.name;
-          });
-          var listTags = list.filters.map(function (x) {
-            return x.name;
-          });
-          var matchTags = transactionTags.filter(function (x) {
-            return listTags.indexOf(x) !== -1;
-          });
-          var matches = !!matchTags.length || !transactionTags.length && !listTags.length;
-          console.log('transaction matches list tags', transaction.name, transaction.filters, list.name, list.filters, matches);
-
-          // Filter on status
-          if (matches && list.data.statuses) {
-            matches = list.data.statuses.indexOf(transaction.status) !== -1;
-            console.log('transaction matches list statuses', transaction.name, transaction.status, list.name, list.statuses, matches);
-          }
-
-          if (matches) {
-            transactions.push(transaction);
-          }
-        })();
+    return list.transactions;
+    /*
+    const transactions = []
+    for (const transactionId in API.cache['transactions']) {
+      const transaction = API.cache['transactions'][transactionId]
+      console.error({list, transaction});
+       if (list.filters && transaction.filters) {
+         // Filter on tags
+        const transactionTags = transaction.filters.map(x => x.name)
+        const listTags = list.filters.map(x => x.name)
+        const matchTags = transactionTags.filter(x => listTags.indexOf(x) !== -1)
+        let matches = !!matchTags.length || (!transactionTags.length && !listTags.length)
+        console.log('transaction matches list tags', transaction.name, transaction.filters, list.name, list.filters, matches)
+         // Filter on status
+        if (matches && list.data.statuses) {
+          matches = list.data.statuses.indexOf(transaction.status) !== -1
+          console.log('transaction matches list statuses', transaction.name, transaction.status, list.name, list.statuses, matches)
+        }
+         if (matches) {
+          transactions.push(transaction)
+        }
       }
     }
-
-    return transactions;
+     return transactions
+    */
   },
   loadListTransactions: function loadListTransactions(list) {
     if (list._transactionsLoaded) {
@@ -109,9 +100,16 @@ var API = {
     if (list.data.date_range) {
       params.date_range = list.data.date_range;
     }
-    if (list.data.statuses) params.status = list.data.statuses;
+    if (list.data.statuses) {
+      params.status = list.data.statuses;
+    }
 
-    return window.tommy.api.getFragments(params);
+    return window.tommy.api.call({
+      endpoint: 'wallet/manager/transactions'
+    }).then(function (transactions) {
+      API.addTransactions(transactions);
+      list.transactions = transactions;
+    });
   },
   loadTransactions: function loadTransactions() {
     console.log('load transactions');
@@ -123,7 +121,7 @@ var API = {
       if (request) requests.push(request);
     }
 
-    return Promise.all(requests).then(API.addTransactions);
+    return Promise.all(requests).then(API.addTasks);
   },
   addTransactionActivity: function addTransactionActivity(transaction, type, text) {
     var currentUser = window.tommy.config.getCurrentUser();
@@ -154,7 +152,7 @@ var API = {
 
     _index2.default.invalidateLists = true; // rerender lists
 
-    transaction.addon = 'transactions';
+    transaction.addon = 'accounts';
     transaction.kind = 'Transaction';
     transaction.with_filters = true;
     transaction.with_permission_to = true;
@@ -226,7 +224,7 @@ var API = {
     list._transactionsLoaded = false;
     _index2.default.invalidateLists = true; // rerender lists
 
-    list.addon = 'transactions';
+    list.addon = 'accounts';
     list.kind = 'TransactionList';
     list.with_filters = true;
     list.with_permission_to = true;
@@ -266,7 +264,7 @@ var API = {
   createDefaultList: function createDefaultList() {
     console.log('creating deafult transaction list');
     var list = {
-      name: window.tommy.i18n.t('index.default-transaction-name'),
+      name: window.tommy.i18n.t('index.default-list-name'),
       data: {
         default: true
       },
@@ -281,30 +279,13 @@ var API = {
       return x.data.default;
     }).length > 0;
   },
-
-
-  // initPermissionSelects (page, wantedPermissions) {
-  //   console.log('init permission selects', wantedPermissions)
-  //   window.tommy.api.getInstalledAddonPermissions('transactions').then(permissions => {
-  //     console.log('installed addon permissions', permissions)
-  //     for (var i = 0; i < permissions.length; i++) {
-  //       const wantedPermission = wantedPermissions.filter(x => x.name == permissions[i].name)[0]
-  //       if (!wantedPermission) continue
-  //       const permission = Object.assign({}, permissions[i], wantedPermission)
-  //       console.log('init permissions', permission)
-  //       window.tommy.tplManager.appendInline('accounts__tagSelectTemplate', permission, page.container)
-  //       API.initTagSelect(page, permission)
-  //     }
-  //   })
-  // },
-
   initPermissionSelect: function initPermissionSelect(page, name, resource_id) {
     console.log('init permission selects', name, resource_id);
     var params = {
       resource_id: resource_id,
       with_filters: true
     };
-    window.tommy.api.getInstalledAddonPermission('transactions', name, params).then(function (permission) {
+    window.tommy.api.getInstalledAddonPermission('accounts', name, params).then(function (permission) {
       console.log('installed addon permission', permission);
       // for (var i = 0; i < permissions.length; i++) {
       // const wantedPermission = wantedPermissions.filter(x => x.name == permissions[i].name)[0]
@@ -322,7 +303,7 @@ var API = {
     console.log('init tag select', permission, $tagSelect.dataset());
     window.tommy.tagSelect.initWidget($tagSelect, permission.filters, function (data) {
       console.log('save permission tags', permission, data);
-      window.tommy.api.updateInstalledAddonPermission('transactions', permission.name, {
+      window.tommy.api.updateInstalledAddonPermission('accounts', permission.name, {
         resource_id: permission.resource_id, // pass the resource_id for resource specific permissions
         with_filters: true,
         filters: JSON.stringify(data) // data
@@ -403,10 +384,6 @@ var _api = require('../api');
 
 var _api2 = _interopRequireDefault(_api);
 
-var _transaction = require('./transaction');
-
-var _transaction2 = _interopRequireDefault(_transaction);
-
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 var IndexController = {
@@ -419,7 +396,6 @@ var IndexController = {
         if (_api2.default.hasDefaultList()) {
           IndexController.loadTransactions(page);
         } else {
-
           // Create a default list if none exists
           _api2.default.createDefaultList().then(function () {
             IndexController.loadTransactions(page);
@@ -453,28 +429,6 @@ var IndexController = {
       }
     });
 
-    $page.on('click', '.fast-add-toggle', function () {
-      var $el = $$(this);
-      var $panel = $el.closest('.in').removeClass('in').siblings().addClass('in');
-      if ($el.data('input-focus')) {
-        $panel.find('input').focus();
-      }
-    });
-
-    $page.on('submit', 'form.fast-add-form', function (ev) {
-      ev.preventDefault();
-      var list = _api2.default.cache['lists'][$$(this).parents('[data-list-id]').data('list-id')];
-      var data = window.tommy.app.f7.formToJSON(this);
-
-      // Inherit list filters from list when quick adding transactions
-      data.filters = list.filters;
-
-      $$(this).find('input[name="name"]').val('');
-      _api2.default.saveTransaction(data).then(function () {
-        IndexController.invalidate(page);
-      });
-    });
-
     // Bind picker actions
     // KLUDGE: This is very hacky and will leave us with unbound events
     $$(document).on('picker:open', function (e) {
@@ -487,70 +441,36 @@ var IndexController = {
         $this.find('input[value="' + name + '"]').parent().parent().addClass('offscreen');
       }
     });
-
-    $page.on('click', 'a.transaction-card', function () {
-      var href = $$(this).data('href');
-
-      // if (API.isTablet()) {
-      $$.get(href, function (response) {
-        var $popup = $$('<div class="popup" data-page="accounts__transaction" id="accounts__transactions"></div>');
-        $popup.append(response);
-        $popup.find('.back').removeClass('back');
-        $popup.find('.page').addClass('navbar-fixed');
-        window.tommy.f7.popup($popup);
-        _transaction2.default.init({
-          container: $popup.find('.page')[0],
-          navbarInnerContainer: $popup.find('.navbar-inner')[0],
-          query: $$.parseUrlQuery(href)
-        });
-
-        $popup.on('popup:close', function () {
-          IndexController.invalidate(page);
-        });
-
-        // window.tommy.f7.initPage($popup.find('.page'))
-      });
-      // window.tommy.f7view.router.load({url: $$(this).data('href'), animatePages: false})
-      // } else {
-      //   window.tommy.f7view.router.loadPage($$(this).data('href'))
-      // }
-    });
   },
   invalidate: function invalidate(page) {
     // if (!IndexController.listsLoaded || !IndexController.transactionsLoaded) return;
 
-    console.log('invalidating transactions index');
+    console.log('invalidating accounts index');
     var $page = $$(page.container);
-    if (IndexController.invalidateLists || !$page.find('.card').length) {
-      console.log('rendering transaction lists');
-      IndexController.invalidateLists = false;
-      window.tommy.tplManager.renderInline('accounts__listsTemplate', _api2.default.getOrderedLists(), page.container);
 
-      var swiper = window.tommy.app.f7.swiper('.swiper-container', {
-        centeredSlides: !_api2.default.isTablet(),
-        spaceBetween: 0,
-        freeMode: false,
-        freeModeSticky: true,
-        slidesPerView: 'auto'
-      });
-    }
+    console.log('rendering transaction lists');
+    IndexController.invalidateLists = false;
+    window.tommy.tplManager.renderInline('accounts__listsTemplate', _api2.default.getOrderedLists(), page.container);
+
+    var swiper = window.tommy.app.f7.swiper('.swiper-container', {
+      centeredSlides: !_api2.default.isTablet(),
+      spaceBetween: 0,
+      freeMode: false,
+      freeModeSticky: true,
+      slidesPerView: 'auto'
+    });
 
     for (var listId in _api2.default.cache['lists']) {
-      var $e = $$(page.container).find('[data-list-id="' + listId + '"] .list-content');
+      var $e = $page.find('[data-list-id="' + listId + '"] .list-content');
       var transactions = _api2.default.getListTransactions(listId);
       window.tommy.tplManager.renderTarget('accounts__listTransactionsTemplate', transactions, $e);
-    }
-
-    var actor = window.tommy.addons.getCurrentActor();
-    if (actor) {
-      window.tommy.app.setPageTitle(window.tommy.i18n.t('index.title_user', { user: actor.first_name }));
     }
   }
 };
 
 exports.default = IndexController;
 
-},{"../api":1,"./transaction":8}],4:[function(require,module,exports){
+},{"../api":1}],4:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -623,7 +543,6 @@ var ListEditController = {
     console.log('edit list', list);
 
     // NOTE: we should probably check that the current user has
-    // `transaction_list_edit_access` permission before rendering the page.
 
     window.tommy.tplManager.renderInline('accounts__listEditTemplate', list, $page);
 
@@ -781,7 +700,7 @@ var ListEditController = {
 
 exports.default = ListEditController;
 
-},{"../api":1,"../format-date-range":9}],6:[function(require,module,exports){
+},{"../api":1,"../format-date-range":10}],6:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -894,320 +813,209 @@ var _api2 = _interopRequireDefault(_api);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var TransactionController = {
+var TransactionDetailsController = {
   init: function init(page) {
-    var transaction = _api2.default.cache['transactions'][page.query.transaction_fragment_id];
-    var $page = $$(page.container);
-    var $navbar = $$(page.navbarInnerContainer);
+    var id = page.query.id;
 
-    var f7 = window.tommy.app.f7;
-
-    console.log('init transaction details', transaction);
-    window.tommy.tplManager.renderInline('accounts__transactionDetailsTemplate', transaction, $page.parent());
-
-    $page.find('.transaction-menu-popover').on('popover:open', function () {
-      // BUG: popover shows offscreen on desktop, this fixes it
-      $$(window).trigger('resize');
-    });
-
-    $page.find('.transaction-menu-popover a').click(function (e) {
-      var command = $$(e.target).data('command');
-
-      switch (command) {
-        case 'add-checklist':
-          TransactionController.renderChecklist(page);
-          break;
-        case 'add-end-time':
-          TransactionController.renderDeadline(page);
-          break;
-        default:
-          alert('Unknown command: ' + command);
-      }
-
-      f7.closeModal('.transaction-menu-popover');
-    });
-
-    // Transaction title area
-    // TODO: make into a reuasble module
-    $page.find('.page-content').scroll(function (e) {
-      if (e.target.scrollTop > 100) {
-        $navbar.addClass('with-title');
-      } else {
-        $navbar.removeClass('with-title');
-      }
-    });
-
-    // Transaction status picker
-    TransactionController.initStatusPicker(page);
-
-    // Transaction checklist actions
-    if (transaction.data.checklist && transaction.data.checklist.items) {
-      TransactionController.renderChecklist(page);
-    }
-
-    // Transaction deadline
-    if (transaction.end_at) {
-      TransactionController.renderDeadline(page);
-    }
-
-    // Transaction activity
-    var myMessagebar = f7.messagebar('.messagebar', { maxHeight: 200 });
-    myMessagebar.textarea.on('change input', function (e) {
-      var value = myMessagebar.value().trim();
-      if (value) myMessagebar.textarea.addClass('with-value');else myMessagebar.textarea.removeClass('with-value');
-    });
-    $page.find('.add-comment').click(function () {
-      var value = myMessagebar.value().trim();
-      if (!value) return;
-      TransactionController.addActivity(page, 'comment', myMessagebar.value());
-      myMessagebar.clear();
-    });
-    TransactionController.renderActivity(page);
-
-    // Transaction participants
-    var $tagSelect = $page.find('.tag-select');
-    var participants = [];
-    if (transaction.filters) {
-      participants = transaction.filters;
-    }
-    console.log('init transaction participants', participants, $tagSelect.length);
-    window.tommy.tplManager.renderInline('accounts__transactionParticipantsTemplate', participants, $page);
-    window.tommy.tagSelect.initWidget($tagSelect, participants, function (data) {
-      console.log('transaction participants changed', data);
-      transaction.filters = data;
-      window.tommy.tplManager.renderInline('accounts__transactionParticipantsTemplate', transaction.filters, page.container);
-      TransactionController.saveTransaction(page);
-    });
-
-    // Transaction name inline editing
-    var $editTransactionName = $page.find('textarea.edit-transaction-name');
-    $editTransactionName.on('focus', function () {
-      TransactionController.enableEditName(page, true);
-    });
-    f7.resizableTextarea('textarea.edit-transaction-name');
-    f7.resizeTextarea('textarea.edit-transaction-name');
-
-    // Transaction description inline editing
-    var $editTransactionDescription = $page.find('textarea.edit-transaction-description');
-    $editTransactionDescription.on('focus', function () {
-      TransactionController.enableEditDescription(page, true);
-    });
-    f7.resizableTextarea('textarea.edit-transaction-description');
-    f7.resizeTextarea('textarea.edit-transaction-description');
-
-    // Save button
-    $navbar.find('a.save').on('click', function () {
-      TransactionController.saveTransaction(page);
-      TransactionController.enableSave(page, false);
-    });
-
-    TransactionController.invalidate(page);
+    var transaction = _api2.default.cache.transactions[id];
+    console.error({ transaction: transaction });
+    window.tommy.tplManager.renderInline('accounts__transactionDetailsTemplate', transaction, page.container);
   },
-  invalidate: function invalidate(page) {
-    var transaction = _api2.default.cache['transactions'][page.query.transaction_fragment_id];
-
-    // Page title must be set after animation
-    // window.tommy.app.setPageTitle(transaction.name)
-    var $navbar = $$(page.navbarInnerContainer);
-    $navbar.find('.center').text(transaction.name);
-  },
-  renderActivity: function renderActivity(page) {
-    var transaction = _api2.default.cache['transactions'][page.query.transaction_fragment_id];
-    var $page = $$(page.container);
-
-    var items = [];
-    if (transaction.data.activity) {
-      items = transaction.data.activity;
-    }
-    window.tommy.tplManager.renderInline('accounts__transactionActivityTemplate', items, $page);
-  },
-  addActivity: function addActivity(page, type, text) {
-    var transaction = _api2.default.cache['transactions'][page.query.transaction_fragment_id];
-    _api2.default.addTransactionActivity(transaction, type, text);
-
-    TransactionController.renderActivity(page);
-    TransactionController.saveTransaction(page);
-  },
-  renderChecklist: function renderChecklist(page) {
-    var transaction = _api2.default.cache['transactions'][page.query.transaction_fragment_id];
-    var $page = $$(page.container);
-
-    var items = [];
-    if (transaction.data.checklist && transaction.data.checklist.items) {
-      items = transaction.data.checklist.items;
-    }
-    window.tommy.tplManager.renderInline('accounts__transactionChecklistTemplate', items, $page);
-
-    var $input = $page.find('input.add-checklist-item');
-    $input.on('blur', function () {
-      var text = $$(this).val();
-      transaction = _api2.default.cache['transactions'][page.query.transaction_fragment_id];
-      if (!text || !text.length) {
-        return;
-      }
-
-      if (!transaction.data.checklist) {
-        transaction.data.checklist = {};
-      }
-      if (!transaction.data.checklist.items) {
-        transaction.data.checklist.items = [];
-      }
-      transaction.data.checklist.items.push({
-        text: text,
-        complete: false
-      });
-      TransactionController.renderChecklist(page);
-      TransactionController.saveTransaction(page);
-    });
-    $page.find('.remove-checklist').click(function () {
-      transaction = _api2.default.cache['transactions'][page.query.transaction_fragment_id];
-      // TODO: confirm alert
-      transaction.data.checklist = {};
-      $page.find('[data-template="accounts__transactionChecklistTemplate"]').html('');
-      TransactionController.saveTransaction(page);
-    });
-    $page.find('.remove-checklist-item').click(function () {
-      transaction = _api2.default.cache['transactions'][page.query.transaction_fragment_id];
-      var index = parseInt($$(this).parents('li').data('checklist-item'));
-
-      console.log('removing checklist item', index);
-      transaction.data.checklist.items.splice(index, 1);
-      TransactionController.renderChecklist(page);
-
-      TransactionController.saveTransaction(page);
-    });
-    $page.find('.checklist-item').click(function (e) {
-      var $target = $$(e.target);
-      if ($target.hasClass('remove-checklist-item') || $target.parents('.remove-checklist-item').length) {
-        return;
-      }
-      var index = parseInt($$(this).parents('li').data('checklist-item'));
-      var isChecked = $$(this).hasClass('checked');
-      transaction = _api2.default.cache['transactions'][page.query.transaction_fragment_id];
-      console.log('toggle checklist item', index);
-      if (isChecked) {
-        $$(this).removeClass('checked');
-        transaction.data.checklist.items[index].complete = false;
-      } else {
-        $$(this).addClass('checked');
-        transaction.data.checklist.items[index].complete = true;
-      }
-
-      TransactionController.saveTransaction(page);
-    });
-  },
-  renderDeadline: function renderDeadline(page) {
-    var transaction = _api2.default.cache['transactions'][page.query.transaction_fragment_id];
-    var $page = $$(page.container);
-
-    console.log('render deadline', transaction.end_at);
-    window.tommy.tplManager.renderInline('accounts__transactionDeadlineTemplate', transaction.end_at, $page);
-
-    var $input = $page.find('input.edit-transaction-deadline');
-    var format = 'dddd, MMM Do YY, h:mm a';
-    var picker = window.tommy.util.createDatePicker($input, transaction.end_at, {
-      onClose: function onClose() {
-        console.log('closing deadline picker', picker.currentDate);
-        transaction.end_at = new Date(picker.currentDate).toJSON();
-
-        TransactionController.saveTransaction(page);
-      },
-      onFormat: function onFormat(date) {
-        console.log('format deadline picker', date);
-        return window.tommy.util.humanTime(date);
-      }
-    });
-
-    if (!transaction.end_at) {
-      $input.val('');
-    }
-
-    $page.on('click', '.remove-deadline', function () {
-      // TODO: confirm alert
-      delete transaction.end_at;
-      $page.find('[data-template="accounts__transactionDeadlineTemplate"]').html('');
-      TransactionController.saveTransaction(page);
-    });
-  },
-  initStatusPicker: function initStatusPicker(page) {
-    var transaction = _api2.default.cache['transactions'][page.query.transaction_fragment_id];
-    var initial = transaction.status === 'Unassigned' ? window.tommy.i18n.t('transaction.waiting_for_assignments') : _api2.default.translateStatus(transaction.status);
-
-    return window.tommy.app.f7.picker({
-      input: $$(page.container).find('.transaction-status-picker'),
-      value: [initial],
-      convertToPopover: false,
-      cols: [{
-        textAlign: 'center',
-        values: _api2.default.translatedStatuses()
-      }],
-      onClose: function onClose(p) {
-        var translatedStatus = p.value[0];
-        var status = _api2.default.untranslateStatus(p.value[0]);
-        if (status == transaction.status) {
-          return;
-        }
-        transaction.status = status;
-        TransactionController.addActivity(page, 'status', window.tommy.i18n.t('transaction.changed_status_to', { status: translatedStatus }));
-        TransactionController.saveTransaction(page);
-      }
-    });
-  },
-  saveTransaction: function saveTransaction(page) {
-    var transaction = _api2.default.cache['transactions'][page.query.transaction_fragment_id];
-
-    console.log('saving transaction fragment', transaction);
-    _api2.default.saveTransaction(transaction);
-  },
-  enableEditName: function enableEditName(page, flag) {
-    var transaction = _api2.default.cache['transactions'][page.query.transaction_fragment_id];
-    var $page = $$(page.container);
-    var $textarea = $page.find('textarea.edit-transaction-name');
-
-    if (flag != false) {
-      $textarea.once('focusout', function () {
-        var newValue = $textarea.val();
-        if (transaction.name !== newValue) {
-          transaction.name = newValue;
-          TransactionController.saveTransaction(page);
-          console.log('set transaction name', transaction.name);
-        }
-      });
-    }
-  },
-  enableEditDescription: function enableEditDescription(page, flag) {
-    var transaction = _api2.default.cache['transactions'][page.query.transaction_fragment_id];
-    var $page = $$(page.container);
-    var $textarea = $page.find('textarea.edit-transaction-description');
-
-    if (flag != false) {
-      $textarea.once('focusout', function () {
-        var newValue = $textarea.val();
-        if (transaction.data.description !== newValue) {
-          transaction.data.description = newValue;
-          TransactionController.saveTransaction(page);
-          console.log('set transaction description', transaction.data.description);
-        }
-      });
-    }
-  },
-  enableSave: function enableSave(page, flag) {
-    var $navbar = $$(page.navbarInnerContainer);
-    var $save = $navbar.find('a.save');
-
-    if (flag != false) {
-      $save.siblings().hide();
-      $save.css('display', 'flex'); // show()
-    } else {
-      $save.siblings().css('display', 'flex'); // .css('display: flex') // show()
-      $save.hide();
-    }
-  }
+  uninit: function uninit() {}
 };
 
-exports.default = TransactionController;
+exports.default = TransactionDetailsController;
 
 },{"../api":1}],9:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+exports.default = function (code) {
+  if (!code) return '';
+  if (map[code]) return map[code];
+  return '';
+};
+
+var map = {
+  'AED': 'د.إ',
+  'AFN': '؋',
+  'ALL': 'L',
+  'AMD': '֏',
+  'ANG': 'ƒ',
+  'AOA': 'Kz',
+  'ARS': '$',
+  'AUD': '$',
+  'AWG': 'ƒ',
+  'AZN': '₼',
+  'BAM': 'KM',
+  'BBD': '$',
+  'BDT': '৳',
+  'BGN': 'лв',
+  'BHD': '.د.ب',
+  'BIF': 'FBu',
+  'BMD': '$',
+  'BND': '$',
+  'BOB': '$b',
+  'BRL': 'R$',
+  'BSD': '$',
+  'BTC': '฿',
+  'BTN': 'Nu.',
+  'BWP': 'P',
+  'BYR': 'Br',
+  'BYN': 'Br',
+  'BZD': 'BZ$',
+  'CAD': '$',
+  'CDF': 'FC',
+  'CHF': 'CHF',
+  'CLP': '$',
+  'CNY': '¥',
+  'COP': '$',
+  'CRC': '₡',
+  'CUC': '$',
+  'CUP': '₱',
+  'CVE': '$',
+  'CZK': 'Kč',
+  'DJF': 'Fdj',
+  'DKK': 'kr',
+  'DOP': 'RD$',
+  'DZD': 'دج',
+  'EEK': 'kr',
+  'EGP': '£',
+  'ERN': 'Nfk',
+  'ETB': 'Br',
+  'ETH': 'Ξ',
+  'EUR': '€',
+  'FJD': '$',
+  'FKP': '£',
+  'GBP': '£',
+  'GEL': '₾',
+  'GGP': '£',
+  'GHC': '₵',
+  'GHS': 'GH₵',
+  'GIP': '£',
+  'GMD': 'D',
+  'GNF': 'FG',
+  'GTQ': 'Q',
+  'GYD': '$',
+  'HKD': '$',
+  'HNL': 'L',
+  'HRK': 'kn',
+  'HTG': 'G',
+  'HUF': 'Ft',
+  'IDR': 'Rp',
+  'ILS': '₪',
+  'IMP': '£',
+  'INR': '₹',
+  'IQD': 'ع.د',
+  'IRR': '﷼',
+  'ISK': 'kr',
+  'JEP': '£',
+  'JMD': 'J$',
+  'JOD': 'JD',
+  'JPY': '¥',
+  'KES': 'KSh',
+  'KGS': 'лв',
+  'KHR': '៛',
+  'KMF': 'CF',
+  'KPW': '₩',
+  'KRW': '₩',
+  'KWD': 'KD',
+  'KYD': '$',
+  'KZT': 'лв',
+  'LAK': '₭',
+  'LBP': '£',
+  'LKR': '₨',
+  'LRD': '$',
+  'LSL': 'M',
+  'LTC': 'Ł',
+  'LTL': 'Lt',
+  'LVL': 'Ls',
+  'LYD': 'LD',
+  'MAD': 'MAD',
+  'MDL': 'lei',
+  'MGA': 'Ar',
+  'MKD': 'ден',
+  'MMK': 'K',
+  'MNT': '₮',
+  'MOP': 'MOP$',
+  'MRO': 'UM',
+  'MRU': 'UM',
+  'MUR': '₨',
+  'MVR': 'Rf',
+  'MWK': 'MK',
+  'MXN': '$',
+  'MYR': 'RM',
+  'MZN': 'MT',
+  'NAD': '$',
+  'NGN': '₦',
+  'NIO': 'C$',
+  'NOK': 'kr',
+  'NPR': '₨',
+  'NZD': '$',
+  'OMR': '﷼',
+  'PAB': 'B/.',
+  'PEN': 'S/.',
+  'PGK': 'K',
+  'PHP': '₱',
+  'PKR': '₨',
+  'PLN': 'zł',
+  'PYG': 'Gs',
+  'QAR': '﷼',
+  'RMB': '￥',
+  'RON': 'lei',
+  'RSD': 'Дин.',
+  'RUB': '₽',
+  'RWF': 'R₣',
+  'SAR': '﷼',
+  'SBD': '$',
+  'SCR': '₨',
+  'SDG': 'ج.س.',
+  'SEK': 'kr',
+  'SGD': '$',
+  'SHP': '£',
+  'SLL': 'Le',
+  'SOS': 'S',
+  'SRD': '$',
+  'SSP': '£',
+  'STD': 'Db',
+  'STN': 'Db',
+  'SVC': '$',
+  'SYP': '£',
+  'SZL': 'E',
+  'THB': '฿',
+  'TJS': 'SM',
+  'TMT': 'T',
+  'TND': 'د.ت',
+  'TOP': 'T$',
+  'TRL': '₤',
+  'TRY': '₺',
+  'TTD': 'TT$',
+  'TVD': '$',
+  'TWD': 'NT$',
+  'TZS': 'TSh',
+  'UAH': '₴',
+  'UGX': 'USh',
+  'USD': '$',
+  'UYU': '$U',
+  'UZS': 'лв',
+  'VEF': 'Bs',
+  'VND': '₫',
+  'VUV': 'VT',
+  'WST': 'WS$',
+  'XAF': 'FCFA',
+  'XBT': 'Ƀ',
+  'XCD': '$',
+  'XOF': 'CFA',
+  'XPF': '₣',
+  'YER': '﷼',
+  'ZAR': 'R',
+  'ZWD': 'Z$'
+};
+
+},{}],10:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1235,7 +1043,7 @@ function formatDate(date) {
   return year + '-' + month + '-' + day;
 }
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 'use strict';
 
 var _api = require('./api');
@@ -1246,9 +1054,9 @@ var _index = require('./controllers/index');
 
 var _index2 = _interopRequireDefault(_index);
 
-var _transaction = require('./controllers/transaction');
+var _transactionDetails = require('./controllers/transaction-details');
 
-var _transaction2 = _interopRequireDefault(_transaction);
+var _transactionDetails2 = _interopRequireDefault(_transactionDetails);
 
 var _transactionAdd = require('./controllers/transaction-add');
 
@@ -1274,6 +1082,10 @@ var _formatDateRange = require('./format-date-range');
 
 var _formatDateRange2 = _interopRequireDefault(_formatDateRange);
 
+var _currencyMap = require('./currency-map');
+
+var _currencyMap2 = _interopRequireDefault(_currencyMap);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 //
@@ -1288,8 +1100,8 @@ window.tommy.app.f7.onPageInit('accounts__list-edit', _listEdit2.default.init);
 window.tommy.app.f7.onPageInit('accounts__list-management', _listManagement2.default.init);
 window.tommy.app.f7.onPageAfterAnimation('accounts__list-management', _listManagement2.default.render);
 window.tommy.app.f7.onPageInit('accounts__transaction-add', _transactionAdd2.default.init);
-window.tommy.app.f7.onPageInit('accounts__transaction', _transaction2.default.init);
-window.tommy.app.f7.onPageAfterAnimation('accounts__transaction', _transaction2.default.invalidate);
+window.tommy.app.f7.onPageInit('accounts__transaction_details', _transactionDetails2.default.init);
+window.tommy.app.f7.onPageBeforeRemove('accounts__transaction_details', _transactionDetails2.default.uninit);
 
 //
 // == Template7 Helpers
@@ -1333,15 +1145,12 @@ window.tommy.app.t7.registerHelper('accounts__statusSelectOptions', function (st
 
 window.tommy.app.t7.registerHelper('accounts__ifCanEditList', function (list, options) {
   var account = window.tommy.config.getCurrentAccount();
-
   // BUG: Due to some unknown bug `this` is undefined in this function,
   // so substituting with the `list` variable for return variables
   // console.log('accounts__canEditList', this, list, options)
 
   // Default lists (the list automatically created for each team member) can
   // only be edited by admins
-  if (list.data.default && !window.tommy.util.isTeamOwnerOrManager(account)) return options.inverse(list, options.data);
-
   if (list.permission_to.indexOf('update') !== -1) return options.fn(list, options.data);else return options.inverse(list, options.data);
 });
 
@@ -1349,4 +1158,33 @@ window.tommy.app.t7.registerHelper('accounts__displayDateRange', function (range
   return (0, _formatDateRange2.default)(range);
 });
 
-},{"./api":1,"./controllers/board-settings":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/transaction":8,"./controllers/transaction-add":7,"./format-date-range":9}]},{},[10]);
+window.tommy.app.t7.registerHelper('accounts__formatTransactionAmount', function (item) {
+  return (item.status === 'paid' || item.status === 'failed' ? '-' : '+') + ' ' + (0, _currencyMap2.default)(item.currency) + item.amount;
+});
+window.tommy.app.t7.registerHelper('accounts__currencySymbol', function (code) {
+  return (0, _currencyMap2.default)(code);
+});
+window.tommy.app.t7.registerHelper('accounts__formatTransactionStatus', function (status) {
+  return status[0].toUpperCase() + status.substr(1);
+});
+window.tommy.app.t7.registerHelper('accounts__formatTransactionDate', function (date) {
+  if (!date) return '';
+  var d = new Date(date);
+  var year = d.getFullYear();
+
+  var month = d.getMonth() + 1;
+  if (month < 10) month = '0' + month;
+
+  var day = d.getDate();
+  if (day < 10) day = '0' + day;
+
+  var hours = d.getHours();
+  if (hours < 10) hours = '0' + hours;
+
+  var minutes = d.getMinutes();
+  if (minutes < 10) minutes = '0' + minutes;
+
+  return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes;
+});
+
+},{"./api":1,"./controllers/board-settings":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/transaction-add":7,"./controllers/transaction-details":8,"./currency-map":9,"./format-date-range":10}]},{},[11]);
