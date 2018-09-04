@@ -1,5 +1,5 @@
 <script id="wallet_accounts__boardSettingTemplate" type="text/template">
-    <div class="list-block top-0">
+    <div class="list-block">
         <ul>
             <!--
             <li class="item-content">
@@ -14,7 +14,7 @@
             <li>
                 <a href="{{addonAssetUrl "views/list-management.html"}}" class="item-link item-content">
                     <div class="item-inner">
-                        <div class="item-title">{{t "board-setting.list-management" defaultValue="List Management"}}</div>
+                        <div class="item-title">{{t "board-settings.list-management" defaultValue="List Management"}}</div>
                     </div>
                 </a>
             </li>
@@ -322,7 +322,7 @@
 
 <script id="wallet_accounts__listTransactionsTemplate" type="text/template">
     <div class="card transactions-card">
-        <div class="card-header">{{t "index.transactions" defaultValue="Transactions"}}</div>
+        <!-- <div class="card-header">{{t "index.transactions" defaultValue="Transactions"}}</div> -->
         <div class="card-content">
             <div class="list-block media-list transactions-list">
                 <ul>
@@ -531,23 +531,6 @@
         </div>
     </div>
     -->
-</script>
-
-<script id="wallet_accounts__addTransactionTemplate" type="text/template">
-    <form>
-        <div class="list-block top-0">
-            <ul>
-                <li class="item-content">
-                    <div class="item-inner">
-                        <div class="item-input item-input-full-width">
-                            <input type="text" name="name" placeholder="{{t "transaction-add.name" defaultValue="Name"}}" class="toggle-save">
-                        </div>
-                    </div>
-                </li>
-
-            </ul>
-        </div>
-    </form>
 </script>
 
 <script id="wallet_accounts__transactionDetailsTemplate" type="text/template">

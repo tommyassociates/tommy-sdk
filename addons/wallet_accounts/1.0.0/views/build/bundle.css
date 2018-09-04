@@ -209,9 +209,6 @@
       color: #ff4500; }
 #wallet_accounts__page.page {
   background: #f1f1f1; }
-#wallet_accounts__page .page-content > .list-block {
-  margin-top: 0;
-  margin-bottom: 0; }
 #wallet_accounts__page .picker-modal {
   background: #fff; }
   #wallet_accounts__page .picker-modal .list-block {

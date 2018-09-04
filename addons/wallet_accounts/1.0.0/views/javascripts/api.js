@@ -121,60 +121,19 @@ const API = {
     return Promise.all(requests).then(API.addTasks)
   },
 
-  addTransactionActivity (transaction, type, text) {
-    const currentUser = window.tommy.config.getCurrentUser()
-    const activity = {
-      type,
-      text,
-      time: new Date(),
-      user_id: currentUser.id,
-      user_name: currentUser.first_name
-    }
-
-    if (!transaction.data) { transaction.data = {} }
-    if (!transaction.data.activity) { transaction.data.activity = [] }
-    transaction.data.activity.unshift(activity)
-
-    return activity
-  },
-
   saveTransaction (transaction) {
     console.log('save transaction', transaction)
-    if (!transaction.name) {
-      alert('Transaction name must be set')
+    if (!transaction.amount) {
+      alert('Transaction amount can not be empty or less than 0')
       return
     }
 
     IndexController.invalidateLists = true // rerender lists
-
-    transaction.addon = 'wallet_accounts'
-    transaction.kind = 'Transaction'
-    transaction.with_filters = true
-    transaction.with_permission_to = true
-    if (!transaction.id) { API.addTransactionActivity(transaction, 'status', window.tommy.i18n.t('transaction.created_a_transaction')) }
-    if (!transaction.status) { transaction.status = API.STATUSES[0] }
-    if (!transaction.start_at) { transaction.start_at = (new Date).getTime() }
-
-    // Specify the access permissions this resource will belong to
-    if (!transaction.id) {
-      transaction.with_permissions = [ 'wallet_accounts_transaction_create_access', 'wallet_accounts_transaction_edit_access' ]
-      const actor = window.tommy.addons.getCurrentActor()
-      if (actor) {
-        if (!transaction.filters) transaction.filters = [];
-        transaction.filters.push({
-          context: 'members',
-          name: `${actor.first_name} ${actor.last_name}`,
-          user_id: actor.user_id
-        })
-      }
-    }
-
-    const params = Object.assign({}, transaction, { data: JSON.stringify(transaction.data) })
-    if (transaction.id) {
-      return window.tommy.api.updateFragment(transaction.id, params).then(API.addTransaction)
-    } else {
-      return window.tommy.api.createFragment(params).then(API.addTransaction)
-    }
+    return window.tommy.api.call({
+      endpoint: 'wallet/manager/transactions',
+      method: 'POST',
+      data: transaction
+    }).then(API.addTransaction)
   },
 
   addList (item) {
@@ -223,11 +182,12 @@ const API = {
     if (!list.data) { list.data = {} }
     if (typeof (list.data.position) === 'undefined') { list.data.position = Object.keys(API.cache['lists']).length }
     if (typeof (list.data.active) === 'undefined') { list.data.active = true }
-    if (typeof (list.data.show_fast_add) === 'undefined') { list.data.show_fast_add = true }
 
     // Specify the access permissions this resource will belong to
     if (!list.id)
-      list.with_permissions = [ 'wallet_accounts_transaction_list_read_access', 'wallet_accounts_transaction_list_edit_access' ]
+      list.with_permissions = [
+        'wallet_accounts_transaction_list_read_access', 'wallet_accounts_transaction_list_edit_access'
+      ]
 
     const params = Object.assign({}, list, {
       data: JSON.stringify(list.data),
@@ -304,27 +264,12 @@ const API = {
     return window.innerWidth >= 630
   },
 
-  STATUSES: [ 'canceled', 'paid', 'processing', 'complete', 'pending'],
+  STATUSES: [ 'failed', 'paid'],
 
   translateStatus (status) {
     if (status)
       return window.tommy.i18n.t('transaction_status.' + window.tommy.util.underscore(status), { defaultValue: status })
   },
-
-  untranslateStatus (translatedStatus) {
-    for (let i = 0; i < API.STATUSES.length; i++) {
-      if (API.translateStatus(API.STATUSES[i]) === translatedStatus)
-        return API.STATUSES[i]
-    }
-  },
-
-  translatedStatuses () {
-    const statuses = []
-    for (let i = 0; i < API.STATUSES.length; i++) {
-      statuses.push(API.translateStatus(API.STATUSES[i]))
-    }
-    return statuses
-  }
 }
 
 export default API

@@ -116,69 +116,19 @@ var API = {
 
     return Promise.all(requests).then(API.addTasks);
   },
-  addTransactionActivity: function addTransactionActivity(transaction, type, text) {
-    var currentUser = window.tommy.config.getCurrentUser();
-    var activity = {
-      type: type,
-      text: text,
-      time: new Date(),
-      user_id: currentUser.id,
-      user_name: currentUser.first_name
-    };
-
-    if (!transaction.data) {
-      transaction.data = {};
-    }
-    if (!transaction.data.activity) {
-      transaction.data.activity = [];
-    }
-    transaction.data.activity.unshift(activity);
-
-    return activity;
-  },
   saveTransaction: function saveTransaction(transaction) {
     console.log('save transaction', transaction);
-    if (!transaction.name) {
-      alert('Transaction name must be set');
+    if (!transaction.amount) {
+      alert('Transaction amount can not be empty or less than 0');
       return;
     }
 
     _index2.default.invalidateLists = true; // rerender lists
-
-    transaction.addon = 'wallet_accounts';
-    transaction.kind = 'Transaction';
-    transaction.with_filters = true;
-    transaction.with_permission_to = true;
-    if (!transaction.id) {
-      API.addTransactionActivity(transaction, 'status', window.tommy.i18n.t('transaction.created_a_transaction'));
-    }
-    if (!transaction.status) {
-      transaction.status = API.STATUSES[0];
-    }
-    if (!transaction.start_at) {
-      transaction.start_at = new Date().getTime();
-    }
-
-    // Specify the access permissions this resource will belong to
-    if (!transaction.id) {
-      transaction.with_permissions = ['wallet_accounts_transaction_create_access', 'wallet_accounts_transaction_edit_access'];
-      var actor = window.tommy.addons.getCurrentActor();
-      if (actor) {
-        if (!transaction.filters) transaction.filters = [];
-        transaction.filters.push({
-          context: 'members',
-          name: actor.first_name + ' ' + actor.last_name,
-          user_id: actor.user_id
-        });
-      }
-    }
-
-    var params = Object.assign({}, transaction, { data: JSON.stringify(transaction.data) });
-    if (transaction.id) {
-      return window.tommy.api.updateFragment(transaction.id, params).then(API.addTransaction);
-    } else {
-      return window.tommy.api.createFragment(params).then(API.addTransaction);
-    }
+    return window.tommy.api.call({
+      endpoint: 'wallet/manager/transactions',
+      method: 'POST',
+      data: transaction
+    }).then(API.addTransaction);
   },
   addList: function addList(item) {
     API.cache['lists'][item.id] = item;
@@ -227,9 +177,6 @@ var API = {
     }
     if (typeof list.data.active === 'undefined') {
       list.data.active = true;
-    }
-    if (typeof list.data.show_fast_add === 'undefined') {
-      list.data.show_fast_add = true;
     }
 
     // Specify the access permissions this resource will belong to
@@ -306,22 +253,10 @@ var API = {
   },
 
 
-  STATUSES: ['canceled', 'paid', 'processing', 'complete', 'pending'],
+  STATUSES: ['failed', 'paid'],
 
   translateStatus: function translateStatus(status) {
     if (status) return window.tommy.i18n.t('transaction_status.' + window.tommy.util.underscore(status), { defaultValue: status });
-  },
-  untranslateStatus: function untranslateStatus(translatedStatus) {
-    for (var i = 0; i < API.STATUSES.length; i++) {
-      if (API.translateStatus(API.STATUSES[i]) === translatedStatus) return API.STATUSES[i];
-    }
-  },
-  translatedStatuses: function translatedStatuses() {
-    var statuses = [];
-    for (var i = 0; i < API.STATUSES.length; i++) {
-      statuses.push(API.translateStatus(API.STATUSES[i]));
-    }
-    return statuses;
   }
 };
 
@@ -488,12 +423,6 @@ var ListAddController = {
     // Default list filters show transactions tagged with current user
     list.filters = [_api2.default.currentUserTag()];
 
-    // console.log('create list', list, data)
-    // if (!list.name) {
-    //   alert('List name must be set')
-    //   return
-    // }
-
     _api2.default.saveList(list).then(ListAddController.afterSave);
   },
   afterSave: function afterSave(res) {
@@ -646,7 +575,7 @@ var ListEditController = {
     window.tommy.f7.views.main.loadContent(html);
   },
   showDateRangePage: function showDateRangePage(settingsPage, list) {
-    var html = window.tommy.tplManager.render('tasks__dateRangeSelectTemplate', list.data);
+    var html = window.tommy.tplManager.render('wallet_accounts__dateRangeSelectTemplate', list.data);
 
     function handleDateRangePage(page) {
       var $page = $$(page.container);
@@ -739,7 +668,7 @@ var ListEditController = {
       $nav.find('.toggle.save').on('click', save);
     }
 
-    $$(window.tommy.f7.views.main.container).once('page:init', '[data-page="tasks__date-range-select"]', function (e) {
+    $$(window.tommy.f7.views.main.container).once('page:init', '[data-page="wallet_accounts__date-range-select"]', function (e) {
       var page = e.detail.page;
       handleDateRangePage(page);
     });
@@ -851,18 +780,19 @@ var TransactionAddController = {
     var $page = $$(page.container);
     var $nav = $$(page.navbarInnerContainer);
 
-    window.tommy.tplManager.renderInline('wallet_accounts__addTransactionTemplate', {}, $page); // API.cache['lists']
-
     $nav.find('a.save').on('click', function (ev) {
       var data = window.tommy.app.f7.formToJSON($page.find('form'));
-      data.filters = [_api2.default.currentUserTag()]; // tag the current user
-
-      TransactionAddController.saveTransaction(data);
       ev.preventDefault();
+      // data.filters = [ API.currentUserTag() ] // tag the current user
+
+      _api2.default.saveTransaction({
+        amount: data.amount,
+        status: 'paid',
+        addon: 'wallet_accounts',
+        addon_id: undefined,
+        addon_install_id: undefined
+      }).then(TransactionAddController.afterSave);
     });
-  },
-  saveTransaction: function saveTransaction(data) {
-    _api2.default.saveTransaction(data).then(TransactionAddController.afterSave);
   },
   afterSave: function afterSave(res) {
     console.log('transaction saved', res);
