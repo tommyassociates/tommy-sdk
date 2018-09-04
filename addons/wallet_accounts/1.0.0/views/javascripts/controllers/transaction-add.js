@@ -5,19 +5,21 @@ const TransactionAddController = {
     const $page = $$(page.container)
     const $nav = $$(page.navbarInnerContainer)
 
-    window.tommy.tplManager.renderInline('wallet_accounts__addTransactionTemplate', {}, $page) // API.cache['lists']
-
     $nav.find('a.save').on('click', ev => {
       const data = window.tommy.app.f7.formToJSON($page.find('form'))
-      data.filters = [ API.currentUserTag() ] // tag the current user
-
-      TransactionAddController.saveTransaction(data)
       ev.preventDefault()
-    })
-  },
+      // data.filters = [ API.currentUserTag() ] // tag the current user
 
-  saveTransaction (data) {
-    API.saveTransaction(data).then(TransactionAddController.afterSave)
+      API
+        .saveTransaction({
+          amount: data.amount,
+          status: 'paid',
+          addon: 'wallet_accounts',
+          addon_id: undefined,
+          addon_install_id: undefined,
+        })
+        .then(TransactionAddController.afterSave)
+    })
   },
 
   afterSave (res) {

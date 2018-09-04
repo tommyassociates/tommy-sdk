@@ -1,14 +1,13 @@
 {
   "board-settings": {
-    "title": "Settings"
+    "title": "Settings",
+    "list-management": "List Management"
   },
   "index": {
     "title": "Wallet Accounts",
     "title_user": "{{user}}'s Transactions",
-    "add-transaction": "Add transaction",
     "cancel": "Cancel",
     "done": "Done",
-    "unassigned": "Unassigned",
     "default-list-name": "Transactions",
     "transactions": "Transactions"
   },
@@ -32,12 +31,8 @@
     "title": "List Management"
   },
   "transaction-add": {
-    "title": "Add Transaction",
-    "name": "Name",
-    "list": "List"
-  },
-  "board-setting": {
-    "list-management": "List Management"
+    "title": "New Transaction",
+    "amount_placeholder": "Amount"
   },
   "date_range": {
     "none": "None",
@@ -53,22 +48,6 @@
     "end_date": "End Date",
     "amount_min": "From",
     "amount_max": "To"
-  },
-  "transaction": {
-    "checklist": "Checklist",
-    "deadline": "Deadline",
-    "transaction_details": "Transaction details",
-    "participant": "Participant",
-    "send": "Send",
-    "waiting_for_assignments": "Waiting for assignments",
-    "edit_description": "Edit the description...",
-    "participants": "Participants",
-    "edit_deadline": "Edit deadline...",
-    "add_items": "Add items",
-    "activity": "Activity",
-    "created_a_transaction": "Created a transaction",
-    "changed_status_to": "Changed status to {{status}}",
-    "enter_comment": "Enter comment"
   },
   "title": "Wallet Accounts",
   "summary": "Manage your projects & transactions with ease.",
@@ -102,10 +81,7 @@
     }
   },
   "transaction_status": {
-    "canceled": "Canceled",
-    "paid": "Paid",
-    "processing": "Processing",
-    "complete": "Complete",
-    "pending": "Pending"
+    "failed": "Failed",
+    "paid": "Paid"
   }
 }

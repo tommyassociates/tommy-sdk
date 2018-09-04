@@ -125,7 +125,7 @@ const ListEditController = {
   },
 
   showDateRangePage (settingsPage, list) {
-    var html = window.tommy.tplManager.render('tasks__dateRangeSelectTemplate', list.data);
+    var html = window.tommy.tplManager.render('wallet_accounts__dateRangeSelectTemplate', list.data);
 
     function handleDateRangePage(page) {
       const $page = $$(page.container);
@@ -220,7 +220,7 @@ const ListEditController = {
       $nav.find('.toggle.save').on('click', save);
     }
 
-    $$(window.tommy.f7.views.main.container).once('page:init', '[data-page="tasks__date-range-select"]', (e) => {
+    $$(window.tommy.f7.views.main.container).once('page:init', '[data-page="wallet_accounts__date-range-select"]', (e) => {
       const page = e.detail.page;
       handleDateRangePage(page)
     })
