@@ -32,7 +32,11 @@
   },
   "transaction-add": {
     "title": "New Transaction",
-    "amount_placeholder": "Amount"
+    "amount_placeholder": "Amount",
+    "payee_placeholder": "Payee",
+    "wallet_account_placeholder": "Wallet Account",
+    "no_amount_error": "Transaction amount can not be empty or less than 0",
+    "no_payee_error": "Transaction payee can not be empty"
   },
   "date_range": {
     "none": "None",

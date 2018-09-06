@@ -124,7 +124,11 @@ const API = {
   saveTransaction (transaction) {
     console.log('save transaction', transaction)
     if (!transaction.amount) {
-      alert('Transaction amount can not be empty or less than 0')
+      alert(window.tommy.i18n.t('transaction-add.no_amount_error'));
+      return
+    }
+    if (!transaction.payee) {
+      alert(window.tommy.i18n.t('transaction-add.no_payee_error'));
       return
     }
 
@@ -270,6 +274,11 @@ const API = {
     if (status)
       return window.tommy.i18n.t('transaction_status.' + window.tommy.util.underscore(status), { defaultValue: status })
   },
+  getCards() {
+    return window.tommy.api.call({
+      endpoint: 'wallet/manager/cards?with_holder=true'
+    });
+  }
 }
 
 export default API

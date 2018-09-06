@@ -119,7 +119,11 @@ var API = {
   saveTransaction: function saveTransaction(transaction) {
     console.log('save transaction', transaction);
     if (!transaction.amount) {
-      alert('Transaction amount can not be empty or less than 0');
+      alert(window.tommy.i18n.t('transaction-add.no_amount_error'));
+      return;
+    }
+    if (!transaction.payee) {
+      alert(window.tommy.i18n.t('transaction-add.no_payee_error'));
       return;
     }
 
@@ -257,6 +261,11 @@ var API = {
 
   translateStatus: function translateStatus(status) {
     if (status) return window.tommy.i18n.t('transaction_status.' + window.tommy.util.underscore(status), { defaultValue: status });
+  },
+  getCards: function getCards() {
+    return window.tommy.api.call({
+      endpoint: 'wallet/manager/cards?with_holder=true'
+    });
   }
 };
 
@@ -779,20 +788,39 @@ var TransactionAddController = {
   init: function init(page) {
     var $page = $$(page.container);
     var $nav = $$(page.navbarInnerContainer);
-
-    $nav.find('a.save').on('click', function (ev) {
+    TransactionAddController.$page = $page;
+    TransactionAddController.$nav = $nav;
+    TransactionAddController.bind($page);
+    _api2.default.getCards().then(TransactionAddController.renderCards);
+  },
+  bind: function bind($page) {
+    TransactionAddController.$nav.find('a.save').on('click', function (ev) {
       var data = window.tommy.app.f7.formToJSON($page.find('form'));
       ev.preventDefault();
       // data.filters = [ API.currentUserTag() ] // tag the current user
-
-      _api2.default.saveTransaction({
-        amount: data.amount,
-        status: 'paid',
-        addon: 'wallet_accounts',
-        addon_id: undefined,
-        addon_install_id: undefined
-      }).then(TransactionAddController.afterSave);
+      TransactionAddController.saveTransaction(data);
     });
+  },
+  renderCards: function renderCards(cards) {
+    var cardsHtml = ('\n      <li>\n        <a href="#" class="smart-select item-link item-content" data-searchbar="true">\n          <select name="wallet_card_id">' + cards.map(function (card, index) {
+      return '\n            <option data-option-class="wallet_accounts_smart-select-option" data-option-image="' + card.holder.icon_url + '" value="' + card.id + '">' + (card.holder.first_name || '') + ' ' + (card.holder.last_name || '') + '</option>\n          ';
+    }) + '</select>\n          <div class="item-inner">\n            <div class="item-title">' + window.tommy.i18n.t('transaction-add.wallet_account_placeholder') + '</div>\n            <div class="item-after">' + (cards[0] ? (cards[0].holder.first_name || '') + ' ' + (cards[0].holder.last_name || '') : '') + '</div>\n          </div>\n        </a>\n      </li>\n    ').trim();
+    TransactionAddController.$page.find('ul').append(cardsHtml);
+  },
+  saveTransaction: function saveTransaction(data) {
+    var amount = data.amount,
+        wallet_card_id = data.wallet_card_id,
+        payee = data.payee;
+
+    _api2.default.saveTransaction({
+      amount: amount,
+      wallet_card_id: wallet_card_id,
+      payee: payee,
+      status: 'paid',
+      addon: 'wallet_accounts',
+      addon_id: undefined,
+      addon_install_id: undefined
+    }).then(TransactionAddController.afterSave);
   },
   afterSave: function afterSave(res) {
     console.log('transaction saved', res);
