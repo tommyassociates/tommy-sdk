@@ -114,7 +114,7 @@ function (app,api,addons,util,cache,tplManager,moment,refreshPanel) {
                         data: JSON.stringify({
                           am: json.am || 0,
                           pm: json.pm || 0,
-                          ns: json.ns || 0,
+                          nd: json.nd || 0,
                         }),
                         start_at: date,
                         user_id: addons.currentActorOrUserId()
