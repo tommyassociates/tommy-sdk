@@ -122,7 +122,7 @@ var API = {
       alert(window.tommy.i18n.t('transaction-add.no_amount_error'));
       return;
     }
-    if (!transaction.payee) {
+    if (!transaction.payee_name) {
       alert(window.tommy.i18n.t('transaction-add.no_payee_error'));
       return;
     }
@@ -184,7 +184,18 @@ var API = {
     }
 
     // Specify the access permissions this resource will belong to
-    if (!list.id) list.with_permissions = ['wallet_accounts_transaction_list_read_access', 'wallet_accounts_transaction_list_edit_access'];
+    if (!list.id) {
+      list.with_permissions = ['wallet_accounts_transaction_list_read_access', 'wallet_accounts_transaction_list_edit_access'];
+      var actor = window.tommy.addons.getCurrentActor();
+      if (actor) {
+        if (!list.filters) task.filters = [];
+        list.filters.push({
+          context: 'members',
+          name: actor.first_name + ' ' + actor.last_name,
+          user_id: actor.user_id
+        });
+      }
+    }
 
     var params = Object.assign({}, list, {
       data: JSON.stringify(list.data),
@@ -430,7 +441,7 @@ var ListAddController = {
     list.name = data.name;
 
     // Default list filters show transactions tagged with current user
-    list.filters = [_api2.default.currentUserTag()];
+    list.filters = [];
 
     _api2.default.saveList(list).then(ListAddController.afterSave);
   },
@@ -810,12 +821,12 @@ var TransactionAddController = {
   saveTransaction: function saveTransaction(data) {
     var amount = data.amount,
         wallet_card_id = data.wallet_card_id,
-        payee = data.payee;
+        payee_name = data.payee_name;
 
     _api2.default.saveTransaction({
       amount: amount,
       wallet_card_id: wallet_card_id,
-      payee: payee,
+      payee_name: payee_name,
       status: 'paid',
       addon: 'wallet_accounts',
       addon_id: undefined,
