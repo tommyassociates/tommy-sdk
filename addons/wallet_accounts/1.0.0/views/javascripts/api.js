@@ -127,7 +127,7 @@ const API = {
       alert(window.tommy.i18n.t('transaction-add.no_amount_error'));
       return
     }
-    if (!transaction.payee) {
+    if (!transaction.payee_name) {
       alert(window.tommy.i18n.t('transaction-add.no_payee_error'));
       return
     }
@@ -188,10 +188,21 @@ const API = {
     if (typeof (list.data.active) === 'undefined') { list.data.active = true }
 
     // Specify the access permissions this resource will belong to
-    if (!list.id)
+    if (!list.id) {
       list.with_permissions = [
         'wallet_accounts_transaction_list_read_access', 'wallet_accounts_transaction_list_edit_access'
       ]
+      const actor = window.tommy.addons.getCurrentActor()
+      if (actor) {
+        if (!list.filters) task.filters = [];
+        list.filters.push({
+          context: 'members',
+          name: `${actor.first_name} ${actor.last_name}`,
+          user_id: actor.user_id
+        });
+      }
+    }
+
 
     const params = Object.assign({}, list, {
       data: JSON.stringify(list.data),
