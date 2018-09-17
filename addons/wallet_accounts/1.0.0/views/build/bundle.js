@@ -277,6 +277,24 @@ var API = {
     return window.tommy.api.call({
       endpoint: 'wallet/manager/cards?with_holder=true'
     });
+  },
+  getBalance: function getBalance() {
+    return window.tommy.api.call({
+      endpoint: 'wallet/manager/cards'
+    }).then(function (cards) {
+      return cards[0];
+    });
+  },
+  saveBalance: function saveBalance(id, amount) {
+    return window.tommy.api.call({
+      endpoint: 'wallet/manager/cards/' + id,
+      method: 'PUT',
+      data: {
+        amount: amount
+      }
+    }).then(function (cards) {
+      return cards[0];
+    });
   }
 };
 
@@ -300,20 +318,15 @@ var BoardSettingsController = {
     var $page = $$(page.container);
     var $nav = $$(page.navbarInnerContainer);
 
-    window.tommy.tplManager.renderInline('wallet_accounts__boardSettingTemplate', null, $page);
+    window.tommy.tplManager.renderInline('wallet_accounts__boardSettingTemplate', {
+      hasActorId: window.tommy.addons.getCurrentActor()
+    }, $page);
 
     // Team manager only settings
     if (window.tommy.util.isTeamOwnerOrManager()) {
       _api2.default.initPermissionSelect(page, 'wallet_accounts_transaction_create_access');
       _api2.default.initPermissionSelect(page, 'wallet_accounts_transaction_edit_access');
     }
-
-    // $nav.find('a.save').on('click', ev => {
-    //   const data = window.tommy.app.f7.formToJSON($page.find('form'))
-    //
-    //   // NOTE: Form not implemented yet
-    //   ev.preventDefault()
-    // })
   }
 };
 
@@ -721,7 +734,7 @@ var ListEditController = {
 
 exports.default = ListEditController;
 
-},{"../api":1,"../format-amount-range":10,"../format-date-range":11}],6:[function(require,module,exports){
+},{"../api":1,"../format-amount-range":11,"../format-date-range":12}],6:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -868,6 +881,54 @@ var TransactionDetailsController = {
 exports.default = TransactionDetailsController;
 
 },{"../api":1}],9:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _api = require('../api');
+
+var _api2 = _interopRequireDefault(_api);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var WalletBalanceController = {
+  init: function init(page) {
+    var $page = $$(page.container);
+    var $nav = $$(page.navbarInnerContainer);
+    WalletBalanceController.$page = $page;
+    WalletBalanceController.$nav = $nav;
+    WalletBalanceController.bind($page);
+    _api2.default.getBalance().then(function (card) {
+      if (!card) return;
+      WalletBalanceController.card = card;
+      $page.find('input[name="amount"]').val(card.balance);
+    });
+  },
+  bind: function bind($page) {
+    WalletBalanceController.$nav.find('a.save').on('click', function (ev) {
+      if (!WalletBalanceController.card) return;
+      var data = window.tommy.app.f7.formToJSON($page.find('form'));
+      ev.preventDefault();
+      WalletBalanceController.saveBalance(data);
+    });
+  },
+  saveBalance: function saveBalance(data) {
+    if (!WalletBalanceController.card) return;
+    var amount = data.amount;
+
+    _api2.default.saveBalance(WalletBalanceController.card.id, amount).then(WalletBalanceController.afterSave);
+  },
+  afterSave: function afterSave(res) {
+    console.log('transaction saved', res);
+    window.tommy.app.f7view.router.back();
+  }
+};
+
+exports.default = WalletBalanceController;
+
+},{"../api":1}],10:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1056,7 +1117,7 @@ var map = {
   'ZWD': 'Z$'
 };
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1076,7 +1137,7 @@ exports.default = function (min, max) {
   return '';
 };
 
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1104,7 +1165,7 @@ function formatDate(date) {
   return year + '-' + month + '-' + day;
 }
 
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 'use strict';
 
 var _api = require('./api');
@@ -1139,6 +1200,10 @@ var _boardSettings = require('./controllers/board-settings');
 
 var _boardSettings2 = _interopRequireDefault(_boardSettings);
 
+var _walletBalance = require('./controllers/wallet-balance');
+
+var _walletBalance2 = _interopRequireDefault(_walletBalance);
+
 var _formatDateRange = require('./format-date-range');
 
 var _formatDateRange2 = _interopRequireDefault(_formatDateRange);
@@ -1167,6 +1232,7 @@ window.tommy.app.f7.onPageAfterAnimation('wallet_accounts__list-management', _li
 window.tommy.app.f7.onPageInit('wallet_accounts__transaction-add', _transactionAdd2.default.init);
 window.tommy.app.f7.onPageInit('wallet_accounts__transaction_details', _transactionDetails2.default.init);
 window.tommy.app.f7.onPageBeforeRemove('wallet_accounts__transaction_details', _transactionDetails2.default.uninit);
+window.tommy.app.f7.onPageInit('wallet_accounts__wallet-balance', _walletBalance2.default.init);
 
 //
 // == Template7 Helpers
@@ -1256,4 +1322,4 @@ window.tommy.app.t7.registerHelper('wallet_accounts__formatTransactionDate', fun
   return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes;
 });
 
-},{"./api":1,"./controllers/board-settings":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/transaction-add":7,"./controllers/transaction-details":8,"./currency-map":9,"./format-amount-range":10,"./format-date-range":11}]},{},[12]);
+},{"./api":1,"./controllers/board-settings":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/transaction-add":7,"./controllers/transaction-details":8,"./controllers/wallet-balance":9,"./currency-map":10,"./format-amount-range":11,"./format-date-range":12}]},{},[13]);

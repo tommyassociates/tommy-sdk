@@ -1,7 +1,12 @@
 {
   "board-settings": {
     "title": "Settings",
-    "list-management": "List Management"
+    "list-management": "List Management",
+    "wallet-balance": "Wallet Balance"
+  },
+  "wallet-balance": {
+    "title": "Wallet Balance",
+    "balance": "Balance"
   },
   "index": {
     "title": "Wallet Accounts",

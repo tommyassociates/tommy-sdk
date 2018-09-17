@@ -289,6 +289,24 @@ const API = {
     return window.tommy.api.call({
       endpoint: 'wallet/manager/cards?with_holder=true'
     });
+  },
+  getBalance() {
+    return window.tommy.api.call({
+      endpoint: 'wallet/manager/cards'
+    }).then((cards) => {
+      return cards[0];
+    });
+  },
+  saveBalance(id, amount) {
+    return window.tommy.api.call({
+      endpoint: `wallet/manager/cards/${id}`,
+      method: 'PUT',
+      data: {
+        amount: amount
+      },
+    }).then((cards) => {
+      return cards[0];
+    });
   }
 }
 
