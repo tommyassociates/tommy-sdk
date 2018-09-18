@@ -44,30 +44,6 @@ var API = {
   getListTransactions: function getListTransactions(listId) {
     var list = API.cache['lists'][listId];
     return list.transactions;
-    /*
-    const transactions = []
-    for (const transactionId in API.cache['transactions']) {
-      const transaction = API.cache['transactions'][transactionId]
-      console.error({list, transaction});
-       if (list.filters && transaction.filters) {
-         // Filter on tags
-        const transactionTags = transaction.filters.map(x => x.name)
-        const listTags = list.filters.map(x => x.name)
-        const matchTags = transactionTags.filter(x => listTags.indexOf(x) !== -1)
-        let matches = !!matchTags.length || (!transactionTags.length && !listTags.length)
-        console.log('transaction matches list tags', transaction.name, transaction.filters, list.name, list.filters, matches)
-         // Filter on status
-        if (matches && list.data.statuses) {
-          matches = list.data.statuses.indexOf(transaction.status) !== -1
-          console.log('transaction matches list statuses', transaction.name, transaction.status, list.name, list.statuses, matches)
-        }
-         if (matches) {
-          transactions.push(transaction)
-        }
-      }
-    }
-     return transactions
-    */
   },
   loadListTransactions: function loadListTransactions(list) {
     // let name, tags, params, request, requests = []
@@ -94,6 +70,9 @@ var API = {
     }
     if (list.data.statuses) {
       params.status = list.data.statuses;
+    }
+    if (API.cache.actorId || list.actorId) {
+      params.executor_id = API.cache.actorId || list.actorId;
     }
 
     return window.tommy.api.call({
@@ -148,7 +127,24 @@ var API = {
   },
   loadLists: function loadLists(params) {
     console.log('load transaction lists', params);
-
+    if (API.cache.actorId) {
+      return new Promise(function (resolve, reject) {
+        API.addLists([{
+          actorId: API.cache.actorId,
+          data: {
+            active: true,
+            default: true,
+            position: 0,
+            statuses: []
+          },
+          id: 'actor-' + API.cache.actorId,
+          kind: 'TransactionList',
+          name: 'Transactions',
+          permission_to: ["create", "read", "update", "delete"]
+        }]);
+        resolve();
+      });
+    }
     params = Object.assign({
       addon: 'wallet_accounts',
       kind: 'TransactionList',
@@ -186,15 +182,6 @@ var API = {
     // Specify the access permissions this resource will belong to
     if (!list.id) {
       list.with_permissions = ['wallet_accounts_transaction_list_read_access', 'wallet_accounts_transaction_list_edit_access'];
-      var actor = window.tommy.addons.getCurrentActor();
-      if (actor) {
-        if (!list.filters) task.filters = [];
-        list.filters.push({
-          context: 'members',
-          name: actor.first_name + ' ' + actor.last_name,
-          user_id: actor.user_id
-        });
-      }
     }
 
     var params = Object.assign({}, list, {
@@ -278,19 +265,26 @@ var API = {
       endpoint: 'wallet/manager/cards?with_holder=true'
     });
   },
-  getBalance: function getBalance() {
+  getActorCard: function getActorCard() {
     return window.tommy.api.call({
-      endpoint: 'wallet/manager/cards'
+      endpoint: 'wallet/manager/cards?with_holder=true'
     }).then(function (cards) {
-      return cards[0];
+      var actorCard = void 0;
+      cards.forEach(function (card) {
+        if (card && card.holder && parseInt(card.holder.id, 10) === parseInt(API.cache.actorId, 10)) {
+          actorCard = card;
+        }
+      });
+      return actorCard;
     });
   },
-  saveBalance: function saveBalance(id, amount) {
+  saveBalance: function saveBalance(id, balance, credit_limit) {
     return window.tommy.api.call({
       endpoint: 'wallet/manager/cards/' + id,
       method: 'PUT',
       data: {
-        amount: amount
+        balance: balance,
+        credit_limit: credit_limit
       }
     }).then(function (cards) {
       return cards[0];
@@ -348,8 +342,20 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 var IndexController = {
   init: function init(page) {
     console.log('initialize accounts addon');
-    window.API = _api2.default;
-    if (!_api2.default.listsLoaded) {
+    IndexController.uninitialized = false;
+
+    var actorId = page.query.actor_id || (window.tommy.addons.getCurrentActor() ? window.tommy.addons.getCurrentActor().user_id : Template7.global.currentActorId);
+    if (actorId === 'null') actorId = undefined;
+
+    if (actorId) {
+      _api2.default.initCache();
+      if (actorId) {
+        _api2.default.cache.actorId = actorId;
+      }
+      _api2.default.loadLists().then(function () {
+        IndexController.invalidate(page);
+      });
+    } else if (!_api2.default.listsLoaded) {
       _api2.default.initCache();
       _api2.default.loadLists().then(function () {
         if (_api2.default.hasDefaultList()) {
@@ -371,6 +377,7 @@ var IndexController = {
     console.log('uninitialize accounts addon');
     _api2.default.cache = {};
     _api2.default.listsLoaded = false;
+    IndexController.uninitialized = true;
   },
   bind: function bind(page) {
     var $page = $$(page.container);
@@ -396,6 +403,7 @@ var IndexController = {
     });
   },
   invalidate: function invalidate(page) {
+    if (IndexController.uninitialized) return;
     _api2.default.loadTransactions().then(function () {
       console.log('invalidating accounts index');
       var $page = $$(page.container);
@@ -403,7 +411,6 @@ var IndexController = {
       console.log('rendering transaction lists');
       IndexController.invalidateLists = false;
       window.tommy.tplManager.renderInline('wallet_accounts__listsTemplate', _api2.default.getOrderedLists(), page.container);
-      console.log('API.getOrderedLists()', _api2.default.getOrderedLists());
 
       var swiper = window.tommy.app.f7.swiper('.swiper-container', {
         centeredSlides: !_api2.default.isTablet(),
@@ -900,10 +907,15 @@ var WalletBalanceController = {
     WalletBalanceController.$page = $page;
     WalletBalanceController.$nav = $nav;
     WalletBalanceController.bind($page);
-    _api2.default.getBalance().then(function (card) {
-      if (!card) return;
+    _api2.default.getActorCard().then(function (card) {
+      if (!card) {
+        $page.find('form.list-block').remove();
+        $page.find('.page-content').append('\n          <div class="content-block">\n            <div class="content-block-inner" style="text-align: center">\n              ' + window.tommy.i18n.t('wallet-balance.no_wallet_card') + '\n            </div>\n          </div>\n        ');
+        return;
+      }
       WalletBalanceController.card = card;
-      $page.find('input[name="amount"]').val(card.balance);
+      $page.find('input[name="balance"]').val(card.balance);
+      $page.find('input[name="credit_limit"]').val(card.credit_limit);
     });
   },
   bind: function bind($page) {
@@ -916,9 +928,10 @@ var WalletBalanceController = {
   },
   saveBalance: function saveBalance(data) {
     if (!WalletBalanceController.card) return;
-    var amount = data.amount;
+    var balance = data.balance,
+        credit_limit = data.credit_limit;
 
-    _api2.default.saveBalance(WalletBalanceController.card.id, amount).then(WalletBalanceController.afterSave);
+    _api2.default.saveBalance(WalletBalanceController.card.id, balance, credit_limit).then(WalletBalanceController.afterSave);
   },
   afterSave: function afterSave(res) {
     console.log('transaction saved', res);

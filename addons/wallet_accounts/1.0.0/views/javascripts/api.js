@@ -40,35 +40,6 @@ const API = {
   getListTransactions (listId) {
     const list = API.cache['lists'][listId]
     return list.transactions;
-    /*
-    const transactions = []
-    for (const transactionId in API.cache['transactions']) {
-      const transaction = API.cache['transactions'][transactionId]
-      console.error({list, transaction});
-
-      if (list.filters && transaction.filters) {
-
-        // Filter on tags
-        const transactionTags = transaction.filters.map(x => x.name)
-        const listTags = list.filters.map(x => x.name)
-        const matchTags = transactionTags.filter(x => listTags.indexOf(x) !== -1)
-        let matches = !!matchTags.length || (!transactionTags.length && !listTags.length)
-        console.log('transaction matches list tags', transaction.name, transaction.filters, list.name, list.filters, matches)
-
-        // Filter on status
-        if (matches && list.data.statuses) {
-          matches = list.data.statuses.indexOf(transaction.status) !== -1
-          console.log('transaction matches list statuses', transaction.name, transaction.status, list.name, list.statuses, matches)
-        }
-
-        if (matches) {
-          transactions.push(transaction)
-        }
-      }
-    }
-
-    return transactions
-    */
   },
 
   loadListTransactions (list) {
@@ -96,6 +67,9 @@ const API = {
     }
     if (list.data.statuses) {
       params.status = list.data.statuses
+    }
+    if (API.cache.actorId || list.actorId) {
+      params.executor_id = API.cache.actorId || list.actorId;
     }
 
     return window.tommy.api.call({
@@ -156,7 +130,26 @@ const API = {
 
   loadLists (params) {
     console.log('load transaction lists', params)
-
+    if (API.cache.actorId) {
+      return new Promise((resolve, reject) => {
+        API.addLists([
+          {
+            actorId: API.cache.actorId,
+            data: {
+              active: true,
+              default: true,
+              position: 0,
+              statuses: [],
+            },
+            id: `actor-${API.cache.actorId}`,
+            kind: 'TransactionList',
+            name: 'Transactions',
+            permission_to: ["create", "read", "update", "delete"],
+          }
+        ]);
+        resolve();
+      });
+    }
     params = Object.assign({
       addon: 'wallet_accounts',
       kind: 'TransactionList',
@@ -192,15 +185,6 @@ const API = {
       list.with_permissions = [
         'wallet_accounts_transaction_list_read_access', 'wallet_accounts_transaction_list_edit_access'
       ]
-      const actor = window.tommy.addons.getCurrentActor()
-      if (actor) {
-        if (!list.filters) task.filters = [];
-        list.filters.push({
-          context: 'members',
-          name: `${actor.first_name} ${actor.last_name}`,
-          user_id: actor.user_id
-        });
-      }
     }
 
 
@@ -290,19 +274,26 @@ const API = {
       endpoint: 'wallet/manager/cards?with_holder=true'
     });
   },
-  getBalance() {
+  getActorCard() {
     return window.tommy.api.call({
-      endpoint: 'wallet/manager/cards'
+      endpoint: 'wallet/manager/cards?with_holder=true'
     }).then((cards) => {
-      return cards[0];
+      let actorCard;
+      cards.forEach((card) => {
+        if (card && card.holder && (parseInt(card.holder.id, 10) === parseInt(API.cache.actorId, 10))) {
+          actorCard = card;
+        }
+      })
+      return actorCard;
     });
   },
-  saveBalance(id, amount) {
+  saveBalance(id, balance, credit_limit) {
     return window.tommy.api.call({
       endpoint: `wallet/manager/cards/${id}`,
       method: 'PUT',
       data: {
-        amount: amount
+        balance,
+        credit_limit,
       },
     }).then((cards) => {
       return cards[0];

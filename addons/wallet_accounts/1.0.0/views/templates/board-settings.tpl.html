@@ -1,16 +1,7 @@
 <script id="wallet_accounts__boardSettingTemplate" type="text/template">
     <div class="list-block">
         <ul>
-            <!--
-            <li class="item-content">
-                <div class="item-inner">
-                    <div class="item-title label">Name</div>
-                    <div class="item-input">
-                        <input type="text" value="Transaction" class="right toggle-save">
-                    </div>
-                </div>
-            </li>
-            -->
+            {{#unless hasActorId}}
             <li>
                 <a href="{{addonAssetUrl "views/list-management.html"}}" class="item-link item-content">
                     <div class="item-inner">
@@ -18,6 +9,7 @@
                     </div>
                 </a>
             </li>
+            {{/unless}}
             {{#if hasActorId}}
             <li>
                 <a href="{{addonAssetUrl "views/wallet-balance.html"}}" class="item-link item-content">
@@ -27,85 +19,6 @@
                 </a>
             </li>
             {{/if}}
-            <!--
-            <li>
-                <a href="{{addonAssetUrl "views/participant-types.html"}}" class="item-link item-content">
-                    <div class="item-inner">
-                        <div class="item-title">Participant types</div>
-                    </div>
-                </a>
-            </li>
-            <li class="item-divider">Who Can Create Transactions</li>
-            <li class="item-content">
-                <div class="item-inner">
-                    <div class="item-media">
-                        <i class="icon f7-icons color-custom search">search_strong</i>
-                    </div>
-                    <div class="item-input">
-                        <input type="text" placeholder="Search Member, Tags" class="search">
-                    </div>
-                </div>
-            </li>
-            <li class="item-content">
-                <div class="item-inner column">
-                    <div class="chip chip-lg">
-                        <div class="chip-media">
-                            <i class="icon f7-icons">person</i>
-                            Role
-                        </div>
-                        <div class="chip-label">Repair Manager</div>
-                        <a href="#" class="delete">
-                            <i class="icon f7-icons color-custom">close</i>
-                        </a>
-                    </div>
-                    <div class="chip chip-lg">
-                        <div class="chip-media">
-                            <i class="icon f7-icons">tags</i>
-                            Tag
-                        </div>
-                        <div class="chip-label">Repair</div>
-                        <a href="#" class="delete">
-                            <i class="icon f7-icons color-custom">close</i>
-                        </a>
-                    </div>
-                </div>
-            </li>
-            <li class="item-divider">Who Can Edit Transactions</li>
-            <li class="item-content">
-                <div class="item-inner">
-                    <div class="item-media">
-                        <i class="icon f7-icons color-custom search">search_strong</i>
-                    </div>
-                    <div class="item-input">
-                        <input type="text" placeholder="Search Member, Tags" class="search">
-                    </div>
-                </div>
-            </li>
-            <li class="item-content">
-                <div class="item-inner column">
-                    <div class="chip chip-lg">
-                        <div class="chip-media">
-                            <i class="icon f7-icons">person</i>
-                            Role
-                        </div>
-                        <div class="chip-label">Repair Manager</div>
-                        <a href="#" class="delete">
-                            <i class="icon f7-icons color-custom">close</i>
-                        </a>
-                    </div>
-                    <div class="chip chip-lg">
-                        <div class="chip-media">
-                            <i class="icon f7-icons">tags</i>
-                            Tag
-                        </div>
-                        <div class="chip-label">Repair</div>
-                        <a href="#" class="delete">
-                            <i class="icon f7-icons color-custom">close</i>
-                        </a>
-                    </div>
-                </div>
-            </li>
-            -->
         </ul>
         <div data-template="wallet_accounts__tagSelectTemplate"></div>
     </div>

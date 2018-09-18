@@ -42,14 +42,13 @@
             <div data-template="wallet_accounts__tagSelectTemplate"></div>
         </div>
     </form>
-
-    {{#unless data.default}}
-        <div class="list-block list-block-custom">
-            <ul>
-                <li>
-                    <a href="#" class="item-link list-button color-custom delete-list">{{t "list-edit.delete-list" defaultValue="Delete List"}}</a>
-                </li>
-            </ul>
-        </div>
-    {{/unless}}
+    <div class="list-block list-block-custom">
+        <ul>
+            <li>
+                <a href="#" class="item-link list-button color-custom delete-list">{{t "list-edit.delete-list" defaultValue="Delete List"}}</a>
+            </li>
+        </ul>
+    </div>
+    <!-- {{#unless data.default}} -->
+    <!-- {{/unless}} -->
 </script>
