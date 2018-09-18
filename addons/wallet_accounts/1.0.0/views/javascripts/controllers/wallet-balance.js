@@ -7,10 +7,21 @@ const WalletBalanceController = {
     WalletBalanceController.$page = $page;
     WalletBalanceController.$nav = $nav;
     WalletBalanceController.bind($page);
-    API.getBalance().then((card) => {
-      if (!card) return;
+    API.getActorCard().then((card) => {
+      if (!card) {
+        $page.find('form.list-block').remove();
+        $page.find('.page-content').append(`
+          <div class="content-block">
+            <div class="content-block-inner" style="text-align: center">
+              ${window.tommy.i18n.t('wallet-balance.no_wallet_card')}
+            </div>
+          </div>
+        `);
+        return;
+      }
       WalletBalanceController.card = card;
-      $page.find('input[name="amount"]').val(card.balance);
+      $page.find('input[name="balance"]').val(card.balance);
+      $page.find('input[name="credit_limit"]').val(card.credit_limit);
     })
   },
   bind($page) {
@@ -24,11 +35,12 @@ const WalletBalanceController = {
 
   saveBalance(data) {
     if (!WalletBalanceController.card) return;
-    const { amount } = data;
+    const { balance, credit_limit } = data;
     API
       .saveBalance(
         WalletBalanceController.card.id,
-        amount
+        balance,
+        credit_limit,
       )
       .then(WalletBalanceController.afterSave)
   },

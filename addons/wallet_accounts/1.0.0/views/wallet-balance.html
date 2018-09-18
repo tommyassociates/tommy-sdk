@@ -16,10 +16,19 @@
     <div class="page-content">
       <form class="list-block">
         <ul>
+          <li class="item-divider">{{t "wallet-balance.balance" defaultValue="Balance"}}</li>
           <li class="item-content">
             <div class="item-inner">
               <div class="item-input item-input-full-width">
-                <input type="number" min="0" name="amount" placeholder="{{t "wallet-balance.balance" defaultValue="Balance"}}" class="toggle-save">
+                <input type="number" min="0" name="balance" placeholder="{{t "wallet-balance.balance" defaultValue="Balance"}}" class="toggle-save">
+              </div>
+            </div>
+          </li>
+          <li class="item-divider">{{t "wallet-balance.credit_limit" defaultValue="Credit Limit"}}</li>
+          <li class="item-content">
+            <div class="item-inner">
+              <div class="item-input item-input-full-width">
+                <input type="number" min="0" name="credit_limit" placeholder="{{t "wallet-balance.credit_limit" defaultValue="Credit Limit"}}" class="toggle-save">
               </div>
             </div>
           </li>
