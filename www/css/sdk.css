@@ -16281,16 +16281,6 @@ html.with-panel-right-cover .panel-backdrop {
 .picker-item span {
   padding: 0 5px; }
 
-.refresh-panel {
-  display: none;
-  text-align: center;
-  padding: 12px 10px;
-  background: white;
-  border-bottom: 1px solid #D9D9D9; }
-
-.refresh-panel .refresh {
-  margin-left: 10px; }
-
 .ios .searchbar {
   background-color: #fff;
   margin: 0;
