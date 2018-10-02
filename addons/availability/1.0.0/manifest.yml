@@ -1,0 +1,47 @@
+---
+  title: "Availability"
+  package: "availability"
+  summary: "Employee availability for rostering and schedule management."
+  description: "Enables employees to register availability for rostering and schedule management."
+  version: "1.0.0"
+  developer: "Tommy Labs GmbH"
+  homepage: "https://mytommy.com"
+  private: false
+  locales:
+    - en-US
+    - zh-CN
+  roles:
+    - Team Member
+    - Team Manager
+  permissions:
+    availability_manager_access:
+      title: "Who Can View Other Team Members' Availabilities"
+      hint: "Select who can view availabilities on behalf of other users"
+      resource_type: "Fragment"
+      resource_kind: "Availability"
+      default_roles:
+        - Team Manager
+        - Team Admin
+      operations:
+        - read
+  views:
+    main:
+      title: "Availability"
+      file: "views/main.html"
+      type: "page"
+      index: true
+      framed: false
+      actor_permission: availability_manager_access
+      roles:
+        - Team Member
+        - Team Manager
+      assets:
+        -
+          type: "stylesheet"
+          file: "views/build/bundle.css"
+        -
+          type: "javascript"
+          file: "views/main.js"
+        -
+          type: "template"
+          file: "views/main.tpl.html"

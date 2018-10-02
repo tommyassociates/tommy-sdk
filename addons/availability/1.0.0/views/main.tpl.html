@@ -1,0 +1,34 @@
+<script id="availability__availabilityListGroupTemplate" type="text/template">
+  <div class="list-block no-margin no-border-top dividers">
+    <ul>
+      {{#each this}}
+      <li class="item-content">
+        <div class="item-media availability__list-date">
+          <strong>{{dayOrToday start_at}}</strong>
+          <span>{{formatDate start_at "Do MMM"}}</span>
+        </div>
+        <div class="item-inner">
+          <div class="availability__toggle-container">
+            <!-- item-title -->
+            <a href="#" class="availability__toggle-availability {{availability__class "am" data}}" data-availability="am">
+              <span>{{t "word.am" ns="availability" defaultValue="am"}}</span>
+            </a>
+            <a href="#" class="availability__toggle-availability {{availability__class "pm" data}}" data-availability="pm">
+              <span>{{t "word.pm" ns="availability" defaultValue="pm"}}</span>
+            </a>
+            <a href="#" class="availability__toggle-availability {{availability__class "nd" data}}" data-availability="nd">
+              <span>{{t "word.nd" ns="availability" defaultValue="nd"}}</span>
+            </a>
+            <form>
+              <input type="hidden" name="start_at" value="{{formatDate start_at "YYYY-MM-DD"}}" />
+              <input type="text" name="am" value="{{availability__value "am" data}}"/>
+              <input type="text" name="pm" value="{{availability__value "pm" data}}"/>
+              <input type="text" name="nd" value="{{availability__value "nd" data}}"/>
+            </form>
+          </div>
+        </div>
+      </li>
+      {{/each}}
+    </ul>
+  </div>
+</script>
