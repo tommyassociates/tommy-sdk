@@ -10,7 +10,7 @@ var express = require('express'),
 
 app.set('port', 4002)
 app.set('view engine', 'ejs')
-app.use(express.static('public'))
+app.use(express.static('www'))
 app.use(express.static('./'))
 
 app.get('/', function(req, res) {
