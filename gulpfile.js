@@ -5,6 +5,7 @@ const buildJs = require('./build/build-js.js');
 const buildSass = require('./build/build-sass.js');
 const buildImages = require('./build/build-images.js');
 const buildFonts = require('./build/build-fonts.js');
+const buildAddon = require('./build/build-addon');
 
 gulp.task('js', (cb) => {
   buildJs(cb);
@@ -20,6 +21,10 @@ gulp.task('images', (cb) => {
 
 gulp.task('fonts', (cb) => {
   buildFonts(cb);
+});
+
+gulp.task('build-addon', () => {
+  buildAddon('availability');
 });
 
 gulp.task('build', ['index', 'images', 'fonts', 'js', 'scss']);
