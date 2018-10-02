@@ -30,14 +30,12 @@
       <f7-list-item
         v-for="(addon, index) in $root.addons"
         :key="index"
-        link="#"
-        :title="`${addon.title} (${addon.package} / ${addon.id})`"
+        :link="addon.entry_path"
+        :title="$t(`${addon.package}.title`, addon.title)"
         :after="addon.version"
-        :text="addon.summary"
-        :data-url="addon.url"
-        :data-addon="addon.package"
-        :data-view-id="addon.id"
-      ></f7-list-item>
+      >
+        <img slot="media" class="icon" width="29" :src="addon.icon_url" />
+      </f7-list-item>
     </f7-list>
   </f7-page>
 </template>

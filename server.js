@@ -144,12 +144,19 @@ function readLocalAddon(package, version) {
   addon.icon_url =  url.resolve(addon.url, 'icon.png') //path + '/icon.png'
   addon.file_base_url = url.resolve(getSdkUrl(), base)
   addon.local = true
+
+  if (addon.assets) {
+    addon.assets.forEach((asset) => {
+      asset.url = url.resolve(addon.url, asset.file);
+    })
+  }
+
   if (addon.views) {
     var views = []
     for (var id in addon.views) {
       var view = addon.views[id]
       view.id = id
-      view.url = url.resolve(addon.url, view.file)
+      if (view.url) view.url = url.resolve(addon.url, view.file)
       view.local = true
       if (view.assets) {
         for (var x = 0; x < view.assets.length; x++) {

@@ -1,9 +1,9 @@
-.page#availability__main {
+.page#availability__index {
   .refresh-panel {
     background: none;
     border-bottom: none;
   }
-  .list-block {
+  .list {
     .item-media {
       padding-top: 8px;
       padding-bottom: 8px;
@@ -17,7 +17,7 @@
     }
   }
 
-  .list-block .availability__list-date {
+  .list .availability__list-date {
     padding-top: 11px;
     line-height: 1.25;
     /*width: 120px;*/
@@ -29,15 +29,16 @@
     flex-direction: column;
     justify-content: left;
     align-items: initial;
+    flex-shrink: 0;
   }
 
-  .list-block .availability__list-date strong {
+  .list .availability__list-date strong {
     display: block;
     font-weight: bold;
     font-size: 14px;
   }
 
-  .list-block .availability__list-date span {
+  .list .availability__list-date span {
     display: block;
     font-size: 12px;
   }
@@ -50,12 +51,11 @@
 
 
   .availability__toggle-container form {
-    visibility: hidden;
-    position: absolute;
+    display: none;
   }
 
 
-  .list-block a.availability__toggle-availability {
+  .list a.availability__toggle-availability {
     box-sizing: border-box;
     display: inline-block;
     text-align: center;
@@ -63,13 +63,13 @@
     margin-left: 10px;
   }
 
-  .list-block a.availability__toggle-availability span {
+  .list a.availability__toggle-availability span {
     font-size: 14px;
     text-transform: uppercase;
     color: #666;
   }
 
-  .list-block a.availability__toggle-availability{
+  .list a.availability__toggle-availability{
     &:after {
       content: '';
       display: block;
@@ -94,15 +94,15 @@
     }
     &.unavailable:after {
       border: none;
-      background: #FF4500 url(../images/icon-no.svg) no-repeat center;
+      background: #FF4500 url(../assets/icon-no.svg) no-repeat center;
     }
     &.available:after {
       border: none;
-      background: #2EC8A1 url(../images/icon-yes.svg) no-repeat center;
+      background: #2EC8A1 url(../assets/icon-yes.svg) no-repeat center;
     }
     &.locked:after {
       border: none;
-      background: #2EC8A1 url(../images/icon-lock.svg) no-repeat center;
+      background: #2EC8A1 url(../assets/icon-lock.svg) no-repeat center;
     }
   }
 }

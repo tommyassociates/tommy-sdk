@@ -59,7 +59,7 @@ app.init({
       team,
       loggedIn,
       language,
-      addons: window.SDK_LOCAL_ADDONS,
+      addons: [],
     };
   },
   methods: {
@@ -170,10 +170,6 @@ app.init({
         .then((account) => {
           self.$api.resetCache();
           self.setAccount(account);
-
-          // TODO: Init addons
-          // addons.init() // only affects once
-          // addons.reloadAllRemote()
         });
     },
     mounted() {
@@ -191,6 +187,17 @@ app.init({
           self.setUser(response, response.token);
           self.updateAccount();
           self.updateTeam();
+
+          events.$on('addonRoutesLoaded', (addon, addonRoutes) => {
+            self.$f7.routes.push(...addonRoutes);
+            self.$f7.views.main.routes.push(...addonRoutes);
+          });
+          events.$on('addonLoaded', (addon) => {
+            self.$root.addons.push(addon);
+          });
+          window.SDK_LOCAL_ADDONS.forEach((addon) => {
+            self.$addons.initAddon(addon);
+          });
         })
         .catch((error) => {
           self.$f7.dialog.alert(`Cannot connect to sandbox server: ${window.SANDBOX_ENDPOINT}: ${error}`);

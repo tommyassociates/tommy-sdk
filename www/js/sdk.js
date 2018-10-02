@@ -55471,132 +55471,112 @@ var tommy = (function () {
       // TODO: remove addon related templates, JS and CSS files?
     },
 
-    initAddon: function initAddon(addon) {
-      var this$1 = this;
-
-      var pkg = addon.package;
-      var iterable = [];
-
-      // Loop through views and preload them if they are index views
-      if (addon.views && addon.views.length) {
-        // If views exist load the locales also
-        if (addon.locales && addon.locales.length) {
-          // TODO: check i18n thing
-          i18n.addNamespaceEndpoint(addon.package, ((addon.file_base_url) + "locales"), addon.locales, true);
+    loadAddonLocales: function loadAddonLocales(addon) {
+      return new Promise(function (resolve) {
+        if (!addon.locales || addon.locales.length === 0) {
+          resolve();
+          return;
         }
+        var iterables = addon.locales.map(function (language) { return new Promise(function (localeResolve) {
+          Request.json(((addon.url) + "locales/" + language + ".json"), function (locales) {
+            var obj, obj$1;
 
-        for (var i = 0; i < addon.views.length; i += 1) {
-          var view = addon.views[i];
+            localeResolve(( obj$1 = {}, obj$1[language] = ( obj = {}, obj[addon.package] = locales, obj ), obj$1 ));
+          });
+        }); });
 
-          switch (view.type) {
-            case 'page':
-              iterable.push(this$1.initPageView(addon, view));
-              break;
-            default:
-              alert(("Unknown view type: " + (view.type)));
-          }
-        }
-      }
-
-      cache.set('addons', pkg, addon);
-      this.onAddonLoaded(addon);
-
-      return Promise.all(iterable);
+        Promise.all(iterables).then(function (locales) {
+          locales.forEach(function (locale) {
+            i18n.addLocales(locale);
+          });
+          events$2.$emit('addonLocalesLoaded', addon, locales);
+          resolve();
+        });
+      });
     },
+    loadAddonStyles: function loadAddonStyles(addon) {
+      return new Promise(function (resolve) {
+        if (!addon.assets || addon.assets.length === 0) {
+          resolve();
+          return;
+        }
+        var stylesUrl;
+        addon.assets.forEach(function (asset) {
+          if (asset.type !== 'stylesheet') { return; }
+          stylesUrl = asset.url;
+        });
+        if (!stylesUrl) {
+          resolve();
+          return;
+        }
 
-    initPageView: function initPageView(addon, view) {
-      var pkg = addon.package;
+        var styleEl = document.createElement('link');
+        styleEl.rel = 'stylesheet';
+        styleEl.onload = function onload() {
+          resolve();
+          events$2.$emit('addonStylesLoaded', addon);
+        };
+        styleEl.href = stylesUrl;
+        document.head.appendChild(styleEl);
+      });
+    },
+    loadAddonScript: function loadAddonScript(addon) {
+      return new Promise(function (resolve, reject) {
+        if (!addon.assets || addon.assets.length === 0) {
+          resolve();
+          return;
+        }
+        var scriptUrl;
+        addon.assets.forEach(function (asset) {
+          if (asset.type !== 'javascript') { return; }
+          scriptUrl = asset.url;
+        });
+        if (!scriptUrl) {
+          resolve();
+          return;
+        }
 
-      // Add some shortcuts to addon data on the view object
-      view.package = pkg;
-      view.uid = pkg + "-" + (view.id);
-      view.icon_url = addon.icon_url;
-      view.url = addon.file_base_url + view.file;
+        var scriptEl = document.createElement('script');
+        var callbackName = "addon_" + (addon.package) + "_script_load_callback";
 
-      // Cache the view object
-      cache.set('addonViews', view.uid, view);
+        Request.get(scriptUrl, function (scriptContent) {
+          // eslint-disable-next-line
+          scriptContent = "window." + callbackName + " = function () {" + scriptContent + "\nreturn addon}";
+          scriptEl.innerHTML = scriptContent;
+          document.head.appendChild(scriptEl);
 
-      // Set global addon view data for Template7
-      if (view.index) {
-        Template7.global.addonViews[view.uid] = view;
-      }
-      // eslint-disable-next-line
-      return addons.loadViewAssets(addon, view).then(function () {
-        // TODO: check window.tommy. reference
-        if (window.tommy.canceledAddonsLoading && window.tommy.canceledAddonsLoading[pkg]) { return false; }
-        log('add addon view', view);
-        addons.onViewLoaded(addon, view);
+          var addonScript = window[callbackName]();
+          delete window[callbackName];
+
+          document.head.removeChild(scriptEl);
+          events$2.$emit('addonScriptLoaded', addon, addonScript);
+          events$2.$emit('addonRoutesLoaded', addon, addonScript);
+          resolve();
+        }, function () {
+          delete window[callbackName];
+          document.head.removeChild(scriptEl);
+          resolve();
+        });
       });
     },
 
-    loadViewAssets: function loadViewAssets(addon, view) {
-      var iterable = [];
+    initAddon: function initAddon(addon) {
+      var pkg = addon.package;
+      var iterables = [];
 
-      if (view && view.assets && view.assets.length) {
-        // Sort assets by load preference
-        view.assets.sort(function (a, b) {
-          switch (b.type) {
-            case 'template':
-              return 2;
-            case 'javascript':
-              return 1;
-            case 'stylesheet':
-            default:
-              return 0;
-          }
+      // Load Locales
+      iterables.push(addons.loadAddonLocales(addon));
+      // Load Routes
+      iterables.push(addons.loadAddonScript(addon));
+      // Load Styles
+      iterables.push(addons.loadAddonStyles(addon));
+
+      return new Promise(function (resolve) {
+        return Promise.all(iterables).then(function () {
+          events$2.$emit('addonLoaded', addon);
+          resolve();
         });
-
-        // Loop through and load assets
-        for (var i = 0; i < view.assets.length; i += 1) {
-          var asset = view.assets[i];
-          // TODO: check addonAssetUrl
-          // const url = utils.addonAssetUrl(addon.package, addon.version, asset.file, true);
-          var url = (void 0);
-
-          if (addons.loadedAssetURLs.indexOf(url) !== -1) {
-            log('skipping already loaded asset', url);
-            continue;
-          }
-          addons.loadedAssetURLs.push(url);
-          log('loading addon asset', addon.package, asset);
-
-          switch (asset.type) {
-            case 'template':
-              iterable.push(addons.loadTemplate(url));
-              break;
-            case 'javascript':
-              iterable.push(addons.loadJavaScript(url));
-              break;
-            case 'stylesheet':
-              iterable.push(addons.loadStylesheet(url));
-              break;
-            default:
-              alert(("Unknown asset type: " + (asset.type)));
-          }
-        }
-      }
-
-      return Promise.all(iterable);
-    },
-
-    loadJavaScript: function loadJavaScript(url) {
-      return new Promise((function (resolve) {
-        var script = document.createElement('script');
-        script.type = 'text/javascript';
-        script.src = url;
-        script.onload = function onload() { resolve(); };
-        document.body.appendChild(script);
-      }));
-    },
-
-    loadStylesheet: function loadStylesheet(url) {
-      return new Promise((function (resolve) {
-        var style = document.createElement('link');
-        style.rel = 'stylesheet';
-        style.href = url;
-        style.onload = function onload() { resolve(); };
-        document.body.appendChild(style);
-      }));
+      });
     },
 
     loadAddon: function loadAddon(pkg, version) {
@@ -69451,7 +69431,7 @@ var tommy = (function () {
   setVueProto('$log', log);
   setVueProto('$moment', hooks$2);
 
-  var Home = {render: function(){var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('f7-page',[_c('f7-navbar',[_c('tommy-nav-menu'),_vm._v(" "),_c('f7-nav-title',[_vm._v("Addons")]),_vm._v(" "),_c('f7-nav-right',[_c('f7-link',{attrs:{"href":"/settings/","icon-material":"settings"}})],1)],1),_vm._v(" "),_c('f7-block-title',[_vm._v("Addons")]),_vm._v(" "),_c('f7-list',{attrs:{"media-list":""}},_vm._l((_vm.$root.addons),function(addon,index){return _c('f7-list-item',{key:index,attrs:{"link":("/addon-details.html?package=" + (addon.package) + "}&version=" + (addon.version)),"title":addon.title,"after":addon.version,"text":addon.summary}},[_c('img',{staticClass:"icon",attrs:{"slot":"media","width":"80","src":addon.icon_url},slot:"media"})])})),_vm._v(" "),_c('f7-block-title',[_vm._v("Views")]),_vm._v(" "),_c('f7-list',_vm._l((_vm.$root.addons),function(addon,index){return _c('f7-list-item',{key:index,attrs:{"link":"#","title":((addon.title) + " (" + (addon.package) + " / " + (addon.id) + ")"),"after":addon.version,"text":addon.summary,"data-url":addon.url,"data-addon":addon.package,"data-view-id":addon.id}})}))],1)},staticRenderFns: [],
+  var Home = {render: function(){var _vm=this;var _h=_vm.$createElement;var _c=_vm._self._c||_h;return _c('f7-page',[_c('f7-navbar',[_c('tommy-nav-menu'),_vm._v(" "),_c('f7-nav-title',[_vm._v("Addons")]),_vm._v(" "),_c('f7-nav-right',[_c('f7-link',{attrs:{"href":"/settings/","icon-material":"settings"}})],1)],1),_vm._v(" "),_c('f7-block-title',[_vm._v("Addons")]),_vm._v(" "),_c('f7-list',{attrs:{"media-list":""}},_vm._l((_vm.$root.addons),function(addon,index){return _c('f7-list-item',{key:index,attrs:{"link":("/addon-details.html?package=" + (addon.package) + "}&version=" + (addon.version)),"title":addon.title,"after":addon.version,"text":addon.summary}},[_c('img',{staticClass:"icon",attrs:{"slot":"media","width":"80","src":addon.icon_url},slot:"media"})])})),_vm._v(" "),_c('f7-block-title',[_vm._v("Views")]),_vm._v(" "),_c('f7-list',_vm._l((_vm.$root.addons),function(addon,index){return _c('f7-list-item',{key:index,attrs:{"link":addon.entry_path,"title":_vm.$t(((addon.package) + ".title"), addon.title),"after":addon.version}},[_c('img',{staticClass:"icon",attrs:{"slot":"media","width":"29","src":addon.icon_url},slot:"media"})])}))],1)},staticRenderFns: [],
 
   };
 
@@ -69617,7 +69597,7 @@ var tommy = (function () {
         team: team,
         loggedIn: loggedIn,
         language: language$1,
-        addons: window.SDK_LOCAL_ADDONS,
+        addons: [],
       };
     },
     methods: {
@@ -69728,10 +69708,6 @@ var tommy = (function () {
           .then(function (account) {
             self.$api.resetCache();
             self.setAccount(account);
-
-            // TODO: Init addons
-            // addons.init() // only affects once
-            // addons.reloadAllRemote()
           });
       },
       mounted: function mounted() {
@@ -69749,6 +69725,19 @@ var tommy = (function () {
             self.setUser(response, response.token);
             self.updateAccount();
             self.updateTeam();
+
+            events$2.$on('addonRoutesLoaded', function (addon, addonRoutes) {
+              var ref, ref$1;
+
+              (ref = self.$f7.routes).push.apply(ref, addonRoutes);
+              (ref$1 = self.$f7.views.main.routes).push.apply(ref$1, addonRoutes);
+            });
+            events$2.$on('addonLoaded', function (addon) {
+              self.$root.addons.push(addon);
+            });
+            window.SDK_LOCAL_ADDONS.forEach(function (addon) {
+              self.$addons.initAddon(addon);
+            });
           })
           .catch(function (error) {
             self.$f7.dialog.alert(("Cannot connect to sandbox server: " + (window.SANDBOX_ENDPOINT) + ": " + error));
