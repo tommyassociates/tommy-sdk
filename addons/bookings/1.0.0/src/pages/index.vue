@@ -74,7 +74,7 @@
         const self = this;
         let title = self.formatDate(event.start_at, 'h:mm a');
         if (event.end_at) {
-          title += ` - ${self.formatDate(event.end_at, 'h:mm a')}`
+          title += ` - ${self.formatDate(event.end_at, 'h:mm a')}`;
         }
         return title;
       },
