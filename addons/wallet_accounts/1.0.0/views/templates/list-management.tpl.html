@@ -1,0 +1,122 @@
+<script id="wallet_accounts__listManagementTemplate" type="text/template">
+    <div class="list-block inset sortable sortable-opened list-block-custom">
+        <ul>
+            {{#each this}}
+            <li data-list-id={{id}}>
+                <label class="label-checkbox item-content">
+                    <input type="checkbox" name="{{id}}" {{#if data.active}}checked{{/if}}>
+                    <div class="item-media">
+                        <i class="icon icon-form-checkbox"></i>
+                    </div>
+                    <div class="item-inner">
+                        <div class="item-title">{{name}}</div>
+                    </div>
+                </label>
+                <div class="sortable-handler"></div>
+            </li>
+            {{/each}}
+        </ul>
+    </div>
+    <div class="list-block list-block-custom inset">
+        <ul>
+            <!--
+            <li>
+                <a href="#" class="item-link list-button open-picker">View More</a>
+            </li>
+            -->
+            <li>
+                <a href="{{addonAssetUrl "views/list-add.html"}}" class="item-link list-button color-custom">Create New List</a>
+            </li>
+        </ul>
+    </div>
+    <!--
+    <div class="picker-modal list-picker">
+        <div class="toolbar">
+            <div class="toolbar-inner">
+                <div class="left color-gray">Cancel</div>
+                <div class="right">
+                    <a href="#" class="link color-custom close-picker">Done</a>
+                </div>
+            </div>
+        </div>
+        <div class="picker-modal-inner">
+            <div class="list-block">
+                <ul>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="1" checked>
+                            <div class="item-inner">
+                                <div class="item-title">Allen's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="2" checked>
+                            <div class="item-inner">
+                                <div class="item-title">Lili's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="3">
+                            <div class="item-inner">
+                                <div class="item-title">Logistics's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="4">
+                            <div class="item-inner">
+                                <div class="item-title">Services's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="5">
+                            <div class="item-inner">
+                                <div class="item-title">Nick's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="6" checked>
+                            <div class="item-inner">
+                                <div class="item-title">Someone's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="7">
+                            <div class="item-inner">
+                                <div class="item-title">Someone's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="8">
+                            <div class="item-inner">
+                                <div class="item-title">Someone's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="9">
+                            <div class="item-inner">
+                                <div class="item-title">Someone's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    -->
+</script>

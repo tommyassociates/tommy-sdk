@@ -1,0 +1,105 @@
+{
+  "index": {
+    "title": "ShanYuan",
+    "vip_label": "VIP",
+    "nursing_label": "Nursing",
+    "cleaning_label": "Cleaning",
+    "massage_label": "Massage",
+    "booking_label": "Booking",
+    "wallet_label": "Wallet"
+  },
+  "vip": {
+    "info": "Upgrade to a VIP package for great value extrude",
+    "current_plan_badge": "Current Plan",
+    "recommended_plan_badge": "Recommended",
+    "plan_green": "Green",
+    "plan_gold": "Gold",
+    "plan_platinum": "Platinum",
+    "details_plan_inclusion": "Plan Inclusion",
+    "details_administration": "Administration"
+  },
+  "service_list": {
+    "nursing_title": "Nursing",
+    "cleaning_title": "Cleaning",
+    "massage_title": "Massage"
+  },
+  "service_details": {
+    "service_details_label": "Service details",
+    "book_button": "Book now"
+  },
+  "coupon_picker": {
+    "text": "You have available coupons that you can choose to use.",
+    "use_label": "Use",
+    "skip_button": "Skip",
+    "confirm_button": "Confirm"
+  },
+  "location": {
+    "title": "Address",
+    "default_label": "default",
+    "select_button": "Select",
+    "add_button": "Add New Address",
+    "city_placeholder": "Enter your city",
+    "address_placeholder": "Enter your address",
+    "set_default_label": "Set as default address",
+    "save_button": "Save",
+    "not_available": "Tuome is not available in your area yet. Invite your friends to install Tuome. The more who express interest the quicker we will open new regions."
+  },
+  "date_time": {
+    "title": "Date & Time",
+    "determine_button": "Determine",
+    "week_days": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  },
+  "nurse_list": {
+    "title": "Nurse"
+  },
+  "order_confirm": {
+    "title": "Confirm Order",
+    "coupons_label": "Coupons",
+    "total_label": "Total",
+    "pay_button": "Payment now"
+  },
+  "order_success": {
+    "title": "Appointment is successful",
+    "details_button": "Check order details",
+    "home_button": "Return to home page "
+  },
+  "order_error": {
+    "title": "Error occured. Order is waiting for the payment",
+    "details_button": "Check order details",
+    "home_button": "Return to home page "
+  },
+  "order_canceled": {
+    "title": "Cancel order successfully",
+    "message": "The refund will be returned to your payment account in the same way as 1-2 business days. Please pay attention to the check.",
+    "home_button": "Return to home page"
+  },
+  "order_details": {
+    "title": "Order Details",
+    "service_label": "Service",
+    "time_label": "Time",
+    "coupons_label": "Coupons",
+    "total_label": "Total",
+    "payment_label": "Payment",
+    "status_canceled": "Order canceled",
+    "status_progress": "Order in progress",
+    "status_complete": "Order completed!",
+    "status_pending": "Need to be paid",
+    "cancel_button": "Cancel",
+    "repeat_button": "Repeat",
+    "pay_button": "Pay Now",
+    "cancel_confirm": "Cancel the order will not be able to enjoy the on-site service, whether to confirm the cancellations"
+  },
+  "history": {
+    "title": "History",
+    "status_canceled": "Order canceled",
+    "status_paid": "Order in progress",
+    "status_processing": "Order in progress",
+    "status_complete": "Order completed!",
+    "status_pending": "Need to be paid"
+  },
+  "views": {
+    "main": {
+      "title": "ShanYuan"
+    }
+  }
+}

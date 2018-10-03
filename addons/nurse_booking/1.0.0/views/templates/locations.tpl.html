@@ -1,0 +1,29 @@
+<script id="nurse_booking__locationsTemplate" type="text/template">
+  {{#if locations.length}}
+    {{#each locations}}
+      <div class="location-card">
+        <i class="location-card-icon"></i>
+        <div class="location-card-title">
+          {{#if default}}
+          <span class="location-card-default-badge">[{{t "location.default_label"}}]</span>
+          {{/if}}
+          {{city}} {{address}}
+        </div>
+        <a href="#" class="location-delete-button" data-location-index="{{@index}}"></a>
+        <a href="#" class="location-card-button location-select-button" data-location-index="{{@index}}">{{t "location.select_button"}}</a>
+      </div>
+    {{/each}}
+    <a href="#" class="location-add-button">{{t "location.add_button"}}</a>
+  {{else}}
+    <div class="location-card location-add-form">
+      <input type="text" name="city" placeholder="{{t "location.city_placeholder"}}" />
+      <textarea type="text" name="address" placeholder="{{t "location.address_placeholder"}}"></textarea>
+      <label>
+        <input type="checkbox" name="default">
+        <i class="framework7-icons">check</i>
+        <span>{{t "location.set_default_label"}}</span>
+      </label>
+      <a href="#" class="location-card-button location-save-button">{{t "location.save_button"}}</a>
+    </div>
+  {{/if}}
+</script>

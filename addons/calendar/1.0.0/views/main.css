@@ -1,0 +1,39 @@
+#calendar__container .has-events {
+  background: #D8FFAC;
+}
+#calendar__container .full-width {
+  width: 100%;
+}
+#calendar__container .calendar-custom-toolbar {
+  color: #000;
+}
+#calendar__container .calendar-custom-toolbar .left a,
+#calendar__container .calendar-custom-toolbar .right a {
+  color: #000;
+}
+
+
+/* Reminder Widget */
+#calendar__event-form .reminder .reminder-input-wrap {
+  position: relative;
+  /*display: none;*/
+  opacity: 0;
+  height: 0;
+}
+#calendar__event-form .reminder.has-reminder .reminder-input-wrap {
+  /*display: block;*/
+  opacity: 1;
+  height: auto;
+}
+#calendar__event-form .reminder .reminder-input-wrap:after {
+  display: none;
+}
+#calendar__event-form .reminder .reminder-input-wrap .reminder-delete {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+}
+#calendar__event-form .reminder.has-reminder .button {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}

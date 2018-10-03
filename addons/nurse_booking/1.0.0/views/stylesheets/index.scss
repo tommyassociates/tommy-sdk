@@ -1,0 +1,1285 @@
+$red: #ff4500;
+$orange: #FF5413;
+$yellow: #FF7B00;
+@mixin encoded-svg-background($svg){
+  background-image: url("data:image/svg+xml;charset=utf-8,#{$svg}");
+}
+[data-page="nurse_booking__index"] {
+  .navbar {
+    background-color: transparent;
+    color: #333;
+    a.link {
+      color: inherit;
+    }
+    i {
+      color: inherit;
+    }
+  }
+}
+[data-page="nurse_booking__vip"],
+[data-page="nurse_booking__vip-details"] {
+  .navbar {
+    background-color: transparent;
+    color: #fff;
+    a.link {
+      color: inherit;
+    }
+    i {
+      color: inherit;
+    }
+  }
+}
+
+.page#nurse_booking__index,
+.page#nurse_booking__vip,
+.page#nurse_booking__vip-details {
+  color: #333;
+  background: #fff;
+  .page-content {
+    padding-top: 0;
+  }
+}
+.page#nurse_booking__index {
+  color: #333;
+  line-height: 1.5;
+  .swiper-container {
+    height: 250px;
+    .swiper-slide {
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+    .swiper-pagination {
+      z-index: 100 !important;
+      -webkit-backface-visibility: hidden;
+    }
+    .swiper-pagination-bullet {
+      background: rgba(255,255,255,1);
+      border: 1px solid #999;
+      opacity: 0.5 !important;
+      width: 10px !important;
+      height: 10px !important;
+      margin: 0 5px !important;
+    }
+    .swiper-pagination-bullet-active {
+      opacity: 1 !important;
+    }
+  }
+  .sections {
+    overflow: hidden;
+    font-size: 0;
+    margin: 35px 0;
+  }
+  .section {
+    width: 33.333333%;
+    text-align: center;
+    font-size: 20px;
+    font-weight: 500;
+    box-sizing: border-box;
+    display: inline-block;
+    line-height: 1.25;
+    &:nth-child(n + 4) {
+      margin-top: 20px;
+    }
+    a {
+      color: inherit;
+      span {
+        display: block;
+        text-align: center;
+        margin-top: 5px;
+      }
+    }
+  }
+}
+.page#nurse_booking__vip,
+.page#nurse_booking__vip-details {
+  .vip-header {
+    height: 170px;
+    background: #EB7C83 url(../images/vip-header.svg) no-repeat center;
+    background-size: cover;
+    color: #fff;
+    box-sizing: border-box;
+    padding-top: 44px;
+    text-align: center;
+    position: relative;
+    &:after {
+      content: '';
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 100%;
+      height: 26px;
+      background: url(../images/vip-header-mask.png) no-repeat center bottom;
+      background-size: 100% 100%;
+    }
+    .avatar {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      margin-left: auto;
+      margin-right: auto;
+      border: 3px solid #fff;
+      position: relative;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: cover;
+    }
+    .name {
+      margin-top: 5px;
+      font-size: 24px;
+      line-height: 1.1;
+    }
+    .medal {
+      width: 30px;
+      height: 30px;
+      position: absolute;
+      right: -6px;
+      bottom: -6px;
+      background-repeat: no-repeat;
+      background-size: contain;
+      background-position: center;
+      &.medal-gold {
+        background-image: url(../images/medal-gold.png);
+      }
+      &.medal-green {
+        background-image: url(../images/medal-green.png);
+      }
+      &.medal-platinum {
+        background-image: url(../images/medal-platinum.png);
+      }
+    }
+  }
+}
+.page#nurse_booking__vip {
+  .vip-info {
+    font-size: 24px;
+    line-height: 1.25;
+    margin-top: 10px;
+  }
+  .vip-plans {
+    margin: 20px 0;
+  }
+  .vip-info, .vip-plans {
+    margin-left: 15px;
+    margin-right: 15px;
+  }
+  .vip-plan {
+    display: block;
+    height: 90px;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px 0 rgba(0,0,0,0.15);
+    color: #fff;
+    font-size: 36px;
+    display: flex;
+    align-content: center;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 0 30px;
+    position: relative;
+    font-weight: 500;
+    &:after {
+      content: '';
+      position: absolute;
+      width: 70px;
+      height: 70px;
+      right: 26px;
+      top: -3px;
+      background-size: contain;
+      background-position: center top;
+      background-repeat: no-repeat;
+    }
+    .vip-plan-badge {
+      position: absolute;
+      left: 0;
+      top: -8px;
+      background: #9013FE;
+      border-radius: 8px 0 8px 8px;
+      color: #fff;
+      box-sizing: border-box;
+      min-width: 140px;
+      font-size: 20px;
+      height: 30px;
+      line-height: 30px;
+      text-align: center;
+      padding: 0 10px;
+    }
+    &.vip-plan-green {
+      background-color: #2EC8A1;
+      &:after {
+        background-image: url(../images/medal-green.png);
+      }
+    }
+    &.vip-plan-gold {
+      background-color: #E8B766;
+      &:after {
+        background-image: url(../images/medal-gold.png);
+      }
+    }
+    &.vip-plan-platinum {
+      background-color: #6DBEFF;
+      &:after {
+        background-image: url(../images/medal-platinum.png);
+      }
+    }
+    + .vip-plan {
+      margin-top: 28px;
+    }
+  }
+}
+.page#nurse_booking__vip-details {
+  .vip-plan-details {
+    display: flex;
+    padding-left: 15px;
+    padding-right: 15px;
+    justify-content: space-between;
+    line-height: 33px;
+    padding-top: 20px;
+    padding-bottom: 20px;
+    align-items: center;
+    .vip-plan-current {
+      display: flex;
+      align-items: center;
+      align-content: center;
+      padding-left: 45px;
+      font-size: 24px;
+      font-weight: 600;
+      background-color: #FFF5F1;
+      border-radius: 4px;
+      position: relative;
+      font-size: 24px;
+      flex-shrink: 0;
+      &:before {
+        position: absolute;
+        left: 0px;
+        bottom: 0;
+        width: 40px;
+        height: 40px;
+        background: url(../images/vip-crown.png) no-repeat left;
+        background-size: 40px 40px;
+        content: '';
+      }
+    }
+    .vip-plan-expiration {
+      font-size: 20px;
+      margin-left: 5px;
+      flex-shrink: 10;
+      line-height: 1.25;
+    }
+  }
+  .list-block.vip-details-list-block {
+    margin: 0;
+    .item-inner {
+      padding-top: 12px;
+      padding-bottom: 11px;
+    }
+    .item-divider {
+      font-size: 24px;
+      &:before {
+        display: none;
+      }
+    }
+    .item-title, .item-after {
+      font-size: 24px;
+    }
+    .item-after {
+      max-height: none;
+    }
+    .item-subtitle {
+      font-size: 20px;
+    }
+    b {
+      font-weight: 600;
+      color: $orange;
+    }
+    .item-link .item-inner {
+      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg%20viewBox%3D'0%200%2060%20120'%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%3E%3Cpath%20d%3D'm60%2061.5-38.25%2038.25-9.75-9.75%2029.25-28.5-29.25-28.5%209.75-9.75z'%20fill%3D'%23c7c7cc'%2F%3E%3C%2Fsvg%3E");
+    }
+  }
+}
+.page#nurse_booking__service-list {
+  .page-content {
+    display: flex;
+    align-items: center;
+    @media (orientation: landscape) {
+      display: block;
+    }
+  }
+  .service-cards.swiper-container {
+    padding-top: 10px;
+    padding-bottom: 20px;
+    width: 100%;
+    .swiper-slide {
+      width: 300px;
+    }
+  }
+  .service-card {
+    display: block;
+    position: relative;
+    overflow: hidden;
+    border-radius: 4px;
+    box-shadow: 0 10px 20px 0 rgba(0,0,0,0.16);
+    background: #fff;
+    transition: 300ms;
+    transform: scale(0.85);
+  }
+  .swiper-slide-active .service-card {
+    transform: scale(1);
+  }
+  .service-card-pic {
+    height: 270px;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+  .service-card-content {
+    padding: 15px 12px 15px;
+    color: #333;
+  }
+  .service-card-title {
+    font-size: 30px;
+    font-weight: 500;
+    line-height: 1.25;
+  }
+  .service-card-duration {
+    font-size: 20px;
+    font-weight: 600;
+    padding-left: 12px + 27px;
+    background: url(../images/icon-time.svg) no-repeat left;
+    background-size: 27px auto;
+    margin: 10px 0;
+  }
+  .service-card-coupons,
+  .service-card-price {
+    color: $red;
+    font-weight: bold;
+    line-height: 40px;
+    margin-top: 5px;
+  }
+  .service-card-coupons {
+    font-size: 36px;
+    padding-left: 19px + 37px;
+    background: url(../images/icon-coupon.svg) no-repeat left;
+    background-size: 37px auto;
+  }
+  .service-card-price {
+    font-size: 40px;
+    padding-left: 19px + 35px;
+    background: url(../images/icon-money.svg) no-repeat left;
+    background-size: 35px auto;
+  }
+}
+.nurse_booking__toolbar-button {
+  background: $orange;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 500;
+  width: 100%;
+  height: 80px;
+  line-height: 80px;
+  font-size: 24px;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #fff;
+  text-align: center;
+  cursor: pointer;
+  &.active-state {
+    color: rgba(255,255,255,0.5);
+  }
+  ~ .page-content {
+    padding-bottom: 80px;
+  }
+}
+.page#nurse_booking__service-details {
+  .service-details-header .swiper-container {
+    height: 66vw;
+    max-height: 500px;
+    background: #fff;
+    .swiper-slide {
+      background-size: cover;
+      background-position: center top;
+    }
+    .swiper-pagination {
+      z-index: 100 !important;
+      -webkit-backface-visibility: hidden;
+    }
+    .swiper-pagination-bullet {
+      background: #fff;
+      width: 10px !important;
+      height: 10px !important;
+      margin: 0 5px !important;
+      border: 1px solid #979797;
+      opacity: 0.8 !important;
+      box-sizing: border-box;
+    }
+    .swiper-pagination-bullet-active {
+      background: $orange;
+      border: none;
+      opacity: 1 !important;
+    }
+  }
+  .service-details-meta {
+    background: #fff;
+    padding: 15px 12px 15px;
+    color: #333;
+    .service-details-meta-wrap {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .service-details-meta-left {
+      flex-shrink: 10;
+      min-width: 0;
+    }
+    .service-details-title {
+      font-size: 30px;
+      font-weight: 500;
+      line-height: 1.25;
+      position: relative;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .service-details-duration {
+      font-size: 22px;
+      font-weight: 600;
+      padding-left: 12px + 27px;
+      background: url(../images/icon-time.svg) no-repeat left;
+      background-size: 27px auto;
+      margin: 10px 0 0;
+    }
+    .service-details-price {
+      color: $red;
+      font-weight: bold;
+      line-height: 1;
+      font-size: 40px;
+      flex-shrink: 0;
+      margin-left: 5px;
+    }
+    .service-details-coupons-link {
+      font-weight: 600;
+      display: block;
+      color: inherit;
+      box-sizing: border-box;
+      width: 100%;
+      font-size: 22px;
+      line-height: 1;
+      position: relative;
+      margin-top: 12px;
+      margin-bottom: -15px;
+      span {
+        border-top: 1px solid #E9EAEB;
+        padding-left: 12px + 27px;
+        padding-top: 15px;
+        padding-bottom: 15px;
+        padding-right: 35px;
+        display: block;
+        background: url(../images/icon-coupon.svg) no-repeat left;
+        background-size: 27px auto;
+        position: relative;
+        z-index: 1;
+      }
+      &:before {
+        content: '';
+        position: absolute;
+        left: -12px;
+        right: -12px;
+        top: 0;
+        bottom: 0;
+        background: #eee;
+        opacity: 0;
+        transition: 200ms;
+        z-index: 0;
+      }
+      &:after {
+        content: '';
+        position: absolute;
+        width: 10px;
+        height: 20px;
+        top: 50%;
+        margin-top: -10px;
+        right: 5px;
+        @include encoded-svg-background("<svg viewBox='0 0 60 120' xmlns='http://www.w3.org/2000/svg'><path d='m60 61.5-38.25 38.25-9.75-9.75 29.25-28.5-29.25-28.5 9.75-9.75z' fill='#c7c7cc'/></svg>");
+        background-size: 10px 20px;
+        background-repeat: no-repeat;
+      }
+
+      &.active-state:before {
+        opacity: 1;
+      }
+    }
+  }
+  .service-details-content {
+    background: #fff;
+    color: #333;
+    padding: 12px;
+    font-size: 22px;
+    line-height: 1.5;
+    margin-top: 8px;
+    .service-details-label {
+      font-size: 24px;
+      font-weight: bold;
+      position: relative;
+      padding-left: 12px;
+      margin-bottom: 12px;
+      &:before {
+        content: '';
+        width: 6px;
+        height: 24px;
+        position: absolute;
+        left: 0;
+        top: 50%;
+        margin-top: -12px;
+        background: $red;
+      }
+    }
+    .service-details-text {
+      ul, ol, p, h1, h2, h3, h4 {
+        &:first-child {
+          margin-top: 0;
+        }
+        &:last-child {
+          margin-bottom: 0;
+        }
+      }
+    }
+  }
+}
+.nurse_booking-coupon-picker-modal {
+  width: 300px;
+  margin-left: -150px;
+  .modal-button-bold {
+    background: rgba(255,255,255,.95);
+    color: $red;
+    font-weight: bold;
+    &.active-state {
+      background: rgba(230,230,230,.95);
+    }
+  }
+  .modal-button-disabled {
+    pointer-events: none;
+    color: rgba(0,0,0,0.5);
+  }
+}
+.nurse_booking-coupon-picker {
+  margin-bottom: -15px;
+  .coupon-picker-text {
+    font-size: 17px;
+    font-weight: 500;
+    margin: 10px 0;
+    line-height: 1.2;
+  }
+  .coupon-picker-items {
+    max-height: 200px;
+    overflow: auto;
+    text-align: left;
+    box-sizing: border-box;
+    padding-bottom: 15px;
+    input {
+      display: none;
+    }
+    label {
+      display: block;
+      color: #fff;
+      border-radius: 8px;
+      border: 1px solid #333;
+      background: linear-gradient(to right, #FF9340, #FE6550);
+      position: relative;
+      display: flex;
+      &:before, &:after {
+        content: '';
+        background: #fff;
+        width: 20px;
+        height: 30px;
+        position: absolute;
+        top: 50%;
+        margin-top: -15px;
+        box-sizing: border-box;
+        border: 1px solid #333;
+        pointer-events: none;
+        border-radius: 50%;
+      }
+      &:before {
+        left: -12px;
+      }
+      &:after {
+        right: -12px;
+      }
+      + label {
+        margin-top: 6px;
+      }
+    }
+  }
+  .coupon-item-content {
+    flex-shrink: 10;
+    min-width: 0;
+    padding: 8px 5px 8px 12px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .coupon-item-title {
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.1;
+  }
+  .coupon-item-date,
+  .coupon-item-name {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .coupon-item-label {
+    flex-shrink: 0;
+    color: #333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 23px;
+    font-weight: 600;
+    background: #fff;
+    width: 65px;
+    text-align: center;
+    border-radius: 0 8px 8px 0;
+  }
+  input:checked ~ .coupon-item-label {
+    background-color: #FFE187;
+    color: $red;
+  }
+
+}
+.page#nurse_booking__location {
+  .location-card {
+    box-shadow: 0 2px 8px 0 rgba(0,0,0,0.10);
+    border-radius: 6px;
+    padding: 12px;
+    margin: 12px;
+    background: #fff;
+    position: relative;
+  }
+  .location-card-title {
+    font-size: 22px;
+    padding-top: 12px;
+    color: #333333;
+    letter-spacing: -0.53px;
+    line-height: 27px;
+    margin-left: 38px;
+    padding-right: 27px + 5px;
+    margin-bottom: 20px;
+    .location-card-default-badge {
+      font-size: 20px;
+      color: #5FA81A;
+      margin-right: 5px;
+    }
+  }
+  .location-delete-button {
+    position: absolute;
+    width: 27px;
+    height: 27px;
+    background: url(../images/icon-delete.svg) no-repeat center;
+    right: 12px;
+    top: 24px;
+    z-index: 10;
+    &.active-state {
+      opacity: 0.5;
+    }
+  }
+  .location-card-icon {
+    position: absolute;
+    width: 27px;
+    height: 29px;
+    background: url(../images/icon-location.svg) no-repeat center;
+    left: 12px;
+    top: 28px;
+  }
+  .location-card-button {
+    display: block;
+    color: #fff;
+    background-color: $orange;
+    height: 56px;
+    border-radius: 6px;
+    line-height: 56px;
+    text-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    margin-top: 20px;
+    &.active-state {
+      color: rgba(255,255,255,0.5);
+    }
+  }
+  .location-add-button {
+    margin: 12px;
+    box-shadow: 0 2px 8px 0 rgba(0,0,0,0.10);
+    border-radius: 6px;
+    height: 60px;
+    line-height: 60px;
+    font-size: 22px;
+    font-weight: bold;
+    color: $orange;
+    text-align: center;
+    display: block;
+    background: #fff;
+    &.active-state {
+      color: lighten($orange, 20%)
+    }
+  }
+  .location-add-form {
+    input[type="text"], textarea {
+      display: block;
+      border-radius: 6px;
+      background: #f1f1f1;
+      font-size: 22px;
+      color: #000;
+      padding-left: 12px;
+      padding-right: 12px;
+      box-sizing: border-box;
+      border: none;
+      outline: 0;
+      appearance: none;
+      width: 100%;
+      box-shadow: none;
+      margin: 20px 0;
+      &:first-child {
+        margin-top: 0;
+      }
+    }
+    input[type="text"] {
+      height: 52px;
+    }
+    textarea {
+      resize: none;
+      height: 84px;
+      padding-top: 12px;
+      padding-bottom: 12px;
+    }
+    label {
+      display: block;
+      margin-top: 20px;
+      margin-bottom: 20px;
+      font-size: 20px;
+      color: #999;
+      line-height: 22px;
+      input {
+        display: none;
+      }
+      i {
+        width: 22px;
+        height: 22px;
+        display: inline-block;
+        vertical-align: middle;
+        background: #999;
+        border-radius: 2px;
+        color: #fff;
+        font-size: 18px;
+        line-height: 20px;
+      }
+      input:checked ~ i {
+        background-color: #5FA81A;
+      }
+      span {
+        display: inline-block;
+        vertical-align: middle;
+      }
+    }
+
+  }
+}
+.page#nurse_booking__date-time {
+  .date-time-dates {
+    background: #fff;
+    overflow: auto;
+    display: flex;
+    padding: 12px;
+    &:after {
+      content: '';
+      display: block;
+      flex-shrink: 0;
+      width: 12px;
+      height: 12px;
+    }
+    .date-time-date {
+      width: 58px;
+      flex-shrink: 0;
+      text-align: center;
+      font-size: 18px;
+      color: #333;
+      input {
+        display: none;
+      }
+      + .date-time-date {
+        margin-left: 22px;
+      }
+    }
+    .date-time-date-disabled {
+      pointer-events: none;
+      opacity: 0.5;
+    }
+    .date-time-date-num {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 58px;
+      background: #E9EAEC;
+      position: relative;
+      margin-bottom: 5px;
+      transition: 200ms;
+      &:before {
+        content: '';
+        transition: 200ms;
+        transform: scale(0.8);
+        opacity: 0;
+        width: 62px;
+        height: 62px;
+        border: 3px solid #E9EAEC;
+        border-radius: 50%;
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        margin-left: -34px;
+        margin-top: -34px;
+      }
+    }
+    .date-time-date-day {
+      display: flex;
+      justify-content: center;
+      white-space: nowrap;
+      transition: 200ms;
+    }
+    input:checked ~ {
+      .date-time-date-num {
+        background: $yellow;
+        color: #fff;
+        &:before {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+      .date-time-date-day {
+        color: $yellow;
+      }
+    }
+  }
+  .date-time-hours {
+    background: #fff;
+    padding: 12px;
+    margin: 8px 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    .date-time-hour {
+      display: block;
+      height: 60px;
+      width: calc(50% - 6px);
+      &:nth-child(n + 3) {
+        margin-top: 12px;
+      }
+      input {
+        display: none;
+      }
+      span {
+        display: block;
+        box-sizing: border-box;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-content: center;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        font-size: 22px;
+        border: 1px solid #999999;
+        border-radius: 8px;
+        transition-duration: 200ms;
+        transition-property: color, background-color;
+      }
+      input:checked ~ span {
+        background: $yellow;
+        color: #fff;
+        border-width: 0;
+      }
+    }
+  }
+}
+.page#nurse_booking__nurse-list {
+  .nurse-list {
+    margin: 12px;
+    color: #333;
+    ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    li {
+      border-radius: 6px;
+      position: relative;
+      box-shadow: 0 2px 8px 0 rgba(0,0,0,0.10);
+      background: #fff;
+      + li {
+        margin-top: 8px;
+      }
+      a {
+        color: inherit;
+        transition: 200ms;
+        &.active-state {
+          background-color: rgba(0,0,0,0.1);
+        }
+      }
+    }
+    .nurse-content-wrap {
+      display: flex;
+      justify-content: space-between;
+      padding: 20px 15px 20px 22px;
+      align-items: flex-start;
+      position: relative;
+    }
+    .nurse-inactive {
+      opacity: 0.5;
+      pointer-events: none;
+      background-color: #ddd;
+      box-shadow: none;
+    }
+    .nurse-media {
+      flex-shrink: 0;
+      width: 80px;
+      height: 80px;
+      align-self: flex-start;
+      position: relative;
+      img {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        border-radius: 50%;
+      }
+    }
+    .nurse-content {
+      flex-shrink: 1;
+      min-width: 0;
+      margin-left: 12px;
+      align-self: center;
+    }
+    .nurse-name {
+      font-size: 24px;
+      font-weight: bold;
+      line-height: 1.2;
+    }
+    .nurse-level {
+      font-size: 20px;
+    }
+    .nurse-extra {
+      margin-left: auto;
+      padding-left: 5px;
+      align-self: center;
+      text-align: right;
+    }
+    .nurse-percentage {
+      font-size: 36px;
+      color: $orange;
+      line-height: 1;
+    }
+    .nurse-bonus {
+      color: #2EC8A1;
+      font-size: 24px;
+      font-weight: bold;
+      line-height: 1.1;
+      margin-top: 4px;
+    }
+    .nurse-delux-badge {
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: 64px;
+      height: 64px;
+      background: url(../images/deluxe-badge.svg) no-repeat right top;
+    }
+    .nurse-crown-badge {
+      position: absolute;
+      background: url(../images/nurse-crown.svg) no-repeat center;
+      width: 41px;
+      height: 41px;
+      left: -16px;
+      top: -15px;
+    }
+    .nurse-busy {
+      margin-top: 4px;
+      min-height: 23px;
+      padding-left: 26px;
+      font-size: 16px;
+      background: url(../images/icon-busy.svg) no-repeat left top;
+      line-height: 23px;
+      position: relative;
+      // overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+  }
+}
+.page#nurse_booking__order-confirm,
+.page#nurse_booking__order-details {
+  color: #333;
+  .service-details-block {
+    padding: 12px;
+    display: flex;
+    background: #fff;
+  }
+  .service-image {
+    width: 100px;
+    height: 100px;
+    border-radius: 4px;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    box-shadow: 0px 2px 5px rgba(0,0,0,0.3);
+    margin-right: 20px;
+    flex-shrink: 0;
+  }
+  .service-details {
+    flex-shrink: 10;
+    min-width: 0;
+    width: 100%;
+    padding-top: 5px;
+    .service-title {
+      font-size: 30px;
+      font-weight: bold;
+      line-height: 1.2;
+    }
+    .service-price {
+      color: $orange;
+      font-size: 42px;
+      line-height: 1;
+    }
+  }
+  .location-default-badge {
+    color: #5FA81A;
+    margin-right: 5px;
+  }
+  .list-block {
+    ul {
+      &:before, &:after {
+        display: none;
+      }
+    }
+    .item-inner {
+      padding-top: 12px;
+      padding-bottom: 12px;
+    }
+    .item-media {
+      width: 36px;
+      text-align: center;
+      justify-content: center;
+    }
+    .item-title {
+      font-size: 24px;
+      font-weight: 500;
+      white-space: normal;
+      line-height: 1.2;
+    }
+    .item-link .item-inner {
+      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg%20viewBox%3D'0%200%2060%20120'%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%3E%3Cpath%20d%3D'm60%2061.5-38.25%2038.25-9.75-9.75%2029.25-28.5-29.25-28.5%209.75-9.75z'%20fill%3D'%23c7c7cc'%2F%3E%3C%2Fsvg%3E");
+    }
+  }
+  .list-block:not(.list-block-prices) {
+    .item-after {
+      font-size: 24px;
+      font-weight: 500;
+      line-height: 1.2;
+      max-height: none;
+      color: #333;
+      text-align: right;
+      &.price {
+        font-weight: bold;
+        color: $yellow;
+      }
+    }
+  }
+  .list-block.list-block-prices {
+    .item-title {
+      font-size: 32px;
+      font-weight: bold;
+    }
+    .item-after {
+      font-size: 32px;
+      font-weight: bold;
+      color: $yellow;
+      max-height: none;
+    }
+    .item-total-price .item-after {
+      font-size: 46px;
+      color: $orange;
+    }
+  }
+  .order-details-status {
+    background: #FF684F;
+    border-radius: 6px;
+    margin: 12px;
+    padding: 20px 90px 20px 12px;
+    color: #fff;
+    position: relative;
+    .order-details-status-title {
+      font-size: 28px;
+      line-height: 1.1;
+      margin-bottom: 10px;
+    }
+    .order-details-status-date {
+      font-size: 20px;
+      line-height: 1;
+    }
+    img {
+      position: absolute;
+      top: 50%;
+      right: 40px;
+      transform: translate(50%, -50%);
+    }
+  }
+  .order-details-list {
+    margin: 12px;
+    background: #FFFFFF;
+    box-shadow: 0 2px 8px 0 rgba(0,0,0,0.10);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .order-details-white-button,
+  .order-details-red-button {
+    display: block;
+    border-radius: 6px;
+    font-size: 24px;
+    height: 56px;
+    margin: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    &.active-state {
+      opacity: 0.7;
+    }
+  }
+  .order-details-red-button {
+    background: #FF5413;
+    color: #fff;
+  }
+  .order-details-white-button {
+    background: #fff;
+    border: 1px solid #999999;
+    color: #999;
+  }
+}
+.page#nurse_booking__order-success,
+.page#nurse_booking__order-canceled,
+.page#nurse_booking__order-error {
+  background: #fff;
+  .order-status-title {
+    font-size: 36px;
+    font-weight: bold;
+    text-align: center;
+    line-height: 1.15;
+    margin-bottom: 20px;
+    margin-top: 44px;
+  }
+  .order-status-img {
+    text-align: center;
+    img {
+      width: auto;
+      height: 200px;
+    }
+  }
+  .order-status-message {
+    font-size: 18px;
+    color: #666;
+    margin: 12px;
+    text-align: center;
+    max-width: 320px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .order-status-buttons {
+    padding: 12px;
+    box-sizing: border-box;
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    a {
+      display: flex;
+      text-align: center;
+      width: 100%;
+      justify-content: center;
+      align-items: center;
+      height: 60px;
+      border-radius: 6px;
+      border: 1px solid #999;
+      color: #999;
+      font-size: 22px;
+      + a {
+        margin-top: 12px;
+      }
+    }
+  }
+}
+.page#nurse_booking__history {
+  .orders-list {
+    color: #333;
+    margin-top: 12px;
+    margin-bottom: 12px;
+    .order-item {
+      display: block;
+      color: inherit;
+      background: #FFFFFF;
+      box-shadow: 0 2px 8px 0 rgba(0,0,0,0.10);
+      border-radius: 6px;
+      margin: 0 12px;
+      + .order-item {
+        margin-top: 12px;
+      }
+    }
+    .order-item-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      margin-left: 12px;
+      margin-right: 12px;
+      border-bottom: 1px solid #E9EAEB;
+      font-size: 20px;
+    }
+    .order-item-status {
+      font-weight: bold;
+      color: #666666;
+      @include encoded-svg-background("<svg viewBox='0 0 60 120' xmlns='http://www.w3.org/2000/svg'><path d='m60 61.5-38.25 38.25-9.75-9.75 29.25-28.5-29.25-28.5 9.75-9.75z' fill='#c7c7cc'/></svg>");
+      background-size: 10px 20px;
+      background-repeat: no-repeat;
+      background-position: right center;
+      padding-right: 15px;
+    }
+    .order-item-content {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 12px;
+    }
+    .order-item-details {
+      flex-shrink: 10;
+      min-width: 0;
+    }
+    .order-item-amount {
+      flex-shrink: 0;
+      color: $orange;
+      font-size: 42px;
+      margin-left: 10px;
+      line-height: 1;
+    }
+    .order-item-details-row {
+      font-size: 24px;
+      font-weight: 500;
+      line-height: 1.2;
+      + .order-item-details-row {
+        margin-top: 10px;
+      }
+    }
+  }
+}
+.order-details-cancel-order-icon {
+  background: url(../images/icon-canceled.svg) no-repeat center;
+  width: 153px;
+  height: 86px;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 10px;
+}

@@ -1,0 +1,283 @@
+<script id="tasks__taskDetailsTemplate" type="text/template">
+    <div class="popover task-menu-popover">
+        <div class="popover-angle"></div>
+        <div class="popover-inner">
+            <div class="list-block">
+                <ul>
+                    <li><a href="#" data-command="add-checklist" class="list-button item-link">{{t "task.checklist" defaultValue="Checklist"}}</a></li>
+                    <li><a href="#" data-command="add-end-time" class="list-button item-link">{{t "task.deadline" defaultValue="Deadline"}}</a></li>
+                    <!--
+                    {{t "task.task_details" defaultValue="Task details"}}
+                    {{t "task.participant" defaultValue="Participant"}}
+                    -->
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="toolbar messagebar">
+        <div class="toolbar-inner">
+            <!--
+            <a href="#" class="icon-only">
+                <img src="{{addonAssetUrl "views/images/Page1.png"}}" srcset="{{addonAssetUrl "views/images/Page1@2x.png"}} 2x,{{addonAssetUrl "views/images/Page1@3x.png"}} 3x">
+            </a>
+            -->
+            <textarea placeholder="{{t "task.enter_comment" defaultValue="Enter comment"}}"></textarea>
+            <a href="#" class="link add-comment">{{t "task.send" defaultValue="Send"}}</a>
+        </div>
+    </div>
+    <div class="page-content">
+        <div class="content-block subheader">
+            <h1>
+                <textarea name="task[name]" class="unstyled edit-task-name resizable">{{name}}</textarea>
+            </h1>
+            <input type="text" value="{{#if_compare status "==" "Unassigned"}}{{t "task.waiting_for_assignments" defaultValue="Waiting for assignments"}}{{else}}{{tasks__displayStatus status}}{{/if_compare}}" readonly="readonly" class="unstyled task-status-picker" />
+        </div>
+
+        <!--
+        What is this section for?
+        <div class="list-block list-block-custom media-list tasks">
+            <ul>
+                <li>
+                    <a href="#" class="item-link item-content">
+                        <div class="item-media">
+                            <img src="{{addonAssetUrl "views/images/Group%208.png"}}" srcset="{{addonAssetUrl "views/images/Group%208@2x.png"}} 2x,{{addonAssetUrl "views/images/Group%208@3x.png"}} 3x">
+                        </div>
+                        <div class="item-inner">
+                            <div class="item-title-row">
+                                <div class="item-title">Meter Reading</div>
+                            </div>
+                            <div class="item-text">2016.01.12</div>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+        </div>
+        -->
+
+        <div class="tag-select" data-searchbar="true" data-open-in="picker">
+          <select multiple></select>
+          <div data-template="tasks__taskParticipantsTemplate"></div>
+        </div>
+        <div class="list-block list-block-custom media-list details bottom-0">
+            <ul>
+                <li>
+                    <div class="item-content item-input">
+                        <div class="item-media">
+                            <img src="{{addonAssetUrl "views/images/slice19.png"}}" srcset="{{addonAssetUrl "views/images/slice19@2x.png"}} 2x,{{addonAssetUrl "views/images/slice19.png"}} 3x">
+                        </div>
+                        <div class="item-inner">
+                            <div class="item-input-wrap inline-edit">
+                                <textarea placeholder="{{t "task.edit_description" defaultValue="Edit the description..."}}" class="unstyled edit-task-description resizable">{{data.description}}</textarea>
+                                <span class="input-clear-button"></span>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+            </ul>
+        </div>
+        <div data-template="tasks__taskDeadlineTemplate"></div>
+        <div data-template="tasks__taskChecklistTemplate"></div>
+        <div data-template="tasks__taskActivityTemplate"></div>
+
+        <!--
+        <div class="popover task-popover overlay-hidden">
+            <div class="popover-angle"></div>
+            <div class="popover-inner">
+                <div class="content-block">
+                    <div class="list-block list-block-custom media-list tasks">
+                        <ul>
+                            <li>
+                                <a href="#" class="item-link item-content">
+                                    <div class="item-media">
+                                        <img src="https://placeimg.com/52/52/people" class="circle">
+                                    </div>
+                                    <div class="item-inner">
+                                        <div class="item-title-row">
+                                            <div class="item-title">Kevin Liu</div>
+                                        </div>
+                                        <div class="item-text">Creator</div>
+                                    </div>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" class="button">View Profile</a>
+                                <a href="#" class="button">View Tasks</a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        -->
+    </div>
+
+</script>
+
+<script id="tasks__taskParticipantsTemplate" type="text/template">
+    <div class="list-block list-block-custom media-list participants top-0" data-searchbar="true" data-page-title="Participants">
+        <ul>
+            <li class="item-divider">{{t "task.participants" defaultValue="Participants"}}</li>
+            <li>
+                <div class="item-content">
+                    <div class="item-inner">
+                        <!-- <img src="{{@global.user.icon_url}}" class="circle item open-popover" data-popover=".task-popover"> -->
+                        {{#each this}}
+                            {{#if_compare context "==" "members"}}
+                                <img src="{{teamMemberIconUrl user_id}}" class="circle item open-popover" data-popover=".task-popover">
+                            {{else}}
+                                <div class="chip item">
+                                    <div class="chip-media">
+                                        <img src="/tommy/assets/icons/{{chop context}}.png" srcset="/tommy/assets/icons/{{chop context}}@2x.png 2x,/tommy/assets/icons/{{chop context}}@3x.png 3x">
+                                    </div>
+                                    <div class="chip-label">{{name}}</div>
+                                </div>
+                            {{/if_compare}}
+                        {{/each}}
+                        <!--
+                        <img src="https://placeimg.com/32/32/people" class="circle item open-popover" data-popover=".task-popover">
+                        <img src="https://placeimg.com/32/32/people" class="circle item open-popover" data-popover=".task-popover">
+                        <div class="chip item">
+                            <div class="chip-media">
+                                <img src="{{addonAssetUrl "views/images/slice22.png"}}" srcset="{{addonAssetUrl "views/images/slice22@2x.png"}} 2x,{{addonAssetUrl "views/images/slice22@3x.png"}} 3x">
+                            </div>
+                            <div class="chip-label">Maintenance Manager</div>
+                        </div>
+                        <img src="https://placeimg.com/32/32/people" class="circle item open-popover" data-popover=".task-popover">
+                        <img src="https://placeimg.com/32/32/people" class="circle item open-popover" data-popover=".task-popover">
+                        <div class="chip item">
+                            <div class="chip-media">
+                                <img src="{{addonAssetUrl "views/images/slice21.png"}}" srcset="{{addonAssetUrl "views/images/slice21@2x.png"}} 2x,{{addonAssetUrl "views/images/slice21@3x.png"}} 3x">
+                            </div>
+                            <div class="chip-label">Apartment location</div>
+                        </div>
+                        <div class="chip item">
+                            <div class="chip-media">
+                                <img src="{{addonAssetUrl "views/images/slice20.png"}}" srcset="{{addonAssetUrl "views/images/slice20@2x.png"}} 2x,{{addonAssetUrl "views/images/slice20@3x.png"}} 3x">
+                            </div>
+                            <div class="chip-label">Maintenance</div>
+                        </div>
+                        <div class="chip item">
+                            <div class="chip-media">
+                                <img src="{{addonAssetUrl "views/images/slice20.png"}}" srcset="{{addonAssetUrl "views/images/slice20@2x.png"}} 2x,{{addonAssetUrl "views/images/slice20@3x.png"}} 3x">
+                            </div>
+                            <div class="chip-label">Maintenance</div>
+                        </div>
+                        -->
+                        <a href="#" class="item icon-only tag-search">
+                            <img src="{{addonAssetUrl "views/images/slice6.png"}}" srcset="{{addonAssetUrl "views/images/slice6@2x.png"}} 2x,{{addonAssetUrl "views/images/slice6.png"}} 3x">
+                        </a>
+                    </div>
+                </div>
+            </li>
+        </ul>
+    </div>
+</script>
+
+<script id="tasks__taskDeadlineTemplate" type="text/template">
+    <div class="list-block list-block-custom media-list details top-0 bottom-0">
+        <ul>
+            <li>
+                <div class="item-content">
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice13.png"}}" srcset="{{addonAssetUrl "views/images/slice13@2x.png"}} 2x,{{addonAssetUrl "views/images/slice13.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        <div class="item-input-wrap">
+                          <input type="text" name="time" class="unstyled edit-task-deadline" placeholder="{{t "task.edit_deadline" defaultValue="Edit deadline..."}}">
+                        </div>
+                        <!-- <div>Tomorrow 12:00 End</div> -->
+                        <a href="#" class="icon-only remove-deadline">
+                            <img src="{{addonAssetUrl "views/images/slice12.png"}}" srcset="{{addonAssetUrl "views/images/slice12@2x.png"}} 2x,{{addonAssetUrl "views/images/slice12.png"}} 3x">
+                        </a>
+                    </div>
+                </div>
+            </li>
+        </ul>
+    </div>
+</script>
+
+<script id="tasks__taskChecklistTemplate" type="text/template">
+    <div class="list-block list-block-custom media-list checklist top-0">
+        <ul>
+            <li>
+                <div class="item-content">
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice17.png"}}" srcset="{{addonAssetUrl "views/images/slice17@2x.png"}} 2x,{{addonAssetUrl "views/images/slice17.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        <div>{{t "task.checklist" defaultValue="Checklist"}}</div>
+                        <a href="#" class="icon-only remove-checklist">
+                            <img src="{{addonAssetUrl "views/images/slice12.png"}}" srcset="{{addonAssetUrl "views/images/slice12@2x.png"}} 2x,{{addonAssetUrl "views/images/slice12.png"}} 3x">
+                        </a>
+                        <!-- <a href="{{addonAssetUrl "views/task-checklist.html"}}" class="icon-only"> -->
+                          <!-- <img src="{{addonAssetUrl "views/images/slice13.png"}}" srcset="{{addonAssetUrl "views/images/slice13@2x.png"}} 2x,{{addonAssetUrl "views/images/slice13.png"}} 3x"> -->
+                          <!-- <img src="{{addonAssetUrl "views/images/slice18.png"}}" srcset="{{addonAssetUrl "views/images/slice18@2x.png"}} 2x,{{addonAssetUrl "views/images/slice18.png"}} 3x"> -->
+                        <!-- </a> -->
+                    </div>
+                </div>
+            </li>
+            {{#each this}}
+            <li data-checklist-item="{{@index}}">
+                <div class="item-content checklist-item{{#if complete}} checked{{/if}}">
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice14.png"}}" srcset="{{addonAssetUrl "views/images/slice14@2x.png"}} 2x,{{addonAssetUrl "views/images/slice14.png"}} 3x">
+                        <img src="{{addonAssetUrl "views/images/slice15.png"}}" srcset="{{addonAssetUrl "views/images/slice15@2x.png"}} 2x,{{addonAssetUrl "views/images/slice15.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        {{this.text}}
+                        <a href="#" class="icon-only remove-checklist-item">
+                            <img src="{{addonAssetUrl "views/images/slice12.png"}}" srcset="{{addonAssetUrl "views/images/slice12@2x.png"}} 2x,{{addonAssetUrl "views/images/slice12.png"}} 3x">
+                        </a>
+                    </div>
+                </div>
+            </li>
+            {{/each}}
+            <li class="add-checklist-item-wrap">
+                <div class="item-content">
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice16.png"}}" srcset="{{addonAssetUrl "views/images/slice16@2x.png"}} 2x,{{addonAssetUrl "views/images/slice16.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        <input type="text" class="add-checklist-item" placeholder="{{t "task.add_items" defaultValue="Add items"}}">
+                    </div>
+                </div>
+            </li>
+        </ul>
+    </div>
+</script>
+
+<script id="tasks__taskActivityTemplate" type="text/template">
+    <div class="list-block list-block-custom media-list activity">
+        <ul>
+            <li class="item-divider">{{t "task.activity" defaultValue="Activity"}}</li>
+            {{#each this}}
+            <li>
+                <div class="item-content">
+                {{#if_compare type "==" "comment"}}
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice11.png"}}" srcset="{{addonAssetUrl "views/images/slice11@2x.png"}} 2x,{{addonAssetUrl "views/images/slice11.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        <div class="item-title-row">
+                            <div class="item-title open-popover" data-popover=".task-popover">{{user_name}}</div>
+                            <div class="item-after">{{humanTime time}}</div>
+                        </div>
+                        <div class="item-subtitle">{{text}}</div>
+                    </div>
+                {{else}}
+                    <div class="item-media">
+                        <img src="{{addonAssetUrl "views/images/slice7.png"}}" srcset="{{addonAssetUrl "views/images/slice7@2x.png"}} 2x,{{addonAssetUrl "views/images/slice7.png"}} 3x">
+                    </div>
+                    <div class="item-inner">
+                        <div class="item-title-row">
+                            <div class="item-title">{{user_name}} <span>{{text}}</span></div>
+                            <div class="item-after">{{humanTime time}}</div>
+                        </div>
+                    </div>
+                {{/if_compare}}
+                </div>
+            </li>
+            {{/each}}
+        </ul>
+    </div>
+</script>

@@ -1,0 +1,20 @@
+<div class="navbar no-border">
+  <div class="navbar-inner">
+    <div class="center"></div>
+  </div>
+</div>
+
+<div class="pages navbar-through">
+  <div data-page="nurse_booking__order-success" id="nurse_booking__order-success" class="page no-navbar">
+    <div class="page-content">
+      <div class="order-status-title">{{t "order_success.title"}}</div>
+      <div class="order-status-img">
+        <img src="{{addonAssetUrl "views/images/order-success.svg"}}">
+      </div>
+      <div class="order-status-buttons">
+        <a href="{{addonAssetUrl "views/order-details.html"}}&backToHome=true&id={{url_query.id}}">{{t "order_success.details_button"}}</a>
+        <a href="{{addonAssetUrl "views/index.html"}}">{{t "order_success.home_button"}}</a>
+      </div>
+    </div>
+  </div>
+</div>
