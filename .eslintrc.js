@@ -14,6 +14,7 @@ module.exports = {
     "localStorage": true,
   },
   rules: {
+    "arrow-body-style": ["off"],
     "camelcase": ["off"],
     "prefer-destructuring": ["off"],
     "max-len": ["error", 1000, 2, {
