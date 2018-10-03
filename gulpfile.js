@@ -1,3 +1,4 @@
+const path = require('path');
 const gulp = require('gulp');
 const connect = require('gulp-connect');
 const gopen = require('gulp-open');
@@ -23,10 +24,6 @@ gulp.task('fonts', (cb) => {
   buildFonts(cb);
 });
 
-gulp.task('build-addon', () => {
-  buildAddon('availability');
-});
-
 gulp.task('build', ['index', 'images', 'fonts', 'js', 'scss']);
 
 gulp.task('watch', () => {
@@ -34,6 +31,11 @@ gulp.task('watch', () => {
   gulp.watch('./src/**/**/*.vue', ['js']);
   gulp.watch('./src/**/**/*.scss', ['scss']);
   gulp.watch('./src/i/*.*', ['images']);
+  gulp.watch(['./addons/**/*.*'], (data) => {
+    const addon = data.path.split(`${__dirname}/addons/`)[1].split('/')[0];
+    if (data.path.indexOf('/build/') >= 0) return;
+    buildAddon(addon);
+  });
 });
 
 gulp.task('connect', () => {

@@ -78,10 +78,19 @@ function buildAddonScss(addonFolder) {
   });
 }
 function buildAddon(addonFolder) {
-  return Promise.all([
-    buildAddonJs(addonFolder),
-    buildAddonScss(addonFolder),
-  ]);
+  console.log(`Building addon "${addonFolder}"`);
+  return new Promise((resolve, reject) => {
+    Promise.all([
+      buildAddonJs(addonFolder),
+      buildAddonScss(addonFolder),
+    ]).then(() => {
+      console.log(`Done addon "${addonFolder}"`);
+      resolve();
+    }).catch((err) => {
+      console.log(`Done addon "${addonFolder}"`);
+      reject(err);
+    });
+  });
 }
 
 module.exports = buildAddon;
