@@ -13,6 +13,7 @@ app.init({
   locales: {},
   components,
   data() {
+    const actorId = localStorage.actorId ? parseInt(localStorage.actorId, 10) : null;
     const accounts = null;
     let token = localStorage.token;
     let user = null;
@@ -52,6 +53,7 @@ app.init({
     }
 
     return {
+      actorId,
       token,
       user,
       account,
@@ -63,6 +65,17 @@ app.init({
     };
   },
   methods: {
+    // Actor
+    setActorId(id) {
+      const self = this;
+      if (id === self.user.id) {
+        self.actorId = null;
+        delete localStorage.actorId;
+      } else {
+        self.actorId = id;
+        localStorage.actorId = id;
+      }
+    },
     // Language
     setLanguage(lang) {
       const self = this;
@@ -110,11 +123,21 @@ app.init({
       localStorage.team = JSON.stringify(team);
       self.$events.$emit('teamChanged', team);
     },
+    unsetTeam() {
+      const self = this;
+      self.team = null;
+      delete localStorage.team;
+      self.$events.$emit('teamChanged', null);
+    },
     getTeam(callback) {
       const self = this;
-      self.$api.getCurrentTeam().then((team) => {
-        if (callback) callback(team);
-      });
+      self.$api.getCurrentTeam()
+        .then((team) => {
+          if (callback) callback(team);
+        })
+        .catch(() => {
+          self.unsetTeam();
+        });
     },
     updateTeam(callback) {
       const self = this;
@@ -170,6 +193,7 @@ app.init({
         .then((account) => {
           self.$api.resetCache();
           self.setAccount(account);
+          self.updateTeam();
         });
     },
     mounted() {

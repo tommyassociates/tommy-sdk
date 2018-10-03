@@ -30,7 +30,7 @@
       <f7-list-item
         v-for="(addon, index) in $root.addons"
         :key="index"
-        :link="addon.entry_path"
+        :link="addonUrl(addon)"
         :title="$t(`${addon.package}.title`, addon.title)"
         :after="addon.version"
       >
@@ -41,7 +41,14 @@
 </template>
 <script>
   export default {
-
+    methods: {
+      addonUrl(addon) {
+        const self = this;
+        let url = addon.entry_path;
+        if (self.$root.actorId) url += `?actor_id=${self.$root.actorId}`;
+        return url;
+      },
+    },
   };
 </script>
 

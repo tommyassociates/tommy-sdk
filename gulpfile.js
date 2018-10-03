@@ -24,7 +24,7 @@ gulp.task('fonts', (cb) => {
   buildFonts(cb);
 });
 
-gulp.task('build', ['index', 'images', 'fonts', 'js', 'scss']);
+gulp.task('build', ['images', 'fonts', 'js', 'scss']);
 
 gulp.task('watch', () => {
   gulp.watch('./src/**/**/*.js', ['js']);
