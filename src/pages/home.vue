@@ -15,7 +15,7 @@
       <f7-list-item
         v-for="(addon, index) in $root.addons"
         :key="index"
-        :link="`/addon-details.html?package=${addon.package}}&version=${addon.version}`"
+        :link="`/addon-details/${addon.package}/`"
         :title="addon.title"
         :after="addon.version"
         :text="addon.summary"
