@@ -1,6 +1,4 @@
-const path = require('path');
 const gulp = require('gulp');
-const connect = require('gulp-connect');
 const gopen = require('gulp-open');
 const buildJs = require('./build/build-js.js');
 const buildSass = require('./build/build-sass.js');
@@ -38,16 +36,8 @@ gulp.task('watch', () => {
   });
 });
 
-gulp.task('connect', () => {
-  connect.server({
-    root: ['./www/'],
-    livereload: false,
-    port: '5000',
-  });
-});
-
 gulp.task('open', () => {
   gulp.src('/').pipe(gopen({ uri: 'http://localhost:4002/' }));
 });
 
-gulp.task('default', ['build', 'watch', 'open']);
+gulp.task('server', ['build', 'watch', 'open']);

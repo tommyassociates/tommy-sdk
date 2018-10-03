@@ -5,23 +5,19 @@
   "main": "sdk.js",
   "dependencies": {
     "archiver": "^1.0.0",
+    "concurrently": "^4.0.1",
     "ejs": "^2.6.1",
     "express": "^4.16.3",
     "request": "^2.88.0",
     "gulp": "^3.9.1",
     "gulp-autoprefixer": "6.0.0",
-    "gulp-connect": "^5.6.1",
     "gulp-nodemon": "*",
     "gulp-open": "^3.0.1",
     "gulp-rename": "^1.4.0",
     "gulp-sourcemaps": "^2.6.4",
     "gulp-uglify": "^3.0.1",
-    "i18next-scanner": "^2.4.6",
     "js-yaml": "^3.11.0",
     "junk": "^2.1.0",
-    "lodash": "^4.17.5",
-    "vinyl-fs": "^3.0.2",
-    "vinyl-source-stream": "^2.0.0",
     "eslint": "^5.6.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-html": "^4.0.6",
@@ -31,7 +27,6 @@
     "gulp-clean": "^0.4.0",
     "gulp-clean-css": "^3.10.0",
     "gulp-if": "^2.0.2",
-    "gulp-modify-file": "^1.0.1",
     "gulp-sass": "^4.0.1",
     "rollup": "^0.64.1",
     "rollup-plugin-buble": "^0.19.2",
@@ -43,7 +38,8 @@
     "vue-template-compiler": "^2.5.17"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "concurrently --kill-others \"node server\" \"gulp server\""
   },
   "repository": {
     "type": "git",
