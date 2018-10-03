@@ -1,0 +1,46 @@
+---
+  title: "Agent Bookings"
+  package: "bookings"
+  summary: "Booking management for agencies and employees."
+  description: "A simple booking management system for agencies and employees."
+  version: "1.0.0"
+  developer: "Tommy Labs GmbH"
+  homepage: "https://mytommy.com"
+  private: false
+  locales:
+    - en-US
+    - zh-CN
+  roles:
+    - Team Member
+    - Team Manager
+  permissions:
+    bookings_manager_access:
+      title: "Who Can View Other Team Members' Bookings"
+      hint: "Select who can view bookings on behalf of other users"
+      resource_type: "Event"
+      resource_kind: "Booking"
+      default_roles:
+        - Team Manager
+        - Team Admin
+      operations:
+        - read
+  triggers:
+    booking_created:
+      title: "Booking created"
+      execute: "Trigger::BookingCreated"
+    booking_updated:
+      title: "Booking updated"
+      execute: "Trigger::BookingUpdated"
+    booking_deleted:
+      title: "Booking deleted"
+      execute: "Trigger::BookingDeleted"
+    booking_viewed:
+      title: "Booking viewed"
+  assets:
+    -
+      type: "javascript"
+      file: "build/addon.js"
+    -
+      type: "stylesheet"
+      file: "build/addon.css"
+  entry_path: "/bookings/"
