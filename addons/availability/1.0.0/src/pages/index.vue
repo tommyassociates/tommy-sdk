@@ -14,7 +14,7 @@
       <a href="#" class="refresh" @click="loadAvailabilities">{{$t('common.save', 'Refresh')}}</a>
     </div>
 
-    <f7-list class="no-margin" v-if="items">
+    <f7-list class="no-margin" no-hairlines v-if="items">
       <f7-list-item
         v-for="(item, key) in items"
         :key="key"
