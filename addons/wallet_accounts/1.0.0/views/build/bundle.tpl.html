@@ -1,0 +1,505 @@
+<script id="wallet_accounts__boardSettingTemplate" type="text/template">
+    <div class="list-block">
+        <ul>
+            {{#unless hasActorId}}
+            <li>
+                <a href="{{addonAssetUrl "views/list-management.html"}}" class="item-link item-content">
+                    <div class="item-inner">
+                        <div class="item-title">{{t "board-settings.list-management" defaultValue="List Management"}}</div>
+                    </div>
+                </a>
+            </li>
+            {{/unless}}
+            {{#if hasActorId}}
+            <li>
+                <a href="{{addonAssetUrl "views/wallet-balance.html"}}" class="item-link item-content">
+                    <div class="item-inner">
+                        <div class="item-title">{{t "board-settings.wallet-balance" defaultValue="Wallet Balance"}}</div>
+                    </div>
+                </a>
+            </li>
+            {{/if}}
+        </ul>
+        <div data-template="wallet_accounts__tagSelectTemplate"></div>
+    </div>
+</script>
+
+<script id="wallet_accounts__tagSelectTemplate" type="text/template">
+  <div class="tag-select" data-searchbar="true" data-permission-name="{{name}}" data-page-title="{{tScope "permissions" name "title"}}">
+    <ul>
+      <li class="item-divider">{{tScope "permissions" name "title"}}</li>
+      <li>
+        <select multiple class="toggle-save"></select>
+        <a href="#" class="item-link tag-search">
+          <div class="item-content">
+            <div class="item-media"><i class="material-icons md-36">search</i></div>
+            <div class="item-inner">
+              <div class="item-title">{{t "common.search_members_tags" defaultValue="Search Members, Tags"}}</div>
+            </div>
+          </div>
+        </a>
+      </li>
+    </ul>
+    <ul class="tag-items">
+    </ul>
+  </div>
+</script>
+
+<script id="wallet_accounts__dateRangeSelectTemplate" type="text/template">
+  <div class="navbar">
+    <div class="navbar-inner wallet-accounts-navbar-inner">
+      <div class="left">
+        <a href="#" class="link icon-only back"><i class="icon f7-icons">left</i></a>
+      </div>
+      <div class="center sliding">{{t "common.date_range" defaultValue="Date Range"}}</div>
+      <div class="right">
+        <a href="#" class="link icon-only save toggle">
+          <i class="icon f7-icons">check</i>
+        </a>
+      </div>
+    </div>
+  </div>
+  <div class="pages">
+    <div class="page" id="wallet_accounts__page" data-page="wallet_accounts__date-range-select">
+      <div class="page-content">
+        <div class="list-block">
+          <ul>
+            <li>
+              <label class="label-checkbox item-content">
+                <input type="radio" name="time_or_created_between" value="">
+                <div class="item-media">
+                  <i class="icon icon-form-checkbox"></i>
+                </div>
+                <div class="item-inner">
+                  <div class="item-title">{{t "date_range.none" defaultValue="None"}}</div>
+                </div>
+              </label>
+            </li>
+            <li>
+              <label class="label-checkbox item-content">
+                <input type="radio" name="time_or_created_between" value="today">
+                <div class="item-media">
+                  <i class="icon icon-form-checkbox"></i>
+                </div>
+                <div class="item-inner">
+                  <div class="item-title">{{t "date_range.today" defaultValue="Today"}}</div>
+                </div>
+              </label>
+            </li>
+            <li>
+              <label class="label-checkbox item-content">
+                <input type="radio" name="time_or_created_between" value="week">
+                <div class="item-media">
+                  <i class="icon icon-form-checkbox"></i>
+                </div>
+                <div class="item-inner">
+                  <div class="item-title">{{t "date_range.week" defaultValue="This Week"}}</div>
+                </div>
+              </label>
+            </li>
+            <li>
+              <label class="label-checkbox item-content">
+                <input type="radio" name="time_or_created_between" value="month">
+                <div class="item-media">
+                  <i class="icon icon-form-checkbox"></i>
+                </div>
+                <div class="item-inner">
+                  <div class="item-title">{{t "date_range.month" defaultValue="This Month"}}</div>
+                </div>
+              </label>
+            </li>
+          </ul>
+        </div>
+
+        <div class="list-block top-10">
+          <ul>
+            <li>
+              <div class="item-content">
+                <!-- <div class="item-media"><i class="icon f7-icons">check</i></div> -->
+                <div class="item-inner">
+                  <div class="item-title label">{{t "common.choose_range" defaultValue="Choose Range"}}</div>
+                  <div class="item-input">
+                    <label class="label-switch">
+                      <input type="checkbox">
+                      <div class="checkbox"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </li>
+            <li class="date-range-custom-item">
+              <div class="item-content">
+                <!-- <div class="item-media"><i class="icon f7-icons">person</i></div> -->
+                <div class="item-inner">
+                  <div class="item-title label">{{t "common.start_date" defaultValue="Start Date"}}</div>
+                  <div class="item-input">
+                    <input type="text" name="start_at" class="align-right">
+                  </div>
+                </div>
+              </div>
+            </li>
+            <li class="date-range-custom-item">
+              <div class="item-content">
+                <!-- <div class="item-media"><i class="icon f7-icons">person</i></div> -->
+                <div class="item-inner">
+                  <div class="item-title label">{{t "common.end_date" defaultValue="End Date"}}</div>
+                  <div class="item-input">
+                    <input type="text" name="end_at" class="align-right">
+                  </div>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</script>
+
+<script id="wallet_accounts__amountSelectTemplate" type="text/template">
+  <div class="navbar">
+    <div class="navbar-inner wallet-accounts-navbar-inner">
+      <div class="left">
+        <a href="#" class="link icon-only back"><i class="icon f7-icons">left</i></a>
+      </div>
+      <div class="center sliding">{{t "list-edit.filter-amount" defaultValue="Transaction Amount"}}</div>
+      <div class="right">
+        <a href="#" class="link icon-only save toggle">
+          <i class="icon f7-icons">check</i>
+        </a>
+      </div>
+    </div>
+  </div>
+  <div class="pages">
+    <div class="page" id="wallet_accounts__page" data-page="wallet_accounts__amount-select">
+      <div class="page-content">
+        <div class="list-block">
+          <ul>
+            <li>
+              <div class="item-content">
+                <div class="item-inner">
+                  <div class="item-title label">{{t "common.choose_range" defaultValue="Choose Range"}}</div>
+                  <div class="item-input">
+                    <label class="label-switch">
+                      <input type="checkbox">
+                      <div class="checkbox"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </li>
+            <li class="amount-range-custom-item">
+              <div class="item-content">
+                <div class="item-inner">
+                  <div class="item-title label">{{t "common.amount_min" defaultValue="From"}}</div>
+                  <div class="item-input">
+                    <input type="number" name="min" class="align-right" placeholder="0">
+                  </div>
+                </div>
+              </div>
+            </li>
+            <li class="amount-range-custom-item">
+              <div class="item-content">
+                <div class="item-inner">
+                  <div class="item-title label">{{t "common.amount_max" defaultValue="To"}}</div>
+                  <div class="item-input">
+                    <input type="number" name="max" class="align-right" placeholder="0">
+                  </div>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</script>
+
+<script id="wallet_accounts__listsTemplate" type="text/template">
+    <div class="swiper-container">
+        <div class="swiper-wrapper">
+            {{#each this}}
+            {{#if data.active}}
+            <div class="swiper-slide" data-list-id="{{id}}">
+                <div class="list">
+                    <div class="list-header">
+                        <div>{{name}}</div>
+                        {{#unless actorId}}
+                        <div>
+                            <a href="{{addonAssetUrl "views/list-edit.html"}}&list_fragment_id={{id}}">
+                                <img src="{{addonAssetUrl "views/images/slice6.png"}}" srcset="{{addonAssetUrl "views/images/slice6@2x.png"}} 2x,{{addonAssetUrl "views/images/slice6@3x.png"}} 3x">
+                            </a>
+                        </div>
+                        {{/unless}}
+                        <!--{{#wallet_accounts__ifCanEditList this}}-->
+                        <!--{{/wallet_accounts__ifCanEditList}}-->
+                    </div>
+                    <div class="list-content">
+                    </div>
+                </div>
+            </div>
+            {{/if}}
+            {{/each}}
+        </div>
+    </div>
+</script>
+
+<script id="wallet_accounts__listTransactionsTemplate" type="text/template">
+    <div class="card transactions-card">
+        <!-- <div class="card-header">{{t "index.transactions" defaultValue="Transactions"}}</div> -->
+        <div class="card-content">
+            {{#if this.length}}
+            <div class="list-block media-list transactions-list">
+                <ul>
+                    {{#each this}}
+                    <li>
+                      <a href="{{addonAssetUrl "views/transaction-details.html"}}?id={{id}}" class="item-content item-link">
+                        <div class="item-media">
+                          {{#if icon_url}}
+                          <img src="{{icon_url}}">
+                          {{else}}
+                          <i class="wallet-icon-placeholder"></i>
+                          {{/if}}
+                        </div>
+                        <div class="item-inner">
+                          <div class="item-details">
+                            <div class="item-title-row">
+                              <div class="item-title">{{payee_name}}</div>
+                            </div>
+                            <div class="item-text">{{wallet__formatTransactionDate paid_at}}</div>
+                          </div>
+                          <div class="item-after">{{wallet__formatTransactionAmount this}}</div>
+                        </div>
+                      </a>
+                    </li>
+                    {{/each}}
+                </ul>
+            </div>
+            {{else}}
+            <div style="padding: 15px">{{t "index.no_list_transaction" defaultValue="No transactions found"}}</div>
+            {{/if}}
+        </div>
+    </div>
+</script>
+
+<script id="wallet_accounts__listEditTemplate" type="text/template">
+    <form>
+        <div class="list-block">
+            <ul>
+                <li class="item-content">
+                    <div class="item-inner">
+                        <div class="item-title label">{{t "list-edit.name" defaultValue="Name"}}</div>
+                        <div class="item-input">
+                            <input type="text" name="name" value="{{name}}" class="right toggle-save">
+                        </div>
+                    </div>
+                </li>
+                <li>
+                    <a href="#" class="item-link smart-select">
+                      <select name="statuses" class="toggle-save" multiple>
+                        {{wallet_accounts__statusSelectOptions data.statuses}}
+                      </select>
+                      <div class="item-content">
+                        <div class="item-inner">
+                          <div class="item-title">{{t "list-edit.filter-status" defaultValue="Filter Status"}}</div>
+                          <div class="item-after">{{wallet_accounts__displayStatuses data.statuses}}</div>
+                        </div>
+                      </div>
+                    </a>
+                </li>
+                <li>
+                  <a href="#" class="item-link item-content amount-select">
+                    <div class="item-inner">
+                      <div class="item-title">{{t "list-edit.filter-amount" defaultValue="Transaction Amount"}}</div>
+                      <div class="item-after">{{wallet_accounts__displayTransactionAmount data.amount_min data.amount_max}}</div>
+                    </div>
+                  </a>
+                <li>
+                  <a href="#" class="item-link item-content date-range-select">
+                    <div class="item-inner">
+                      <div class="item-title">{{t "common.date_range" defaultValue="Date Range"}}</div>
+                      <div class="item-after">{{wallet_accounts__displayDateRange data.date_range}}</div>
+                    </div>
+                  </a>
+                </li>
+            </ul>
+            <div data-template="wallet_accounts__tagSelectTemplate"></div>
+        </div>
+    </form>
+    <div class="list-block list-block-custom">
+        <ul>
+            <li>
+                <a href="#" class="item-link list-button color-custom delete-list">{{t "list-edit.delete-list" defaultValue="Delete List"}}</a>
+            </li>
+        </ul>
+    </div>
+    <!-- {{#unless data.default}} -->
+    <!-- {{/unless}} -->
+</script>
+
+<script id="wallet_accounts__listManagementTemplate" type="text/template">
+    <div class="list-block inset sortable sortable-opened list-block-custom">
+        <ul>
+            {{#each this}}
+            <li data-list-id={{id}}>
+                <label class="label-checkbox item-content">
+                    <input type="checkbox" name="{{id}}" {{#if data.active}}checked{{/if}}>
+                    <div class="item-media">
+                        <i class="icon icon-form-checkbox"></i>
+                    </div>
+                    <div class="item-inner">
+                        <div class="item-title">{{name}}</div>
+                    </div>
+                </label>
+                <div class="sortable-handler"></div>
+            </li>
+            {{/each}}
+        </ul>
+    </div>
+    <div class="list-block list-block-custom inset">
+        <ul>
+            <!--
+            <li>
+                <a href="#" class="item-link list-button open-picker">View More</a>
+            </li>
+            -->
+            <li>
+                <a href="{{addonAssetUrl "views/list-add.html"}}" class="item-link list-button color-custom">Create New List</a>
+            </li>
+        </ul>
+    </div>
+    <!--
+    <div class="picker-modal list-picker">
+        <div class="toolbar">
+            <div class="toolbar-inner">
+                <div class="left color-gray">Cancel</div>
+                <div class="right">
+                    <a href="#" class="link color-custom close-picker">Done</a>
+                </div>
+            </div>
+        </div>
+        <div class="picker-modal-inner">
+            <div class="list-block">
+                <ul>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="1" checked>
+                            <div class="item-inner">
+                                <div class="item-title">Allen's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="2" checked>
+                            <div class="item-inner">
+                                <div class="item-title">Lili's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="3">
+                            <div class="item-inner">
+                                <div class="item-title">Logistics's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="4">
+                            <div class="item-inner">
+                                <div class="item-title">Services's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="5">
+                            <div class="item-inner">
+                                <div class="item-title">Nick's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="6" checked>
+                            <div class="item-inner">
+                                <div class="item-title">Someone's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="7">
+                            <div class="item-inner">
+                                <div class="item-title">Someone's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="8">
+                            <div class="item-inner">
+                                <div class="item-title">Someone's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="label-radio item-content">
+                            <input type="checkbox" value="9">
+                            <div class="item-inner">
+                                <div class="item-title">Someone's Transaction</div>
+                            </div>
+                        </label>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    -->
+</script>
+
+<script id="wallet_accounts__transactionDetailsTemplate" type="text/template">
+  <div class="accounts-transaction-header">
+    <div class="accounts-transaction-header-wrap">
+      <div class="accounts-transaction-icon">
+        {{#if icon_url}}
+          <img src="{{icon_url}}">
+        {{else}}
+          <i class="accounts-transaction-icon-placeholder"></i>
+        {{/if}}
+      </div>
+      <div class="accounts-transaction-payment-info">
+        <div class="accounts-transaction-payment-name">{{payee_name}}</div>
+        <div class="accounts-transaction-payment-amount">{{wallet_accounts__formatTransactionAmount this}}</div>
+      </div>
+    </div>
+    <div class="accounts-transaction-status">{{wallet_accounts__formatTransactionStatus status}}</div>
+  </div>
+
+  <div class="accounts-transaction-details-list list-block">
+    <ul>
+      {{#if card_name}}
+      <li class="item-content">
+        <div class="item-inner">
+          <div class="item-title">{{t "transaction_details.payment_label" defaultValue="Payment"}}</div>
+          <div class="item-after">{{card_name}}</div>
+        </div>
+      </li>
+      {{/if}}
+      <li class="item-content">
+        <div class="item-inner">
+          <div class="item-title">{{t "transaction_details.time_label" defaultValue="Time"}}</div>
+          <div class="item-after">{{wallet_accounts__formatTransactionDate paid_at}}</div>
+        </div>
+      </li>
+      <li class="item-content">
+        <div class="item-inner">
+          <div class="item-title">{{t "transaction_details.payee_label" defaultValue="Payee"}}</div>
+          <div class="item-after">{{payee_name}}</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+</script>

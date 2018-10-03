@@ -1,0 +1,61 @@
+<div class="navbar no-border">
+  <div class="navbar-inner">
+    <div class="left">
+      <a href="#" class="open-panel link icon-only"><i class="icon material-icons">menu</i></a>
+    </div>
+    <div class="center sliding">{{t "index.title" defaultValue="Nurse Booking"}}</div>
+  </div>
+</div>
+
+<div class="pages navbar-through">
+  <div data-page="nurse_booking__index" id="nurse_booking__index" class="page">
+    <div class="page-content">
+      <div class="swiper-container">
+        <div class="swiper-wrapper">
+          <div class="swiper-slide" style="background-image: url({{addonAssetUrl "views/images/demo-slide.jpg"}})"></div>
+          <div class="swiper-slide" style="background-image: url({{addonAssetUrl "views/images/demo-slide.jpg"}})"></div>
+          <div class="swiper-slide" style="background-image: url({{addonAssetUrl "views/images/demo-slide.jpg"}})"></div>
+        </div>
+        <div class="swiper-pagination"></div>
+      </div>
+      <div class="sections">
+        <div class="section">
+          <a href="{{addonAssetUrl "views/vip.html"}}">
+            <img src="{{addonAssetUrl "views/images/icon-vip.svg"}}" />
+            <span>{{t "index.vip_label" defaultValue="VIP"}}</span>
+          </a>
+        </div>
+        <div class="section">
+          <a href="{{addonAssetUrl "views/service-list.html"}}?category=Nursing">
+            <img src="{{addonAssetUrl "views/images/icon-nursing.svg"}}" />
+            <span>{{t "index.nursing_label" defaultValue="Nursing"}}</span>
+          </a>
+        </div>
+        <div class="section">
+          <a href="{{addonAssetUrl "views/service-list.html"}}?category=Cleaning">
+            <img src="{{addonAssetUrl "views/images/icon-cleaning.svg"}}" />
+            <span>{{t "index.cleaning_label" defaultValue="Cleaning"}}</span>
+          </a>
+        </div>
+        <div class="section">
+          <a href="{{addonAssetUrl "views/service-list.html"}}?category=Massage">
+            <img src="{{addonAssetUrl "views/images/icon-massage.svg"}}" />
+            <span>{{t "index.massage_label" defaultValue="Massage"}}</span>
+          </a>
+        </div>
+        <div class="section">
+          <a href="{{addonAssetUrl "views/history.html"}}">
+            <img src="{{addonAssetUrl "views/images/icon-booking.svg"}}" />
+            <span>{{t "index.booking_label" defaultValue="Booking"}}</span>
+          </a>
+        </div>
+        <div class="section">
+          <a href="tommy://addon?package=wallet&back=true" class="external">
+            <img src="{{addonAssetUrl "views/images/icon-wallet.svg"}}" />
+            <span>{{t "index.wallet_label" defaultValue="Wallet"}}</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

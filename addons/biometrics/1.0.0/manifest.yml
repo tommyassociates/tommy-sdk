@@ -1,0 +1,36 @@
+---
+  title: "Biometrics"
+  package: "biometrics"
+  version: "1.0.0"
+  summary: "Display biometrics assessment data."
+  description: "This addon displays biometrics assessment data."
+  developer: "Tommy Labs GmbH"
+  homepage: "https://mytommy.com"
+  private: false
+  views:
+    main:
+      title: "Biometrics"
+      file: "views/main.html"
+      type: "page"
+      framed: false
+      index: true
+      assets:
+        -
+          type: "stylesheet"
+          file: "views/main.css"
+        -
+          type: "javascript"
+          file: "views/main.js"
+        -
+          type: "template"
+          file: "views/main.tpl.html"
+    assessment:
+      title: "Assessment"
+      file: "views/assessment.html"
+      type: "page"
+      framed: false
+    assessment_item:
+      title: "Assessment Item"
+      file: "views/assessment-item.html"
+      type: "page"
+      framed: false

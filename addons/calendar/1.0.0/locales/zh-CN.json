@@ -1,0 +1,115 @@
+{
+  "minutes_before": "{{minutes}} 分钟前",
+  "minutes_before_plural": "{{minutes}} 分钟前",
+  "hours_before": "{{hours}} 小时前",
+  "hours_before_plural": "{{hours}} 小时前",
+  "hours_and_minutes_before": "{{hours}} 小时和 {{minutes}} 分钟前",
+  "hours_and_minutes_before_plural": "{{hours}} 小时和 {{minutes}} 分钟前",
+  "label": {
+    "cancel": "取消",
+    "save": "保存",
+    "edit": "编辑",
+    "title": "标题",
+    "location": "位置",
+    "start_time": "开始时间",
+    "end_time": "结束时间",
+    "add_reminder": "添加提醒"
+  },
+  "edit_event": {
+    "title": "编辑"
+  },
+  "event_details": {
+    "title": "详情"
+  },
+  "main": {
+    "title": "日历"
+  },
+  "word": {
+    "before": "之前",
+    "at": "at"
+  },
+  "new_event": {
+    "title": "新增事件"
+  },
+  "title": "日历",
+  "summary": "管理个人和团队日程的日历。",
+  "description": "管理个人和团队日程的日历。",
+  "developer": "杭州托秘网络科技有限公司",
+  "permissions": {
+    "team_member_events_access": {
+      "title": "允许团队成员查看其他成员的事件",
+      "hint": "选择可以查看其他成员创建事件的团队成员"
+    }
+  },
+  "triggers": {
+    "event_created": {
+      "title": "日历事件创建"
+    },
+    "event_deleted": {
+      "title": "日历事件删除"
+    },
+    "event_updated": {
+      "title": "日历事件修改"
+    },
+    "event_viewed": {
+      "title": "日历事件查看"
+    },
+    "event_starting": {
+      "title": "日历事件开始"
+    },
+    "event_ending": {
+      "title": "日历事件结束"
+    }
+  },
+  "activities": {
+    "create_event": {
+      "title": "创建一个日历事件"
+    },
+    "update_event": {
+      "title": "修改一个日历事件"
+    },
+    "delete_event": {
+      "title": "删除一个日历事件"
+    }
+  },
+  "actions": {
+    "calendar_event_start_message": {
+      "title": "日历事件开始通知",
+      "summary": "日历事件开始通过Tommy chat消息通知。"
+    },
+    "calendar_event_end_message": {
+      "title": "日历事件结束通知",
+      "summary": "日历事件结束通过Tommy chat消息通知。"
+    }
+  },
+  "views": {
+    "main": {
+      "title": "日历"
+    }
+  },
+  "parameters": {
+    "title": {
+      "title": "事件标题"
+    },
+    "start_at": {
+      "title": "事件开始时间"
+    },
+    "location": {
+      "title": "事件位置"
+    },
+    "details": {
+      "title": "事件详情"
+    },
+    "end_at": {
+      "title": "事件结束时间"
+    },
+    "id": {
+      "title": "事件ID"
+    }
+  },
+  "mappings": {
+    "message": {
+      "title": "消息文本"
+    }
+  }
+}

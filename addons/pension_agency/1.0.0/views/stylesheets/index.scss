@@ -1,0 +1,13 @@
+@mixin encoded-svg-background($svg){
+  background-image: url("data:image/svg+xml;charset=utf-8,#{$svg}");
+}
+.page#pension_agency__index {
+  .list-block ul {
+    background: #fff;
+    .item-text i.icon {
+      vertical-align: top;
+      font-size: 21px;
+      margin-left: -2px;
+    }
+  }
+}

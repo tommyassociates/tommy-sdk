@@ -1,0 +1,131 @@
+---
+  title: "Calendar"
+  package: "calendar"
+  summary: "Calendar for managing personal and team schedules."
+  description: "Calendar for managing personal and team schedules."
+  version: "1.0.0"
+  developer: "Tommy Labs GmbH"
+  homepage: "https://mytommy.com"
+  private: false
+  locales:
+    - en-US
+    - zh-CN
+  default_event_required_parameters: &default_event_required_parameters
+    title:
+      title: "Event title"
+      type: "string"
+      required: true
+    start_at:
+      title: "Event start time"
+      type: "string"
+      required: true
+  default_event_extra_parameters: &default_event_extra_parameters
+    location:
+      title: "Event location"
+      type: "string"
+    details:
+      title: "Event details"
+      type: "string"
+    end_at:
+      title: "Event finish time"
+      type: "string"
+  default_event_create_parameters: &default_event_create_parameters
+    <<: *default_event_required_parameters
+    <<: *default_event_extra_parameters
+  default_event_delete_parameters: &default_event_delete_parameters
+    id:
+      title: "Event ID"
+      type: "integer"
+      required: true
+  default_event_parameters: &default_event_parameters
+    <<: *default_event_required_parameters
+    <<: *default_event_extra_parameters
+    id:
+      title: "Event ID"
+      type: "integer"
+      required: true
+  permissions:
+    calendar_manager_access:
+      title: "Who Can View Other Team Members' Events"
+      hint: "Select Team Members who can view events created by others"
+      resource_type: "Event"
+      default_roles:
+        - Team Manager
+        - Team Admin
+      operations:
+        - read
+  triggers:
+    event_created:
+      title: "Calender event created"
+      parameters: *default_event_parameters
+    event_deleted:
+      title: "Calender event deleted"
+      parameters: *default_event_parameters
+    event_updated:
+      title: "Calender event updated"
+      parameters: *default_event_parameters
+    event_viewed:
+      title: "Calender event viewed"
+      parameters: *default_event_parameters
+    event_starting:
+      title: "Calender event starting"
+      parameters: *default_event_parameters
+    event_ending:
+      title: "Calender event ending"
+      parameters: *default_event_parameters
+  activities:
+    create_event:
+      title: "Create a calendar event"
+      execute: "Activity::CreateEvent"
+      parameters: *default_event_create_parameters
+    update_event:
+      title: "Update a calendar event"
+      execute: "Activity::UpdateEvent"
+      parameters: *default_event_parameters
+    delete_event:
+      title: "Delete a calendar event"
+      execute: "Activity::DeleteEvent"
+      parameters: *default_event_delete_parameters
+  actions:
+    calendar_event_start_message:
+      title: "Calendar event starting notification"
+      summary: "Calendar event starting message notification via Tommy chat."
+      trigger: "calendar.event_starting"
+      activity: "chat.send_message"
+      internal: true
+      mappings:
+        message:
+          title: "Message text"
+          type: "string"
+          source: "custom"
+          value: "%{trigger.title} is starting at %{trigger.start_at}"
+    calendar_event_end_message:
+      title: "Calendar event ending notification"
+      summary: "Calendar event ending message notification via Tommy chat."
+      trigger: "calendar.event_ending"
+      activity: "chat.send_message"
+      internal: true
+      mappings:
+        message:
+          title: "Message text"
+          type: "string"
+          source: "custom"
+          value: "%{trigger.title} is ending at %{trigger.end_at}"
+  views:
+    main:
+      title: "Calendar"
+      file: "views/main.html"
+      type: "page"
+      framed: false
+      index: true
+      actor_permission: calendar_manager_access
+      assets:
+        -
+          type: "stylesheet"
+          file: "views/main.css"
+        -
+          type: "javascript"
+          file: "views/main.js"
+        -
+          type: "template"
+          file: "views/main.tpl.html"

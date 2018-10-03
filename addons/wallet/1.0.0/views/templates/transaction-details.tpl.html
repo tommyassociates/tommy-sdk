@@ -1,0 +1,43 @@
+<script id="wallet__transactionDetailsTemplate" type="text/template">
+  <div class="wallet-transaction-header">
+    <div class="wallet-transaction-header-wrap">
+      <div class="wallet-transaction-icon">
+        {{#if icon_url}}
+          <img src="{{icon_url}}">
+        {{else}}
+          <i class="wallet-transaction-icon-placeholder"></i>
+        {{/if}}
+      </div>
+      <div class="wallet-transaction-payment-info">
+        <div class="wallet-transaction-payment-name">{{payee_name}}</div>
+        <div class="wallet-transaction-payment-amount">{{wallet__formatTransactionAmount this}}</div>
+      </div>
+    </div>
+    <div class="wallet-transaction-status">{{wallet__formatTransactionStatus status}}</div>
+  </div>
+
+  <div class="wallet-transaction-details-list list-block">
+    <ul>
+      {{#if card_name}}
+      <li class="item-content">
+        <div class="item-inner">
+          <div class="item-title">{{t "transaction_details.payment_label" defaultValue="Payment"}}</div>
+          <div class="item-after">{{card_name}}</div>
+        </div>
+      </li>
+      {{/if}}
+      <li class="item-content">
+        <div class="item-inner">
+          <div class="item-title">{{t "transaction_details.time_label" defaultValue="Time"}}</div>
+          <div class="item-after">{{wallet__formatTransactionDate paid_at}}</div>
+        </div>
+      </li>
+      <li class="item-content">
+        <div class="item-inner">
+          <div class="item-title">{{t "transaction_details.payee_label" defaultValue="Payee"}}</div>
+          <div class="item-after">{{payee_name}}</div>
+        </div>
+      </li>
+    </ul>
+  </div>
+</script>
