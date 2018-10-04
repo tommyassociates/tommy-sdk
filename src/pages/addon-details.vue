@@ -110,7 +110,7 @@
       },
       uploadAddon() {
         const self = this;
-        delete self.addonData.status;
+        self.addonData.status = null;
         self.addonData.uploading = true;
         const { package: pkg, version } = self.addon;
 
@@ -120,6 +120,7 @@
           dataType: 'json',
           success(data) {
             self.addonData = data;
+            self.addonData.uploading = false;
             self.$api.call({endpoint: `addons/${pkg}/install`, method: 'POST' });
             self.$app.notify(
               'Addon Uploaded',
@@ -127,6 +128,7 @@
             );
           },
           error(xhr) {
+            self.addonData.uploading = false;
             self.$app.notify(
               'Addon Upload Failed',
               `Your addon uploaded failed: ${xhr.responseText}`
@@ -142,7 +144,7 @@
 
         self.$api.deleteAddonVersion(pkg, version, { url: window.SANDBOX_ENDPOINT })
           .then(() => {
-            delete self.addonData.status;
+            self.addonData.status = null;
             self.addonData.deleting = false;
             self.$app.notify(
               'Addon Uninstalled',
@@ -150,7 +152,7 @@
             );
           })
           .catch((err) => {
-            delete self.addonData.status;
+            self.addonData.status = null;
             self.addonData.deleting = false;
             self.$app.notify(
               'Addon Error',
