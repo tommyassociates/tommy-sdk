@@ -36,11 +36,17 @@
       execute: "Trigger::BookingDeleted"
     booking_viewed:
       title: "Booking viewed"
-  assets:
-    -
-      type: "javascript"
-      file: "build/addon.js"
-    -
-      type: "stylesheet"
-      file: "build/addon.css"
-  entry_path: "/bookings/"
+  views:
+    index:
+      title: "Agent Bookings"
+      index: true
+      framed: false
+      path: "/bookings/"
+      type: "page"
+      assets:
+        -
+          type: "stylesheet"
+          file: "build/addon.css"
+        -
+          type: "javascript"
+          file: "build/addon.js"

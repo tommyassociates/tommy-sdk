@@ -24,12 +24,19 @@
         - Team Admin
       operations:
         - read
-  assets:
-    -
-      type: "stylesheet"
-      file: "build/addon.css"
-    -
-      type: "javascript"
-      file: "build/addon.js"
-  entry_path: "/availability/"
+  views:
+    index:
+      title: "Availability"
+      index: true
+      framed: false
+      path: "/availability/"
+      type: "page"
+      assets:
+        -
+          type: "stylesheet"
+          file: "build/addon.css"
+        -
+          type: "javascript"
+          file: "build/addon.js"
+
 
