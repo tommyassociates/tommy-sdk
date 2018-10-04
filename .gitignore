@@ -1,6 +1,5 @@
 node_modules/
-old/vendor/
-old/archives/*
+archives/*.zip
 backup
 bak
 config*

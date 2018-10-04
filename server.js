@@ -114,7 +114,7 @@ function createAddon(host, action, package, version, archivePath, callback) {
       callback(null, JSON.parse(body))
     }
     else {
-      callback(err || 'Upload failed', null)
+      callback(err || 'Upload failed', JSON.parse(body))
     }
   })
 }
