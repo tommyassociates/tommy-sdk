@@ -43,6 +43,7 @@
       framed: false
       path: "/bookings/"
       type: "page"
+      file: ""
       assets:
         -
           type: "stylesheet"
