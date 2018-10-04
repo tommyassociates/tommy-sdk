@@ -31,6 +31,7 @@
       framed: false
       path: "/availability/"
       type: "page"
+      file: ""
       assets:
         -
           type: "stylesheet"

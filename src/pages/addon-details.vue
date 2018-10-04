@@ -120,13 +120,14 @@
           dataType: 'json',
           success(data) {
             self.addonData = data;
-            self.$root.notify(
+            self.$api.call({endpoint: `addons/${pkg}/install`, method: 'POST' });
+            self.$app.notify(
               'Addon Uploaded',
               'Your addon uploaded successfully'
             );
           },
           error(xhr) {
-            self.$root.notify(
+            self.$app.notify(
               'Addon Upload Failed',
               `Your addon uploaded failed: ${xhr.responseText}`
             );
@@ -143,7 +144,7 @@
           .then(() => {
             delete self.addonData.status;
             self.addonData.deleting = false;
-            self.$root.notify(
+            self.$app.notify(
               'Addon Uninstalled',
               'Addon uninstalled successfully'
             );
@@ -151,7 +152,7 @@
           .catch((err) => {
             delete self.addonData.status;
             self.addonData.deleting = false;
-            self.$root.notify(
+            self.$app.notify(
               'Addon Error',
               `Addon uninstall failed: ${err}`
             );
