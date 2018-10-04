@@ -220,7 +220,7 @@ app.init({
             self.$root.addons.push(addon);
           });
           window.SDK_LOCAL_ADDONS.forEach((addon) => {
-            self.$addons.initAddon(addon);
+            self.$addons.initAddon(addon).catch(() => {});
           });
         })
         .catch((error) => {
