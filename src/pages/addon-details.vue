@@ -121,7 +121,7 @@
           success(data) {
             self.addonData = data;
             self.addonData.uploading = false;
-            self.$api.call({endpoint: `addons/${pkg}/install`, method: 'POST' });
+            self.$api.call({ endpoint: `addons/${pkg}/install`, method: 'POST' });
             self.$app.notify(
               'Addon Uploaded',
               'Your addon uploaded successfully'
