@@ -2,14 +2,14 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui">
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: gap: content:">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, minimal-ui, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#ff9502">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="msapplication-tap-highlight" content="no">
     <title>Tommy SDK</title>
-    <link rel="stylesheet" href="tommy/vendors/framework7/framework7.ios.min.css">
-    <link rel="stylesheet" href="tommy/vendors/material/material-icons.css">
-    <link rel="stylesheet" href="tommy/vendors/framework7-icons.css">
-    <link rel="stylesheet" href="tommy/styles/tommy.css">
     <link rel="stylesheet" href="css/sdk.css">
 
     <script type="text/javascript">
@@ -23,64 +23,7 @@
     </script>
   </head>
   <body>
-    <div class="statusbar-overlay"></div>
-    <div class="panel-overlay"></div>
-    <div class="panel panel-left layout-dark panel-reveal">
-      <div class="content-block-title">Navigation</div>
-      <div class="list-block">
-        <ul class="addon-views-nav">
-          <li>
-            <a href="local-addons.html" class="close-panel item-link">
-              <div class="item-content">
-                <div class="item-inner">
-                  <div class="item-title">Addons</div>
-                </div>
-              </div>
-            </a>
-            <a href="settings.html" class="close-panel item-link">
-              <div class="item-content">
-                <div class="item-inner">
-                  <div class="item-title">Settings</div>
-                </div>
-              </div>
-            </a>
-          </li>
-        </ul>
-      </div>
-
-      <!-- <div class="content-block-title">Addons</div>
-      <div class="list-block">
-        <ul class="addon-views-nav">
-        </ul>
-      </div> -->
-    </div>
-    <!-- <div class="panel panel-right panel-cover">
-      <div class="content-block">
-        <p>Right panel content goes here</p>
-      </div>
-    </div> -->
-    <div class="views">
-      <div class="view view-main">
-        <div class="navbar layout-dark theme-white">
-          <div class="navbar-inner">
-            <div class="left">
-              <a href="#" class="link icon-only open-panel"><i class="icon icon-bars"></i></a>
-              <!-- <a href="#" class="link icon-only do-switch-account"><img src="" class="current-avatar"></a></a> -->
-            </div>
-            <div class="center sliding">Emulator</div>
-            <div class="right">
-              <!-- <a href="settings.html" class="link icon-only"><i class="icon icon-bars"></i></a> -->
-              <!-- open-panel -->
-            </div>
-          </div>
-        </div>
-        <div class="pages navbar-through">
-          <div data-page="index" class="page">
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <script data-main="js/main" src="tommy/vendors/require/require.js"></script>
+    <div id="tommy-sdk"></div>
+    <script src="js/sdk.js"></script>
   </body>
 </html>
