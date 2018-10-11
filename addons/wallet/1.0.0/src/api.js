@@ -1,5 +1,3 @@
-import IndexController from './controllers/index'
-
 const api = window.tommy.api;
 const API = {
   wallet: {},
@@ -7,11 +5,11 @@ const API = {
     return api.call({
       endpoint: 'wallet',
       method: 'GET',
-      data: {}
+      data: {},
     }).then((data) => {
       API.wallet = data;
       return data;
-    })
+    });
   },
   updateWalletSettings(data = {}) {
     Object.keys(data).forEach((key) => {
@@ -27,8 +25,8 @@ const API = {
     return api.call({
       endpoint: 'wallet/cards',
       method: 'GET',
-      data: {}
-    })
+      data: {},
+    });
   },
   getWalletTransactions(cardId) {
     return api.call({
@@ -36,7 +34,7 @@ const API = {
       method: 'GET',
       data: {
         card_id: cardId,
-      }
+      },
     }).then((items) => {
       return items.sort((a, b) => {
         const aDate = new Date(a.paid_at).getTime();
@@ -45,14 +43,14 @@ const API = {
           return 1;
         }
         return -1;
-      })
+      });
     });
   },
   getWalletTransaction(transactionId) {
     return api.call({
       endpoint: `wallet/transactions/${transactionId}`,
       method: 'GET',
-      data: {}
+      data: {},
     });
   },
   getBalanceHistory() {
@@ -65,6 +63,6 @@ const API = {
       data,
     });
   },
-}
+};
 
-export default API
+export default API;
