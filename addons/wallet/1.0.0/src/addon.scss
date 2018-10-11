@@ -1,9 +1,6 @@
-[data-page="wallet__index"] {
-  .navbar {
-    background-color: #555;
-  }
+.navbar.wallet-index-navbar {
+  background-color: #555;
 }
-
 .wallet-index-navbar-inner {
   color: #fff;
   a.link {
@@ -45,6 +42,7 @@
     display: block;
     font-size: 16px;
     margin-top: 4px;
+    margin-left: 0 !important;
   }
   i.wallet-tab-link-icon {
     width: 55px;
@@ -56,29 +54,29 @@
     margin-right: auto;
   }
   i.wallet-tab-link-icon-wallet {
-    background-image: url(../images/icon-wallet-outline.svg);
+    background-image: url(../assets/icon-wallet-outline.svg);
   }
-  a.active i.wallet-tab-link-icon-wallet {
-    background-image: url(../images/icon-wallet-fill.svg);
+  a.tab-link-active i.wallet-tab-link-icon-wallet {
+    background-image: url(../assets/icon-wallet-fill.svg);
   }
   i.wallet-tab-link-icon-balance {
-    background-image: url(../images/icon-balance-outline.svg);
+    background-image: url(../assets/icon-balance-outline.svg);
   }
-  a.active i.wallet-tab-link-icon-balance {
-    background-image: url(../images/icon-balance-fill.svg);
+  a.tab-link-active i.wallet-tab-link-icon-balance {
+    background-image: url(../assets/icon-balance-fill.svg);
   }
   i.wallet-tab-link-icon-transactions {
-    background-image: url(../images/icon-transactions-outline.svg);
+    background-image: url(../assets/icon-transactions-outline.svg);
   }
-  a.active i.wallet-tab-link-icon-transactions {
-    background-image: url(../images/icon-transactions-fill.svg);
+  a.tab-link-active i.wallet-tab-link-icon-transactions {
+    background-image: url(../assets/icon-transactions-fill.svg);
   }
   .wallet-balance-value {
     font-size: 14px;
   }
 }
 .wallet-tabs {
-  .content-block-title {
+  .block-title {
     margin-top: 10px;
     font-size: 14px;
     color: #999;
@@ -86,16 +84,13 @@
   }
 }
 // Settings List
-.list-block.wallet-settings-list-block {
+.list.wallet-settings-list {
   margin: 0;
 }
 // Transactions List + Accounts List
-.list-block.wallet-list-block {
+.ios .list.wallet-list {
   color: #333;
   margin: 0;
-  ul {
-    background: #fff;
-  }
   .item-media {
     align-self: flex-start;
     img {
@@ -187,7 +182,7 @@
     margin-top: 10px;
   }
 }
-.list-block.wallet-transaction-details-list {
+.list.wallet-transaction-details-list {
   margin: 0;
   ul {
     background: #fff;
@@ -212,7 +207,7 @@
 }
 // Card details page
 .page#wallet__card_details {
-  .content-block-title {
+  .block-title {
     display: none;
   }
 }
@@ -247,7 +242,7 @@
       animation: wallet-preloader-rotate 1.5s linear infinite;
     }
     &:after {
-      background: url(../images/preloader-wallet.svg) no-repeat center;
+      background: url(../assets/preloader-wallet.svg) no-repeat center;
       background-size: 100px auto;
     }
   }
@@ -271,7 +266,7 @@
   }
   .transaction-popup-logo {
     width: 93px;
-    background: url(../images/logo.png) no-repeat left center;
+    background: url(../assets/logo.png) no-repeat left center;
     background-size: 90% auto;
     display: block;
     height: 41px;
@@ -311,7 +306,7 @@
     width: 80px;
     height: 70px;
     margin: 30px auto;
-    background: url(../images/icon-wallet-outline.svg) no-repeat center;
+    background: url(../assets/icon-wallet-outline.svg) no-repeat center;
     background-size: 100% auto;
   }
   .transaction-popup-list {
@@ -365,10 +360,10 @@
     }
   }
   .transaction-popup-error-icon:after {
-    background: url(../images/icon-error.svg) no-repeat center;
+    background: url(../assets/icon-error.svg) no-repeat center;
   }
   .transaction-popup-success-icon:after {
-    background: url(../images/icon-success.svg) no-repeat center;
+    background: url(../assets/icon-success.svg) no-repeat center;
   }
   .transaction-popup-status-title {
     font-size: 36px;

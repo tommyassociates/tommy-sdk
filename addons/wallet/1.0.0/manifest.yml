@@ -10,20 +10,18 @@
   locales:
     - en-US
     - zh-CN
+  assets:
+    -
+      type: "stylesheet"
+      file: "build/addon.css"
+    -
+      type: "javascript"
+      file: "build/addon.js"
   views:
     index:
       title: "Wallet"
-      file: "views/index.html"
+      file: ""
+      path: "/wallet/"
       type: "page"
       index: true
       framed: false
-      assets:
-        -
-          type: "stylesheet"
-          file: "views/build/bundle.css"
-        -
-          type: "javascript"
-          file: "views/build/bundle.js"
-        -
-          type: "template"
-          file: "views/build/bundle.tpl.html"
