@@ -9,10 +9,10 @@
     "time": "时间",
     "end": "结束"
   },
-  "booking_details": {
+  "details": {
     "title": "预约详情"
   },
-  "main": {
+  "index": {
     "title": "预约"
   },
   "no_bookings": "未分配预约",
@@ -33,11 +33,6 @@
     },
     "booking_viewed": {
       "title": "预约查看"
-    }
-  },
-  "views": {
-    "main": {
-      "title": "预约"
     }
   }
 }

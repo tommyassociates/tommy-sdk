@@ -44,30 +44,6 @@ var API = {
   getListTransactions: function getListTransactions(listId) {
     var list = API.cache['lists'][listId];
     return list.transactions;
-    /*
-    const transactions = []
-    for (const transactionId in API.cache['transactions']) {
-      const transaction = API.cache['transactions'][transactionId]
-      console.error({list, transaction});
-       if (list.filters && transaction.filters) {
-         // Filter on tags
-        const transactionTags = transaction.filters.map(x => x.name)
-        const listTags = list.filters.map(x => x.name)
-        const matchTags = transactionTags.filter(x => listTags.indexOf(x) !== -1)
-        let matches = !!matchTags.length || (!transactionTags.length && !listTags.length)
-        console.log('transaction matches list tags', transaction.name, transaction.filters, list.name, list.filters, matches)
-         // Filter on status
-        if (matches && list.data.statuses) {
-          matches = list.data.statuses.indexOf(transaction.status) !== -1
-          console.log('transaction matches list statuses', transaction.name, transaction.status, list.name, list.statuses, matches)
-        }
-         if (matches) {
-          transactions.push(transaction)
-        }
-      }
-    }
-     return transactions
-    */
   },
   loadListTransactions: function loadListTransactions(list) {
     // let name, tags, params, request, requests = []
@@ -94,6 +70,9 @@ var API = {
     }
     if (list.data.statuses) {
       params.status = list.data.statuses;
+    }
+    if (API.cache.actorId || list.actorId) {
+      params.executor_id = API.cache.actorId || list.actorId;
     }
 
     return window.tommy.api.call({
@@ -122,7 +101,7 @@ var API = {
       alert(window.tommy.i18n.t('transaction-add.no_amount_error'));
       return;
     }
-    if (!transaction.payee) {
+    if (!transaction.payee_name) {
       alert(window.tommy.i18n.t('transaction-add.no_payee_error'));
       return;
     }
@@ -148,7 +127,24 @@ var API = {
   },
   loadLists: function loadLists(params) {
     console.log('load transaction lists', params);
-
+    if (API.cache.actorId) {
+      return new Promise(function (resolve, reject) {
+        API.addLists([{
+          actorId: API.cache.actorId,
+          data: {
+            active: true,
+            default: true,
+            position: 0,
+            statuses: []
+          },
+          id: 'actor-' + API.cache.actorId,
+          kind: 'TransactionList',
+          name: 'Transactions',
+          permission_to: ["create", "read", "update", "delete"]
+        }]);
+        resolve();
+      });
+    }
     params = Object.assign({
       addon: 'wallet_accounts',
       kind: 'TransactionList',
@@ -184,7 +180,9 @@ var API = {
     }
 
     // Specify the access permissions this resource will belong to
-    if (!list.id) list.with_permissions = ['wallet_accounts_transaction_list_read_access', 'wallet_accounts_transaction_list_edit_access'];
+    if (!list.id) {
+      list.with_permissions = ['wallet_accounts_transaction_list_read_access', 'wallet_accounts_transaction_list_edit_access'];
+    }
 
     var params = Object.assign({}, list, {
       data: JSON.stringify(list.data),
@@ -266,6 +264,31 @@ var API = {
     return window.tommy.api.call({
       endpoint: 'wallet/manager/cards?with_holder=true'
     });
+  },
+  getActorCard: function getActorCard() {
+    return window.tommy.api.call({
+      endpoint: 'wallet/manager/cards?with_holder=true'
+    }).then(function (cards) {
+      var actorCard = void 0;
+      cards.forEach(function (card) {
+        if (card && card.holder && parseInt(card.holder.id, 10) === parseInt(API.cache.actorId, 10)) {
+          actorCard = card;
+        }
+      });
+      return actorCard;
+    });
+  },
+  saveBalance: function saveBalance(id, balance, credit_limit) {
+    return window.tommy.api.call({
+      endpoint: 'wallet/manager/cards/' + id,
+      method: 'PUT',
+      data: {
+        balance: balance,
+        credit_limit: credit_limit
+      }
+    }).then(function (cards) {
+      return cards[0];
+    });
   }
 };
 
@@ -289,20 +312,15 @@ var BoardSettingsController = {
     var $page = $$(page.container);
     var $nav = $$(page.navbarInnerContainer);
 
-    window.tommy.tplManager.renderInline('wallet_accounts__boardSettingTemplate', null, $page);
+    window.tommy.tplManager.renderInline('wallet_accounts__boardSettingTemplate', {
+      hasActorId: window.tommy.addons.getCurrentActor()
+    }, $page);
 
     // Team manager only settings
     if (window.tommy.util.isTeamOwnerOrManager()) {
       _api2.default.initPermissionSelect(page, 'wallet_accounts_transaction_create_access');
       _api2.default.initPermissionSelect(page, 'wallet_accounts_transaction_edit_access');
     }
-
-    // $nav.find('a.save').on('click', ev => {
-    //   const data = window.tommy.app.f7.formToJSON($page.find('form'))
-    //
-    //   // NOTE: Form not implemented yet
-    //   ev.preventDefault()
-    // })
   }
 };
 
@@ -324,8 +342,20 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 var IndexController = {
   init: function init(page) {
     console.log('initialize accounts addon');
-    window.API = _api2.default;
-    if (!_api2.default.listsLoaded) {
+    IndexController.uninitialized = false;
+
+    var actorId = page.query.actor_id || (window.tommy.addons.getCurrentActor() ? window.tommy.addons.getCurrentActor().user_id : Template7.global.currentActorId);
+    if (actorId === 'null') actorId = undefined;
+
+    if (actorId) {
+      _api2.default.initCache();
+      if (actorId) {
+        _api2.default.cache.actorId = actorId;
+      }
+      _api2.default.loadLists().then(function () {
+        IndexController.invalidate(page);
+      });
+    } else if (!_api2.default.listsLoaded) {
       _api2.default.initCache();
       _api2.default.loadLists().then(function () {
         if (_api2.default.hasDefaultList()) {
@@ -347,6 +377,7 @@ var IndexController = {
     console.log('uninitialize accounts addon');
     _api2.default.cache = {};
     _api2.default.listsLoaded = false;
+    IndexController.uninitialized = true;
   },
   bind: function bind(page) {
     var $page = $$(page.container);
@@ -372,6 +403,7 @@ var IndexController = {
     });
   },
   invalidate: function invalidate(page) {
+    if (IndexController.uninitialized) return;
     _api2.default.loadTransactions().then(function () {
       console.log('invalidating accounts index');
       var $page = $$(page.container);
@@ -379,7 +411,6 @@ var IndexController = {
       console.log('rendering transaction lists');
       IndexController.invalidateLists = false;
       window.tommy.tplManager.renderInline('wallet_accounts__listsTemplate', _api2.default.getOrderedLists(), page.container);
-      console.log('API.getOrderedLists()', _api2.default.getOrderedLists());
 
       var swiper = window.tommy.app.f7.swiper('.swiper-container', {
         centeredSlides: !_api2.default.isTablet(),
@@ -430,7 +461,7 @@ var ListAddController = {
     list.name = data.name;
 
     // Default list filters show transactions tagged with current user
-    list.filters = [_api2.default.currentUserTag()];
+    list.filters = [];
 
     _api2.default.saveList(list).then(ListAddController.afterSave);
   },
@@ -710,7 +741,7 @@ var ListEditController = {
 
 exports.default = ListEditController;
 
-},{"../api":1,"../format-amount-range":10,"../format-date-range":11}],6:[function(require,module,exports){
+},{"../api":1,"../format-amount-range":11,"../format-date-range":12}],6:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -810,12 +841,12 @@ var TransactionAddController = {
   saveTransaction: function saveTransaction(data) {
     var amount = data.amount,
         wallet_card_id = data.wallet_card_id,
-        payee = data.payee;
+        payee_name = data.payee_name;
 
     _api2.default.saveTransaction({
       amount: amount,
       wallet_card_id: wallet_card_id,
-      payee: payee,
+      payee_name: payee_name,
       status: 'paid',
       addon: 'wallet_accounts',
       addon_id: undefined,
@@ -857,6 +888,60 @@ var TransactionDetailsController = {
 exports.default = TransactionDetailsController;
 
 },{"../api":1}],9:[function(require,module,exports){
+'use strict';
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _api = require('../api');
+
+var _api2 = _interopRequireDefault(_api);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var WalletBalanceController = {
+  init: function init(page) {
+    var $page = $$(page.container);
+    var $nav = $$(page.navbarInnerContainer);
+    WalletBalanceController.$page = $page;
+    WalletBalanceController.$nav = $nav;
+    WalletBalanceController.bind($page);
+    _api2.default.getActorCard().then(function (card) {
+      if (!card) {
+        $page.find('form.list-block').remove();
+        $page.find('.page-content').append('\n          <div class="content-block">\n            <div class="content-block-inner" style="text-align: center">\n              ' + window.tommy.i18n.t('wallet-balance.no_wallet_card') + '\n            </div>\n          </div>\n        ');
+        return;
+      }
+      WalletBalanceController.card = card;
+      $page.find('input[name="balance"]').val(card.balance);
+      $page.find('input[name="credit_limit"]').val(card.credit_limit);
+    });
+  },
+  bind: function bind($page) {
+    WalletBalanceController.$nav.find('a.save').on('click', function (ev) {
+      if (!WalletBalanceController.card) return;
+      var data = window.tommy.app.f7.formToJSON($page.find('form'));
+      ev.preventDefault();
+      WalletBalanceController.saveBalance(data);
+    });
+  },
+  saveBalance: function saveBalance(data) {
+    if (!WalletBalanceController.card) return;
+    var balance = data.balance,
+        credit_limit = data.credit_limit;
+
+    _api2.default.saveBalance(WalletBalanceController.card.id, balance, credit_limit).then(WalletBalanceController.afterSave);
+  },
+  afterSave: function afterSave(res) {
+    console.log('transaction saved', res);
+    window.tommy.app.f7view.router.back();
+  }
+};
+
+exports.default = WalletBalanceController;
+
+},{"../api":1}],10:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1045,7 +1130,7 @@ var map = {
   'ZWD': 'Z$'
 };
 
-},{}],10:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1065,7 +1150,7 @@ exports.default = function (min, max) {
   return '';
 };
 
-},{}],11:[function(require,module,exports){
+},{}],12:[function(require,module,exports){
 'use strict';
 
 Object.defineProperty(exports, "__esModule", {
@@ -1093,7 +1178,7 @@ function formatDate(date) {
   return year + '-' + month + '-' + day;
 }
 
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 'use strict';
 
 var _api = require('./api');
@@ -1128,6 +1213,10 @@ var _boardSettings = require('./controllers/board-settings');
 
 var _boardSettings2 = _interopRequireDefault(_boardSettings);
 
+var _walletBalance = require('./controllers/wallet-balance');
+
+var _walletBalance2 = _interopRequireDefault(_walletBalance);
+
 var _formatDateRange = require('./format-date-range');
 
 var _formatDateRange2 = _interopRequireDefault(_formatDateRange);
@@ -1156,6 +1245,7 @@ window.tommy.app.f7.onPageAfterAnimation('wallet_accounts__list-management', _li
 window.tommy.app.f7.onPageInit('wallet_accounts__transaction-add', _transactionAdd2.default.init);
 window.tommy.app.f7.onPageInit('wallet_accounts__transaction_details', _transactionDetails2.default.init);
 window.tommy.app.f7.onPageBeforeRemove('wallet_accounts__transaction_details', _transactionDetails2.default.uninit);
+window.tommy.app.f7.onPageInit('wallet_accounts__wallet-balance', _walletBalance2.default.init);
 
 //
 // == Template7 Helpers
@@ -1245,4 +1335,4 @@ window.tommy.app.t7.registerHelper('wallet_accounts__formatTransactionDate', fun
   return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes;
 });
 
-},{"./api":1,"./controllers/board-settings":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/transaction-add":7,"./controllers/transaction-details":8,"./currency-map":9,"./format-amount-range":10,"./format-date-range":11}]},{},[12]);
+},{"./api":1,"./controllers/board-settings":2,"./controllers/index":3,"./controllers/list-add":4,"./controllers/list-edit":5,"./controllers/list-management":6,"./controllers/transaction-add":7,"./controllers/transaction-details":8,"./controllers/wallet-balance":9,"./currency-map":10,"./format-amount-range":11,"./format-date-range":12}]},{},[13]);

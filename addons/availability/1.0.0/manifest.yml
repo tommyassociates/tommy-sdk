@@ -24,24 +24,21 @@
         - Team Admin
       operations:
         - read
+  assets:
+    -
+      type: "stylesheet"
+      file: "build/addon.css"
+    -
+      type: "javascript"
+      file: "build/addon.js"
   views:
-    main:
+    index:
       title: "Availability"
-      file: "views/main.html"
-      type: "page"
       index: true
       framed: false
-      actor_permission: availability_manager_access
-      roles:
-        - Team Member
-        - Team Manager
-      assets:
-        -
-          type: "stylesheet"
-          file: "views/build/bundle.css"
-        -
-          type: "javascript"
-          file: "views/main.js"
-        -
-          type: "template"
-          file: "views/main.tpl.html"
+      path: "/availability/"
+      type: "page"
+      file: ""
+
+
+

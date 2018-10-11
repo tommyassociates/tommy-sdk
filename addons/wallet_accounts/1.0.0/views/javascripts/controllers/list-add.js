@@ -17,7 +17,7 @@ const ListAddController = {
     list.name = data.name
 
     // Default list filters show transactions tagged with current user
-    list.filters = [ API.currentUserTag() ]
+    list.filters = []
 
     API.saveList(list).then(ListAddController.afterSave)
   },

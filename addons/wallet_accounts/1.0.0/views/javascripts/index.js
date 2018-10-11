@@ -6,6 +6,7 @@ import ListAddController from './controllers/list-add'
 import ListEditController from './controllers/list-edit'
 import ListManagementController from './controllers/list-management'
 import BoardSettingsController from './controllers/board-settings'
+import WalletBalanceController from './controllers/wallet-balance';
 
 import formatDateRange from './format-date-range';
 import currencyMap from './currency-map';
@@ -25,6 +26,7 @@ window.tommy.app.f7.onPageAfterAnimation('wallet_accounts__list-management', Lis
 window.tommy.app.f7.onPageInit('wallet_accounts__transaction-add', TransactionAddController.init)
 window.tommy.app.f7.onPageInit('wallet_accounts__transaction_details', TransactionDetailsController.init)
 window.tommy.app.f7.onPageBeforeRemove('wallet_accounts__transaction_details', TransactionDetailsController.uninit)
+window.tommy.app.f7.onPageInit('wallet_accounts__wallet-balance', WalletBalanceController.init)
 
 
 //

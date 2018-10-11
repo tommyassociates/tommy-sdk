@@ -7,13 +7,15 @@
                 <div class="list">
                     <div class="list-header">
                         <div>{{name}}</div>
-                        {{#wallet_accounts__ifCanEditList this}}
+                        {{#unless actorId}}
                         <div>
                             <a href="{{addonAssetUrl "views/list-edit.html"}}&list_fragment_id={{id}}">
                                 <img src="{{addonAssetUrl "views/images/slice6.png"}}" srcset="{{addonAssetUrl "views/images/slice6@2x.png"}} 2x,{{addonAssetUrl "views/images/slice6@3x.png"}} 3x">
                             </a>
                         </div>
-                        {{/wallet_accounts__ifCanEditList}}
+                        {{/unless}}
+                        <!--{{#wallet_accounts__ifCanEditList this}}-->
+                        <!--{{/wallet_accounts__ifCanEditList}}-->
                     </div>
                     <div class="list-content">
                     </div>
@@ -29,6 +31,7 @@
     <div class="card transactions-card">
         <!-- <div class="card-header">{{t "index.transactions" defaultValue="Transactions"}}</div> -->
         <div class="card-content">
+            {{#if this.length}}
             <div class="list-block media-list transactions-list">
                 <ul>
                     {{#each this}}
@@ -55,6 +58,9 @@
                     {{/each}}
                 </ul>
             </div>
+            {{else}}
+            <div style="padding: 15px">{{t "index.no_list_transaction" defaultValue="No transactions found"}}</div>
+            {{/if}}
         </div>
     </div>
 </script>
