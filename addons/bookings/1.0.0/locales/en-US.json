@@ -9,10 +9,10 @@
     "time": "Time",
     "end": "End"
   },
-  "booking_details": {
+  "details": {
     "title": "Booking Details"
   },
-  "main": {
+  "index": {
     "title": "Bookings"
   },
   "no_bookings": "No bookings have been assigned",
@@ -33,11 +33,6 @@
     },
     "booking_viewed": {
       "title": "Booking viewed"
-    }
-  },
-  "views": {
-    "main": {
-      "title": "Bookings"
     }
   }
 }

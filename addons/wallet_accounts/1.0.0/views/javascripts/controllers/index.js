@@ -3,8 +3,26 @@ import API from '../api'
 const IndexController = {
   init (page) {
     console.log('initialize accounts addon')
-    window.API = API;
-    if (!API.listsLoaded) {
+    IndexController.uninitialized = false;
+
+    let actorId = page.query.actor_id
+      || (
+        window.tommy.addons.getCurrentActor()
+        ? window.tommy.addons.getCurrentActor().user_id
+        : Template7.global.currentActorId
+      );
+    if (actorId === 'null') actorId = undefined;
+
+    if (actorId) {
+      API.initCache()
+      if (actorId) {
+        API.cache.actorId = actorId;
+      }
+      API.loadLists().then(() => {
+        IndexController.invalidate(page)
+      });
+    }
+    else if (!API.listsLoaded) {
       API.initCache()
       API.loadLists().then(() => {
         if (API.hasDefaultList()) {
@@ -17,8 +35,7 @@ const IndexController = {
           })
         }
       })
-    }
-    else {
+    } else {
       IndexController.invalidate(page)
     }
 
@@ -29,6 +46,7 @@ const IndexController = {
     console.log('uninitialize accounts addon')
     API.cache = {}
     API.listsLoaded = false;
+    IndexController.uninitialized = true;
   },
 
   bind (page) {
@@ -54,6 +72,7 @@ const IndexController = {
   },
 
   invalidate (page) {
+    if (IndexController.uninitialized) return;
     API.loadTransactions().then(() => {
       console.log('invalidating accounts index')
       const $page = $$(page.container)
@@ -61,7 +80,6 @@ const IndexController = {
       console.log('rendering transaction lists')
       IndexController.invalidateLists = false
       window.tommy.tplManager.renderInline('wallet_accounts__listsTemplate', API.getOrderedLists(), page.container)
-      console.log('API.getOrderedLists()', API.getOrderedLists());
 
       const swiper = window.tommy.app.f7.swiper('.swiper-container', {
         centeredSlides: !API.isTablet(),

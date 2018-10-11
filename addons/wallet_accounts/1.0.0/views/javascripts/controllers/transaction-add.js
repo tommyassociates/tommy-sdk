@@ -34,12 +34,12 @@ const TransactionAddController = {
     TransactionAddController.$page.find('ul').append(cardsHtml);
   },
   saveTransaction(data) {
-    const { amount, wallet_card_id, payee } = data;
+    const { amount, wallet_card_id, payee_name } = data;
     API
       .saveTransaction({
         amount,
         wallet_card_id,
-        payee,
+        payee_name,
         status: 'paid',
         addon: 'wallet_accounts',
         addon_id: undefined,
