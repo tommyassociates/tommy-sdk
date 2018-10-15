@@ -69,18 +69,18 @@
             self.selectedCoupon = coupon;
             API.cache.booking.service = service;
             API.cache.booking.coupon = self.selectedCoupon;
-            self.$f7router.navigate('/nurse_booking/locations/');
+            self.$f7router.navigate('/nurse_booking/location/');
           }, () => {
             API.cache.booking.coupon = null;
             delete API.cache.booking.coupon;
             self.selectedCoupon = null;
-            self.$f7router.navigate('/nurse_booking/locations/');
+            self.$f7router.navigate('/nurse_booking/location/');
           });
         } else {
           API.cache.booking.coupon = null;
           delete API.cache.booking.coupon;
           self.selectedCoupon = null;
-          self.$f7router.navigate('/nurse_booking/locations/');
+          self.$f7router.navigate('/nurse_booking/location/');
         }
       },
       chooseCoupon() {
@@ -90,7 +90,7 @@
           self.selectedCoupon = coupon;
           API.cache.booking.service = self.service;
           API.cache.booking.coupon = self.selectedCoupon;
-          self.$f7router.navigate('/nurse_booking/locations/');
+          self.$f7router.navigate('/nurse_booking/location/');
         }, () => {
           self.selectedCoupon = null;
         });
