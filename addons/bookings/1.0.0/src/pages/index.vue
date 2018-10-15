@@ -100,6 +100,9 @@
           kind: 'Booking',
           user_id: actor_id || self.$root.user.id,
         };
+        if (actor_id) {
+          params.actor_id = actor_id;
+        }
         self.$api.getEvents(params).then((events) => {
           self.events = events;
         });
