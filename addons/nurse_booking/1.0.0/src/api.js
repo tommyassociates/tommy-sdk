@@ -8,29 +8,29 @@ const API = {
     locations: [],
     booking: {},
   },
-  getServiceList(categoryId) {
+  getServiceList(teamId) {
     return api.call({
-      endpoint: `vendors/${tommy.config.getCurrentTeamId()}/products`,
+      endpoint: `vendors/${teamId}/products`,
       method: 'GET',
-      data: {}
+      data: {},
     }).then((data) => {
       API.cache.services = data;
       return data;
     });
   },
-  getServiceDetails(id) {
+  getServiceDetails(id, teamId) {
     return api.call({
-      endpoint: `vendors/${tommy.config.getCurrentTeamId()}/products/${id}`,
+      endpoint: `vendors/${teamId}/products/${id}`,
       method: 'GET',
     }).then((data) => {
       return data;
     });
   },
-  getCouponList(categoryId) {
+  getCouponList(teamId) {
     return api.call({
-      endpoint: `vendors/${tommy.config.getCurrentTeamId()}/coupons`,
+      endpoint: `vendors/${teamId}/coupons`,
       method: 'GET',
-      data: {}
+      data: {},
     }).then((data) => {
       API.cache.coupons = data;
       return data;
