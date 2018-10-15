@@ -3,6 +3,7 @@ import VipPage from './pages/vip.vue';
 import VipDetailsPage from './pages/vip-details.vue';
 import ServiceListPage from './pages/service-list.vue';
 import ServiceDetailsPage from './pages/service-details.vue';
+import LocationPage from './pages/location.vue';
 
 const routes = [
   {
@@ -24,6 +25,10 @@ const routes = [
   {
     path: '/nurse_booking/service-details/:id/',
     component: ServiceDetailsPage,
+  },
+  {
+    path: '/nurse_booking/location/',
+    component: LocationPage,
   },
 ];
 
