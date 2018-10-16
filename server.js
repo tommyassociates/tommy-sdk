@@ -62,6 +62,23 @@ app.post('/addon/sandbox/upload/:package/:version', function(req, res) {
   })
 })
 
+app.post('/addon/sandbox/update/:package/:version', function(req, res) {
+  var package = req.params.package,
+    version = req.params.version
+  createAddonArchive(package, version, function(err, archivePath) {
+    console.log('Created archive', archivePath)
+    createAddon(config.apiSandboxEndpoint, 'update', package, version, archivePath, function(err, json) {
+      console.log('Uploaded archive', err, json)
+      if (err) {
+        res.status(500).send(err)
+      }
+      else {
+        res.send(json)
+      }
+    })
+  })
+})
+
 app.post('/addon/store/submit/:package/:version', function(req, res) {
   var package = req.params.package,
     version = req.params.version
@@ -102,9 +119,12 @@ function loadConfig(filepath) {
 }
 
 function createAddon(host, action, package, version, archivePath, callback) {
-  // console.log('Creating addon: ', host, action, package, version, archivePath)
+  let url = host + '/v1/addons/' + action + '?api_key=' + config.apiKey;
+  if (action === 'update') {
+    // url = host + '/v1/addons/' + package + '/upload?api_key=' + config.apiKey;
+  }
   request.post({
-    url: host + '/v1/addons/' + action + '?api_key=' + config.apiKey,
+    url: url,
     formData: {
       package: package,
       version: version,
@@ -114,7 +134,11 @@ function createAddon(host, action, package, version, archivePath, callback) {
       callback(null, JSON.parse(body))
     }
     else {
-      callback(err || 'Upload failed', JSON.parse(body))
+      let errMessage = {};
+      try {
+        errMessage = JSON.parse(body);
+      } catch (e) {};
+      callback(err || 'Upload failed', errMessage)
     }
   })
 }
