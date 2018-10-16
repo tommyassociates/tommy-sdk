@@ -385,11 +385,11 @@ a.nurse_booking__toolbar-button {
 .page#nurse_booking__service-details {
   .service-details-header .swiper-container {
     height: 66vw;
-    max-height: 500px;
+    max-height: 400px;
     background: #fff;
     .swiper-slide {
       background-size: cover;
-      background-position: center top;
+      background-position: center;
     }
     .swiper-pagination {
       z-index: 100 !important;
@@ -1043,12 +1043,7 @@ a.nurse_booking__toolbar-button {
     color: #5FA81A;
     margin-right: 5px;
   }
-  .list-block {
-    ul {
-      &:before, &:after {
-        display: none;
-      }
-    }
+  .list {
     .item-inner {
       padding-top: 12px;
       padding-bottom: 12px;
@@ -1064,11 +1059,8 @@ a.nurse_booking__toolbar-button {
       white-space: normal;
       line-height: 1.2;
     }
-    .item-link .item-inner {
-      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg%20viewBox%3D'0%200%2060%20120'%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%3E%3Cpath%20d%3D'm60%2061.5-38.25%2038.25-9.75-9.75%2029.25-28.5-29.25-28.5%209.75-9.75z'%20fill%3D'%23c7c7cc'%2F%3E%3C%2Fsvg%3E");
-    }
   }
-  .list-block:not(.list-block-prices) {
+  .list:not(.list-prices) {
     .item-after {
       font-size: 24px;
       font-weight: 500;
@@ -1082,7 +1074,7 @@ a.nurse_booking__toolbar-button {
       }
     }
   }
-  .list-block.list-block-prices {
+  .list.list-prices {
     .item-title {
       font-size: 32px;
       font-weight: bold;

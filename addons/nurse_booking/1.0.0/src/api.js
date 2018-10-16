@@ -18,7 +18,7 @@ const API = {
       return data;
     });
   },
-  getServiceDetails(id, teamId) {
+  getServiceDetails(teamId, id) {
     return api.call({
       endpoint: `vendors/${teamId}/products/${id}`,
       method: 'GET',
@@ -47,6 +47,7 @@ const API = {
   },
   saveLocations(locations) {
     if (!locations) {
+      // eslint-disable-next-line
       locations = API.cache.locations;
     } else {
       API.cache.locations = locations;
@@ -54,7 +55,7 @@ const API = {
     return api.call({
       endpoint: 'addons/nurse_booking/install/settings/locations',
       method: 'PUT',
-      data: {data: JSON.stringify({locations})},
+      data: { data: JSON.stringify({ locations }) },
     }).then((res) => {
       return res.data.locations;
     });
@@ -74,36 +75,36 @@ const API = {
     API.cache.locations.splice(index, 1);
     return API.saveLocations(API.cache.locations);
   },
-  sendOrder(data) {
+  sendOrder(teamId, data) {
     return api.call({
-      endpoint: `vendors/${tommy.config.getCurrentTeamId()}/orders`,
+      endpoint: `vendors/${teamId}/orders`,
       method: 'POST',
       data,
     });
   },
-  getOrdersHistory() {
+  getOrdersHistory(teamId) {
     return api.call({
-      endpoint: `vendors/${tommy.config.getCurrentTeamId()}/orders/`,
+      endpoint: `vendors/${teamId}/orders/`,
       method: 'GET',
     }).then((data) => {
       API.cache.orders = data;
       return data;
     });
   },
-  getOrderDetails(id) {
+  getOrderDetails(teamId, id) {
     return api.call({
-      endpoint: `vendors/${tommy.config.getCurrentTeamId()}/orders/${id}?with_wallet_transaction=true`,
+      endpoint: `vendors/${teamId}/orders/${id}?with_wallet_transaction=true`,
       method: 'GET',
     }).then((data) => {
       return data;
     });
   },
-  cancelOrder(id) {
+  cancelOrder(teamId, id) {
     return api.call({
-      endpoint: `vendors/${tommy.config.getCurrentTeamId()}/orders/${id}`,
+      endpoint: `vendors/${teamId}/orders/${id}`,
       method: 'DELETE',
     });
-  }
-}
+  },
+};
 
-export default API
+export default API;

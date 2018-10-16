@@ -53,6 +53,10 @@
 </template>
 <script>
   export default {
+    beforeDestroy() {
+      const self = this;
+      self.$f7router.view.$navbarEl.removeClass('nurse-booking-index-navbar');
+    },
     methods: {
       onPageBeforeIn() {
         const self = this;

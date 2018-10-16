@@ -76,7 +76,7 @@
         if (self.$f7route.query.back) {
           self.$f7router.back();
         } else {
-          self.$f7router.navigate('/nurse_booking/date-time/');
+          self.$f7router.navigate('/nurse_booking/order-select-date/');
         }
       },
       saveLocation() {
