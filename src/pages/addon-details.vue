@@ -51,19 +51,32 @@
 
       <f7-block>
         <template v-if="addonData.status">
-          <p v-if="addonData.deleting">
-            <f7-button fill big color="red" class="disabled">Deleting...</f7-button>
+          <p>
+            <f7-button
+              :disabled="addonData.deleting || addonData.updating"
+              fill
+              big
+              @click="updateAddon"
+            >{{addonData.updating ? 'Updating...' : 'Update Sandbox'}}</f7-button>
           </p>
-          <p v-else>
-            <f7-button fill big color="red" @click="deleteAddon">Delete from Sandbox</f7-button>
+          <p>
+            <f7-button
+              :disabled="addonData.deleting || addonData.updating"
+              fill
+              big
+              color="red"
+              @click="deleteAddon"
+            >{{addonData.deleting ? 'Deleting...' : 'Delete from Sandbox'}}</f7-button>
           </p>
         </template>
         <template v-else>
-          <p v-if="addonData.uploading">
-            <f7-button fill big class="disabled">Uploading...</f7-button>
-          </p>
-          <p v-else>
-            <f7-button fill big @click="uploadAddon">Upload to Sandbox</f7-button>
+          <p>
+            <f7-button
+              :disabled="addonData.uploading"
+              fill
+              big
+              @click="uploadAddon"
+            >{{addonData.uploading ? 'Uploading...' : 'Upload to Sandbox'}}</f7-button>
           </p>
         </template>
       </f7-block>
@@ -100,9 +113,10 @@
     methods: {
       addonStatus() {
         const self = this;
-        const { status, deleting, uploading } = self.addonData;
+        const { status, deleting, uploading, updating } = self.addonData;
         if (status) {
           if (deleting) return 'Deleting...';
+          if (updating) return 'Updating...';
           return 'Installed';
         }
         if (uploading) return 'Uploading...';
@@ -121,17 +135,46 @@
           success(data) {
             self.addonData = data;
             self.addonData.uploading = false;
-            self.$api.call({ endpoint: `addons/${pkg}/install`, method: 'POST' });
+            self.$api.installAddon(pkg, {}, {});
             self.$app.notify(
               'Addon Uploaded',
               'Your addon uploaded successfully'
             );
           },
           error(xhr) {
+            self.addonData.status = null;
             self.addonData.uploading = false;
             self.$app.notify(
               'Addon Upload Failed',
               `Your addon uploaded failed: ${xhr.responseText}`
+            );
+          },
+        });
+      },
+      updateAddon() {
+        const self = this;
+        self.addonData.status = 'Updating...';
+        self.addonData.updating = true;
+        const { package: pkg, version } = self.addon;
+        self.$request({
+          url: `/addon/sandbox/update/${pkg}/${version}`,
+          method: 'POST',
+          dataType: 'json',
+          success(data) {
+            self.addonData = data;
+            self.addonData.updating = false;
+            self.$api.installAddon(pkg, {}, {});
+            self.$app.notify(
+              'Addon Updated',
+              'Your addon updated successfully'
+            );
+          },
+          error(xhr) {
+            self.addonData.status = null;
+            self.addonData.updating = false;
+            self.$app.notify(
+              'Addon Update Failed',
+              `Your addon update failed: ${xhr.responseText}`
             );
           },
         });
@@ -142,7 +185,7 @@
         self.addonData.deleting = true;
         const { package: pkg, version } = self.addon;
 
-        self.$api.deleteAddonVersion(pkg, version, { url: window.SANDBOX_ENDPOINT })
+        self.$api.deleteAddon(pkg, version, { url: window.SANDBOX_ENDPOINT })
           .then(() => {
             self.addonData.status = null;
             self.addonData.deleting = false;
