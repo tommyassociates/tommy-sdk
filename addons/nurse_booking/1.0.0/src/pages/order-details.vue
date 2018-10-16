@@ -1,7 +1,7 @@
 <template>
   <f7-page name="nurse_booking__order-details" id="nurse_booking__order-details">
     <f7-navbar>
-      <tommy-nav-back v-if="$f7route.query.backToHome" href="/" force></tommy-nav-back>
+      <tommy-nav-back v-if="$f7route.query.backToHome" href="/nurse_booking/" force></tommy-nav-back>
       <tommy-nav-back v-else></tommy-nav-back>
       <f7-nav-title>{{$t(`nurse_booking.order_details.title`)}}</f7-nav-title>
     </f7-navbar>
