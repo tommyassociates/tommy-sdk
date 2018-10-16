@@ -3,7 +3,14 @@ import VipPage from './pages/vip.vue';
 import VipDetailsPage from './pages/vip-details.vue';
 import ServiceListPage from './pages/service-list.vue';
 import ServiceDetailsPage from './pages/service-details.vue';
-import LocationPage from './pages/location.vue';
+import OrderLocationPage from './pages/order-select-location.vue';
+import OrderDatePage from './pages/order-select-date.vue';
+import OrderConfirmPage from './pages/order-confirm.vue';
+import OrderDetailsPage from './pages/order-details.vue';
+import OrderCanceledPage from './pages/order-canceled.vue';
+import OrderErrorPage from './pages/order-error.vue';
+import OrderSuccessPage from './pages/order-success.vue';
+import HistoryPage from './pages/history.vue';
 
 const routes = [
   {
@@ -27,8 +34,36 @@ const routes = [
     component: ServiceDetailsPage,
   },
   {
-    path: '/nurse_booking/location/',
-    component: LocationPage,
+    path: '/nurse_booking/order-select-location/',
+    component: OrderLocationPage,
+  },
+  {
+    path: '/nurse_booking/order-select-date/',
+    component: OrderDatePage,
+  },
+  {
+    path: '/nurse_booking/order-confirm/',
+    component: OrderConfirmPage,
+  },
+  {
+    path: '/nurse_booking/order-details/',
+    component: OrderDetailsPage,
+  },
+  {
+    path: '/nurse_booking/order-canceled/',
+    component: OrderCanceledPage,
+  },
+  {
+    path: '/nurse_booking/order-error/',
+    component: OrderErrorPage,
+  },
+  {
+    path: '/nurse_booking/order-success/',
+    component: OrderSuccessPage,
+  },
+  {
+    path: '/nurse_booking/history/',
+    component: HistoryPage,
   },
 ];
 
