@@ -201,7 +201,7 @@ const transaction = {
         if (transactionDetails.status && transactionDetails.status !== 'failed') {
           transaction.renderSuccess(transactionDetails);
           f7.$(document).trigger('wallet:transaction', transactionDetails);
-          tommy.events.trigger('walletTransaction', transactionDetails);
+          tommy.events.$emit('walletTransaction', transactionDetails);
           if (transaction.cache.onSuccess) transaction.cache.onSuccess(transactionDetails);
         } else if (transactionDetails.status === 'failed') {
           transaction.renderError(Object.assign(transactionDetails, {
