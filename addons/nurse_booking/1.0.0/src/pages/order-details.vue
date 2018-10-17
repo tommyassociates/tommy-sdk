@@ -1,0 +1,195 @@
+<template>
+  <f7-page name="nurse_booking__order-details" id="nurse_booking__order-details">
+    <f7-navbar>
+      <tommy-nav-back v-if="$f7route.query.backToHome" href="/nurse_booking/" force></tommy-nav-back>
+      <tommy-nav-back v-else></tommy-nav-back>
+      <f7-nav-title>{{$t(`nurse_booking.order_details.title`)}}</f7-nav-title>
+    </f7-navbar>
+
+    <template v-if="status">
+      <div class="order-details-status" v-if="status.canceled">
+        <div class="order-details-status-title">{{$t('nurse_booking.order_details.status_canceled')}}</div>
+        <div class="order-details-status-date">{{formatDate(date, 'D MMM. YYYY')}}</div>
+        <img :src="`${$addonAssetsUrl}icon-status-canceled.svg`">
+      </div>
+      <div class="order-details-status" v-if="status.pending">
+        <div class="order-details-status-title">{{$t('nurse_booking.order_details.status_pending')}}</div>
+        <div class="order-details-status-date">{{formatDate(date, 'D MMM. YYYY')}}</div>
+        <img :src="`${$addonAssetsUrl}icon-status-pending.svg`">
+      </div>
+      <div class="order-details-status" v-if="status.progress">
+        <div class="order-details-status-title">{{$t('nurse_booking.order_details.status_progress')}}</div>
+        <div class="order-details-status-date">{{formatDate(date, 'D MMM. YYYY')}}</div>
+        <img :src="`${$addonAssetsUrl}icon-status-progress.svg`">
+      </div>
+      <div class="order-details-status" v-if="status.complete">
+        <div class="order-details-status-title">{{$t('nurse_booking.order_details.status_complete')}}</div>
+        <div class="order-details-status-date">{{formatDate(date, 'D MMM. YYYY')}}</div>
+        <img :src="`${$addonAssetsUrl}icon-status-complete.svg`">
+      </div>
+    </template>
+
+    <f7-list class="order-details-list" v-if="service" no-hairlines>
+      <f7-list-item
+        :title="`${$t('nurse_booking.order_details.service_label')}:`"
+        :after="service.name"
+      ></f7-list-item>
+      <f7-list-item
+        :title="`${$t('nurse_booking.order_details.time_label')}:`"
+        :after="formatDate(date, 'MMMM D, YYYY HH:mm')"
+      ></f7-list-item>
+      <li class="item-content" v-if="coupon">
+        <div class="item-inner">
+          <div class="item-title">{{$t('nurse_booking.order_details.coupons_label')}}:</div>
+          <div class="item-after price">-¥{{coupon.amount}}</div>
+        </div>
+      </li>
+      <li class="item-content item-total-price">
+        <div class="item-inner">
+          <div class="item-title">{{$t('nurse_booking.order_details.total_label')}}:</div>
+          <div class="item-after price">¥{{total}}</div>
+        </div>
+      </li>
+      <f7-list-item
+        class="item-total-price"
+        :title="`${$t('nurse_booking.order_details.payment_label')}:`"
+        :after="transaction ? transaction.card_name : null"
+      ></f7-list-item>
+
+      <template v-if="status">
+        <a v-if="status.progress" href="#" class="order-details-white-button" @click="cancelOrder">{{$t('nurse_booking.order_details.cancel_button')}}</a>
+        <a v-if="status.pending" href="#" class="order-details-red-button" @click="payOrder">{{$t('nurse_booking.order_details.pay_button')}}</a>
+        <a v-if="status.complete || status.canceled" href="#" class="order-details-red-button" @click="repeatOrder">{{$t('nurse_booking.order_details.repeat_button')}}</a>
+      </template>
+    </f7-list>
+
+  </f7-page>
+</template>
+<script>
+  import API from '../api';
+  import payOrder from '../pay-order';
+  import formatDate from '../format-date';
+
+  export default {
+    data() {
+      const self = this;
+      const { transaction, service, coupon, location, date } = API.cache.booking;
+      const data = {
+        transaction: null,
+        service: null,
+        coupon: null,
+        location: null,
+        date: null,
+        order: null,
+        status: null,
+        total: null,
+        preventCancel: false,
+      };
+      if (!self.$f7route.query.id) {
+        Object.assign(data, {
+          transaction,
+          service,
+          coupon,
+          location,
+          date,
+        });
+      }
+      return data;
+    },
+    computed: {
+      totalComputed() {
+        const self = this;
+        const { service, coupon, total } = self;
+        return total || (service.price - (coupon ? coupon.amount : 0));
+      },
+    },
+    mounted() {
+      const self = this;
+      if (!self.$f7route.query.id) return;
+      API.getOrderDetails(self.$root.team.id, self.$f7route.query.id).then((order) => {
+        self.order = order;
+        const canceled = order.canceled;
+        self.status = {
+          pending: !canceled && order.status === 'pending',
+          canceled,
+          progress: !canceled && (order.status === 'paid' || order.status === 'processing'),
+          complete: !canceled && order.status === 'complete',
+        };
+        self.date = parseInt(order.data.date, 10);
+        self.service = {
+          name: order.name,
+          id: order.vendor_product_id,
+        };
+        self.transaction = {
+          card_name: order.wallet_transaction.card_name,
+        };
+        self.total = order.total;
+        if (order.vendor_coupon_id) {
+          self.coupon = {
+            id: order.vendor_coupon_id,
+            amount: order.discount,
+          };
+        }
+      });
+    },
+    methods: {
+      formatDate,
+      repeatOrder() {
+        const self = this;
+        const { order } = self;
+        if (!order) return;
+
+        API.cache.booking.date = parseInt(order.data.date, 10);
+        API.cache.booking.location = order.data.location;
+        delete API.cache.booking.coupon;
+
+        API.getServiceDetails(self.$root.team.id, order.vendor_product_id).then((service) => {
+          API.cache.booking.service = service;
+          self.$f7router.navigate('/nurse_booking/order-confirm/');
+        });
+      },
+      cancelOrder() {
+        const self = this;
+        const { order } = self;
+        if (!order) return;
+        if (self.preventCancel) return;
+        self.preventCancel = true;
+
+        self.$f7.dialog.confirm(
+          `
+          <div class="order-details-cancel-order-icon"></div>
+          <div>${self.$t('nurse_booking.order_details.cancel_confirm')}</div>
+          `,
+          () => {
+            API.cancelOrder(self.$root.team.id, order.id)
+              .then(() => {
+                self.preventCancel = false;
+                self.$f7router.navigate('/nurse_booking/order-canceled/');
+              })
+              .catch(() => {
+                self.preventCancel = false;
+              });
+          },
+          () => {
+            self.preventCancel = false;
+          }
+        );
+      },
+      payOrder() {
+        const self = this;
+        const { order } = self;
+        payOrder({
+          teamId: self.$root.team.id,
+          orderId: order.id,
+          productName: order.name,
+          productId: order.vendor_product_id,
+          total: order.total,
+          couponId: order.vendor_coupon_id,
+          discount: order.discount,
+          location: order.data.location,
+          date: order.data.date,
+        }, false);
+      },
+    },
+  };
+</script>

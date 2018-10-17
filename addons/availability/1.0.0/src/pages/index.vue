@@ -81,6 +81,7 @@
         refreshPanelTimeout: null,
         refreshPanelInterval: null,
         refreshPanelText: '1 min ago',
+        actor_id: self.$f7route.query.actor_id,
       };
     },
     methods: {
@@ -125,17 +126,19 @@
       },
       loadAvailabilities() {
         const self = this;
-        const actor_id = self.$f7route.query.actor_id;
         // eslint-disable-next-line
         const params = {
           addon: 'availability',
           kind: 'Availability',
-          user_id: actor_id || self.$root.user.id,
+          user_id: self.actor_id || self.$root.user.id,
           date_range: [
             self.startAt.utc().format(),
             self.endAt.utc().format(),
           ],
         };
+        if (self.actor_id) {
+          params.actor_id = self.actor_id;
+        }
 
         self.showRefreshPanel = false;
 
@@ -171,10 +174,13 @@
               nd: item.data.nd || 0,
             }),
             start_at: key,
-            user_id: self.$f7route.query.actor_id || self.$root.user.id,
+            user_id: self.actor_id || self.$root.user.id,
           };
+          if (self.actor_id) {
+            itemToSend.actor_id = self.actor_id;
+          }
           if (item.id) {
-            self.$api.updateFragment(item.id, itemToSend).then((response) => {
+            self.$api.updateFragment(item.id, Object.assign(itemToSend)).then((response) => {
               self.items[key] = response;
               self.$forceUpdate();
             });
