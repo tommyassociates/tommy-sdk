@@ -57,7 +57,7 @@
               fill
               big
               @click="updateAddon"
-            >{{addonData.updating ? 'Updating...' : 'Update Sandbox'}}</f7-button>
+            >{{addonData.updating ? 'Updating...' : 'Update on Sandbox'}}</f7-button>
           </p>
           <p>
             <f7-button
@@ -157,13 +157,12 @@
         self.addonData.updating = true;
         const { package: pkg, version } = self.addon;
         self.$request({
-          url: `/addon/sandbox/update/${pkg}/${version}`,
+          url: `/addon/sandbox/upload/${pkg}/${version}`,
           method: 'POST',
           dataType: 'json',
           success(data) {
             self.addonData = data;
             self.addonData.updating = false;
-            self.$api.installAddon(pkg, {}, {});
             self.$app.notify(
               'Addon Updated',
               'Your addon updated successfully'
