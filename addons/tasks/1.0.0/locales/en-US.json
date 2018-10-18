@@ -9,7 +9,7 @@
     "cancel": "Cancel",
     "done": "Done",
     "unassigned": "Unassigned",
-    "default-task-name": "My Tasks"
+    "default-list-name": "My Tasks"
   },
   "list-add": {
     "title": "Add List"

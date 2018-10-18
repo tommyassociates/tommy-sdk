@@ -21,7 +21,7 @@
       </f7-list-item>
     </f7-list>
 
-    <template v-if="$root.team && teamMembers">
+    <template v-if="$root.team && $root.teamMembers">
       <f7-block-title>Actor</f7-block-title>
       <f7-list>
         <f7-list-item
@@ -30,7 +30,7 @@
         >
           <select @change="changeActorId" :value="actorId">
             <option
-              v-for="(teamMember, index) in teamMembers"
+              v-for="(teamMember, index) in $root.teamMembers"
               :key="index"
               :value="teamMember.user_id"
             >{{teamMember.first_name}} {{teamMember.last_name}} ({{teamMember.user_id}})</option>
@@ -44,17 +44,8 @@
   export default {
     data() {
       return {
-        teamMembers: null,
         actorId: this.$root.actorId || this.$root.user.id,
       };
-    },
-    mounted() {
-      const self = this;
-      if (self.$root.team) {
-        self.$api.getCurrentTeamMembers().then((response) => {
-          self.teamMembers = response;
-        });
-      }
     },
     methods: {
       changeActorId(e) {
