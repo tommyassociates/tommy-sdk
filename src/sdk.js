@@ -19,6 +19,7 @@ app.init({
     let user = null;
     let account = null;
     let team = null;
+    let teamMembers = null;
     let loggedIn = false;
     if (token) {
       if (localStorage.user) {
@@ -42,6 +43,13 @@ app.init({
           // no user
         }
       }
+      if (localStorage.teamMembers) {
+        try {
+          teamMembers = JSON.parse(localStorage.teamMembers);
+        } catch (e) {
+          // no user
+        }
+      }
     }
     if (token && user && account) {
       loggedIn = true;
@@ -50,6 +58,7 @@ app.init({
       user = null;
       account = null;
       team = null;
+      teamMembers = null;
     }
 
     return {
@@ -59,6 +68,7 @@ app.init({
       account,
       accounts,
       team,
+      teamMembers,
       loggedIn,
       language,
       addons: [],
@@ -80,6 +90,7 @@ app.init({
           self.setUser(response, response.token);
           self.updateAccount();
           self.updateTeam();
+          self.updateTeamMembers();
 
           events.$on('addonRoutesLoaded', (addon, addonRoutes) => {
             self.$f7.routes.push(...addonRoutes);
