@@ -1,5 +1,5 @@
 <template>
-  <f7-page id="tasks__index" name="tasks__index">
+  <f7-page id="tasks__index" name="tasks__index" class="tasks-page">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{pageTitle}}</f7-nav-title>
@@ -85,6 +85,7 @@
 <script>
   import API from '../api';
   import humanTime from '../utils/human-time';
+  import taskStatus from '../utils/task-status';
 
   export default {
     data() {
@@ -203,9 +204,7 @@
         return ret;
       },
       taskStatus(status) {
-        const self = this;
-        const underscore = status.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
-        return self.$t(`tasks.status.${underscore}`, status);
+        taskStatus.call(this, status);
       },
       isTaskDone(task) {
         const statuses = 'Completed,Closed,Archive Task,Cancel'.split(',');

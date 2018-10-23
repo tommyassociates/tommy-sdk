@@ -113,6 +113,9 @@ const API = {
 
     return activity;
   },
+  getTask(taskId) {
+    return api.getFragment(taskId);
+  },
 
   saveTask(task) {
     task.addon = 'tasks';

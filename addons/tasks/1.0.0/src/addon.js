@@ -1,5 +1,6 @@
 import IndexPage from './pages/index.vue';
 import TaskAddPage from './pages/task-add.vue';
+import TaskDetailsPage from './pages/task-details.vue';
 
 const routes = [
   {
@@ -7,7 +8,10 @@ const routes = [
     component: IndexPage,
   },
   {
-    path: '/tasks/task/:id/',
+    path: '/tasks/task/:taskId/',
+    popup: {
+      component: TaskDetailsPage,
+    },
   },
   {
     path: '/tasks/list-edit/:id/',
