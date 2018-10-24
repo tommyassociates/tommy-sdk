@@ -114,7 +114,11 @@ const API = {
     return activity;
   },
   getTask(taskId) {
-    return api.getFragment(taskId);
+    return api.getFragment(taskId, {
+      data: {
+        with_filters: true,
+      },
+    });
   },
 
   saveTask(task) {
