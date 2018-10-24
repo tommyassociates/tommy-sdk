@@ -1,5 +1,5 @@
 <template>
-  <f7-popup tablet-fullscreen>
+  <f7-popup>
     <f7-view :init="false">
       <f7-page id="tasks__task" name="tasks__task" class="tasks-page">
         <f7-navbar noBorder class="text-color-white">
@@ -7,7 +7,6 @@
           <f7-nav-title>{{taskName}}</f7-nav-title>
           <f7-nav-right>
             <f7-link popover-open=".task-menu-popover" icon-f7="add"></f7-link>
-            <f7-link v-if="showSaveButton && !saving" icon-f7="check" @click="save"></f7-link>
           </f7-nav-right>
         </f7-navbar>
 
@@ -30,13 +29,11 @@
             <h1>
               <textarea @input="task.name = $event.target.value" class="unstyled edit-task-name resizable" :value="task.name" @change="saveTaskName"></textarea>
             </h1>
-            <input type="text" :value="task.status === 'Unassigned' ? $t('tasks.task.waiting_for_assignments', 'Waiting for assignments') : taskStatus(status)" readonly="readonly" class="unstyled task-status-picker" />
+            <input ref="statusInput" type="text" :value="task.status === 'Unassigned' ? $t('tasks.task.waiting_for_assignments', 'Waiting for assignments') : taskStatus(task.status)" readonly="readonly" class="unstyled task-status-picker" />
           </f7-block>
 
-          <div class="tag-select" data-searchbar="true" data-open-in="picker">
-            <select multiple></select>
-            <div data-template="tasks__taskParticipantsTemplate"></div>
-          </div>
+          <tag-select :tags="task.filters || []" @tagToggle="onTagToggle"></tag-select>
+
           <f7-list media-list class="list-custom details bottom-0">
             <f7-list-item>
               <img slot="media" :src="`${$addonAssetsUrl}slice19.png`" :srcset="`${$addonAssetsUrl}slice19@2x.png 2x, ${$addonAssetsUrl}slice19.png 3x`">
@@ -120,7 +117,6 @@
               :subtitle="item.type === 'comment' ? item.text : undefined"
               :title="item.user_name"
               :link="item.type === 'comment'"
-              :popover-open="item.type === 'comment' ? '.task-popover' : undefined"
             >
               <img
                 v-if="item.type === 'comment'"
@@ -146,8 +142,13 @@
   import API from '../api';
   import taskStatus from '../utils/task-status';
   import humanTime from '../utils/human-time';
+  import taskStatuses from '../utils/task-statuses';
+  import tagSelect from '../components/tag-select.vue';
 
   export default {
+    components: {
+      tagSelect,
+    },
     props: {
       taskId: [Number, String],
     },
@@ -156,8 +157,6 @@
         id: parseInt(this.taskId, 10),
         task: null,
         taskName: null,
-        saving: false,
-        showSaveButton: false,
         comment: '',
         showDeadline: false,
         showChecklist: false,
@@ -168,6 +167,12 @@
         return '';
       },
     },
+    beforeDestroy() {
+      const self = this;
+      if (self.datePicker && self.datePicker.destroy) self.datePicker.destroy();
+      if (self.statusPicker && self.statusPicker.destroy) self.statusPicker.destroy();
+      self.$$(self.$el).find('.page-content').off('scroll');
+    },
     mounted() {
       const self = this;
       API.getTask(self.id).then((task) => {
@@ -176,13 +181,23 @@
         self.task = task;
         self.$nextTick(() => {
           self.createDatePicker();
+          self.createStatusPicker();
         });
+      });
+      const $navbarTitleEl = self.$$(self.$el).find('.navbar .title');
+      const $pageContentEl = self.$$(self.$el).find('.page-content');
+      $pageContentEl.on('scroll', () => {
+        if ($pageContentEl[0].scrollTop > 100) {
+          $navbarTitleEl.css('opacity', 1);
+        } else {
+          $navbarTitleEl.css('opacity', 0);
+        }
       });
     },
     methods: {
       humanTime,
       taskStatus(status) {
-        taskStatus.call(this, status);
+        return taskStatus.call(this, status);
       },
       saveTaskName() {
         const self = this;
@@ -193,6 +208,21 @@
       },
       saveTaskDescription() {
         const self = this;
+        self.saveTask();
+      },
+      onTagToggle(tag, action) {
+        const self = this;
+        if (action === 'add') {
+          self.task.filters.push(tag);
+        } else {
+          let indexToRemove;
+          self.task.filters.forEach((t, index) => {
+            if (t.name === tag.name && t.type === tag.type && t.id === tag.id) {
+              indexToRemove = index;
+            }
+          });
+          self.task.filters.splice(indexToRemove, 1);
+        }
         self.saveTask();
       },
       addChecklist() {
@@ -262,10 +292,19 @@
         const comment = self.comment;
         self.comment = '';
 
+        self.addActivity('comment', comment);
+      },
+      saveTask() {
+        const self = this;
+        const { task } = self;
+        API.saveTask(task);
+      },
+      addActivity(type, text) {
+        const self = this;
         const currentUser = self.$root.user;
         const activity = {
-          type: 'comment',
-          text: comment,
+          type,
+          text,
           time: new Date(),
           user_id: currentUser.id,
           user_name: currentUser.first_name,
@@ -274,18 +313,34 @@
         if (!task.data) { task.data = {}; }
         if (!task.data.activity) { task.data.activity = []; }
         task.data.activity.unshift(activity);
-
         self.saveTask();
       },
-      saveTask() {
+      createStatusPicker() {
         const self = this;
         const { task } = self;
-        API.saveTask(task);
-      },
-      save() {
-        const self = this;
-        if (self.saving) return;
-        self.saving = true;
+        self.statusPicker = self.$f7.picker.create({
+          inputEl: self.$refs.statusInput,
+          convertToPopover: false,
+          value: [task.status],
+          cols: [
+            {
+              textAlign: 'center',
+              values: taskStatuses,
+              displayValues: taskStatuses.map(s => self.$t(`tasks.status.${s.toLowerCase().replace(/ /g, '_')}`, { defaultValue: s })),
+            },
+          ],
+          on: {
+            close(picker) {
+              const translatedStatus = picker.cols[0].displayValue;
+              const status = picker.cols[0].value;
+              if (status === task.status) {
+                return;
+              }
+              task.status = status;
+              self.addActivity('status', self.$t('tasks.task.changed_status_to', { status: translatedStatus }));
+            },
+          },
+        });
       },
       createDatePicker() {
         const self = this;
@@ -310,7 +365,7 @@
 
         const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-        self.$f7.picker.create({
+        self.datePicker = self.$f7.picker.create({
           inputEl: self.$refs.deadlineInput,
           rotateEffect: true,
           inputReadOnly: true,
