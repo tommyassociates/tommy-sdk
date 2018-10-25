@@ -284,10 +284,10 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
           input {
             font-size: inherit
           }
-          input:checked+.item-media .icon-form-checkbox {
+          input:checked + .icon-checkbox {
             background-color: $color_custom
           }
-          input:checked:disabled+.item-media .icon-form-checkbox {
+          input:checked:disabled + .icon-checkbox {
             background-color: #ccc
           }
         }

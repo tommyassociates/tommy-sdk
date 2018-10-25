@@ -4,7 +4,7 @@
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{pageTitle}}</f7-nav-title>
       <f7-nav-right>
-        <f7-link href="/tasks/board-settings/" icon-f7="gear"></f7-link>
+        <f7-link href="/tasks/list-management/" icon-f7="gear"></f7-link>
         <f7-link href="/tasks/task-add/" icon-f7="add"></f7-link>
       </f7-nav-right>
     </f7-navbar>
@@ -161,6 +161,7 @@
           const hasDefaultList = self.lists.filter(list => list.data.default).length > 0;
           if (hasDefaultList) {
             self.lists.forEach((list) => {
+              if (!list.data.active) return;
               self.loadListTasks(list);
             });
           } else {
@@ -184,7 +185,7 @@
         self.fastAddValue[list.id] = '';
         self.fastAddEnabled[list.id] = false;
 
-        API.saveTask(data).then((task) => {
+        API.saveTask(data).then(() => {
           self.loadListTasks(list);
         });
         return false;
@@ -233,11 +234,13 @@
     beforeDestroy() {
       const self = this;
       self.$events.$off('tasks:reloadListsTasks', self.reloadListsTasks);
+      self.$events.$off('tasks:reloadLists', self.loadLists);
     },
     mounted() {
       const self = this;
       self.loadLists();
       self.$events.$on('tasks:reloadListsTasks', self.reloadListsTasks);
+      self.$events.$on('tasks:reloadLists', self.loadLists);
     },
   };
 </script>

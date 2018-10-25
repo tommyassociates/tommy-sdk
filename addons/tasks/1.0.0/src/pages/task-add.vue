@@ -17,6 +17,8 @@
 </template>
 <script>
   import API from '../api';
+  import taskStatuses from '../utils/task-statuses';
+
 
   export default {
     data() {
@@ -31,13 +33,24 @@
         if (self.saving) return;
         self.saving = true;
         const user = self.$root.user;
+
         const data = {
           name: self.name,
+          status: taskStatuses[0],
           filters: [{
             context: 'members',
             name: `${user.first_name} ${user.last_name}`,
             user_id: user.id,
           }],
+          data: {
+            activity: [{
+              type: 'status',
+              text: self.$t('tasks.task.created_a_task'),
+              time: new Date(),
+              user_id: user.id,
+              user_name: user.first_name,
+            }],
+          },
         };
         API.saveTask(data).then(() => {
           self.$events.$emit('tasks:reloadListsTasks');

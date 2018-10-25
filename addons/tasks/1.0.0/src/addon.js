@@ -1,6 +1,8 @@
 import IndexPage from './pages/index.vue';
 import TaskAddPage from './pages/task-add.vue';
 import TaskDetailsPage from './pages/task-details.vue';
+import ListManagementPage from './pages/list-management.vue';
+import ListAddPage from './pages/list-add.vue';
 
 const routes = [
   {
@@ -19,6 +21,14 @@ const routes = [
   {
     path: '/tasks/task-add/',
     component: TaskAddPage,
+  },
+  {
+    path: '/tasks/list-management/',
+    component: ListManagementPage,
+  },
+  {
+    path: '/tasks/list-add/',
+    component: ListAddPage,
   },
 ];
 

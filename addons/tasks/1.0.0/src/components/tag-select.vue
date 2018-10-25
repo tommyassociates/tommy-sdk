@@ -85,8 +85,14 @@
         self.teamTags = tagItems;
       });
     },
+    beforeDestroy() {
+      const self = this;
+      self.$f7.sheet.close('#task-participants-sheet');
+      self.sheetOpened = false;
+      self.popoverOpened = false;
+    },
     methods: {
-      openSelector(tag) {
+      openSelector() {
         const self = this;
         if (self.$f7.width >= 768) {
           self.popoverOpened = true;
