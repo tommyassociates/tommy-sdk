@@ -107,6 +107,11 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
       .icon {
         display: flex;
         font-size: 16px;
+        align-items: center;
+        img {
+          width: 22px;
+          height: 22px;
+        }
       }
       .color-gray {
         color: #999;

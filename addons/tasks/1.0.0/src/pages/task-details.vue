@@ -203,15 +203,13 @@
       });
     },
     methods: {
+      humanTime,
+      taskStatus,
       onPopupClose() {
         const self = this;
         if (self.taskChanged) {
           self.$events.$emit('tasks:reloadListsTasks');
         }
-      },
-      humanTime,
-      taskStatus(status) {
-        return taskStatus.call(this, status);
       },
       saveTaskName() {
         const self = this;

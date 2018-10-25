@@ -3,6 +3,8 @@ import TaskAddPage from './pages/task-add.vue';
 import TaskDetailsPage from './pages/task-details.vue';
 import ListManagementPage from './pages/list-management.vue';
 import ListAddPage from './pages/list-add.vue';
+import ListEditPage from './pages/list-edit.vue';
+import DateRangePage from './pages/date-range.vue';
 
 const routes = [
   {
@@ -16,7 +18,8 @@ const routes = [
     },
   },
   {
-    path: '/tasks/list-edit/:id/',
+    path: '/tasks/list-edit/:listId/',
+    component: ListEditPage,
   },
   {
     path: '/tasks/task-add/',
@@ -30,6 +33,10 @@ const routes = [
     path: '/tasks/list-add/',
     component: ListAddPage,
   },
+  {
+    path: '/tasks/list-edit/:listId/date-range/',
+    component: DateRangePage,
+  }
 ];
 
 export default routes;
