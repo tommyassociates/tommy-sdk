@@ -42,7 +42,7 @@
                   <p>{{task.name}}</p>
                 </div>
                 <div class="card-footer no-border color-gray">
-                  <span v-if="task.data.deadline" class="badge" :class="isPastDate(task.data.deadline) ? 'bg-red' : 'bg-blue'">{{humanTime(task.data.deadline)}}</span>
+                  <span v-if="task.end_at" class="badge" :class="isPastDate(task.end_at) ? 'bg-red' : 'bg-blue'">{{humanTime(task.end_at)}}</span>
                   <span v-else-if="task.data.checklist" class="icon">
                     <img
                       :src="`${$addonAssetsUrl}slice1.png`"
@@ -129,6 +129,7 @@
       },
     },
     methods: {
+      taskStatus,
       humanTime,
       listHasScroll(list) {
         const self = this;
@@ -151,9 +152,16 @@
           });
         });
       },
-      loadLists() {
+      reloadListsTasks() {
         const self = this;
-        API.loadLists().then((lists) => {
+        if (!self.lists) return;
+        self.lists.forEach((list) => {
+          self.loadListTasks(list);
+        });
+      },
+      loadLists(ignoreCache) {
+        const self = this;
+        API.loadLists({}, { cache: !ignoreCache }).then((lists) => {
           lists.forEach((list) => {
             list.tasks = [];
           });
@@ -170,6 +178,10 @@
             });
           }
         });
+      },
+      reloadLists() {
+        const self = this;
+        self.loadLists(true);
       },
       fastAddTask(e, list) {
         const self = this;
@@ -204,9 +216,6 @@
         }
         return ret;
       },
-      taskStatus(status) {
-        taskStatus.call(this, status);
-      },
       isTaskDone(task) {
         const statuses = 'Completed,Closed,Archive Task,Cancel'.split(',');
         if (statuses.indexOf(task.data.status) >= 0) return true;
@@ -215,32 +224,25 @@
       canEditList(list) {
         const self = this;
         const account = self.$root.account;
-        const isOwnerOrManager = (account.type === 'Team')
-          || (account.type === 'TeamMember' && account.roles.indexOf('Team Manager') >= 0);
+        const isOwnerOrManager = (account.type === 'Team') || (account.type === 'TeamMember');
 
         if (list.data.default && !isOwnerOrManager) return false;
 
         if (list.permission_to.indexOf('update') !== -1) return true;
         return false;
       },
-      reloadListsTasks() {
-        const self = this;
-        if (!self.lists) return;
-        self.lists.forEach((list) => {
-          self.loadListTasks(list);
-        });
-      },
+
     },
     beforeDestroy() {
       const self = this;
       self.$events.$off('tasks:reloadListsTasks', self.reloadListsTasks);
-      self.$events.$off('tasks:reloadLists', self.loadLists);
+      self.$events.$off('tasks:reloadLists', self.reloadLists);
     },
     mounted() {
       const self = this;
       self.loadLists();
       self.$events.$on('tasks:reloadListsTasks', self.reloadListsTasks);
-      self.$events.$on('tasks:reloadLists', self.loadLists);
+      self.$events.$on('tasks:reloadLists', self.reloadLists);
     },
   };
 </script>

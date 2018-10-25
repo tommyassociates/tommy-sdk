@@ -83,6 +83,17 @@ const API = {
     return api.createFragment(params);
   },
 
+  getList(listId) {
+    return api.getFragment(listId, {
+      data: {
+        addon: 'tasks',
+        kind: 'TaskList',
+        with_filters: true,
+        with_permission_to: true,
+      },
+    });
+  },
+
   loadLists(params = {}, options = {}) {
     return api.getFragments(Object.assign({
       addon: 'tasks',
