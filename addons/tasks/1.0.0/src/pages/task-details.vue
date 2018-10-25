@@ -1,5 +1,5 @@
 <template>
-  <f7-popup>
+  <f7-popup @popup:close="onPopupClose">
     <f7-view :init="false">
       <f7-page id="tasks__task" name="tasks__task" class="tasks-page">
         <f7-navbar noBorder class="text-color-white">
@@ -27,7 +27,15 @@
         <template v-if="task">
           <f7-block class="subheader">
             <h1>
-              <textarea @input="task.name = $event.target.value" class="unstyled edit-task-name resizable" :value="task.name" @change="saveTaskName"></textarea>
+              <f7-input
+                :wrap="false"
+                type="textarea"
+                @input="task.name = $event.target.value"
+                class="unstyled edit-task-name"
+                :value="task.name"
+                resizable
+                @change="saveTaskName"
+              ></f7-input>
             </h1>
             <input ref="statusInput" type="text" :value="task.status === 'Unassigned' ? $t('tasks.task.waiting_for_assignments', 'Waiting for assignments') : taskStatus(task.status)" readonly="readonly" class="unstyled task-status-picker" />
           </f7-block>
@@ -195,6 +203,12 @@
       });
     },
     methods: {
+      onPopupClose() {
+        const self = this;
+        if (self.taskChanged) {
+          self.$events.$emit('tasks:reloadListsTasks');
+        }
+      },
       humanTime,
       taskStatus(status) {
         return taskStatus.call(this, status);
@@ -297,6 +311,7 @@
       saveTask() {
         const self = this;
         const { task } = self;
+        self.taskChanged = true;
         API.saveTask(task);
       },
       addActivity(type, text) {
