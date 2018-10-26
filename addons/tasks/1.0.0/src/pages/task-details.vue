@@ -40,7 +40,7 @@
             <input ref="statusInput" type="text" :value="task.status === 'Unassigned' ? $t('tasks.task.waiting_for_assignments', 'Waiting for assignments') : taskStatus(task.status)" readonly="readonly" class="unstyled task-status-picker" />
           </f7-block>
 
-          <tag-select :tags="task.filters || []" @tagToggle="onTagToggle"></tag-select>
+          <participants-select :tags="task.filters || []" @tagToggle="onTagToggle"></participants-select>
 
           <f7-list media-list class="list-custom details bottom-0">
             <f7-list-item>
@@ -151,11 +151,11 @@
   import taskStatus from '../utils/task-status';
   import humanTime from '../utils/human-time';
   import taskStatuses from '../utils/task-statuses';
-  import tagSelect from '../components/tag-select.vue';
+  import participantsSelect from '../components/participants-select.vue';
 
   export default {
     components: {
-      tagSelect,
+      participantsSelect,
     },
     props: {
       taskId: [Number, String],

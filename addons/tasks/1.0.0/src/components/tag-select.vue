@@ -1,82 +1,41 @@
 <template>
-  <div class="tag-select">
-    <f7-list media-list class="list-custom participants top-0">
-      <f7-list-item :title="$t('tasks.task.participants', 'Participants')" divider></f7-list-item>
-      <li class="item-content">
-        <div class="item-inner">
-          <template v-for="(tag, index) in tags">
-            <img v-if="tag.context === 'members'" :key="index" :src="teamMemberIconUrl(tag.user_id)" class="circle item">
-            <div v-else :key="index" class="chip item">
-              <div class="chip-media">
-                <img :src="contextIconSrc(tag)" :srcset="contextIconSrcset(tag)">
-              </div>
-              <div class="chip-label">{{tag.name}}</div>
+  <div class="tag-select tasks-tag-select tasks-list-tags-select">
+    <ul>
+      <li class="item-divider">{{$t(`tasks.permissions.${data.name}.title`)}}</li>
+      <li>
+        <a href="#" class="item-link tag-search" @click="openSelector">
+          <div class="item-content">
+            <div class="item-media"><i class="material-icons md-36">search</i></div>
+            <div class="item-inner">
+              <div class="item-title">{{$t('tasks.common.search_members_tags', 'Search Members, Tags')}}</div>
             </div>
-          </template>
-          <a href="#" class="item icon-only tag-search" @click="openSelector">
-            <img :src="`${$addonAssetsUrl}slice6.png`" :srcset="`${$addonAssetsUrl}slice6@2x.png 2x,${$addonAssetsUrl}slice6.png 3x`">
-          </a>
+          </div>
+        </a>
+      </li>
+    </ul>
+    <ul class="tag-items">
+      <li class="tag-item" v-for="(tag, index) in data.filters" :key="index">
+        <div class="item-content">
+          <div class="item-inner">
+            <div class="item-title">{{tag.name}}</div>
+            <div class="item-after"><a style="height: 24px" @click="removeTag(tag)" href="#" class="item-link"><i class="material-icons">close</i></a></div>
+          </div>
         </div>
       </li>
-    </f7-list>
-    <f7-popover id="task-participants-popover" target=".tag-select .item.tag-search" v-if="teamTags" :opened="popoverOpened" @popover:closed="popoverOpened = false">
-      <f7-list class="no-margin" no-hairlines>
-        <f7-list-item
-          v-for="(tag, index) in teamTags"
-          :key="index"
-          checkbox
-          :checked="isTagSelected(tag)"
-          :title="tag.name"
-          @change="toggleTag(tag, $event.target.checked)"
-        >
-          <span class="tag-select-list-avatar" :style="`background-image: url(${tag.icon || ''})`" v-if="tag.context === 'members'" slot="media"></span>
-          <span v-else class="tag-select-list-icon" slot="media">
-            <img :src="contextIconSrc(tag)" :srcset="contextIconSrcset(tag)">
-          </span>
-        </f7-list-item>
-      </f7-list>
-    </f7-popover>
-    <f7-sheet id="task-participants-sheet" v-if="teamTags" :opened="sheetOpened" @sheet:closed="sheetOpened = false">
-      <f7-toolbar>
-        <div class="left"></div>
-        <div class="right">
-          <f7-link @click="sheetOpened = false">Done</f7-link>
-        </div>
-      </f7-toolbar>
-      <div class="page-content">
-        <f7-searchbar
-          search-container="#task-participants-sheet .list"
-          search-in=".item-title"
-        ></f7-searchbar>
-        <f7-list class="no-margin" no-hairlines>
-          <f7-list-item
-            v-for="(tag, index) in teamTags"
-            :key="index"
-            checkbox
-            :checked="isTagSelected(tag)"
-            :title="tag.name"
-            @change="toggleTag(tag, $event.target.checked)"
-          >
-            <span class="tag-select-list-avatar" :style="`background-image: url(${tag.icon || ''})`" v-if="tag.context === 'members'" slot="media"></span>
-            <span v-else class="tag-select-list-icon" slot="media">
-              <img :src="contextIconSrc(tag)" :srcset="contextIconSrcset(tag)">
-            </span>
-          </f7-list-item>
-        </f7-list>
-      </div>
-    </f7-sheet>
+    </ul>
   </div>
 </template>
 <script>
   export default {
     props: {
-      tags: Array,
+      data: Object,
+      listId: [String, Number],
     },
     data() {
       return {
         teamTags: null,
-        sheetOpened: false,
-        popoverOpened: false,
+        // sheetOpened: false,
+        // popoverOpened: false,
       };
     },
     mounted() {
@@ -85,52 +44,28 @@
         self.teamTags = tagItems;
       });
     },
-    beforeDestroy() {
-      const self = this;
-      self.$f7.sheet.close('#task-participants-sheet');
-      self.sheetOpened = false;
-      self.popoverOpened = false;
-    },
     methods: {
       openSelector() {
         const self = this;
-        if (self.$f7.width >= 768) {
-          self.popoverOpened = true;
-        } else {
-          self.sheetOpened = true;
-        }
+        self.$f7router.navigate(`/tasks/list-edit/${self.listId}/tag-select/`, {
+          props: {
+            filters: self.data.filters,
+            pageTitle: self.$t(`tasks.permissions.${self.data.name}.title`),
+            teamTags: self.teamTags,
+            onChange(tag, selected) {
+              if (selected) {
+                self.$emit('tagAdd', tag);
+              } else {
+                self.$emit('tagRemove', tag);
+              }
+            },
+          },
+        });
       },
-      isTagSelected(tag) {
+      removeTag(tag) {
         const self = this;
-        return self.tags.filter(t => t.name === tag.name && t.id === tag.id && t.type === tag.type).length > 0;
-      },
-      contextIconSrc(tag) {
-        const self = this;
-        const $addonAssetsUrl = self.$addonAssetsUrl;
-        return `${$addonAssetsUrl}icons/${tag.context.slice(0, -1)}.png`;
-      },
-      contextIconSrcset(tag) {
-        const self = this;
-        const $addonAssetsUrl = self.$addonAssetsUrl;
-        return `${$addonAssetsUrl}icons/${tag.context.slice(0, -1)}@2x.png 2x,${$addonAssetsUrl}icons/${tag.context.slice(0, -1)}@3x.png 3x`;
-      },
-      teamMemberIconUrl(user_id) {
-        const self = this;
-        if (!user_id) return '#';
-        const path = `${self.$root.$config.apiUrl}team/members/${user_id}/avatar.png?token=${self.$root.token}`;
-        return path;
-      },
-      toggleTag(tag, selected) {
-        const self = this;
-        if (selected) {
-          self.$emit('tagToggle', tag, 'add');
-          self.$emit('tagAdd', tag);
-        } else {
-          self.$emit('tagToggle', tag, 'remove');
-          self.$emit('tagRemove', tag);
-        }
+        self.$emit('tagRemove', tag);
       },
     },
   };
 </script>
-
