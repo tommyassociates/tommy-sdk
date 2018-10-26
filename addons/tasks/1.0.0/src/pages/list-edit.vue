@@ -39,7 +39,26 @@
         :title="$t('tasks.common.date_range', 'Date Range')"
         :after="formatDateRange(list.data.date_range)"
       ></f7-list-item>
-      <div data-template="tasks__tagSelectTemplate"></div>
+
+      <tag-select
+        v-for="(permission, index) in permissions"
+        :key="index"
+        :listId="list.id"
+        :data="permission"
+        @tagAdd="(tag) => addListPermission(permission, tag)"
+        @tagRemove="(tag) => removeListPermission(permission, tag)"
+      ></tag-select>
+      <tag-select
+        :listId="list.id"
+        :data="{
+          title: $t('tasks.parmissions.filter_tasks.title'),
+          name: 'filter_tasks',
+          filters: list.filters,
+        }"
+        @tagAdd="addListFilter"
+        @tagRemove="removeListFilter"
+      ></tag-select>
+
 
     </f7-list>
 
@@ -53,8 +72,12 @@
   import API from '../api';
   import taskStatuses from '../utils/task-statuses';
   import formatDateRange from '../utils/format-date-range';
+  import tagSelect from '../components/tag-select.vue';
 
   export default {
+    components: {
+      tagSelect,
+    },
     props: {
       listId: [String, Number],
     },
@@ -64,6 +87,7 @@
         id: parseInt(this.listId, 10),
         taskStatuses,
         list: null,
+        permissions: [],
       };
     },
     beforeDestroy() {
@@ -76,6 +100,20 @@
         if (!list.data) list.data = {};
         if (!list.data.statuses) list.data.statuses = [];
         self.list = list;
+        self.$api.getInstalledAddonPermission('tasks', 'task_list_read_access', {
+          resource_id: list.id,
+          with_filters: true,
+        }).then((permission) => {
+          permission.resource_id = list.id;
+          self.permissions.push(permission);
+        });
+        self.$api.getInstalledAddonPermission('tasks', 'task_list_edit_access', {
+          resource_id: list.id,
+          with_filters: true,
+        }).then((permission) => {
+          permission.resource_id = list.id;
+          self.permissions.push(permission);
+        });
       });
       self.$events.$on('tasks:setListDateRange', self.updateListDateRange);
     },
@@ -131,6 +169,36 @@
           self.$events.$emit('tasks:reloadLists');
           self.$f7router.back();
         });
+      },
+      addListFilter(tag) {
+        const self = this;
+        if (self.saving) return;
+        self.showSave = true;
+        self.list.filters.push(tag);
+      },
+      removeListFilter(tag) {
+        const self = this;
+        if (self.saving) return;
+        self.showSave = true;
+        self.list.filters.splice(self.list.filters.indexOf(tag), 1);
+      },
+      saveListPermission(permission) {
+        const self = this;
+        self.$api.updateInstalledAddonPermission('tasks', permission.name, {
+          resource_id: permission.resource_id,
+          with_filters: true,
+          filters: JSON.stringify(permission.filters),
+        });
+      },
+      addListPermission(permission, tag) {
+        const self = this;
+        permission.filters.push(tag);
+        self.saveListPermission(permission);
+      },
+      removeListPermission(permission, tag) {
+        const self = this;
+        permission.filters.splice(permission.filters.indexOf(tag), 1);
+        self.saveListPermission(permission);
       },
     },
   };

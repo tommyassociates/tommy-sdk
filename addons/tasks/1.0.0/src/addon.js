@@ -5,6 +5,7 @@ import ListManagementPage from './pages/list-management.vue';
 import ListAddPage from './pages/list-add.vue';
 import ListEditPage from './pages/list-edit.vue';
 import DateRangePage from './pages/date-range.vue';
+import TagSelectPage from './pages/tag-select-page.vue';
 
 const routes = [
   {
@@ -36,7 +37,11 @@ const routes = [
   {
     path: '/tasks/list-edit/:listId/date-range/',
     component: DateRangePage,
-  }
+  },
+  {
+    path: '/tasks/list-edit/:listId/tag-select/',
+    component: TagSelectPage,
+  },
 ];
 
 export default routes;

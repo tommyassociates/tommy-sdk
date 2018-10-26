@@ -1,4 +1,3 @@
-// import IndexController from './controllers/index';
 const tommy = window.tommy;
 const api = tommy.api;
 
@@ -151,59 +150,6 @@ const API = {
       }],
     };
     return API.saveList(list);
-  },
-
-  initPermissionSelect(page, name, resource_id) {
-    console.log('init permission selects', name, resource_id);
-    const params = {
-      resource_id,
-      with_filters: true,
-    };
-    api.getInstalledAddonPermission('tasks', name, params).then((permission) => {
-      console.log('installed addon permission', permission);
-      // for (var i = 0; i < permissions.length; i += 1) {
-      // const wantedPermission = wantedPermissions.filter(x => x.name == permissions[i].name)[0]
-      // if (!wantedPermission) continue
-      // const permission = Object.assign({}, permissions[i], wantedPermission)
-      // console.log('init permissions', permission)
-      permission.resource_id = resource_id;
-      window.tommy.tplManager.appendInline('tasks__tagSelectTemplate', permission, page.container);
-      API.initTagSelect(page, permission);
-      // }
-    });
-  },
-
-  initTagSelect(page, permission) {
-    const $tagSelect = $$(page.container).find(`.tag-select[data-permission-name="${permission.name}"]`); // .find('') //$page.find('#addon-permissions-form .tag-select')
-    console.log('init tag select', permission, $tagSelect.dataset());
-    window.tommy.tagSelect.initWidget($tagSelect, permission.filters, (data) => {
-      console.log('save permission tags', permission, data);
-      api.updateInstalledAddonPermission('tasks', permission.name, {
-        resource_id: permission.resource_id, // pass the resource_id for resource specific permissions
-        with_filters: true,
-        filters: JSON.stringify(data), // data
-      });
-    });
-  },
-
-  STATUSES: ['Unassigned', 'Assigned', 'Processing', 'Completed', 'Closed', 'Archive Task', 'Cancel'],
-
-  translateStatus(status) {
-    if (status) { return window.tommy.i18n.t(`status.${window.tommy.util.underscore(status)}`, { defaultValue: status }); }
-  },
-
-  untranslateStatus(translatedStatus) {
-    for (let i = 0; i < API.STATUSES.length; i += 1) {
-      if (API.translateStatus(API.STATUSES[i]) === translatedStatus) { return API.STATUSES[i]; }
-    }
-  },
-
-  translatedStatuses() {
-    const statuses = [];
-    for (let i = 0; i < API.STATUSES.length; i += 1) {
-      statuses.push(API.translateStatus(API.STATUSES[i]));
-    }
-    return statuses;
   },
 };
 
