@@ -69,21 +69,19 @@
         - Creator
       operations:
         - update
+  assets:
+    -
+      type: "stylesheet"
+      file: "build/addon.css"
+    -
+      type: "javascript"
+      file: "build/addon.js"
   views:
     index:
       title: "Wallet Accounts"
-      file: "views/index.html"
+      file: ""
       type: "page"
       index: true
       framed: false
       actor_permission: wallet_accounts_manager_access
-      assets:
-        -
-          type: "stylesheet"
-          file: "views/build/bundle.css"
-        -
-          type: "javascript"
-          file: "views/build/bundle.js"
-        -
-          type: "template"
-          file: "views/build/bundle.tpl.html"
+      path: "/wallet_accounts/"
