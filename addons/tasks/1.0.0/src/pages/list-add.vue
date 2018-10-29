@@ -34,7 +34,6 @@
     methods: {
       save() {
         const self = this;
-        self.showSave = false;
         if (self.saving) return;
         self.saving = true;
 
@@ -44,7 +43,7 @@
           })
           .then(() => {
             self.$events.$emit('tasks:reloadLists');
-            self.$f7router.back('/tasks/', { force: true });
+            self.$f7router.back(`/tasks/${API.actorId ? `?actor_id=${API.actorId}` : ''}`, { force: true });
           });
       },
     },

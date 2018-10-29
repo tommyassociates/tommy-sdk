@@ -167,7 +167,7 @@
           });
           self.lists = lists;
           const hasDefaultList = self.lists.filter(list => list.data.default).length > 0;
-          if (hasDefaultList) {
+          if (hasDefaultList || self.actorId) {
             self.lists.forEach((list) => {
               if (!list.data.active) return;
               self.loadListTasks(list);

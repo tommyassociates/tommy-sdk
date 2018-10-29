@@ -58,8 +58,6 @@
         @tagAdd="addListFilter"
         @tagRemove="removeListFilter"
       ></tag-select>
-
-
     </f7-list>
 
     <f7-list v-if="list && !list.data.default" class="margin-top">
