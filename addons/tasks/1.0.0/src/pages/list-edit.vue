@@ -51,7 +51,7 @@
       <tag-select
         :listId="list.id"
         :data="{
-          title: $t('tasks.parmissions.filter_tasks.title'),
+          title: $t('tasks.permissions.filter_tasks.title'),
           name: 'filter_tasks',
           filters: list.filters,
         }"
@@ -94,7 +94,7 @@
     },
     mounted() {
       const self = this;
-      API.getList(self.id).then((list) => {
+      API.loadList(self.id).then((list) => {
         if (!list.data) list.data = {};
         if (!list.data.statuses) list.data.statuses = [];
         self.list = list;
