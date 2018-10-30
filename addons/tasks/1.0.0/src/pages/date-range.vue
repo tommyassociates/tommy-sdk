@@ -13,7 +13,6 @@
         radio
         value=""
         :checked="!isCustomRange && (range === '' || !range)"
-        @change="range = ''"
         @change="setPlainRange('')"
         :title="$t('tasks.date_range.none', 'None')"
       ></f7-list-item>
@@ -40,7 +39,7 @@
       ></f7-list-item>
     </f7-list>
 
-    <f7-list class="top-10">
+    <f7-list class="top-10 list-custom">
       <f7-list-item
         :title="$t('tasks.common.choose_range', 'Choose Range')"
       >
