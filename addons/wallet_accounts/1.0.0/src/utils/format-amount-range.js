@@ -1,3 +1,4 @@
+/* eslint no-param-reassign: off */
 export default function (min, max) {
   min = parseFloat(min);
   max = parseFloat(max);

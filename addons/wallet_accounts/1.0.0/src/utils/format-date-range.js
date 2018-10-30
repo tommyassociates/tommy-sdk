@@ -1,5 +1,5 @@
 function formatDate(date) {
-  const d = new Date();
+  const d = new Date(date);
   const year = d.getFullYear();
   let month = d.getMonth() + 1;
   let day = d.getDate();
@@ -10,10 +10,10 @@ function formatDate(date) {
 export default function (range) {
   if (!range) return '';
   if (typeof range === 'string') {
-    return window.tommy.i18n.t(`date_range.${range}`);
+    return window.tommy.i18n.t(`tasks.date_range.${range}`);
   }
   if (Array.isArray(range)) {
-    return `${formatDate(range[0])} - ${formatDate(range[1])}`
+    return `${formatDate(range[0])} - ${formatDate(range[1])}`;
   }
   return range || '';
 }
