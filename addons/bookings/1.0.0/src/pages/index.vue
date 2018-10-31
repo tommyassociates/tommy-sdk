@@ -17,7 +17,7 @@
         >
           <div class="item-media text-icon align-self-center" slot="content-start">
             <span>{{formatDate(event.start_at, 'D')}}</span>
-            <small>{{formatDate(start_at, 'MMM')}}</small>
+            <small>{{formatDate(event.start_at, 'MMM')}}</small>
           </div>
         </f7-list-item>
       </f7-list-group>
