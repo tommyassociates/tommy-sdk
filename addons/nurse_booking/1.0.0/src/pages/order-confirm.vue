@@ -21,6 +21,13 @@
     </div>
     <f7-list no-hairlines>
       <f7-list-item
+        v-if="nurse"
+        :title="`${nurse.first_name} ${nurse.last_name}`"
+        :link="`/nurse_booking/order-select-nurse/?nurse_id=${nurse.id}&back=true`"
+      >
+        <img slot="media" :src="`${$addonAssetsUrl}icon-nurse.svg`">
+      </f7-list-item>
+      <f7-list-item
         :title="formatDate(date, 'MMMM D, YYYY HH:mm')"
         :link="`/nurse_booking/order-select-date/?date=${new Date(date).getTime()}&back=true`"
       >
@@ -81,9 +88,8 @@
         user: self.$root.user,
         location: API.cache.booking.location,
         date: API.cache.booking.date,
+        nurse: API.cache.booking.nurse,
       };
-    },
-    watch: {
     },
     computed: {
       total() {
@@ -106,11 +112,12 @@
         if (page.from === 'previous') {
           self.location = API.cache.booking.location;
           self.date = API.cache.booking.date;
+          self.nurse = API.cache.booking.nurse;
         }
       },
       payOrder() {
         const self = this;
-        const { service, coupon, location, date, total } = self;
+        const { service, coupon, location, date, total, nurse } = self;
 
         payOrder({
           teamId: self.$root.team.id,
@@ -121,6 +128,7 @@
           discount: coupon ? coupon.amount : 0,
           location,
           date,
+          nurse,
         });
       },
     },

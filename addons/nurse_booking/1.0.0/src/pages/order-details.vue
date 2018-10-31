@@ -31,6 +31,12 @@
 
     <f7-list class="order-details-list" v-if="service" no-hairlines>
       <f7-list-item
+        v-if="nurse"
+        :title="`${nurse.first_name} ${nurse.last_name}`"
+      >
+        <span :style="`background-image: url(${nurse.icon_url || ''})`" class="order-details-list-nurse-avatar" slot="media"></span>
+      </f7-list-item>
+      <f7-list-item
         :title="`${$t('nurse_booking.order_details.service_label')}:`"
         :after="service.name"
       ></f7-list-item>
@@ -73,7 +79,7 @@
   export default {
     data() {
       const self = this;
-      const { transaction, service, coupon, location, date } = API.cache.booking;
+      const { transaction, service, coupon, location, date, nurse } = API.cache.booking;
       const data = {
         transaction: null,
         service: null,
@@ -84,6 +90,7 @@
         status: null,
         total: null,
         preventCancel: false,
+        nurse: null,
       };
       if (!self.$f7route.query.id) {
         Object.assign(data, {
@@ -92,6 +99,7 @@
           coupon,
           location,
           date,
+          nurse,
         });
       }
       return data;
@@ -116,6 +124,7 @@
           complete: !canceled && order.status === 'complete',
         };
         self.date = parseInt(order.data.date, 10);
+        self.nurse = order.data.nurse;
         self.service = {
           name: order.name,
           id: order.vendor_product_id,
@@ -141,6 +150,7 @@
 
         API.cache.booking.date = parseInt(order.data.date, 10);
         API.cache.booking.location = order.data.location;
+        API.cache.booking.nurse = order.data.nurse;
         delete API.cache.booking.coupon;
 
         API.getServiceDetails(self.$root.team.id, order.vendor_product_id).then((service) => {
@@ -162,6 +172,9 @@
           `,
           () => {
             API.cancelOrder(self.$root.team.id, order.id)
+              .then(() => {
+                return API.deleteBookingEvent(order.id);
+              })
               .then(() => {
                 self.preventCancel = false;
                 self.$f7router.navigate('/nurse_booking/order-canceled/');

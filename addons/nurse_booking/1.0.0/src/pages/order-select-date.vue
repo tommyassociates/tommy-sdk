@@ -119,7 +119,7 @@
         if (self.$f7route.query.back) {
           self.$f7router.back();
         } else {
-          self.$f7router.navigate('/nurse_booking/order-confirm/');
+          self.$f7router.navigate('/nurse_booking/order-select-nurse/');
         }
       },
     },

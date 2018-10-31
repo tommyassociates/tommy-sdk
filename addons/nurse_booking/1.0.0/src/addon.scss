@@ -915,6 +915,10 @@ a.nurse_booking__toolbar-button {
         }
       }
     }
+    .nurse-selected {
+      background-color: $yellow;
+      color: #fff;
+    }
     .nurse-content-wrap {
       display: flex;
       justify-content: space-between;
@@ -934,19 +938,17 @@ a.nurse_booking__toolbar-button {
       height: 80px;
       align-self: flex-start;
       position: relative;
-      img {
-        max-width: 100%;
-        max-height: 100%;
-        width: auto;
-        height: auto;
-        border-radius: 50%;
-      }
+      border-radius: 50%;
+      background-position: center;
+      background-size: cover;
+      background-color: #eee;
     }
     .nurse-content {
-      flex-shrink: 1;
+      flex-shrink: 10;
       min-width: 0;
       margin-left: 12px;
       align-self: center;
+      width: 100%;
     }
     .nurse-name {
       font-size: 24px;
@@ -961,6 +963,7 @@ a.nurse_booking__toolbar-button {
       padding-left: 5px;
       align-self: center;
       text-align: right;
+      flex-shrink: 0;
     }
     .nurse-percentage {
       font-size: 36px;
@@ -1119,6 +1122,17 @@ a.nurse_booking__toolbar-button {
     box-shadow: 0 2px 8px 0 rgba(0,0,0,0.10);
     border-radius: 6px;
     overflow: hidden;
+    .item-media {
+      width: 70px;
+    }
+  }
+  .order-details-list-nurse-avatar {
+    display: block;
+    width: 70px;
+    height: 70px;
+    background: #eee no-repeat center;
+    background-size: cover;
+    border-radius: 50%;
   }
   .order-details-white-button,
   .order-details-red-button {
