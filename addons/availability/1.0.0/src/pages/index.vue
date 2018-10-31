@@ -14,6 +14,14 @@
       <a href="#" class="refresh" @click="loadAvailabilities">{{$t('common.save', 'Refresh')}}</a>
     </div>
 
+    <f7-list class="no-margin-top" no-hairlines>
+      <f7-list-item
+        :title="$t('availability.index.available_button')"
+      >
+        <f7-toggle slot="after" :checked="availableForWork" @change="changeAvailableForWork($event.target.checked)"></f7-toggle>
+      </f7-list-item>
+    </f7-list>
+
     <f7-list class="no-margin" no-hairlines v-if="items">
       <f7-list-item
         v-for="(item, key) in items"
@@ -71,6 +79,16 @@
           };
         }
       }
+      const actor_id = self.$f7route.query.actor_id;
+      let availableForWork = false;
+      if (self.$root.teamMembers) {
+        self.$root.teamMembers.forEach((member) => {
+          const userId = actor_id || self.$root.user.id;
+          if (member.user_id === parseInt(userId, 10)) {
+            availableForWork = member.tags.indexOf('Available For Work') >= 0;
+          }
+        });
+      }
       return {
         startAt,
         endAt,
@@ -81,10 +99,25 @@
         refreshPanelTimeout: null,
         refreshPanelInterval: null,
         refreshPanelText: '1 min ago',
-        actor_id: self.$f7route.query.actor_id,
+        actor_id,
+        availableForWork,
       };
     },
     methods: {
+      changeAvailableForWork(available) {
+        const self = this;
+        self.availableForWork = true;
+        const userId = self.actor_id || self.$root.user.id;
+        const currentTeamMember = self.$root.teamMembers.filter(m => m.user_id === parseInt(userId, 10))[0];
+        if (!currentTeamMember) return;
+        const currentTags = [...currentTeamMember.tags];
+        if (available) {
+          currentTags.push('Available For Work');
+        } else {
+          currentTags.splice(currentTags.indexOf('Available For Work'), 1);
+        }
+        self.$api.updateCurrentTeamMember(userId, { tags: currentTags.length ? currentTags : [''] });
+      },
       onPageAfterIn() {
         const self = this;
         self.loadAvailabilities();
