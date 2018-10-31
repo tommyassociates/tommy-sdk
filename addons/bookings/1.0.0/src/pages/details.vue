@@ -17,8 +17,8 @@
       ></f7-list-item>
     </f7-list>
 
-    <f7-block-title>{{$t('bookings.label.start', 'Start')}}</f7-block-title>
-    <f7-list no-hairlines>
+    <f7-block-title v-if="event.start_at">{{$t('bookings.label.start', 'Start')}}</f7-block-title>
+    <f7-list no-hairlines v-if="event.start_at">
       <f7-list-item
         :header="$t('bookings.label.date', 'Date')"
         :title="formatDate(event.start_at, 'D MMM YY')"
@@ -29,8 +29,8 @@
       ></f7-list-item>
     </f7-list>
 
-    <f7-block-title>{{$t('bookings.label.end', 'End')}}</f7-block-title>
-    <f7-list no-hairlines>
+    <f7-block-title v-if="event.end_at">{{$t('bookings.label.end', 'End')}}</f7-block-title>
+    <f7-list no-hairlines v-if="event.end_at">
       <f7-list-item
         :header="$t('bookings.label.date', 'Date')"
         :title="formatDate(event.end_at, 'D MMM YY')"
