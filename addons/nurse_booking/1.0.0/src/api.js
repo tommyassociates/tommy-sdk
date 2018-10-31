@@ -45,6 +45,18 @@ const API = {
       return API.cache.locations;
     });
   },
+  getNurseList(teamId) {
+    return api.call({
+      endpoint: `teams/${teamId}/members`,
+      method: 'GET',
+      data: {
+        tags: ['Available For Work'],
+      },
+    }).then((res) => {
+      API.cache.nurses = res;
+      return API.cache.nurses;
+    });
+  },
   saveLocations(locations) {
     if (!locations) {
       // eslint-disable-next-line
@@ -75,10 +87,38 @@ const API = {
     API.cache.locations.splice(index, 1);
     return API.saveLocations(API.cache.locations);
   },
+  createBookingEvent(teamId, order) {
+    return api.createEvent({
+      title: order.name,
+      start_at: new Date(order.data.date).toJSON(),
+      location: `${order.data.location.city} ${order.data.location.address}`,
+      user_id: order.data.nurse.user_id,
+      team_id: teamId,
+      kind: 'Booking',
+      resource_id: order.id,
+      resource_type: 'VendorOrder',
+    });
+  },
+  deleteBookingEvent(orderId) {
+    return api.getEvents({
+      kind: 'Booking',
+      resource_id: orderId,
+      resource_type: 'VendorOrder',
+    }).then((events) => {
+      return Promise.all(events.map(event => api.deleteEvent(event.id)));
+    });
+  },
   sendOrder(teamId, data) {
     return api.call({
       endpoint: `vendors/${teamId}/orders`,
       method: 'POST',
+      data,
+    });
+  },
+  updateOrder(teamId, data) {
+    return api.call({
+      endpoint: `vendors/${teamId}/orders`,
+      method: 'PUT',
       data,
     });
   },

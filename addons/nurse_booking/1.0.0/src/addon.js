@@ -3,8 +3,9 @@ import VipPage from './pages/vip.vue';
 import VipDetailsPage from './pages/vip-details.vue';
 import ServiceListPage from './pages/service-list.vue';
 import ServiceDetailsPage from './pages/service-details.vue';
-import OrderLocationPage from './pages/order-select-location.vue';
-import OrderDatePage from './pages/order-select-date.vue';
+import OrderSelectLocationPage from './pages/order-select-location.vue';
+import OrderSelectDatePage from './pages/order-select-date.vue';
+import OrderSelectNursePage from './pages/order-select-nurse.vue';
 import OrderConfirmPage from './pages/order-confirm.vue';
 import OrderDetailsPage from './pages/order-details.vue';
 import OrderCanceledPage from './pages/order-canceled.vue';
@@ -35,11 +36,15 @@ const routes = [
   },
   {
     path: '/nurse_booking/order-select-location/',
-    component: OrderLocationPage,
+    component: OrderSelectLocationPage,
   },
   {
     path: '/nurse_booking/order-select-date/',
-    component: OrderDatePage,
+    component: OrderSelectDatePage,
+  },
+  {
+    path: '/nurse_booking/order-select-nurse/',
+    component: OrderSelectNursePage,
   },
   {
     path: '/nurse_booking/order-confirm/',
