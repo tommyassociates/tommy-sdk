@@ -1,0 +1,49 @@
+{
+  "index" : {
+    "title" : "Orders",
+    "title_user": "{{user}}'s Orders"
+  },
+  "settings": {
+    "title": "Settings",
+    "list_management": "List Management"
+  },
+  "list_management": {
+    "title": "List Management",
+    "create_list": "Create New List"
+  },
+  "list_add": {
+    "title": "Add List",
+    "name_placeholder": "Name"
+  },
+  "views": {
+    "index": {
+      "title": "Orders"
+    }
+  },
+  "title": "Invoicing",
+  "summary": "Manage your orders and products.",
+  "description": "Manage your orders and products.",
+  "developer": "Tommy Labs GmbH",
+  "permissions": {
+    "filter_orders": {
+      "title": "Filter Orders",
+      "hint": "Select which orders will appear on the list"
+    },
+    "invoicing_order_list_read_access": {
+      "title": "Who Can See List",
+      "hint": "Select who can view this list"
+    },
+    "invoicing_order_list_edit_access": {
+      "title": "Who Can Edit List",
+      "hint": "Select who can edit this list"
+    },
+    "invoicing_item_create_access": {
+      "title": "Who Can Create Items",
+      "hint": "Select who can create items/services"
+    },
+    "invoicing_item_edit_access": {
+      "title": "Who Can Edit Items",
+      "hint": "Select who can edit items/services"
+    }
+  }
+}
