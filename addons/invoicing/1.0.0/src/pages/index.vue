@@ -1,0 +1,186 @@
+<template>
+  <f7-page id="invoicing__index" name="invoicing__index" class="invoicing-page">
+    <f7-navbar>
+      <tommy-nav-menu></tommy-nav-menu>
+      <f7-nav-title>{{pageTitle}}</f7-nav-title>
+      <f7-nav-right>
+        <f7-link href="/invoicing/settings/" icon-f7="gear"></f7-link>
+        <!-- <f7-link href="/invoicing/task-add/" icon-f7="add"></f7-link> -->
+      </f7-nav-right>
+    </f7-navbar>
+
+    <f7-swiper v-if="orderedLists && orderedLists.length" :params="{
+      slidesPerView: 'auto',
+      breakpointsInverse: true,
+      centeredSlides: false,
+      breakpoints: {
+        768: {
+          centeredSlides: true,
+        }
+      },
+    }">
+      <f7-swiper-slide
+        v-for="list in orderedLists"
+        :key="list.id"
+      >
+        <div class="orders-list" :data-id="list.id" :class="{'hasScroll': listWithScroll[list.id]}">
+          <div class="orders-list-header">
+            <div>{{list.name}}</div>
+            <div v-if="canEditList(list)">
+              <a :href="`/invoicing/list-edit/${list.id}/`">
+                <img
+                  :src="`${$addonAssetsUrl}slice6.png`"
+                  :srcset="`${$addonAssetsUrl}slice6@2x.png 2x, ${$addonAssetsUrl}slice6@3x.png 3x`"
+                >
+              </a>
+            </div>
+          </div>
+          <div class="orders-list-content">
+            <template v-if="list.orders && list.orders.length">
+              <a v-for="(order, index) in list.orders" :key="index" :href="`/invoicing/order-details/${order.id}/`" class="card order-card">
+                <div class="card-content card-content-padding">
+                  <!-- <p>{{order.name}}</p> -->
+                </div>
+                <div class="card-footer no-border color-gray">
+                  <!-- <span v-if="order.end_at" class="badge" :class="isPastDate(order.end_at) ? 'bg-red' : 'bg-blue'">{{humanTime(task.end_at)}}</span>
+                  <span v-else-if="order.data.checklist" class="icon">
+                    <img
+                      :src="`${$addonAssetsUrl}slice1.png`"
+                      :srcset="`${$addonAssetsUrl}slice1@2x.png 2x,${$addonAssetsUrl}slice1@3x.png 3x`"
+                    >
+                    {{checklistNumCompleted(order.data.checklist)}}
+                  </span>
+                  <span v-else class="icon">
+                    <img
+                      :src="`${$addonAssetsUrl}slice2.png`"
+                      :srcset="`${$addonAssetsUrl}slice2@2x.png 2x,${$addonAssetsUrl}slice2@3x.png 3x`"
+                    >
+                  </span>
+                  <span>
+                    {{task.status ? taskStatus(task.status) : $t('invoicing.index.unassigned', 'Unassigned')}}
+                  </span> -->
+                </div>
+              </a>
+            </template>
+          </div>
+        </div>
+      </f7-swiper-slide>
+    </f7-swiper>
+  </f7-page>
+</template>
+<script>
+  import API from '../api';
+  import humanTime from '../utils/human-time';
+
+  export default {
+    data() {
+      const self = this;
+      return {
+        lists: null,
+        actorId: self.$f7route.query.actor_id,
+        listWithScroll: {},
+      };
+    },
+    created() {
+      const self = this;
+      if (self.actorId) {
+        API.actorId = parseInt(self.actorId, 10);
+        API.actor = self.actor;
+      } else {
+        delete API.actorId;
+        delete API.actor;
+      }
+    },
+    computed: {
+      actor() {
+        const self = this;
+        if (!self.actorId) return null;
+        return self.$root.teamMembers.filter(user => user.user_id === parseInt(self.actorId, 10))[0];
+      },
+      pageTitle() {
+        const self = this;
+        if (!self.actorId) return self.$t('invoicing.index.title', 'Orders');
+        const actorName = self.$root.teamMembers.filter(user => user.user_id === parseInt(self.actorId, 10))[0].first_name;
+        return self.$t('invoicing.index.title_user', { user: actorName });
+      },
+      orderedLists() {
+        const self = this;
+        if (!self.lists) return null;
+        return self.lists.sort((a, b) => {
+          return a.data.position - b.data.position;
+        }).filter(list => list.data.active);
+      },
+    },
+    methods: {
+      humanTime,
+      listHasScroll(list) {
+        const self = this;
+        if (!list.orders || list.orders.length === 0) return false;
+        const listContentEl = self.$$(`.orders-list[data-id="${list.id}"] .orders-list-content`)[0];
+        if (!listContentEl) return false;
+        return listContentEl.scrollHeight > listContentEl.offsetHeight;
+      },
+      loadListOrders(list) {
+        const self = this;
+        const user = self.actor || self.$root.user;
+        API.loadListOrders(list, [`${user.first_name} ${user.last_name}`]).then((orders) => {
+          list.orders = orders;
+          self.$nextTick(() => {
+            if (self.listHasScroll(list)) {
+              self.$set(self.listWithScroll, list.id, true);
+            } else {
+              self.$set(self.listWithScroll, list.id, false);
+            }
+          });
+        });
+      },
+      reloadListsOrders() {
+        const self = this;
+        if (!self.lists) return;
+        self.lists.forEach((list) => {
+          self.loadListOrders(list);
+        });
+      },
+      loadLists(ignoreCache) {
+        const self = this;
+        API.loadLists({}, { cache: !ignoreCache }).then((lists) => {
+          lists.forEach((list) => {
+            list.orders = [];
+          });
+          self.lists = lists;
+          self.lists.forEach((list) => {
+            if (!list.data.active) return;
+            self.loadListOrders(list);
+          });
+        });
+      },
+      reloadLists() {
+        const self = this;
+        self.loadLists(true);
+      },
+      canEditList(list) {
+        const self = this;
+        const account = self.$root.account;
+        const isOwnerOrManager = (account.type === 'Team') || (account.type === 'TeamMember');
+
+        if (list.data.default && !isOwnerOrManager) return false;
+
+        if (list.permission_to.indexOf('update') !== -1) return true;
+        return false;
+      },
+
+    },
+    beforeDestroy() {
+      const self = this;
+      self.$events.$off('invoicing:reloadListsOrders', self.reloadListsOrders);
+      self.$events.$off('invoicing:reloadLists', self.reloadLists);
+    },
+    mounted() {
+      const self = this;
+      self.loadLists();
+      self.$events.$on('invoicing:reloadListsOrders', self.reloadListsOrders);
+      self.$events.$on('invoicing:reloadLists', self.reloadLists);
+    },
+  };
+</script>
+

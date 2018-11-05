@@ -1,0 +1,81 @@
+---
+  title: "Invoicing"
+  package: "invoicing"
+  summary: "Manage your orders and products."
+  description: "Manage your orders and products."
+  version: "1.0.0"
+  developer: "Tommy Labs GmbH"
+  homepage: "https://mytommy.com"
+  private: false
+  locales:
+    - en-US
+    - zh-CN
+  permissions:
+    invoicing_manager_access:
+      title: "Who Can View Other Team Members' Orders"
+      hint: "Select who can view orders on behalf of other users"
+      resource_type: "Fragment"
+      resource_kind: "Order"
+      default_roles:
+        - Team Manager
+        - Team Admin
+      operations:
+        - read
+        - create
+    invoicing_item_create_access:
+      title: "Who Can Create Items"
+      hint: "Select who can create items/services"
+      resource_type: "Fragment"
+      resource_kind: "Item"
+      default_roles:
+        - Team Manager
+        - Team Admin
+      operations:
+        - create
+    invoicing_item_edit_access:
+      title: "Who Can Edit Items"
+      hint: "Select who can edit items/services"
+      resource_type: "Fragment"
+      resource_kind: "Item"
+      default_roles:
+        - Team Admin
+      operations:
+        - update
+    invoicing_order_list_read_access:
+      title: "Who Can See List"
+      hint: "Select who can view this list"
+      resource_type: "Fragment"
+      resource_kind: "OrderList"
+      default_roles:
+        - Team Manager
+        - Team Admin
+        - Creator
+      operations:
+        - read
+    invoicing_order_list_edit_access:
+      title: "Who Can Edit List"
+      hint: "Select who can edit this list"
+      resource_type: "Fragment"
+      resource_kind: "OrderList"
+      default_roles:
+        - Team Manager
+        - Team Admin
+        - Creator
+      operations:
+        - update
+  assets:
+    -
+      type: "stylesheet"
+      file: "build/addon.css"
+    -
+      type: "javascript"
+      file: "build/addon.js"
+  views:
+    index:
+      title: "Orders"
+      file: ""
+      type: "page"
+      index: true
+      framed: false
+      actor_permission: invoicing_manager_access
+      path: "/invoicing/"
