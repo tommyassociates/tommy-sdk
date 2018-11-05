@@ -5,7 +5,9 @@
   },
   "settings": {
     "title": "Settings",
-    "list_management": "List Management"
+    "list_management": "List Management",
+    "item_service_management": "Item/Service Management",
+    "promotion_management": "Promotion Management"
   },
   "list_management": {
     "title": "List Management",
@@ -14,6 +16,13 @@
   "list_add": {
     "title": "Add List",
     "name_placeholder": "Name"
+  },
+  "item_service_management": {
+    "title": "Items / Services",
+    "items_tab": "Items",
+    "packages_tab": "Packages",
+    "search_items": "Search Items or Services",
+    "search_packages": "Search Packages"
   },
   "views": {
     "index": {

@@ -10,7 +10,6 @@ const API = {
         if (tags.indexOf(list.filters[i].name) < 0) tags.push(list.filters[i].name);
       }
     }
-
     const params = {
       addon: 'tasks',
       kind: 'Task',
@@ -110,6 +109,27 @@ const API = {
       return api.updateFragment(list.id, params);
     }
     return api.createFragment(params);
+  },
+
+  loadItems(params = {}, options = {}) {
+    return api.getFragments(Object.assign({
+      addon: 'invoicing',
+      kind: 'InvoicingItem',
+      with_filters: true,
+      with_permission_to: true,
+      actor_id: API.actorId,
+      user_id: API.actorId,
+    }, params), options);
+  },
+  loadPackages(params = {}, options = {}) {
+    return api.getFragments(Object.assign({
+      addon: 'invoicing',
+      kind: 'InvoicingPackage',
+      with_filters: true,
+      with_permission_to: true,
+      actor_id: API.actorId,
+      user_id: API.actorId,
+    }, params), options);
   },
 };
 
