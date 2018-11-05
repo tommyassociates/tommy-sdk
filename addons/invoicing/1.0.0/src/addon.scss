@@ -1,4 +1,5 @@
 $color_custom: #ff4500;
+$orange: #FF5413;
 $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$color_custom}'><path d='M0,2V0h22v2H0z'/><path d='M0,7V5h22v2H0z'/><path d='M0,12v-2h22v2H0z'/></svg>";
 @function url-friendly-colour($colour) {
   @return '%23'+str-slice('#{$colour}', 2, -1)
@@ -488,6 +489,23 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
   .date-range-select {
     .item-inner {
       padding-right: 15px;
+    }
+  }
+  .item-service-tabs-links {
+    height: 50px;
+    background: #fff;
+    display: flex;
+    a {
+      width: 50%;
+      height: 50px;
+      font-size: 18px;
+      color: #999;
+      border-bottom: 2px solid transparent;
+    }
+    a.active {
+      color: $orange;
+      border-bottom-color: $orange;
+      pointer-events: none;
     }
   }
 }
