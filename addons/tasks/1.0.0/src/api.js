@@ -129,14 +129,6 @@ const API = {
     return api.createFragment(params);
   },
 
-  currentUserTag() {
-    return {
-      context: 'members',
-      name: window.tommy.config.getCurrentUserName(),
-      user_id: window.tommy.config.getCurrentUserId(),
-    };
-  },
-
   createDefaultList(user) {
     const list = {
       name: tommy.i18n.t('tasks.index.default-list-name'),
