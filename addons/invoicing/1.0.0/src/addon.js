@@ -5,9 +5,11 @@ import SettingsPage from './pages/settings.vue';
 import ItemServiceManagementPage from './pages/item-service-management.vue';
 import ListManagementPage from './pages/list-management.vue';
 import ListAddPage from './pages/list-add.vue';
-// import ListEditPage from './pages/list-edit.vue';
-// import DateRangePage from './pages/date-range.vue';
-// import TagSelectPage from './pages/tag-select-page.vue';
+import ListEditPage from './pages/list-edit.vue';
+import DateRangePage from './pages/date-range.vue';
+import TagSelectPage from './pages/tag-select-page.vue';
+import ItemDetailsPage from './pages/item-details.vue';
+import PackageDetailsPage from './pages/package-details.vue';
 
 const routes = [
   {
@@ -20,10 +22,7 @@ const routes = [
   //     component: TaskDetailsPage,
   //   },
   // },
-  // {
-  //   path: '/invoicing/list-edit/:listId/',
-  //   component: ListEditPage,
-  // },
+
   // {
   //   path: '/invoicing/task-add/',
   //   component: TaskAddPage,
@@ -44,14 +43,26 @@ const routes = [
     path: '/invoicing/list-add/',
     component: ListAddPage,
   },
-  // {
-  //   path: '/invoicing/list-edit/:listId/date-range/',
-  //   component: DateRangePage,
-  // },
-  // {
-  //   path: '/invoicing/list-edit/:listId/tag-select/',
-  //   component: TagSelectPage,
-  // },
+  {
+    path: '/invoicing/list-edit/date-range/',
+    component: DateRangePage,
+  },
+  {
+    path: '/invoicing/list-edit/:listId/',
+    component: ListEditPage,
+  },
+  {
+    path: '/invoicing/tag-select/',
+    component: TagSelectPage,
+  },
+  {
+    path: '/invoicing/item-details/:id?/',
+    component: ItemDetailsPage,
+  },
+  {
+    path: '/invoicing/package-details/:id?/',
+    component: PackageDetailsPage,
+  },
 ];
 
 export default routes;

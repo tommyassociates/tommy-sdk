@@ -3,6 +3,13 @@
     "title" : "Orders",
     "title_user": "{{user}}'s Orders"
   },
+  "common": {
+    "search_members_tags": "Search Members, Tags",
+    "date_range": "Date Range",
+    "choose_range": "Choose Range",
+    "start_date": "Start Date",
+    "end_date": "End Date"
+  },
   "settings": {
     "title": "Settings",
     "list_management": "List Management",
@@ -13,6 +20,15 @@
     "title": "List Management",
     "create_list": "Create New List"
   },
+  "list_edit": {
+    "title": "Edit List",
+    "name": "Name",
+    "delete_list": "Delete List",
+    "filter_status": "Status",
+    "activity_from": "Activity From",
+    "customer": "Customer",
+    "bill_to": "Bill To"
+  },
   "list_add": {
     "title": "Add List",
     "name_placeholder": "Name"
@@ -22,7 +38,49 @@
     "items_tab": "Items",
     "packages_tab": "Packages",
     "search_items": "Search Items or Services",
-    "search_packages": "Search Packages"
+    "search_packages": "Search Packages",
+    "new_item": "New Item/Service",
+    "new_package": "New Package"
+  },
+  "item": {
+    "new_title": "New Item/Service",
+    "name_label": "Name",
+    "name_placeholder": "Enter item/service name",
+    "enabled_label": "Enabled",
+    "photos_label": "Photos",
+    "description_label": "Description",
+    "description_placeholder": "Enter item/service description",
+    "packages_label": "Packages",
+    "packages_no_packages": "No associated packages found",
+    "tags_label": "Tags",
+    "price_label": "Price",
+    "price_placeholder": "Enter item/service price",
+    "sku_label": "SKU",
+    "sku_placeholder": "Enter item/service SKU",
+    "barcode_label": "Barcode ID",
+    "barcode_placeholder": "Enter item/service barcode ID"
+  },
+  "package": {
+    "new_title": "New Package",
+    "name_label": "Name",
+    "name_placeholder": "Enter package name",
+    "enabled_label": "Enabled",
+    "photos_label": "Photos",
+    "description_label": "Description",
+    "description_placeholder": "Enter package description",
+    "tags_label": "Tags",
+    "price_label": "Price",
+    "price_placeholder": "Enter package price",
+    "sku_label": "SKU",
+    "sku_placeholder": "Enter package SKU",
+    "barcode_label": "Barcode ID",
+    "barcode_placeholder": "Enter package barcode ID"
+  },
+  "date_range": {
+    "none": "None",
+    "today": "Today",
+    "week": "This Week",
+    "month": "This Month"
   },
   "views": {
     "index": {
