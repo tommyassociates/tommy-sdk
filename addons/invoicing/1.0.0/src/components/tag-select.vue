@@ -1,13 +1,13 @@
 <template>
   <div class="tag-select tasks-tag-select orders-list-tags-select">
     <ul>
-      <li class="item-divider">{{$t(`invoicing.permissions.${data.name}.title`)}}</li>
+      <li class="item-divider">{{data.title}}</li>
       <li>
         <a href="#" class="item-link tag-search" @click="openSelector">
           <div class="item-content">
             <div class="item-media"><i class="material-icons md-36">search</i></div>
             <div class="item-inner">
-              <div class="item-title">{{$t('invoicing.common.search_members_tags', 'Search Members, Tags')}}</div>
+              <div class="item-title">{{data.placeholder}}</div>
             </div>
           </div>
         </a>
@@ -29,7 +29,6 @@
   export default {
     props: {
       data: Object,
-      listId: [String, Number],
     },
     data() {
       return {
@@ -47,10 +46,10 @@
     methods: {
       openSelector() {
         const self = this;
-        self.$f7router.navigate(`/invoicing/list-edit/${self.listId}/tag-select/`, {
+        self.$f7router.navigate('/invoicing/tag-select/', {
           props: {
             filters: self.data.filters,
-            pageTitle: self.$t(`invoicing.permissions.${self.data.name}.title`),
+            pageTitle: self.data.pageTitle,
             teamTags: self.teamTags,
             onChange(tag, selected) {
               if (selected) {

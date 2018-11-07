@@ -110,7 +110,16 @@ const API = {
     }
     return api.createFragment(params);
   },
-
+  loadItem(itemId) {
+    return new Promise((resolve) => {
+      resolve({});
+    });
+  },
+  loadPackage(itemId) {
+    return new Promise((resolve) => {
+      resolve({});
+    });
+  },
   loadItems(params = {}, options = {}) {
     return api.getFragments(Object.assign({
       addon: 'invoicing',

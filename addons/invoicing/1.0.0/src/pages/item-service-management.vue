@@ -4,7 +4,7 @@
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('invoicing.item_service_management.title', 'Items / Service')}}</f7-nav-title>
       <f7-nav-right>
-        <f7-link @click="add" icon-f7="add"></f7-link>
+        <f7-link popover-open=".add-item-service-package-popover" icon-f7="add"></f7-link>
       </f7-nav-right>
     </f7-navbar>
     <div class="item-service-tabs-links">
@@ -18,7 +18,7 @@
           v-for="item in items"
           :key="item.id"
           :title="item.name"
-          :link="`/invoicing/item-details/${item.id}/`"
+          :link="`/invoicing/item-details/${item.id}/?title=${item.name}`"
         ></f7-list-item>
       </f7-list>
     </div>
@@ -29,10 +29,16 @@
           v-for="item in packages"
           :key="item.id"
           :title="item.name"
-          :link="`/invoicing/package-details/${item.id}/`"
+          :link="`/invoicing/package-details/${item.id}/?title=${item.name}`"
         ></f7-list-item>
       </f7-list>
     </div>
+    <f7-popover class="add-item-service-package-popover">
+      <f7-list>
+        <f7-list-button popover-close link="/invoicing/item-details/">{{$t('invoicing.item_service_management.new_item')}}</f7-list-button>
+        <f7-list-button popover-close link="/invoicing/package-details/">{{$t('invoicing.item_service_management.new_package')}}</f7-list-button>
+      </f7-list>
+    </f7-popover>
   </f7-page>
 </template>
 <script>
@@ -50,9 +56,29 @@
       const self = this;
       API.loadItems({}, { cache: false }).then((items) => {
         self.items = items;
+        self.items = [
+          {
+            id: 1,
+            name: 'Item 1',
+          },
+          {
+            id: 2,
+            name: 'Item 2',
+          },
+        ]
       });
       API.loadPackages({}, { cache: false }).then((packages) => {
         self.packages = packages;
+        self.packages = [
+          {
+            id: 1,
+            name: 'Package 1',
+          },
+          {
+            id: 2,
+            name: 'Package 2',
+          },
+        ]
       });
     },
     computed: {
