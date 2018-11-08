@@ -8,7 +8,9 @@
     "date_range": "Date Range",
     "choose_range": "Choose Range",
     "start_date": "Start Date",
-    "end_date": "End Date"
+    "end_date": "End Date",
+    "amount_min": "From",
+    "amount_max": "To"
   },
   "settings": {
     "title": "Settings",
@@ -20,6 +22,12 @@
     "title": "List Management",
     "create_list": "Create New List"
   },
+  "order_status": {
+    "quote": "Quote",
+    "paid": "Paid",
+    "processing": "Processing",
+    "complete": "Complete"
+  },
   "list_edit": {
     "title": "Edit List",
     "name": "Name",
@@ -27,7 +35,17 @@
     "filter_status": "Status",
     "activity_from": "Activity From",
     "customer": "Customer",
-    "bill_to": "Bill To"
+    "bill_to": "Bill To",
+    "type": "Type",
+    "type_all": "All",
+    "type_invoice": "Invoice",
+    "type_quote": "Quote",
+    "sort": "Sort",
+    "sort_default": "Default",
+    "sort_price_high": "Price high",
+    "sort_price_low": "Price low",
+    "sort_newest": "Newest",
+    "payment_range": "Payment Range"
   },
   "list_add": {
     "title": "Add List",

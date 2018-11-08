@@ -15,7 +15,20 @@
       </f7-list-item>
 
       <!-- Sort -->
-      <!-- ... -->
+      <f7-list-item
+        smart-select
+        :smart-select-params="{closeOnSelect: true}"
+        :title="$t('invoicing.list_edit.sort', 'Sort')"
+      >
+        <select name="sort" class="toggle-save" @change="onSortChange">
+          <option
+            v-for="(sorting, index) in ['default', 'price_high', 'price_low', 'newest']"
+            :key="index"
+            :value="sorting"
+            :selected="list.data.sort === sorting || (sorting === 'default' && !list.data.sort)"
+          >{{$t(`invoicing.list_edit.sort_${sorting}`)}}</option>
+        </select>
+      </f7-list-item>
 
       <f7-list-item
         link="#"
@@ -26,6 +39,7 @@
 
       <f7-list-item
         smart-select
+        :smart-select-params="{openIn: 'popover', closeOnSelect: true}"
         :title="$t('invoicing.list_edit.filter_status', 'Status')"
       >
         <select name="statuses" class="toggle-save" multiple @change="onStatusChange">
@@ -33,30 +47,32 @@
             v-for="(status, index) in orderStatuses"
             :key="index"
             :value="status"
-            :selected="list.data.statuses.indexOf(status) >= 0"
-          >{{$t(`invoicing.status.${status.toLowerCase().replace(/ /g, '_')}`)}}</option>
+            :selected="list.data.status.indexOf(status) >= 0 || !list.data.status"
+          >{{$t(`invoicing.order_status.${status}`)}}</option>
         </select>
       </f7-list-item>
 
       <!-- Type -->
-      <!-- Balance Range -->
-      <!-- Payment Range -->
-      <!-- Specific Items -->
-      <!-- Auto Renew -->
-
-      <!-- Activity From -->
-      <f7-list-item smart-select :smart-select-params="{searchbar: true}" v-if="$root.team && $root.teamMembers" :title="$t('invoicing.list_edit.activity_from', 'Activity From')">
-        <select name="activity_from" multiple @change="onActivityFromChange">
-          <option
-            v-for="(teamMember) in $root.teamMembers"
-            :key="teamMember.id"
-            :value="teamMember.user_id"
-            data-option-class="invoicing-smart-select-option"
-            :data-option-image="teamMember.icon_url"
-            :selected="list.data.activity_from.indexOf(teamMember.user_id) >= 0"
-          >{{teamMember.first_name || ''}} {{teamMember.last_name || ''}}</option>
+      <f7-list-item smart-select :smart-select-params="{openIn: 'popover', closeOnSelect: true}" :title="$t('invoicing.list_edit.type')">
+        <select name="type" @change="onTypeChange">
+          <option :selected="list.data.type === 'all' || !list.data.type" value="all">{{$t('invoicing.list_edit.type_all')}}</option>
+          <option :selected="list.data.type === 'invoice'" value="invoice">{{$t('invoicing.list_edit.type_invoice')}}</option>
+          <option :selected="list.data.type === 'quote'" value="quote">{{$t('invoicing.list_edit.type_quote')}}</option>
         </select>
       </f7-list-item>
+
+      <!-- Balance Range -->
+
+      <!-- Payment Range -->
+      <f7-list-item
+        link
+        :title="$t('invoicing.list_edit.payment_range')"
+        @click="showPaymentRange"
+        :after="typeof list.data.price_min !== 'undefined' && typeof list.data.price_max !== 'undefined' ? `${list.data.price_min} - ${list.data.price_max}` : ''"
+      ></f7-list-item>
+
+      <!-- Specific Items -->
+      <!-- Auto Renew -->
 
       <!-- Customer -->
       <f7-list-item smart-select :smart-select-params="{searchbar: true}" v-if="$root.team && $root.teamMembers" :title="$t('invoicing.list_edit.customer', 'Customer')">
@@ -68,20 +84,6 @@
             data-option-class="invoicing-smart-select-option"
             :data-option-image="teamMember.icon_url"
             :selected="list.data.customer.indexOf(teamMember.user_id) >= 0"
-          >{{teamMember.first_name || ''}} {{teamMember.last_name || ''}}</option>
-        </select>
-      </f7-list-item>
-
-      <!-- Bill To -->
-      <f7-list-item smart-select :smart-select-params="{searchbar: true}" v-if="$root.team && $root.teamMembers" :title="$t('invoicing.list_edit.bill_to', 'Bill To')">
-        <select name="bill_to" multiple @change="onBillToChange">
-          <option
-            v-for="(teamMember) in $root.teamMembers"
-            :key="teamMember.id"
-            :value="teamMember.user_id"
-            data-option-class="invoicing-smart-select-option"
-            :data-option-image="teamMember.icon_url"
-            :selected="list.data.bill_to.indexOf(teamMember.user_id) >= 0"
           >{{teamMember.first_name || ''}} {{teamMember.last_name || ''}}</option>
         </select>
       </f7-list-item>
@@ -137,10 +139,8 @@
       const self = this;
       API.loadList(self.id).then((list) => {
         if (!list.data) list.data = {};
-        if (!list.data.statuses) list.data.statuses = [];
-        if (!list.data.activity_from) list.data.activity_from = [];
+        if (!list.data.status) list.data.status = [];
         if (!list.data.customer) list.data.customer = [];
-        if (!list.data.bill_to) list.data.bill_to = [];
         self.list = list;
         self.$api.getInstalledAddonPermission('invoicing', 'invoicing_order_list_read_access', {
           resource_id: list.id,
@@ -172,16 +172,22 @@
         self.list.name = name;
         self.showSave = true;
       },
+      onSortChange(e) {
+        const self = this;
+        if (self.saving) return;
+        self.list.data.sort = self.$$(e.target).val();
+        self.showSave = true;
+      },
       onStatusChange(e) {
         const self = this;
         if (self.saving) return;
-        self.list.data.statuses = self.$$(e.target).val();
+        self.list.data.status = self.$$(e.target).val();
         self.showSave = true;
       },
-      onActivityFromChange(e) {
+      onTypeChange(e) {
         const self = this;
         if (self.saving) return;
-        self.list.data.activity_from = self.$$(e.target).val().map(el => parseInt(el, 10));
+        self.list.data.type = e.target.value;
         self.showSave = true;
       },
       onCustomerChange(e) {
@@ -190,17 +196,30 @@
         self.list.data.customer = self.$$(e.target).val().map(el => parseInt(el, 10));
         self.showSave = true;
       },
-      onBillToChange(e) {
-        const self = this;
-        if (self.saving) return;
-        self.list.data.bill_to = self.$$(e.target).val().map(el => parseInt(el, 10));
-        self.showSave = true;
-      },
       showDateRange() {
         const self = this;
         self.$f7router.navigate('/invoicing/list-edit/date-range/', {
           props: {
             list: self.list,
+          },
+        });
+      },
+      showPaymentRange() {
+        const self = this;
+        const { price_min, price_max } = self.list.data;
+        self.$f7router.navigate('/invoicing/range-select/', {
+          props: {
+            pageTitle: self.$t('invoicing.list_edit.payment_range'),
+            from: price_min ? parseFloat(price_min) : price_min,
+            to: price_max ? parseFloat(price_max) : price_max,
+            onSave({ from, to }) {
+              self.list.data.price_min = from;
+              self.list.data.price_max = to;
+              self.list = self.list;
+              API.saveList(self.list).then(() => {
+                self.$f7router.back();
+              });
+            },
           },
         });
       },

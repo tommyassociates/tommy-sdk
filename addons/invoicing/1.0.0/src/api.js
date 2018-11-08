@@ -4,15 +4,14 @@ const api = tommy.api;
 const API = {
   actor: undefined,
   actorId: undefined,
-  loadListOrders(list, tags) {
+  loadListOrders(list, teamId) {
+    const tags = [];
     if (list.data && list.filters) {
       for (let i = 0; i < list.filters.length; i += 1) {
         if (tags.indexOf(list.filters[i].name) < 0) tags.push(list.filters[i].name);
       }
     }
     const params = {
-      addon: 'tasks',
-      kind: 'Task',
       tags,
       with_filters: true,
       with_permission_to: true,
@@ -21,12 +20,46 @@ const API = {
     if (list.data.date_range) {
       params.date_range = list.data.date_range;
     }
-    if (list.data.statuses) {
-      params.status = list.data.statuses;
+    if (list.data.status) {
+      params.status = list.data.status;
     }
+    if (list.data.sort) {
+      params.sort = list.data.sort;
+    }
+    if (list.data.price_min) {
+      params.price_min = list.data.price_min;
+    }
+    if (list.data.price_max) {
+      params.price_max = list.data.price_max;
+    }
+    if (list.data.type === 'invoice') {
+      params.invoices = true;
+    }
+    if (list.data.type === 'quote') {
+      params.quotes = true;
+    }
+    if (list.data.customer) {
+      params.user_id = list.data.customer;
+    }
+    /*
+    sort: [price_high, price_low, newest]
+    # status: [quote, paid, processing, complete]
+    # price_min: integer
+    # price_max: integer
+    # quotes: boolean
+    # invoices: boolean
+    # user_id: integer (customer)
+    # kind: string
+    # tags:object
+    # resource_id:integer
+    # resource_type:string
+    */
     params.data = JSON.stringify(params.data);
 
-    return api.getFragments(params);
+    return api.call({
+      endpoint: `/vendors/${teamId}/orders`,
+      data: params,
+    });
   },
 
   getTask(taskId) {

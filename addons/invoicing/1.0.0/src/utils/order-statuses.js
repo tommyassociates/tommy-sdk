@@ -1,1 +1,1 @@
-export default ['Unassigned', 'Assigned', 'Processing', 'Completed', 'Closed', 'Archive Task', 'Cancel'];
+export default ['quote', 'paid', 'processing', 'complete'];
