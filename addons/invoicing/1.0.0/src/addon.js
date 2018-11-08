@@ -10,6 +10,7 @@ import DateRangePage from './pages/date-range.vue';
 import TagSelectPage from './pages/tag-select-page.vue';
 import ItemDetailsPage from './pages/item-details.vue';
 import PackageDetailsPage from './pages/package-details.vue';
+import RangeSelectPage from './pages/range-select.vue';
 
 const routes = [
   {
@@ -62,6 +63,10 @@ const routes = [
   {
     path: '/invoicing/package-details/:id?/',
     component: PackageDetailsPage,
+  },
+  {
+    path: '/invoicing/range-select/',
+    component: RangeSelectPage,
   },
 ];
 

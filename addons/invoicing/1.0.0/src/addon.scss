@@ -87,7 +87,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
         >.card-footer,
         >.card-header {
           min-height: 0;
-          padding: 2px 8px 8px;
+          padding: 8px 15px;
         }
       }
       .card-content-padding {
@@ -127,67 +127,6 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
       font-size: 16px;
       img {
         display: block
-      }
-    }
-    >.orders-list-footer {
-      .card-add {
-        display: flex;
-        padding: 0 8px;
-        height: 44px;
-        align-items: center;
-        justify-content: center;
-        color: #9B9B9B;
-        font-size: 16px;
-      }
-      .card-form {
-        padding: 10px 5px;
-        input {
-          -webkit-appearance: none;
-          display: block;
-          box-sizing: border-box;
-          width: 100%;
-          padding: 8px;
-          font-size: 16px;
-          line-height: 18px;
-          color: #3D4647;
-          background: #FFFFFF;
-          box-shadow: 0 0 1px 0 rgba(0, 0, 0, 0.10);
-          border: none;
-          border-radius: 3px;
-        }
-        .buttons {
-          display: flex;
-          flex-direction: row;
-          justify-content: flex-end;
-          padding: 0 15px;
-          margin-top: 10px;
-          >.button {
-            padding: 0 15px;
-            flex-shrink: 10;
-            border-radius: 2px;
-            width: 100%;
-            &:first-child {
-              margin-right: 8px;
-            }
-            &:last-child {
-              margin-left: 8px;
-            }
-          }
-          >.cancel {
-            color: #9B9B9B;
-            border-color: transparent;
-            background: transparent
-          }
-          >.save {
-            background-color: #FF4500;
-          }
-        }
-      }
-      >div {
-        display: none;
-      }
-      >.in {
-        display: block;
       }
     }
     >div {
@@ -787,5 +726,29 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
   .item-media img {
     max-width: 28px;
     max-height: 28px;
+  }
+}
+.invoicing-page .invoicing-order-card {
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    .order-status {
+      font-weight: bold;
+      color: #999;
+    }
+  }
+  .card-content .list {
+    .item-media {
+      width: 25px;
+      justify-content: center;
+      padding-top: 4px;
+    }
+    .item-content, .item-inner {
+      min-height: 0;
+    }
+    .item-inner {
+      padding-top: 4px;
+      padding-bottom: 4px;
+    }
   }
 }

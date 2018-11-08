@@ -37,28 +37,36 @@
           </div>
           <div class="orders-list-content">
             <template v-if="list.orders && list.orders.length">
-              <a v-for="(order, index) in list.orders" :key="index" :href="`/invoicing/order-details/${order.id}/`" class="card order-card">
-                <div class="card-content card-content-padding">
-                  <!-- <p>{{order.name}}</p> -->
+              <a v-for="(order, index) in list.orders" :key="index" :href="`/invoicing/order-details/${order.id}/`" class="card invoicing-order-card">
+                <div class="card-header">
+                  <span class="order-date">{{orderDate(order.data.date)}}</span>
+                  <span class="order-status">{{$t(`invoicing.order_status.${order.status}`)}}</span>
                 </div>
-                <div class="card-footer no-border color-gray">
-                  <!-- <span v-if="order.end_at" class="badge" :class="isPastDate(order.end_at) ? 'bg-red' : 'bg-blue'">{{humanTime(task.end_at)}}</span>
-                  <span v-else-if="order.data.checklist" class="icon">
-                    <img
-                      :src="`${$addonAssetsUrl}slice1.png`"
-                      :srcset="`${$addonAssetsUrl}slice1@2x.png 2x,${$addonAssetsUrl}slice1@3x.png 3x`"
+                <div class="card-content">
+                  <f7-list class="no-hairlines no-hairlines-between">
+                    <f7-list-item
+                      :title="orderUserName(order.user_id)"
                     >
-                    {{checklistNumCompleted(order.data.checklist)}}
-                  </span>
-                  <span v-else class="icon">
-                    <img
-                      :src="`${$addonAssetsUrl}slice2.png`"
-                      :srcset="`${$addonAssetsUrl}slice2@2x.png 2x,${$addonAssetsUrl}slice2@3x.png 3x`"
+                      <img :src="`${$addonAssetsUrl}icon-user.svg`" slot="media">
+                    </f7-list-item>
+                    <f7-list-item
+                      :title="order.name"
                     >
-                  </span>
-                  <span>
-                    {{task.status ? taskStatus(task.status) : $t('invoicing.index.unassigned', 'Unassigned')}}
-                  </span> -->
+                      <img :src="`${$addonAssetsUrl}icon-product.svg`" slot="media">
+                    </f7-list-item>
+                    <f7-list-item
+                      v-if="order.total"
+                      :title="order.total"
+                    >
+                      <img :src="`${$addonAssetsUrl}icon-money.svg`" slot="media">
+                    </f7-list-item>
+                    <f7-list-item
+                      v-if="order.data && order.data.location"
+                      :title="`${order.data.location.address} ${order.data.location.city}`"
+                    >
+                      <img :src="`${$addonAssetsUrl}icon-location.svg`" slot="media">
+                    </f7-list-item>
+                  </f7-list>
                 </div>
               </a>
             </template>
@@ -113,6 +121,15 @@
     },
     methods: {
       humanTime,
+      orderDate(date) {
+        const self = this;
+        return self.$moment(parseInt(date, 10)).format('D MMM YYYY');
+      },
+      orderUserName(user_id) {
+        const self = this;
+        const user = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
+        return `${user.first_name} ${user.last_name}`;
+      },
       listHasScroll(list) {
         const self = this;
         if (!list.orders || list.orders.length === 0) return false;
@@ -122,8 +139,7 @@
       },
       loadListOrders(list) {
         const self = this;
-        const user = self.actor || self.$root.user;
-        API.loadListOrders(list, [`${user.first_name} ${user.last_name}`]).then((orders) => {
+        API.loadListOrders(list, self.$root.team.id).then((orders) => {
           list.orders = orders;
           self.$nextTick(() => {
             if (self.listHasScroll(list)) {
