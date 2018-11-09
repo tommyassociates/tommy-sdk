@@ -24,6 +24,7 @@
   },
   "order_status": {
     "quote": "Quote",
+    "pending": "Pending",
     "paid": "Paid",
     "processing": "Processing",
     "complete": "Complete"
@@ -93,6 +94,16 @@
     "sku_placeholder": "Enter package SKU",
     "barcode_label": "Barcode ID",
     "barcode_placeholder": "Enter package barcode ID"
+  },
+  "order_details": {
+    "title": "Order",
+    "created": "Created",
+    "due": "Due",
+    "status": "Status",
+    "type": "Type",
+    "discount": "Discount",
+    "total": "Total",
+    "customer": "Customer"
   },
   "date_range": {
     "none": "None",

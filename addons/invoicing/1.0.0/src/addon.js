@@ -1,6 +1,4 @@
 import IndexPage from './pages/index.vue';
-// import TaskAddPage from './pages/task-add.vue';
-// import TaskDetailsPage from './pages/task-details.vue';
 import SettingsPage from './pages/settings.vue';
 import ItemServiceManagementPage from './pages/item-service-management.vue';
 import ListManagementPage from './pages/list-management.vue';
@@ -11,23 +9,13 @@ import TagSelectPage from './pages/tag-select-page.vue';
 import ItemDetailsPage from './pages/item-details.vue';
 import PackageDetailsPage from './pages/package-details.vue';
 import RangeSelectPage from './pages/range-select.vue';
+import OrderDetailsPage from './pages/order-details.vue';
 
 const routes = [
   {
     path: '/invoicing/',
     component: IndexPage,
   },
-  // {
-  //   path: '/invoicing/task/:taskId/',
-  //   popup: {
-  //     component: TaskDetailsPage,
-  //   },
-  // },
-
-  // {
-  //   path: '/invoicing/task-add/',
-  //   component: TaskAddPage,
-  // },
   {
     path: '/invoicing/settings/',
     component: SettingsPage,
@@ -67,6 +55,10 @@ const routes = [
   {
     path: '/invoicing/range-select/',
     component: RangeSelectPage,
+  },
+  {
+    path: '/invoicing/order-details/:id/',
+    component: OrderDetailsPage,
   },
 ];
 

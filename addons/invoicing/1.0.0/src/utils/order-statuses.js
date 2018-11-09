@@ -1,1 +1,1 @@
-export default ['quote', 'paid', 'processing', 'complete'];
+export default ['pending', 'paid', 'processing', 'complete'];

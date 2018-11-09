@@ -4,6 +4,24 @@ const api = tommy.api;
 const API = {
   actor: undefined,
   actorId: undefined,
+  loadOrder(orderId, teamId) {
+    const params = {
+      with_filters: true,
+      with_permission_to: true,
+      actor_id: API.actorId,
+    };
+    return api.call({
+      endpoint: `/vendors/${teamId}/orders/${orderId}`,
+      data: params,
+    });
+  },
+  saveOrder(order, teamId) {
+    return api.call({
+      method: 'PUT',
+      endpoint: `/vendors/${teamId}/orders/${order.id}`,
+      data: order,
+    });
+  },
   loadListOrders(list, teamId) {
     const tags = [];
     if (list.data && list.filters) {
