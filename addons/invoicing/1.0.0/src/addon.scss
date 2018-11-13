@@ -1,6 +1,6 @@
-$color_custom: #ff4500;
+$red: #ff4500;
 $orange: #FF5413;
-$svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$color_custom}'><path d='M0,2V0h22v2H0z'/><path d='M0,7V5h22v2H0z'/><path d='M0,12v-2h22v2H0z'/></svg>";
+$svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$red}'><path d='M0,2V0h22v2H0z'/><path d='M0,7V5h22v2H0z'/><path d='M0,12v-2h22v2H0z'/></svg>";
 @function url-friendly-colour($colour) {
   @return '%23'+str-slice('#{$colour}', 2, -1)
 }
@@ -22,7 +22,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
       padding: 0 12px 0 0;
       overflow: hidden;
       background: #FFF7F4;
-      border: solid 1px $color_custom;
+      border: solid 1px $red;
       border-radius: 8px;
       font-size: inherit;
       &:first-child {
@@ -35,7 +35,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
         font-weight: 300;
         line-height: normal;
         border-radius: 0;
-        background: $color_custom;
+        background: $red;
         i.icon {
           font-size: 23px;
           height: 23px;
@@ -190,7 +190,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
           &[type=checkbox]:checked {
             &+.item-media i.icon-form-checkbox,
             &+.checkbox {
-              background: $color_custom#{"!important"}
+              background: $red#{"!important"}
             }
           }
         }
@@ -231,7 +231,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
             font-size: inherit
           }
           input:checked + .icon-checkbox {
-            background-color: $color_custom
+            background-color: $red
           }
           input:checked:disabled + .icon-checkbox {
             background-color: #ccc
@@ -315,7 +315,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
         }
         .close {
           margin: 0 16px;
-          color: $color_custom
+          color: $red
         }
       }
     }
@@ -358,7 +358,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
       }
       i {
         font-size: 25px;
-        color: $color_custom
+        color: $red
       }
     }
   }
@@ -414,10 +414,10 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
   }
   .color-custom,
   .list .list-button.color-custom {
-    color: $color_custom
+    color: $red
   }
   .bg-custom {
-    background-color: $color_custom
+    background-color: $red
   }
   .label-switch .checkbox:before {
     background-color: #fff#{"!important"}
@@ -445,6 +445,13 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
       color: $orange;
       border-bottom-color: $orange;
       pointer-events: none;
+    }
+  }
+  .invoicing-money-amount-item {
+    .item-after {
+      font-size: 24px;
+      font-weight: 500;
+      color: $red
     }
   }
 }
