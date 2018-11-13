@@ -11,14 +11,14 @@ const API = {
       actor_id: API.actorId,
     };
     return api.call({
-      endpoint: `/vendors/${teamId}/orders/${orderId}`,
+      endpoint: `vendors/${teamId}/orders/${orderId}`,
       data: params,
     });
   },
   saveOrder(order, teamId) {
     return api.call({
       method: 'PUT',
-      endpoint: `/vendors/${teamId}/orders/${order.id}`,
+      endpoint: `vendors/${teamId}/orders/${order.id}`,
       data: order,
     });
   },

@@ -45,6 +45,7 @@
       initials() {
         const self = this;
         const { data } = self;
+        if (!data) return 'TO';
         if (data.first_name) {
           return data.first_name[0] + data.last_name[0];
         }
@@ -62,17 +63,19 @@
       user_id() {
         const self = this;
         const { data } = self;
+        if (!data) return null;
         if (data.first_name || data.name) return data.user_id;
         return null;
       },
       online() {
         const self = this;
         const { data } = self;
-        return self.isOnline || data.online;
+        return self.isOnline || (data && data.online);
       },
       notification_count() {
         const self = this;
         const { data } = self;
+        if (!data) return null;
         if (data.first_name || data.name) return data.notification_count;
         return null;
       },
@@ -80,6 +83,7 @@
         const self = this;
         const { data, url } = self;
         if (url) return url;
+        if (!data) return '';
         if (data.icon_url) return data.icon_url;
         if (data.first_name || data.name) return data.icon_url;
         if (data.sender) return data.chat.icon_url;

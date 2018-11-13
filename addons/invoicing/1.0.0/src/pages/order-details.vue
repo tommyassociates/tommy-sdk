@@ -15,11 +15,19 @@
           :title="$t('invoicing.order_details.created')"
           :after="formatDate(order.created_at)"
         ></f7-list-item>
+
         <f7-list-item
-          v-if="order.data && order.data.date"
           :title="$t('invoicing.order_details.due')"
-          :after="formatDate(parseInt(order.data.date, 10))"
+        >
+          <input style="text-align: right; height: auto; line-height: 1" slot="after" type="datetime-local" :value="formatValueDate(order.data ? order.data.date : null)" @change="onDateChange">
+        </f7-list-item>
+
+        <f7-list-item
+          v-if="order.data && order.data.location"
+          :title="$t('invoicing.order_details.location')"
+          :after="`${order.data.location.address} ${order.data.location.city}`"
         ></f7-list-item>
+
         <f7-list-item
           :title="$t('invoicing.order_details.status')"
           smart-select
@@ -61,7 +69,7 @@
         <f7-list-item
           :title="orderUserName(order.user_id)"
         >
-          <tommy-circle-avatar :url="orderUserAvatarUrl(order.user_id)" slot="media"></tommy-circle-avatar>
+          <tommy-circle-avatar :url="orderUserAvatar(order.user_id)" slot="media"></tommy-circle-avatar>
         </f7-list-item>
       </f7-list>
     </template>
@@ -99,25 +107,38 @@
         const user = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
         return user.icon_url;
       },
-
-      formatCreatedDate(date) {
+      formatValueDate(date) {
+        const self = this;
+        if (!date) return '';
+        return self.$moment(new Date(parseInt(date, 10))).format('YYYY-MM-DDTHH:mm');
+      },
+      formatDate(date) {
         const self = this;
         return self.$moment(new Date(date)).format('HH:mm D MMM YYYY');
+      },
+      onDateChange(e) {
+        const self = this;
+        const value = e.target.value;
+        clearTimeout(self.dateChangeTimeout);
+        self.order.data.date = new Date(value).getTime();
+        self.dateChangeTimeout = setTimeout(() => {
+          self.saveOrder({ data: self.order.data });
+        }, 600);
       },
       onStatusChange(e) {
         const self = this;
         self.order.status = e.target.value;
-        self.saveOrder();
+        self.saveOrder({ status: self.order.status });
       },
       onTypeChange(e) {
         const self = this;
         if (e.target.value === 'quote') self.order.quote = true;
         else self.order.quote = false;
-        self.saveOrder();
+        self.saveOrder({ quote: self.order.quote });
       },
-      saveOrder() {
+      saveOrder(data) {
         const self = this;
-        return API.saveOrder(self.order, self.$root.teamId);
+        return API.saveOrder({ ...data, id: self.order.id }, self.$root.team.id);
       },
       save() {},
     },

@@ -99,6 +99,7 @@
     "title": "Order",
     "created": "Created",
     "due": "Due",
+    "location": "Location",
     "status": "Status",
     "type": "Type",
     "discount": "Discount",
