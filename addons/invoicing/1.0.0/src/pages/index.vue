@@ -1,5 +1,5 @@
 <template>
-  <f7-page id="invoicing__index" name="invoicing__index" class="invoicing-page">
+  <f7-page id="invoicing__index" name="invoicing__index" class="invoicing-page" @page:afterin="onPageAfterIn">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{pageTitle}}</f7-nav-title>
@@ -39,12 +39,13 @@
             <template v-if="list.orders && list.orders.length">
               <a v-for="(order, index) in list.orders" :key="index" :href="`/invoicing/order-details/${order.id}/`" class="card invoicing-order-card">
                 <div class="card-header">
-                  <span class="order-date">{{orderDate(order.data.date)}}</span>
+                  <span class="order-date" v-if="order.data && order.data.date">{{orderDate(order.data ? order.data.date : null)}}</span>
                   <span class="order-status">{{$t(`invoicing.order_status.${order.status}`)}}</span>
                 </div>
                 <div class="card-content">
                   <f7-list class="no-hairlines no-hairlines-between">
                     <f7-list-item
+                      v-if="order.user_id"
                       :title="orderUserName(order.user_id)"
                     >
                       <img :src="`${$addonAssetsUrl}icon-user.svg`" slot="media">
@@ -123,11 +124,13 @@
       humanTime,
       orderDate(date) {
         const self = this;
+        if (!date) return '';
         return self.$moment(parseInt(date, 10)).format('D MMM YYYY');
       },
       orderUserName(user_id) {
         const self = this;
         const user = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
+        if (!user) return '';
         return `${user.first_name} ${user.last_name}`;
       },
       listHasScroll(list) {
@@ -139,7 +142,7 @@
       },
       loadListOrders(list) {
         const self = this;
-        API.loadListOrders(list, self.$root.team.id).then((orders) => {
+        API.loadListOrders(list).then((orders) => {
           list.orders = orders;
           self.$nextTick(() => {
             if (self.listHasScroll(list)) {
@@ -184,7 +187,6 @@
         if (list.permission_to.indexOf('update') !== -1) return true;
         return false;
       },
-
     },
     beforeDestroy() {
       const self = this;
