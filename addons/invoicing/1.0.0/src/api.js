@@ -4,25 +4,25 @@ const api = tommy.api;
 const API = {
   actor: undefined,
   actorId: undefined,
-  loadOrder(orderId, teamId) {
+  loadOrder(orderId) {
     const params = {
       with_filters: true,
       with_permission_to: true,
       actor_id: API.actorId,
     };
     return api.call({
-      endpoint: `vendors/${teamId}/orders/${orderId}`,
+      endpoint: `vendor/manager/orders/${orderId}`,
       data: params,
     });
   },
-  saveOrder(order, teamId) {
+  saveOrder(order) {
     return api.call({
       method: 'PUT',
-      endpoint: `vendors/${teamId}/orders/${order.id}`,
+      endpoint: `vendor/manager/orders/${order.id}`,
       data: order,
     });
   },
-  loadListOrders(list, teamId) {
+  loadListOrders(list) {
     const tags = [];
     if (list.data && list.filters) {
       for (let i = 0; i < list.filters.length; i += 1) {
@@ -75,7 +75,7 @@ const API = {
     params.data = JSON.stringify(params.data);
 
     return api.call({
-      endpoint: `/vendors/${teamId}/orders`,
+      endpoint: '/vendor/manager/orders',
       data: params,
     });
   },

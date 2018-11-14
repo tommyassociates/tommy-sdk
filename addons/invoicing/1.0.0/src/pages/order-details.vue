@@ -92,7 +92,7 @@
     },
     mounted() {
       const self = this;
-      API.loadOrder(self.id, self.$root.team.id).then((order) => {
+      API.loadOrder(self.id).then((order) => {
         self.order = order;
       });
     },
@@ -138,7 +138,8 @@
       },
       saveOrder(data) {
         const self = this;
-        return API.saveOrder({ ...data, id: self.order.id }, self.$root.team.id);
+        self.$events.$emit('invoicing:reloadListsOrders');
+        return API.saveOrder({ ...data, id: self.order.id });
       },
       save() {},
     },
