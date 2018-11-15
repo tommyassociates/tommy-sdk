@@ -21,11 +21,11 @@
       >
         <f7-toggle :checked="item.active" @change="($event) => {item.active = $event.target.checked; enableSave();}"></f7-toggle>
       </f7-list-item>
-      <f7-list-item
+      <!-- <f7-list-item
         :title="$t('invoicing.item.photos_label', 'Photos')"
         :after="(item.photos && item.photos.length) || 'Not set'"
         link="#"
-      ></f7-list-item>
+      ></f7-list-item> -->
       <!-- Description -->
       <f7-list-item divider :title="$t('invoicing.item.description_label', 'Description')"></f7-list-item>
       <f7-list-input
@@ -35,8 +35,44 @@
         :value="item.description"
         @input="($event) => {item.description = $event.target.value; enableSave()}"
       ></f7-list-input>
+      <!-- Duration -->
+      <f7-list-item divider :title="$t('invoicing.item.duration_label', 'Duration')"></f7-list-item>
+      <f7-list-input
+        :placeholder="$t('invoicing.item.duration_placeholder', 'Item duration in minutes')"
+        type="text"
+        :value="item.data.duration"
+        @input="onDurationChange"
+      ></f7-list-input>
+      <!-- Category -->
+      <f7-list-item divider :title="$t('invoicing.item.category_label', 'Cagegory')"></f7-list-item>
+      <f7-list-input
+        :placeholder="$t('invoicing.item.category_placeholder', 'Enter item/service category')"
+        type="text"
+        :value="item.category"
+        @input="($event) => {item.category = $event.target.value; enableSave()}"
+      ></f7-list-input>
+      <!-- Photo -->
+      <f7-list-item divider :title="$t('invoicing.item.photo_label', 'Photo')"></f7-list-item>
+      <li>
+        <div class="invoicing-product-photo-container">
+          <div
+            v-if="item.image_url || imagePreview"
+            class="invoicing-product-photo"
+          >
+            <img :src="item.image_url || imagePreview">
+            <f7-link icon-f7="close_round_fill" @click="deleteImage"></f7-link>
+          </div>
+          <label
+            v-else
+            class="invoicing-product-photo-add"
+          >
+            <input type="file" @change="onFileChange">
+            <f7-icon f7="add"></f7-icon>
+          </label>
+        </div>
+      </li>
       <!-- Packages -->
-      <f7-list-item divider :title="$t('invoicing.item.packages_label', 'Packages')"></f7-list-item>
+      <!-- <f7-list-item divider :title="$t('invoicing.item.packages_label', 'Packages')"></f7-list-item>
       <f7-list-item
         v-if="!item.packages || !item.packages.length"
         :title="$t('invoicing.item.packages_no_packages', 'No associated packages found')"
@@ -47,7 +83,7 @@
         :key="pkg.id"
         :title="pkg.name"
         :link="`/invoicing/package-details/${pkg.id}/?title=${pkg.name}`"
-      ></f7-list-item>
+      ></f7-list-item> -->
       <!-- Tags -->
       <tag-select
         slot="after-list"
@@ -55,7 +91,7 @@
           title: $t('invoicing.item.tags_label'),
           placeholder: $t('invoicing.common.search_members_tags', 'Search Members, Tags'),
           pageTitle: $t('invoicing.common.search_members_tags', 'Search Members, Tags'),
-          filters: item.tags,
+          filters: item.data.tags,
         }"
         @tagAdd="addItemTag"
         @tagRemove="removeItemTag"
@@ -68,26 +104,24 @@
         :label="$t('invoicing.item.price_label', 'Price')"
         :placeholder="$t('invoicing.item.price_placeholder', 'Enter item/service price')"
         type="text"
-        :value="`¥${item.price}`"
+        :value="item.price ? `¥${item.price}` : ''"
         @input="setPrice($event.target.value)"
       ></f7-list-input>
-      <f7-list-input
+      <!-- <f7-list-input
         :label="$t('invoicing.item.sku_label', 'SKU')"
         :placeholder="$t('invoicing.item.sku_placeholder', 'Enter item/service SKU')"
         type="text"
         :value="`${item.sku}`"
         @input="($event) => {item.sku = $event.target.value; enableSave()}"
-      ></f7-list-input>
+      ></f7-list-input> -->
       <f7-list-input
         :label="$t('invoicing.item.barcode_label', 'Barcode ID')"
         :placeholder="$t('invoicing.item.barcode_placeholder', 'Enter item/service barcode ID')"
         type="text"
-        :value="`${item.barcode}`"
-        @input="($event) => {item.barcode = $event.target.value; enableSave()}"
+        :value="item.code"
+        @input="($event) => {item.code = $event.target.value; enableSave()}"
       ></f7-list-input>
     </f7-list>
-
-
   </f7-page>
 </template>
 <script>
@@ -107,41 +141,44 @@
         pageTitle: self.$f7route.query.title || self.$t('invoicing.item.new_title'),
         item: null,
         showSave: false,
+        imagePreview: null,
       };
     },
     mounted() {
       const self = this;
       if (!self.id) {
         self.item = {
-          name: '',
-          description: '',
           active: false,
-          photos: [],
+          category: '',
+          code: '',
+          data: {
+            duration: null,
+            availabile_in: [],
+            tags: [],
+          },
+          description: '',
+          name: '',
           price: 0,
-          sku: '',
-          barcode: '',
-          tags: [],
         };
         return;
       }
-      API.loadItem(self.id).then((item) => {
+      API.loadProduct(self.id).then((item) => {
+        if (!item.data || typeof item.data === 'string') {
+          item.data = {
+            duration: null,
+            availabile_in: [],
+            tags: [],
+          };
+        }
+        if (typeof item.data.tags === 'string') item.data.tags = JSON.parse(decodeURIComponent(item.data.tags));
+        if (!item.data.tags) item.data.tags = [];
         self.item = item;
-        self.item = {
-          name: '',
-          description: '',
-          active: false,
-          photos: [],
-          price: 0,
-          sku: '',
-          barcode: '',
-          tags: [],
-        };
       });
     },
     methods: {
       setPrice(value) {
         const self = this;
-        const newPrice = value.replace(/¥ /g, '').replace(/,/g, '.').trim();
+        const newPrice = value.replace(/[¥ ]*/, '').replace(/,/g, '.').trim();
         self.item.price = newPrice;
         self.enableSave();
       },
@@ -151,15 +188,45 @@
       },
       addItemTag(tag) {
         const self = this;
-        self.item.tags.push(tag);
+        self.item.data.tags.push(tag);
         self.enableSave();
       },
       removeItemTag(tag) {
         const self = this;
-        self.item.tags.splice(self.item.tags.indexOf(tag), 1);
+        self.item.data.tags.splice(self.item.data.tags.indexOf(tag), 1);
         self.enableSave();
       },
-      save() {},
+      onDurationChange(e) {
+        const self = this;
+        self.item.data.duration = e.target.value;
+        self.enableSave();
+      },
+      onFileChange(e) {
+        const self = this;
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          self.imagePreview = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+        self.item.image = file;
+        self.enableSave();
+      },
+      deleteImage() {
+        const self = this;
+        self.item.image = null;
+        self.item.image_url = null;
+        self.imagePreview = null;
+        self.enableSave();
+      },
+      save() {
+        const self = this;
+        self.showSave = false;
+        API.saveProduct(self.item).then(() => {
+          self.$events.$emit('invoicing:reloadProducts');
+          self.$f7router.back();
+        });
+      },
     },
   };
 </script>

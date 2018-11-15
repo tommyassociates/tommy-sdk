@@ -67,8 +67,13 @@
     "name_placeholder": "Enter item/service name",
     "enabled_label": "Enabled",
     "photos_label": "Photos",
+    "photo_label": "Photo",
     "description_label": "Description",
     "description_placeholder": "Enter item/service description",
+    "duration_label": "Duration",
+    "duration_placeholder": "Item duration in minutes",
+    "category_label": "Category",
+    "category_placeholder": "Enter item/service category",
     "packages_label": "Packages",
     "packages_no_packages": "No associated packages found",
     "tags_label": "Tags",
@@ -104,7 +109,10 @@
     "type": "Type",
     "discount": "Discount",
     "total": "Total",
-    "customer": "Customer"
+    "customer": "Customer",
+    "items": "Items",
+    "promotions": "Promotions",
+    "add_item_label": "Add Item/Service"
   },
   "date_range": {
     "none": "None",
