@@ -15,10 +15,10 @@
       <f7-searchbar search-container=".invoicing-list-items" :backdrop="false" v-if="items && items.length" :disable-button="false" :placeholder="$t('invoicing.item_service_management.search_items')"></f7-searchbar>
       <f7-list class="list-custom invoicing-list-items" no-hairlines v-if="items && items.length">
         <f7-list-item
-          v-for="item in items"
+          v-for="item in orderedProducts"
           :key="item.id"
           :title="item.name"
-          :link="`/invoicing/item-details/${item.id}/?title=${item.name}`"
+          :link="`/invoicing/product-details/${item.id}/?title=${item.name || ''}`"
         ></f7-list-item>
       </f7-list>
     </div>
@@ -26,16 +26,16 @@
       <f7-searchbar search-container=".invoicing-list-packages" :backdrop="false" v-if="packages && packages.length" :disable-button="false" :placeholder="$t('invoicing.item_service_management.search_packages')"></f7-searchbar>
       <f7-list class="list-custom invoicing-list-packages" no-hairlines v-if="packages && packages.length">
         <f7-list-item
-          v-for="item in packages"
+          v-for="item in orderedPackages"
           :key="item.id"
           :title="item.name"
-          :link="`/invoicing/package-details/${item.id}/?title=${item.name}`"
+          :link="`/invoicing/package-details/${item.id}/?title=${item.name || ''}`"
         ></f7-list-item>
       </f7-list>
     </div>
     <f7-popover class="add-item-service-package-popover">
       <f7-list>
-        <f7-list-button popover-close link="/invoicing/item-details/">{{$t('invoicing.item_service_management.new_item')}}</f7-list-button>
+        <f7-list-button popover-close link="/invoicing/product-details/">{{$t('invoicing.item_service_management.new_item')}}</f7-list-button>
         <f7-list-button popover-close link="/invoicing/package-details/">{{$t('invoicing.item_service_management.new_package')}}</f7-list-button>
       </f7-list>
     </f7-popover>
@@ -54,37 +54,51 @@
     },
     mounted() {
       const self = this;
-      API.loadItems({}, { cache: false }).then((items) => {
-        self.items = items;
-        self.items = [
-          {
-            id: 1,
-            name: 'Item 1',
-          },
-          {
-            id: 2,
-            name: 'Item 2',
-          },
-        ]
-      });
-      API.loadPackages({}, { cache: false }).then((packages) => {
-        self.packages = packages;
-        self.packages = [
-          {
-            id: 1,
-            name: 'Package 1',
-          },
-          {
-            id: 2,
-            name: 'Package 2',
-          },
-        ]
-      });
+      self.loadProducts();
+      self.loadPackages();
+      self.$events.$on('invoicing:reloadProducts', self.loadProducts);
+      self.$events.$on('invoicing:reloadPackages', self.loadProducts);
+    },
+    beforeDestroy() {
+      const self = this;
+      self.$events.$off('invoicing:reloadProducts', self.loadProducts);
+      self.$events.$off('invoicing:reloadPackages', self.loadProducts);
     },
     computed: {
-
+      orderedProducts() {
+        const self = this;
+        if (!self.items) return [];
+        return self.items.sort((a, b) => a.id - b.id);
+      },
+      orderedPackages() {
+        const self = this;
+        if (!self.packages) return [];
+        return self.packages.sort((a, b) => a.id - b.id);
+      },
     },
     methods: {
+      loadPackages() {
+        const self = this;
+        API.loadPackages({}, { cache: false }).then((packages) => {
+          self.packages = packages;
+          self.packages = [
+            {
+              id: 1,
+              name: 'Package 1',
+            },
+            {
+              id: 2,
+              name: 'Package 2',
+            },
+          ];
+        });
+      },
+      loadProducts() {
+        const self = this;
+        API.loadProducts({}, { cache: false }).then((items) => {
+          self.items = items;
+        });
+      },
       add() {},
     },
   };

@@ -161,26 +161,62 @@ const API = {
     }
     return api.createFragment(params);
   },
-  loadItem(itemId) {
-    return new Promise((resolve) => {
-      resolve({});
+  loadProducts() {
+    return api.call({
+      endpoint: 'vendor/manager/products',
+      method: 'GET',
+      cache: false,
     });
   },
-  loadPackage(itemId) {
-    return new Promise((resolve) => {
-      resolve({});
+  loadProduct(itemId) {
+    return api.call({
+      endpoint: `vendor/manager/products/${itemId}`,
+      method: 'GET',
+      cache: false,
     });
   },
-  loadItems(params = {}, options = {}) {
-    return api.getFragments(Object.assign({
-      addon: 'invoicing',
-      kind: 'InvoicingItem',
-      with_filters: true,
-      with_permission_to: true,
-      actor_id: API.actorId,
-      user_id: API.actorId,
-    }, params), options);
+  saveProduct(item) {
+    const fd = new FormData();
+    const data = { ...item };
+    if (data.data && typeof data.data === 'object') data.data = { ...data.data };
+    Object.keys(data).forEach((key) => {
+      let value = data[key];
+      if (value === null) value = '';
+      if (value === 'null') value = '';
+      if (key === 'data' && value) {
+        if (typeof value === 'string' && value !== '[object Object]') value = JSON.parse(value);
+        if (value && value.tags) value.tags = JSON.stringify(value.tags);
+        if (value === '[object Object]') {
+          value = '';
+          fd.append(key, value);
+          return;
+        }
+        if (!Object.keys(value).length) {
+          value = '';
+          fd.append(key, value);
+        } else {
+          value = tommy.app.f7.utils.serializeObject({ data: value }).split('&').forEach((group) => {
+            fd.append(group.split('=')[0], group.split('=')[1]);
+          });
+        }
+        return;
+      }
+      if (key === 'image' && !value) {
+        value = null;
+      }
+      if (key === 'image_url' && !value) {
+        value = null;
+      }
+      fd.append(key, value);
+    });
+    return api.call({
+      endpoint: `vendor/manager/products/${item.id || ''}`,
+      method: item.id ? 'PUT' : 'POST',
+      data: fd,
+      contentType: 'multipart/form-data',
+    });
   },
+
   loadPackages(params = {}, options = {}) {
     return api.getFragments(Object.assign({
       addon: 'invoicing',
@@ -190,6 +226,11 @@ const API = {
       actor_id: API.actorId,
       user_id: API.actorId,
     }, params), options);
+  },
+  loadPackage(itemId) {
+    return new Promise((resolve) => {
+      resolve({});
+    });
   },
 };
 

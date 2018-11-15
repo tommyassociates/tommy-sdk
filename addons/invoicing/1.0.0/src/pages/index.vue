@@ -1,5 +1,5 @@
 <template>
-  <f7-page id="invoicing__index" name="invoicing__index" class="invoicing-page" @page:afterin="onPageAfterIn">
+  <f7-page id="invoicing__index" name="invoicing__index" class="invoicing-page">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{pageTitle}}</f7-nav-title>

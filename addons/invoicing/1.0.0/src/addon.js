@@ -6,7 +6,7 @@ import ListAddPage from './pages/list-add.vue';
 import ListEditPage from './pages/list-edit.vue';
 import DateRangePage from './pages/date-range.vue';
 import TagSelectPage from './pages/tag-select-page.vue';
-import ItemDetailsPage from './pages/item-details.vue';
+import ProductDetailsPage from './pages/product-details.vue';
 import PackageDetailsPage from './pages/package-details.vue';
 import RangeSelectPage from './pages/range-select.vue';
 import OrderDetailsPage from './pages/order-details.vue';
@@ -45,8 +45,8 @@ const routes = [
     component: TagSelectPage,
   },
   {
-    path: '/invoicing/item-details/:id?/',
-    component: ItemDetailsPage,
+    path: '/invoicing/product-details/:id?/',
+    component: ProductDetailsPage,
   },
   {
     path: '/invoicing/package-details/:id?/',

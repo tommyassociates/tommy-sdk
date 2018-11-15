@@ -759,3 +759,160 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$red}
     }
   }
 }
+.invoicing-product-photo-container {
+  padding: 20px;
+  .invoicing-product-photo,
+  .invoicing-product-photo-add {
+    width: 150px;
+    height: 150px;
+    text-align: center;
+    font-size: 0;
+    line-height: 150px;
+    margin-left: auto;
+    margin-right: auto;
+    position: relative;
+    display: block;
+  }
+  .invoicing-product-photo {
+    img {
+      max-width: 100%;
+      max-height: 100%;
+      vertical-align: middle;
+    }
+    a.link {
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: 30px;
+      height: 30px;
+      line-height: 30px;
+      text-align: center;
+      i {
+        width: 30px;
+        height: 30px;
+        line-height: 30px;
+        text-align: center;
+      }
+    }
+
+  }
+  .invoicing-product-photo-add {
+    cursor: pointer;
+    background: #eee;
+    overflow: hidden;
+    input {
+      position: absolute;
+      left: 0;
+      top: 0;
+      font-size: 1000px;
+      visibility: hidden;
+      opacity: 0;
+    }
+    .icon {
+      font-size: 50px;
+      color: #777;
+    }
+  }
+}
+.invoicing-order-items {
+  display: block !important;
+  .invoicing-order-item {
+    border-bottom: 1px solid #eee;
+    padding: 10px 15px;
+    padding-left: 0;
+    margin-left: 15px;
+    .invoicing-order-item-name {
+      font-weight: 500;
+      color: #333;
+      font-size: 22px;
+      line-height: 1.3;
+      margin-bottom: 10px;
+    }
+    .invoicing-order-item-details {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+    }
+    .invoicing-order-item-price {
+      color: $red;
+      font-size: 20px;
+      font-weight: 500;
+    }
+    .invoicing-order-item-selector {
+      display: flex;
+      align-items: center;
+      font-size: 0;
+      .link {
+        width: 30px;
+        height: 30px;
+        text-align: center;
+        line-height: 30px;
+        font-size: 0;
+        color: $red;
+      }
+      .icon {
+        font-size: 30px;
+        width: 30px;
+        height: 30px;
+        position: relative;
+        top: -1px;
+      }
+      .invoicing-order-item-qty {
+        width: 50px;
+        text-align: center;
+        height: 30px;
+        line-height: 30px;
+        font-size: 22px;
+        font-weight: 500;
+      }
+    }
+  }
+}
+.invoicing-order-total {
+  padding: 15px;
+  .invoicing-order-total-row {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    align-items: center;
+  }
+  .invoicing-order-total-label {
+    font-size: 18px;
+  }
+  .invoicing-order-total-value {
+    color: $red;
+    font-size: 24px;
+    font-weight: 500;
+  }
+}
+.invoicing-order-add-box {
+  height: 44px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-left: 15px;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+  .icon {
+    color: $red;
+    font-size: 30px;
+    height: 30px;
+    width: 30px;
+    margin-right: 10px;
+    flex-shrink: 0;
+  }
+  .invoicing-order-add-box-placeholder {
+    width: 100%;
+    flex-shrink: 10;
+    font-size: 20px;
+    color: #D4D4D4;
+  }
+}
+.list.invoicing-order-details-products {
+  .item-after {
+    color: $red;
+    font-size: 18px;
+    font-weight: 500;
+  }
+}

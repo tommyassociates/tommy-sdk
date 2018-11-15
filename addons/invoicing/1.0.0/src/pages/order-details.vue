@@ -71,7 +71,58 @@
         >
           <tommy-circle-avatar :url="orderUserAvatar(order.user_id)" slot="media"></tommy-circle-avatar>
         </f7-list-item>
+
+        <f7-list-item divider :title="$t('invoicing.order_details.items')"></f7-list-item>
+        <li class="invoicing-order-items" v-if="orderItems">
+          <div class="invoicing-order-add-box" @click="productsOpened = true">
+            <f7-icon f7="add"></f7-icon>
+            <div class="invoicing-order-add-box-placeholder">{{$t('invoicing.order_details.add_item_label')}}</div>
+          </div>
+          <div class="invoicing-order-item"
+            v-for="product in orderItems"
+            :key="product.id"
+          >
+            <div class="invoicing-order-item-name">{{product.name}}</div>
+            <div class="invoicing-order-item-details">
+              <div class="invoicing-order-item-price">{{product.price}}</div>
+              <div class="invoicing-order-item-selector">
+                <f7-link icon-f7="delete_round" @click="decreaseOrderItem(product)"></f7-link>
+                <div class="invoicing-order-item-qty">{{orderItemsAmount[product.id]}}</div>
+                <f7-link icon-f7="add_round_fill" @click="increaseOrderItem(product)"></f7-link>
+              </div>
+            </div>
+          </div>
+          <div class="invoicing-order-total">
+            <div class="invoicing-order-total-row">
+              <div class="invoicing-order-total-label">{{$t('invoicing.order_details.total')}}</div>
+              <div class="invoicing-order-total-value">{{orderItemsTotal}}</div>
+            </div>
+          </div>
+        </li>
       </f7-list>
+      <f7-popup :opened="productsOpened" @popup:closed="productsOpened = false">
+        <f7-view :init="false">
+          <f7-page>
+            <f7-navbar>
+              <f7-nav-right>
+                <f7-link popup-close icon-f7="close"></f7-link>
+              </f7-nav-right>
+              <f7-nav-title>{{$t('invoicing.order_details.add_item_label')}}</f7-nav-title>
+            </f7-navbar>
+            <f7-searchbar v-if="products" search-container=".invoicing-order-details-products"></f7-searchbar>
+            <f7-list v-if="products" class="list-custom invoicing-order-details-products">
+              <f7-list-item
+                v-for="product in products"
+                :key="product.id"
+                link
+                :title="product.name"
+                :after="`¥${product.price}`"
+                @click="addOrderItem(product)"
+              ></f7-list-item>
+            </f7-list>
+          </f7-page>
+        </f7-view>
+      </f7-popup>
     </template>
   </f7-page>
 </template>
@@ -88,13 +139,41 @@
         order: null,
         showSave: false,
         orderStatuses,
+        orderItems: null,
+        orderItemsAmount: null,
+        products: null,
+        productsOpened: false,
       };
     },
     mounted() {
       const self = this;
+      API.loadProducts().then((products) => {
+        self.products = products;
+      });
       API.loadOrder(self.id).then((order) => {
         self.order = order;
+        API.loadProduct(self.order.vendor_product_id).then((product) => {
+          self.orderItems = {
+            [product.id]: product,
+          };
+          self.orderItemsAmount = {
+            [product.id]: 1,
+          };
+        });
       });
+    },
+    computed: {
+      orderItemsTotal() {
+        const self = this;
+        if (!self.orderItems || Object.keys(self.orderItems).length === 0) return 0;
+        let total = 0;
+        Object.keys(self.orderItems).forEach((itemId) => {
+          const item = self.orderItems[itemId];
+          total += item.price * self.orderItemsAmount[itemId];
+        });
+
+        return total;
+      },
     },
     methods: {
       orderUserName(user_id) {
@@ -135,6 +214,27 @@
         if (e.target.value === 'quote') self.order.quote = true;
         else self.order.quote = false;
         self.saveOrder({ quote: self.order.quote });
+      },
+      increaseOrderItem(product) {
+        const self = this;
+        self.orderItemsAmount[product.id] += 1;
+        self.showSave = true;
+      },
+      decreaseOrderItem(product) {
+        const self = this;
+        self.orderItemsAmount[product.id] -= 1;
+        if (self.orderItemsAmount[product.id] === 0) {
+          delete self.orderItemsAmount[product.id];
+          delete self.orderItems[product.id];
+        }
+        self.showSave = true;
+      },
+      addOrderItem(product) {
+        const self = this;
+        self.productsOpened = false;
+        if (self.orderItems[product.id]) return;
+        self.$set(self.orderItems, product.id, product);
+        self.$set(self.orderItemsAmount, product.id, 1);
       },
       saveOrder(data) {
         const self = this;
