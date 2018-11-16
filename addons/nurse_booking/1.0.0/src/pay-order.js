@@ -18,6 +18,7 @@ export default function (data, createNewOrder = true) {
     (transaction) => {
       const order = {
         vendor_product_id: productId,
+        vendor_order_items: [productId],
         vendor_coupon_id: couponId || null,
         wallet_transaction_id: transaction.id,
         name: productName,
@@ -52,6 +53,7 @@ export default function (data, createNewOrder = true) {
       if (!transaction.id) return;
       const order = {
         vendor_product_id: productId,
+        vendor_order_items: [productId],
         vendor_coupon_id: couponId || null,
         wallet_transaction_id: transaction.id,
         name: productName,

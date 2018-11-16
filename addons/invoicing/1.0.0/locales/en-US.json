@@ -61,6 +61,9 @@
     "new_item": "New Item/Service",
     "new_package": "New Package"
   },
+  "promotion_management": {
+    "title": "Promotions"
+  },
   "item": {
     "new_title": "New Item/Service",
     "name_label": "Name",
@@ -83,6 +86,21 @@
     "sku_placeholder": "Enter item/service SKU",
     "barcode_label": "Barcode ID",
     "barcode_placeholder": "Enter item/service barcode ID"
+  },
+  "promotion": {
+    "new_title": "New Promotion",
+    "name_label": "Name",
+    "name_placeholder": "Enter promotion name",
+    "description_label": "Description",
+    "description_placeholder": "Enter promotion description",
+    "expires_label": "Expires",
+    "expires_placeholder": "Expiration date",
+    "amount_label": "Discount amount",
+    "amount_placeholder": "Enter promotion discount",
+    "item_label": "Item",
+    "item_placeholder": "Select item for this promotion",
+    "customer_label": "Customer",
+    "customer_placeholder": "Select customer for this promotion"
   },
   "package": {
     "new_title": "New Package",

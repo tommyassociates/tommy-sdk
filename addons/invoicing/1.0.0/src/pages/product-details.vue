@@ -180,6 +180,8 @@
         const self = this;
         const newPrice = value.replace(/[¥ ]*/, '').replace(/,/g, '.').trim();
         self.item.price = newPrice;
+        self.item.price_cents = self.item.price * 100;
+        if (Number.isNaN(self.item.price_cents)) self.item.price_cents = 0;
         self.enableSave();
       },
       enableSave() {

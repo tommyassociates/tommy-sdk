@@ -73,12 +73,13 @@
         </f7-list-item>
 
         <f7-list-item divider :title="$t('invoicing.order_details.items')"></f7-list-item>
-        <li class="invoicing-order-items" v-if="orderItems">
+        <li class="invoicing-order-items" >
           <div class="invoicing-order-add-box" @click="productsOpened = true">
             <f7-icon f7="add"></f7-icon>
             <div class="invoicing-order-add-box-placeholder">{{$t('invoicing.order_details.add_item_label')}}</div>
           </div>
           <div class="invoicing-order-item"
+            v-if="orderItems"
             v-for="product in orderItems"
             :key="product.id"
           >
@@ -232,9 +233,15 @@
       addOrderItem(product) {
         const self = this;
         self.productsOpened = false;
+        if (!self.orderItems) {
+          self.orderItems = {};
+          self.orderItemsAmount = {};
+        }
         if (self.orderItems[product.id]) return;
+
         self.$set(self.orderItems, product.id, product);
         self.$set(self.orderItemsAmount, product.id, 1);
+        self.showSave = true;
       },
       saveOrder(data) {
         const self = this;

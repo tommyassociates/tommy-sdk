@@ -127,7 +127,7 @@
         self.nurse = order.data.nurse;
         self.service = {
           name: order.name,
-          id: order.vendor_product_id,
+          id: order.vendor_product_id || order.vendor_order_items[0],
         };
         self.transaction = {
           card_name: order.wallet_transaction.card_name,
@@ -153,7 +153,7 @@
         API.cache.booking.nurse = order.data.nurse;
         delete API.cache.booking.coupon;
 
-        API.getServiceDetails(self.$root.team.id, order.vendor_product_id).then((service) => {
+        API.getServiceDetails(self.$root.team.id, order.vendor_product_id || order.vendor_order_items[0]).then((service) => {
           API.cache.booking.service = service;
           self.$f7router.navigate('/nurse_booking/order-confirm/');
         });
@@ -195,7 +195,7 @@
           teamId: self.$root.team.id,
           orderId: order.id,
           productName: order.name,
-          productId: order.vendor_product_id,
+          productId: order.vendor_product_id || order.vendor_order_items[0],
           total: order.total,
           couponId: order.vendor_coupon_id,
           discount: order.discount,

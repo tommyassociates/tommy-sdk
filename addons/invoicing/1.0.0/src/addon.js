@@ -10,6 +10,8 @@ import ProductDetailsPage from './pages/product-details.vue';
 import PackageDetailsPage from './pages/package-details.vue';
 import RangeSelectPage from './pages/range-select.vue';
 import OrderDetailsPage from './pages/order-details.vue';
+import PromotionManagementPage from './pages/promotion-management.vue';
+import PromotionDetailsPage from './pages/promotion-details.vue';
 
 const routes = [
   {
@@ -27,6 +29,10 @@ const routes = [
   {
     path: '/invoicing/list-management/',
     component: ListManagementPage,
+  },
+  {
+    path: '/invoicing/promotion-management/',
+    component: PromotionManagementPage,
   },
   {
     path: '/invoicing/list-add/',
@@ -59,6 +65,10 @@ const routes = [
   {
     path: '/invoicing/order-details/:id/',
     component: OrderDetailsPage,
+  },
+  {
+    path: '/invoicing/promotion-details/:id?/',
+    component: PromotionDetailsPage,
   },
 ];
 
