@@ -161,6 +161,27 @@ const API = {
     }
     return api.createFragment(params);
   },
+  loadPromotions() {
+    return api.call({
+      endpoint: 'vendor/manager/coupons',
+      method: 'GET',
+      cache: false,
+    });
+  },
+  loadPromotion(itemId) {
+    return api.call({
+      endpoint: `vendor/manager/coupons/${itemId}`,
+      method: 'GET',
+      cache: false,
+    });
+  },
+  savePromotion(item) {
+    return api.call({
+      endpoint: `vendor/manager/coupons/${item.id || ''}`,
+      method: item.id ? 'PUT' : 'POST',
+      data: item,
+    });
+  },
   loadProducts() {
     return api.call({
       endpoint: 'vendor/manager/products',
