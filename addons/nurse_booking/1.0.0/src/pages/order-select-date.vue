@@ -76,7 +76,6 @@
       }
 
       return {
-        service: API.cache.booking.service,
         dates,
         selectedDate: overrideSelectedDate || (todayDisabled ? dates[1].value : dates[0].value),
         selectedHours: overrideSelectedHours || null,

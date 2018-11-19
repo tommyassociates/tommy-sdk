@@ -15,7 +15,7 @@
         :key="service.id"
       >
         <a :href="`/nurse_booking/service-details/${service.id}/`" class="service-card">
-          <div class="service-card-pic" :style="`background-image:url(${$addonAssetsUrl}demo-package.png`"></div>
+          <div class="service-card-pic" :style="`background-image:url(${serviceImage(service)})`"></div>
           <div class="service-card-content">
             <div class="service-card-title">{{service.name}}</div>
             <div class="service-card-duration">{{service.data.duration}}min</div>
@@ -36,6 +36,13 @@
         services: null,
         category: this.$f7route.query.category,
       };
+    },
+    methods: {
+      serviceImage(service) {
+        const self = this;
+        if (service.image_url) return service.image_url;
+        return `${self.$addonAssetsUrl}demo-package.png`;
+      },
     },
     mounted() {
       const self = this;

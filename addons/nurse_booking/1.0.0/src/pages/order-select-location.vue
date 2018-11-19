@@ -36,7 +36,7 @@
   export default {
     data() {
       return {
-        service: API.cache.booking.service,
+        service: API.cache.booking.services[0],
         locations: null,
         addMode: false,
         city: '',

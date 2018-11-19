@@ -29,7 +29,7 @@
       </div>
     </template>
 
-    <f7-list class="order-details-list" v-if="service" no-hairlines>
+    <f7-list class="order-details-list" v-if="services" no-hairlines>
       <f7-list-item
         v-if="nurse"
         :title="`${nurse.first_name} ${nurse.last_name}`"
@@ -38,7 +38,7 @@
       </f7-list-item>
       <f7-list-item
         :title="`${$t('nurse_booking.order_details.service_label')}:`"
-        :after="service.name"
+        :after="serviceName"
       ></f7-list-item>
       <f7-list-item
         :title="`${$t('nurse_booking.order_details.time_label')}:`"
@@ -79,10 +79,10 @@
   export default {
     data() {
       const self = this;
-      const { transaction, service, coupon, location, date, nurse } = API.cache.booking;
+      const { transaction, services, coupon, location, date, nurse } = API.cache.booking;
       const data = {
         transaction: null,
-        service: null,
+        services: null,
         coupon: null,
         location: null,
         date: null,
@@ -95,7 +95,7 @@
       if (!self.$f7route.query.id) {
         Object.assign(data, {
           transaction,
-          service,
+          services,
           coupon,
           location,
           date,
@@ -107,8 +107,16 @@
     computed: {
       totalComputed() {
         const self = this;
-        const { service, coupon, total } = self;
-        return total || (service.price - (coupon ? coupon.amount : 0));
+        const { services, coupon, total } = self;
+        let servicesTotal = 0;
+        services.forEach((el) => {
+          servicesTotal += el.price;
+        });
+        return total || (servicesTotal - (coupon ? coupon.amount : 0));
+      },
+      serviceName() {
+        const self = this;
+        return self.services.map(el => el.name).join(', ');
       },
     },
     mounted() {
@@ -127,7 +135,7 @@
         self.nurse = order.data.nurse;
         self.service = {
           name: order.name,
-          id: order.vendor_product_id || order.vendor_order_items[0],
+          id: order.vendor_order_items[0].vendor_product_id,
         };
         self.transaction = {
           card_name: order.wallet_transaction.card_name,
@@ -139,24 +147,36 @@
             amount: order.discount,
           };
         }
+        Promise.all(order.vendor_order_items.map((el) => {
+          return API.getServiceDetails(self.$root.team.id, el.vendor_product_id).then((service) => {
+            service.quantity = el.quantity;
+            return Promise.resolve(service);
+          });
+        })).then((services) => {
+          self.services = services;
+        });
       });
     },
     methods: {
       formatDate,
       repeatOrder() {
         const self = this;
-        const { order } = self;
+        const { order, services } = self;
         if (!order) return;
 
         API.cache.booking.date = parseInt(order.data.date, 10);
         API.cache.booking.location = order.data.location;
         API.cache.booking.nurse = order.data.nurse;
+        API.cache.booking.vendor_order_items_attributes = order.vendor_order_items.map((el) => {
+          return {
+            vendor_product_id: el.vendor_product_id,
+            quantity: el.quantity,
+          };
+        });
         delete API.cache.booking.coupon;
 
-        API.getServiceDetails(self.$root.team.id, order.vendor_product_id || order.vendor_order_items[0]).then((service) => {
-          API.cache.booking.service = service;
-          self.$f7router.navigate('/nurse_booking/order-confirm/');
-        });
+        API.cache.booking.services = services;
+        self.$f7router.navigate('/nurse_booking/order-confirm/');
       },
       cancelOrder() {
         const self = this;
@@ -193,6 +213,12 @@
         const { order } = self;
         payOrder({
           teamId: self.$root.team.id,
+          vendor_order_items_attributes: (order.vendor_order_items || []).map((el) => {
+            return {
+              vendor_product_id: el.vendor_product_id,
+              quantity: el.quantity,
+            };
+          }),
           orderId: order.id,
           productName: order.name,
           productId: order.vendor_product_id || order.vendor_order_items[0],

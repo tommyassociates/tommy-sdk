@@ -5,7 +5,7 @@ export default function (data, createNewOrder = true) {
   const tommy = window.tommy;
   const f7 = tommy.app.f7;
   const {
-    teamId, productName, productId, total, discount = 0, location, date, couponId, orderId, nurse,
+    teamId, productName, productId, total, discount = 0, location, date, couponId, orderId, nurse, vendor_order_items_attributes,
   } = data;
 
   tommy.initWalletTransaction(
@@ -18,7 +18,7 @@ export default function (data, createNewOrder = true) {
     (transaction) => {
       const order = {
         vendor_product_id: productId,
-        vendor_order_items: [productId],
+        vendor_order_items_attributes,
         vendor_coupon_id: couponId || null,
         wallet_transaction_id: transaction.id,
         name: productName,
@@ -53,7 +53,7 @@ export default function (data, createNewOrder = true) {
       if (!transaction.id) return;
       const order = {
         vendor_product_id: productId,
-        vendor_order_items: [productId],
+        vendor_order_items_attributes,
         vendor_coupon_id: couponId || null,
         wallet_transaction_id: transaction.id,
         name: productName,

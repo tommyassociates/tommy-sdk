@@ -64,7 +64,6 @@
   export default {
     data() {
       return {
-        service: API.cache.booking.service,
         nurses: null,
         selectedNurseId: this.$f7route.query.nurse_id ? parseInt(this.$f7route.query.nurse_id, 10) : undefined,
       };
