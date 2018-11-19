@@ -13,10 +13,10 @@
     >{{$t('nurse_booking.order_confirm.pay_button')}}</a>
 
     <div class="service-details-block">
-      <div class="service-image" :style="`background-image: url(${$addonAssetUrl}demo-package.png)`"></div>
+      <div class="service-image" :style="`background-image: url(${serviceImage})`"></div>
       <div class="service-details">
-        <div class="service-title">{{service.name}}</div>
-        <div class="service-price">¥{{service.price}}</div>
+        <div class="service-title">{{serviceName}}</div>
+        <div class="service-price">¥{{servicePrice}}</div>
       </div>
     </div>
     <f7-list no-hairlines>
@@ -83,7 +83,7 @@
       const self = this;
 
       return {
-        service: API.cache.booking.service,
+        services: API.cache.booking.services,
         coupon: API.cache.booking.coupon,
         user: self.$root.user,
         location: API.cache.booking.location,
@@ -94,15 +94,39 @@
     computed: {
       total() {
         const self = this;
-        const { service, coupon } = self;
-        return service.price - (coupon ? coupon.amount : 0);
+        const { services, coupon } = self;
+        let price = 0;
+        services.forEach((service) => {
+          price += service.price;
+        });
+        return price - (coupon ? coupon.amount : 0);
+      },
+      servicePrice() {
+        const self = this;
+        const { services } = self;
+        let price = 0;
+        services.forEach((service) => {
+          price += service.price;
+        });
+        return price;
+      },
+      serviceImage() {
+        const self = this;
+        const service = self.services[0];
+        if (service.image_url) return service.image_url;
+        return `${self.$addonAssetsUrl}demo-package.png`;
+      },
+      serviceName() {
+        const self = this;
+        return self.services.map(el => el.name).join(', ');
       },
     },
     methods: {
       formatDate,
       selectCoupon() {
         const self = this;
-        couponPicker(self.service.coupons, (coupon) => {
+        const service = self.services[0];
+        couponPicker(service.coupons, (coupon) => {
           API.cache.booking.coupon = coupon;
           self.coupon = coupon;
         }, () => {}, self.coupon);
@@ -117,12 +141,18 @@
       },
       payOrder() {
         const self = this;
-        const { service, coupon, location, date, total, nurse } = self;
-
+        const { services, coupon, location, date, total, nurse } = self;
+        const vendor_order_items_attributes = self.services.map((el) => {
+          return {
+            vendor_product_id: el.id,
+            quantity: el.quantity || 1,
+          };
+        });
         payOrder({
+          vendor_order_items_attributes,
           teamId: self.$root.team.id,
-          productName: service.name,
-          productId: service.id,
+          productName: services.map(el => el.name).join(', '),
+          productId: services[0].id,
           total,
           couponId: coupon ? coupon.id : null,
           discount: coupon ? coupon.amount : 0,

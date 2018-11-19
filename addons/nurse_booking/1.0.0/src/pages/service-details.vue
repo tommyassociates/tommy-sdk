@@ -7,10 +7,10 @@
     <a class="nurse_booking__toolbar-button" @click="book" slot="fixed">{{$t('nurse_booking.service_details.book_button')}}</a>
 
     <div class="service-details-header">
-      <f7-swiper pagination>
-        <div class="swiper-slide" :style="`background-image: url(${$addonAssetUrl}demo-package.png)`"></div>
-        <div class="swiper-slide" :style="`background-image: url(${$addonAssetUrl}demo-package.png)`"></div>
-        <div class="swiper-slide" :style="`background-image: url(${$addonAssetUrl}demo-package.png)`"></div>
+      <f7-swiper>
+        <div class="swiper-slide" :style="`background-image: url(${serviceImage(service)})`"></div>
+        <!-- <div class="swiper-slide" :style="`background-image: url(${$addonAssetUrl}demo-package.png)`"></div> -->
+        <!-- <div class="swiper-slide" :style="`background-image: url(${$addonAssetUrl}demo-package.png)`"></div> -->
       </f7-swiper>
     </div>
     <div class="service-details-meta">
@@ -59,15 +59,20 @@
       // const self = this;
     },
     methods: {
+      serviceImage(service) {
+        const self = this;
+        if (service.image_url) return service.image_url;
+        return `${self.$addonAssetsUrl}demo-package.png`;
+      },
       book() {
         const self = this;
         const service = self.service;
-        API.cache.booking.service = service;
+        API.cache.booking.services = [service];
 
         if (service.coupons && service.coupons.length) {
           couponPicker(service.coupons, (coupon) => {
             self.selectedCoupon = coupon;
-            API.cache.booking.service = service;
+            API.cache.booking.services = [service];
             API.cache.booking.coupon = self.selectedCoupon;
             self.$f7router.navigate('/nurse_booking/order-select-location/');
           }, () => {
@@ -88,7 +93,7 @@
         const service = self.service;
         couponPicker(service.coupons, (coupon) => {
           self.selectedCoupon = coupon;
-          API.cache.booking.service = self.service;
+          API.cache.booking.services = [self.service];
           API.cache.booking.coupon = self.selectedCoupon;
           self.$f7router.navigate('/nurse_booking/order-select-location/');
         }, () => {
