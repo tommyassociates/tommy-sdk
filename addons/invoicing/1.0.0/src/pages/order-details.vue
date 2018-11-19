@@ -73,23 +73,23 @@
         </f7-list-item>
 
         <f7-list-item divider :title="$t('invoicing.order_details.items')"></f7-list-item>
-        <li class="invoicing-order-items" >
+        <li class="invoicing-order-items" v-if="products">
           <div class="invoicing-order-add-box" @click="productsOpened = true">
             <f7-icon f7="add"></f7-icon>
             <div class="invoicing-order-add-box-placeholder">{{$t('invoicing.order_details.add_item_label')}}</div>
           </div>
           <div class="invoicing-order-item"
-            v-if="orderItems"
-            v-for="product in orderItems"
-            :key="product.id"
+            v-for="(product, index) in order.vendor_order_items"
+            :key="`${product.vendor_product_id}-${index}`"
+            v-if="!product._destroy"
           >
-            <div class="invoicing-order-item-name">{{product.name}}</div>
+            <div class="invoicing-order-item-name">{{productName(product.vendor_product_id)}}</div>
             <div class="invoicing-order-item-details">
-              <div class="invoicing-order-item-price">{{product.price}}</div>
+              <div class="invoicing-order-item-price">{{productPrice(product.vendor_product_id)}}</div>
               <div class="invoicing-order-item-selector">
-                <f7-link icon-f7="delete_round" @click="decreaseOrderItem(product)"></f7-link>
-                <div class="invoicing-order-item-qty">{{orderItemsAmount[product.id]}}</div>
-                <f7-link icon-f7="add_round_fill" @click="increaseOrderItem(product)"></f7-link>
+                <f7-link icon-f7="delete_round" @click="decreaseOrderItem(index)"></f7-link>
+                <div class="invoicing-order-item-qty">{{product.quantity}}</div>
+                <f7-link icon-f7="add_round_fill" @click="increaseOrderItem(index)"></f7-link>
               </div>
             </div>
           </div>
@@ -141,7 +141,7 @@
         showSave: false,
         orderStatuses,
         orderItems: null,
-        orderItemsAmount: null,
+        orderItemsQuantity: null,
         products: null,
         productsOpened: false,
       };
@@ -153,30 +153,27 @@
       });
       API.loadOrder(self.id).then((order) => {
         self.order = order;
-        API.loadProduct(self.order.vendor_product_id).then((product) => {
-          self.orderItems = {
-            [product.id]: product,
-          };
-          self.orderItemsAmount = {
-            [product.id]: 1,
-          };
-        });
       });
     },
     computed: {
       orderItemsTotal() {
         const self = this;
-        if (!self.orderItems || Object.keys(self.orderItems).length === 0) return 0;
         let total = 0;
-        Object.keys(self.orderItems).forEach((itemId) => {
-          const item = self.orderItems[itemId];
-          total += item.price * self.orderItemsAmount[itemId];
+        self.order.vendor_order_items.forEach((el) => {
+          total += self.productPrice(el.vendor_product_id) * el.quantity;
         });
-
         return total;
       },
     },
     methods: {
+      productName(id) {
+        const self = this;
+        return self.products.filter(el => el.id === parseInt(id, 10))[0].name;
+      },
+      productPrice(id) {
+        const self = this;
+        return self.products.filter(el => el.id === parseInt(id, 10))[0].price;
+      },
       orderUserName(user_id) {
         const self = this;
         const user = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
@@ -199,56 +196,64 @@
       onDateChange(e) {
         const self = this;
         const value = e.target.value;
-        clearTimeout(self.dateChangeTimeout);
         self.order.data.date = new Date(value).getTime();
-        self.dateChangeTimeout = setTimeout(() => {
-          self.saveOrder({ data: self.order.data });
-        }, 600);
+        self.showSave = true;
       },
       onStatusChange(e) {
         const self = this;
         self.order.status = e.target.value;
-        self.saveOrder({ status: self.order.status });
+        self.showSave = true;
       },
       onTypeChange(e) {
         const self = this;
         if (e.target.value === 'quote') self.order.quote = true;
         else self.order.quote = false;
-        self.saveOrder({ quote: self.order.quote });
-      },
-      increaseOrderItem(product) {
-        const self = this;
-        self.orderItemsAmount[product.id] += 1;
         self.showSave = true;
       },
-      decreaseOrderItem(product) {
+      increaseOrderItem(index) {
         const self = this;
-        self.orderItemsAmount[product.id] -= 1;
-        if (self.orderItemsAmount[product.id] === 0) {
-          delete self.orderItemsAmount[product.id];
-          delete self.orderItems[product.id];
+        self.order.vendor_order_items[index].quantity += 1;
+        self.showSave = true;
+      },
+      decreaseOrderItem(index) {
+        const self = this;
+        self.order.vendor_order_items[index].quantity -= 1;
+        if (self.order.vendor_order_items[index].quantity === 0) {
+          if (self.order.vendor_order_items[index].id) {
+            self.order.vendor_order_items[index]._destroy = true;
+          } else {
+            self.order.vendor_order_items.splice(index, 1);
+          }
         }
         self.showSave = true;
       },
       addOrderItem(product) {
         const self = this;
         self.productsOpened = false;
-        if (!self.orderItems) {
-          self.orderItems = {};
-          self.orderItemsAmount = {};
-        }
-        if (self.orderItems[product.id]) return;
+        let hasProduct;
+        self.order.vendor_order_items.forEach((el) => {
+          if (el.vendor_product_id === product.id) hasProduct = true;
+        })
+        if (hasProduct) return;
 
-        self.$set(self.orderItems, product.id, product);
-        self.$set(self.orderItemsAmount, product.id, 1);
+        self.order.vendor_order_items.push({
+          vendor_product_id: product.id,
+          quantity: 1,
+        });
         self.showSave = true;
       },
-      saveOrder(data) {
+      save() {
         const self = this;
-        self.$events.$emit('invoicing:reloadListsOrders');
-        return API.saveOrder({ ...data, id: self.order.id });
+        const data = { ...self.order };
+        self.showSave = false;
+        data.vendor_order_items_attributes = [...data.vendor_order_items];
+        data.total = self.orderItemsTotal;
+        delete data.vendor_order_items;
+        API.saveOrder(data).then((order) => {
+          self.order = order;
+          self.$events.$emit('invoicing:reloadListsOrders');
+        });
       },
-      save() {},
     },
   };
 </script>
