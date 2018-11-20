@@ -121,7 +121,8 @@
   "order_details": {
     "title": "Order",
     "created": "Created",
-    "due": "Due",
+    "due_date": "Date",
+    "due_time": "Time",
     "location": "Location",
     "status": "Status",
     "type": "Type",
@@ -130,7 +131,9 @@
     "customer": "Customer",
     "items": "Items",
     "promotions": "Promotions",
-    "add_item_label": "Add Item/Service"
+    "payment": "Payment",
+    "add_item_label": "Add Item/Service",
+    "add_promotion_label": "Add Promotion"
   },
   "date_range": {
     "none": "None",
