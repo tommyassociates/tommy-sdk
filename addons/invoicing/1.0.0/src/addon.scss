@@ -823,7 +823,8 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$red}
   }
 }
 
-.page#invoicing__order-details {
+.page#invoicing__order-details,
+.page#invoicing__item-details {
   input[type="datetime-local"]::-webkit-date-and-time-value {
     margin-right: 0;
   }
@@ -877,6 +878,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$red}
       font-weight: 500;
     }
   }
+
   .invoicing-order-items {
     display: block !important;
     .invoicing-order-item {
@@ -931,5 +933,16 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$red}
         }
       }
     }
+  }
+}
+.page#invoicing__item-details .invoicing-order-items {
+  .invoicing-order-item {
+    display: flex;
+    justify-content: space-between;
+  }
+  .invoicing-order-item-name {
+    flex-shrink: 10;
+    min-width: 0;
+    margin-bottom: 0;
   }
 }

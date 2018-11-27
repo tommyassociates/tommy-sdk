@@ -96,7 +96,7 @@
           title: $t(`invoicing.permissions.${permission.name}.title`),
           placeholder: $t('invoicing.common.search_members_tags', 'Search Members, Tags'),
           pageTitle: $t('invoicing.common.search_members_tags', 'Search Members, Tags'),
-          filters: permission.filters,
+          tags: permission.filters,
         }"
         @tagAdd="(tag) => addListPermission(permission, tag)"
         @tagRemove="(tag) => removeListPermission(permission, tag)"

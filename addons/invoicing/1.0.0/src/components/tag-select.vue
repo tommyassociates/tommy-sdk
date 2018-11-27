@@ -14,7 +14,7 @@
       </li>
     </ul>
     <ul class="tag-items">
-      <li class="tag-item" v-for="(tag, index) in data.filters" :key="index">
+      <li class="tag-item" v-for="(tag, index) in data.tags" :key="index">
         <div class="item-content">
           <div class="item-inner">
             <div class="item-title">{{tag.name}}</div>
@@ -39,7 +39,7 @@
     },
     mounted() {
       const self = this;
-      self.$api.getCurrentTeamTags({ cache: true }).then((tagItems) => {
+      self.$api.getCurrentTeamTags({ cache: false }).then((tagItems) => {
         self.teamTags = tagItems;
       });
     },
@@ -48,7 +48,7 @@
         const self = this;
         self.$f7router.navigate('/invoicing/tag-select/', {
           props: {
-            filters: self.data.filters,
+            tags: self.data.tags,
             pageTitle: self.data.pageTitle,
             teamTags: self.teamTags,
             onChange(tag, selected) {
