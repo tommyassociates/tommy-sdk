@@ -7,8 +7,9 @@
         <f7-link href="/invoicing/promotion-details/" icon-f7="add"></f7-link>
       </f7-nav-right>
     </f7-navbar>
+    <f7-searchbar slot="static" search-container=".invoicing-list-items" :backdrop="false" v-if="items && items.length" :disable-button="false" :placeholder="$t('invoicing.promotion_management.search_placeholder')"></f7-searchbar>
 
-    <f7-list class="list-custom invoicing-list-items" no-hairlines v-if="items && items.length">
+    <f7-list slot="static" class="list-custom invoicing-list-items" no-hairlines v-if="items && items.length">
       <f7-list-item
         v-for="item in orderedPromotions"
         :key="item.id"

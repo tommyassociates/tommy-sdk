@@ -21,11 +21,6 @@
       >
         <f7-toggle :checked="item.active" @change="($event) => {item.active = $event.target.checked; enableSave();}"></f7-toggle>
       </f7-list-item>
-      <!-- <f7-list-item
-        :title="$t('invoicing.item.photos_label', 'Photos')"
-        :after="(item.photos && item.photos.length) || 'Not set'"
-        link="#"
-      ></f7-list-item> -->
       <!-- Description -->
       <f7-list-item divider :title="$t('invoicing.item.description_label', 'Description')"></f7-list-item>
       <f7-list-input
@@ -71,19 +66,6 @@
           </label>
         </div>
       </li>
-      <!-- Packages -->
-      <!-- <f7-list-item divider :title="$t('invoicing.item.packages_label', 'Packages')"></f7-list-item>
-      <f7-list-item
-        v-if="!item.packages || !item.packages.length"
-        :title="$t('invoicing.item.packages_no_packages', 'No associated packages found')"
-      ></f7-list-item>
-      <f7-list-item
-        v-if="item.packages && item.packages.length"
-        v-for="pkg in item.packages"
-        :key="pkg.id"
-        :title="pkg.name"
-        :link="`/invoicing/package-details/${pkg.id}/?title=${pkg.name}`"
-      ></f7-list-item> -->
       <!-- Tags -->
       <tag-select
         slot="after-list"
@@ -91,7 +73,7 @@
           title: $t('invoicing.item.tags_label'),
           placeholder: $t('invoicing.common.search_members_tags', 'Search Members, Tags'),
           pageTitle: $t('invoicing.common.search_members_tags', 'Search Members, Tags'),
-          filters: item.data.tags,
+          tags: item.filters,
         }"
         @tagAdd="addItemTag"
         @tagRemove="removeItemTag"
@@ -138,7 +120,7 @@
     data() {
       const self = this;
       return {
-        pageTitle: self.$f7route.query.title || self.$t('invoicing.item.new_title'),
+        pageTitle: self.$f7route.query.title || self.$t('invoicing.product.new_title'),
         item: null,
         showSave: false,
         imagePreview: null,
@@ -154,8 +136,8 @@
           data: {
             duration: null,
             availabile_in: [],
-            tags: [],
           },
+          filters: [],
           description: '',
           name: '',
           price: 0,
@@ -167,11 +149,10 @@
           item.data = {
             duration: null,
             availabile_in: [],
-            tags: [],
           };
         }
-        if (typeof item.data.tags === 'string') item.data.tags = JSON.parse(decodeURIComponent(item.data.tags));
-        if (!item.data.tags) item.data.tags = [];
+        if (typeof item.filters === 'string') item.filters = JSON.parse(decodeURIComponent(item.filters));
+        if (!item.filters) item.filters = [];
         self.item = item;
       });
     },
@@ -190,12 +171,12 @@
       },
       addItemTag(tag) {
         const self = this;
-        self.item.data.tags.push(tag);
+        self.item.filters.push(tag);
         self.enableSave();
       },
       removeItemTag(tag) {
         const self = this;
-        self.item.data.tags.splice(self.item.data.tags.indexOf(tag), 1);
+        self.item.filters.splice(self.item.filters.indexOf(tag), 1);
         self.enableSave();
       },
       onDurationChange(e) {

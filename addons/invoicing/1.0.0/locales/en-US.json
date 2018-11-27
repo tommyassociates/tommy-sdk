@@ -62,10 +62,10 @@
     "new_package": "New Package"
   },
   "promotion_management": {
-    "title": "Promotions"
+    "title": "Promotions",
+    "search_placeholder": "Search promotions"
   },
   "item": {
-    "new_title": "New Item/Service",
     "name_label": "Name",
     "name_placeholder": "Enter item/service name",
     "enabled_label": "Enabled",
@@ -87,6 +87,14 @@
     "barcode_label": "Barcode ID",
     "barcode_placeholder": "Enter item/service barcode ID"
   },
+  "product": {
+    "new_title": "New Item"
+  },
+  "package": {
+    "new_title": "New Package",
+    "items_label": "Items",
+    "add_item_label": "Add Item/Service"
+  },
   "promotion": {
     "new_title": "New Promotion",
     "name_label": "Name",
@@ -102,34 +110,27 @@
     "customer_label": "Customer",
     "customer_placeholder": "Select customer for this promotion"
   },
-  "package": {
-    "new_title": "New Package",
-    "name_label": "Name",
-    "name_placeholder": "Enter package name",
-    "enabled_label": "Enabled",
-    "photos_label": "Photos",
-    "description_label": "Description",
-    "description_placeholder": "Enter package description",
-    "tags_label": "Tags",
-    "price_label": "Price",
-    "price_placeholder": "Enter package price",
-    "sku_label": "SKU",
-    "sku_placeholder": "Enter package SKU",
-    "barcode_label": "Barcode ID",
-    "barcode_placeholder": "Enter package barcode ID"
-  },
+
   "order_details": {
     "title": "Order",
+    "new_title": "New Order",
     "created": "Created",
     "due_date": "Date",
     "due_time": "Time",
     "location": "Location",
+    "city": "City",
+    "city_placeholder": "Add city",
+    "address": "Address",
+    "address_placeholder": "Add address",
     "status": "Status",
     "type": "Type",
     "discount": "Discount",
     "total": "Total",
+    "comment": "Comments",
+    "comment_placeholder": "Add comments",
     "customer": "Customer",
     "items": "Items",
+    "packages": "Packages",
     "promotions": "Promotions",
     "payment": "Payment",
     "add_item_label": "Add Item/Service",

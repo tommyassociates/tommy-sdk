@@ -3,7 +3,7 @@
   <f7-page name="invoicing__order-details" id="invoicing__order-details" class="invoicing-page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{$t('invoicing.order_details.title', 'Order')}} #{{id}}</f7-nav-title>
+      <f7-nav-title>{{pageTitle}}</f7-nav-title>
       <f7-nav-right>
         <f7-link v-if="showSave" @click="save" icon-f7="check"></f7-link>
       </f7-nav-right>
@@ -11,7 +11,7 @@
     <template v-if="order">
       <f7-list class="list-custom">
         <f7-list-item
-          v-if="order.created_at"
+          v-if="order.created_at && order.id"
           :title="$t('invoicing.order_details.created')"
           :after="formatDate(order.created_at)"
         ></f7-list-item>
@@ -29,11 +29,23 @@
           @click="openTimeSelect"
         ></f7-list-item>
 
-        <f7-list-item
+        <f7-list-input
           v-if="order.data && order.data.location"
-          :title="$t('invoicing.order_details.location')"
-          :after="`${order.data.location.address} ${order.data.location.city}`"
-        ></f7-list-item>
+          :label="$t('invoicing.order_details.city')"
+          :placeholder="$t('invoicing.order_details.city_placeholder')"
+          type="text"
+          :value="order.data.location.city"
+          @input="onCityChange"
+        ></f7-list-input>
+
+        <f7-list-input
+          v-if="order.data && order.data.location"
+          :label="$t('invoicing.order_details.address')"
+          :placeholder="$t('invoicing.order_details.address_placeholder')"
+          type="text"
+          :value="order.data.location.address"
+          @input="onAddressChange"
+        ></f7-list-input>
 
         <f7-list-item
           :title="$t('invoicing.order_details.status')"
@@ -60,11 +72,33 @@
           </select>
         </f7-list-item>
 
+        <!-- Comments -->
+        <f7-list-item divider :title="$t('invoicing.order_details.comment')"></f7-list-item>
+        <f7-list-input
+          type="textarea"
+          :value="order.comment"
+          :placeholder="$t('invoicing.order_details.comment_placeholder')"
+          @input="onCommentChange"
+          resizable
+        ></f7-list-input>
+
+        <!-- Customer -->
         <f7-list-item divider :title="$t('invoicing.order_details.customer')"></f7-list-item>
         <f7-list-item
           :title="orderUserName(order.user_id)"
+          smart-select
         >
           <tommy-circle-avatar :url="orderUserAvatar(order.user_id)" slot="media"></tommy-circle-avatar>
+          <select name="customer" @change="onCustomerChange">
+            <option
+              v-for="(teamMember) in $root.teamMembers"
+              :key="teamMember.id"
+              :value="teamMember.user_id"
+              data-option-class="invoicing-smart-select-option"
+              :data-option-image="teamMember.icon_url"
+              :selected="order.user_id === teamMember.user_id"
+            >{{teamMember.first_name || ''}} {{teamMember.last_name || ''}}</option>
+          </select>
         </f7-list-item>
 
         <!-- Items -->
@@ -76,12 +110,12 @@
           </div>
           <div class="invoicing-order-item"
             v-for="(product, index) in order.vendor_order_items"
-            :key="`${product.vendor_product_id}-${index}`"
+            :key="`${product.orderable_id}-${index}`"
             v-if="!product._destroy"
           >
-            <div class="invoicing-order-item-name">{{productName(product.vendor_product_id)}}</div>
+            <div class="invoicing-order-item-name">{{productName(product.orderable_id, product.orderable_type)}}</div>
             <div class="invoicing-order-item-details">
-              <div class="invoicing-order-item-price">{{productPrice(product.vendor_product_id)}}</div>
+              <div class="invoicing-order-item-price">{{productPrice(product.orderable_id, product.orderable_type)}}</div>
               <div class="invoicing-order-item-selector">
                 <f7-link icon-f7="delete_round" @click="decreaseOrderItem(index)"></f7-link>
                 <div class="invoicing-order-item-qty">{{product.quantity}}</div>
@@ -143,22 +177,32 @@
       </f7-list>
       <f7-popup :opened="productsOpened" @popup:closed="productsOpened = false">
         <f7-view :init="false">
-          <f7-page>
+          <f7-page class="invoicing-page">
             <f7-navbar>
               <f7-nav-right>
                 <f7-link popup-close icon-f7="close"></f7-link>
               </f7-nav-right>
               <f7-nav-title>{{$t('invoicing.order_details.add_item_label')}}</f7-nav-title>
             </f7-navbar>
-            <f7-searchbar v-if="products" search-container=".invoicing-order-details-products"></f7-searchbar>
-            <f7-list v-if="products" class="list-custom invoicing-order-details-products">
+            <f7-searchbar v-if="products && packages" search-container=".invoicing-order-details-products"></f7-searchbar>
+            <f7-list v-if="products && packages" class="list-custom invoicing-order-details-products">
+              <f7-list-item divider :title="$t('invoicing.order_details.packages')"></f7-list-item>
+              <f7-list-item
+                v-for="product in packages"
+                :key="product.id"
+                link
+                :title="product.name"
+                :after="`¥${product.price}`"
+                @click="addOrderItem(product, 'VendorPackage')"
+              ></f7-list-item>
+              <f7-list-item divider :title="$t('invoicing.order_details.items')"></f7-list-item>
               <f7-list-item
                 v-for="product in products"
                 :key="product.id"
                 link
                 :title="product.name"
                 :after="`¥${product.price}`"
-                @click="addOrderItem(product)"
+                @click="addOrderItem(product, 'VendorProduct')"
               ></f7-list-item>
             </f7-list>
           </f7-page>
@@ -200,11 +244,14 @@
       id: [Number, String],
     },
     data() {
+      const self = this;
       return {
+        pageTitle: self.id ? `${self.$t('invoicing.order_details.title', 'Order')} #${self.id}` : self.$t('invoicing.order_details.new_title'),
         order: null,
         showSave: false,
         orderStatuses,
         products: null,
+        packages: null,
         productsOpened: false,
         promotions: null,
         promotionsOpened: false,
@@ -212,11 +259,36 @@
     },
     mounted() {
       const self = this;
-      API.loadOrder(self.id).then((order) => {
-        self.order = order;
-      });
+      if (self.id) {
+        API.loadOrder(self.id).then((order) => {
+          self.order = order;
+        });
+      } else {
+        self.order = {
+          comment: '',
+          discount: 0,
+          total: 0,
+          user_id: null,
+          vendor_coupon_id: null,
+          vendor_order_items: [],
+          wallet_transaction_id: null,
+          status: 'pending',
+          canceled: false,
+          data: {
+            location: {
+              address: '',
+              city: '',
+            },
+            date: new Date().getTime(),
+          },
+        };
+      }
+
       API.loadProducts().then((products) => {
         self.products = products;
+      });
+      API.loadPackages().then((packages) => {
+        self.packages = packages;
       });
       API.loadPromotions().then((promotions) => {
         self.promotions = promotions;
@@ -232,7 +304,7 @@
         const self = this;
         let total = 0;
         self.order.vendor_order_items.forEach((el) => {
-          total += self.productPrice(el.vendor_product_id) * el.quantity;
+          total += self.productPrice(el.orderable_id, el.orderable_type) * el.quantity;
         });
         return total;
       },
@@ -253,6 +325,30 @@
       },
     },
     methods: {
+      onCustomerChange(e) {
+        const self = this;
+        self.order.user_id = parseInt(e.target.value, 10);
+        self.showSave = true;
+      },
+      onCommentChange(e) {
+        const self = this;
+        self.order.comment = e.target.value;
+        self.showSave = true;
+      },
+      onCityChange(e) {
+        const self = this;
+        if (!self.order.data) self.order.data = {};
+        if (!self.order.data.location) self.order.data.location = {};
+        self.order.data.location.city = e.target.value;
+        self.showSave = true;
+      },
+      onAddressChange(e) {
+        const self = this;
+        if (!self.order.data) self.order.data = {};
+        if (!self.order.data.location) self.order.data.location = {};
+        self.order.data.location.address = e.target.address;
+        self.showSave = true;
+      },
       openTimeSelect() {
         const self = this;
         const order = self.order;
@@ -334,22 +430,24 @@
         const self = this;
         return self.promotions.filter(el => el.id === parseInt(id, 10))[0].amount;
       },
-      productName(id) {
+      productName(id, type) {
         const self = this;
-        return self.products.filter(el => el.id === parseInt(id, 10))[0].name;
+        return self[type === 'VendorProduct' ? 'products' : 'packages'].filter(el => el.id === parseInt(id, 10))[0].name;
       },
-      productPrice(id) {
+      productPrice(id, type) {
         const self = this;
-        return self.products.filter(el => el.id === parseInt(id, 10))[0].price;
+        return self[type === 'VendorProduct' ? 'products' : 'packages'].filter(el => el.id === parseInt(id, 10))[0].price;
       },
       orderUserName(user_id) {
         const self = this;
         const user = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
+        if (!user) return '';
         return `${user.first_name} ${user.last_name}`;
       },
       orderUserAvatar(user_id) {
         const self = this;
         const user = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
+        if (!user) return undefined;
         return user.icon_url;
       },
       formatOrderDate(date) {
@@ -394,17 +492,18 @@
         }
         self.showSave = true;
       },
-      addOrderItem(product) {
+      addOrderItem(product, type) {
         const self = this;
         self.productsOpened = false;
         let hasProduct;
         self.order.vendor_order_items.forEach((el) => {
-          if (el.vendor_product_id === product.id) hasProduct = true;
-        })
+          if (el.orderable_id === product.id) hasProduct = true;
+        });
         if (hasProduct) return;
 
         self.order.vendor_order_items.push({
-          vendor_product_id: product.id,
+          orderable_id: product.id,
+          orderable_type: type,
           quantity: 1,
         });
         self.showSave = true;
@@ -424,6 +523,9 @@
         const self = this;
         const data = { ...self.order };
         self.showSave = false;
+        if (!data.name && data.vendor_order_items.length) {
+          data.name = self.productName(data.vendor_order_items[0].orderable_id, data.vendor_order_items[0].orderable_type);
+        }
         data.vendor_order_items_attributes = [...data.vendor_order_items];
         data.total = self.orderItemsTotal;
         data.discount = self.orderDiscountTotal;

@@ -5,7 +5,7 @@
       <f7-nav-title>{{pageTitle}}</f7-nav-title>
       <f7-nav-right>
         <f7-link href="/invoicing/settings/" icon-f7="gear"></f7-link>
-        <!-- <f7-link href="/invoicing/task-add/" icon-f7="add"></f7-link> -->
+        <f7-link href="/invoicing/order-details/" icon-f7="add"></f7-link>
       </f7-nav-right>
     </f7-navbar>
 

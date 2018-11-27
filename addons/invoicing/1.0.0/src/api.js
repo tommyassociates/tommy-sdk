@@ -17,8 +17,8 @@ const API = {
   },
   saveOrder(order) {
     return api.call({
-      method: 'PUT',
-      endpoint: `vendor/manager/orders/${order.id}`,
+      method: order.id ? 'PUT' : 'POST',
+      endpoint: `vendor/manager/orders/${order.id || ''}`,
       data: order,
     });
   },
@@ -196,7 +196,7 @@ const API = {
       cache: false,
     });
   },
-  saveProduct(item) {
+  saveProduct(item, isPackage) {
     const fd = new FormData();
     const data = { ...item };
     if (data.data && typeof data.data === 'object') data.data = { ...data.data };
@@ -204,11 +204,15 @@ const API = {
       let value = data[key];
       if (value === null) value = '';
       if (value === 'null') value = '';
-      if (key === 'data' && value) {
+      if ((key === 'data' || key === 'filters' || key === 'vendor_product_ids') && value || Array.isArray(value)) {
         if (typeof value === 'string' && value !== '[object Object]') value = JSON.parse(value);
-        if (value && value.tags) value.tags = JSON.stringify(value.tags);
         if (value === '[object Object]') {
           value = '';
+          fd.append(key, value);
+          return;
+        }
+        if (Array.isArray(value) && !value.length) {
+          value = null;
           fd.append(key, value);
           return;
         }
@@ -216,8 +220,8 @@ const API = {
           value = '';
           fd.append(key, value);
         } else {
-          value = tommy.app.f7.utils.serializeObject({ data: value }).split('&').forEach((group) => {
-            fd.append(group.split('=')[0], group.split('=')[1]);
+          value = tommy.app.f7.utils.serializeObject({ [key]: value }).split('&').forEach((group) => {
+            fd.append(group.split('=')[0], decodeURIComponent(group.split('=')[1]));
           });
         }
         return;
@@ -231,7 +235,7 @@ const API = {
       fd.append(key, value);
     });
     return api.call({
-      endpoint: `vendor/manager/products/${item.id || ''}`,
+      endpoint: `vendor/manager/${isPackage ? 'packages' : 'products'}/${item.id || ''}`,
       method: item.id ? 'PUT' : 'POST',
       data: fd,
       contentType: 'multipart/form-data',
@@ -239,18 +243,17 @@ const API = {
   },
 
   loadPackages(params = {}, options = {}) {
-    return api.getFragments(Object.assign({
-      addon: 'invoicing',
-      kind: 'InvoicingPackage',
-      with_filters: true,
-      with_permission_to: true,
-      actor_id: API.actorId,
-      user_id: API.actorId,
-    }, params), options);
+    return api.call({
+      endpoint: 'vendor/manager/packages',
+      method: 'GET',
+      cache: false,
+    });
   },
   loadPackage(itemId) {
-    return new Promise((resolve) => {
-      resolve({});
+    return api.call({
+      endpoint: `vendor/manager/packages/${itemId}`,
+      method: 'GET',
+      cache: false,
     });
   },
 };

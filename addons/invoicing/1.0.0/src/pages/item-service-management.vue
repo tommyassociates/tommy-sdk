@@ -4,7 +4,7 @@
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('invoicing.item_service_management.title', 'Items / Service')}}</f7-nav-title>
       <f7-nav-right>
-        <f7-link popover-open=".add-item-service-package-popover" icon-f7="add"></f7-link>
+        <f7-link @click="addItem" icon-f7="add"></f7-link>
       </f7-nav-right>
     </f7-navbar>
     <div class="item-service-tabs-links">
@@ -33,12 +33,6 @@
         ></f7-list-item>
       </f7-list>
     </div>
-    <f7-popover class="add-item-service-package-popover">
-      <f7-list>
-        <f7-list-button popover-close link="/invoicing/product-details/">{{$t('invoicing.item_service_management.new_item')}}</f7-list-button>
-        <f7-list-button popover-close link="/invoicing/package-details/">{{$t('invoicing.item_service_management.new_package')}}</f7-list-button>
-      </f7-list>
-    </f7-popover>
   </f7-page>
 </template>
 <script>
@@ -57,12 +51,12 @@
       self.loadProducts();
       self.loadPackages();
       self.$events.$on('invoicing:reloadProducts', self.loadProducts);
-      self.$events.$on('invoicing:reloadPackages', self.loadProducts);
+      self.$events.$on('invoicing:reloadPackages', self.loadPackages);
     },
     beforeDestroy() {
       const self = this;
       self.$events.$off('invoicing:reloadProducts', self.loadProducts);
-      self.$events.$off('invoicing:reloadPackages', self.loadProducts);
+      self.$events.$off('invoicing:reloadPackages', self.loadPackages);
     },
     computed: {
       orderedProducts() {
@@ -77,20 +71,18 @@
       },
     },
     methods: {
+      addItem() {
+        const self = this;
+        if (self.activeTab === 'items') {
+          self.$f7router.navigate('/invoicing/product-details/');
+        } else {
+          self.$f7router.navigate('/invoicing/package-details/');
+        }
+      },
       loadPackages() {
         const self = this;
         API.loadPackages({}, { cache: false }).then((packages) => {
           self.packages = packages;
-          self.packages = [
-            {
-              id: 1,
-              name: 'Package 1',
-            },
-            {
-              id: 2,
-              name: 'Package 2',
-            },
-          ];
         });
       },
       loadProducts() {

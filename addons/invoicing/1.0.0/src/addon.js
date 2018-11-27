@@ -63,7 +63,7 @@ const routes = [
     component: RangeSelectPage,
   },
   {
-    path: '/invoicing/order-details/:id/',
+    path: '/invoicing/order-details/:id?/',
     component: OrderDetailsPage,
   },
   {
