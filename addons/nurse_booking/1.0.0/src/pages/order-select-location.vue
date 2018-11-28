@@ -62,10 +62,16 @@
         const city = location.city;
         const service = self.service;
         let available;
+        const availableIn = service.data.available_in || service.data.availabile_in || [];
 
-        (service.data.available_in || service.data.availabile_in || []).forEach((availableCity) => {
-          if (availableCity.toLowerCase() === city.toLowerCase()) available = true;
-        });
+        if (!availableIn || !availableIn.length) {
+          available = true;
+        } else {
+          availableIn.forEach((availableCity) => {
+            if (availableCity.toLowerCase() === city.toLowerCase()) available = true;
+          });
+        }
+
         if (!available) {
           self.$f7.dialog.alert(self.$t('nurse_booking.location.not_available'));
           return;

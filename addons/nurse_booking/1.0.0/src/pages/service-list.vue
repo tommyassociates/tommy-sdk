@@ -12,14 +12,14 @@
     }" class="service-cards no-swipe-panel" v-if="services">
       <f7-swiper-slide
         v-for="service in services"
-        :key="service.id"
+        :key="`${serviceType(service)}-${service.id}`"
       >
-        <a :href="`/nurse_booking/service-details/${service.id}/`" class="service-card">
+        <a :href="`/nurse_booking/service-details/${service.id}/?type=${serviceType(service)}`" class="service-card">
           <div class="service-card-pic" :style="`background-image:url(${serviceImage(service)})`"></div>
           <div class="service-card-content">
             <div class="service-card-title">{{service.name}}</div>
-            <div class="service-card-duration">{{service.data.duration}}min</div>
-            <div v-if="service.coupons.length" class="service-card-coupons">{{service.coupons.length}} Coupons</div>
+            <div class="service-card-duration" v-if="service.data.duration">{{service.data.duration}}min</div>
+            <div v-if="service.coupons && service.coupons.length" class="service-card-coupons">{{service.coupons.length}} Coupons</div>
             <div v-else class="service-card-price">¥ {{service.price}}</div>
           </div>
         </a>
@@ -38,6 +38,9 @@
       };
     },
     methods: {
+      serviceType(service) {
+        return service.vendor_package_products ? 'package' : 'product';
+      },
       serviceImage(service) {
         const self = this;
         if (service.image_url) return service.image_url;
@@ -51,6 +54,7 @@
         const services = servicesData.filter(el => el.category === self.category);
 
         services.forEach((service) => {
+          if (service.vendor_package_products) return;
           service.coupons = couponsData.filter(coupon => coupon.vendor_product_id === service.id);
         });
 

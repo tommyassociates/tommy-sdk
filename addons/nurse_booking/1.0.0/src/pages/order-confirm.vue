@@ -144,7 +144,8 @@
         const { services, coupon, location, date, total, nurse } = self;
         const vendor_order_items_attributes = self.services.map((el) => {
           return {
-            vendor_product_id: el.id,
+            orderable_id: el.id,
+            orderable_type: el.vendor_package_products ? 'VendorPackage' : 'VendorProduct',
             quantity: el.quantity || 1,
           };
         });

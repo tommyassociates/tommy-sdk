@@ -133,10 +133,6 @@
         };
         self.date = parseInt(order.data.date, 10);
         self.nurse = order.data.nurse;
-        self.service = {
-          name: order.name,
-          id: order.vendor_order_items[0].vendor_product_id,
-        };
         self.transaction = {
           card_name: order.wallet_transaction.card_name,
         };
@@ -148,7 +144,7 @@
           };
         }
         Promise.all(order.vendor_order_items.map((el) => {
-          return API.getServiceDetails(self.$root.team.id, el.vendor_product_id).then((service) => {
+          return API.getServiceDetails(self.$root.team.id, el.orderable_id, el.orderable_type).then((service) => {
             service.quantity = el.quantity;
             return Promise.resolve(service);
           });
@@ -170,6 +166,8 @@
         API.cache.booking.vendor_order_items_attributes = order.vendor_order_items.map((el) => {
           return {
             vendor_product_id: el.vendor_product_id,
+            orderable_id: el.vendor_product_id,
+            orderable_type: el.vendor_package_products ? 'VendorPackage' : 'VendorProduct',
             quantity: el.quantity,
           };
         });
@@ -215,7 +213,8 @@
           teamId: self.$root.team.id,
           vendor_order_items_attributes: (order.vendor_order_items || []).map((el) => {
             return {
-              vendor_product_id: el.vendor_product_id,
+              orderable_id: el.vendor_product_id,
+              orderable_type: el.vendor_package_products ? 'VendorPackage' : 'VendorProduct',
               quantity: el.quantity,
             };
           }),
@@ -227,6 +226,7 @@
           discount: order.discount,
           location: order.data.location,
           date: order.data.date,
+          nurse: order.data.nurse,
         }, false);
       },
     },
