@@ -37,7 +37,7 @@
           </div>
           <div class="tasks-list-content">
             <div class="card transactions-card">
-              <f7-list v-if="list.transactions && list.transactions.length" media-list class="transactions-list">
+              <f7-list v-if="list.transactions && list.transactions.length" media-list class="transactions-list no-chevron">
                 <li v-for="(transaction, index) in list.transactions" :key="index">
                   <a :href="`/wallet_accounts/transaction-details/${transaction.id}/`" class="item-content item-link">
                     <div class="item-media">
@@ -115,7 +115,7 @@
       loadListTransactions(list) {
         const self = this;
         const user = self.actor || self.$root.user;
-        API.loadListTransactions(list, [`${user.first_name} ${user.last_name}`]).then((transactions) => {
+        API.loadListTransactions(list).then((transactions) => {
           list.transactions = transactions;
           self.$nextTick(() => {
             if (self.listHasScroll(list)) {

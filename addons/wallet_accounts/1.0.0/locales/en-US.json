@@ -95,5 +95,11 @@
   "transaction_status": {
     "failed": "Failed",
     "paid": "Paid"
+  },
+  "transaction_details": {
+    "title": "Transaction Details",
+    "payment_label": "Payment",
+    "time_label": "Time",
+    "payee_label": "Payee"
   }
 }
