@@ -8,6 +8,7 @@ import TagSelectPage from './pages/tag-select-page.vue';
 import ListEditPage from './pages/list-edit.vue';
 import DateRangePage from './pages/date-range.vue';
 import AmountSelectPage from './pages/amount-select.vue';
+import TransactionDetailsPage from './pages/transaction-details.vue';
 
 const routes = [
   {
@@ -49,6 +50,10 @@ const routes = [
   {
     path: '/wallet_accounts/list-edit/:listId/amount-select/',
     component: AmountSelectPage,
+  },
+  {
+    path: '/wallet_accounts/transaction-details/:id/',
+    component: TransactionDetailsPage,
   },
 ];
 

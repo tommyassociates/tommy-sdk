@@ -45,6 +45,12 @@ const API = {
       data: transaction,
     });
   },
+  loadTransaction(id) {
+    return api.call({
+      endpoint: `wallet/manager/transactions/${id}`,
+      method: 'GET',
+    });
+  },
 
   loadList(listId) {
     return api.getFragment(listId, {
@@ -122,11 +128,7 @@ const API = {
       data: {
         default: true,
       },
-      filters: [{
-        context: 'members',
-        name: `${user.first_name} ${user.last_name}`,
-        user_id: user.id,
-      }],
+      filters: [],
     };
     return API.saveList(list);
   },

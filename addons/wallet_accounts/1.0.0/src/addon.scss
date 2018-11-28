@@ -521,16 +521,16 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
   }
 }
 
-.accounts-transaction-header {
+.wallet_accounts-transaction-header {
   background: #fff;
   padding: 20px 20px 10px;
   border-bottom: 1px solid #eee;
-  .accounts-transaction-header-wrap {
+  .wallet_accounts-transaction-header-wrap {
     display: flex;
     justify-content: center;
     align-items: flex-start;
   }
-  .accounts-transaction-icon {
+  .wallet_accounts-transaction-icon {
     flex-shrink: 0;
     margin-right: 20px;
     img {
@@ -538,7 +538,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
       height: 58px;
       border-radius: 4px;
     }
-    i.accounts-transaction-icon-placeholder {
+    i.wallet_accounts-transaction-icon-placeholder {
       width: 58px;
       height: 58px;
       border-radius: 4px;
@@ -546,21 +546,21 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
       display: block;
     }
   }
-  .accounts-transaction-payment-info {
+  .wallet_accounts-transaction-payment-info {
     flex-shrink: 10;
     min-width: 0;
     color: #333;
   }
-  .accounts-transaction-payment-name {
+  .wallet_accounts-transaction-payment-name {
     font-size: 18px;
     line-height: 1;
   }
-  .accounts-transaction-payment-amount {
+  .wallet_accounts-transaction-payment-amount {
     font-size: 36px;
     font-weight: 300;
     line-height: 1.2;
   }
-  .accounts-transaction-status {
+  .wallet_accounts-transaction-status {
     color: #999;
     text-align: center;
     font-size: 16px;
