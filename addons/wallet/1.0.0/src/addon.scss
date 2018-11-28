@@ -2,7 +2,9 @@
   background-color: #555;
 }
 .wallet-index-navbar-inner {
-  color: #fff;
+  .title {
+    color: #fff !important;
+  }
   a.link {
     color: #fff;
     i {
