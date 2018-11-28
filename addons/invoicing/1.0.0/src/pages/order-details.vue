@@ -103,7 +103,7 @@
 
         <!-- Items -->
         <f7-list-item divider :title="$t('invoicing.order_details.items')"></f7-list-item>
-        <li class="invoicing-order-items" v-if="products">
+        <li class="invoicing-order-items" v-if="products && packages">
           <div class="invoicing-order-add-box" @click="productsOpened = true">
             <f7-icon f7="add"></f7-icon>
             <div class="invoicing-order-add-box-placeholder">{{$t('invoicing.order_details.add_item_label')}}</div>
@@ -156,9 +156,10 @@
             </div>
           </div>
         </li>
+
         <!-- Payment -->
         <f7-list-item divider :title="$t('invoicing.order_details.payment')"></f7-list-item>
-        <li class="invoicing-order-items" v-if="products && promotions">
+        <li class="invoicing-order-items" v-if="products && packages && promotions">
           <div class="invoicing-order-total">
             <div class="invoicing-order-total-row" v-if="orderItemsTotal">
               <div class="invoicing-order-total-label">{{$t('invoicing.order_details.items')}}</div>
@@ -430,13 +431,15 @@
         const self = this;
         return self.promotions.filter(el => el.id === parseInt(id, 10))[0].amount;
       },
-      productName(id, type) {
+      productName(id, type = 'VendorProduct') {
         const self = this;
-        return self[type === 'VendorProduct' ? 'products' : 'packages'].filter(el => el.id === parseInt(id, 10))[0].name;
+        const product = self[type === 'VendorProduct' ? 'products' : 'packages'].filter(el => el.id === parseInt(id, 10))[0];
+        return product ? product.name : '';
       },
-      productPrice(id, type) {
+      productPrice(id, type = 'VendorProduct') {
         const self = this;
-        return self[type === 'VendorProduct' ? 'products' : 'packages'].filter(el => el.id === parseInt(id, 10))[0].price;
+        const product = self[type === 'VendorProduct' ? 'products' : 'packages'].filter(el => el.id === parseInt(id, 10))[0];
+        return product ? product.price : 0;
       },
       orderUserName(user_id) {
         const self = this;
