@@ -5,7 +5,7 @@ export default function (data, createNewOrder = true) {
   const tommy = window.tommy;
   const f7 = tommy.app.f7;
   const {
-    teamId, productName, productId, total, discount = 0, location, date, couponId, orderId, nurse, vendor_order_items_attributes,
+    teamId, productName, total, discount = 0, location, date, couponId, orderId, nurse, vendor_order_items_attributes,
   } = data;
 
   tommy.initWalletTransaction(
@@ -17,7 +17,6 @@ export default function (data, createNewOrder = true) {
     },
     (transaction) => {
       const order = {
-        vendor_product_id: productId,
         vendor_order_items_attributes,
         vendor_coupon_id: couponId || null,
         wallet_transaction_id: transaction.id,
@@ -43,16 +42,17 @@ export default function (data, createNewOrder = true) {
           });
         });
       } else {
-        API.createBookingEvent(teamId, { id: orderId, ...order }).then(() => {
-          API.cache.booking.transaction = transaction;
-          f7.views.main.router.navigate(`${successUrl}?id=${orderId}`);
+        API.updateOrder(teamId, { id: orderId, status: 'paid' }).then((response) => {
+          API.createBookingEvent(teamId, { id: orderId, ...order }).then(() => {
+            API.cache.booking.transaction = transaction;
+            f7.views.main.router.navigate(`${successUrl}?id=${orderId}`);
+          });
         });
       }
     },
     (transaction) => {
       if (!transaction.id) return;
       const order = {
-        vendor_product_id: productId,
         vendor_order_items_attributes,
         vendor_coupon_id: couponId || null,
         wallet_transaction_id: transaction.id,

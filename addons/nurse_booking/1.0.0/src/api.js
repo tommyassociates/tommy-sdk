@@ -7,20 +7,29 @@ const API = {
     coupons: [],
     locations: [],
     booking: {},
+    nurse: {},
   },
   getServiceList(teamId) {
-    return api.call({
-      endpoint: `vendors/${teamId}/products`,
-      method: 'GET',
-      data: {},
-    }).then((data) => {
-      API.cache.services = data;
-      return data;
+    return Promise.all([
+      api.call({
+        endpoint: `vendors/${teamId}/products`,
+        method: 'GET',
+        data: {},
+      }),
+      api.call({
+        endpoint: `vendors/${teamId}/packages`,
+        method: 'GET',
+        data: {},
+      }),
+    ]).then(([products, packages]) => {
+      const services = [...products, ...packages];
+      API.cache.services = services;
+      return services;
     });
   },
-  getServiceDetails(teamId, id) {
+  getServiceDetails(teamId, id, type) {
     return api.call({
-      endpoint: `vendors/${teamId}/products/${id}`,
+      endpoint: `vendors/${teamId}/${type === 'VendorProduct' ? 'products' : 'packages'}/${id}`,
       method: 'GET',
     }).then((data) => {
       return data;
@@ -88,9 +97,11 @@ const API = {
     return API.saveLocations(API.cache.locations);
   },
   createBookingEvent(teamId, order) {
+    let date = order.data.date;
+    if (typeof date === 'string') date = parseInt(date, 10);
     return api.createEvent({
       title: order.name,
-      start_at: new Date(order.data.date).toJSON(),
+      start_at: new Date(date).toJSON(),
       location: `${order.data.location.city} ${order.data.location.address}`,
       user_id: order.data.nurse.user_id,
       team_id: teamId,
@@ -117,7 +128,7 @@ const API = {
   },
   updateOrder(teamId, data) {
     return api.call({
-      endpoint: `vendors/${teamId}/orders`,
+      endpoint: `vendors/${teamId}/orders/${data.id}`,
       method: 'PUT',
       data,
     });
@@ -126,6 +137,7 @@ const API = {
     return api.call({
       endpoint: `vendors/${teamId}/orders/`,
       method: 'GET',
+      cache: false,
     }).then((data) => {
       API.cache.orders = data;
       return data;

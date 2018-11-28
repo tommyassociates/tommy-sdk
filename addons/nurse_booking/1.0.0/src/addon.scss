@@ -302,6 +302,7 @@ $yellow: #FF7B00;
     width: 100%;
     .swiper-slide {
       width: 300px;
+      max-width: 80%;
     }
   }
   .service-card {
@@ -533,6 +534,32 @@ a.nurse_booking__toolbar-button {
           margin-bottom: 0;
         }
       }
+    }
+    .service-details-products {
+      margin-left: 10px;
+      margin-top: 10px;
+    }
+    .service-details-product {
+      display: flex;
+      padding-top: 10px;
+      padding-bottom: 10px;
+    }
+    .service-details-product + .service-details-product {
+      border-top: 1px solid #eee;
+    }
+    .service-details-product-image {
+      width: 100px;
+      height: 100px;
+      flex-shrink: 0;
+      border-radius: 4px;
+    }
+    .service-details-product-name {
+      min-width: 0;
+      flex-shrink: 10;
+      margin-left: 15px;
+      font-size: 21px;
+      font-weight: bold;
+      padding-top: 10px;
     }
   }
 }
