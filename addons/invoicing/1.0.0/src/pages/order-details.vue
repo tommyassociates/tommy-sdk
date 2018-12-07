@@ -1,240 +1,246 @@
 <template>
+  <f7-popup>
+    <f7-view>
+      <f7-page name="invoicing__order-details" id="invoicing__order-details" class="invoicing-page">
+        <f7-navbar>
+          <!-- <tommy-nav-back></tommy-nav-back> -->
+          <f7-nav-left>
+            <f7-link popup-close icon-f7="close"></f7-link>
+          </f7-nav-left>
+          <f7-nav-title>{{pageTitle}}</f7-nav-title>
+          <f7-nav-right>
+            <f7-link v-if="showSave" @click="save" icon-f7="check"></f7-link>
+          </f7-nav-right>
+        </f7-navbar>
+        <template v-if="order">
+          <f7-list class="list-custom">
+            <f7-list-item
+              v-if="order.created_at && order.id"
+              :title="$t('invoicing.order_details.created')"
+              :after="formatDate(order.created_at)"
+            ></f7-list-item>
 
-  <f7-page name="invoicing__order-details" id="invoicing__order-details" class="invoicing-page">
-    <f7-navbar>
-      <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{pageTitle}}</f7-nav-title>
-      <f7-nav-right>
-        <f7-link v-if="showSave" @click="save" icon-f7="check"></f7-link>
-      </f7-nav-right>
-    </f7-navbar>
-    <template v-if="order">
-      <f7-list class="list-custom">
-        <f7-list-item
-          v-if="order.created_at && order.id"
-          :title="$t('invoicing.order_details.created')"
-          :after="formatDate(order.created_at)"
-        ></f7-list-item>
+            <f7-list-item
+              :title="$t('invoicing.order_details.due_date')"
+              link
+              :after="formatOrderDate(order.data ? parseInt(order.data.date, 10) : null)"
+              @click="openDateSelect"
+            ></f7-list-item>
+            <f7-list-item
+              :title="$t('invoicing.order_details.due_time')"
+              link
+              :after="formatOrderTime(order.data ? parseInt(order.data.date, 10) : null)"
+              @click="openTimeSelect"
+            ></f7-list-item>
 
-        <f7-list-item
-          :title="$t('invoicing.order_details.due_date')"
-          link
-          :after="formatOrderDate(order.data ? parseInt(order.data.date, 10) : null)"
-          @click="openDateSelect"
-        ></f7-list-item>
-        <f7-list-item
-          :title="$t('invoicing.order_details.due_time')"
-          link
-          :after="formatOrderTime(order.data ? parseInt(order.data.date, 10) : null)"
-          @click="openTimeSelect"
-        ></f7-list-item>
+            <f7-list-input
+              v-if="order.data && order.data.location"
+              :label="$t('invoicing.order_details.city')"
+              :placeholder="$t('invoicing.order_details.city_placeholder')"
+              type="text"
+              :value="order.data.location.city"
+              @input="onCityChange"
+            ></f7-list-input>
 
-        <f7-list-input
-          v-if="order.data && order.data.location"
-          :label="$t('invoicing.order_details.city')"
-          :placeholder="$t('invoicing.order_details.city_placeholder')"
-          type="text"
-          :value="order.data.location.city"
-          @input="onCityChange"
-        ></f7-list-input>
+            <f7-list-input
+              v-if="order.data && order.data.location"
+              :label="$t('invoicing.order_details.address')"
+              :placeholder="$t('invoicing.order_details.address_placeholder')"
+              type="text"
+              :value="order.data.location.address"
+              @input="onAddressChange"
+            ></f7-list-input>
 
-        <f7-list-input
-          v-if="order.data && order.data.location"
-          :label="$t('invoicing.order_details.address')"
-          :placeholder="$t('invoicing.order_details.address_placeholder')"
-          type="text"
-          :value="order.data.location.address"
-          @input="onAddressChange"
-        ></f7-list-input>
+            <f7-list-item
+              :title="$t('invoicing.order_details.status')"
+              smart-select
+              :smart-select-params="{openIn: 'popover', closeOnSelect: true, routableModals: false}"
+            >
+              <select @change="onStatusChange">
+                <option
+                  v-for="(status, index) in orderStatuses"
+                  :key="index"
+                  :value="status"
+                  :selected="order.status === status"
+                >{{$t(`invoicing.order_status.${status}`)}}</option>
+              </select>
+            </f7-list-item>
+            <f7-list-item
+              :title="$t('invoicing.order_details.type')"
+              smart-select
+              :smart-select-params="{openIn: 'popover', closeOnSelect: true, routableModals: false}"
+            >
+              <select @change="onTypeChange">
+                <option :selected="!order.quote" value="invoice">{{$t('invoicing.list_edit.type_invoice')}}</option>
+                <option :selected="order.quote" value="quote">{{$t('invoicing.list_edit.type_quote')}}</option>
+              </select>
+            </f7-list-item>
 
-        <f7-list-item
-          :title="$t('invoicing.order_details.status')"
-          smart-select
-          :smart-select-params="{openIn: 'popover', closeOnSelect: true}"
-        >
-          <select @change="onStatusChange">
-            <option
-              v-for="(status, index) in orderStatuses"
-              :key="index"
-              :value="status"
-              :selected="order.status === status"
-            >{{$t(`invoicing.order_status.${status}`)}}</option>
-          </select>
-        </f7-list-item>
-        <f7-list-item
-          :title="$t('invoicing.order_details.type')"
-          smart-select
-          :smart-select-params="{openIn: 'popover', closeOnSelect: true}"
-        >
-          <select @change="onTypeChange">
-            <option :selected="!order.quote" value="invoice">{{$t('invoicing.list_edit.type_invoice')}}</option>
-            <option :selected="order.quote" value="quote">{{$t('invoicing.list_edit.type_quote')}}</option>
-          </select>
-        </f7-list-item>
+            <!-- Comments -->
+            <f7-list-item divider :title="$t('invoicing.order_details.comment')"></f7-list-item>
+            <f7-list-input
+              type="textarea"
+              :value="order.comment"
+              :placeholder="$t('invoicing.order_details.comment_placeholder')"
+              @input="onCommentChange"
+              resizable
+            ></f7-list-input>
 
-        <!-- Comments -->
-        <f7-list-item divider :title="$t('invoicing.order_details.comment')"></f7-list-item>
-        <f7-list-input
-          type="textarea"
-          :value="order.comment"
-          :placeholder="$t('invoicing.order_details.comment_placeholder')"
-          @input="onCommentChange"
-          resizable
-        ></f7-list-input>
+            <!-- Customer -->
+            <f7-list-item divider :title="$t('invoicing.order_details.customer')"></f7-list-item>
+            <f7-list-item
+              :title="orderUserName(order.user_id)"
+              smart-select
+            >
+              <tommy-circle-avatar :data="orderUser(order.user_id)" slot="media"></tommy-circle-avatar>
+              <select name="customer" @change="onCustomerChange">
+                <option
+                  v-for="(teamMember) in $root.teamMembers"
+                  :key="teamMember.id"
+                  :value="teamMember.user_id"
+                  data-option-class="invoicing-smart-select-option"
+                  :data-option-image="teamMember.icon_url"
+                  :selected="order.user_id === teamMember.user_id"
+                >{{teamMember.first_name || ''}} {{teamMember.last_name || ''}}</option>
+              </select>
+            </f7-list-item>
 
-        <!-- Customer -->
-        <f7-list-item divider :title="$t('invoicing.order_details.customer')"></f7-list-item>
-        <f7-list-item
-          :title="orderUserName(order.user_id)"
-          smart-select
-        >
-          <tommy-circle-avatar :url="orderUserAvatar(order.user_id)" slot="media"></tommy-circle-avatar>
-          <select name="customer" @change="onCustomerChange">
-            <option
-              v-for="(teamMember) in $root.teamMembers"
-              :key="teamMember.id"
-              :value="teamMember.user_id"
-              data-option-class="invoicing-smart-select-option"
-              :data-option-image="teamMember.icon_url"
-              :selected="order.user_id === teamMember.user_id"
-            >{{teamMember.first_name || ''}} {{teamMember.last_name || ''}}</option>
-          </select>
-        </f7-list-item>
-
-        <!-- Items -->
-        <f7-list-item divider :title="$t('invoicing.order_details.items')"></f7-list-item>
-        <li class="invoicing-order-items" v-if="products && packages">
-          <div class="invoicing-order-add-box" @click="productsOpened = true">
-            <f7-icon f7="add"></f7-icon>
-            <div class="invoicing-order-add-box-placeholder">{{$t('invoicing.order_details.add_item_label')}}</div>
-          </div>
-          <div class="invoicing-order-item"
-            v-for="(product, index) in order.vendor_order_items"
-            :key="`${product.orderable_id}-${index}`"
-            v-if="!product._destroy"
-          >
-            <div class="invoicing-order-item-name">{{productName(product.orderable_id, product.orderable_type)}}</div>
-            <div class="invoicing-order-item-details">
-              <div class="invoicing-order-item-price">{{productPrice(product.orderable_id, product.orderable_type)}}</div>
-              <div class="invoicing-order-item-selector">
-                <f7-link icon-f7="delete_round" @click="decreaseOrderItem(index)"></f7-link>
-                <div class="invoicing-order-item-qty">{{product.quantity}}</div>
-                <f7-link icon-f7="add_round_fill" @click="increaseOrderItem(index)"></f7-link>
+            <!-- Items -->
+            <f7-list-item divider :title="$t('invoicing.order_details.items')"></f7-list-item>
+            <li class="invoicing-order-items" v-if="products && packages">
+              <div class="invoicing-order-add-box" @click="productsOpened = true">
+                <f7-icon f7="add"></f7-icon>
+                <div class="invoicing-order-add-box-placeholder">{{$t('invoicing.order_details.add_item_label')}}</div>
               </div>
-            </div>
-          </div>
-          <div class="invoicing-order-total" v-if="orderItemsTotal">
-            <div class="invoicing-order-total-row">
-              <div class="invoicing-order-total-label">{{$t('invoicing.order_details.total')}}</div>
-              <div class="invoicing-order-total-value">{{orderItemsTotal}}</div>
-            </div>
-          </div>
-        </li>
-
-        <!-- Promotions -->
-        <f7-list-item divider :title="$t('invoicing.order_details.promotions')"></f7-list-item>
-        <li class="invoicing-order-items" v-if="promotions">
-          <div class="invoicing-order-add-box" @click="promotionsOpened = true">
-            <f7-icon f7="add"></f7-icon>
-            <div class="invoicing-order-add-box-placeholder">{{$t('invoicing.order_details.add_promotion_label')}}</div>
-          </div>
-          <div class="invoicing-order-item"
-            v-if="order.vendor_coupon_id"
-          >
-            <div class="invoicing-order-item-name">{{promotionName(order.vendor_coupon_id)}}</div>
-            <div class="invoicing-order-item-details">
-              <div class="invoicing-order-item-price">-{{promotionDiscount(order.vendor_coupon_id)}}</div>
-              <div class="invoicing-order-item-selector">
-                <f7-link icon-f7="delete_round" @click="deleteOrderPromotion()"></f7-link>
+              <div class="invoicing-order-item"
+                v-for="(product, index) in order.vendor_order_items"
+                :key="`${product.orderable_id}-${index}`"
+                v-if="!product._destroy"
+              >
+                <div class="invoicing-order-item-name">{{productName(product.orderable_id, product.orderable_type)}}</div>
+                <div class="invoicing-order-item-details">
+                  <div class="invoicing-order-item-price">{{productPrice(product.orderable_id, product.orderable_type)}}</div>
+                  <div class="invoicing-order-item-selector">
+                    <f7-link icon-f7="delete_round" @click="decreaseOrderItem(index)"></f7-link>
+                    <div class="invoicing-order-item-qty">{{product.quantity}}</div>
+                    <f7-link icon-f7="add_round_fill" @click="increaseOrderItem(index)"></f7-link>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <div class="invoicing-order-total" v-if="orderDiscountTotal">
-            <div class="invoicing-order-total-row">
-              <div class="invoicing-order-total-label">{{$t('invoicing.order_details.total')}}</div>
-              <div class="invoicing-order-total-value">-{{orderDiscountTotal}}</div>
-            </div>
-          </div>
-        </li>
+              <div class="invoicing-order-total" v-if="orderItemsTotal">
+                <div class="invoicing-order-total-row">
+                  <div class="invoicing-order-total-label">{{$t('invoicing.order_details.total')}}</div>
+                  <div class="invoicing-order-total-value">{{orderItemsTotal}}</div>
+                </div>
+              </div>
+            </li>
 
-        <!-- Payment -->
-        <f7-list-item divider :title="$t('invoicing.order_details.payment')"></f7-list-item>
-        <li class="invoicing-order-items" v-if="products && packages && promotions">
-          <div class="invoicing-order-total">
-            <div class="invoicing-order-total-row" v-if="orderItemsTotal">
-              <div class="invoicing-order-total-label">{{$t('invoicing.order_details.items')}}</div>
-              <div class="invoicing-order-total-value">{{orderItemsTotal}}</div>
-            </div>
-            <div class="invoicing-order-total-row" v-if="orderDiscountTotal">
-              <div class="invoicing-order-total-label">{{$t('invoicing.order_details.promotions')}}</div>
-              <div class="invoicing-order-total-value">-{{orderDiscountTotal}}</div>
-            </div>
-            <div class="invoicing-order-total-row invoicing-order-final-row">
-              <div class="invoicing-order-total-label">{{$t('invoicing.order_details.total')}}</div>
-              <div class="invoicing-order-total-value">{{orderTotal}}</div>
-            </div>
-          </div>
-        </li>
-      </f7-list>
-      <f7-popup :opened="productsOpened" @popup:closed="productsOpened = false">
-        <f7-view :init="false">
-          <f7-page class="invoicing-page">
-            <f7-navbar>
-              <f7-nav-right>
-                <f7-link popup-close icon-f7="close"></f7-link>
-              </f7-nav-right>
-              <f7-nav-title>{{$t('invoicing.order_details.add_item_label')}}</f7-nav-title>
-            </f7-navbar>
-            <f7-searchbar v-if="products && packages" search-container=".invoicing-order-details-products"></f7-searchbar>
-            <f7-list v-if="products && packages" class="list-custom invoicing-order-details-products">
-              <f7-list-item divider :title="$t('invoicing.order_details.packages')"></f7-list-item>
-              <f7-list-item
-                v-for="product in packages"
-                :key="product.id"
-                link
-                :title="product.name"
-                :after="`¥${product.price}`"
-                @click="addOrderItem(product, 'VendorPackage')"
-              ></f7-list-item>
-              <f7-list-item divider :title="$t('invoicing.order_details.items')"></f7-list-item>
-              <f7-list-item
-                v-for="product in products"
-                :key="product.id"
-                link
-                :title="product.name"
-                :after="`¥${product.price}`"
-                @click="addOrderItem(product, 'VendorProduct')"
-              ></f7-list-item>
-            </f7-list>
-          </f7-page>
-        </f7-view>
-      </f7-popup>
+            <!-- Promotions -->
+            <f7-list-item divider :title="$t('invoicing.order_details.promotions')"></f7-list-item>
+            <li class="invoicing-order-items" v-if="promotions">
+              <div class="invoicing-order-add-box" @click="promotionsOpened = true">
+                <f7-icon f7="add"></f7-icon>
+                <div class="invoicing-order-add-box-placeholder">{{$t('invoicing.order_details.add_promotion_label')}}</div>
+              </div>
+              <div class="invoicing-order-item"
+                v-if="order.vendor_coupon_id"
+              >
+                <div class="invoicing-order-item-name">{{promotionName(order.vendor_coupon_id)}}</div>
+                <div class="invoicing-order-item-details">
+                  <div class="invoicing-order-item-price">-{{promotionDiscount(order.vendor_coupon_id)}}</div>
+                  <div class="invoicing-order-item-selector">
+                    <f7-link icon-f7="delete_round" @click="deleteOrderPromotion()"></f7-link>
+                  </div>
+                </div>
+              </div>
+              <div class="invoicing-order-total" v-if="orderDiscountTotal">
+                <div class="invoicing-order-total-row">
+                  <div class="invoicing-order-total-label">{{$t('invoicing.order_details.total')}}</div>
+                  <div class="invoicing-order-total-value">-{{orderDiscountTotal}}</div>
+                </div>
+              </div>
+            </li>
 
-      <f7-popup :opened="promotionsOpened" @popup:closed="promotionsOpened = false">
-        <f7-view :init="false">
-          <f7-page>
-            <f7-navbar>
-              <f7-nav-right>
-                <f7-link popup-close icon-f7="close"></f7-link>
-              </f7-nav-right>
-              <f7-nav-title>{{$t('invoicing.order_details.add_promotion_label')}}</f7-nav-title>
-            </f7-navbar>
-            <f7-searchbar v-if="promotions" search-container=".invoicing-order-details-products"></f7-searchbar>
-            <f7-list v-if="promotions" class="list-custom invoicing-order-details-products">
-              <f7-list-item
-                v-for="promotion in promotions"
-                :key="promotion.id"
-                link
-                :title="promotion.name"
-                :after="`- ¥${promotion.amount}`"
-                @click="addOrderPromotion(promotion)"
-              ></f7-list-item>
-            </f7-list>
-          </f7-page>
-        </f7-view>
-      </f7-popup>
-    </template>
-  </f7-page>
+            <!-- Payment -->
+            <f7-list-item divider :title="$t('invoicing.order_details.payment')"></f7-list-item>
+            <li class="invoicing-order-items" v-if="products && packages && promotions">
+              <div class="invoicing-order-total">
+                <div class="invoicing-order-total-row" v-if="orderItemsTotal">
+                  <div class="invoicing-order-total-label">{{$t('invoicing.order_details.items')}}</div>
+                  <div class="invoicing-order-total-value">{{orderItemsTotal}}</div>
+                </div>
+                <div class="invoicing-order-total-row" v-if="orderDiscountTotal">
+                  <div class="invoicing-order-total-label">{{$t('invoicing.order_details.promotions')}}</div>
+                  <div class="invoicing-order-total-value">-{{orderDiscountTotal}}</div>
+                </div>
+                <div class="invoicing-order-total-row invoicing-order-final-row">
+                  <div class="invoicing-order-total-label">{{$t('invoicing.order_details.total')}}</div>
+                  <div class="invoicing-order-total-value">{{orderTotal}}</div>
+                </div>
+              </div>
+            </li>
+          </f7-list>
+          <f7-popup :opened="productsOpened" @popup:closed="productsOpened = false" v-if="products && packages">
+            <f7-view :init="false">
+              <f7-page class="invoicing-page">
+                <f7-navbar>
+                  <f7-nav-right>
+                    <f7-link @click="productsOpened = false" icon-f7="close"></f7-link>
+                  </f7-nav-right>
+                  <f7-nav-title>{{$t('invoicing.order_details.add_item_label')}}</f7-nav-title>
+                </f7-navbar>
+                <f7-searchbar search-container=".invoicing-order-details-items" :disable-button="false"></f7-searchbar>
+                <f7-list class="list-custom invoicing-order-details-products invoicing-order-details-items">
+                  <f7-list-item divider :title="$t('invoicing.order_details.packages')"></f7-list-item>
+                  <f7-list-item
+                    v-for="product in packages"
+                    :key="product.id"
+                    link
+                    :title="product.name"
+                    :after="`¥${product.price}`"
+                    @click="addOrderItem(product, 'VendorPackage')"
+                  ></f7-list-item>
+                  <f7-list-item divider :title="$t('invoicing.order_details.items')"></f7-list-item>
+                  <f7-list-item
+                    v-for="product in products"
+                    :key="product.id"
+                    link
+                    :title="product.name"
+                    :after="`¥${product.price}`"
+                    @click="addOrderItem(product, 'VendorProduct')"
+                  ></f7-list-item>
+                </f7-list>
+              </f7-page>
+            </f7-view>
+          </f7-popup>
+
+          <f7-popup :opened="promotionsOpened" @popup:closed="promotionsOpened = false" v-if="promotions">
+            <f7-view :init="false">
+              <f7-page>
+                <f7-navbar>
+                  <f7-nav-right>
+                    <f7-link @click="promotionsOpened = false" icon-f7="close"></f7-link>
+                  </f7-nav-right>
+                  <f7-nav-title>{{$t('invoicing.order_details.add_promotion_label')}}</f7-nav-title>
+                </f7-navbar>
+                <f7-searchbar search-container=".invoicing-order-details-promotions" :disable-button="false"></f7-searchbar>
+                <f7-list class="list-custom invoicing-order-details-products invoicing-order-details-promotions">
+                  <f7-list-item
+                    v-for="promotion in promotions"
+                    :key="promotion.id"
+                    link
+                    :title="promotion.name"
+                    :after="`- ¥${promotion.amount}`"
+                    @click="addOrderPromotion(promotion)"
+                  ></f7-list-item>
+                </f7-list>
+              </f7-page>
+            </f7-view>
+          </f7-popup>
+        </template>
+      </f7-page>
+    </f7-view>
+  </f7-popup>
 </template>
 <script>
   import API from '../api';
@@ -347,7 +353,7 @@
         const self = this;
         if (!self.order.data) self.order.data = {};
         if (!self.order.data.location) self.order.data.location = {};
-        self.order.data.location.address = e.target.address;
+        self.order.data.location.address = e.target.value;
         self.showSave = true;
       },
       openTimeSelect() {
@@ -447,11 +453,11 @@
         if (!user) return '';
         return `${user.first_name} ${user.last_name}`;
       },
-      orderUserAvatar(user_id) {
+      orderUser(user_id) {
         const self = this;
         const user = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
         if (!user) return undefined;
-        return user.icon_url;
+        return user;
       },
       formatOrderDate(date) {
         const self = this;
@@ -500,7 +506,15 @@
         self.productsOpened = false;
         let hasProduct;
         self.order.vendor_order_items.forEach((el) => {
-          if (el.orderable_id === product.id) hasProduct = true;
+          if (el.orderable_id === product.id) {
+            hasProduct = true;
+            if (el._destroy) {
+              el._destroy = false;
+              delete el._destroy;
+              el.quantity = 1;
+              self.showSave = true;
+            }
+          }
         });
         if (hasProduct) return;
 

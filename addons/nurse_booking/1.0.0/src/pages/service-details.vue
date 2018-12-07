@@ -15,7 +15,7 @@
       <div class="service-details-meta-wrap">
         <div class="service-details-meta-left">
           <div class="service-details-title">{{service.name}}</div>
-          <div class="service-details-duration" v-if="service.data.duration">{{service.data.duration}}min</div>
+          <div class="service-details-duration" v-if="service.data && service.data.duration">{{service.data.duration}}min</div>
         </div>
         <div class="service-details-price">¥ {{service.price}}</div>
       </div>

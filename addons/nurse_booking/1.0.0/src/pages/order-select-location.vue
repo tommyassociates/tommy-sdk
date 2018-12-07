@@ -62,7 +62,7 @@
         const city = location.city;
         const service = self.service;
         let available;
-        const availableIn = service.data.available_in || service.data.availabile_in || [];
+        const availableIn = service.data ? service.data.available_in || service.data.availabile_in || [] : [];
 
         if (!availableIn || !availableIn.length) {
           available = true;
