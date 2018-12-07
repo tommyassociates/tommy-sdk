@@ -8,7 +8,7 @@
       </f7-nav-right>
     </f7-navbar>
 
-    <f7-list class="top-0">
+    <f7-list class="top-0 list-custom">
       <f7-list-item>
         <f7-input type="text" :placeholder="$t('invoicing.list_add.name_placeholder', 'Name')" :value="name" @input="name = $event.target.value"></f7-input>
       </f7-list-item>

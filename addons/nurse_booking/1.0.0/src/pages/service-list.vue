@@ -9,16 +9,20 @@
       centeredSlides: true,
       slidesPerView: 'auto',
       touchMoveStopPropagation: false,
+      on: {
+        tap: onSlideClick
+      },
     }" class="service-cards no-swipe-panel" v-if="services">
       <f7-swiper-slide
         v-for="service in services"
         :key="`${serviceType(service)}-${service.id}`"
+        :data-url="`/nurse_booking/service-details/${service.id}/?type=${serviceType(service)}`"
       >
-        <a :href="`/nurse_booking/service-details/${service.id}/?type=${serviceType(service)}`" class="service-card">
+        <a href="#" class="service-card">
           <div class="service-card-pic" :style="`background-image:url(${serviceImage(service)})`"></div>
           <div class="service-card-content">
             <div class="service-card-title">{{service.name}}</div>
-            <div class="service-card-duration" v-if="service.data.duration">{{service.data.duration}}min</div>
+            <div class="service-card-duration" v-if="service.data && service.data.duration">{{service.data.duration}}min</div>
             <div v-if="service.coupons && service.coupons.length" class="service-card-coupons">{{service.coupons.length}} Coupons</div>
             <div v-else class="service-card-price">¥ {{service.price}}</div>
           </div>
@@ -38,6 +42,12 @@
       };
     },
     methods: {
+      onSlideClick(e) {
+        const self = this;
+        const url = self.$$(e.target).closest('.swiper-slide').attr('data-url');
+        if (!url) return;
+        self.$f7router.navigate(url);
+      },
       serviceType(service) {
         return service.vendor_package_products ? 'package' : 'product';
       },

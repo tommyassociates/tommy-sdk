@@ -46,6 +46,14 @@
         :value="item.category"
         @input="($event) => {item.category = $event.target.value; enableSave()}"
       ></f7-list-input>
+      <!-- Available in -->
+      <f7-list-item divider :title="$t('invoicing.item.available_in_label', 'Available in')"></f7-list-item>
+      <f7-list-input
+        :placeholder="$t('invoicing.item.available_in_placeholder', 'City where it is available')"
+        type="text"
+        :value="availabile_in"
+        @input="setAvailable($event.target.value)"
+      ></f7-list-input>
       <!-- Photo -->
       <f7-list-item divider :title="$t('invoicing.item.photo_label', 'Photo')"></f7-list-item>
       <li>
@@ -107,7 +115,7 @@
         :label="$t('invoicing.item.price_label', 'Price')"
         :placeholder="$t('invoicing.item.price_placeholder', 'Enter item/service price')"
         type="text"
-        :value="item.price ? `¥${item.price}` : ''"
+        :value="item.price"
         @input="setPrice($event.target.value)"
       ></f7-list-input>
       <!-- <f7-list-input
@@ -126,7 +134,7 @@
       ></f7-list-input>
     </f7-list>
 
-    <f7-popup :opened="productsOpened" @popup:closed="productsOpened = false">
+    <f7-popup :opened="productsOpened" @popup:closed="productsOpened = false" v-if="products">
       <f7-view :init="false">
         <f7-page class="invoicing-page">
           <f7-navbar>
@@ -135,8 +143,8 @@
             </f7-nav-right>
             <f7-nav-title>{{$t('invoicing.package.add_item_label')}}</f7-nav-title>
           </f7-navbar>
-          <f7-searchbar v-if="products" search-container=".invoicing-order-details-products"></f7-searchbar>
-          <f7-list v-if="products" class="list-custom invoicing-order-details-products">
+          <f7-searchbar search-container=".invoicing-package-details-products" :disable-button="false"></f7-searchbar>
+          <f7-list class="list-custom invoicing-order-details-products invoicing-package-details-products">
             <f7-list-item
               v-for="product in products"
               :key="product.id"
@@ -171,6 +179,7 @@
         imagePreview: null,
         products: null,
         productsOpened: false,
+        availabile_in: '',
       };
     },
     mounted() {
@@ -188,6 +197,9 @@
           name: '',
           price: 0,
           vendor_package_products_attributes: [],
+          data: {
+            availabile_in: [],
+          },
         };
         return;
       }
@@ -209,12 +221,19 @@
             availabile_in: [],
           };
         }
+        self.availabile_in = (item.data.availabile_in || []).join(',');
         if (typeof item.filters === 'string') item.filters = JSON.parse(decodeURIComponent(item.filters));
         if (!item.filters) item.filters = [];
         self.item = item;
       });
     },
     methods: {
+      setAvailable(value) {
+        const self = this;
+        self.availabile_in = value;
+        self.item.data.availabile_in = value.split(',').map(el => el.trim()).filter(el => el);
+        self.enableSave();
+      },
       productName(id) {
         const self = this;
         return self.products.filter(el => el.id === parseInt(id, 10))[0].name;
@@ -253,9 +272,8 @@
       },
       setPrice(value) {
         const self = this;
-        const newPrice = value.replace(/[¥ ]*/, '').replace(/,/g, '.').trim();
-        self.item.price = newPrice;
-        self.item.price_cents = self.item.price * 100;
+        self.item.price = value;
+        self.item.price_cents = parseFloat(self.item.price) * 100;
         if (Number.isNaN(self.item.price_cents)) self.item.price_cents = 0;
         self.enableSave();
       },

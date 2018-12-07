@@ -64,7 +64,9 @@ const routes = [
   },
   {
     path: '/invoicing/order-details/:id?/',
-    component: OrderDetailsPage,
+    popup: {
+      component: OrderDetailsPage,
+    },
   },
   {
     path: '/invoicing/promotion-details/:id?/',

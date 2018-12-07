@@ -9,10 +9,14 @@
       </f7-nav-right>
     </f7-navbar>
 
-    <f7-swiper v-if="orderedLists && orderedLists.length" :params="{
+    <f7-swiper v-if="orderedLists && orderedLists.length" class="no-swipe-panel" :params="{
       slidesPerView: 'auto',
       breakpointsInverse: true,
       centeredSlides: false,
+      touchMoveStopPropagation: false,
+      on: {
+        tap: onSlideClick
+      },
       breakpoints: {
         768: {
           centeredSlides: true,
@@ -27,7 +31,7 @@
           <div class="orders-list-header">
             <div>{{list.name}}</div>
             <div v-if="canEditList(list)">
-              <a :href="`/invoicing/list-edit/${list.id}/`">
+              <a :data-url="`/invoicing/list-edit/${list.id}/`">
                 <img
                   :src="`${$addonAssetsUrl}slice6.png`"
                   :srcset="`${$addonAssetsUrl}slice6@2x.png 2x, ${$addonAssetsUrl}slice6@3x.png 3x`"
@@ -37,7 +41,7 @@
           </div>
           <div class="orders-list-content">
             <template v-if="list.orders && list.orders.length">
-              <a v-for="(order, index) in list.orders" :key="index" :href="`/invoicing/order-details/${order.id}/`" class="card invoicing-order-card">
+              <a v-for="(order, index) in list.orders" :key="index" :data-url="`/invoicing/order-details/${order.id}/`" class="card invoicing-order-card">
                 <div class="card-header">
                   <span class="order-date" v-if="order.data && order.data.date">{{orderDate(order.data ? order.data.date : null)}}</span>
                   <span class="order-status">{{$t(`invoicing.order_status.${order.status}`)}}</span>
@@ -121,6 +125,12 @@
       },
     },
     methods: {
+      onSlideClick(e) {
+        const self = this;
+        const url = self.$$(e.target).closest('a').eq(0).attr('data-url');
+        if (!url) return;
+        self.$f7router.navigate(url);
+      },
       humanTime,
       orderDate(date) {
         const self = this;

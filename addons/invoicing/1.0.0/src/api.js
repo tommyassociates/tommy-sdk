@@ -50,6 +50,12 @@ const API = {
     if (list.data.price_max) {
       params.price_max = list.data.price_max;
     }
+    if (list.data.balance_min) {
+      params.balance_min = list.data.balance_min;
+    }
+    if (list.data.balance_max) {
+      params.balance_max = list.data.balance_max;
+    }
     if (list.data.type === 'invoice') {
       params.invoices = true;
     }

@@ -62,6 +62,12 @@
       </f7-list-item>
 
       <!-- Balance Range -->
+      <f7-list-item
+        link
+        :title="$t('invoicing.list_edit.balance_range')"
+        @click="showBalanceRange"
+        :after="typeof list.data.balance_min !== 'undefined' && typeof list.data.balance_max !== 'undefined' ? `${list.data.balance_min} - ${list.data.balance_max}` : ''"
+      ></f7-list-item>
 
       <!-- Payment Range -->
       <f7-list-item
@@ -201,6 +207,25 @@
         self.$f7router.navigate('/invoicing/list-edit/date-range/', {
           props: {
             list: self.list,
+          },
+        });
+      },
+      showBalanceRange() {
+        const self = this;
+        const { balance_min, balance_max } = self.list.data;
+        self.$f7router.navigate('/invoicing/range-select/', {
+          props: {
+            pageTitle: self.$t('invoicing.list_edit.balance_range'),
+            from: balance_min ? parseFloat(balance_min) : balance_min,
+            to: balance_max ? parseFloat(balance_max) : balance_max,
+            onSave({ from, to }) {
+              self.list.data.balance_min = from;
+              self.list.data.balance_max = to;
+              self.list = self.list;
+              API.saveList(self.list).then(() => {
+                self.$f7router.back();
+              });
+            },
           },
         });
       },

@@ -201,6 +201,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$red}
       font-size: 14px;
       color: #666666;
       background: #f7f7f7 !important;
+      text-transform: uppercase;
       &::before {
         display: none
       }
@@ -320,48 +321,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$red}
       }
     }
   }
-  .messagebar {
-    background: #FFFFFF;
-    box-shadow: 0 -1px 0 0 #EEEEEE;
-    .icon-only {
-      min-width: 32px;
-    }
-    textarea {
-      background-color: #f8f8f8;
-      border-color: #f2f2f2;
-      font-size: 14px;
-      font-weight: 400;
-      &::placeholder {
-        color: #ccc;
-      }
-    }
-    textarea+.link {
-      font-size: 16px;
-      font-weight: 400
-    }
-  }
-  .navbar {
-    background: #fafafa;
-    .center {
-      font-size: 20px !important;
-      color: #333333;
-      letter-spacing: -0.48px;
-      font-weight: normal !important;
-    }
-    i.icon {
-      color: #333;
-    }
-    a.save {
-      visibility: hidden;
-      &.active {
-        visibility: initial;
-      }
-      i {
-        font-size: 25px;
-        color: $red
-      }
-    }
-  }
+
   &.page {
     background: #f1f1f1
   }

@@ -46,7 +46,8 @@
     "sort_price_high": "Price high",
     "sort_price_low": "Price low",
     "sort_newest": "Newest",
-    "payment_range": "Payment Range"
+    "payment_range": "Payment Range",
+    "balance_range": "Balance Range"
   },
   "list_add": {
     "title": "Add List",
@@ -85,7 +86,9 @@
     "sku_label": "SKU",
     "sku_placeholder": "Enter item/service SKU",
     "barcode_label": "Barcode ID",
-    "barcode_placeholder": "Enter item/service barcode ID"
+    "barcode_placeholder": "Enter item/service barcode ID",
+    "available_in_label": "Available in",
+    "available_in_placeholder": "City where it is available"
   },
   "product": {
     "new_title": "New Item"

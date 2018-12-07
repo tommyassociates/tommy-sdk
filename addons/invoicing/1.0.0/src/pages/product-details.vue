@@ -34,7 +34,7 @@
       <f7-list-item divider :title="$t('invoicing.item.duration_label', 'Duration')"></f7-list-item>
       <f7-list-input
         :placeholder="$t('invoicing.item.duration_placeholder', 'Item duration in minutes')"
-        type="text"
+        type="number"
         :value="item.data.duration"
         @input="onDurationChange"
       ></f7-list-input>
@@ -45,6 +45,14 @@
         type="text"
         :value="item.category"
         @input="($event) => {item.category = $event.target.value; enableSave()}"
+      ></f7-list-input>
+      <!-- Available in -->
+      <f7-list-item divider :title="$t('invoicing.item.available_in_label', 'Available in')"></f7-list-item>
+      <f7-list-input
+        :placeholder="$t('invoicing.item.available_in_placeholder', 'City where it is available')"
+        type="text"
+        :value="availabile_in"
+        @input="setAvailable($event.target.value)"
       ></f7-list-input>
       <!-- Photo -->
       <f7-list-item divider :title="$t('invoicing.item.photo_label', 'Photo')"></f7-list-item>
@@ -85,8 +93,8 @@
       <f7-list-input
         :label="$t('invoicing.item.price_label', 'Price')"
         :placeholder="$t('invoicing.item.price_placeholder', 'Enter item/service price')"
-        type="text"
-        :value="item.price ? `¥${item.price}` : ''"
+        type="number"
+        :value="item.price"
         @input="setPrice($event.target.value)"
       ></f7-list-input>
       <!-- <f7-list-input
@@ -124,6 +132,7 @@
         item: null,
         showSave: false,
         imagePreview: null,
+        availabile_in: '',
       };
     },
     mounted() {
@@ -151,17 +160,23 @@
             availabile_in: [],
           };
         }
+        self.availabile_in = (item.data.availabile_in || []).join(',');
         if (typeof item.filters === 'string') item.filters = JSON.parse(decodeURIComponent(item.filters));
         if (!item.filters) item.filters = [];
         self.item = item;
       });
     },
     methods: {
+      setAvailable(value) {
+        const self = this;
+        self.availabile_in = value;
+        self.item.data.availabile_in = value.split(',').map(el => el.trim()).filter(el => el);
+        self.enableSave();
+      },
       setPrice(value) {
         const self = this;
-        const newPrice = value.replace(/[¥ ]*/, '').replace(/,/g, '.').trim();
-        self.item.price = newPrice;
-        self.item.price_cents = self.item.price * 100;
+        self.item.price = value;
+        self.item.price_cents = parseFloat(self.item.price) * 100;
         if (Number.isNaN(self.item.price_cents)) self.item.price_cents = 0;
         self.enableSave();
       },
