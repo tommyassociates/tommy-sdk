@@ -91,10 +91,10 @@
     "available_in_placeholder": "City where it is available"
   },
   "product": {
-    "new_title": "New Item"
+    "new_title": "Item / Service"
   },
   "package": {
-    "new_title": "New Package",
+    "new_title": "Package",
     "items_label": "Items",
     "add_item_label": "Add Item/Service"
   },

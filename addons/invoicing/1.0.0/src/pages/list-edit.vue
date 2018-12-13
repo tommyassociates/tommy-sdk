@@ -62,12 +62,12 @@
       </f7-list-item>
 
       <!-- Balance Range -->
-      <f7-list-item
+      <!-- <f7-list-item
         link
         :title="$t('invoicing.list_edit.balance_range')"
         @click="showBalanceRange"
         :after="typeof list.data.balance_min !== 'undefined' && typeof list.data.balance_max !== 'undefined' ? `${list.data.balance_min} - ${list.data.balance_max}` : ''"
-      ></f7-list-item>
+      ></f7-list-item> -->
 
       <!-- Payment Range -->
       <f7-list-item
