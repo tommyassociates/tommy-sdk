@@ -1,0 +1,58 @@
+{
+  "index": {
+    "title": "健康简介",
+    "profile_age_label": "年龄:",
+    "profile_sex_label": "性别:",
+    "profile_sex_options": ["男", "女"],
+    "frequency_everyday_label": "每天",
+    "frequency_every_label": "每",
+    "frequency_times_label": "次数",
+    "frequency_options": ["分钟","小时","天"],
+    "between_label": "在",
+    "between_and_label": "之间",
+    "vital_types": ["服药提醒","血压","血糖","心率","饮水记录","体温","计步器","身高","体重","过敏症","疫苗注射"],
+"water_units": ["杯子（英制度量衡）", "杯子 （美国度量衡）", "液体盎司（英制度量衡）", "液体盎司（美国度量衡）", "升", "毫升", "磅（英制度量衡）", "磅（美国度量衡）"],
+    "medication_units": ["包", "毫升", "片", "毫克", "滴"],
+    "blood_glucose_units": "毫摩尔每升",
+    "body_temperature_units": ["摄氏度", "华氏度"],
+    "pedometer_units": "步",
+    "height_units": ["厘米", "英寸"],
+    "heart_rate_units": "每分钟跳动次数",
+    "blood_pressure_units": "毫摩尔每克",
+    "weight_units": ["千克", "英磅", "英石"]
+  },
+  "settings": {
+    "title": "设置",
+    "vital_types": ["服药提醒","血压","血糖","心率","饮水记录","体温","计步器","身高","体重","过敏症","疫苗注射"],
+    "history_label": "历史记录",
+    "enabled_title": "启用",
+    "available_title": "可用"
+  },
+  "settings_vital": {
+    "title_types": ["服药提醒","血压","血糖","心率","饮水记录","体温","计步器","身高","体重","过敏症","疫苗注射"],
+    "enabled_label": "启用",
+    "inform_label": "通知",
+    "inform_notice_label": "超出范围将发送消息",
+    "frequency_title": "频率",
+    "frequency_label": "频率",
+    "frequency_everyday_label": "每天",
+    "frequency_every_label": "每",
+    "frequency_times_label": "次数",
+    "frequency_options": ["分钟","小时","天"],
+    "range_title": "范围",
+    "display_label": "显示",
+    "low_label": "低",
+    "high_label": "高"
+  },
+  "settings_profile": {
+    "title": "简介",
+    "enabled_label": "启用"
+  },
+  "history": {
+    "title": "历史记录"
+  },
+  "title": "健康简介",
+  "summary": "",
+  "description": "",
+  "developer": "Tommy Labs GmbH"
+}
