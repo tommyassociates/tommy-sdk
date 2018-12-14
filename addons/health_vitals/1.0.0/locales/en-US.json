@@ -1,0 +1,59 @@
+{
+  "index": {
+    "title": "Health Vitals",
+    "profile_age_label": "Age:",
+    "profile_sex_label": "Sex:",
+    "profile_sex_options": ["Male", "Female"],
+    "frequency_everyday_label": "Everyday",
+    "frequency_every_label": "Every",
+    "frequency_times_label": "Times",
+    "frequency_options": ["Minute","Hour","Day"],
+    "between_label": "Between",
+    "between_and_label": "and",
+    "vital_types": ["Medication Reminder","Blood Pressure","Blood Glucose","Heart Rate","Water Tracker","Temperature","Pedometer","Height","Weight","Allergies","Immunizations"],
+    "water_units": ["cups (Imperial)", "cups (US)", "fl oz (Imperial)", "fl oz (US)", "L", "mL", "pt (Imperial)", "pt (US)"],
+    "medication_units": ["bag", "Ml", "Pill", "mg", "Drop"],
+    "blood_glucose_units": "mmol/L",
+    "body_temperature_units": ["°C", "°F"],
+    "pedometer_units": "steps",
+    "height_units": ["cm", "in"],
+    "heart_rate_units": "bpm",
+    "blood_pressure_units": "mmHg",
+    "weight_units": ["kg", "lbs", "st"],
+    "taken": "Taken"
+  },
+  "settings": {
+    "title": "Settings",
+    "vital_types": ["Medication Reminder","Blood Pressure","Blood Glucose","Heart Rate","Water Tracker","Temperature","Pedometer","Height","Weight","Allergies","Immunizations"],
+    "history_label": "History",
+    "enabled_title": "Enabled",
+    "available_title": "Available"
+  },
+  "settings_vital": {
+    "title_types": ["Medication Reminder","Blood Pressure","Blood Glucose","Heart Rate","Water Tracker","Temperature","Pedometer","Height","Weight","Allergies","Immunizations"],
+    "enabled_label": "Enabled",
+    "inform_label": "Inform",
+    "inform_notice_label": "Send message when drop outside range",
+    "frequency_title": "Frequency",
+    "frequency_label": "Frequency",
+    "frequency_everyday_label": "Everyday",
+    "frequency_every_label": "Every",
+    "frequency_times_label": "Times",
+    "frequency_options": ["Minute","Hour","Day"],
+    "range_title": "Range",
+    "display_label": "Display",
+    "low_label": "Low",
+    "high_label": "High"
+  },
+  "settings_profile": {
+    "title": "Profile",
+    "enabled_label": "Enabled"
+  },
+  "history": {
+    "title": "History"
+  },
+  "title": "Health Vitals",
+  "summary": "",
+  "description": "",
+  "developer": "Tommy Labs GmbH"
+}
