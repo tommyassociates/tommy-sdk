@@ -13,6 +13,10 @@
       slidesPerView: 'auto',
       breakpointsInverse: true,
       centeredSlides: false,
+      touchMoveStopPropagation: false,
+      on: {
+        tap: onSlideClick
+      },
       breakpoints: {
         768: {
           centeredSlides: true,
@@ -27,7 +31,7 @@
           <div class="tasks-list-header">
             <div>{{list.name}}</div>
             <div v-if="canEditList(list)">
-              <a :href="`/tasks/list-edit/${list.id}/`">
+              <a :data-url="`/tasks/list-edit/${list.id}/`">
                 <img
                   :src="`${$addonAssetsUrl}slice6.png`"
                   :srcset="`${$addonAssetsUrl}slice6@2x.png 2x, ${$addonAssetsUrl}slice6@3x.png 3x`"
@@ -37,7 +41,7 @@
           </div>
           <div class="tasks-list-content">
             <template v-if="list.tasks && list.tasks.length">
-              <a v-for="(task, index) in list.tasks" :key="index" :href="`/tasks/task/${task.id}/`" class="card task-card" :class="isTaskDone(task) ? 'color-gray done' : ''">
+              <a v-for="(task, index) in list.tasks" :key="index" :data-url="`/tasks/task/${task.id}/`" class="card task-card" :class="isTaskDone(task) ? 'color-gray done' : ''">
                 <div class="card-content card-content-padding">
                   <p>{{task.name}}</p>
                 </div>
@@ -129,6 +133,12 @@
       },
     },
     methods: {
+      onSlideClick(e) {
+        const self = this;
+        const url = self.$$(e.target).closest('a').eq(0).attr('data-url');
+        if (!url) return;
+        self.$f7router.navigate(url);
+      },
       taskStatus,
       humanTime,
       listHasScroll(list) {
