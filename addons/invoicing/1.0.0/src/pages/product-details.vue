@@ -182,6 +182,10 @@
       },
       enableSave() {
         const self = this;
+        if (!self.item.name) {
+          self.showSave = false;
+          return;
+        }
         self.showSave = true;
       },
       addItemTag(tag) {
