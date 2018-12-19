@@ -1,1 +1,179 @@
-{}
+{
+  "index" : {
+    "title" : "订单",
+    "title_user": "{{user}} 订单"
+  },
+  "common": {
+    "search_members_tags": "Search Members, Tags",
+    "date_range": "日期区间",
+    "choose_range": "自定义",
+    "start_date": "开始日期",
+    "end_date": "截止日期",
+    "amount_min": "从",
+    "amount_max": "至"
+  },
+  "settings": {
+    "title": "设置",
+    "list_management": "列表管理",
+    "item_service_management": "订单管理",
+    "promotion_management": "优惠管理"
+  },
+  "list_management": {
+    "title": "列表管理",
+    "create_list": "创建新的列表"
+  },
+  "order_status": {
+    "quote": "订单",
+    "pending": "Pending",
+    "paid": "已经支付",
+    "processing": "Processing",
+    "complete": "Complete"
+  },
+  "list_edit": {
+    "title": "编辑列表",
+    "name": "名字",
+    "delete_list": "删除",
+    "filter_status": "状态",
+    "activity_from": "活动列表",
+    "customer": "客户",
+    "bill_to": "账单接收人",
+    "type": "种类",
+    "type_all": "All",
+    "type_invoice": "账单",
+    "type_quote": "订单",
+    "sort": "排序",
+    "sort_default": "Default",
+    "sort_price_high": "余额降序",
+    "sort_price_low": "余额升序",
+    "sort_newest": "创建日期降序",
+    "payment_range": "付款范围",
+    "balance_range": "余额范围"
+  },
+  "list_add": {
+    "title": "添加列表",
+    "name_placeholder": "名字"
+  },
+  "item_service_management": {
+    "title": "项目/服务",
+    "items_tab": "项目",
+    "packages_tab": "套餐",
+    "search_items": "搜索服务项目",
+    "search_packages": "搜索服务套餐",
+    "new_item": "New Item/Service",
+    "new_package": "New Package"
+  },
+  "promotion_management": {
+    "title": "Promotions",
+    "search_placeholder": "Search promotions"
+  },
+  "item": {
+    "name_label": "名字",
+    "name_placeholder": "Enter 项目/服务 名字",
+    "enabled_label": "开启",
+    "photos_label": "照片",
+    "photo_label": "Photo",
+    "description_label": "描述",
+    "description_placeholder": "输入套餐描述...",
+    "duration_label": "Duration",
+    "duration_placeholder": "Item duration in minutes",
+    "category_label": "Category",
+    "category_placeholder": "Enter 项目/服务 category",
+    "packages_label": "套餐",
+    "packages_no_packages": "No associated packages found",
+    "tags_label": "标签",
+    "price_label": "价格",
+    "price_placeholder": "Enter 项目/服务 price",
+    "sku_label": "SKU",
+    "sku_placeholder": "Enter 项目/服务 SKU",
+    "barcode_label": "条形码",
+    "barcode_placeholder": "Enter 项目/服务 条形码",
+    "available_in_label": "Available in",
+    "available_in_placeholder": "City where it is available"
+  },
+  "product": {
+    "new_title": "项目/服务"
+  },
+  "package": {
+    "new_title": "套餐",
+    "items_label": "项目",
+    "add_item_label": "Add 项目/服务"
+  },
+  "promotion": {
+    "new_title": "New Promotion",
+    "name_label": "Name",
+    "name_placeholder": "Enter promotion name",
+    "description_label": "Description",
+    "description_placeholder": "Enter promotion description",
+    "expires_label": "Expires",
+    "expires_placeholder": "Expiration date",
+    "amount_label": "Discount amount",
+    "amount_placeholder": "Enter promotion discount",
+    "item_label": "Item",
+    "item_placeholder": "Select item for this promotion",
+    "customer_label": "Customer",
+    "customer_placeholder": "Select customer for this promotion"
+  },
+
+  "order_details": {
+    "title": "订单细节",
+    "new_title": "New Order",
+    "created": "创建",
+    "due_date": "截止日期",
+    "due_time": "Time",
+    "location": "Location",
+    "city": "City",
+    "city_placeholder": "Add city",
+    "address": "Address",
+    "address_placeholder": "Add address",
+    "status": "状态",
+    "type": "种类",
+    "discount": "Discount",
+    "total": "合计",
+    "comment": "Comments",
+    "comment_placeholder": "Add comments",
+    "customer": "客户",
+    "items": "项目",
+    "packages": "套餐",
+    "promotions": "优惠",
+    "payment": "付款",
+    "add_item_label": "Add 项目/服务",
+    "add_promotion_label": "Add 优惠"
+  },
+  "date_range": {
+    "none": "None",
+    "today": "今天",
+    "week": "本周",
+    "month": "本月"
+  },
+  "views": {
+    "index": {
+      "title": "订单"
+    }
+  },
+  "title": "Invoicing",
+  "summary": "Manage your orders and products.",
+  "description": "Manage your orders and products.",
+  "developer": "Tommy Labs GmbH",
+  "permissions": {
+    "filter_orders": {
+      "title": "Filter Orders",
+      "hint": "Select which orders will appear on the list"
+    },
+    "invoicing_order_list_read_access": {
+      "title": "可以看列表的人",
+      "hint": "Select who can view this list"
+    },
+    "invoicing_order_list_edit_access": {
+      "title": "Who Can Edit List",
+      "hint": "Select who can edit this list"
+    },
+    "invoicing_item_create_access": {
+      "title": "Who Can Create Items",
+      "hint": "Select who can create items/services"
+    },
+    "invoicing_item_edit_access": {
+      "title": "Who Can Edit Items",
+      "hint": "Select who can edit items/services"
+    }
+  }
+}

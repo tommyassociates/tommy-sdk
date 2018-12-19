@@ -63,13 +63,39 @@
     "details_button": "查看订单详情",
     "home_button": "返回主页 "
   },
+  "order_error": {
+    "title": "Error occured. Order is waiting for the payment",
+    "details_button": "查看订单详情",
+    "home_button": "返回主页"
+  },
+  "order_canceled": {
+    "title": "订单取消成功",
+    "message": "退款将在1-2个工作日内返还到你的付款帐户，请注意查收。",
+    "home_button": "返回主页"
+  },
   "order_details": {
     "title": "订单详情",
     "service_label": "服务",
-    "time_label": "Time",
+    "time_label": "时间",
     "coupons_label": "优惠券",
     "total_label": "总计",
-    "payment_label": "付款"
+    "payment_label": "付款",
+    "status_canceled": "订单已取消",
+    "status_progress": "订单正在进行中",
+    "status_complete": "订单已完成！",
+    "status_pending": "需要付款",
+    "cancel_button": "取消",
+    "repeat_button": "Repeat",
+    "pay_button": "立即付款",
+    "cancel_confirm": "取消订单将无法享受上门服务，是否确认取消"
+  },
+  "history": {
+    "title": "预订",
+    "status_canceled": "订单已取消",
+    "status_paid": "订单正在进行中",
+    "status_processing": "订单正在进行中",
+    "status_complete": "订单已完成！",
+    "status_pending": "需要付款"
   },
   "views": {
     "main": {

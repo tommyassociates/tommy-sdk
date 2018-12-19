@@ -1,6 +1,7 @@
 {
   "index": {
-    "title": "可用性"
+    "title": "可用性",
+    "available_button": "可以工作的时间"
   },
   "word": {
     "am": "上午",
