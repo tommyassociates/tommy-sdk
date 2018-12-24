@@ -5,7 +5,7 @@
       <f7-nav-title>{{$t('wallet_accounts.index.title', 'Wallet Accounts')}}</f7-nav-title>
       <f7-nav-right>
         <f7-link href="/wallet_accounts/board-settings/" icon-f7="gear"></f7-link>
-        <f7-link href="/wallet_accounts/transaction-add/" icon-f7="add"></f7-link>
+        <f7-link icon-f7="add" popover-open="#wallet_accounts__index-popover"></f7-link>
       </f7-nav-right>
     </f7-navbar>
 
@@ -13,6 +13,10 @@
       slidesPerView: 'auto',
       breakpointsInverse: true,
       centeredSlides: false,
+      touchMoveStopPropagation: false,
+      on: {
+        tap: onSlideClick
+      },
       breakpoints: {
         768: {
           centeredSlides: true,
@@ -27,7 +31,7 @@
           <div class="tasks-list-header">
             <div>{{list.name}}</div>
             <div v-if="!actorId">
-              <a :href="`/wallet_accounts/list-edit/${list.id}/`">
+              <a :data-url="`/wallet_accounts/list-edit/${list.id}/`">
                 <img
                   :src="`${$addonAssetsUrl}slice6.png`"
                   :srcset="`${$addonAssetsUrl}slice6@2x.png 2x, ${$addonAssetsUrl}slice6@3x.png 3x`"
@@ -39,7 +43,7 @@
             <div class="card transactions-card">
               <f7-list v-if="list.transactions && list.transactions.length" media-list class="transactions-list no-chevron">
                 <li v-for="(transaction, index) in list.transactions" :key="index">
-                  <a :href="`/wallet_accounts/transaction-details/${transaction.id}/`" class="item-content item-link">
+                  <a :data-url="`/wallet_accounts/transaction-details/${transaction.id}/`" class="item-content item-link">
                     <div class="item-media">
                       <img v-if="transaction.icon_url" :src="transaction.icon_url">
                       <i v-else class="wallet-icon-placeholder"></i>
@@ -62,6 +66,12 @@
         </div>
       </f7-swiper-slide>
     </f7-swiper>
+    <f7-popover id="wallet_accounts__index-popover">
+      <f7-list>
+        <f7-list-button popover-close href="/wallet_accounts/list-add/">{{$t('wallet_accounts.list-add.title', 'Add List')}}</f7-list-button>
+        <f7-list-button popover-close href="/wallet_accounts/transaction-add/">{{$t('wallet_accounts.transaction-add.title', 'New Transaction')}}</f7-list-button>
+      </f7-list>
+    </f7-popover>
   </f7-page>
 </template>
 <script>
@@ -103,6 +113,12 @@
       },
     },
     methods: {
+      onSlideClick(e) {
+        const self = this;
+        const url = self.$$(e.target).closest('a').eq(0).attr('data-url');
+        if (!url) return;
+        self.$f7router.navigate(url);
+      },
       formatTransactionDate,
       formatTransactionAmount,
       listHasScroll(list) {
