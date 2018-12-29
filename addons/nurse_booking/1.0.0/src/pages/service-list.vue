@@ -59,7 +59,7 @@
     },
     mounted() {
       const self = this;
-      const teamId = self.$root.team.id;
+      const teamId = self.$root.team ? self.$root.team.id : self.$root.addons.nurse_booking.data.nursing_team_id;
       Promise.all([API.getServiceList(teamId), API.getCouponList(teamId)]).then(([servicesData, couponsData]) => {
         const services = servicesData.filter(el => el.category === self.category);
 

@@ -81,6 +81,7 @@
       const self = this;
       const { transaction, services, coupon, location, date, nurse } = API.cache.booking;
       const data = {
+        teamId: self.$root.team ? self.$root.team.id : self.$root.addons.nurse_booking.data.nursing_team_id,
         transaction: null,
         services: null,
         coupon: null,
@@ -122,7 +123,7 @@
     mounted() {
       const self = this;
       if (!self.$f7route.query.id) return;
-      API.getOrderDetails(self.$root.team.id, self.$f7route.query.id).then((order) => {
+      API.getOrderDetails(self.teamId, self.$f7route.query.id).then((order) => {
         self.order = order;
         const canceled = order.canceled;
         self.status = {
@@ -144,7 +145,7 @@
           };
         }
         Promise.all(order.vendor_order_items.map((el) => {
-          return API.getServiceDetails(self.$root.team.id, el.orderable_id, el.orderable_type).then((service) => {
+          return API.getServiceDetails(self.teamId, el.orderable_id, el.orderable_type).then((service) => {
             service.quantity = el.quantity;
             return Promise.resolve(service);
           });
@@ -189,7 +190,7 @@
           <div>${self.$t('nurse_booking.order_details.cancel_confirm')}</div>
           `,
           () => {
-            API.cancelOrder(self.$root.team.id, order.id)
+            API.cancelOrder(self.teamId, order.id)
               .then(() => {
                 return API.deleteBookingEvent(order.id);
               })
@@ -210,7 +211,7 @@
         const self = this;
         const { order } = self;
         payOrder({
-          teamId: self.$root.team.id,
+          teamId: self.teamId,
           vendor_order_items_attributes: (order.vendor_order_items || []).map((el) => {
             return {
               orderable_id: el.vendor_product_id,

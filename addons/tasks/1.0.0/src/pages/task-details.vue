@@ -4,7 +4,7 @@
       <f7-page id="tasks__task" name="tasks__task" class="tasks-page">
         <f7-navbar noBorder class="text-color-white">
           <tommy-nav-back></tommy-nav-back>
-          <f7-nav-title>{{taskName}}</f7-nav-title>
+          <f7-nav-title text-color="white">{{taskName}}</f7-nav-title>
           <f7-nav-right>
             <f7-link popover-open=".task-menu-popover" icon-f7="add"></f7-link>
           </f7-nav-right>
