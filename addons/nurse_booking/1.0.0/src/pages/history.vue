@@ -50,7 +50,8 @@
     },
     mounted() {
       const self = this;
-      API.getOrdersHistory(self.$root.team.id).then((orders) => {
+      const teamId = self.$root.team ? self.$root.team.id : self.$root.addons.nurse_booking.data.nursing_team_id;
+      API.getOrdersHistory(teamId).then((orders) => {
         orders.forEach((order) => {
           order.statusKey = `nurse_booking.history.status_${order.canceled ? 'canceled' : order.status}`;
           if (order.data && order.data.date) {

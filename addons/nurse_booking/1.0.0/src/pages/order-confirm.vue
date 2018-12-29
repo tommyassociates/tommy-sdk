@@ -149,9 +149,10 @@
             quantity: el.quantity || 1,
           };
         });
+        const teamId = self.$root.team ? self.$root.team.id : self.$root.addons.nurse_booking.data.nursing_team_id;
         payOrder({
           vendor_order_items_attributes,
-          teamId: self.$root.team.id,
+          teamId,
           productName: services.map(el => el.name).join(', '),
           productId: services[0].id,
           total,
