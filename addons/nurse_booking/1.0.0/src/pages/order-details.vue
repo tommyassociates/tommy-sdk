@@ -81,7 +81,7 @@
       const self = this;
       const { transaction, services, coupon, location, date, nurse } = API.cache.booking;
       const data = {
-        teamId: self.$root.team ? self.$root.team.id : self.$root.addons.nurse_booking.data.nursing_team_id,
+        teamId: self.$root.team ? self.$root.team.id : self.$addons.addons.nurse_booking.data.nursing_team_id,
         transaction: null,
         services: null,
         coupon: null,
