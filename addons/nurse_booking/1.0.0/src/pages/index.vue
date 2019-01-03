@@ -12,12 +12,12 @@
     </f7-swiper>
 
     <div class="sections">
-      <div class="section">
+      <!-- <div class="section">
         <a href="/nurse_booking/vip/">
           <img :src="`${$addonAssetUrl}icon-vip.svg`" />
           <span>{{$t('nurse_booking.index.vip_label', 'VIP')}}</span>
         </a>
-      </div>
+      </div> -->
       <div class="section">
         <a href="/nurse_booking/service-list/?category=Nursing">
           <img :src="`${$addonAssetUrl}icon-nursing.svg`" />

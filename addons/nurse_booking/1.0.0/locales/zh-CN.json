@@ -1,6 +1,6 @@
 {
   "index": {
-    "title": "山缘老人公寓",
+    "title": "居家服务",
     "vip_label": "VIP",
     "nursing_label": "护理",
     "cleaning_label": "保洁",
@@ -99,7 +99,7 @@
   },
   "views": {
     "main": {
-      "title": "山缘老人公寓"
+      "title": "居家服务"
     }
   }
 }
