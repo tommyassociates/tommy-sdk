@@ -1,6 +1,6 @@
 {
   "index": {
-    "title": "ShanYuan",
+    "title": "Home Service",
     "vip_label": "VIP",
     "nursing_label": "Nursing",
     "cleaning_label": "Cleaning",
@@ -99,7 +99,7 @@
   },
   "views": {
     "main": {
-      "title": "ShanYuan"
+      "title": "Home Service"
     }
   }
 }

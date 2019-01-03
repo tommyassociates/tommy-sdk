@@ -1,18 +1,18 @@
 {
   "index": {
-    "title": "Tommy Wallet",
-    "tab_link_wallets": "Wallets",
-    "tab_link_balance": "Balance",
-    "tab_link_transactions": "Transactions",
+    "title": "钱包",
+    "tab_link_wallets": "钱包",
+    "tab_link_balance": "余额",
+    "tab_link_transactions": "转账记录",
     "tab_balance_title": "History",
-    "tab_transactions_title": "Transactions",
-    "no_transactions_message": "Sorry. You do not have any transactions history yet.",
-    "tab_wallets_title": "Wallets"
+    "tab_transactions_title": " 转账记录",
+    "no_transactions_message": "对不起，你的账户还没有历史转账记录",
+    "tab_wallets_title": "钱包"
   },
   "settings": {
     "title": "设置",
-    "balance_label": "Show Balance",
-    "inform_label": "Inform"
+    "balance_label": "显示余额",
+    "inform_label": "信息提醒"
   },
   "transaction_details": {
     "title": "交易详情",
@@ -21,18 +21,18 @@
     "payee_label": "收款人"
   },
   "transaction_popup": {
-    "confirm_button": "Confirm",
-    "pay_label": "Pay",
-    "using_label": "Using",
-    "report_button": "View Report",
+    "confirm_button": "确认",
+    "pay_label": "支付",
+    "using_label": "账户",
+    "report_button": "查看报告",
     "error_title": "支付失败",
     "success_title": "已付款",
-    "success_message": "You sent {{currency}}{{amount}}.<br>To {{to}}.<br>From {{from}}.",
+    "success_message": "发送金额 {{currency}}{{amount}}.<br>收款人 {{to}}.<br>付款人 {{from}}.",
     "error_insufficient": "Sorry. Your account balance is insufficient. Please use other payment method."
   },
   "views": {
     "main": {
-      "title": "Wallet"
+      "title": "钱包"
     }
   }
 }

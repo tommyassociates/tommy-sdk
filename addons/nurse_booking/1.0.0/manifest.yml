@@ -1,8 +1,8 @@
 ---
-  title: "ShanYuan"
+  title: "Home Service"
   package: "nurse_booking"
   version: "1.0.0"
-  summary: "Nurse Booking"
+  summary: "Home Service"
   description: "This addon provides nurse booking integration."
   developer: "Tommy Labs GmbH"
   homepage: "https://mytommy.com"
@@ -19,7 +19,7 @@
       file: "build/addon.js"
   views:
     index:
-      title: "Nurse Booking"
+      title: "Home Service"
       file: ""
       type: "page"
       index: true
