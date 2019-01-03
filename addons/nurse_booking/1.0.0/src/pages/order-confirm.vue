@@ -149,7 +149,7 @@
             quantity: el.quantity || 1,
           };
         });
-        const teamId = self.$root.team ? self.$root.team.id : self.$root.addons.nurse_booking.data.nursing_team_id;
+        const teamId = self.$root.team ? self.$root.team.id : self.$addons.addons.nurse_booking.data.nursing_team_id;
         payOrder({
           vendor_order_items_attributes,
           teamId,
