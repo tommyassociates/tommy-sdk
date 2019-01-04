@@ -97,6 +97,7 @@
     "status_complete": "订单已完成！",
     "status_pending": "需要付款"
   },
+  "title": "居家服务",
   "views": {
     "main": {
       "title": "居家服务"

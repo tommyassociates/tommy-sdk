@@ -97,6 +97,7 @@
     "status_complete": "Order completed!",
     "status_pending": "Need to be paid"
   },
+  "title": "Home Service",
   "views": {
     "main": {
       "title": "Home Service"

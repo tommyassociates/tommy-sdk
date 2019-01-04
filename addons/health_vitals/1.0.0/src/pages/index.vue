@@ -46,7 +46,7 @@
             <div class="health-vitals-card-icon">
               <img :src="`${$addonAssetsUrl}icon-check.svg`" >
             </div>
-            <span class="health-vitals-card-icon-text">{{t('taken')}}</span>
+            <span class="health-vitals-card-icon-text">{{t('taken', 'Taken')}}</span>
             <div class="health-vitals-subcard-value">100%</div>
           </div>
         </div>
@@ -165,9 +165,9 @@
       return {};
     },
     methods: {
-      t(v) {
-        return this.$t(`health_vitals.index.${v}`);
-      }
+      t(v, d) {
+        return this.$t(`health_vitals.index.${v}`, d);
+      },
     },
   };
 </script>
