@@ -72,7 +72,7 @@
       const self = this;
       const teamId = self.$root.team ? self.$root.team.id : self.$addons.addons.nurse_booking.data.nursing_team_id;
       API.getNurseList(teamId).then((nurses) => {
-        if (nurses.length === self.$root.teamMembers.length) {
+        if (self.$root.teamMembers && nurses.length === self.$root.teamMembers.length) {
           self.nurses = self.$root.teamMembers.filter(m => m.tags.indexOf('Available For Work') >= 0);
         } else {
           self.nurses = nurses;
