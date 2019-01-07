@@ -61,7 +61,12 @@
       const self = this;
       const teamId = self.$root.team ? self.$root.team.id : self.$addons.addons.nurse_booking.data.nursing_team_id;
       Promise.all([API.getServiceList(teamId), API.getCouponList(teamId)]).then(([servicesData, couponsData]) => {
-        const services = servicesData.filter(el => el.category === self.category);
+        const cnCategories = {
+          Massage: '按摩',
+          Cleaning: '清洁',
+          Nursing: '护理',
+        };
+        const services = servicesData.filter(el => el.category === self.category || el.category === cnCategories[self.category]);
 
         services.forEach((service) => {
           if (service.vendor_package_products) return;
