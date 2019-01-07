@@ -30,6 +30,7 @@
     "success_message": "发送金额 {{currency}}{{amount}}.<br>收款人 {{to}}.<br>付款人 {{from}}.",
     "error_insufficient": "Sorry. Your account balance is insufficient. Please use other payment method."
   },
+  "title": "钱包",
   "views": {
     "main": {
       "title": "钱包"
