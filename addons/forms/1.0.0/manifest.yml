@@ -1,0 +1,28 @@
+---
+  title: "Forms"
+  package: "forms"
+  version: "1.0.0"
+  summary: "Forms"
+  description: "This addon provides opportunity to create forms."
+  developer: "Tommy Labs GmbH"
+  homepage: "https://mytommy.com"
+  private: false
+  locales:
+    - en-US
+    - zh-CN
+  assets:
+    -
+      type: "stylesheet"
+      file: "build/addon.css"
+    -
+      type: "javascript"
+      file: "build/addon.js"
+  views:
+    index:
+      title: "Forms"
+      file: ""
+      type: "page"
+      index: true
+      framed: false
+      path: "/forms/"
+
