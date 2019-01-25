@@ -33,8 +33,8 @@
 
       <!-- WALLETS -->
       <f7-tab tab-active id="wallet-tab-wallets">
-        <f7-block-title>{{$t('wallet.index.tab_wallets_title', 'Wallets')}}</f7-block-title>
-        <f7-list media-list no-hairlines no-chevron class="wallet-list wallets-list" v-if="wallets">
+        <f7-block-title v-if="wallets && wallets.length">{{$t('wallet.index.tab_wallets_title', 'Wallets')}}</f7-block-title>
+        <f7-list media-list no-hairlines no-chevron class="wallet-list wallets-list" v-if="wallets && wallets.length">
           <f7-list-item
             v-for="(wallet, index) in wallets"
             :key="index"
@@ -51,6 +51,9 @@
             <div class="item-after" slot="inner-end">{{currencyMap(wallet.currency)}}{{wallet.balance}}</div>
           </f7-list-item>
         </f7-list>
+        <f7-block class="text-align-center" style="font-size: 18px; color: #999;" v-if="wallets && !wallets.length">
+          <p>{{$t('wallet.index.no_accounts_message')}}</p>
+        </f7-block>
 
         <f7-block v-if="showTestButton">
           <p>
