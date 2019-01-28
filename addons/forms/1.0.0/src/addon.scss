@@ -1,0 +1,125 @@
+$red: #ff4500;
+$orange: #FF5413;
+$yellow: #FF7B00;
+$blue: #00B4F1;
+
+.navbar-inner.forms__navbar-inner {
+  background: $blue;
+  color: #fff;
+  .title {
+    color: #fff;
+  }
+  a.link {
+    color: #fff;
+  }
+  i {
+    color: #fff;
+  }
+}
+.forms__page {
+  .forms-fab-icon-template {
+    background: url('../assets/icon-template-blue.svg');
+    width: 34px;
+    height: 32px;
+  }
+  .forms-fab-icon-pointer {
+    background: url('../assets/icon-pointer-blue.svg');
+    width: 33px;
+    height: 33px;
+  }
+  .forms-fab-icon-people {
+    background: url('../assets/icon-people-blue.svg');
+    width: 37px;
+    height: 32px;
+  }
+  .forms-fab-icon-plus {
+    background: url('../assets/icon-plus-white.svg');
+    width: 32px;
+    height: 32px;
+  }
+  .forms-fab-icon-close {
+    width: 24px;
+    height: 24px;
+    background: url('../assets/icon-close-white.svg');
+  }
+  .fab > a {
+    background: $blue;
+    color: #fff;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    &.active-state {
+      background: darken($blue, 5%);
+    }
+  }
+  .fab[class*="-bottom"] {
+    bottom: 30px;
+  }
+  .fab-buttons-left {
+    height: 60px;
+    margin-top: -30px;
+  }
+  div.fab-buttons a {
+    background: #fff;
+    color: $blue;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    overflow: visible;
+    &.active-state {
+      background: #f4f4f4;
+    }
+    span {
+      position: absolute;
+      left: 50%;
+      top: 100%;
+      text-align: center;
+      white-space: normal;
+      transform: translateX(-50%);
+      font-size: 14px;
+      font-weight: 500;
+      color: #fff;
+    }
+  }
+}
+.forms-tabbar {
+  height: 50px;
+  background: #fff;
+  .forms-tabbar-inner {
+    height: 100%;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    padding-left: 12px;
+    &:after {
+      content: '';
+      width: 12px;
+      height: 100%;
+      flex-shrink: 0;
+    }
+  }
+  a {
+    font-size: 18px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #999999;
+    padding: 0 5px;
+    flex-shrink: 0;
+    + a {
+      margin-left: 15px;
+    }
+    &.tab-link-active {
+      color: $orange;
+      &:after {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        height: 2px;
+        background: $orange;
+        width: 100%;
+        content: '';
+      }
+    }
+  }
+}
