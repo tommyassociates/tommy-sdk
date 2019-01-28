@@ -37,8 +37,5 @@
       index: true
       framed: false
       path: "/availability/"
+      actor_permission: availability_manager_access
       type: "page"
-      file: ""
-
-
-
