@@ -1,0 +1,191 @@
+{
+  "title": "Forms",
+  "views": {
+    "index": "Forms"
+  },
+  "index": {
+    "title": "Forms",
+    "menu_templates_label": "Templates",
+    "menu_assigned_label": "Assigned",
+    "menu_completed_label": "Completed",
+    "menu_shortcuts_label": "Shortcuts",
+    "menu_myforms_label": "My Forms",
+    "assign_button": "Assign",
+    "edit_button": "Edit",
+    "template_label": "Template",
+    "version_label": "Version",
+    "startdate_label": "Start Date",
+    "enddate_label": "End Date",
+    "display_label": "Display",
+    "notset_label": "Not Set",
+    "assigned_title": "ASSIGNED",
+    "available_label": "AVAILABLE"
+  },
+  "index_add": {
+    "template_button": "Template",
+    "assign_button": "Assign",
+    "shortcut_button": "Shortcut"
+  },
+  "shortcuts_display_options": {
+    "menu_label": "Menu",
+    "team_label": "Team Profile Screen",
+    "contact_label": "Contact Profile Screen",
+    "cancel_button": "Cancel",
+    "done_button": "Done"
+  },
+  "shortcuts_type_options": {
+    "title": "Type",
+    "single_label": "Single Use",
+    "single_text": "Template can only be completed one time.",
+    "multi_label": "Multi Input",
+    "multi_text": "Template can be completed multiple times by the same User. Some Users will be able to view their previous submissions while others will only see Template again for new input.",
+    "recent_label": "Most Recent Update",
+    "recent_text": "Updates to the Template would create new versions. Admin can see the old versions though User can only see the latest version pre-populated."
+  },
+  "shortcut_details_template_select": {
+    "title": "Select Template",
+    "version_notice": "Use the Primary version?",
+    "yes_button": "Yes",
+    "no_button": "No",
+    "select_version_title": "Select Version",
+    "select_version_status": "(active)"
+  },
+  "shortcut_details": {
+    "title": "New Shortcut",
+    "shortcut_icon_label": "Icon",
+    "shortcut_name_label": "Name",
+    "shortcut_availbale_label": "Available",
+    "shortcut_template_label": "Template",
+    "shortcut_display_label": "Display",
+    "shortcut_type_label": "Shortcut Type",
+    "shortcut_anonymous_label": "Anonymous",
+    "shortcut_permission_view_shortcut_title": "WHO CAN SEE SHORTCUT",
+    "done_button": "Done"
+  },
+  "template_edit": {
+    "title": "Edit Template",
+    "template_icon_label": "Icon",
+    "template_name_label": "Name",
+    "template_description_label": "Description",
+    "template_completes_label": "Completes",
+    "template_assignments_label": "Assignments",
+    "template_shortcuts_label": "Shortcuts",
+    "template_permission_view_unassigned_title": "WHO CAN VIEW UNASSIGNED",
+    "template_version_title": "VERSIONS",
+    "template_version_active_label": "(active)",
+    "delete_button": "Delete"
+  },
+  "template_delete_confirm": {
+    "text": "Deleting a Template will remove all form versions and data that has already been entered. This process cannot be recovered. Please confirm you wish to delete this Template?",
+    "cancel_button": "Cancel",
+    "delete_button": "Delete"
+  },
+  "assignment_delete_confirm": {
+    "text": "Deleting an assignment will not delete results already collected. Please confirm that you wish to delete this assignment?",
+    "cancel_button": "Cancel",
+    "delete_button": "Delete"
+  },
+  "shortcut_delete_confirm": {
+    "text": "Deleting this Shortcut will not delete the Template or any data. Only the Shortcut will be removed from it's selected display areas.",
+    "cancel_button": "Cancel",
+    "delete_button": "Delete"
+  },
+  "template_details": {
+    "template_view_title": "View",
+    "template_new_title": "New Template",
+    "template_details_next_button": "Next",
+    "template_details_enabled_label": "Enabled",
+    "template_details_type_label": "Type",
+    "template_details_created_label": "Created",
+    "template_details_deadline_label": "Deadline",
+    "template_details_anonymous_label": "Anonymous",
+    "template_details_completes_label": "Completes",
+    "template_details_assigned_title": "ASSIGNED",
+    "template_details_delete_button": "Delete"
+  },
+  "template_edit": {
+    "title": "Edit Template",
+    "back_label": "BACK",
+    "next_label": "NEXT",
+    "preview_label": "PREVIEW",
+    "copy_label": "COPY",
+    "edit_options_button": "Edit Options",
+    "restart_button": "Restart",
+    "save_button": "Save",
+    "object_barchart_unit_button": "Enter Unit",
+    "object_barchart_value_button": "Enter Value",
+    "object_barchart_quantity_button": "Enter Qty",
+    "object_problemgroup_add_button": "+ Add",
+    "object_date_default_notice_label": "Tap here to select the date...",
+    "object_barchart_enterunit_button": "Enter Unit"
+  },
+  "template_edit_chapter": {
+    "title": "Chapter Options",
+    "new_chapter_default": "Add Chapter...",
+    "chapter_delete_notice": "Please confirm you wish to delete Chapter '[x]', all questions within this chapter will also be removed.",
+    "chapter_delete_cancel_button": "Cancel",
+    "chapter_delete_confirm_button": "Delete"
+  },
+  "template_edit_checkbox_options": {
+    "title": "Edit Options",
+    "color_label": "Colour",
+    "score_label": "Score",
+    "option_delete_notice": "Please confirm you wish to delete Chapter '[x]', all questions within this chapter will also be removed.",
+    "option_delete_cancel_button": "Cancel",
+    "option_delete_confirm_button": "Delete",
+    "inputbox_label": "Input Box",
+    "inputbox_default_label": "Action required...",
+    "mustanswer_label": "Must Answer",
+    "association_label": "Assoication",
+    "conflict_label": "Conflict",
+    "notset_label": "Not Set"
+  },
+  "template_edit_association": {
+    "title": "Association Logic",
+    "topic_label": "Topic:",
+    "option_select_button": "Select Option",
+    "option_select_title": "Select Option",
+    "option_select_selectoptions_title": "SELECT ASSOCIATED ISSUES AND OPTIONS"
+  },
+  "template_edit_conflict": {
+    "title": "Conflict Logic",
+    "topic_label": "Topic:",
+    "conflict_select_button": "Select Option",
+    "conflict_select_title": "Select Option",
+    "conflict_select_current_title": "SELECT CURRENT OPTION",
+    "conflict_select_associated_title": "SELECT ASSOCIATED OPTIONS",
+    "conflict_notice_text": "After selecting one of the options, you cannot select the option that conflicts with it."
+  },
+  "color_select": {
+    "title": "Select Color"
+  },
+  "template_question_add": {
+    "template_question_program_group_button": "Problem Group",
+    "template_question_group_button": "Group",
+    "template_question_problem_button": "Problem",
+    "template_question_location_button": "Location",
+    "template_question_barchart_button": "Bar Chart",
+    "template_question_date_button": "Date",
+    "template_question_multichoice_button": "Multiple Choice",
+    "template_question_signature_button": "Signature",
+    "template_question_text_button": "Text",
+    "template_question_piechart_button": "Pie Chart"
+  },
+  "settings": {
+    "title": "Settings",
+    "icon_label": "Icon",
+    "name_label": "Name",
+    "notification_label": "Notifications",
+    "notification_text": "Receive reminders and notifications about Templates you have been assigned.",
+    "templates_permissions_new_title": "WHO CAN MAKE NEW TEMPLATES",
+    "templates_permissions_edit_title": "WHO CAN EDIT TEMPLATES",
+    "templates_permissions_delete_title": "WHO CAN DELETE TEMPLATES",
+    "templates_permissions_new_shortcuts_title": "WHO CAN CREATE SHORTCUTS",
+    "templates_permissions_delete_shortcuts_title": "WHO CAN DELETE SHORTCUTS",
+    "templates_permissions_new_assign_title": "WHO CAN ASSIGN",
+    "templates_permissions_delete_assign_title": "WHO CAN DELETE ASSIGNMENTS",
+    "templates_permissions_view_completes_title": "WHO CAN VIEW COMPLETES",
+    "templates_permissions_edit_completes_title": "WHO CAN EDIT COMPLETES",
+    "templates_permissions_delete_completes_title": "WHO CAN DELETE COMPLETES"
+  }
+}

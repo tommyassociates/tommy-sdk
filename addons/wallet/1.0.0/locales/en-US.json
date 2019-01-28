@@ -7,7 +7,8 @@
     "tab_balance_title": "History",
     "tab_transactions_title": "Transactions",
     "no_transactions_message": "Sorry. You do not have any transactions history yet.",
-    "tab_wallets_title": "Wallets"
+    "tab_wallets_title": "Wallets",
+    "no_accounts_message": "When you have Accounts, they will appear within your Wallet here."
   },
   "settings": {
     "title": "Settings",

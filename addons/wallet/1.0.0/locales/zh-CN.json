@@ -7,7 +7,8 @@
     "tab_balance_title": "History",
     "tab_transactions_title": " 转账记录",
     "no_transactions_message": "对不起，你的账户还没有历史转账记录",
-    "tab_wallets_title": "钱包"
+    "tab_wallets_title": "钱包",
+    "no_accounts_message": "你的注册账号将会出现在你的钱包账户里"
   },
   "settings": {
     "title": "设置",

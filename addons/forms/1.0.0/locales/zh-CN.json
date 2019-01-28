@@ -1,0 +1,191 @@
+{
+  "title": "表格",
+  "views": {
+    "index": "表格"
+  },
+  "index": {
+    "title": "表格",
+    "menu_templates_label": "模板",
+    "menu_assigned_label": "已分配",
+    "menu_completed_label": "已完成",
+    "menu_shortcuts_label": "快捷方式",
+    "menu_myforms_label": "我的表格",
+    "assign_button": "分配",
+    "edit_button": "编辑",
+    "template_label": "模板",
+    "version_label": "版本",
+    "startdate_label": "开始日期",
+    "enddate_label": "结束日期",
+    "display_label": "显示",
+    "notset_label": "未设置",
+    "assigned_title": "已分配",
+    "available_label": "可用的"
+  },
+  "index_add": {
+    "template_button": "模板",
+    "assign_button": "分配",
+    "shortcut_button": "快捷方式"
+  },
+  "shortcuts_display_options": {
+    "menu_label": "菜单",
+    "team_label": "团队简介屏幕",
+    "contact_label": "联系人资料屏幕",
+    "cancel_button": "取消",
+    "done_button": "完成"
+  },
+  "shortcuts_type_options": {
+    "title": "类型",
+    "single_label": "一次性使用",
+    "single_text": "模板只能完成一次。",
+    "multi_label": "多输入",
+    "multi_text": "模板可以由同一个用户多次完成。一些用户能够查看他们以前提交的，而其他用户只能再次看到新输入的模板。",
+    "recent_label": "最近更新",
+    "recent_text": "对模板的更新将创建新版本。管理员可以看到旧版本，但用户只能看到最新的预设版本。"
+  },
+  "shortcut_details_template_select": {
+    "title": "选择模板",
+    "version_notice": "使用最早的版本？",
+    "yes_button": "是",
+    "no_button": "否",
+    "select_version_title": "选择版本",
+    "select_version_status": "(有效)"
+  },
+  "shortcut_details": {
+    "title": "新快捷方式",
+    "shortcut_icon_label": "图标",
+    "shortcut_name_label": "名称",
+    "shortcut_availbale_label": "可用",
+    "shortcut_template_label": "模板",
+    "shortcut_display_label": "显示",
+    "shortcut_type_label": "快捷方式类型",
+    "shortcut_anonymous_label": "匿名",
+    "shortcut_permission_view_shortcut_title": "谁能看快捷方式",
+    "done_button": "完成"
+  },
+  "template_edit": {
+    "title": "编辑模板",
+    "template_icon_label": "图标",
+    "template_name_label": "名称",
+    "template_description_label": "描述",
+    "template_completes_label": "完成",
+    "template_assignments_label": "分配",
+    "template_shortcuts_label": "快捷方式",
+    "template_permission_view_unassigned_title": "谁能查看未分配的",
+    "template_version_title": "版本",
+    "template_version_active_label": "(有效)",
+    "delete_button": "删除"
+  },
+  "template_delete_confirm": {
+    "text": "删除模板将删除所有已输入的表格版本和数据。此过程无法恢复。请确认你要删除此模板吗？ ",
+    "cancel_button": "取消",
+    "delete_button": "删除"
+  },
+  "assignment_delete_confirm": {
+    "text": "删除任务不会删除已搜集的结果。请确认你要删除此任务吗？ ",
+    "cancel_button": "取消",
+    "delete_button": "删除"
+  },
+  "shortcut_delete_confirm": {
+    "text": "删除此快捷方式不会删除模板或任何数据。只是将快捷方式从其选定的显示区域中删除。",
+    "cancel_button": "取消",
+    "delete_button": "删除"
+  },
+  "template_details": {
+    "template_view_title": "查看",
+    "template_new_title": "新模板",
+    "template_details_next_button": "下一步",
+    "template_details_enabled_label": "已启用",
+    "template_details_type_label": "类型",
+    "template_details_created_label": "已创建",
+    "template_details_deadline_label": "截止日期",
+    "template_details_anonymous_label": "匿名",
+    "template_details_completes_label": "完成",
+    "template_details_assigned_title": "已分配",
+    "template_details_delete_button": "删除"
+  },
+  "template_edit": {
+    "title": "编辑模板",
+    "back_label": "返回",
+    "next_label": "下一步",
+    "preview_label": "预览",
+    "copy_label": "复制",
+    "edit_options_button": "编辑选项",
+    "restart_button": "重启",
+    "save_button": "保存",
+    "object_barchart_unit_button": "输入单位 ",
+    "object_barchart_value_button": "输入值",
+    "object_barchart_quantity_button": "输入数量",
+    "object_problemgroup_add_button": "+添加",
+    "object_date_default_notice_label": "点击此处选择日期...",
+    "object_barchart_enterunit_button": "输入单位"
+  },
+  "template_edit_chapter": {
+    "title": "章节选项",
+    "new_chapter_default": "添加章节...",
+    "chapter_delete_notice": "请确认你要删除章节'[x]'，本章中的所有问题也将被删除。",
+    "chapter_delete_cancel_button": "取消",
+    "chapter_delete_confirm_button": "删除"
+  },
+  "template_edit_checkbox_options": {
+    "title": "编辑选项",
+    "color_label": "颜色",
+    "score_label": "分数",
+    "option_delete_notice": "请确认你要删除章节'[x]'，本章中的所有问题也将被删除。",
+    "option_delete_cancel_button": "取消",
+    "option_delete_confirm_button": "删除",
+    "inputbox_label": "输入框",
+    "inputbox_default_label": "所需操作...",
+    "mustanswer_label": "必须回答",
+    "association_label": "关联",
+    "conflict_label": "冲突",
+    "notset_label": "未设置"
+  },
+  "template_edit_association": {
+    "title": "关联逻辑",
+    "topic_label": "主题:",
+    "option_select_button": "选择选项",
+    "option_select_title": "选择选项",
+    "option_select_selectoptions_title": "选择相关的问题和选项"
+  },
+  "template_edit_conflict": {
+    "title": "冲突逻辑",
+    "topic_label": "主题:",
+    "conflict_select_button": "选择选项",
+    "conflict_select_title": "选择选项",
+    "conflict_select_current_title": "选择当前选项",
+    "conflict_select_associated_title": "选择关联选项",
+    "conflict_notice_text": "选择其中一项后，你就无法选择与其冲突的选项"
+  },
+  "color_select": {
+    "title": "选择颜色"
+  },
+  "template_question_add": {
+    "template_question_program_group_button": "问题组",
+    "template_question_group_button": "群组",
+    "template_question_problem_button": "问题",
+    "template_question_location_button": "位置",
+    "template_question_barchart_button": "柱形图",
+    "template_question_date_button": "日期",
+    "template_question_multichoice_button": "多项选择",
+    "template_question_signature_button": "签名",
+    "template_question_text_button": "文字",
+    "template_question_piechart_button": "饼形图"
+  },
+  "settings": {
+    "title": "设置",
+    "icon_label": "图标",
+    "name_label": "名称",
+    "notification_label": "通知",
+    "notification_text": "接收与你被分配的模板相关的提醒和通知。",
+    "templates_permissions_new_title": "谁可以制作新的模板",
+    "templates_permissions_edit_title": "谁可以编辑模板",
+    "templates_permissions_delete_title": "谁可以删除模板",
+    "templates_permissions_new_shortcuts_title": "谁可以创建快捷方式",
+    "templates_permissions_delete_shortcuts_title": "谁可以删除快捷方式",
+    "templates_permissions_new_assign_title": "谁可以分配",
+    "templates_permissions_delete_assign_title": "谁可以删除分配",
+    "templates_permissions_view_completes_title": "谁可以查看完成",
+    "templates_permissions_edit_completes_title": "谁可以编辑完成",
+    "templates_permissions_delete_completes_title": "谁可以删除完成"
+  }
+}
