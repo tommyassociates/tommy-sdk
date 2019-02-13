@@ -5,7 +5,7 @@
       <f7-nav-title>{{$t('nurse_booking.index.title', 'Nurse Booking')}}</f7-nav-title>
     </f7-navbar>
 
-    <f7-swiper pagination>
+    <f7-swiper pagination ref="swiper">
       <f7-swiper-slide class="swiper-slide" :style="`background-image: url(${$addonAssetUrl}demo-slide.jpg)`"></f7-swiper-slide>
       <f7-swiper-slide class="swiper-slide" :style="`background-image: url(${$addonAssetUrl}demo-slide.jpg)`"></f7-swiper-slide>
       <f7-swiper-slide class="swiper-slide" :style="`background-image: url(${$addonAssetUrl}demo-slide.jpg)`"></f7-swiper-slide>
@@ -19,25 +19,25 @@
         </a>
       </div> -->
       <div class="section">
-        <a href="/nurse_booking/service-list/?category=Nursing">
+        <a href="/nurse_booking/service-list/?category=Nursing&masterDetailRoot=true" data-reload-detail="true">
           <img :src="`${$addonAssetUrl}icon-nursing.svg`" />
           <span>{{$t('nurse_booking.index.nursing_label', 'Nursing')}}</span>
         </a>
       </div>
       <div class="section">
-        <a href="/nurse_booking/service-list/?category=Cleaning">
+        <a href="/nurse_booking/service-list/?category=Cleaning&masterDetailRoot=true" data-reload-detail="true">
           <img :src="`${$addonAssetUrl}icon-cleaning.svg`" />
           <span>{{$t('nurse_booking.index.cleaning_label', 'Cleaning')}}</span>
         </a>
       </div>
       <div class="section">
-        <a href="/nurse_booking/service-list/?category=Massage">
+        <a href="/nurse_booking/service-list/?category=Massage&masterDetailRoot=true" data-reload-detail="true">
           <img :src="`${$addonAssetUrl}icon-massage.svg`" />
           <span>{{$t('nurse_booking.index.massage_label', 'Massage')}}</span>
         </a>
       </div>
       <div class="section">
-        <a href="/nurse_booking/history/">
+        <a href="/nurse_booking/history/?masterDetailRoot=true" data-reload-detail="true">
           <img :src="`${$addonAssetUrl}icon-booking.svg`" />
           <span>{{$t('nurse_booking.index.booking_label', 'Booking')}}</span>
         </a>
@@ -56,6 +56,14 @@
     beforeDestroy() {
       const self = this;
       self.$f7router.view.$navbarEl.removeClass('nurse-booking-index-navbar');
+    },
+    mounted() {
+      const self = this;
+      if (self.$refs.swiper && self.$refs.swiper.swiper) {
+        self.$nextTick(() => {
+          self.$refs.swiper.swiper.update();
+        });
+      }
     },
     methods: {
       onPageBeforeIn() {

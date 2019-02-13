@@ -5,8 +5,8 @@
       <img :src="`${$addonAssetsUrl}order-success.svg`">
     </div>
     <div class="order-status-buttons">
-      <a href="/nurse_booking/order-details/">{{$t('nurse_booking.order_error.details_button')}}</a>
-      <a href="/nurse_booking/" data-clear-previous-history="true">{{$t('nurse_booking.order_error.home_button')}}</a>
+      <a href="/nurse_booking/order-details/?masterDetailRoot=true">{{$t('nurse_booking.order_error.details_button')}}</a>
+      <a href="/nurse_booking/" class="no-master-detail" data-clear-previous-history="true">{{$t('nurse_booking.order_error.home_button')}}</a>
     </div>
   </f7-page>
 </template>

@@ -4,7 +4,7 @@ $yellow: #FF7B00;
 @mixin encoded-svg-background($svg){
   background-image: url("data:image/svg+xml;charset=utf-8,#{$svg}");
 }
-.navbar.nurse-booking-index-navbar {
+.view:not(.view-master-detail) .navbar.nurse-booking-index-navbar {
   background-color: transparent;
   color: #333;
   a.link {
@@ -12,6 +12,17 @@ $yellow: #FF7B00;
   }
   i {
     color: inherit;
+  }
+}
+.view.view-master-detail .navbar.nurse-booking-index-navbar {
+  .navbar-master {
+    color: #333;
+    a.link {
+      color: inherit;
+    }
+    i {
+      color: inherit;
+    }
   }
 }
 .navbar.nurse-booking-vip-navbar {

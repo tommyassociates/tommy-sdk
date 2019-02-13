@@ -122,6 +122,12 @@
     },
     mounted() {
       const self = this;
+      if (self.$f7route.query.masterDetailRoot) {
+        const navbarEl = self.$f7.navbar.getElByPage(self.$el);
+        if (navbarEl) {
+          self.$$(navbarEl).addClass('navbar-master-detail-root');
+        }
+      }
       if (!self.$f7route.query.id) return;
       API.getOrderDetails(self.teamId, self.$f7route.query.id).then((order) => {
         self.order = order;

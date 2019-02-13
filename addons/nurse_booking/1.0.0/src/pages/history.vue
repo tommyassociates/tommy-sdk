@@ -50,6 +50,12 @@
     },
     mounted() {
       const self = this;
+      if (self.$f7route.query.masterDetailRoot) {
+        const navbarEl = self.$f7.navbar.getElByPage(self.$el);
+        if (navbarEl) {
+          self.$$(navbarEl).addClass('navbar-master-detail-root');
+        }
+      }
       const teamId = self.$root.team ? self.$root.team.id : self.$addons.addons.nurse_booking.data.nursing_team_id;
       API.getOrdersHistory(teamId).then((orders) => {
         orders.forEach((order) => {

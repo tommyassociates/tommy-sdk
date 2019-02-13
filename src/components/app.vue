@@ -8,19 +8,20 @@
             <f7-list-item
               link="/"
               title="Addons"
-              reload-current
+              reload-all
               panel-close
             ></f7-list-item>
             <f7-list-item
               link="/settings/"
               title="Settings"
+              reload-all
               panel-close
             ></f7-list-item>
           </f7-list>
         </f7-page>
       </f7-view>
     </f7-panel>
-    <f7-view class="ios-edges" main url="/"></f7-view>
+    <f7-view class="ios-edges" main url="/" :masterDetailBreakpoint="1024"></f7-view>
   </f7-app>
 </template>
 
