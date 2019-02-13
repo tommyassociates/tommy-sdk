@@ -17,6 +17,7 @@ const routes = [
   {
     path: '/nurse_booking/',
     component: IndexPage,
+    master: true,
   },
   {
     path: '/nurse_booking/vip/',

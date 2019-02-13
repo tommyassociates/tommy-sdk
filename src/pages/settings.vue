@@ -1,7 +1,7 @@
 <template>
   <f7-page id="settings">
     <f7-navbar>
-      <tommy-nav-back></tommy-nav-back>
+      <tommy-nav-back href="/" force></tommy-nav-back>
       <f7-nav-title>Settings</f7-nav-title>
     </f7-navbar>
 
