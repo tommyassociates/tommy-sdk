@@ -1,0 +1,71 @@
+{
+  "index": {
+    "title": "Weight",
+    "vital_label": "No Data",
+    "vital_unit": ["kg", "lbs", "st"],
+    "not_available": "Add new records by clicking \"+\" button.",
+    "loading_label": "Loading...",
+    "manual_button": "Enter Manually",
+    "device_button": "Device"
+  },
+  "device": {
+    "title": "Device",
+    "device_label": "Default Device",
+    "search_button": "Find new device",
+    "start_button": "Start Measuring",
+    "new_label": "New Device"
+  },
+  "bluetooth_error": {
+    "text": "Bluetooth is not turned on or does not support the device.",
+    "confirm_button": "OK"
+  },
+  "device_search": {
+    "title": "New device",
+    "scan_label": "Searching...",
+    "not_available": "No available devices found",
+    "search_button": "Search Again"
+  },
+  "device_found": {
+    "title": "Add new device",
+    "devices_label": "Devices Found"
+  },
+  "device_operate": {
+    "title": "Measurement",
+    "scan_label": "Measuring...",
+    "vital_unit": ["kg", "lbs", "st"],
+    "restart_button": "Restart",
+    "save_button": "Save"
+  },
+  "manual_enter": {
+    "title": "Add Measurement",
+    "vital_label": "Body Weight",
+    "vital_unit": ["kg", "lbs", "st"],
+    "date_label": "Date",
+    "time_label": "Time",
+    "variants_button": "Done",
+    "save_text": "Saved successfully!",
+    "save_button": "OK"
+  },
+  "settings": {
+    "title": "Settings",
+    "vital_text": "Being overweight or underweight is not good for health, nor does it give a sense of fitness. Being consistent and within healthy range is a good sign of health.",
+    "chat_label": "Receive the message",
+    "vital_unit_label": "Preference",
+    "vital_unit": ["kg", "lbs", "st"],
+    "source_label": "Data Sources",
+    "add_label": "Add Data Source"
+  },
+  "device_details": {
+    "remove_button": "Remove Device"
+  },
+  "history": {
+    "title": "History",
+    "date_options": ["Day","Week","Month"],
+    "vital_unit": ["kg", "lbs", "st"],
+    "week_days": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  },
+  "title": "Weight",
+  "summary": "",
+  "description": "",
+  "developer": "Tommy Labs GmbH"
+}
