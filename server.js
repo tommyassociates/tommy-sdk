@@ -33,10 +33,13 @@ function getFilteredFiles(folder, pkg) {
 
 
 function createAddon(host, action, pkg, version, archivePath, callback) {
-  const url1 = `https://api.mytommy.com/v1/addons/${action}?api_key=${config.apiKey}`;
-  const url2 = `https://api.tuome.com.cn/v1/addons/${action}?api_key=${config.apiKey}`;
+  const urls = [
+    `https://api.mytommy.com/v1/addons/${action}?api_key=${config.apiKey}`,
+    `http://api.tuome.com.cn/v1/addons/${action}?api_key=${config.apiKey}`,
+  ];
 
-  const promises = [url1, url2].map(url => new Promise((resolve, reject) => {
+  const promises = urls.map(url => new Promise((resolve, reject) => {
+    console.log('uploading to ', url);
     request.post({
       url,
       formData: {
@@ -46,8 +49,10 @@ function createAddon(host, action, pkg, version, archivePath, callback) {
       },
     }, (err, httpResponse, body) => {
       if (!err && httpResponse.statusCode === 201) {
+        console.log('uploaded to ', url);
         resolve(JSON.parse(body));
       } else {
+        console.log('error uploading to ', url);
         let errMessage;
         try {
           errMessage = JSON.parse(body);
