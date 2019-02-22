@@ -15,6 +15,9 @@
     "balance_label": "Show Balance",
     "inform_label": "Inform"
   },
+  "transaction_status": {
+    "paid": "Paid"
+  },
   "transaction_details": {
     "title": "Transaction Details",
     "payment_label": "Payment",
