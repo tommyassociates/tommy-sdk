@@ -21,7 +21,7 @@
     <f7-list class="list-custom margin-bottom" inset>
       <f7-list-item
         link="/wallet_accounts/list-add/"
-        title="Create New List"
+        :title="$t('wallet_accounts.list-management.create_new_list')"
       ></f7-list-item>
     </f7-list>
   </f7-page>

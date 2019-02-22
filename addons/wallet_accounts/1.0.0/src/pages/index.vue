@@ -60,7 +60,7 @@
                   </a>
                 </li>
               </f7-list>
-              <div v-if="list.transactions && !list.transactions.length" style="padding: 15px">{{$t('wallet_accounts.index.no_list_transaction', 'No transactions found')}}</div>
+              <div v-if="list.transactions && !list.transactions.length" style="padding: 15px">{{$t('wallet_accounts.index.no_transactions_found', 'No transactions found')}}</div>
             </div>
           </div>
         </div>
