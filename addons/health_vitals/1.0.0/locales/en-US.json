@@ -1,4 +1,8 @@
 {
+  "dates": {
+    "today": "Today",
+    "yesterday": "Yesterday"
+  },
   "index": {
     "title": "Health Vitals",
     "profile_age_label": "Age:",
