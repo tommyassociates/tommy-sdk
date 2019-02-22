@@ -9,9 +9,9 @@
     </f7-navbar>
 
     <div class="refresh-panel" v-if="showRefreshPanel">
-      {{$t('common.last_updated', 'Last updated')}}:
+      {{$t('availability.index.last_updated', 'Last updated')}}:
       <span class="time">{{refreshPanelText}}</span>
-      <a href="#" class="refresh" @click="loadAvailabilities">{{$t('common.save', 'Refresh')}}</a>
+      <a href="#" class="refresh" @click="loadAvailabilities">{{$t('availability.index.refresh', 'Refresh')}}</a>
     </div>
 
     <f7-list class="no-margin-top" no-hairlines>

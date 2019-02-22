@@ -1,7 +1,9 @@
 {
   "index": {
     "title": "Availabilities",
-    "available_button": "Available for work"
+    "available_button": "Available for work",
+    "refresh": "Refresh",
+    "last_updated": "Last updated"
   },
   "word": {
     "am": "am",

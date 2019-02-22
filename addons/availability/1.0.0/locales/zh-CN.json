@@ -1,7 +1,9 @@
 {
   "index": {
     "title": "可用性",
-    "available_button": "可以工作的时间"
+    "available_button": "可以工作的时间",
+    "refresh": "刷新",
+    "last_updated": "上一次更新"
   },
   "word": {
     "am": "上午",
