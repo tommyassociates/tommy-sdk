@@ -4,7 +4,7 @@
     "title_user": "{{user}} 订单"
   },
   "common": {
-    "search_members_tags": "Search Members, Tags",
+    "search_members_tags": "搜索成员，标签",
     "date_range": "日期区间",
     "choose_range": "自定义",
     "start_date": "开始日期",
@@ -42,7 +42,7 @@
     "type_invoice": "账单",
     "type_quote": "订单",
     "sort": "排序",
-    "sort_default": "Default",
+    "sort_default": "默认",
     "sort_price_high": "余额降序",
     "sort_price_low": "余额升序",
     "sort_newest": "创建日期降序",
@@ -63,32 +63,32 @@
     "new_package": "New Package"
   },
   "promotion_management": {
-    "title": "Promotions",
-    "search_placeholder": "Search promotions"
+    "title": "优惠",
+    "search_placeholder": "搜索优惠"
   },
   "item": {
     "name_label": "名字",
-    "name_placeholder": "Enter 项目/服务 名字",
+    "name_placeholder": "输入项目/服务名字",
     "enabled_label": "开启",
     "photos_label": "照片",
-    "photo_label": "Photo",
+    "photo_label": "照片",
     "description_label": "描述",
     "description_placeholder": "输入套餐描述...",
-    "duration_label": "Duration",
-    "duration_placeholder": "Item duration in minutes",
-    "category_label": "Category",
-    "category_placeholder": "Enter 项目/服务 category",
+    "duration_label": "时长",
+    "duration_placeholder": "该项目时长（以分钟计）",
+    "category_label": "类型",
+    "category_placeholder": "输入该项目/该服务类型",
     "packages_label": "套餐",
     "packages_no_packages": "No associated packages found",
     "tags_label": "标签",
     "price_label": "价格",
-    "price_placeholder": "Enter 项目/服务 price",
+    "price_placeholder": "输入项目/服务价格",
     "sku_label": "SKU",
-    "sku_placeholder": "Enter 项目/服务 SKU",
+    "sku_placeholder": "输入项目/服务 SKU",
     "barcode_label": "条形码",
-    "barcode_placeholder": "Enter 项目/服务 条形码",
-    "available_in_label": "Available in",
-    "available_in_placeholder": "City where it is available"
+    "barcode_placeholder": "输入项目/服务 条形码",
+    "available_in_label": "可使用于",
+    "available_in_placeholder": "可使用城市"
   },
   "product": {
     "new_title": "项目/服务"
@@ -99,19 +99,19 @@
     "add_item_label": "Add 项目/服务"
   },
   "promotion": {
-    "new_title": "New Promotion",
-    "name_label": "Name",
-    "name_placeholder": "Enter promotion name",
-    "description_label": "Description",
-    "description_placeholder": "Enter promotion description",
-    "expires_label": "Expires",
-    "expires_placeholder": "Expiration date",
-    "amount_label": "Discount amount",
-    "amount_placeholder": "Enter promotion discount",
-    "item_label": "Item",
+    "new_title": "新的优惠",
+    "name_label": "名字",
+    "name_placeholder": "输入该优惠名字",
+    "description_label": "描述",
+    "description_placeholder": "输入该优惠描述",
+    "expires_label": "过期",
+    "expires_placeholder": "截止日期",
+    "amount_label": "折扣金额",
+    "amount_placeholder": "输入优惠折扣",
+    "item_label": "项目",
     "item_placeholder": "Select item for this promotion",
-    "customer_label": "Customer",
-    "customer_placeholder": "Select customer for this promotion"
+    "customer_label": "客户",
+    "customer_placeholder": "选择该优惠的客户"
   },
 
   "order_details": {
@@ -120,14 +120,14 @@
     "created": "创建",
     "due_date": "截止日期",
     "due_time": "时间",
-    "location": "Location",
+    "location": "地点",
     "city": "城市",
     "city_placeholder": "添加城市",
     "address": "地址",
     "address_placeholder": "添加地址",
     "status": "状态",
     "type": "种类",
-    "discount": "Discount",
+    "discount": "折扣",
     "total": "合计",
     "comment": "备注",
     "comment_placeholder": "添加备注",
