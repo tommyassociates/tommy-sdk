@@ -1,5 +1,5 @@
 <template>
-  <f7-page id="bookings__index" @page:afterin="loadEvents">
+  <f7-page id="bookings__index" @page:afterin="loadEvents" ptr @ptr:refresh="onPtrRefresh">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{$t('bookings.index.title', 'Bookings')}}</f7-nav-title>
@@ -39,8 +39,8 @@
       </f7-list-group>
     </f7-list>
     <f7-block v-if="events && !events.length" class="no-data">
-      <h2>{{$t('bookins.no_bookings', 'No bookings have been assigned')}}</h2>
-      <p>{{$t('bookins.no_bookings_hint', 'Please check again later...')}}</p>
+      <h2>{{$t('bookings.no_bookings', 'No bookings have been assigned')}}</h2>
+      <p>{{$t('bookings.no_bookings_hint', 'Please check again later...')}}</p>
     </f7-block>
   </f7-page>
 </template>
@@ -92,6 +92,14 @@
         const self = this;
         self.$f7router.navigate('/bookings/details/', { props: { event } });
       },
+      onPtrRefresh(event, done) {
+        const self = this;
+        self.loadEvents().then(() => {
+          if (done) {
+            done();
+          }
+        });
+      },
       loadEvents() {
         const self = this;
         const actor_id = self.$f7route.query.actor_id;
@@ -103,7 +111,7 @@
         if (actor_id) {
           params.actor_id = actor_id;
         }
-        self.$api.getEvents(params).then((events) => {
+        return self.$api.getEvents(params, { cache: false }).then((events) => {
           self.events = events;
         });
       },
