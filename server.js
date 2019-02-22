@@ -33,25 +33,38 @@ function getFilteredFiles(folder, pkg) {
 
 
 function createAddon(host, action, pkg, version, archivePath, callback) {
-  const url = `${host}/v1/addons/${action}?api_key=${config.apiKey}`;
-  request.post({
-    url,
-    formData: {
-      package: pkg,
-      version,
-      archive: fs.createReadStream(archivePath),
-    },
-  }, (err, httpResponse, body) => {
-    if (!err && httpResponse.statusCode === 201) {
-      callback(null, JSON.parse(body));
-    } else {
-      let errMessage = {};
-      try {
-        errMessage = JSON.parse(body);
-      } catch (e) {}
-      callback(err || 'Upload failed', errMessage);
-    }
-  });
+  const url1 = `https://api.mytommy.com/v1/addons/${action}?api_key=${config.apiKey}`;
+  const url2 = `https://api.tuome.com.cn/v1/addons/${action}?api_key=${config.apiKey}`;
+
+  const promises = [url1, url2].map(url => new Promise((resolve, reject) => {
+    request.post({
+      url,
+      formData: {
+        package: pkg,
+        version,
+        archive: fs.createReadStream(archivePath),
+      },
+    }, (err, httpResponse, body) => {
+      if (!err && httpResponse.statusCode === 201) {
+        resolve(JSON.parse(body));
+      } else {
+        let errMessage;
+        try {
+          errMessage = JSON.parse(body);
+        } catch (e) {}
+        reject(errMessage || err);
+      }
+    });
+  }));
+
+  Promise.all(promises)
+    .then((jsons) => {
+      callback(null, jsons);
+    })
+    .catch((errs) => {
+      callback('Upload failed', errs);
+    });
+
 }
 
 function readLocalAddonVersions() {
@@ -184,12 +197,12 @@ app.post('/addon/sandbox/upload/:package/:version', (req, res) => {
   const version = req.params.version;
   createAddonArchive(pkg, version, (err, archivePath) => {
     console.log('Created archive', archivePath);
-    createAddon(config.apiSandboxEndpoint, 'upload', pkg, version, archivePath, (err, json) => {
-      console.log('Uploaded archive', err, json);
-      if (err) {
-        res.status(500).send(err);
+    createAddon(config.apiSandboxEndpoint, 'upload', pkg, version, archivePath, (errs, jsons) => {
+      console.log('Uploaded archive', errs, jsons);
+      if (errs) {
+        res.status(500).send(errs[0] || errs[1]);
       } else {
-        res.send(json);
+        res.send(jsons[0] || jsons[1]);
       }
     });
   });
