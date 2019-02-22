@@ -14,16 +14,16 @@ const archiver = require('archiver');
 
 const app = express();
 
-function loadConfig(filepath) {
-  return JSON.parse(
-    fs.readFileSync(filepath).toString().replace( //
-      new RegExp('\\/\\*(.|\\r|\\n)*?\\*\\/', 'g'),
-      '' // strip out comments
-    )
-  );
-}
+let config = {};
+let configCn = {};
 
-const config = loadConfig('config.json');
+try {
+  config = JSON.parse(fs.readFileSync('./config.json'), 'utf8');
+} catch (e) {}
+
+try {
+  configCn = JSON.parse(fs.readFileSync('./config-cn.json'), 'utf8');
+} catch (e) {}
 
 function getFilteredFiles(folder, pkg) {
   let files = fs.readdirSync(folder, pkg);
@@ -33,10 +33,13 @@ function getFilteredFiles(folder, pkg) {
 
 
 function createAddon(host, action, pkg, version, archivePath, callback) {
-  const urls = [
-    `https://api.mytommy.com/v1/addons/${action}?api_key=${config.apiKey}`,
-    `http://api.tuome.com.cn/v1/addons/${action}?api_key=${config.apiKey}`,
-  ];
+  const urls = [];
+  if (config && config.apiEndpoint) {
+    urls.push(`${config.apiEndpoint}/v1/addons/${action}?api_key=${config.apiKey}`);
+  }
+  if (configCn && configCn.apiEndpoint) {
+    urls.push(`${configCn.apiEndpoint}/v1/addons/${action}?api_key=${configCn.apiKey}`);
+  }
 
   const promises = urls.map(url => new Promise((resolve, reject) => {
     console.log('uploading to ', url);
