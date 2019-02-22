@@ -11,7 +11,17 @@
     <f7-list class="list-custom">
       <f7-list-input type="number" min="0" :value="amount" @input="amount = parseFloat($event.target.value)" :placeholder="$t('wallet_accounts.transaction-add.amount_placeholder', 'Amount')"></f7-list-input>
       <f7-list-input type="text" :value="payee_name" @input="payee_name = $event.target.value" :placeholder="$t('wallet_accounts.transaction-add.payee_placeholder', 'Payee')"></f7-list-input>
-      <f7-list-item smart-select :smart-select-params="{searchbar: true}" v-if="cards && cards.length" :title="$t('wallet_accounts.transaction-add.wallet_account_placeholder')">
+      <f7-list-item
+        smart-select
+        :smart-select-params="{
+          searchbar: true,
+          pageBackLinkText: $t('label.back'),
+          searchbarPlaceholder: $t('label.search'),
+          searchbarDisableText: $t('label.cancel'),
+        }"
+        v-if="cards && cards.length"
+        :title="$t('wallet_accounts.transaction-add.wallet_account_placeholder')"
+      >
         <select :value="wallet_card_id" @change="wallet_card_id = parseInt($event.target.value, 10)">
           <option
             v-for="(card) in cards"

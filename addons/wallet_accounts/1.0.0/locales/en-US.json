@@ -36,7 +36,8 @@
     "filter-amount": "Transaction Amount"
   },
   "list-management": {
-    "title": "List Management"
+    "title": "List Management",
+    "create_new_list": "Create New List"
   },
   "transaction-add": {
     "title": "New Transaction",

@@ -17,7 +17,7 @@
     "done": "完成",
     "default-list-name": "交易",
     "transactions": "交易",
-    "no_transactions_found": "No transactions found"
+    "no_transactions_found": "未发现交易"
   },
   "transaction_details": {
     "title": "交易详情",
@@ -36,7 +36,8 @@
     "filter-amount": "交易金额"
   },
   "list-management": {
-    "title": "列表管理"
+    "title": "列表管理",
+    "create_new_list": "添加新列表"
   },
   "transaction-add": {
     "title": "新交易",
