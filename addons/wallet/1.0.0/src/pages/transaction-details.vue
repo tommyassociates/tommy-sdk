@@ -17,7 +17,7 @@
             <div class="wallet-transaction-payment-amount">{{formatTransactionAmount(transaction)}}</div>
           </div>
         </div>
-        <div class="wallet-transaction-status">{{formatTransactionStatus(transaction.status)}}</div>
+        <div class="wallet-transaction-status">{{formatTransactionStatus($t(`wallet.transaction_status.${transaction.status.toLowerCase()}`, transaction.status))}}</div>
       </div>
 
       <f7-list class="wallet-transaction-details-list" no-hairlines>

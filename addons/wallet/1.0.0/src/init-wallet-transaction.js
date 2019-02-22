@@ -96,7 +96,7 @@ function renderPopupReport(transaction) {
             <div class="wallet-transaction-payment-amount">${formatTransactionAmount(transaction)}</div>
           </div>
         </div>
-        <div class="wallet-transaction-status">${formatTransactionStatus(transaction.status)}</div>
+        <div class="wallet-transaction-status">${formatTransactionStatus(i18n.t(`wallet.transaction_status.${transaction.status.toLowerCase()}`, transaction.status))}</div>
       </div>
       <div class="list wallet-transaction-details-list no-hairlines">
         <ul>
