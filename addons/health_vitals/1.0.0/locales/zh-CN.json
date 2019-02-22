@@ -1,4 +1,8 @@
 {
+  "dates": {
+    "today": "Today",
+    "yesterday": "Yesterday"
+  },
   "index": {
     "title": "健康简介",
     "profile_age_label": "年龄:",

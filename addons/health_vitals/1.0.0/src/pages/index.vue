@@ -11,7 +11,7 @@
         <div class="health-vitals-card-subtitle">2 {{t('frequency_every_label')}} 2 {{t('frequency_options.2')}}</div>
         <div class="health-vitals-card-subtitle">{{t('between_label')}} 5 {{t('between_and_label')}} 6</div>
         <div class="health-vitals-subcard health-vitals-subcard-red">
-          <div class="health-vitals-subcard-title">Yesterday 18:36</div>
+          <div class="health-vitals-subcard-title">{{$t('health_vitals.dates.yesterday')}} 18:36</div>
           <div class="health-vitals-subcard-content">
             <div class="health-vitals-card-icon">
               <img :src="`${$addonAssetsUrl}icon-soup.svg`" >
@@ -26,7 +26,7 @@
         <div class="health-vitals-card-subtitle">{{t('frequency_everyday_label')}}</div>
         <div class="health-vitals-card-subtitle">{{t('between_label')}} 1000 {{t('between_and_label')}} 3500</div>
         <div class="health-vitals-subcard">
-          <div class="health-vitals-subcard-title">Yesterday 22:00</div>
+          <div class="health-vitals-subcard-title">{{$t('health_vitals.dates.yesterday')}} 22:00</div>
           <div class="health-vitals-subcard-content">
             <div class="health-vitals-card-icon">
               <img :src="`${$addonAssetsUrl}icon-water.svg`" >
@@ -41,7 +41,7 @@
         <div class="health-vitals-card-subtitle">{{t('frequency_everyday_label')}}</div>
         <div class="health-vitals-card-subtitle">{{t('between_label')}} 80 {{t('between_and_label')}} 100</div>
         <div class="health-vitals-subcard">
-          <div class="health-vitals-subcard-title">Yesterday 18:36</div>
+          <div class="health-vitals-subcard-title">{{$t('health_vitals.dates.yesterday')}} 18:36</div>
           <div class="health-vitals-subcard-content">
             <div class="health-vitals-card-icon">
               <img :src="`${$addonAssetsUrl}icon-check.svg`" >
@@ -57,7 +57,7 @@
         <div class="health-vitals-card-subtitle">2 {{t('frequency_every_label')}} {{t('frequency_options.2')}}</div>
         <div class="health-vitals-card-subtitle">{{t('between_label')}} 35 {{t('between_and_label')}} 37.7</div>
         <div class="health-vitals-subcard health-vitals-subcard-red">
-          <div class="health-vitals-subcard-title">Today 14:22</div>
+          <div class="health-vitals-subcard-title">{{$t('health_vitals.dates.today')}} 14:22</div>
           <div class="health-vitals-subcard-content">
             <div class="health-vitals-card-icon">
               <img :src="`${$addonAssetsUrl}icon-temp.svg`" >
@@ -66,7 +66,7 @@
           </div>
         </div>
         <div class="health-vitals-subcard">
-          <div class="health-vitals-subcard-title">Today 08:36</div>
+          <div class="health-vitals-subcard-title">{{$t('health_vitals.dates.today')}} 08:36</div>
           <div class="health-vitals-subcard-content">
             <div class="health-vitals-card-icon">
               <img :src="`${$addonAssetsUrl}icon-temp.svg`" >
@@ -81,7 +81,7 @@
         <div class="health-vitals-card-subtitle">{{t('frequency_everyday_label')}}</div>
         <div class="health-vitals-card-subtitle">{{t('between_label')}} 2000 {{t('between_and_label')}} 8000</div>
         <div class="health-vitals-subcard">
-          <div class="health-vitals-subcard-title">Today 14:22</div>
+          <div class="health-vitals-subcard-title">{{$t('health_vitals.dates.today')}} 14:22</div>
           <div class="health-vitals-subcard-content">
             <div class="health-vitals-card-icon">
               <img :src="`${$addonAssetsUrl}icon-foot.svg`" >
@@ -96,7 +96,7 @@
         <div class="health-vitals-card-subtitle">1 {{t('frequency_every_label')}} 2 {{t('frequency_options.2')}}</div>
         <div class="health-vitals-card-subtitle">{{t('between_label')}} 160 {{t('between_and_label')}} 170</div>
         <div class="health-vitals-subcard">
-          <div class="health-vitals-subcard-title">Yesterday 16:00</div>
+          <div class="health-vitals-subcard-title">{{$t('health_vitals.dates.yesterday')}} 16:00</div>
           <div class="health-vitals-subcard-content">
             <div class="health-vitals-card-icon">
               <img :src="`${$addonAssetsUrl}icon-person.svg`" >
@@ -111,7 +111,7 @@
         <div class="health-vitals-card-subtitle">{{t('frequency_everyday_label')}}</div>
         <div class="health-vitals-card-subtitle">{{t('between_label')}} 60 {{t('between_and_label')}} 120</div>
         <div class="health-vitals-subcard">
-          <div class="health-vitals-subcard-title">Yesterday 22:00</div>
+          <div class="health-vitals-subcard-title">{{$t('health_vitals.dates.yesterday')}} 22:00</div>
           <div class="health-vitals-subcard-content">
             <div class="health-vitals-card-icon">
               <img :src="`${$addonAssetsUrl}icon-yoga.svg`" >
@@ -126,14 +126,14 @@
         <div class="health-vitals-card-subtitle">2 {{t('frequency_every_label')}} {{t('frequency_options.2')}}</div>
         <div class="health-vitals-card-subtitle">{{t('between_label')}} 100/70 {{t('between_and_label')}} 140/90</div>
         <div class="health-vitals-subcard">
-          <div class="health-vitals-subcard-title">Today 14:32</div>
+          <div class="health-vitals-subcard-title">{{$t('health_vitals.dates.today')}} 14:32</div>
           <div class="health-vitals-subcard-content">
             <div class="health-vitals-subcard-value">120/82</div>
             <div class="health-vitals-subcard-value"><sub>{{t('blood_pressure_units')}}</sub></div>
           </div>
         </div>
         <div class="health-vitals-subcard">
-          <div class="health-vitals-subcard-title">Today 18:40</div>
+          <div class="health-vitals-subcard-title">{{$t('health_vitals.dates.today')}} 18:40</div>
           <div class="health-vitals-subcard-content">
             <div class="health-vitals-subcard-value">108/73</div>
             <div class="health-vitals-subcard-value"><sub>{{t('blood_pressure_units')}}</sub></div>
@@ -146,7 +146,7 @@
         <div class="health-vitals-card-subtitle">{{t('frequency_everyday_label')}}</div>
         <div class="health-vitals-card-subtitle">{{t('between_label')}} 60 {{t('between_and_label')}} 85</div>
         <div class="health-vitals-subcard">
-          <div class="health-vitals-subcard-title">Yesterday 16:00</div>
+          <div class="health-vitals-subcard-title">{{$t('health_vitals.dates.yesterday')}} 16:00</div>
           <div class="health-vitals-subcard-content">
             <div class="health-vitals-card-icon">
               <img :src="`${$addonAssetsUrl}icon-weight.svg`" >
