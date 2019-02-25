@@ -24,10 +24,10 @@
   },
   "order_status": {
     "quote": "订单",
-    "pending": "Pending",
+    "pending": "未完成",
     "paid": "已经支付",
-    "processing": "Processing",
-    "complete": "Complete"
+    "processing": "进行中",
+    "complete": "已完成"
   },
   "list_edit": {
     "title": "编辑列表",
@@ -59,8 +59,8 @@
     "packages_tab": "套餐",
     "search_items": "搜索服务项目",
     "search_packages": "搜索服务套餐",
-    "new_item": "New Item/Service",
-    "new_package": "New Package"
+    "new_item": "新的项目/服务",
+    "new_package": "新的套餐"
   },
   "promotion_management": {
     "title": "优惠",
@@ -79,7 +79,7 @@
     "category_label": "类型",
     "category_placeholder": "输入该项目/该服务类型",
     "packages_label": "套餐",
-    "packages_no_packages": "No associated packages found",
+    "packages_no_packages": "未找到相关套餐",
     "tags_label": "标签",
     "price_label": "价格",
     "price_placeholder": "输入项目/服务价格",
@@ -96,7 +96,7 @@
   "package": {
     "new_title": "套餐",
     "items_label": "项目",
-    "add_item_label": "Add 项目/服务"
+    "add_item_label": "添加 项目/服务"
   },
   "promotion": {
     "new_title": "新的优惠",
@@ -109,14 +109,14 @@
     "amount_label": "折扣金额",
     "amount_placeholder": "输入优惠折扣",
     "item_label": "项目",
-    "item_placeholder": "Select item for this promotion",
+    "item_placeholder": "选择该优惠的项目",
     "customer_label": "客户",
     "customer_placeholder": "选择该优惠的客户"
   },
 
   "order_details": {
     "title": "订单细节",
-    "new_title": "New Order",
+    "new_title": "新的订单",
     "created": "创建",
     "due_date": "截止日期",
     "due_time": "时间",
@@ -136,11 +136,11 @@
     "packages": "套餐",
     "promotions": "优惠",
     "payment": "付款",
-    "add_item_label": "Add 项目/服务",
-    "add_promotion_label": "Add 优惠"
+    "add_item_label": "添加 项目/服务",
+    "add_promotion_label": "添加 优惠"
   },
   "date_range": {
-    "none": "None",
+    "none": "无",
     "today": "今天",
     "week": "本周",
     "month": "本月"
