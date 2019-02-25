@@ -1,7 +1,7 @@
 {
   "dates": {
-    "today": "Today",
-    "yesterday": "Yesterday"
+    "today": "今天",
+    "yesterday": "昨天"
   },
   "index": {
     "title": "健康简介",
