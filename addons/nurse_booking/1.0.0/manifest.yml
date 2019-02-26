@@ -20,9 +20,7 @@
   views:
     index:
       title: "Home Service"
-      file: ""
       type: "page"
       index: true
       framed: false
       path: "/nurse_booking/"
-
