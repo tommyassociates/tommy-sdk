@@ -59,12 +59,12 @@ const API = {
       endpoint: `teams/${teamId}/members`,
       method: 'GET',
       data: {
-        tags: ['Available For Work'],
-        has_booking_between: [new Date(startTime).toJSON(), new Date(endTime).toJSON()],
+        tags: ['Nurse'],
+        is_available_between: [new Date(startTime).toJSON(), new Date(endTime).toJSON()],
       },
       cache: false,
     }).then((res) => {
-      API.cache.nurses = res;
+      API.cache.nurses = (res || []).filter(n => n.is_available === true);
       return API.cache.nurses;
     });
   },
@@ -101,9 +101,14 @@ const API = {
   createBookingEvent(teamId, order) {
     let date = order.data.date;
     if (typeof date === 'string') date = parseInt(date, 10);
+    let end_at;
+    if (order.data.duration && order.data.duration > 0)  {
+      end_at = date + parseInt(order.data.duration, 10) * 60 * 1000;
+    }
     return api.createEvent({
       title: order.name,
       start_at: new Date(date).toJSON(),
+      end_at: new Date(end_at).toJSON(),
       location: `${order.data.location.city} ${order.data.location.address}`,
       user_id: order.data.nurse.user_id,
       team_id: teamId,
