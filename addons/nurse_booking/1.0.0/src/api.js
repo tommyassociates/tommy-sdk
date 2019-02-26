@@ -151,10 +151,18 @@ const API = {
       return data;
     });
   },
-  cancelOrder(teamId, id) {
+  cancelOrder(teamId, id, transactionId) {
     return api.call({
       endpoint: `vendors/${teamId}/orders/${id}`,
       method: 'DELETE',
+    }).then(() => {
+      return Promise.all([
+        API.deleteBookingEvent(id),
+        api.call({
+          endpoint: `/wallet/transactions/${transactionId}/refund`,
+          method: 'POST',
+        }),
+      ]);
     });
   },
 };
