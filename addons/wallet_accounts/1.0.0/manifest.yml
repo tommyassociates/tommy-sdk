@@ -17,7 +17,6 @@
       resource_type: "Fragment"
       resource_kind: "Account"
       default_roles:
-        - Team Member
         - Team Manager
         - Team Admin
       operations:
@@ -29,7 +28,6 @@
       resource_type: "Fragment"
       resource_kind: "Transaction"
       default_roles:
-        - Team Member
         - Team Manager
         - Team Admin
       operations:
@@ -40,7 +38,6 @@
       resource_type: "Fragment"
       resource_kind: "Transaction"
       default_roles:
-        - Team Member
         - Team Manager
         - Team Admin
       operations:
@@ -51,7 +48,6 @@
       resource_type: "Fragment"
       resource_kind: "TransactionList"
       default_roles:
-        - Team Member
         - Team Manager
         - Team Admin
         - Creator
@@ -63,7 +59,6 @@
       resource_type: "Fragment"
       resource_kind: "TransactionList"
       default_roles:
-        - Team Member
         - Team Manager
         - Team Admin
         - Creator
@@ -79,7 +74,6 @@
   views:
     index:
       title: "Wallet Accounts"
-      file: ""
       type: "page"
       index: true
       framed: false
