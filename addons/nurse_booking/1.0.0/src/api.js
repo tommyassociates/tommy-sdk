@@ -54,13 +54,15 @@ const API = {
       return API.cache.locations;
     });
   },
-  getNurseList(teamId) {
+  getNurseList(teamId, startTime, endTime) {
     return api.call({
       endpoint: `teams/${teamId}/members`,
       method: 'GET',
       data: {
         tags: ['Available For Work'],
+        has_booking_between: [new Date(startTime).toJSON(), new Date(endTime).toJSON()],
       },
+      cache: false,
     }).then((res) => {
       API.cache.nurses = res;
       return API.cache.nurses;
