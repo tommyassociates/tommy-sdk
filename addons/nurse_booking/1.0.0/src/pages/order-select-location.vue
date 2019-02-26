@@ -68,7 +68,13 @@
           available = true;
         } else {
           availableIn.forEach((availableCity) => {
-            if (availableCity.toLowerCase() === city.toLowerCase()) available = true;
+            const parts = city.toLowerCase()
+              .split(/[,， ]/)
+              .map(c => c.replace(/,/g, '').trim())
+              .filter(f => f.trim());
+            parts.forEach((p) => {
+              if (availableCity.toLowerCase().trim() === p) available = true;
+            });
           });
         }
 

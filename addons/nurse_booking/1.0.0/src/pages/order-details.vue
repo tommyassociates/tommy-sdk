@@ -196,10 +196,7 @@
           <div>${self.$t('nurse_booking.order_details.cancel_confirm')}</div>
           `,
           () => {
-            API.cancelOrder(self.teamId, order.id)
-              .then(() => {
-                return API.deleteBookingEvent(order.id);
-              })
+            API.cancelOrder(self.teamId, order.id, order.wallet_transaction_id)
               .then(() => {
                 self.preventCancel = false;
                 self.$f7router.navigate('/nurse_booking/order-canceled/');

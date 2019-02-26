@@ -19,9 +19,12 @@
 
     <div class="weight-index-header">
       <div class="weight-index-header-icon"></div>
-      <div class="weight-index-header-content">
-        <div class="weight-index-header-data">68<span>Kg</span></div>
-        <div class="weight-index-header-date">21 Jan. 2018 00:00</div>
+      <div class="weight-index-header-content" v-if="data && data.length">
+        <div class="weight-index-header-data">{{data[0].data.value}}<span>{{$t(`weight.index.vital_unit.${data[0].data.unit || 0}`)}}</span></div>
+        <div class="weight-index-header-date">{{$moment(data[0].data.date).format('DD MMM YYYY')}} {{data[0].data.time}}</div>
+      </div>
+      <div class="weight-index-header-content" v-if="data && !data.length">
+        <div class="weight-index-header-data">{{$t('weight.index.vital_label')}}</div>
       </div>
     </div>
 
@@ -35,12 +38,12 @@
         v-for="(item, index) in data"
         :key="index"
       >
-        <div class="weight-vitals-card-title">{{$moment(item.date).format('DD MMM YYYY H:m')}}</div>
+        <div class="weight-vitals-card-title">{{$moment(item.data.date).format('DD MMM YYYY')}} {{item.data.time}}</div>
         <div class="weight-vitals-card-content">
           <div class="weight-vitals-card-icon">
             <img :src="`${$addonAssetsUrl}card-icon.svg`" >
           </div>
-          <div class="weight-vitals-card-value">{{item.value}} <sub>{{item.unit}}</sub></div>
+          <div class="weight-vitals-card-value">{{item.data.value}} <sub>{{$t(`weight.index.vital_unit.${item.data.unit || 0}`)}}</sub></div>
         </div>
       </div>
     </div>
@@ -48,31 +51,42 @@
   </f7-page>
 </template>
 <script>
+  import API from '../api';
+
   export default {
     data() {
       return {
-        data: [
-          {
-            date: new Date().getTime() - 1000 * 60 * 60 * 24,
-            value: 68,
-            unit: 'kg',
-          },
-          {
-            date: new Date().getTime() - 1000 * 60 * 60 * 24 * 2,
-            value: 66,
-            unit: 'kg',
-          },
-          {
-            date: new Date().getTime() - 1000 * 60 * 60 * 24 * 3,
-            value: 66,
-            unit: 'kg',
-          },
-        ],
+        data: null,
       };
+    },
+    mounted() {
+      const self = this;
+      self.getData();
+      self.$events.$on('weight:updateRecords', self.getData);
+    },
+    beforeDestroy() {
+      const self = this;
+      self.$events.$off('weight:updateRecords', self.getData);
     },
     methods: {
       t(v, d) {
         return this.$t(`weight.index.${v}`, d);
+      },
+      getData() {
+        const self = this;
+        API.getRecords(self.$root.user).then((data) => {
+          self.data = data.filter(el => el.data && el.data.value).sort((a, b) => {
+            const aDate = new Date(a.data.date);
+            const [aH, aM] = a.data.time.split(':');
+            aDate.setHours(parseInt(aH, 10), parseInt(aM, 10));
+
+            const bDate = new Date(b.data.date);
+            const [bH, bM] = b.data.time.split(':');
+            bDate.setHours(parseInt(bH, 10), parseInt(bM, 10));
+
+            return bDate - aDate;
+          });
+        });
       },
       onPageScroll(e) {
         const self = this;
