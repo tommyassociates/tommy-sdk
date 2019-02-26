@@ -31,8 +31,9 @@
         link="#"
         @click="showAmountSelect"
         :title="$t('wallet_accounts.list-edit.filter-amount', 'Transaction Amount')"
-        :after="formatAmountRange(list.data.amount_min, list.data.amount_max)"
-      ></f7-list-item>
+      >
+        <span v-html="formatAmountRange(list.data.amount_min, list.data.amount_max)" slot="after"></span>
+      </f7-list-item>
       <f7-list-item
         link="#"
         @click="showDateRange"

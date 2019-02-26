@@ -70,14 +70,21 @@
     },
     mounted() {
       const self = this;
-      const teamId = self.$root.team ? self.$root.team.id : self.$addons.addons.nurse_booking.data.nursing_team_id;
-      API.getNurseList(teamId).then((nurses) => {
-        if (self.$root.teamMembers && nurses.length === self.$root.teamMembers.length) {
-          self.nurses = self.$root.teamMembers.filter(m => m.tags.indexOf('Available For Work') >= 0);
-        } else {
-          self.nurses = nurses;
-        }
-      });
+      const teamId = self.$root.team
+        ? self.$root.team.id
+        : self.$addons.addons.nurse_booking.data.nursing_team_id;
+
+      const startTime = API.cache.booking.date;
+      const endTime = startTime + 1000 * 60 * 60 * 3;
+      API
+        .getNurseList(teamId, new Date(startTime), new Date(endTime))
+        .then((nurses) => {
+          if (self.$root.teamMembers && nurses.length === self.$root.teamMembers.length) {
+            self.nurses = self.$root.teamMembers.filter(m => m.tags.indexOf('Available For Work') >= 0);
+          } else {
+            self.nurses = nurses;
+          }
+        });
     },
     methods: {
       selectNurse(nurse) {
