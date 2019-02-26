@@ -231,6 +231,7 @@
           location: order.data.location,
           date: order.data.date,
           nurse: order.data.nurse,
+          duration: order.data.duration,
         }, false);
       },
     },

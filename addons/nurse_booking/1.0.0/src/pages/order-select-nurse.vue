@@ -75,7 +75,16 @@
         : self.$addons.addons.nurse_booking.data.nursing_team_id;
 
       const startTime = API.cache.booking.date;
-      const endTime = startTime + 1000 * 60 * 60 * 3;
+      let endTime = startTime + 1000 * 60 * 60 * 1;
+      if (API.cache.booking.services && API.cache.booking.services.length) {
+        let duration = 0;
+        API.cache.booking.services.forEach((el) => {
+          if (el.data && el.data.duration) duration += parseInt(el.data.duration, 10);
+        });
+        if (duration) {
+          endTime = startTime + 1000 * 60 * duration;
+        }
+      }
       API
         .getNurseList(teamId, new Date(startTime), new Date(endTime))
         .then((nurses) => {

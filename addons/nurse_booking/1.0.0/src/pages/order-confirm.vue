@@ -150,6 +150,12 @@
           };
         });
         const teamId = self.$root.team ? self.$root.team.id : self.$addons.addons.nurse_booking.data.nursing_team_id;
+
+        let duration = 0;
+        services.forEach((el) => {
+          if (el.data && el.data.duration) duration += parseInt(el.data.duration, 10);
+        });
+
         payOrder({
           vendor_order_items_attributes,
           teamId,
@@ -161,6 +167,7 @@
           location,
           date,
           nurse,
+          duration,
         });
       },
     },

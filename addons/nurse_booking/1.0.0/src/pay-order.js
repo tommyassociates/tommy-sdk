@@ -5,7 +5,7 @@ export default function (data, createNewOrder = true) {
   const tommy = window.tommy;
   const f7 = tommy.app.f7;
   const {
-    teamId, productName, total, discount = 0, location, date, couponId, orderId, nurse, vendor_order_items_attributes,
+    teamId, productName, total, discount = 0, location, date, couponId, orderId, nurse, vendor_order_items_attributes, duration,
   } = data;
 
   tommy.initWalletTransaction(
@@ -27,6 +27,7 @@ export default function (data, createNewOrder = true) {
           location,
           date,
           nurse,
+          duration,
         },
         discount,
         total,
@@ -42,7 +43,7 @@ export default function (data, createNewOrder = true) {
           });
         });
       } else {
-        API.updateOrder(teamId, { id: orderId, status: 'paid' }).then((response) => {
+        API.updateOrder(teamId, { id: orderId, status: 'paid' }).then(() => {
           API.createBookingEvent(teamId, { id: orderId, ...order }).then(() => {
             API.cache.booking.transaction = transaction;
             f7.views.main.router.navigate(`${successUrl}?id=${orderId}`);
