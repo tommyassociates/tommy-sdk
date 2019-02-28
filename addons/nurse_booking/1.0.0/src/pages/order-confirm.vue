@@ -151,7 +151,7 @@
         });
         const teamId = self.$root.team ? self.$root.team.id : self.$addons.addons.nurse_booking.data.nursing_team_id;
 
-        let duration = 0;
+        let duration = 60;
         services.forEach((el) => {
           if (el.data && el.data.duration) duration += parseInt(el.data.duration, 10);
         });
