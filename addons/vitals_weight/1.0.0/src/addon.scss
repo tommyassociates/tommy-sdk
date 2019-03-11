@@ -1,0 +1,37 @@
+$orange: #FF4500;
+@import '../../../../addons_common/vitals_element/addon';
+
+.ios .vitals-weight-fab {
+  > a {
+    background: linear-gradient(to bottom, #62BE76, #7CE397);
+    &.active-state {
+      background-color: #62BE76;
+    }
+  }
+}
+.vitals-weight-icon-settings {
+  background-image: url(../assets/icon-settings.svg);
+}
+.vitals-weight-icon-chart {
+  background-image: url(../assets/icon-chart.svg);
+}
+.vitals-weight-index-header {
+  background-image: url(../assets/header-bg.svg);
+}
+.vitals-weight-index-header-icon {
+  background-image: url(../assets/header-icon.svg);
+}
+.vitals-weight-index-no-data-img {
+  background-image: url(../assets/empty.svg);
+}
+.vitals-weight-settings-page {
+  .vitals-weight-settings-header {
+    background-image: url(../assets/header-bg.svg);
+  }
+  .vitals-weight-settings-icon {
+    background-image: url(../assets/header-icon.svg);
+  }
+  .vitals-weight-settings-center-icon {
+    background-image: url(../assets/settings-icon.svg);
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "index": {
+    "title": "Height",
+    "vital_label": "No Data",
+    "vital_unit": ["cm", "in"],
+    "not_available": "Add new records by clicking \"+\" button.",
+    "loading_label": "Loading...",
+    "manual_button": "Enter Manually",
+    "device_button": "Device"
+  },
+  "device": {
+    "title": "Device",
+    "device_label": "Default Device",
+    "search_button": "Find new device",
+    "start_button": "Start Measuring",
+    "new_label": "New Device"
+  },
+  "bluetooth_error": {
+    "text": "Bluetooth is not turned on or does not support the device.",
+    "confirm_button": "OK"
+  },
+  "device_search": {
+    "title": "New device",
+    "scan_label": "Searching...",
+    "not_available": "No available devices found",
+    "search_button": "Search Again"
+  },
+  "device_found": {
+    "title": "Add new device",
+    "devices_label": "Devices Found"
+  },
+  "device_operate": {
+    "title": "Measurement",
+    "scan_label": "Measuring...",
+    "vital_unit": ["cm", "in"],
+    "restart_button": "Restart",
+    "save_button": "Save"
+  },
+  "manual_enter": {
+    "title": "Add Measurement",
+    "vital_label": "Height",
+    "vital_unit": ["cm", "in"],
+    "date_label": "Date",
+    "time_label": "Time",
+    "variants_button": "Done",
+    "save_text": "Saved successfully!",
+    "save_button": "OK"
+  },
+  "settings": {
+    "title": "Settings",
+    "vital_text": "Measure height to determine growth, health status and fatigue. Middle-aged and older people can also assess the degree of aging to a certain extent as height decreases with age.",
+    "chat_label": "Receive the message",
+    "vital_unit_label": "Preference",
+    "vital_unit_options": ["cm", "in"],
+    "source_label": "Data Sources",
+    "add_label": "Add Data Source"
+  },
+  "device_details": {
+    "remove_button": "Remove Device"
+  },
+  "history": {
+    "title": "History",
+    "date_options": ["Day","Week","Month"],
+    "vital_unit": ["cm", "in"],
+    "week_days": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  },
+  "title": "Height",
+  "summary": "",
+  "description": "",
+  "developer": "Tommy Labs GmbH"
+}
