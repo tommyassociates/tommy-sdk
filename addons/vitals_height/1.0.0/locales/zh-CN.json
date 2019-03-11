@@ -1,0 +1,71 @@
+{
+  "index": {
+    "title": "身高",
+    "vital_label": "没有数据",
+    "vital_unit": ["厘米", "英寸"],
+    "not_available": "点击+键可增加新的记录",
+    "loading_label": "加载中...",
+    "manual_button": "手动输入 ",
+    "device_button": "设备"
+  },
+  "device": {
+    "title": "设备",
+    "device_label": "默认设备",
+    "search_button": "查找新设备",
+    "start_button": "开始测量",
+    "new_label": "新设备"
+  },
+  "bluetooth_error": {
+    "text": "手机蓝牙未开启或不支持该设备",
+    "confirm_button": "确认"
+  },
+ "device_search": {
+    "title": "新设备",
+    "scan_label": "搜索中...",
+    "not_available": "未找到可用设备",
+    "search_button": "再次搜索 "
+  },
+  "device_found": {
+   "title": "添加新设备",
+    "devices_label": "发现设备"
+  },
+  "device_operate": {
+    "title": "测量",
+    "scan_label": "测量中...",
+    "vital_unit": ["厘米", "英寸"],
+    "restart_button": "重新开始",
+    "save_button": "保存"
+  },
+  "manual_enter": {
+    "title": "添加测量",
+    "vital_label": "身高",
+    "vital_unit": ["厘米", "英寸"],
+    "date_label": "日期",
+    "time_label": "时间",
+    "variants_button": "完成",
+    "save_text": "保存成功！",
+    "save_button": "确认"
+  },
+  "settings": {
+    "title": "设置",
+    "vital_text": "测量身高是用来确定生长、健康状况和疲劳等状况。 随着年龄的增长，中老年人也可以在一定程度上评估衰老程度。",
+    "chat_label": "接收消息",
+    "vital_unit_label": "偏好设置",
+    "vital_unit_options": ["厘米", "英寸"],
+    "source_label": "数据来源",
+    "add_label": "添加数据来源"
+  },
+  "device_details": {
+    "remove_button": "删除设备"
+  },
+  "history": {
+    "title": "历史",
+    "date_options": ["天","周","月"],
+    "vital_unit": ["厘米", "英寸"],
+    "week_days": ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+  },
+  "title": "身高",
+  "summary": "",
+  "description": "",
+  "developer": "Tommy Labs GmbH"
+}

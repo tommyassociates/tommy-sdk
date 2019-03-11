@@ -1,31 +1,31 @@
 <template>
-  <f7-page id="weight__history" class="weight-history-page">
+  <f7-page id="vitals_element__history" :class="`vitals-element-history-page vitals-${vitalsElement}-history-page`">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{$t('weight.history.title')}}</f7-nav-title>
+      <f7-nav-title>{{t('title')}}</f7-nav-title>
     </f7-navbar>
 
     <f7-block>
       <f7-segmented>
-        <f7-button :active="range === 'day'" @click="range = 'day'">{{$t('weight.history.date_options.0')}}</f7-button>
-        <f7-button :active="range === 'week'" @click="range = 'week'">{{$t('weight.history.date_options.1')}}</f7-button>
-        <f7-button :active="range === 'month'" @click="range = 'month'">{{$t('weight.history.date_options.2')}}</f7-button>
+        <f7-button :active="range === 'day'" @click="range = 'day'">{{t('date_options.0')}}</f7-button>
+        <f7-button :active="range === 'week'" @click="range = 'week'">{{t('date_options.1')}}</f7-button>
+        <f7-button :active="range === 'month'" @click="range = 'month'">{{t('date_options.2')}}</f7-button>
       </f7-segmented>
     </f7-block>
 
-    <div class="weight-chart-clicked">
+    <div :class="`vitals-element-chart-clicked vitals-${vitalsElement}-chart-clicked`">
       <span>{{clickedDate}}</span>
       <span>{{clickedValue}}</span>
     </div>
     <template v-if="data && data.length">
-      <div class="weight-chart" v-if="range === 'day'" key="weight-chart-day">
-        <div ref="weightChartDay"></div>
+      <div :class="`vitals-element-chart vitals-${vitalsElement}-chart`" v-if="range === 'day'" key="chart-day">
+        <div ref="chartDay"></div>
       </div>
-      <div class="weight-chart" v-if="range === 'week'" key="weight-chart-week">
-        <div ref="weightChartWeek"></div>
+      <div :class="`vitals-element-chart vitals-${vitalsElement}-chart`" v-if="range === 'week'" key="chart-week">
+        <div ref="chartWeek"></div>
       </div>
-      <div class="weight-chart" v-if="range === 'month'" key="weight-chart-month">
-        <div ref="weightChartMonth"></div>
+      <div :class="`vitals-element-chart vitals-${vitalsElement}-chart`" v-if="range === 'month'" key="chart-month">
+        <div ref="chartMonth"></div>
       </div>
     </template>
 
@@ -35,6 +35,10 @@
   import API from '../api';
 
   export default {
+    props: {
+      addon: String,
+      vitalsElement: String,
+    },
     data() {
       return {
         data: null,
@@ -46,7 +50,7 @@
       const self = this;
       const dateFrom = new Date().setMonth(new Date().getMonth() - 1);
       const dateTo = new Date();
-      API.getRecords(self.$root.user, { dateFrom, dateTo }).then((data) => {
+      API.getRecords(self.addon, self.vitalsElement, self.$root.user, { dateFrom, dateTo }).then((data) => {
         self.data = (data || []).sort((a, b) => {
           const aDate = new Date(a.data.date);
           const [aH, aM] = a.data.time.split(':');
@@ -82,7 +86,7 @@
         const self = this;
         if (!self.clicked) return '';
         const originalItem = self.data[self.clicked.id];
-        return `${self.clicked.y} ${self.$t(`weight.history.vital_unit.${originalItem.data.unit}`)}`;
+        return `${self.clicked.y} ${self.t(`vital_unit.${originalItem.data.unit}`)}`;
       },
 
       todayValues() {
@@ -131,9 +135,13 @@
       },
     },
     methods: {
+      t(v, d) {
+        return this.$t(`${this.addon}.history.${v}`, d);
+      },
       initChart() {
         const self = this;
         const range = self.range;
+        if (!self.data || !self.data.length) return;
         const common = {
           credits: {
             enabled: false,
@@ -167,7 +175,7 @@
           },
         };
         if (range === 'day') {
-          self.$highcharts.chart(self.$refs.weightChartDay, {
+          self.$highcharts.chart(self.$refs.chartDay, {
             ...common,
             series: [{
               ...seriesCommon,
@@ -184,7 +192,7 @@
           });
         }
         if (range === 'week') {
-          self.$highcharts.chart(self.$refs.weightChartWeek, {
+          self.$highcharts.chart(self.$refs.chartWeek, {
             ...common,
             series: [{
               ...seriesCommon,
@@ -201,7 +209,7 @@
           });
         }
         if (range === 'month') {
-          self.$highcharts.chart(self.$refs.weightChartMonth, {
+          self.$highcharts.chart(self.$refs.chartMonth, {
             ...common,
             series: [{
               ...seriesCommon,

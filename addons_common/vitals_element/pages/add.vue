@@ -1,8 +1,8 @@
 <template>
-  <f7-page id="weight__add" class="weight-manual-add-page">
+  <f7-page id="vitals_element__add" :class="`vitals-element-manual-add-page vitals-${vitalsElement}-manual-add-page`">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{$t('weight.manual_enter.title')}}</f7-nav-title>
+      <f7-nav-title>{{t('title')}}</f7-nav-title>
       <f7-nav-right>
         <f7-link href="#" icon-only v-if="allowSave" @click="save">
           <i class="icon f7-icons">check</i>
@@ -17,21 +17,21 @@
         :value="value"
         @input="value = $event.target.value"
         min="1"
-        :label="$t('weight.manual_enter.vital_label')"
+        :label="t('vital_label')"
       >
-        <span slot="inner" class="weight-input-unit">{{$t('weight.manual_enter.vital_unit.0')}}</span>
+        <span slot="inner" class="vitals-element-input-unit">{{t('vital_unit.0')}}</span>
       </f7-list-input>
       <f7-list-input
         type="text"
         inline-label
         input-id="date-input"
-        :label="$t('weight.manual_enter.date_label')"
+        :label="t('date_label')"
       />
       <f7-list-input
         type="text"
         inline-label
         input-id="time-input"
-        :label="$t('weight.manual_enter.time_label')"
+        :label="t('time_label')"
       />
     </f7-list>
   </f7-page>
@@ -40,6 +40,10 @@
   import API from '../api';
 
   export default {
+    props: {
+      addon: String,
+      vitalsElement: String,
+    },
     data() {
       return {
         value: '',
@@ -107,17 +111,24 @@
       });
     },
     methods: {
+      t(v, d) {
+        return this.$t(`${this.addon}.manual_enter.${v}`, d);
+      },
       save() {
         const self = this;
         const { value, date, time } = self;
-        API.addRecord({
-          value,
-          date: new Date(date).toJSON(),
-          time,
-          user: self.$root.user,
-          unit: 0,
-        }).then(() => {
-          self.$events.$emit('weight:updateRecords');
+        API.addRecord(
+          self.addon,
+          self.vitalsElement,
+          {
+            value,
+            date: new Date(date).toJSON(),
+            time,
+            user: self.$root.user,
+            unit: 0,
+          }
+        ).then(() => {
+          self.$events.$emit(`${self.addon}:updateRecords`);
           self.$f7router.back();
         });
       },
