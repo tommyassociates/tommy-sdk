@@ -1,0 +1,69 @@
+{
+  "index": {
+    "title": "步数",
+    "vital_label": "没有数据",
+    "vital_unit": ["步数"],
+    "not_available": "点击+键可增加新的记录",
+    "loading_label": "加载中...",
+    "manual_button": "手动输入 ",
+    "device_button": "设备"
+  },
+  "device": {
+    "title": "设备",
+    "device_label": "默认设备",
+    "search_button": "查找新设备",
+    "start_button": "开始测量",
+    "new_label": "新设备"
+  },
+  "bluetooth_error": {
+    "text": "手机蓝牙未开启或不支持该设备",
+    "confirm_button": "确认"
+  },
+  "device_search": {
+    "title": "新设备",
+    "scan_label": "搜索中...",
+    "not_available": "未找到可用设备",
+    "search_button": "再次搜索"
+  },
+  "device_found": {
+    "title": "添加新设备",
+    "devices_label": "发现设备"
+  },
+  "device_operate": {
+    "title": "测量",
+    "scan_label": "测量中...",
+    "vital_label": "步数",
+    "vital_unit": ["步数"],
+    "restart_button": "重新开始",
+    "save_button": "保存"
+  },
+  "manual_enter": {
+    "title": "添加测量",
+    "vital_label": "步数",
+    "vital_unit": ["步数"],
+    "date_label": "日期",
+    "time_label": "时间",
+    "variants_button": "完成",
+    "save_text": "保存成功！",
+    "save_button": "确认"
+  },
+  "settings": {
+    "title": "设置",
+    "vital_text": "步数指的是您在一天中走的步数。 计步器或数字运动追踪器可帮助您确定总的步数。 内置于手机或者连接到手机，就会在此处显示数据。",
+    "chat_label": "接收消息",
+    "source_label": "数据来源",
+    "add_label": "添加数据来源"
+  },
+  "device_details": {
+    "remove_button": "删除设备"
+  },
+  "history": {
+    "title": "历史",
+    "date_options": ["天","周","月"],
+    "vital_unit": ["步数"],
+    "day_label": "累计步数：",
+    "week_label": "平均步数：",
+    "month_label": "平均步数：",
+    "week_days": ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+  }
+}

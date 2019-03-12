@@ -38,6 +38,12 @@
     props: {
       addon: String,
       vitalsElement: String,
+      chartType: {
+        type: String,
+        default: 'line',
+      },
+      chartWeekSumsDays: Boolean,
+      chartMonthSumsDays: Boolean,
     },
     data() {
       return {
@@ -52,15 +58,10 @@
       const dateTo = new Date();
       API.getRecords(self.addon, self.vitalsElement, self.$root.user, { dateFrom, dateTo }).then((data) => {
         self.data = (data || []).sort((a, b) => {
-          const aDate = new Date(a.data.date);
-          const [aH, aM] = a.data.time.split(':');
-          aDate.setHours(parseInt(aH, 10), parseInt(aM, 10));
+          const aDate = self.itemDate(a);
+          const bDate = self.itemDate(b);
 
-          const bDate = new Date(b.data.date);
-          const [bH, bM] = b.data.time.split(':');
-          bDate.setHours(parseInt(bH, 10), parseInt(bM, 10));
-
-          return bDate - aDate;
+          return aDate.getTime() - bDate.getTime();
         });
         self.$nextTick(() => {
           self.initChart();
@@ -80,6 +81,12 @@
       clickedDate() {
         const self = this;
         if (!self.clicked) return '';
+        if (self.chartWeekSumsDays && self.range === 'week') {
+          return self.$moment(self.clicked.x).format('DD MMM YYYY');
+        }
+        if (self.chartMonthSumsDays && self.range === 'month') {
+          return self.$moment(self.clicked.x).format('DD MMM YYYY');
+        }
         return self.$moment(self.clicked.x).format('DD MMM YYYY HH:mm');
       },
       clickedValue() {
@@ -94,14 +101,20 @@
         if (!self.data) return null;
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        return self.data.filter((el) => {
-          const hours = parseInt(el.data.time.split(':')[0], 10);
-          const mins = parseInt(el.data.time.split(':')[1], 10);
-          const d = new Date(el.data.date);
-          d.setHours(hours, mins);
-          if (d.getTime() > today.getTime()) return true;
-          return false;
-        });
+        return self.data
+          .filter((el) => {
+            const d = self.itemDate(el);
+            if (d.getTime() > today.getTime()) return true;
+            return false;
+          })
+          .map((el) => {
+            const elDate = self.itemDate(el);
+            return {
+              y: parseInt(el.data.value, 10),
+              x: elDate,
+              id: self.data.indexOf(el),
+            };
+          });
       },
       weekValues() {
         const self = this;
@@ -109,14 +122,25 @@
         const weekStart = new Date();
         weekStart.setHours(0, 0, 0, 0);
         weekStart.setMonth(weekStart.getMonth(), weekStart.getDate() - 7);
-        return self.data.filter((el) => {
-          const hours = parseInt(el.data.time.split(':')[0], 10);
-          const mins = parseInt(el.data.time.split(':')[1], 10);
-          const d = new Date(el.data.date);
-          d.setHours(hours, mins);
-          if (d.getTime() > weekStart.getTime()) return true;
-          return false;
-        });
+
+        const values = self.data
+          .filter((el) => {
+            const d = self.itemDate(el);
+            if (d.getTime() > weekStart.getTime()) return true;
+            return false;
+          });
+        if (self.chartWeekSumsDays) {
+          return self.sumValuesByDay(values);
+        }
+        return values
+          .map((el) => {
+            const elDate = self.itemDate(el);
+            return {
+              y: parseInt(el.data.value, 10),
+              x: elDate,
+              id: self.data.indexOf(el),
+            };
+          });
       },
       monthValues() {
         const self = this;
@@ -124,17 +148,57 @@
         const monthStart = new Date();
         monthStart.setHours(0, 0, 0, 0);
         monthStart.setMonth(monthStart.getMonth() - 1, monthStart.getDate());
-        return self.data.filter((el) => {
-          const hours = parseInt(el.data.time.split(':')[0], 10);
-          const mins = parseInt(el.data.time.split(':')[1], 10);
-          const d = new Date(el.data.date);
-          d.setHours(hours, mins);
-          if (d.getTime() > monthStart.getTime()) return true;
-          return false;
+        const values = self.data
+          .filter((el) => {
+            const d = self.itemDate(el);
+            if (d.getTime() > monthStart.getTime()) return true;
+            return false;
+          });
+        if (self.chartWeekSumsDays) {
+          return self.sumValuesByDay(values);
+        }
+        return  values.map((el) => {
+          const elDate = self.itemDate(el);
+          return {
+            y: parseInt(el.data.value, 10),
+            x: elDate,
+            id: self.data.indexOf(el),
+          };
         });
       },
     },
     methods: {
+      sumValuesByDay(values) {
+        const self = this;
+        const newValues = [];
+        let currentDate = self.itemDate(values[0]);
+        currentDate.setHours(0, 0, 0, 0);
+        let newIndex = 0;
+        values.forEach((el) => {
+          const elDate = self.itemDate(el);
+          elDate.setHours(0, 0, 0, 0);
+          if (elDate.getTime() !== currentDate.getTime()) {
+            newIndex += 1;
+            currentDate = elDate;
+          }
+          if (!newValues[newIndex]) {
+            newValues[newIndex] = {
+              x: currentDate,
+              y: 0,
+              id: self.data.indexOf(el),
+            };
+          }
+          newValues[newIndex].y += parseInt(el.data.value, 10);
+        });
+        return newValues;
+      },
+      itemDate(item) {
+        const d = new Date(item.data.date);
+        const hours = parseInt(item.data.time.split(':')[0], 10);
+        const mins = parseInt(item.data.time.split(':')[1], 10);
+        d.setHours(hours, mins);
+        return d;
+      },
       t(v, d) {
         return this.$t(`${this.addon}.history.${v}`, d);
       },
@@ -143,6 +207,9 @@
         const range = self.range;
         if (!self.data || !self.data.length) return;
         const common = {
+          chart: {
+            type: self.chartType || 'line',
+          },
           credits: {
             enabled: false,
           },
@@ -158,6 +225,9 @@
           },
           yAxis: {
             title: null,
+          },
+          time: {
+            timezoneOffset: new Date().getTimezoneOffset(),
           },
         };
         const seriesCommon = {
@@ -179,15 +249,7 @@
             ...common,
             series: [{
               ...seriesCommon,
-              data: self.todayValues.map((el) => {
-                const elDate = new Date(el.data.date);
-                elDate.setHours(parseInt(el.data.time.split(':')[0], 10), parseInt(el.data.time.split(':')[1], 10));
-                return {
-                  y: parseInt(el.data.value, 10),
-                  x: elDate,
-                  id: self.data.indexOf(el),
-                };
-              }),
+              data: self.todayValues,
             }],
           });
         }
@@ -196,15 +258,7 @@
             ...common,
             series: [{
               ...seriesCommon,
-              data: self.weekValues.map((el) => {
-                const elDate = new Date(el.data.date);
-                elDate.setHours(parseInt(el.data.time.split(':')[0], 10), parseInt(el.data.time.split(':')[1], 10));
-                return {
-                  y: parseInt(el.data.value, 10),
-                  x: elDate,
-                  id: self.data.indexOf(el),
-                };
-              }),
+              data: self.weekValues,
             }],
           });
         }
@@ -213,15 +267,7 @@
             ...common,
             series: [{
               ...seriesCommon,
-              data: self.monthValues.map((el) => {
-                const elDate = new Date(el.data.date);
-                elDate.setHours(parseInt(el.data.time.split(':')[0], 10), parseInt(el.data.time.split(':')[1], 10));
-                return {
-                  y: parseInt(el.data.value, 10),
-                  x: elDate,
-                  id: self.data.indexOf(el),
-                };
-              }),
+              data: self.monthValues,
             }],
           });
         }
