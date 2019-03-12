@@ -5,10 +5,10 @@
       <f7-nav-title>{{t('title')}}</f7-nav-title>
       <f7-nav-right>
         <f7-link :href="`/${addon}/settings/`" icon-only>
-          <i class="icon vitals-element-icon-settings"></i>
+          <i :class="`icon vitals-element-icon-settings vitals-${vitalsElement}-icon-settings`"></i>
         </f7-link>
         <f7-link :href="`/${addon}/history/`" icon-only>
-          <i class="icon vitals-element-icon-chart"></i>
+          <i :class="`icon vitals-element-icon-chart vitals-${vitalsElement}-icon-chart`"></i>
         </f7-link>
       </f7-nav-right>
     </f7-navbar>

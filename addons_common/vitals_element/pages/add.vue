@@ -93,6 +93,10 @@
             })(),
           },
           {
+            divider: true,
+            content: ':',
+          },
+          {
             values: (() => {
               const v = [];
               for (let i = 0; i < 60; i += 1) {
