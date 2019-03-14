@@ -16,6 +16,7 @@
     <div :class="`vitals-element-chart-clicked vitals-${vitalsElement}-chart-clicked`">
       <span>{{clickedDate}}</span>
       <span>{{clickedValue}}</span>
+      <span v-if="clickedExtra" v-html="clickedExtra"></span>
     </div>
     <template v-if="data && data.length">
       <div :class="`vitals-element-chart vitals-${vitalsElement}-chart`" v-if="range === 'day'" key="chart-day">
@@ -42,6 +43,12 @@
         type: String,
         default: 'line',
       },
+      chartColor: {
+        type: String,
+        default: '#5FA81A',
+      },
+      chartMarkerColor: String,
+      chartClickedExtra: Function,
       chartWeekSumsDays: Boolean,
       chartMonthSumsDays: Boolean,
     },
@@ -94,6 +101,15 @@
         if (!self.clicked) return '';
         const originalItem = self.data[self.clicked.id];
         return `${self.clicked.y} ${self.t(`vital_unit.${originalItem.data.unit}`)}`;
+      },
+      clickedExtra() {
+        const self = this;
+        if (!self.clicked) return '';
+        if (self.chartClickedExtra) {
+          const originalItem = self.data[self.clicked.id];
+          return self.chartClickedExtra(originalItem, self.$t);
+        }
+        return '';
       },
 
       todayValues() {
@@ -229,9 +245,17 @@
           time: {
             timezoneOffset: new Date().getTimezoneOffset(),
           },
+          plotOptions: {
+            line: {
+              marker: {
+                enabled: true,
+                fillColor: self.chartMarkerColor || self.chartColor,
+              },
+            },
+          },
         };
         const seriesCommon = {
-          color: '#5FA81A',
+          color: self.chartColor,
           cursor: 'pointer',
           point: {
             events: {
