@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="46" height="46" viewBox="0 0 46 46">
+  <defs>
+    <circle id="card-icon-before-a" cx="23" cy="23" r="23"/>
+    <rect id="card-icon-before-b" width="10.645" height="2.172"/>
+    <path id="card-icon-before-d" d="M20.2565445,13.7763707 C24.1312925,12.5705287 29.6710008,8.97021577 30,0.0269944726 C30.0019726,-0.0266278267 -0.000241931066,0.0139863011 5.68434189e-14,0.0269944726 C0.135852445,7.33152101 4.31620936,12.1844024 9.71900202,13.7763707 C10.7624474,14.0838287 19.3287325,14.0651107 20.2565445,13.7763707 Z"/>
+  </defs>
+  <g fill="none" fill-rule="evenodd">
+    <use fill="#FDB29B" xlink:href="#card-icon-before-a"/>
+    <g transform="translate(8 11)">
+      <g transform="translate(10 24)">
+        <mask id="card-icon-before-c" fill="#fff">
+          <use xlink:href="#card-icon-before-b"/>
+        </mask>
+        <use fill="#034751" xlink:href="#card-icon-before-b"/>
+        <rect width="4.355" height="2.172" x="6.29" fill="#013A42" mask="url(#card-icon-before-c)"/>
+      </g>
+      <g fill="#EBEBEB" transform="translate(3)">
+        <path d="M0.577559005,1.51081375 L4.03838324,1.51081375 C4.31452562,1.51081375 4.53838324,1.73467137 4.53838324,2.01081375 L4.53838324,3.08094285 C4.53838324,3.35708523 4.31452562,3.58094285 4.03838324,3.58094285 L0.577559005,3.58094285 C0.301416631,3.58094285 0.0775590055,3.35708523 0.0775590055,3.08094285 L0.0775590055,2.01081375 C0.0775590055,1.73467137 0.301416631,1.51081375 0.577559005,1.51081375 Z" transform="rotate(50 2.308 2.546)"/>
+        <path d="M10.0504427,10.862069 L8.11436925,10.862069 L2.66263745,4.12974086 L3.8319403,3.18285808 L10.0504427,10.862069 Z"/>
+      </g>
+      <g transform="translate(0 10)">
+        <mask id="card-icon-before-e" fill="#fff">
+          <use xlink:href="#card-icon-before-d"/>
+        </mask>
+        <use fill="#045464" xlink:href="#card-icon-before-d"/>
+        <path fill="#014A58" d="M25.8119645,0 L30.7528588,0 L28.967167,14.0353583 L15.7258065,13.8349946 C20.3207759,11.4854823 23.1966343,8.90358009 24.3533817,6.08928812 C25.3317556,3.70896754 25.8179498,1.67920483 25.8119645,0 Z" mask="url(#card-icon-before-e)"/>
+      </g>
+    </g>
+  </g>
+</svg>

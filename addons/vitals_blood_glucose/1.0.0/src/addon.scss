@@ -1,0 +1,66 @@
+$orange: #FF4500;
+@import '../../../../addons_common/vitals_element/addon';
+
+.ios .vitals-blood_glucose-fab {
+  > a {
+    background: linear-gradient(to right top, #FB628F, #F73C61);
+    &.active-state {
+      background-color: #F73C61;
+    }
+  }
+}
+.vitals-blood_glucose-icon-settings {
+  background-image: url(../assets/icon-settings.svg);
+}
+.vitals-blood_glucose-icon-chart {
+  background-image: url(../assets/icon-chart.svg);
+}
+.vitals-blood_glucose-index-header {
+  background-image: url(../assets/header-bg.svg);
+}
+.vitals-blood_glucose-index-header-icon {
+  background-image: url(../assets/header-icon.svg);
+}
+.vitals-blood_glucose-index-no-data-img {
+  background-image: url(../assets/empty.svg);
+}
+.vitals-blood_glucose-settings-page {
+  .vitals-blood_glucose-settings-header {
+    background-image: url(../assets/header-bg.svg);
+  }
+  .vitals-blood_glucose-settings-icon {
+    background-image: url(../assets/header-icon.svg);
+  }
+  .vitals-blood_glucose-settings-center-icon {
+    background-image: url(../assets/settings-icon.svg);
+  }
+}
+.vitals-blood_glucose-chart-clicked {
+  height: auto !important;
+  min-height: 30px;
+}
+.vitals-blood_glucose-chart-clicked-state-icon-none,
+.vitals-blood_glucose-chart-clicked-state-icon-beforemeal,
+.vitals-blood_glucose-chart-clicked-state-icon-aftermeal {
+  display: block;
+  width: 100%;
+  min-width: 56px;
+  height: 56px;
+  background-position: center right;
+  background-size: contain;
+  background-repeat: no-repeat;
+  margin-top: -28px;
+}
+.vitals-blood_glucose-chart-clicked-state-icon-none {
+  background-image: url(../assets/state-icon-none.svg);
+}
+.vitals-blood_glucose-chart-clicked-state-icon-beforemeal {
+  background-image: url(../assets/state-icon-beforemeal.svg);
+}
+.vitals-blood_glucose-chart-clicked-state-icon-aftermeal {
+  background-image: url(../assets/state-icon-aftermeal.svg);
+}
+.vitals-blood_glucose-chart-clicked-state-text {
+  font-size: 18px;
+  text-align: right;
+}

@@ -33,6 +33,42 @@
         input-id="time-input"
         :label="t('time_label')"
       />
+      <template v-for="(field, index) in manualAddExtraFields">
+        <f7-list-item
+          v-if="field.type === 'smartselect'"
+          :key="index"
+          :title="field.label($t)"
+          smart-select
+          :smart-select-params="{openIn: 'popover', closeOnSelect: true}"
+        >
+          <select
+            @change="onExtraFieldChange($event, field)"
+          >
+            <option
+              v-for="(value, valueIndex) in field.values($t)"
+              :key="valueIndex"
+              :value="value.value"
+            >{{value.display}}</option>
+          </select>
+        </f7-list-item>
+        <f7-list-input
+          v-if="field.type === 'select'"
+          :key="index"
+          :type="field.type"
+          :value="this[field.propName]"
+          :label="field.label($t)"
+          :input-style="field.inputStyle"
+          @change="onExtraFieldChange($event, field)"
+          inline-label
+        >
+          <option
+            v-for="(value, valueIndex) in field.values($t)"
+            :key="valueIndex"
+            :value="value.value"
+          >{{value.display}}</option>
+        </f7-list-input>
+      </template>
+
     </f7-list>
   </f7-page>
 </template>
@@ -43,18 +79,27 @@
     props: {
       addon: String,
       vitalsElement: String,
+      manualAddExtraFields: Array,
     },
     data() {
+      const self = this;
+      const extraFields = {};
+      if (self.manualAddExtraFields) {
+        self.manualAddExtraFields.forEach((field) => {
+          extraFields[field.propName] = field.defaultValue;
+        });
+      }
       return {
         value: '',
         date: '',
         time: '',
+        ...extraFields,
       };
     },
     computed: {
       allowSave() {
         const self = this;
-        return self.value && self.value > 0
+        return self.value && self.value > 0;
       },
     },
     mounted() {
@@ -115,21 +160,31 @@
       });
     },
     methods: {
+      onExtraFieldChange(event, field) {
+        this[field.propName] = event.target.value;
+      },
       t(v, d) {
         return this.$t(`${this.addon}.manual_enter.${v}`, d);
       },
       save() {
         const self = this;
         const { value, date, time } = self;
+        const extraFields = {};
+        if (self.manualAddExtraFields) {
+          self.manualAddExtraFields.forEach((field) => {
+            extraFields[field.propName] = self[field.propName];
+          });
+        }
         API.addRecord(
           self.addon,
           self.vitalsElement,
+          self.$root.user,
           {
             value,
             date: new Date(date).toJSON(),
             time,
-            user: self.$root.user,
             unit: 0,
+            ...extraFields,
           }
         ).then(() => {
           self.$events.$emit(`${self.addon}:updateRecords`);

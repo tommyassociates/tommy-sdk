@@ -27,6 +27,7 @@ routes.forEach((r) => {
       addon: 'vitals_pedometer',
       vitalsElement: 'pedometer',
       chartType: 'column',
+      chartColor: '#1498CE',
       chartWeekSumsDays: true,
       chartMonthSumsDays: true,
     },

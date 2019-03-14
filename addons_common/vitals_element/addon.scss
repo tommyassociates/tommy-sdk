@@ -135,16 +135,23 @@ $orange: #FF4500;
 }
 
 .vitals-element-manual-add-page {
-  .list .item-input .item-label {
+  .list .item-input .item-label,
+  .list .smart-select .item-title {
     font-size: 17px;
     font-weight: 500;
   }
-  .list .item-input input {
+  .list .item-input input,
+  .list .item-input select,
+  .list .smart-select .item-after {
     font-size: 17px;
     text-align: right;
+    color: #000;
   }
   .list .item-input-wrap {
     width: 100%;
+  }
+  .list .input-dropdown {
+    width: auto;
   }
   .vitals-element-input-unit {
     margin-left: 4px;
