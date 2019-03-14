@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="940" height="300" viewBox="0 0 940 300">
+  <defs>
+    <polygon id="header-bg-a" points="0 0 940 0 940 300 0 300"/>
+    <linearGradient id="header-bg-c" x1="50%" x2="50%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#FCAA89"/>
+      <stop offset="100%" stop-color="#FD594A"/>
+    </linearGradient>
+    <linearGradient id="header-bg-d" x1="80.182%" x2="17.773%" y1="13.483%" y2="81.237%">
+      <stop offset="0%" stop-color="#FDD8CC" stop-opacity=".608"/>
+      <stop offset="100%" stop-color="#FAAF9D" stop-opacity=".21"/>
+    </linearGradient>
+    <linearGradient id="header-bg-e" x1="79.776%" x2="15.793%" y1="11.414%" y2="84.381%">
+      <stop offset="0%" stop-color="#FDD8CC" stop-opacity=".812"/>
+      <stop offset="100%" stop-color="#FAAF9D" stop-opacity=".299"/>
+    </linearGradient>
+    <filter id="header-bg-f" width="325.7%" height="325.6%" x="-112.9%" y="-112.8%" filterUnits="objectBoundingBox">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="12.184"/>
+    </filter>
+  </defs>
+  <g fill="none" fill-rule="evenodd">
+    <mask id="header-bg-b" fill="#fff">
+      <use xlink:href="#header-bg-a"/>
+    </mask>
+    <use fill="#D8D8D8" xlink:href="#header-bg-a"/>
+    <g mask="url(#header-bg-b)">
+      <g transform="translate(-3)">
+        <polygon fill="url(#header-bg-c)" points=".726 0 944.726 0 944.726 300 .726 300" opacity=".8"/>
+        <ellipse cx="904.017" cy="101.4" fill="#FFFCD5" opacity=".199" rx="14.993" ry="15"/>
+        <ellipse cx="773.275" cy="190.2" fill="#FAAF9D" opacity=".565" rx="5.398" ry="5.4"/>
+        <ellipse cx="864.435" cy="249" fill="#FAAF9D" opacity=".565" rx="4.198" ry="4.2"/>
+        <ellipse cx="746.887" cy="213" fill="url(#header-bg-d)" opacity=".601" rx="8.996" ry="9"/>
+        <ellipse cx="896.221" cy="110.4" fill="#FFF" opacity=".169" rx="22.79" ry="22.8"/>
+        <ellipse cx="548.375" cy="253.2" fill="url(#header-bg-e)" opacity=".407" rx="27.588" ry="27.6"/>
+        <ellipse cx="934.004" cy="83.4" fill="#FAFF3F" filter="url(#header-bg-f)" opacity=".601" rx="16.193" ry="16.2"/>
+      </g>
+    </g>
+  </g>
+</svg>

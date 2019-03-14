@@ -1,0 +1,74 @@
+{
+  "index": {
+    "title": "Heart Rate",
+    "vital_label": "No Data",
+    "vital_unit": ["bpm"],
+    "not_available": "Add new records by clicking \"+\" button.",
+    "loading_label": "Loading...",
+    "manual_button": "Enter Manually",
+    "device_button": "Device"
+  },
+  "device": {
+    "title": "Device",
+    "device_label": "Default Device",
+    "search_button": "Find new device",
+    "start_button": "Start Measuring",
+    "new_label": "New Device"
+  },
+  "bluetooth_error": {
+    "text": "Bluetooth is not turned on or does not support the device.",
+    "confirm_button": "OK"
+  },
+  "device_search": {
+    "title": "New device",
+    "scan_label": "Searching...",
+    "not_available": "No available devices found",
+    "search_button": "Search Again"
+  },
+  "device_found": {
+    "title": "Add new device",
+    "devices_label": "Devices Found"
+  },
+  "device_operate": {
+    "title": "Measurement",
+    "scan_label": "Measuring...",
+    "vital_variants_label": "State:",
+    "vital_variants": ["Resting", "Walking", "Running"],
+    "restart_button": "Restart",
+    "save_button": "Save"
+  },
+  "manual_enter": {
+    "title": "Add Measurement",
+    "vital_label": "Heart Rate",
+    "vital_unit": ["bpm"],
+    "date_label": "Date",
+    "time_label": "Time",
+    "vital_variants_label": "State",
+    "vital_variants": ["Resting", "Walking", "Running"],
+    "variants_button": "Done",
+    "save_text": "Saved successfully!",
+    "save_button": "OK"
+  },
+  "settings": {
+    "title": "Settings",
+    "vital_text": "Your heart beats about 100,000 times a day, and it accelerates and slows down during exercise and rest. Heart rate refers to the number of beats per minute of the heart and can be regarded as an indicator of cardiovascular health.",
+    "chat_label": "Receive the message",
+    "source_label": "Data Sources",
+    "add_label": "Add Data Source"
+  },
+  "device_details": {
+    "remove_button": "Remove Device"
+  },
+  "history": {
+    "title": "History",
+    "date_options": ["Day","Week","Month"],
+    "vital_unit": ["bpm"],
+    "average_label": "Avg.",
+    "vital_variants": ["Resting", "Walking", "Running"],
+    "week_days": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  },
+  "title": "Heart Rate",
+  "summary": "",
+  "description": "",
+  "developer": "Tommy Labs GmbH"
+}

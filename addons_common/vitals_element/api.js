@@ -3,7 +3,7 @@ const api = window.tommy.api;
 const API = {
   getRecords(addon, vitalsElement, user, { page, limit, dateFrom, dateTo } = {}) {
     // eslint-disable-next-line
-    vitalsElement = vitalsElement.split('-').map(w => w[0].toUpperCase() + w.substr(1)).join('');
+    vitalsElement = vitalsElement.split(/[-_]/g).map(w => w[0].toUpperCase() + w.substr(1)).join('');
     let date_range;
     if (dateFrom && dateTo) {
       date_range = [new Date(dateFrom).toJSON(), new Date(dateTo).toJSON()];
@@ -21,11 +21,11 @@ const API = {
       cache: false,
     });
   },
-  addRecord(addon, vitalsElement, { value, date, time, user, unit }) {
+  addRecord(addon, vitalsElement, user, data) {
     // eslint-disable-next-line
-    vitalsElement = vitalsElement.split('-').map(w => w[0].toUpperCase() + w.substr(1)).join('');
-    const startAt = new Date(date);
-    startAt.setHours(parseInt(time.split(':')[0], 10), parseInt(time.split(':')[1], 10));
+    vitalsElement = vitalsElement.split(/[-_]/g).map(w => w[0].toUpperCase() + w.substr(1)).join('');
+    const startAt = new Date(data.date);
+    startAt.setHours(parseInt(data.time.split(':')[0], 10), parseInt(data.time.split(':')[1], 10));
     const obj = {
       addon,
       kind: `Vitals${vitalsElement}Item`,
@@ -41,12 +41,7 @@ const API = {
         name: `${user.first_name} ${user.last_name}`,
         user_id: user.id,
       }],
-      data: JSON.stringify({
-        value,
-        date,
-        time,
-        unit,
-      }),
+      data: JSON.stringify(data),
     };
     return api.createFragment(obj);
   },

@@ -34,14 +34,15 @@
     </div>
 
     <div :class="`vitals-element-index-cards vitals-${vitalsElement}-index-cards`" v-if="data && data.length">
-      <div :class="`vitals-element-card vitals-${vitalsElement}-card`"
+      <div :class="`vitals-element-card vitals-${vitalsElement}-card ${cardExtraClass(item)}`"
         v-for="(item, index) in data"
         :key="index"
       >
         <div :class="`vitals-element-card-title vitals-${vitalsElement}-card-title`">{{$moment(item.data.date).format('DD MMM YYYY')}} {{item.data.time}}</div>
         <div :class="`vitals-element-card-content vitals-${vitalsElement}-card-content`">
           <div :class="`vitals-element-card-icon vitals-${vitalsElement}-card-icon`">
-            <img :src="`${$addonAssetsUrl}card-icon.svg`" >
+            <img v-if="cardCustomIconName(item)" :src="`${$addonAssetsUrl}${cardCustomIconName(item)}.svg`" >
+            <img v-else :src="`${$addonAssetsUrl}card-icon.svg`" >
           </div>
           <div :class="`vitals-element-card-value vitals-${vitalsElement}-card-value`">{{item.data.value}} <sub>{{t(`vital_unit.${item.data.unit || 0}`)}}</sub></div>
         </div>
@@ -57,6 +58,8 @@
     props: {
       addon: String,
       vitalsElement: String,
+      indexCardExtraClass: [String, Function],
+      indexCardCustomIconName: [String, Function],
     },
     data() {
       return {
@@ -73,6 +76,22 @@
       self.$events.$off(`${self.addon}:updateRecords`, self.getData);
     },
     methods: {
+      cardCustomIconName(item) {
+        const self = this;
+        if (self.indexCardCustomIconName) {
+          if (typeof self.indexCardCustomIconName === 'function') return self.indexCardCustomIconName(item);
+          return self.indexCardCustomIconName;
+        }
+        return '';
+      },
+      cardExtraClass(item) {
+        const self = this;
+        if (self.indexCardExtraClass) {
+          if (typeof self.indexCardExtraClass === 'function') return self.indexCardExtraClass(item);
+          return self.indexCardExtraClass;
+        }
+        return '';
+      },
       t(v, d) {
         return this.$t(`${this.addon}.index.${v}`, d);
       },
