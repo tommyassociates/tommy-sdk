@@ -1,0 +1,76 @@
+{
+  "index": {
+    "title": "Blood Pressure",
+    "vital_label": "No Data",
+    "vital_unit": ["mmHg"],
+    "bpm_unit": ["bpm"],
+    "not_available": "Add new records by clicking '+' button.",
+    "loading_label": "Loading...",
+    "manual_button": "Enter Manually",
+    "device_button": "Device"
+  },
+  "device": {
+    "title": "Device",
+    "device_label": "Default Device",
+    "search_button": "Find new device",
+    "start_button": "Start Measuring",
+    "new_label": "New Device"
+  },
+  "bluetooth_error": {
+    "text": "Bluetooth is not turned on or does not support the device.",
+    "confirm_button": "OK"
+  },
+  "device_search": {
+    "title": "New device",
+    "scan_label": "Searching...",
+    "not_available": "No available devices found",
+    "search_button": "Search Again"
+  },
+  "device_found": {
+    "title": "Add new device",
+    "devices_label": "Devices Found"
+  },
+  "device_operate": {
+    "title": "Measurement",
+    "scan_label": "Measuring...",
+    "bpm_label": "bpm",
+    "dia_label": "DIA",
+    "sys_label": "SYS",
+    "restart_button": "Restart",
+    "save_button": "Save"
+  },
+  "manual_enter": {
+    "title": "Add Measurement",
+    "sys_label": "Systolic pressure",
+    "sys_unit": ["mmHg"],
+    "dia_label": "Diastolic pressure",
+    "dia_unit": ["mmHg"],
+    "bpm_label": "Heart rate",
+    "bpm_unit": ["bpm"],
+    "date_label": "Date",
+    "time_label": "Time",
+    "variants_button": "Done",
+    "save_text": "Saved successfully!",
+    "save_button": "OK"
+  },
+  "settings": {
+    "title": "Settings",
+    "vital_text": "Blood pressure refers to the pressure of blood flow on the arterial wall when the heart delivers blood. The blood pressure value usually writes the systolic pressure value above or in front of the diastolic pressure value (eg 120/80).",
+    "chat_label": "Receive the message",
+    "source_label": "Data Sources",
+    "add_label": "Add Data Source"
+  },
+  "device_details": {
+    "remove_button": "Remove Device"
+  },
+  "history": {
+    "title": "History",
+    "date_options": ["Day","Week","Month"],
+    "vital_units": ["mmHg", "mmHg", "bpm"],
+    "week_days": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  },
+  "title": "Blood Pressure",
+  "summary": "",
+  "description": "",
+  "developer": "Tommy Labs GmbH"
+}
