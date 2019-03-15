@@ -1,0 +1,76 @@
+{
+  "index": {
+    "title": "血压",
+    "vital_label": "没有数据",
+    "vital_unit": ["毫米汞柱"],
+    "bpm_unit": ["每分钟跳动次数"],
+    "not_available": "点击+键可增加新的记录",
+    "loading_label": "加载中...",
+    "manual_button": "手动输入",
+    "device_button": "设备"
+  },
+  "device": {
+    "title": "设备",
+    "device_label": "默认设备",
+    "search_button": "查找新设备",
+    "start_button": "开始测量",
+    "new_label": "新设备"
+  },
+  "bluetooth_error": {
+    "text": "手机蓝牙未开启或不支持该设备",
+    "confirm_button": "确认"
+  },
+  "device_search": {
+    "title": "新设备",
+    "scan_label": "搜索中...",
+    "not_available": "未找到可用设备",
+    "search_button": "再次搜索 "
+  },
+  "device_found": {
+    "title": "添加新设备",
+    "devices_label": "发现设备"
+  },
+  "device_operate": {
+    "title": "测量",
+    "scan_label": "测量中...",
+    "bpm_label": "每分钟跳动次数",
+    "dia_label": "舒张压",
+    "sys_label": "收缩压",
+    "restart_button": "重新开始",
+    "save_button": "保存"
+  },
+  "manual_enter": {
+    "title": "添加测量",
+    "sys_label": "收缩压",
+    "sys_unit": ["毫米汞柱"],
+    "dia_label": "舒张压",
+    "dia_unit": ["毫米汞柱"],
+    "bpm_label": "心率",
+    "bpm_unit": ["每分钟跳动次数"],
+    "date_label": "日期",
+    "time_label": "时间",
+    "variants_button": "完成",
+    "save_text": "保存成功！",
+    "save_button": "确认"
+  },
+  "settings": {
+    "title": "设置",
+    "vital_text": "血压是指心脏输血时动脉壁上的血流压力。 通常血压值的记录是将收缩压值放在舒张压值之上或之前（例如120/80）。",
+    "chat_label": "接收消息",
+    "source_label": "数据来源",
+    "add_label": "添加数据来源"
+  },
+  "device_details": {
+    "remove_button": "删除设备"
+  },
+  "history": {
+    "title": "历史",
+    "date_options": ["天","周","月"],
+    "vital_units": [["毫米汞柱"], ["毫米汞柱"], "每分钟跳动次数"],
+    "week_days": ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+  },
+  "title": "血压",
+  "summary": "",
+  "description": "",
+  "developer": "Tommy Labs GmbH"
+}
