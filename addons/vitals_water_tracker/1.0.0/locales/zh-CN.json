@@ -1,0 +1,90 @@
+{
+  "index": {
+    "title": "饮水记录",
+    "vital_label": "没有数据",
+    "vital_unit": ["杯子（英制度量衡）", "杯子 （美国度量衡）", "液体盎司（英制度量衡）", "液体盎司（美国度量衡）", "升", "毫升", "磅（英制度量衡）", "磅（美国度量衡）"],
+    "goal_label": "目标：",
+    "achieved_label": "已喝：",
+    "not_available": "点击+键可增加新的记录",
+    "loading_label": "加载中...",
+    "manual_button": "手动输入",
+    "device_button": "设备"
+  },
+  "drink_time": {
+    "text": "该喝水啦！要喝{{value}}{{unit}}.",
+    "confirm_button": "确认"
+  },
+  "manual_enter": {
+    "title": "添加饮水量",
+    "vital_unit": ["杯子（英制度量衡）", "杯子 （美国度量衡）", "液体盎司（英制度量衡）", "液体盎司（美国度量衡）", "升", "毫升", "磅（英制度量衡）", "磅（美国度量衡）"],
+    "option_a_label": "150",
+    "option_b_label": "220",
+    "option_c_label": "350",
+    "option_d_label": "400",
+    "custom_button": "自定义数量"
+  },
+  "custom_amount": {
+    "text": "在{{unit}}输入饮水量：",
+    "cancel_button": "取消",
+    "confirm_button": "确认"
+  },
+  "drinking_plan": {
+    "title": "饮水计划",
+    "vital_label": "每日目标",
+    "vital_unit": ["杯子（英制度量衡）", "杯子 （美国度量衡）", "液体盎司（英制度量衡）", "液体盎司（美国度量衡）", "升", "毫升", "磅（英制度量衡）", "磅（美国度量衡）"],
+    "reminder_label": "提醒",
+    "start_label": "开始时间",
+    "end_label": "结束时间 ",
+    "interval_label": "时间间隔"
+  },
+  "settings": {
+    "title": "设置",
+    "vital_text": "喝水对于保持快乐和健康非常重要。 当大脑提醒您脱水时，已经太迟了，因为您的身体已处于不健康的状态。",
+    "chat_label": "接收消息",
+    "plan_label": "饮水计划",
+    "vital_unit": ["杯子（英制度量衡）", "杯子 （美国度量衡）", "液体盎司（英制度量衡）", "液体盎司（美国度量衡）", "升", "毫升", "磅（英制度量衡）", "磅（美国度量衡）"],
+    "source_label": "数据来源 ",
+    "add_label": "添加数据来源"
+  },
+  "device": {
+    "title": "设备",
+    "device_label": "默认设备",
+    "search_button": "发现新设备",
+    "start_button": "开始测量",
+    "new_label": "新设备"
+  },
+  "bluetooth_error": {
+    "text": "手机蓝牙未开启或不支持该设备",
+    "confirm_button": "确认"
+  },
+  "device_search": {
+    "title": "新设备",
+    "scan_label": "搜索中...",
+    "not_available": "未找到可用设备",
+    "search_button": "再次搜索"
+  },
+  "device_found": {
+    "title": "添加新设备",
+    "devices_label": "发现设备"
+  },
+  "device_operate": {
+    "title": "测量",
+    "scan_label": "测量中...",
+    "vital_unit": ["杯子（英制度量衡）", "杯子 （美国度量衡）", "液体盎司（英制度量衡）", "液体盎司（美国度量衡）", "升", "毫升", "磅（英制度量衡）", "磅（美国度量衡）"],
+    "restart_button": "重新开始",
+    "save_button": "保存"
+  },
+  "device_details": {
+    "remove_button": "删除设备"
+  },
+  "history": {
+    "title": "历史",
+    "date_options": ["天","周","月"],
+    "vital_unit": ["杯子（英制度量衡）", "杯子 （美国度量衡）", "液体盎司（英制度量衡）", "液体盎司（美国度量衡）", "升", "毫升", "磅（英制度量衡）", "磅（美国度量衡）"],
+    "week_days": ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+  },
+  "title": "饮水记录",
+  "summary": "",
+  "description": "",
+  "developer": "Tommy Labs GmbH"
+}
