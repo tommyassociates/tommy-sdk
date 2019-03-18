@@ -1,24 +1,19 @@
-import Index from '../../../../addons_common/vitals_element/pages/index.vue';
-import Add from '../../../../addons_common/vitals_element/pages/add.vue';
-import Settings from '../../../../addons_common/vitals_element/pages/settings.vue';
-import History from '../../../../addons_common/vitals_element/pages/history.vue';
-
 const routes = [
   {
     path: '/vitals_heart_rate/',
-    component: Index,
+    component: 'tommy-vitals-element-index',
   },
   {
     path: '/vitals_heart_rate/add/',
-    component: Add,
+    component: 'tommy-vitals-element-add',
   },
   {
     path: '/vitals_heart_rate/settings/',
-    component: Settings,
+    component: 'tommy-vitals-element-settings',
   },
   {
     path: '/vitals_heart_rate/history/',
-    component: History,
+    component: 'tommy-vitals-element-history',
   },
 ];
 routes.forEach((r) => {
