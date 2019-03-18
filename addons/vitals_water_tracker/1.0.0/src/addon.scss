@@ -1,0 +1,117 @@
+$orange: #FF4500;
+@import '../../../../addons_common/vitals_element/addon';
+
+.ios .vitals-water_tracker-fab {
+  > a {
+    background: linear-gradient(to right top, #8DBBEF, #5DA1F1);
+    &.active-state {
+      background-color: #5DA1F1;
+    }
+  }
+}
+.vitals-water_tracker-index-header-data-row {
+  display: flex;
+  align-items: flex-end;
+  margin-bottom: 0;
+  justify-content: space-between;
+  + .vitals-water_tracker-index-header-data-row {
+    margin-top: 10px;
+  }
+}
+.vitals-water_tracker-index-header-data-label {
+  color: #717171;
+  font-size: 18px;
+  width: 70px;
+}
+.vitals-element-index-header-data.vitals-water_tracker-index-header-data {
+  margin-bottom: -4px;
+}
+.vitals-water_tracker-manual-add-page {
+  .vitals-water_tracker-manual-add-custom-button {
+    color: $orange;
+    .item-inner {
+      justify-content: center;
+    }
+  }
+  .list {
+    ul {
+      background: transparent;
+      margin-top: 12px;
+      margin-bottom: 12px;
+    }
+    li {
+      margin: 12px;
+      background: #fff;
+      border-radius: 4px;
+      font-size: 30px;
+      overflow: hidden;
+      font-weight: 500;
+    }
+  }
+}
+.vitals-water_tracker-plan-page {
+  .block-title {
+    font-size: 16px;
+    color: #999999;
+    text-transform: none;
+    margin-top: -20px;
+  }
+  .list .item-input .item-label,
+  .list .smart-select .item-title,
+  .list .item-link .item-title {
+    font-size: 17px;
+    font-weight: 500;
+  }
+  .list .item-input input,
+  .list .item-input select,
+  .list .smart-select .item-after,
+  .list .item-link .item-after {
+    font-size: 17px;
+    text-align: right;
+    color: #000;
+  }
+  .list .item-input-wrap {
+    width: 100%;
+  }
+  .list .input-dropdown {
+    width: auto;
+  }
+  .vitals-element-input-unit {
+    margin-left: 4px;
+  }
+}
+.vitals-water_tracker-dialog-time-picker {
+  height: 145px;
+  .picker-inline {
+    height: 145px;
+  }
+  .picker-item.picker-item-selected {
+    color: $orange;
+  }
+}
+.vitals-water_tracker-icon-settings {
+  background-image: url(../assets/icon-settings.svg);
+}
+.vitals-water_tracker-icon-chart {
+  background-image: url(../assets/icon-chart.svg);
+}
+.vitals-water_tracker-index-header {
+  background-image: url(../assets/header-bg.svg);
+}
+.vitals-water_tracker-index-header-icon {
+  background-image: url(../assets/header-icon.svg);
+}
+.vitals-water_tracker-index-no-data-img {
+  background-image: url(../assets/empty.svg);
+}
+.vitals-water_tracker-settings-page {
+  .vitals-water_tracker-settings-header {
+    background-image: url(../assets/header-bg.svg);
+  }
+  .vitals-water_tracker-settings-icon {
+    background-image: url(../assets/header-icon.svg);
+  }
+  .vitals-water_tracker-settings-center-icon {
+    background-image: url(../assets/settings-icon.svg);
+  }
+}
