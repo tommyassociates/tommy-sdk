@@ -1,0 +1,61 @@
+{
+  "index": {
+    "title": "Medication Reminder",
+    "vital_label": "No Data",
+    "dosage_unit": {"bag": "bag", "ml": "Ml", "pill": "Pill", "mg": "mg", "drop": "Drop"},
+    "not_available": "You have no medication today! Enjoy your day!",
+    "loading_label": "Loading..."
+  },
+  "medication_time": {
+    "text": "It's time to take a Pill!",
+    "snooze_button": "Snooze",
+    "confirm_button": "Taken"
+  },
+  "medication_add": {
+    "title": "Add Medication",
+    "vital_label": "Name",
+    "startdate_label": "Start Date",
+    "enddate_label": "End Date",
+    "frequency_label": "Frequency",
+    "frequency_units": ["Once per day", "Twice per day", "Three times per day", "Four times per day", "Five times per day", "Six times per day", "Seven times per day", "Eight times per day"],
+    "dosage_label": "Dosage",
+    "dosage_unit": {"bag": "bag", "ml": "Ml", "pill": "Pill", "mg": "mg", "drop": "Drop"},
+    "variants_button": "Done",
+    "save_text": "Saved successfully!",
+    "save_button": "OK"
+  },
+  "medication_edit": {
+    "title": "Edit Medication",
+    "vital_label": "Name",
+    "startdate_label": "Start Date",
+    "enddate_label": "End Date",
+    "frequency_label": "Frequency",
+    "frequency_units": ["Once per day", "Twice per day", "Three times per day", "Four times per day", "Five times per day", "Six times per day", "Seven times per day", "Eight times per day"],
+    "dosage_label": "Dosage",
+    "dosage_unit": {"bag": "bag", "ml": "Ml", "pill": "Pill", "mg": "mg", "drop": "Drop"},
+    "variants_button": "Done",
+    "delete_button": "Delete",
+    "pause_button": "Stop reminders",
+    "start_button": "Start reminders",
+    "save_text": "Saved successfully!",
+    "save_button": "OK"
+  },
+  "medication_plan": {
+    "title": "Medication Plan"
+  },
+  "settings": {
+    "title": "Settings",
+    "vital_text": "Medication Reminder is a simple and beautiful prescription reminder mini program.",
+    "chat_label": "Receive the message",
+    "source_label": "Data Sources"
+  },
+  "history": {
+    "title": "Record",
+    "notice_text": ["Good job! Keep it up!", "Remember to take the medicine!"],
+    "dosage_status": "Taken"
+  },
+  "title": "Medication Reminder",
+  "summary": "",
+  "description": "",
+  "developer": "Tommy Labs GmbH"
+}
