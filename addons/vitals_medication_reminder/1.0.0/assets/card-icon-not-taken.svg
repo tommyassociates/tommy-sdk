@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="48" height="48" viewBox="0 0 48 48">
+  <defs>
+    <circle id="card-icon-not-taken-b" cx="23" cy="23" r="23"/>
+    <filter id="card-icon-not-taken-a" width="104.3%" height="104.3%" x="-2.2%" y="-2.2%" filterUnits="objectBoundingBox">
+      <feGaussianBlur in="SourceAlpha" result="shadowBlurInner1" stdDeviation=".5"/>
+      <feOffset in="shadowBlurInner1" result="shadowOffsetInner1"/>
+      <feComposite in="shadowOffsetInner1" in2="SourceAlpha" k2="-1" k3="1" operator="arithmetic" result="shadowInnerInner1"/>
+      <feColorMatrix in="shadowInnerInner1" values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.2 0"/>
+    </filter>
+  </defs>
+  <g fill="none" fill-rule="evenodd" transform="matrix(-1 0 0 1 47 1)">
+    <use fill="#000" filter="url(#card-icon-not-taken-a)" xlink:href="#card-icon-not-taken-b"/>
+    <use stroke="#FF4500" xlink:href="#card-icon-not-taken-b"/>
+    <circle cx="23" cy="23" r="23" stroke="#FF4500" stroke-width="2"/>
+    <path fill="#FF4500" fill-rule="nonzero" d="M2.97413257,2.95498644 C2.97413257,1.32221111 2.30824406,0 1.48707342,0 C0.666402499,0 0,1.32221108 0,2.95498644 L0,14.0442667 C0,15.6770991 0.666402499,17.0003096 1.48707342,17.0003096 C2.30825833,17.0003096 2.97413257,15.6770706 2.97413257,14.0442667 L2.97413257,2.95498644 L2.97413257,2.95498644 Z M1.5000072,19.2182342 C0.672198515,19.2182342 1.13686838e-13,19.8850752 1.13686838e-13,20.7090963 C1.13686838e-13,21.5320804 0.672198515,22.19944 1.5000072,22.19944 C2.32833434,22.19944 3,21.532066 3,20.7090963 C3,19.8856081 2.32833434,19.2182342 1.5000072,19.2182342 L1.5000072,19.2182342 Z" transform="translate(21 12)"/>
+  </g>
+</svg>
