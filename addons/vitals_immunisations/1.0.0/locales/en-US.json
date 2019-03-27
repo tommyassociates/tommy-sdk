@@ -1,0 +1,70 @@
+{
+  "index": {
+    "title": "Immunisations",
+    "vital_label": "No Data",
+    "next_label": "Next vaccine:",
+    "days_label": "Days",
+    "not_available": "Add new Immunisations by clicking '+' button.",
+    "loading_label": "Loading..."
+  },
+  "due_alert": {
+    "text": "You are due to have an immunisation. Please select the vaccine and confirm when complete.",
+    "confirm_button": "Dismiss"
+  },
+  "immunisation_details": {
+    "title": "Details",
+    "vaccine_label": "Vaccine",
+    "date_label": "Scheduled date",
+    "status_label": "Status",
+    "status_options": ["Overdue injection","Injected","Waiting"],
+    "injection_confirmed_label": "Injection confirmed by",
+    "injection_date_label": "Injected date",
+    "next_due_label": "Next due date",
+    "prevent_disease_title": "Prevent Disease",
+    "precautions_title": "Precautions",
+    "confirm_injection_button": "Confirm Injection",
+    "archive_button": "Archive"
+  },
+  "injection_confirm": {
+    "title": "Details",
+    "date_label": "Injection date",
+    "cancel_button": "Cancel",
+    "confirm_button": "Confirm"
+  },
+  "add_vaccine": {
+    "title": "Add Vaccine",
+    "vaccine_label": "Vaccine",
+    "select_vaccine_label": "Select Vaccine",
+    "date_label": "Scheduled date"
+  },
+  "vaccine_selector": {
+    "title": "Vaccine Name",
+    "vaccine_search": "Search Vaccine",
+    "custom_title": "Custom"
+  },
+  "settings": {
+    "title": "Settings",
+    "vital_text": "Immunisation Reminder is a simple and beautiful vaccinations tracker and reminder application designed to keep you up to date with important vaccination schedules.",
+    "chat_label": "Receive the message",
+    "archive_label": "Archive",
+    "plan_label": "Immunisations plan"
+  },
+  "archive": {
+    "title": "Archive",
+    "no_available": "When you have archived previous records, they will show here.",
+    "delete_button": "Delete"
+  },
+  "archive_delete_confirm_prompt": {
+    "text": "Are you sure you wish to delete this entry?",
+    "cancel_button": "No",
+    "confirm_button": "Yes"
+  },
+  "archive_delete_success_prompt": {
+    "text": "Successfully deleted!",
+    "delete_button": "Dismiss"
+  },
+  "title": "Immunisations",
+  "summary": "",
+  "description": "",
+  "developer": "Tommy Labs GmbH"
+}
