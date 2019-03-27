@@ -1,0 +1,70 @@
+{
+  "index": {
+    "title": "免疫记录",
+    "vital_label": "没有记录",
+    "next_label": "下一次疫苗时间:",
+    "days_label": "天",
+    "not_available": "按 '+' 键添加疫苗记录.",
+    "loading_label": "载入"
+  },
+  "due_alert": {
+    "text": "你的疫苗时间马上到了。请尽快注射并且更新注射时间。",
+    "confirm_button": "忽略"
+  },
+  "immunisation_details": {
+    "title": "细节",
+    "vaccine_label": "疫苗",
+    "date_label": "注射日期",
+    "status_label": "状态",
+    "status_options": ["过期未注射","已注射","等待"],
+    "injection_confirmed_label": "注射确认人员",
+    "injection_date_label": "注射日期",
+    "next_due_label": "下次注射日期",
+    "prevent_disease_title": "预防疾病",
+    "precautions_title": "准备措施",
+    "confirm_injection_button": "确认注射",
+    "archive_button": "存档"
+  },
+  "injection_confirm": {
+    "title": "细节",
+    "date_label": "注射日期",
+    "cancel_button": "取消",
+    "confirm_button": "确认"
+  },
+  "add_vaccine": {
+    "title": "添加疫苗",
+    "vaccine_label": "疫苗",
+    "select_vaccine_label": "选择疫苗",
+    "date_label": "规定日期"
+  },
+  "vaccine_selector": {
+    "title": "疫苗名称",
+    "vaccine_search": "搜索疫苗",
+    "custom_title": "病人"
+  },
+  "settings": {
+    "title": "设置",
+    "vital_text": "疫苗提醒功能是简单有效的提醒你按时注册疫苗的小程序.",
+    "chat_label": "接收信息",
+    "archive_label": "存档",
+    "plan_label": "免疫计划"
+  },
+  "archive": {
+    "title": "存档",
+    "no_available": "你的存档记录会出现在这里.",
+    "delete_button": "删除"
+  },
+  "archive_delete_confirm_prompt": {
+    "text": "确定删除吗?",
+    "cancel_button": "否",
+    "confirm_button": "是"
+  },
+  "archive_delete_success_prompt": {
+    "text": "成功删除!",
+    "delete_button": "忽略"
+  },
+  "title": "免疫记录",
+  "summary": "",
+  "description": "",
+  "developer": "Tommy Labs GmbH"
+}
