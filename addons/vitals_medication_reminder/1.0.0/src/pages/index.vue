@@ -164,9 +164,15 @@
         const self = this;
         if (!self.takenData) return false;
         let taken;
+        const todayDate = new Date();
+        todayDate.setHours(0, 0, 0, 0);
         self.takenData.forEach((takenItem) => {
           if (taken) return;
-          if (item.id === takenItem.data.medication_id && item.time === takenItem.data.time) taken = takenItem.data.taken === true;
+          const takenDate = new Date(takenItem.data.date || takenItem.start_at);
+          takenDate.setHours(0, 0, 0, 0);
+          if (item.id === takenItem.data.medication_id && item.time === takenItem.data.time && todayDate.getTime() === takenDate.getTime() && takenItem.data.taken) {
+            taken = true;
+          }
         });
         return taken;
       },
@@ -174,9 +180,15 @@
         const self = this;
         if (!self.takenData) return false;
         let notTaken;
+        const todayDate = new Date();
+        todayDate.setHours(0, 0, 0, 0);
         self.takenData.forEach((takenItem) => {
           if (notTaken) return;
-          if (item.id === takenItem.data.medication_id && item.time === takenItem.data.time) notTaken = takenItem.data.taken === false;
+          const takenDate = new Date(takenItem.data.date || takenItem.start_at);
+          takenDate.setHours(0, 0, 0, 0);
+          if (item.id === takenItem.data.medication_id && item.time === takenItem.data.time && todayDate.getTime() === takenDate.getTime() && !takenItem.data.taken) {
+            notTaken = true;
+          }
         });
         return notTaken;
       },
