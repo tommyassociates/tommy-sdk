@@ -19,21 +19,21 @@
     >
       <div class="medication-history-card-date">
         <span>{{$moment(key).format('DD MMM YYYY')}}</span>
-        <span v-if="isOpenedCard(key)">{{percentageTaken(dateItems)}}%</span>
+        <span v-if="isOpenedCard(key)">{{percentageTaken(dateItems, key)}}%</span>
         <f7-icon :f7="isOpenedCard(key) ? 'chevron_up' : 'chevron_right'" size="16" />
       </div>
       <div class="medication-history-card-content" v-if="!isOpenedCard(key)">
-        <div class="medication-history-card-icon taken" v-if="percentageTaken(dateItems) === 100"></div>
+        <div class="medication-history-card-icon taken" v-if="percentageTaken(dateItems, key) === 100"></div>
         <f7-gauge
           v-else
           :size="46"
-          :value="percentageTaken(dateItems) / 100"
+          :value="percentageTaken(dateItems, key) / 100"
           border-bg-color="#FAE1C9"
           border-color="#FF4500"
           :border-width="8"
         />
         <div class="medication-history-card-title">{{t('dosage_status')}}</div>
-        <div class="medication-history-card-value">{{percentageTaken(dateItems)}}%</div>
+        <div class="medication-history-card-value">{{percentageTaken(dateItems, key)}}%</div>
       </div>
       <template v-else>
         <div
@@ -42,8 +42,8 @@
           :key="index"
         >
           <div class="medication-history-card-icon" :class="{
-            taken: isTaken(item),
-            'not-taken': isNotTaken(item),
+            taken: isTaken(item, key),
+            'not-taken': isNotTaken(item, key),
           }"></div>
           <div class="medication-history-card-title">{{item.name}}</div>
           <div class="medication-history-card-value">{{item.time}}</div>
@@ -114,7 +114,17 @@
             return 1;
           });
         });
-        return data;
+        const sortedKeys = Object.keys(data).sort((a, b) => {
+          const aDate = new Date(a).getTime();
+          const bDate = new Date(b).getTime();
+          if (aDate > bDate) return -1;
+          return 1;
+        });
+        const sortedData = {};
+        sortedKeys.forEach((key) => {
+          sortedData[key] = data[key];
+        });
+        return sortedData;
       },
     },
     methods: {
@@ -130,35 +140,45 @@
           self.openedCards.push(key);
         }
       },
-      percentageTaken(items) {
+      percentageTaken(items, date) {
         const self = this;
-        const takenItems = items.filter(item => self.isTaken(item));
+        const takenItems = items.filter(item => self.isTaken(item, date));
         return Math.round(takenItems.length / items.length * 100);
       },
-      isTaken(item) {
+      isTaken(item, date) {
         const self = this;
         if (!self.takenData) return false;
         let taken;
+        const todayDate = new Date(date);
+        todayDate.setHours(0, 0, 0, 0);
         self.takenData.forEach((takenItem) => {
           if (taken) return;
-          if (item.id === takenItem.data.medication_id && item.time === takenItem.data.time) taken = takenItem.data.taken === true;
+          const takenDate = new Date(takenItem.data.date || takenItem.start_at);
+          takenDate.setHours(0, 0, 0, 0);
+          if (item.id === takenItem.data.medication_id && item.time === takenItem.data.time && todayDate.getTime() === takenDate.getTime() && takenItem.data.taken) {
+            taken = true;
+          }
         });
         return taken;
       },
-      isNotTaken(item) {
+      isNotTaken(item, date) {
         const self = this;
         if (!self.takenData) return false;
         let notTaken;
+        const todayDate = new Date(date);
+        todayDate.setHours(0, 0, 0, 0);
         self.takenData.forEach((takenItem) => {
           if (notTaken) return;
-          if (item.id === takenItem.data.medication_id && item.time === takenItem.data.time) notTaken = takenItem.data.taken === false;
+          const takenDate = new Date(takenItem.data.date || takenItem.start_at);
+          takenDate.setHours(0, 0, 0, 0);
+          if (item.id === takenItem.data.medication_id && item.time === takenItem.data.time && todayDate.getTime() === takenDate.getTime() && !takenItem.data.taken) {
+            notTaken = true;
+          }
         });
         return notTaken;
       },
       getData() {
         const self = this;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
 
         function getTaken() {
           return new Promise((resolve, reject) => {

@@ -2,12 +2,12 @@ const api = window.tommy.api;
 
 const API = {
   takeMedication(user, id, time, taken) {
-    const startAt = new Date();
+    const startAt = new Date().toJSON();
     const obj = {
       addon: 'vitals_medication_reminder',
       kind: 'VitalsMedicationReminderTaken',
       with_filters: true,
-      start_at: startAt.toJSON(),
+      start_at: startAt,
       tags: [{
         context: 'members',
         name: `${user.first_name} ${user.last_name}`,
@@ -18,7 +18,7 @@ const API = {
         name: `${user.first_name} ${user.last_name}`,
         user_id: user.id,
       }],
-      data: JSON.stringify({ medication_id: id, taken, time }),
+      data: JSON.stringify({ medication_id: id, taken, time, date: startAt }),
     };
     return api.createFragment(obj);
   },
