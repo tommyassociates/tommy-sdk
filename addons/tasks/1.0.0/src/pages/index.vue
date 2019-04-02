@@ -241,10 +241,18 @@
         if (list.permission_to.indexOf('update') !== -1) return true;
         return false;
       },
-
+      onSympleEvent(e) {
+        const self = this;
+        if (self.destroyed) return;
+        if (!e || !e.name) return;
+        if (e.name.indexOf('task_') === 0) {
+          self.reloadListsTasks();
+        }
+      },
     },
     beforeDestroy() {
       const self = this;
+      self.destroyed = true;
       self.$events.$off('tasks:reloadListsTasks', self.reloadListsTasks);
       self.$events.$off('tasks:reloadLists', self.reloadLists);
     },
@@ -253,6 +261,9 @@
       self.loadLists();
       self.$events.$on('tasks:reloadListsTasks', self.reloadListsTasks);
       self.$events.$on('tasks:reloadLists', self.reloadLists);
+      self.$events.$emit('getChatClient', (client) => {
+        client.on('event', self.onSympleEvent);
+      });
     },
   };
 </script>
