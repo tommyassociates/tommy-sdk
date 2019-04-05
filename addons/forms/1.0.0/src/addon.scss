@@ -3,6 +3,7 @@ $orange: #FF5413;
 $yellow: #FF7B00;
 $blue: #00B4F1;
 
+// Icons
 // Forms Navbar
 .navbar-inner.forms-blue-navbar-inner {
   background: $blue;
@@ -26,12 +27,6 @@ a.forms-swipeout-button-blue {
   background: #2E83EA;
 }
 .forms-templates-list {
-  .forms-templates-list-icon {
-    width: 70px;
-    height: 70px;
-    border-radius: 8px;
-    background: #f1f1f1;
-  }
   .forms-templates-list-badge {
     display: inline-block;
     color: #fff;
@@ -88,6 +83,15 @@ a.forms-swipeout-button-blue {
   width: 24px;
   height: 24px;
   background: url('../assets/icon-close-white.svg');
+}
+.forms-fab-backdrop {
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: rgba(0,0,0,0.4);
+  width: 100%;
+  height: 100%;
+  z-index: 140;
 }
 .ios .forms-fab {
   > a {
@@ -256,5 +260,47 @@ a.forms-card {
         background-image: url(../assets/icon-a-user-round.svg);
       }
     }
+  }
+}
+.ios .forms-list {
+  font-size: 18px;
+  .item-after {
+    font-size: 16px;
+    align-items: center;
+  }
+}
+.ios .forms-inputs-list {
+  input[type=time],
+  input[type=number],
+  input[type=search],
+  input[type=text],
+  input[type=password],
+  input[type=email],
+  input[type=tel],
+  input[type=url],
+  input[type=date],
+  input[type=datetime-local],
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+.forms-template-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  background-color: #f1f1f1;
+  &.s60 {
+    width: 60px;
+    height: 60px;
+  }
+  &.s70 {
+    width: 70px;
+    height: 70px;
+  }
+  &.s80 {
+    width: 80px;
+    height: 80px;
   }
 }
