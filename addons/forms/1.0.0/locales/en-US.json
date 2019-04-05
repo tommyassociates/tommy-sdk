@@ -26,6 +26,20 @@
     "assign_button": "Assign",
     "shortcut_button": "Shortcut"
   },
+  "assignment": {
+    "create_title": "Assign",
+    "template_label": "Template",
+    "type_label": "Type",
+    "deadline_label": "Deadline",
+    "repeat_label": "Repeat",
+    "assignment_label": "Assignment",
+    "enabled_label": "Enabled",
+    "frequency_label": "Frequency",
+    "every_label": "Every",
+    "frequency_minutes_label": "Minutes",
+    "frequency_hours_label": "Hours",
+    "frequency_days_label": "Days"
+  },
   "shortcuts_display_options": {
     "menu_label": "Menu",
     "team_label": "Team Profile Screen",
@@ -62,19 +76,6 @@
     "shortcut_permission_view_shortcut_title": "WHO CAN SEE SHORTCUT",
     "done_button": "Done"
   },
-  "template_edit": {
-    "title": "Edit Template",
-    "template_icon_label": "Icon",
-    "template_name_label": "Name",
-    "template_description_label": "Description",
-    "template_completes_label": "Completes",
-    "template_assignments_label": "Assignments",
-    "template_shortcuts_label": "Shortcuts",
-    "template_permission_view_unassigned_title": "WHO CAN VIEW UNASSIGNED",
-    "template_version_title": "VERSIONS",
-    "template_version_active_label": "(active)",
-    "delete_button": "Delete"
-  },
   "template_delete_confirm": {
     "text": "Deleting a Template will remove all form versions and data that has already been entered. This process cannot be recovered. Please confirm you wish to delete this Template?",
     "cancel_button": "Cancel",
@@ -105,6 +106,16 @@
   },
   "template_edit": {
     "title": "Edit Template",
+    "template_icon_label": "Icon",
+    "template_name_label": "Name",
+    "template_description_label": "Description",
+    "template_completes_label": "Completes",
+    "template_assignments_label": "Assignments",
+    "template_shortcuts_label": "Shortcuts",
+    "template_permission_view_unassigned_title": "WHO CAN VIEW UNASSIGNED",
+    "template_version_title": "VERSIONS",
+    "template_version_active_label": "(active)",
+    "delete_button": "Delete",
     "back_label": "BACK",
     "next_label": "NEXT",
     "preview_label": "PREVIEW",

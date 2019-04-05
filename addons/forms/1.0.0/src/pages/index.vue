@@ -1,5 +1,5 @@
 <template>
-  <f7-page id="forms_index">
+  <f7-page>
     <f7-navbar innerClass="forms-blue-navbar-inner">
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{$t('forms.index.title', 'Forms')}}</f7-nav-title>
@@ -18,19 +18,20 @@
       </div>
     </div>
 
-    <f7-fab class="forms-fab">
+    <div slot="fixed" class="forms-fab-backdrop" v-if="fabBackdropVisible"></div>
+    <f7-fab class="forms-fab" @fab:open.native="fabBackdropVisible = true" @fab:close.native="fabBackdropVisible = false">
       <i class="icon forms-fab-icon-plus"></i>
       <i class="icon forms-fab-icon-close"></i>
       <f7-fab-buttons position="left">
-        <f7-fab-button fab-close>
+        <f7-fab-button fab-close href="/forms/shortcut-create/">
           <i class="icon forms-fab-icon-pointer"></i>
           <span>{{$t('forms.index_add.shortcut_button')}}</span>
         </f7-fab-button>
-        <f7-fab-button fab-close>
+        <f7-fab-button fab-close href="/forms/assignment-create/">
           <i class="icon forms-fab-icon-people"></i>
           <span>{{$t('forms.index_add.assign_button')}}</span>
         </f7-fab-button>
-        <f7-fab-button fab-close>
+        <f7-fab-button fab-close href="/forms/template-create/">
           <i class="icon forms-fab-icon-template"></i>
           <span>{{$t('forms.index_add.template_button')}}</span>
         </f7-fab-button>
@@ -45,39 +46,32 @@
           no-hairlines
         >
           <f7-list-item
-            title="Home Service Feedback"
-            text="Collect user feedback"
+            v-for="template in templates"
+            :key="template.id"
+            :title="template.data.name"
+            :text="template.data.description"
             swipeout
-            link
+            :link="`/forms/template-details/${template.id}/`"
+            :route-props="{ template }"
           >
-            <div class="forms-templates-list-icon" slot="media"></div>
+            <div
+              class="forms-template-icon s70"
+              slot="media"
+              :style="{
+                'background-image': template.iconUrl ? `url(${template.iconUrl})` : null,
+              }"
+            ></div>
             <f7-swipeout-actions right>
-              <f7-swipeout-button class="forms-swipeout-button-green">Assign</f7-swipeout-button>
-              <f7-swipeout-button class="forms-swipeout-button-blue">Edit</f7-swipeout-button>
-            </f7-swipeout-actions>
-          </f7-list-item>
-          <f7-list-item
-            title="Safety Check"
-            text="Collect user feedback"
-            swipeout
-            link
-          >
-            <div class="forms-templates-list-icon" slot="media"></div>
-            <f7-swipeout-actions right>
-              <f7-swipeout-button class="forms-swipeout-button-green">Assign</f7-swipeout-button>
-              <f7-swipeout-button class="forms-swipeout-button-blue">Edit</f7-swipeout-button>
-            </f7-swipeout-actions>
-          </f7-list-item>
-          <f7-list-item
-            title="Risk Assessment"
-            text="Collect user feedback"
-            swipeout
-            link
-          >
-            <div class="forms-templates-list-icon" slot="media"></div>
-            <f7-swipeout-actions right>
-              <f7-swipeout-button class="forms-swipeout-button-green">Assign</f7-swipeout-button>
-              <f7-swipeout-button class="forms-swipeout-button-blue">Edit</f7-swipeout-button>
+              <f7-swipeout-button
+                class="forms-swipeout-button-green"
+                :href="`/forms/assignment-create/?templateId=${template.id}`"
+                :route-props="{ template }"
+              >{{$t('forms.index.assign_button')}}</f7-swipeout-button>
+
+              <f7-swipeout-button
+                class="forms-swipeout-button-blue"
+                :href="`/forms/template-edit/${template.id}/`"
+              >{{$t('forms.index.edit_button')}}</f7-swipeout-button>
             </f7-swipeout-actions>
           </f7-list-item>
         </f7-list>
@@ -143,7 +137,7 @@
                 title="Home Service Feedback"
                 text="Collect user feedback"
               >
-                <div class="forms-templates-list-icon" slot="media"></div>
+                <div class="forms-template-icon s70" slot="media"></div>
               </f7-list-item>
             </f7-list>
             <div class="forms-card-rows">
@@ -170,7 +164,7 @@
                 title="Home Service Feedback"
                 text="Collect user feedback"
               >
-                <div class="forms-templates-list-icon" slot="media"></div>
+                <div class="forms-template-icon s70" slot="media"></div>
               </f7-list-item>
             </f7-list>
             <div class="forms-card-rows">
@@ -202,7 +196,7 @@
             text="Collect user feedback"
             link
           >
-            <div class="forms-templates-list-icon" slot="media"></div>
+            <div class="forms-template-icon s70" slot="media"></div>
             <div>
               <span class="forms-templates-list-badge">17 June 2018</span>
             </div>
@@ -213,14 +207,14 @@
             text="Collect user feedback"
             link
           >
-            <div class="forms-templates-list-icon" slot="media"></div>
+            <div class="forms-template-icon s70" slot="media"></div>
           </f7-list-item>
           <f7-list-item
             title="Risk Assessment"
             text="Collect user feedback"
             link
           >
-            <div class="forms-templates-list-icon" slot="media"></div>
+            <div class="forms-template-icon s70" slot="media"></div>
           </f7-list-item>
         </f7-list>
       </f7-tab>
@@ -229,8 +223,54 @@
   </f7-page>
 </template>
 <script>
-  export default {
+  import API from '../api';
 
+  export default {
+    data() {
+      return {
+        fabBackdropVisible: false,
+        templates: null,
+        assignments: null,
+        completed: null,
+        shortcuts: null,
+        my_forms: null,
+      };
+    },
+    mounted() {
+      const self = this;
+      self.getTemplates();
+      self.$events.$on('forms:assignmentcreated', self.getAssignments);
+      self.$events.$on('forms:assignmentupdated', self.getAssignments);
+      self.$events.$on('forms:assignmentdeleted', self.getAssignments);
+      self.$events.$on('forms:templatecreated', self.getTemplates);
+      self.$events.$on('forms:templateupdated', self.getTemplates);
+      self.$events.$on('forms:templatedeleted', self.getTemplates);
+    },
+    beforeDestroy() {
+      const self = this;
+      self.$events.$off('forms:assignmentcreated', self.getAssignments);
+      self.$events.$off('forms:assignmentupdated', self.getAssignments);
+      self.$events.$off('forms:assignmentdeleted', self.getAssignments);
+      self.$events.$off('forms:templatecreated', self.getTemplates);
+      self.$events.$off('forms:templateupdated', self.getTemplates);
+      self.$events.$off('forms:templatedeleted', self.getTemplates);
+    },
+    methods: {
+      getAssignments() {
+        const self = this;
+        API.getAssignments(self.$root.user)
+          .then((data) => {
+            self.assignments = data;
+          });
+      },
+      getTemplates() {
+        const self = this;
+        API.getTemplates(self.$root.user)
+          .then((data) => {
+            self.templates = data;
+          });
+      },
+    },
   };
 </script>
 

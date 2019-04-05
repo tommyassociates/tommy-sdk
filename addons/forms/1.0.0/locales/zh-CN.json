@@ -62,19 +62,6 @@
     "shortcut_permission_view_shortcut_title": "谁能看快捷方式",
     "done_button": "完成"
   },
-  "template_edit": {
-    "title": "编辑模板",
-    "template_icon_label": "图标",
-    "template_name_label": "名称",
-    "template_description_label": "描述",
-    "template_completes_label": "完成",
-    "template_assignments_label": "分配",
-    "template_shortcuts_label": "快捷方式",
-    "template_permission_view_unassigned_title": "谁能查看未分配的",
-    "template_version_title": "版本",
-    "template_version_active_label": "(有效)",
-    "delete_button": "删除"
-  },
   "template_delete_confirm": {
     "text": "删除模板将删除所有已输入的表格版本和数据。此过程无法恢复。请确认你要删除此模板吗？ ",
     "cancel_button": "取消",
@@ -105,6 +92,16 @@
   },
   "template_edit": {
     "title": "编辑模板",
+    "template_icon_label": "图标",
+    "template_name_label": "名称",
+    "template_description_label": "描述",
+    "template_completes_label": "完成",
+    "template_assignments_label": "分配",
+    "template_shortcuts_label": "快捷方式",
+    "template_permission_view_unassigned_title": "谁能查看未分配的",
+    "template_version_title": "版本",
+    "template_version_active_label": "(有效)",
+    "delete_button": "删除",
     "back_label": "返回",
     "next_label": "下一步",
     "preview_label": "预览",
