@@ -77,16 +77,26 @@
         </f7-list>
       </f7-tab>
       <f7-tab id="tab-assigned">
-        <a href="#" class="forms-card">
+        <f7-link
+          no-link-class
+          v-for="assignment in assignments"
+          class="forms-card"
+          :key="assignment.id"
+          :href="`/forms/assignment-details/${assignment.id}/`"
+          :route-props="{
+            assignment,
+            template: getTemplateById(assignment.data.templateId)
+          }"
+        >
           <div class="forms-card-header">
-            <div class="forms-card-date">31st August 2018</div>
-            <div class="forms-card-status">Enabled</div>
+            <div class="forms-card-date">{{$moment(assignment.created_at).format('DD MMM YYYY')}}</div>
+            <div class="forms-card-status" v-if="assignment.data.enabled">{{$t('forms.assignment.enabled_label')}}</div>
           </div>
           <div class="forms-card-content">
             <div class="forms-card-rows">
               <div class="forms-card-row">
                 <i class="forms-card-icon-template"></i>
-                <span>Risk Assessment</span>
+                <span>{{getTemplateNameById(assignment.data.templateId)}}</span>
               </div>
               <div class="forms-card-row">
                 <i class="forms-card-icon-user"></i>
@@ -98,29 +108,7 @@
               </div>
             </div>
           </div>
-        </a>
-        <a href="#" class="forms-card">
-          <div class="forms-card-header">
-            <div class="forms-card-date">31st August 2018</div>
-            <div class="forms-card-status">Enabled</div>
-          </div>
-          <div class="forms-card-content">
-            <div class="forms-card-rows">
-              <div class="forms-card-row">
-                <i class="forms-card-icon-template"></i>
-                <span>Risk Assessment</span>
-              </div>
-              <div class="forms-card-row">
-                <i class="forms-card-icon-user"></i>
-                <span>Safety Office</span>
-              </div>
-              <div class="forms-card-row">
-                <i class="forms-card-icon-tag"></i>
-                <span>Custom Tags</span>
-              </div>
-            </div>
-          </div>
-        </a>
+        </f7-link>
       </f7-tab>
       <f7-tab id="tab-completed">
         <a href="#" class="forms-card">
@@ -150,9 +138,19 @@
         </a>
       </f7-tab>
       <f7-tab id="tab-shortcuts">
-        <a href="#" class="forms-card">
+        <f7-link
+          no-link-class
+          v-for="shortcut in shortcuts"
+          class="forms-card"
+          :key="shortcut.id"
+          :href="`/forms/shortcut-edit/${shortcut.id}/`"
+          :route-props="{
+            shortcut,
+            template: getTemplateById(shortcut.data.templateId)
+          }"
+        >
           <div class="forms-card-header">
-            <div class="forms-card-date">31st August 2018</div>
+            <div class="forms-card-date">{{$moment(shortcut.created_at).format('DD MMM YYYY')}}</div>
           </div>
           <div class="forms-card-content">
             <f7-list
@@ -161,8 +159,8 @@
               no-hairlines
             >
               <f7-list-item
-                title="Home Service Feedback"
-                text="Collect user feedback"
+                :title="getTemplateNameById(shortcut.data.templateId)"
+                :text="getTemplateDescriptionById(shortcut.data.templateId)"
               >
                 <div class="forms-template-icon s70" slot="media"></div>
               </f7-list-item>
@@ -178,11 +176,11 @@
               </div>
               <div class="forms-card-row">
                 <i class="forms-card-icon-eye"></i>
-                <span>Main Menu, Team Profile</span>
+                <span>{{shortcut.data.display.map(el => $t(`forms.shortcuts_display_options.${el}_label`)).join(', ')}}</span>
               </div>
             </div>
           </div>
-        </a>
+        </f7-link>
       </f7-tab>
       <f7-tab id="tab-my-forms">
         <f7-list
@@ -239,12 +237,17 @@
     mounted() {
       const self = this;
       self.getTemplates();
+      self.getAssignments();
+      self.getShortcuts();
       self.$events.$on('forms:assignmentcreated', self.getAssignments);
       self.$events.$on('forms:assignmentupdated', self.getAssignments);
       self.$events.$on('forms:assignmentdeleted', self.getAssignments);
       self.$events.$on('forms:templatecreated', self.getTemplates);
       self.$events.$on('forms:templateupdated', self.getTemplates);
       self.$events.$on('forms:templatedeleted', self.getTemplates);
+      self.$events.$on('forms:shortcutcreated', self.getShortcuts);
+      self.$events.$on('forms:shortcutupdated', self.getShortcuts);
+      self.$events.$on('forms:shortcutdeleted', self.getShortcuts);
     },
     beforeDestroy() {
       const self = this;
@@ -254,8 +257,38 @@
       self.$events.$off('forms:templatecreated', self.getTemplates);
       self.$events.$off('forms:templateupdated', self.getTemplates);
       self.$events.$off('forms:templatedeleted', self.getTemplates);
+      self.$events.$off('forms:shortcutcreated', self.getShortcuts);
+      self.$events.$off('forms:shortcutupdated', self.getShortcuts);
+      self.$events.$off('forms:shortcutdeleted', self.getShortcuts);
     },
     methods: {
+      getTemplateById(id) {
+        const self = this;
+        if (!self.templates) return '';
+        let template;
+        self.templates.forEach((t) => {
+          if (t.id === id) template = t;
+        });
+        return template;
+      },
+      getTemplateNameById(id) {
+        const self = this;
+        if (!self.templates) return '';
+        let name = '';
+        self.templates.forEach((t) => {
+          if (t.id === id) name = t.data.name;
+        });
+        return name;
+      },
+      getTemplateDescriptionById(id) {
+        const self = this;
+        if (!self.templates) return '';
+        let description = '';
+        self.templates.forEach((t) => {
+          if (t.id === id) description = t.data.description;
+        });
+        return description;
+      },
       getAssignments() {
         const self = this;
         API.getAssignments(self.$root.user)
@@ -268,6 +301,13 @@
         API.getTemplates(self.$root.user)
           .then((data) => {
             self.templates = data;
+          });
+      },
+      getShortcuts() {
+        const self = this;
+        API.getShortcuts(self.$root.user)
+          .then((data) => {
+            self.shortcuts = data;
           });
       },
     },

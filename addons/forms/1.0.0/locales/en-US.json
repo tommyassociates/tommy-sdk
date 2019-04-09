@@ -66,6 +66,7 @@
   },
   "shortcut_details": {
     "title": "New Shortcut",
+    "edit_title": "Edit Shortcut",
     "shortcut_icon_label": "Icon",
     "shortcut_name_label": "Name",
     "shortcut_availbale_label": "Available",
