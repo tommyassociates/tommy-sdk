@@ -130,7 +130,6 @@
           name,
           description,
         });
-        console.log(self.template.data);
         API.updateTemplate(self.template).then(() => {
           self.$f7router.back();
           self.$events.$emit('forms:templateupdated');

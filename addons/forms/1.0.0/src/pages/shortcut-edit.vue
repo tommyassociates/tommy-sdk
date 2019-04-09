@@ -2,7 +2,7 @@
   <f7-page>
     <f7-navbar innerClass="forms-blue-navbar-inner">
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{$t('forms.assignment.create_title')}}</f7-nav-title>
+      <f7-nav-title>{{$t('forms.shortcut_details.edit_title')}}</f7-nav-title>
       <f7-nav-right>
         <f7-link href="#" icon-only v-if="allowSave" @click="save">
           <i class="icon f7-icons">check</i>
@@ -12,77 +12,69 @@
 
     <f7-list no-hairlines class="no-margin forms-list">
       <f7-list-item
+        :title="$t('forms.shortcut_details.shortcut_icon_label')"
         link
-        :title="$t('forms.assignment.template_label')"
+      >
+        <div
+          class="forms-template-icon s60"
+          :style="{
+            'background-image': iconUrl ? `url(${iconUrl})` : null,
+          }"
+        ></div>
+      </f7-list-item>
+    </f7-list>
+
+    <f7-list no-hairlines class="forms-list forms-inputs-list">
+      <f7-list-input
+        inline-label
+        :label="$t('forms.shortcut_details.shortcut_name_label')"
+        :placeholder="$t('forms.shortcut_details.shortcut_name_label')"
+        type="text"
+        :value="name"
+        @input="name = $event.target.value"
+      />
+      <f7-list-item
+        :title="$t('forms.shortcut_details.shortcut_availbale_label')"
+      >
+        <f7-toggle slot="after" :checked="available" @change="available = $event.target.checked"/>
+      </f7-list-item>
+      <f7-list-item
+        link
+        :title="$t('forms.shortcut_details.shortcut_template_label')"
         :after="templateName"
         @click="templateSelectOpened = true"
       >
       </f7-list-item>
       <f7-list-item
+        :title="$t('forms.shortcut_details.shortcut_display_label')"
+        smart-select
+        :smart-select-params="{ openIn: 'sheet', on: { change(ss, v) { setDisplay(v); } } }"
+        :after="display.map(el => $t(`forms.shortcuts_display_options.${el}_label`)).join(', ')"
+      >
+        <select multiple>
+          <option :selected="display.indexOf('menu') >= 0" value="menu">{{$t('forms.shortcuts_display_options.menu_label')}}</option>
+          <option :selected="display.indexOf('team') >= 0" value="team">{{$t('forms.shortcuts_display_options.team_label')}}</option>
+          <option :selected="display.indexOf('contact') >= 0" value="contact">{{$t('forms.shortcuts_display_options.contact_label')}}</option>
+        </select>
+      </f7-list-item>
+      <f7-list-item
         link
-        :title="$t('forms.assignment.type_label')"
+        :title="$t('forms.shortcut_details.shortcut_type_label')"
         :after="$t(`forms.shortcuts_type_options.${type}_label`)"
         @click="typeSelectOpened = true"
       >
       </f7-list-item>
       <f7-list-item
-        link
-        :title="$t('forms.assignment.deadline_label')"
-        :after="$moment(deadline).format('DD MMM YYYY')"
-        @click="openDeadLineCalendar()"
+        :title="$t('forms.shortcut_details.shortcut_anonymous_label')"
       >
+        <f7-toggle slot="after" :checked="anonymous" @change="anonymous = $event.target.checked"/>
       </f7-list-item>
+    </f7-list>
 
-      <!-- Repeat -->
-      <f7-list-item divider :title="$t('forms.assignment.repeat_label')" />
-      <f7-list-item
-        :title="$t('forms.assignment.enabled_label')"
-      >
-        <f7-toggle :checked="repeat" @change="repeat = $event.target.checked" slot="after" />
-      </f7-list-item>
-      <f7-list-item
-        v-if="repeat"
-        link
-        class="assignment-frequency-selector"
-        :title="$t('forms.assignment.frequency_label')"
-        :after="$t(`forms.assignment.frequency_${repeatFrequency}_label`)"
-        @click="popoverFrequencyOpened = true"
-      >
-        <f7-popover target=".assignment-frequency-selector" :opened="popoverFrequencyOpened" @popover:close="popoverFrequencyOpened = false">
-          <f7-list>
-            <f7-list-item
-              v-for="(freq, index) in ['minutes', 'hours', 'days']"
-              :key="index"
-              radio
-              :title="$t(`forms.assignment.frequency_${freq}_label`)"
-              :checked="repeatFrequency === freq"
-              @change="() => { repeatFrequency = freq; popoverFrequencyOpened = false} "
-            />
-          </f7-list>
-        </f7-popover>
-      </f7-list-item>
-      <f7-list-item
-        v-if="repeat"
-        link
-        class="assignment-every-selector"
-        :title="$t('forms.assignment.every_label')"
-        :after="`${repeatEvery} ${$t(`forms.assignment.frequency_${repeatFrequency}_label`)}`"
-        @click="popoverEveryOpened = true"
-      >
-        <f7-popover target=".assignment-frequency-selector" :opened="popoverEveryOpened" @popover:close="popoverEveryOpened = false">
-          <f7-list style="height: 300px">
-            <f7-list-item
-              v-for="n in 60"
-              :key="n"
-              radio
-              :title="n"
-              :checked="repeatEvery === n"
-              @change="() => { repeatEvery = n; popoverEveryOpened = false} "
-            />
-          </f7-list>
-        </f7-popover>
-      </f7-list-item>
-
+    <f7-list no-hairlines>
+      <f7-list-button color="red" @click="deleteShortcut">
+        {{$t('forms.template_edit.delete_button')}}
+      </f7-list-button>
     </f7-list>
 
     <f7-popup :opened="typeSelectOpened" @popup:close="typeSelectOpened = false">
@@ -148,31 +140,39 @@
 
   export default {
     props: {
-      assignment: Object,
+      shortcut: Object,
     },
     data() {
-      const self = this;
-      const assignment = self.assignment;
+      const shortcut = this.shortcut;
+      const {
+        iconUrl,
+        name,
+        available,
+        templateId,
+        display,
+        type,
+        anonymous,
+      } = shortcut.data;
+
       return {
         typeSelectOpened: false,
         templateSelectOpened: false,
-        popoverFrequencyOpened: false,
-        popoverEveryOpened: false,
         templates: API.cache.templates,
 
-        templateId: assignment.data.templateId,
-        type: assignment.data.type,
-        deadline: assignment.data.deadline,
-        repeat: assignment.data.repeat,
-        repeatFrequency: assignment.data.repeatFrequency,
-        repeatEvery: assignment.data.repeatEvery,
+        iconUrl,
+        name,
+        available,
+        templateId,
+        display,
+        type,
+        anonymous,
       };
     },
     computed: {
       allowSave() {
         const self = this;
-        const { templateId } = self;
-        if (templateId) {
+        const { templateId, name } = self;
+        if (templateId && name.trim().length) {
           return true;
         }
         return false;
@@ -195,48 +195,48 @@
           self.templates = data;
         });
       }
-      self.calendar = self.$f7.calendar.create({
-        value: [new Date(self.deadline)],
-        openIn: 'customModal',
-        backdrop: true,
-        closeOnSelect: true,
-        on: {
-          change(cal, val) {
-            self.deadline = val[0];
-          },
-        },
-      });
     },
     methods: {
-      openDeadLineCalendar() {
+      setDisplay(v) {
         const self = this;
-        self.calendar.open();
+        self.display = v;
+      },
+      deleteShortcut() {
+        const self = this;
+        self.$f7.dialog.confirm(self.$t('forms.shortcut_delete_confirm.text'), () => {
+          API.deleteShortcut(self.shortcut.id).then(() => {
+            self.$f7router.back();
+            self.$events.$emit('forms:shortcutdeleted');
+          });
+        });
       },
       save() {
         const self = this;
         if (self.saving) return;
         self.saving = true;
         const {
+          iconUrl,
+          name,
+          available,
           templateId,
+          display,
           type,
-          deadline,
-          repeat,
-          repeatFrequency,
-          repeatEvery,
+          anonymous,
         } = self;
-        API.updateAssignment({
-          id: self.assignment.id,
-          data: Object.assign({}, self.assignment.data, {
+        API.updateShortcut({
+          id: self.shortcut.id,
+          data: Object.assign({}, self.shortcut.data, {
+            iconUrl,
+            name,
+            available,
             templateId,
+            display,
             type,
-            deadline,
-            repeat,
-            repeatFrequency,
-            repeatEvery,
+            anonymous,
           }),
         }).then(() => {
-          self.$f7router.back('/forms/', { force: true });
-          self.$events.$emit('forms:assignmentupdated');
+          self.$f7router.back();
+          self.$events.$emit('forms:shortcutupdated');
         });
       },
     },
