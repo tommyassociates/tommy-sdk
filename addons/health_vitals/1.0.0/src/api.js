@@ -172,6 +172,10 @@ const API = {
         });
 
         const lastDate = sortedKeys[sortedKeys.length - 1];
+        if (!lastDate) {
+          reject();
+          return;
+        }
         const lastData = data[lastDate];
         const takenItems = lastData.filter((item) => {
           let taken;

@@ -346,7 +346,7 @@
           if (!res) return;
           self.medication_reminder = res;
           cachedVitals.medication_reminder = self.medication_reminder;
-        });
+        }).catch(() => {});
       },
     },
   };
