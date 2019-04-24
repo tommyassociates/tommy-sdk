@@ -22,7 +22,7 @@
       file: "build/addon.js"
   views:
     index:
-      title: "Availability"
+      title: "Health Vitals"
       index: true
       framed: false
       path: "/health_vitals/"
