@@ -6,9 +6,9 @@
     "last_updated": "Last updated"
   },
   "word": {
-    "am": "am",
-    "pm": "pm",
-    "nd": "nd"
+    "am": "07:00 - 13:00",
+    "pm": "13:00 - 22:00",
+    "nd": "22:00 - 07:00"
   },
   "title": "Availability",
   "summary": "Employee availability for rostering and schedule management.",
