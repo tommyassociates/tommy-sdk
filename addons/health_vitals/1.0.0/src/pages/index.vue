@@ -6,10 +6,10 @@
     </f7-navbar>
 
     <div class="health-vitals-cards">
-      <div class="health-vitals-card health-vitals-user-card">
-        <tommy-circle-avatar :data="$root.user" />
+      <div class="health-vitals-card health-vitals-user-card" v-if="user">
+        <tommy-circle-avatar v-if="user" :data="user" />
         <div class="health-vitals-user-card-content">
-          <div class="name">{{$root.user.first_name}} {{$root.user.last_name}}</div>
+          <div class="name">{{user.first_name}} {{user.last_name}}</div>
           <div class="props">
             <div class="prop" v-if="userAge">
               <div class="prop-label">{{t('profile_age_label')}}</div>
@@ -271,7 +271,11 @@
 
   export default {
     data() {
+      const self = this;
       return {
+        actorId: self.$f7route.query.actor_id,
+        user: null,
+
         water_tracker: cachedVitals.water_tracker,
         temperature: cachedVitals.temperature,
         pedometer: cachedVitals.pedometer,
@@ -284,12 +288,24 @@
       };
     },
     mounted() {
+      const self = this;
+      if (self.actorId) {
+        API.actorId = parseInt(self.actorId, 10);
+        self.$api.getContact(self.actorId).then((response) => {
+          self.user = response;
+        });
+      } else {
+        self.user = self.$root.user;
+        delete API.actorId;
+        delete API.actor;
+      }
       this.getData();
     },
     computed: {
       userAge() {
         const self = this;
-        const dob = self.$root.user.dob;
+        if (!self.user) return;
+        const dob = self.user.dob;
         if (!dob) return;
         const dobDate = self.$moment(new Date(dob));
         const nowDate = self.$moment(new Date());
