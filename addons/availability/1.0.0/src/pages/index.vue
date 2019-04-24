@@ -39,7 +39,7 @@
             class="availability__toggle-availability"
             @click="toggle(item, key, 'am')"
           >
-            <span>{{$t('word.am', 'am')}}</span>
+            <span v-html="$t('availability.word.am', 'am')"></span>
           </a>
           <a
             href="#"
@@ -47,7 +47,7 @@
             :class="availabilityClass('pm', item.data)"
             @click="toggle(item, key, 'pm')"
           >
-            <span>{{$t('word.pm', 'pm')}}</span>
+            <span v-html="$t('availability.word.pm', 'pm')"></span>
           </a>
           <a
             href="#"
@@ -55,7 +55,7 @@
             :class="availabilityClass('nd', item.data)"
             @click="toggle(item, key, 'nd')"
           >
-            <span>{{$t('word.nd', 'nd')}}</span>
+            <span v-html="$t('availability.word.nd', 'nd')"></span>
           </a>
         </div>
       </f7-list-item>

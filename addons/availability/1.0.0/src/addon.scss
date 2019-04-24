@@ -62,13 +62,17 @@
     display: inline-block;
     text-align: center;
     position: relative;
-    margin-left: 10px;
+    margin-left: 5px;
   }
 
   .list a.availability__toggle-availability span {
-    font-size: 14px;
+    font-size: 12px;
     text-transform: uppercase;
-    color: #666;
+    color: #333;
+    display: block;
+    line-height: 1.2;
+    margin-bottom: 5px;
+    letter-spacing: -0.01em;
   }
 
   .list a.availability__toggle-availability{
