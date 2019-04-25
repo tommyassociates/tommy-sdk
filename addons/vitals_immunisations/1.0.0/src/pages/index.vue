@@ -75,6 +75,15 @@
     },
     mounted() {
       const self = this;
+      if (self.$f7route.query.actor_id) {
+        API.actorId = parseInt(self.actorId, 10);
+        self.$api.getContact(self.actorId).then((response) => {
+          API.actor = response;
+        });
+      } else {
+        API.actorId = null;
+        API.actor = null;
+      }
       self.getData();
       self.$events.$on(`${self.addon}:updateRecords`, self.getData);
     },
@@ -90,7 +99,7 @@
         vaccines.sort((a, b) => {
           const aDate = new Date(a.data.scheduledDate || a.data.sheduledDate).getTime();
           const bDate = new Date(b.data.scheduledDate || b.data.sheduledDate).getTime();
-          if (a < b) return -1;
+          if (aDate < bDate) return -1;
           return 1;
         });
         let closest;
@@ -99,7 +108,7 @@
           if (closest) return;
           const vDate = new Date(v.data.scheduledDate || v.data.sheduledDate).getTime();
           if (vDate > today) closest = v;
-        })
+        });
         return closest;
       },
       orderedData() {

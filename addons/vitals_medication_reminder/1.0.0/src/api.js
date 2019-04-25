@@ -1,8 +1,12 @@
 const api = window.tommy.api;
 
 const API = {
+  actorId: null,
+  actor: null,
+
   takeMedication(user, id, time, taken) {
     const startAt = new Date().toJSON();
+    const tagUser = API.actor || user;
     const obj = {
       addon: 'vitals_medication_reminder',
       kind: 'VitalsMedicationReminderTaken',
@@ -10,16 +14,20 @@ const API = {
       start_at: startAt,
       tags: [{
         context: 'members',
-        name: `${user.first_name} ${user.last_name}`,
+        name: `${tagUser.first_name} ${tagUser.last_name}`,
         user_id: user.id,
       }],
       filters: [{
         context: 'members',
-        name: `${user.first_name} ${user.last_name}`,
-        user_id: user.id,
+        name: `${tagUser.first_name} ${tagUser.last_name}`,
+        user_id: tagUser.id,
       }],
       data: JSON.stringify({ medication_id: id, taken, time, date: startAt }),
     };
+    if (API.actorId) {
+      obj.actor_id = API.actorId;
+      obj.actor_type = 'User';
+    }
     return api.createFragment(obj);
   },
   getTaken(user, { dateFrom, dateTo } = {}) {
@@ -33,7 +41,8 @@ const API = {
       kind: 'VitalsMedicationReminderTaken',
       with_filters: true,
       with_permission_to: true,
-      user_id: user.id,
+      user_id: API.actorId || user.id,
+      actor_id: API.actorId,
       date_range,
     }, {
       cache: false,
@@ -45,7 +54,8 @@ const API = {
       kind: 'VitalsMedicationReminderMedication',
       with_filters: true,
       with_permission_to: true,
-      user_id: user.id,
+      user_id: API.actorId || user.id,
+      actor_id: API.actorId,
     }, {
       cache: false,
     });
@@ -56,12 +66,14 @@ const API = {
       kind: 'VitalsMedicationReminderMedication',
       with_filters: true,
       with_permission_to: true,
-      user_id: user.id,
+      user_id: API.actorId || user.id,
+      actor_id: API.actorId,
     }, {
       cache: false,
     });
   },
   addMedication(user, data) {
+    const tagUser = API.actor || user;
     const obj = {
       addon: 'vitals_medication_reminder',
       kind: 'VitalsMedicationReminderMedication',
@@ -70,19 +82,24 @@ const API = {
       end_at: new Date(data.endDate).toJSON(),
       tags: [{
         context: 'members',
-        name: `${user.first_name} ${user.last_name}`,
-        user_id: user.id,
+        name: `${tagUser.first_name} ${tagUser.last_name}`,
+        user_id: tagUser.id,
       }],
       filters: [{
         context: 'members',
-        name: `${user.first_name} ${user.last_name}`,
-        user_id: user.id,
+        name: `${tagUser.first_name} ${tagUser.last_name}`,
+        user_id: tagUser.id,
       }],
       data: JSON.stringify(data),
     };
+    if (API.actorId) {
+      obj.actor_id = API.actorId;
+      obj.actor_type = 'User';
+    }
     return api.createFragment(obj);
   },
   updateMedication(user, id, data) {
+    const tagUser = API.actor || user;
     const startAt = new Date(data.startDate);
     const obj = {
       addon: 'vitals_medication_reminder',
@@ -91,16 +108,20 @@ const API = {
       start_at: startAt.toJSON(),
       tags: [{
         context: 'members',
-        name: `${user.first_name} ${user.last_name}`,
-        user_id: user.id,
+        name: `${tagUser.first_name} ${tagUser.last_name}`,
+        user_id: tagUser.id,
       }],
       filters: [{
         context: 'members',
-        name: `${user.first_name} ${user.last_name}`,
-        user_id: user.id,
+        name: `${tagUser.first_name} ${tagUser.last_name}`,
+        user_id: tagUser.id,
       }],
       data: JSON.stringify(data),
     };
+    if (API.actorId) {
+      obj.actor_id = API.actorId;
+      obj.actor_type = 'User';
+    }
     return api.updateFragment(id, obj);
   },
   deleteMedication(user, id) {
