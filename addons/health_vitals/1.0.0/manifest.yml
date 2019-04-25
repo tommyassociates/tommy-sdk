@@ -11,8 +11,7 @@
     - en-US
     - zh-CN
   roles:
-    - Team Member
-    - Team Manager
+    - Personal
   assets:
     -
       type: "stylesheet"
@@ -27,7 +26,27 @@
       framed: false
       path: "/health_vitals/"
       type: "page"
-      file: ""
-
-
+  permissions:
+    health_vitals_nursing_team_addon_access:
+      title: "Nursing teams which can view my vitals"
+      hint: "Select which nursing teams can view my vitals data"
+      policy: false
+      # default_roles:
+      #   - Team Manager
+      #   - Team Admin
+      #   - Nurse
+      operations:
+        - read
+    health_vitals_nursing_team_manage_access:
+      title: "Nursing teams which can manage my vitals"
+      hint: "Select which nursing teams can manage my vitals data"
+      resource_type: "Fragment"
+      # default_roles:
+      #   - Team Manager
+      #   - Team Admin
+      #   - Nurse
+      operations:
+        - create
+        - update
+        - delete
 
