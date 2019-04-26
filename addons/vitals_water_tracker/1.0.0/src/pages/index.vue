@@ -74,6 +74,15 @@
     },
     mounted() {
       const self = this;
+      if (self.$f7route.query.actor_id) {
+        API.actorId = parseInt(self.actorId, 10);
+        self.$api.getContact(self.actorId).then((response) => {
+          API.actor = response;
+        });
+      } else {
+        API.actorId = null;
+        API.actor = null;
+      }
       self.getData();
       self.$events.$on(`${self.addon}:updateRecords`, self.getData);
       API.getSettings(self.addon).then((res) => {
