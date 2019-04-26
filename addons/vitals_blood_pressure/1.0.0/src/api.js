@@ -1,6 +1,9 @@
 const api = window.tommy.api;
 
 const API = {
+  actorId: null,
+  actor: null,
+
   getRecords(addon, vitalsElement, user, { page, limit, dateFrom, dateTo } = {}) {
     // eslint-disable-next-line
     vitalsElement = vitalsElement.split(/[-_]/g).map(w => w[0].toUpperCase() + w.substr(1)).join('');
@@ -13,7 +16,8 @@ const API = {
       kind: `Vitals${vitalsElement}Item`,
       with_filters: true,
       with_permission_to: true,
-      user_id: user.id,
+      user_id: API.actorId || user.id,
+      actor_id: API.actorId,
       page: page || 1,
       limit: limit || 50,
       date_range,
@@ -26,6 +30,7 @@ const API = {
     vitalsElement = vitalsElement.split(/[-_]/g).map(w => w[0].toUpperCase() + w.substr(1)).join('');
     const startAt = new Date(data.date);
     startAt.setHours(parseInt(data.time.split(':')[0], 10), parseInt(data.time.split(':')[1], 10));
+    const tagUser = API.actor || user;
     const obj = {
       addon,
       kind: `Vitals${vitalsElement}Item`,
@@ -33,16 +38,20 @@ const API = {
       start_at: startAt.toJSON(),
       tags: [{
         context: 'members',
-        name: `${user.first_name} ${user.last_name}`,
-        user_id: user.id,
+        name: `${tagUser.first_name} ${tagUser.last_name}`,
+        user_id: tagUser.id,
       }],
       filters: [{
         context: 'members',
-        name: `${user.first_name} ${user.last_name}`,
-        user_id: user.id,
+        name: `${tagUser.first_name} ${tagUser.last_name}`,
+        user_id: tagUser.id,
       }],
       data: JSON.stringify(data),
     };
+    if (API.actorId) {
+      obj.actor_id = API.actorId;
+      obj.actor_type = 'User';
+    }
     return api.createFragment(obj);
   },
   getSettings(addon) {
