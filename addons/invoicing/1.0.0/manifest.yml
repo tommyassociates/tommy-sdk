@@ -10,23 +10,24 @@
   locales:
     - en-US
     - zh-CN
+  roles:
+    - Team Manager
+    - Team Admin
+    - Nurse
   permissions:
     invoicing_manager_access:
       title: "Who Can View Other Team Members' Orders"
       hint: "Select who can view orders on behalf of other users"
-      resource_type: "Fragment"
-      resource_kind: "Order"
+      resource_type: "VendorOrder"
       default_roles:
         - Team Manager
         - Team Admin
       operations:
         - read
-        - create
     invoicing_item_create_access:
       title: "Who Can Create Items"
       hint: "Select who can create items/services"
-      resource_type: "Fragment"
-      resource_kind: "Item"
+      resource_type: "VendorOrderItem"
       default_roles:
         - Team Manager
         - Team Admin
@@ -35,8 +36,7 @@
     invoicing_item_edit_access:
       title: "Who Can Edit Items"
       hint: "Select who can edit items/services"
-      resource_type: "Fragment"
-      resource_kind: "Item"
+      resource_type: "VendorOrderItem"
       default_roles:
         - Team Admin
       operations:
@@ -49,7 +49,6 @@
       default_roles:
         - Team Manager
         - Team Admin
-        - Creator
       operations:
         - read
     invoicing_order_list_edit_access:
@@ -73,9 +72,6 @@
   views:
     index:
       title: "Orders"
-      file: ""
       type: "page"
       index: true
-      framed: false
-      actor_permission: invoicing_manager_access
       path: "/invoicing/"
