@@ -10,6 +10,9 @@
   locales:
     - en-US
     - zh-CN
+  roles:
+    - Team Manager
+    - Team Admin
   permissions:
     wallet_accounts_manager_access:
       title: "Who Can View Other Team Members' Accounts"
