@@ -131,6 +131,16 @@ const API = {
     }
     return api.createFragment(params);
   },
+  createDefaultList(user) {
+    const list = {
+      name: tommy.i18n.t('invoicing.index.default_list_name'),
+      data: {
+        default: true,
+      },
+      filters: [],
+    };
+    return API.saveList(list);
+  },
   loadPromotions() {
     return api.call({
       endpoint: 'vendor/manager/coupons',

@@ -5,7 +5,7 @@
       <f7-nav-title>{{pageTitle}}</f7-nav-title>
       <f7-nav-right>
         <f7-link href="/invoicing/settings/" icon-f7="gear"></f7-link>
-        <f7-link href="/invoicing/order-details/" icon-f7="add"></f7-link>
+        <f7-link v-if="!isNurse" href="/invoicing/order-details/" icon-f7="add"></f7-link>
       </f7-nav-right>
     </f7-navbar>
 
@@ -88,14 +88,17 @@
   export default {
     data() {
       const self = this;
+      API.isNurse = self.$root.account && self.$root.account.roles.indexOf('Nurse') >= 0;
       return {
         lists: null,
         actorId: self.$f7route.query.actor_id,
         listWithScroll: {},
+        isNurse: API.isNurse,
       };
     },
     created() {
       const self = this;
+
       if (self.actorId) {
         API.actorId = parseInt(self.actorId, 10);
         API.actor = self.actor;
@@ -177,10 +180,17 @@
             list.orders = [];
           });
           self.lists = lists;
-          self.lists.forEach((list) => {
-            if (!list.data.active) return;
-            self.loadListOrders(list);
-          });
+          const hasDefaultList = self.lists.filter(list => list.data.default).length > 0;
+          if (!self.lists.length && !hasDefaultList && self.isNurse) {
+            API.createDefaultList(self.$root.user).then(() => {
+              self.loadLists();
+            });
+          } else {
+            self.lists.forEach((list) => {
+              if (!list.data.active) return;
+              self.loadListOrders(list);
+            });
+          }
         });
       },
       reloadLists() {

@@ -1,7 +1,8 @@
 {
   "index" : {
     "title" : "订单",
-    "title_user": "{{user}} 订单"
+    "title_user": "{{user}} 订单",
+    "default_list_name": "订单"
   },
   "common": {
     "search_members_tags": "搜索成员，标签",

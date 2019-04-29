@@ -90,10 +90,13 @@
             <f7-list-item divider :title="$t('invoicing.order_details.customer')"></f7-list-item>
             <f7-list-item
               :title="orderUserName(order.user_id)"
-              smart-select
+              :smart-select="!isNurse"
+              :link="isNurse ? `/contact-details/?user_id=${order.user_id}&masterDetailRoot=true` : false"
+              view=".view-main"
+              :reload-all="isNurse"
             >
               <tommy-circle-avatar :data="orderUser(order.user_id)" slot="media"></tommy-circle-avatar>
-              <select name="customer" @change="onCustomerChange">
+              <select v-if="!isNurse" name="customer" @change="onCustomerChange">
                 <option
                   v-for="(teamMember) in $root.teamMembers"
                   :key="teamMember.id"
@@ -253,6 +256,7 @@
     data() {
       const self = this;
       return {
+        isNurse: API.isNurse,
         pageTitle: self.id ? `${self.$t('invoicing.order_details.title', 'Order')} #${self.id}` : self.$t('invoicing.order_details.new_title'),
         order: null,
         showSave: false,
