@@ -74,8 +74,4 @@
       title: "Orders"
       type: "page"
       index: true
-<<<<<<< HEAD
       path: "/invoicing/"
-=======
-      path: "/invoicing/"
->>>>>>> 32ee2d8a9b153936b910a98117fdb6698345e3c8
