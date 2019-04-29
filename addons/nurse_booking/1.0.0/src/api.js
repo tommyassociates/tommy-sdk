@@ -106,6 +106,7 @@ const API = {
       end_at = date + parseInt(order.data.duration, 10) * 60 * 1000;
     }
     return api.createEvent({
+      addon: 'nurse_booking',
       title: order.name,
       start_at: new Date(date).toJSON(),
       end_at: new Date(end_at).toJSON(),
@@ -119,6 +120,7 @@ const API = {
   },
   deleteBookingEvent(orderId) {
     return api.getEvents({
+      addon: 'nurse_booking',
       kind: 'Booking',
       resource_id: orderId,
       resource_type: 'VendorOrder',
