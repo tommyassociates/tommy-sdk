@@ -1,7 +1,8 @@
 {
   "index" : {
     "title" : "Orders",
-    "title_user": "{{user}}'s Orders"
+    "title_user": "{{user}}'s Orders",
+    "default_list_name": "Orders"
   },
   "common": {
     "search_members_tags": "Search Members, Tags",
