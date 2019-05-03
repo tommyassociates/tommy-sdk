@@ -130,12 +130,13 @@
         clearTimeout(self.refreshPanelTimeout);
         clearInterval(self.refreshPanelInterval);
       },
-      toggle(item, key, availability) {
+      toggle(item, key, shift) {
         const self = this;
-        const itemAvail = item.data[availability];
-        if (!itemAvail) item.data[availability] = 1;
-        if (itemAvail === 1) item.data[availability] = -1;
-        if (itemAvail === -1) item.data[availability] = 0;
+        if (item.data[`lock_${shift}`] === 'true' || item.data[`lock_${shift}`] === true) return;
+        const itemAvail = item.data[shift];
+        if (!itemAvail || itemAvail === '0') item.data[shift] = 1;
+        if (itemAvail === 1 || itemAvail === '1') item.data[shift] = -1;
+        if (itemAvail === -1 || itemAvail === '-1') item.data[shift] = 0;
         item.changed = true;
         self.items[key] = item;
         self.formChanged = true;
@@ -153,6 +154,7 @@
         return self.$moment(localTime).format(format);
       },
       availabilityClass(shift, data) {
+        if (data && data[`lock_${shift}`] === 'true' || data[`lock_${shift}`] === true) return 'locked';
         if (data && (data[shift] === -1 || data[shift] === '-1')) return 'unavailable';
         if (data && (data[shift] === 1 || data[shift] === '1')) return 'available';
         return '';
@@ -185,6 +187,9 @@
             items.forEach((item) => {
               const date = self.$moment(item.start_at).format('YYYY-MM-DD');
               if (!item.data) item.data = {};
+              if (self.items[date] && self.items[date].data) {
+                Object.assign(item.data, self.items[date].data);
+              }
               self.items[date] = item;
               self.$forceUpdate();
             });
@@ -197,15 +202,19 @@
           const item = self.items[key];
           if (!item.changed) return;
           item.changed = false;
+          const itemData = {
+            am: item.data.am || 0,
+            pm: item.data.pm || 0,
+            nd: item.data.nd || 0,
+          };
+          if (item.data.lock_am === true || item.data.lock_am === 'true') itemData.lock_am = true;
+          if (item.data.lock_pm === true || item.data.lock_pm === 'true') itemData.lock_pm = true;
+          if (item.data.lock_nd === true || item.data.lock_nd === 'true') itemData.lock_nd = true;
           const itemToSend = {
             ...item,
             addon: 'availability',
             kind: 'Availability',
-            data: JSON.stringify({
-              am: item.data.am || 0,
-              pm: item.data.pm || 0,
-              nd: item.data.nd || 0,
-            }),
+            data: JSON.stringify(itemData),
             start_at: key,
             user_id: self.actor_id || self.$root.user.id,
           };
