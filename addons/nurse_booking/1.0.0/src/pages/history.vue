@@ -19,7 +19,7 @@
         <div class="order-item-content">
           <div class="order-item-details">
             <div class="order-item-details-row">{{order.name}}</div>
-            <div class="order-item-details-row order-item-details-date">{{formatDate(order.data.date, 'MMM D, YYYY H:m')}}</div>
+            <div class="order-item-details-row order-item-details-date">{{formatDate(order.data.date, 'MMM D, YYYY H:mm')}}</div>
           </div>
           <div class="order-item-amount">¥{{order.total}}</div>
         </div>

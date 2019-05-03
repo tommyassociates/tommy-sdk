@@ -7,7 +7,7 @@
 
     <div class="nurse-list" v-if="nurses">
       <ul>
-        <li v-for="nurse in nurses" :key="nurse.id" :class="{'nurse-selected': selectedNurseId === nurse.id}">
+        <li v-for="nurse in nurses" :key="nurse.id" :class="{'nurse-selected': selectedNurseId === nurse.user_id}">
           <a class="nurse-content-wrap" @click="selectNurse(nurse)">
             <div class="nurse-media" :style="`background-image: url(${nurse.icon_url || ''})`"></div>
             <div class="nurse-content">
@@ -98,7 +98,7 @@
     methods: {
       selectNurse(nurse) {
         const self = this;
-        self.selectedNurseId = nurse.id;
+        self.selectedNurseId = nurse.user_id;
         API.cache.booking.nurse = nurse;
 
         if (self.$f7route.query.back) {
