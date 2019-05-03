@@ -128,6 +128,86 @@ const API = {
       return Promise.all(events.map(event => api.deleteEvent(event.id)));
     });
   },
+  setAvailabilityLock(order) {
+    const nurseId = order.data.nurse.user_id;
+    let date = new Date(order.data.date);
+    const hours = date.getHours();
+    date.setHours(0, 0, 0, 0);
+    date = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
+    const minusDay = new Date(date.getTime() - 24 * 60 * 60 * 1000);
+    const plusDay = new Date(date.getTime() + 24 * 60 * 60 * 1000);
+    return api.call({
+      endpoint: 'fragments?addon=availability&kind=Availability',
+      data: {
+        user_id: nurseId,
+        date_range: [minusDay.toJSON(), plusDay.toJSON()],
+      },
+    }).then((fragments) => {
+      let fragment;
+      fragments.forEach((f) => {
+        if (new Date(f.start_at).toJSON() === date.toJSON()) {
+          fragment = f;
+        }
+      });
+      const lockData = {};
+      if (hours >= 7 && hours < 13) {
+        lockData.lock_am = true;
+      } else if (hours >= 13 && hours < 22) {
+        lockData.lock_pm = true;
+      } else {
+        lockData.lock_nd = true;
+      }
+      if (fragment) {
+        Object.assign(fragment.data, lockData);
+        return api.updateFragment(fragment.id, fragment);
+      }
+      return api.createFragment({
+        addon: 'availability',
+        kind: 'Availability',
+        data: JSON.stringify({
+          ...lockData,
+        }),
+        start_at: date.toJSON(),
+        user_id: nurseId,
+      });
+    });
+  },
+  deleteAvailabilityLock(order) {
+    const nurseId = order.data.nurse.user_id;
+    let date = new Date(parseInt(order.data.date, 10));
+    const hours = date.getHours();
+    date.setHours(0, 0, 0, 0);
+    date = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
+    const minusDay = new Date(date.getTime() - 24 * 60 * 60 * 1000);
+    const plusDay = new Date(date.getTime() + 24 * 60 * 60 * 1000);
+    return api.call({
+      endpoint: 'fragments?addon=availability&kind=Availability',
+      data: {
+        user_id: nurseId,
+        date_range: [minusDay.toJSON(), plusDay.toJSON()],
+      },
+    }).then((fragments) => {
+      let fragment;
+      fragments.forEach((f) => {
+        if (new Date(f.start_at).toJSON() === date.toJSON()) {
+          fragment = f;
+        }
+      });
+      let keyToRemove;
+      if (hours >= 7 && hours < 13) {
+        keyToRemove = 'lock_am';
+      } else if (hours >= 13 && hours < 22) {
+        keyToRemove = 'lock_pm';
+      } else {
+        keyToRemove = 'lock_nd';
+      }
+      if (fragment && fragment.data && fragment.data[keyToRemove]) {
+        delete fragment.data[keyToRemove];
+        return api.updateFragment(fragment.id, fragment);
+      }
+      return Promise.resolve('nothing-to-remove');
+    });
+  },
   sendOrder(teamId, data) {
     return api.call({
       endpoint: `vendors/${teamId}/orders`,
@@ -160,13 +240,14 @@ const API = {
       return data;
     });
   },
-  cancelOrder(teamId, id, transactionId) {
+  cancelOrder(teamId, id, transactionId, order) {
     return api.call({
       endpoint: `vendors/${teamId}/orders/${id}`,
       method: 'DELETE',
     }).then(() => {
       return Promise.all([
         API.deleteBookingEvent(id),
+        API.deleteAvailabilityLock(order),
         api.call({
           endpoint: `/wallet/transactions/${transactionId}/refund`,
           method: 'POST',
