@@ -41,6 +41,7 @@ export default function (data, createNewOrder = true) {
             API.cache.booking.transaction = transaction;
             f7.views.main.router.navigate(`${successUrl}?id=${response.id}`);
           });
+          API.setAvailabilityLock(order);
         });
       } else {
         API.updateOrder(teamId, { id: orderId, status: 'paid' }).then(() => {
@@ -48,6 +49,7 @@ export default function (data, createNewOrder = true) {
             API.cache.booking.transaction = transaction;
             f7.views.main.router.navigate(`${successUrl}?id=${orderId}`);
           });
+          API.setAvailabilityLock(order);
         });
       }
     },

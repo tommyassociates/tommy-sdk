@@ -180,8 +180,7 @@
             list.orders = [];
           });
           self.lists = lists;
-          const hasDefaultList = self.lists.filter(list => list.data.default).length > 0;
-          if (!self.lists.length && !hasDefaultList && self.isNurse) {
+          if (!self.lists.length) {
             API.createDefaultList(self.$root.user).then(() => {
               self.loadLists();
             });
