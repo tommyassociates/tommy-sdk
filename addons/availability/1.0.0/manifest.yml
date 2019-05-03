@@ -14,10 +14,18 @@
     - Team Member
     - Team Manager
   permissions:
-    availability_manager_access:
+    addon_access:
+      title: "Allow Team Member Access"
+      hint: "Select Team Members who can access this Add-on"
+      default_roles:
+        - Team Manager
+        - Team Member
+      operations:
+        - read
+    addon_actor_access:
       title: "Who Can View Other Team Members' Availabilities"
       hint: "Select who can view availabilities on behalf of other users"
-      resource_type: "Fragment"
+      resource_type: Fragment
       resource_kind: "Availability"
       default_roles:
         - Team Manager
@@ -35,7 +43,6 @@
     index:
       title: "Availability"
       index: true
-      framed: false
       path: "/availability/"
-      actor_permission: availability_manager_access
+      actor_permission: addon_actor_access
       type: "page"

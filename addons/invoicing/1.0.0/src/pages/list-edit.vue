@@ -149,17 +149,17 @@
         if (!list.data.customer) list.data.customer = [];
         self.list = list;
         self.$api.getInstalledAddonPermission('invoicing', 'invoicing_order_list_read_access', {
-          resource_id: list.id,
+          taggable_id: list.id,
           with_filters: true,
         }).then((permission) => {
-          permission.resource_id = list.id;
+          permission.taggable_id = list.id;
           self.permissions.push(permission);
         });
         self.$api.getInstalledAddonPermission('invoicing', 'invoicing_order_list_edit_access', {
-          resource_id: list.id,
+          taggable_id: list.id,
           with_filters: true,
         }).then((permission) => {
-          permission.resource_id = list.id;
+          permission.taggable_id = list.id;
           self.permissions.push(permission);
         });
       });
@@ -271,7 +271,7 @@
       saveListPermission(permission) {
         const self = this;
         self.$api.updateInstalledAddonPermission('invoicing', permission.name, {
-          resource_id: permission.resource_id,
+          taggable_id: permission.taggable_id,
           with_filters: true,
           filters: JSON.stringify(permission.filters),
         });

@@ -45,10 +45,19 @@
       type: "integer"
       required: true
   permissions:
-    calendar_manager_access:
+    addon_access:
+      title: "Allow Team Member Access"
+      hint: "Select Team Members who can access this Add-on"
+      default_roles:
+        - Team Admin
+        - Team Manager
+        - Team Member
+      operations:
+        - read
+    addon_actor_access:
       title: "Who Can View Other Team Members' Events"
       hint: "Select Team Members who can view events created by others"
-      resource_type: "Event"
+      resource_type: Event
       default_roles:
         - Team Manager
         - Team Admin
@@ -116,9 +125,8 @@
       title: "Calendar"
       file: "views/main.html"
       type: "page"
-      framed: false
       index: true
-      actor_permission: calendar_manager_access
+      actor_permission: addon_actor_access
       assets:
         -
           type: "stylesheet"

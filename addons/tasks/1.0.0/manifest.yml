@@ -11,10 +11,19 @@
     - en-US
     - zh-CN
   permissions:
-    tasks_manager_access:
+    addon_access:
+      title: "Allow Team Member Access"
+      hint: "Select Team Members who can access this Add-on"
+      default_roles:
+        - Team Admin
+        - Team Manager
+        - Team Member
+      operations:
+        - read
+    addon_actor_access:
       title: "Who Can View Other Team Members' Tasks"
       hint: "Select who can view tasks on behalf of other users"
-      resource_type: "Fragment"
+      resource_type: Fragment
       resource_kind: "Task"
       default_roles:
         - Team Manager
@@ -22,46 +31,44 @@
       operations:
         - read
         - create
-    tasks_task_create_access:
+    task_create_access:
       title: "Who Can Create Tasks"
       hint: "Select who can create tasks"
-      resource_type: "Fragment"
+      resource_type: Fragment
       resource_kind: "Task"
       default_roles:
         - Team Manager
         - Team Admin
       operations:
         - create
-    tasks_task_edit_access:
+    task_edit_access:
       title: "Who Can Edit Tasks"
       hint: "Select who can edit tasks"
-      resource_type: "Fragment"
+      resource_type: Fragment
       resource_kind: "Task"
       default_roles:
         - Team Manager
         - Team Admin
       operations:
         - update
-    tasks_task_list_read_access:
+    task_list_read_access:
       title: "Who Can See List"
       hint: "Select who can view this list"
-      resource_type: "Fragment"
-      resource_kind: "TaskList"
+      resource_type: Fragment
+      resource_kind: TaskList
       default_roles:
         - Team Manager
         - Team Admin
-        - Creator
       operations:
         - read
-    tasks_task_list_edit_access:
+    task_list_edit_access:
       title: "Who Can Edit List"
       hint: "Select who can edit this list"
-      resource_type: "Fragment"
-      resource_kind: "TaskList"
+      resource_type: Fragment
+      resource_kind: TaskList
       default_roles:
         - Team Manager
         - Team Admin
-        - Creator
       operations:
         - update
   assets:
@@ -74,9 +81,7 @@
   views:
     index:
       title: "Tasks"
-      file: ""
       type: "page"
       index: true
-      framed: false
-      actor_permission: tasks_manager_access
       path: "/tasks/"
+      actor_permission: addon_actor_access

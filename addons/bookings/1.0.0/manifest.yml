@@ -11,14 +11,24 @@
     - en-US
     - zh-CN
   roles:
-    - Team Member
+    - Team Admin
     - Team Manager
+    - Team Member
   permissions:
-    bookings_manager_access:
+    addon_access:
+      title: "Allow Team Member Access"
+      hint: "Select Team Members who can access this Add-on"
+      default_roles:
+        - Team Admin
+        - Team Manager
+        - Team Member
+      operations:
+        - read
+    addon_actor_access:
       title: "Who Can View Other Team Members' Bookings"
       hint: "Select who can view bookings on behalf of other users"
-      resource_type: "Event"
-      resource_kind: "Booking"
+      resource_type: Event
+      resource_kind: Booking
       default_roles:
         - Team Manager
         - Team Admin

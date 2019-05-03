@@ -14,57 +14,54 @@
     - Team Manager
     - Team Admin
   permissions:
-    wallet_accounts_manager_access:
+    addon_access:
+      title: "Allow Team Member Access"
+      hint: "Select Team Members who can access this Add-on"
+      default_roles:
+        - Team Admin
+        - Team Manager
+      operations:
+        - read
+    addon_actor_access:
       title: "Who Can View Other Team Members' Accounts"
       hint: "Select who can view accounts on behalf of other users"
-      resource_type: "Fragment"
-      resource_kind: "Account"
+      resource_type: Fragment
+      resource_kind: Account
       default_roles:
         - Team Manager
         - Team Admin
       operations:
         - read
         - create
-    wallet_accounts_transaction_create_access:
+    transaction_manage_access:
       title: "Who Can Create Transaction"
       hint: "Select who can create transactions"
-      resource_type: "Fragment"
-      resource_kind: "Transaction"
+      resource_type: Fragment
+      resource_kind: Transaction
       default_roles:
         - Team Manager
         - Team Admin
       operations:
         - create
-    wallet_accounts_transaction_edit_access:
-      title: "Who Can Edit Transaction"
-      hint: "Select who can edit transaction"
-      resource_type: "Fragment"
-      resource_kind: "Transaction"
-      default_roles:
-        - Team Manager
-        - Team Admin
-      operations:
         - update
-    wallet_accounts_transaction_list_read_access:
+    transaction_list_access:
       title: "Who Can See List"
       hint: "Select who can view this list"
-      resource_type: "Fragment"
-      resource_kind: "TransactionList"
+      resource_type: Fragment
+      resource_kind: TransactionList
       default_roles:
         - Team Manager
         - Team Admin
-        - Creator
       operations:
         - read
-    wallet_accounts_transaction_list_edit_access:
+    transaction_list_manage_access:
       title: "Who Can Edit List"
       hint: "Select who can edit this list"
-      resource_type: "Fragment"
-      resource_kind: "TransactionList"
+      resource_type: Fragment
+      resource_kind: TransactionList
       default_roles:
         - Team Manager
         - Team Admin
-        - Creator
       operations:
         - update
   assets:
@@ -79,6 +76,5 @@
       title: "Wallet Accounts"
       type: "page"
       index: true
-      framed: false
-      actor_permission: wallet_accounts_manager_access
       path: "/wallet_accounts/"
+      actor_permission: addon_actor_access
