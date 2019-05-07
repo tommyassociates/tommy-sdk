@@ -37,15 +37,43 @@
   triggers:
     booking_created:
       title: "Booking created"
-      execute: "Trigger::BookingCreated"
+      # execute: "Trigger::BookingCreated"
+      observe:
+        object: Event
+        conditions:
+          kind: Booking
+        event: create
+      # resource_type: Event
+      # resource_kind: Booking
     booking_updated:
       title: "Booking updated"
-      execute: "Trigger::BookingUpdated"
+      # execute: "Trigger::BookingUpdated"
+      observe:
+        object: Event
+        conditions:
+          kind: Booking
+        event: update
+      # resource_type: Event
+      # resource_kind: Booking
     booking_deleted:
       title: "Booking deleted"
-      execute: "Trigger::BookingDeleted"
-    booking_viewed:
-      title: "Booking viewed"
+      # execute: "Trigger::BookingDeleted"
+      observe:
+        object: Event
+        conditions:
+          kind: Booking
+        event: delete
+      # resource_type: Event
+      # resource_kind: Booking
+    # booking_viewed:
+    #   title: "Booking viewed"
+    #   observe:
+    #     object: Event
+    #     conditions:
+    #       kind: Booking
+    #     event: delete
+    #   # resource_type: Event
+    #   # resource_kind: Booking
   assets:
     -
       type: "stylesheet"
