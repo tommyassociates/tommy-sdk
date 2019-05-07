@@ -148,14 +148,14 @@
         if (!list.data.status) list.data.status = [];
         if (!list.data.customer) list.data.customer = [];
         self.list = list;
-        self.$api.getInstalledAddonPermission('invoicing', 'invoicing_order_list_read_access', {
+        self.$api.getInstalledAddonPermission('invoicing', 'order_list_read_access', {
           taggable_id: list.id,
           with_filters: true,
         }).then((permission) => {
           permission.taggable_id = list.id;
           self.permissions.push(permission);
         });
-        self.$api.getInstalledAddonPermission('invoicing', 'invoicing_order_list_edit_access', {
+        self.$api.getInstalledAddonPermission('invoicing', 'order_list_edit_access', {
           taggable_id: list.id,
           with_filters: true,
         }).then((permission) => {
