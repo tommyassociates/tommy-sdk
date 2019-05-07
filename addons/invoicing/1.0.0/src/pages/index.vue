@@ -3,9 +3,9 @@
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{pageTitle}}</f7-nav-title>
-      <f7-nav-right>
+      <f7-nav-right v-if="!isNurse">
         <f7-link href="/invoicing/settings/" icon-f7="gear"></f7-link>
-        <f7-link v-if="!isNurse" href="/invoicing/order-details/" icon-f7="add"></f7-link>
+        <f7-link href="/invoicing/order-details/" icon-f7="add"></f7-link>
       </f7-nav-right>
     </f7-navbar>
 
@@ -44,7 +44,7 @@
               <a v-for="(order, index) in list.orders" :key="index" :data-url="`/invoicing/order-details/${order.id}/`" class="card invoicing-order-card">
                 <div class="card-header">
                   <span class="order-date" v-if="order.data && order.data.date">{{orderDate(order.data ? order.data.date : null)}}</span>
-                  <span class="order-status">{{$t(`invoicing.order_status.${order.status}`)}}</span>
+                  <span class="order-status" v-if="!isNurse">{{$t(`invoicing.order_status.${order.status}`)}}</span>
                 </div>
                 <div class="card-content">
                   <f7-list class="no-hairlines no-hairlines-between">
@@ -60,7 +60,7 @@
                       <img :src="`${$addonAssetsUrl}icon-product.svg`" slot="media">
                     </f7-list-item>
                     <f7-list-item
-                      v-if="order.total"
+                      v-if="order.total && !isNurse"
                       :title="order.total"
                     >
                       <img :src="`${$addonAssetsUrl}icon-money.svg`" slot="media">
@@ -173,16 +173,16 @@
           self.loadListOrders(list);
         });
       },
-      loadLists(ignoreCache) {
+      loadLists(ignoreCache, createDefault = true) {
         const self = this;
         API.loadLists({}, { cache: !ignoreCache }).then((lists) => {
           lists.forEach((list) => {
             list.orders = [];
           });
           self.lists = lists;
-          if (!self.lists.length) {
+          if (!self.lists.length && createDefault) {
             API.createDefaultList(self.$root.user).then(() => {
-              self.loadLists();
+              self.loadLists(true, false);
             });
           } else {
             self.lists.forEach((list) => {
@@ -198,11 +198,10 @@
       },
       canEditList(list) {
         const self = this;
+        if (self.isNurse) return false;
         const account = self.$root.account;
         const isOwnerOrManager = (account.type === 'Team') || (account.type === 'TeamMember');
-
         if (list.data.default && !isOwnerOrManager) return false;
-
         if (list.permission_to.indexOf('update') !== -1) return true;
         return false;
       },
