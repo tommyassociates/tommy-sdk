@@ -247,7 +247,6 @@ const API = {
     }).then(() => {
       return Promise.all([
         API.deleteBookingEvent(id),
-        API.deleteAvailabilityLock(order),
         api.call({
           endpoint: `/wallet/transactions/${transactionId}/refund`,
           method: 'POST',
