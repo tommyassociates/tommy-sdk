@@ -1,3 +1,5 @@
+import API from './api';
+
 import IndexPage from './pages/index.vue';
 import SettingsPage from './pages/settings.vue';
 import ItemServiceManagementPage from './pages/item-service-management.vue';
@@ -10,6 +12,7 @@ import ProductDetailsPage from './pages/product-details.vue';
 import PackageDetailsPage from './pages/package-details.vue';
 import RangeSelectPage from './pages/range-select.vue';
 import OrderDetailsPage from './pages/order-details.vue';
+import OrderDetailsNursePage from './pages/order-details-nurse.vue';
 import PromotionManagementPage from './pages/promotion-management.vue';
 import PromotionDetailsPage from './pages/promotion-details.vue';
 
@@ -65,7 +68,11 @@ const routes = [
   {
     path: '/invoicing/order-details/:id?/',
     popup: {
-      component: OrderDetailsPage,
+      async(to, from, resolve) {
+        resolve({
+          component: API.isNurse ? OrderDetailsNursePage : OrderDetailsPage,
+        });
+      },
     },
   },
   {
