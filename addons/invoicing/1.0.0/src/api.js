@@ -120,7 +120,7 @@ const API = {
     if (!list.data) { list.data = {}; }
     if (typeof (list.data.position) === 'undefined') { list.data.position = 0; }
     if (typeof (list.data.active) === 'undefined') { list.data.active = true; }
-    if (!list.id) { list.with_permissions = ['invoicing_order_list_read_access', 'invoicing_order_list_edit_access']; }
+    if (!list.id) { list.with_permissions = ['order_list_read_access', 'order_list_edit_access']; }
 
     const params = Object.assign({}, list, {
       data: JSON.stringify(list.data),

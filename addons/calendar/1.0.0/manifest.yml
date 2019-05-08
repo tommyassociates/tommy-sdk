@@ -67,21 +67,39 @@
     event_created:
       title: "Calender event created"
       parameters: *default_event_parameters
+      observe:
+        object: Event
+        event: create
     event_deleted:
       title: "Calender event deleted"
       parameters: *default_event_parameters
+      observe:
+        object: Event
+        event: delete
     event_updated:
       title: "Calender event updated"
       parameters: *default_event_parameters
+      observe:
+        object: Event
+        event: update
     event_viewed:
       title: "Calender event viewed"
       parameters: *default_event_parameters
+      observe:
+        object: Event
+        event: view
     event_starting:
       title: "Calender event starting"
       parameters: *default_event_parameters
+      observe:
+        object: Event
+        event: start
     event_ending:
       title: "Calender event ending"
       parameters: *default_event_parameters
+      observe:
+        object: Event
+        event: end
   activities:
     create_event:
       title: "Create a calendar event"
@@ -106,7 +124,6 @@
         message:
           title: "Message text"
           type: "string"
-          source: "custom"
           value: "%{trigger.title} is starting at %{trigger.start_at}"
     calendar_event_end_message:
       title: "Calendar event ending notification"
@@ -118,7 +135,6 @@
         message:
           title: "Message text"
           type: "string"
-          source: "custom"
           value: "%{trigger.title} is ending at %{trigger.end_at}"
   views:
     main:
