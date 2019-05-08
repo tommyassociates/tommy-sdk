@@ -183,6 +183,8 @@
           if (!self.lists.length && createDefault) {
             API.createDefaultList(self.$root.user).then(() => {
               self.loadLists(true, false);
+            }).catch(() => {
+              self.loadLists(true, false);
             });
           } else {
             self.lists.forEach((list) => {

@@ -1,6 +1,6 @@
 <template>
-  <f7-popup>
-    <f7-view>
+  <f7-popup ref="popup">
+    <f7-view :ios-dynamic-navbar="false">
       <f7-page name="invoicing__order-details" id="invoicing__order-details" class="invoicing-page">
         <f7-navbar>
           <!-- <tommy-nav-back></tommy-nav-back> -->
@@ -22,13 +22,13 @@
 
             <f7-list-item
               :title="$t('invoicing.order_details.due_date')"
-              link
+              :link="true"
               :after="formatOrderDate(order.data ? parseInt(order.data.date, 10) : null)"
               @click="openDateSelect"
             ></f7-list-item>
             <f7-list-item
               :title="$t('invoicing.order_details.due_time')"
-              link
+              :link="true"
               :after="formatOrderTime(order.data ? parseInt(order.data.date, 10) : null)"
               @click="openTimeSelect"
             ></f7-list-item>
@@ -90,13 +90,10 @@
             <f7-list-item divider :title="$t('invoicing.order_details.customer')"></f7-list-item>
             <f7-list-item
               :title="orderUserName(order.user_id)"
-              :smart-select="!isNurse"
-              :link="isNurse ? `/contact-details/?user_id=${order.user_id}&masterDetailRoot=true` : false"
-              view=".view-main"
-              :reload-all="isNurse"
+              smart-select
             >
               <tommy-circle-avatar :data="orderUser(order.user_id)" slot="media"></tommy-circle-avatar>
-              <select v-if="!isNurse" name="customer" @change="onCustomerChange">
+              <select name="customer" @change="onCustomerChange">
                 <option
                   v-for="(teamMember) in $root.teamMembers"
                   :key="teamMember.id"
@@ -107,6 +104,7 @@
                 >{{teamMember.first_name || ''}} {{teamMember.last_name || ''}}</option>
               </select>
             </f7-list-item>
+
 
             <!-- Items -->
             <f7-list-item divider :title="$t('invoicing.order_details.items')"></f7-list-item>
@@ -182,6 +180,47 @@
                 </div>
               </div>
             </li>
+
+            <!-- Time Clocking & Feedback -->
+            <template v-if="order && order.data.feedback && products && packages">
+              <f7-list-item divider :title="$t('invoicing.order_feedback_results.time_clocking')"></f7-list-item>
+              <f7-list-item
+                :title="$t('invoicing.order_feedback_results.scheduled')"
+                :after="calcOrderDuration()"
+              />
+              <f7-list-item
+                :title="$t('invoicing.order_feedback_results.start')"
+                :after="$moment(parseInt(order.data.date, 10)).format('H:mm DD MMM YYYY')"
+              />
+              <f7-list-item
+                :title="$t('invoicing.order_feedback_results.finish')"
+                :after="$moment(parseInt(order.data.date, 10) + calcOrderDuration() * 60 * 1000).format('H:mm DD MMM YYYY')"
+              />
+              <template v-if="order.data.feedback.start_date && order.data.feedback.end_date">
+                <f7-list-item divider :title="$t('invoicing.order_feedback_results.time_change')"></f7-list-item>
+                <f7-list-item
+                  :title="$t('invoicing.order_feedback_results.start')"
+                  :after="$moment(order.data.feedback.start_date).format('H:mm DD MMM YYYY')"
+                />
+                <f7-list-item
+                  :title="$t('invoicing.order_feedback_results.finish')"
+                  :after="$moment(order.data.feedback.end_date).format('H:mm DD MMM YYYY')"
+                />
+              </template>
+              <f7-list-item divider :title="$t('invoicing.order_feedback_results.feedback')"></f7-list-item>
+              <f7-list-item
+                :title="$t('invoicing.order_feedback_results.question_1')"
+                :after="$t(`invoicing.order_feedback_results.${order.data.feedback.question1}`)"
+              />
+              <f7-list-item
+                :title="$t('invoicing.order_feedback_results.question_2')"
+                :after="$t(`invoicing.order_feedback_results.${order.data.feedback.question2}`)"
+              />
+              <f7-list-item
+                :title="$t('invoicing.order_feedback_results.question_3')"
+                :after="$t(`invoicing.order_feedback_results.${order.data.feedback.question3}`)"
+              />
+            </template>
           </f7-list>
           <f7-popup :opened="productsOpened" @popup:closed="productsOpened = false" v-if="products && packages">
             <f7-view :init="false">
@@ -256,7 +295,6 @@
     data() {
       const self = this;
       return {
-        isNurse: API.isNurse,
         pageTitle: self.id ? `${self.$t('invoicing.order_details.title', 'Order')} #${self.id}` : self.$t('invoicing.order_details.new_title'),
         order: null,
         showSave: false,
@@ -266,6 +304,7 @@
         productsOpened: false,
         promotions: null,
         promotionsOpened: false,
+        isFeedback: false,
       };
     },
     mounted() {
@@ -336,6 +375,16 @@
       },
     },
     methods: {
+      calcOrderDuration() {
+        const self = this;
+        let duration = 0;
+        if (self.order && self.products && self.packages) {
+          self.order.vendor_order_items.forEach((el) => {
+            duration += self.productDuration(el.orderable_id, el.orderable_type) * el.quantity;
+          });
+        }
+        return duration;
+      },
       onCustomerChange(e) {
         const self = this;
         self.order.user_id = parseInt(e.target.value, 10);
@@ -450,6 +499,11 @@
         const self = this;
         const product = self[type === 'VendorProduct' ? 'products' : 'packages'].filter(el => el.id === parseInt(id, 10))[0];
         return product ? product.price : 0;
+      },
+      productDuration(id, type = 'VendorProduct') {
+        const self = this;
+        const product = self[type === 'VendorProduct' ? 'products' : 'packages'].filter(el => el.id === parseInt(id, 10))[0];
+        return product ? parseInt(product.data.duration, 10) : 0;
       },
       orderUserName(user_id) {
         const self = this;
