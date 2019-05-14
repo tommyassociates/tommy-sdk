@@ -1,0 +1,115 @@
+$red: #FF4500;
+.ios .myprogress-progressbar {
+  height: 14px;
+  border: 2px solid #CCCCCC;
+  box-sizing: border-box;
+  border-radius: 14px;
+  margin: 10px 12px 5px;
+  width: auto;
+  background: transparent;
+  span {
+    background: $red;
+  }
+}
+.ios .page.myprogress-home-page {
+  background: #fff;
+}
+.myprogress-progress {
+  text-align: right;
+  margin: 5px 12px 20px;
+  font-size: 18px;
+  color: #333;
+}
+.myprogress-list {
+  font-size: 28px;
+  color: #333;
+  line-height: 1.2;
+}
+.myprogress-list-item {
+  padding-top: 15px;
+  padding-bottom: 15px;
+  display: flex;
+  align-items: flex-start;
+  padding-left: 12px;
+  padding-right: 15px;
+  position: relative;
+  &:after {
+    content: '';
+    position: absolute;
+    left: 12px;
+    bottom: 0;
+    height: 1px;
+    background: #D8D8D8;
+    right: 0;
+  }
+  &:last-child:after {
+    display: none;
+  }
+}
+.myprogress-item-content {
+  flex-shrink: 10;
+  margin-left: 5px;
+  margin-right: 10px;
+  width: 100%;
+  min-width: 0;
+}
+.myprogress-item-number {
+  width: 40px;
+  flex-shrink: 0;
+  text-align: right;
+  flex-shrink: 0;
+}
+.myprogress-item-checkbox {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.myprogress-checkbox {
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  display: block;
+  margin-top: 4px;
+  input {
+    display: none;
+  }
+  &.disabled {
+    opacity: 1 !important;
+  }
+  i {
+    width: 24px;
+    height: 24px;
+    border: 2px solid #999999;
+    border-radius: 2px;
+    display: block;
+    box-sizing: border-box;
+    position: relative;
+  }
+  input:checked + i:after {
+    content: '';
+    width: 24px;
+    height: 18px;
+    position: absolute;
+    bottom: 2px;
+    left: 2px;
+    background: url(../assets/check.svg) no-repeat center;
+    background-size: contain;
+  }
+}
+.myprogress-button {
+  margin-top: 5px;
+  height: 50px;
+  border-radius: 6px;
+  display: block;
+  background: $red;
+  max-width: 275px;
+  cursor: pointer;
+  color: #fff !important;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 22px;
+  font-weight: 500;
+  &.active-state {
+    background: darken($red, 5%);
+  }
+}

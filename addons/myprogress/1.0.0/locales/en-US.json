@@ -1,0 +1,25 @@
+{
+  "index": {
+    "title": "My Progress",
+    "upload": "Upload",
+    "fill_address": "Fill the address",
+    "pending": "pending",
+    "view_contract": "View the contract"
+  },
+  "points": {
+    "training": "Tuome Pre-job Training",
+    "national_id": "National ID Card",
+    "profile_photo": "Profile Photo",
+    "health_cert": "Health Certificate",
+    "address": "Postal Address",
+    "residential_permit": "Residential Permit",
+    "approval": "Approval",
+    "sign_contract": "Sign Contract",
+    "receive_tuome_bag": "Receive Tuome Bag",
+    "the_first_job": "The first Job"
+  },
+  "title": "My Progress",
+  "summary": "",
+  "description": "",
+  "developer": "Tommy Labs GmbH"
+}
