@@ -1,0 +1,25 @@
+{
+  "index": {
+    "title": "我的进度",
+    "upload": "上传",
+    "fill_address": "填写",
+    "pending": "等待中",
+    "view_contract": "条款"
+  },
+  "points": {
+    "training": "托 me 岗前培训",
+    "national_id": "身份证",
+    "profile_photo": "个人照片",
+    "health_cert": "健康证",
+    "address": "邮寄地址",
+    "residential_permit": "居住证",
+    "approval": "审核",
+    "sign_contract": "小时工协议",
+    "receive_tuome_bag": "收到护工包",
+    "the_first_job": "第一份工作"
+  },
+  "title": "我的进度",
+  "summary": "",
+  "description": "",
+  "developer": "Tommy Labs GmbH"
+}
