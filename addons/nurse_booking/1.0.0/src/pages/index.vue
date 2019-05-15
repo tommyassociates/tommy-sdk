@@ -19,15 +19,27 @@
         </a>
       </div> -->
       <div class="section">
-        <a href="/nurse_booking/service-list/?category=Nursing&masterDetailRoot=true" data-reload-detail="true">
-          <img :src="`${$addonAssetUrl}icon-nursing.svg`" />
-          <span>{{$t('nurse_booking.index.nursing_label', 'Nursing')}}</span>
-        </a>
-      </div>
-      <div class="section">
         <a href="/nurse_booking/service-list/?category=Cleaning&masterDetailRoot=true" data-reload-detail="true">
           <img :src="`${$addonAssetUrl}icon-cleaning.svg`" />
           <span>{{$t('nurse_booking.index.cleaning_label', 'Cleaning')}}</span>
+        </a>
+      </div>
+      <div class="section">
+        <a href="/nurse_booking/service-list/?category=Elderservice&masterDetailRoot=true" data-reload-detail="true">
+          <img :src="`${$addonAssetUrl}icon-elderservice.svg`" />
+          <span>{{$t('nurse_booking.index.elderservice_label', 'Elders Service')}}</span>
+        </a>
+      </div>
+      <div class="section">
+        <a href="/nurse_booking/service-list/?category=Extras&masterDetailRoot=true" data-reload-detail="true">
+          <img :src="`${$addonAssetUrl}icon-extras.svg`" />
+          <span>{{$t('nurse_booking.index.cleaning_label', 'Accompany to Go Out')}}</span>
+        </a>
+      </div>
+      <div class="section">
+        <a href="/nurse_booking/service-list/?category=Nursing&masterDetailRoot=true" data-reload-detail="true">
+          <img :src="`${$addonAssetUrl}icon-nursing.svg`" />
+          <span>{{$t('nurse_booking.index.nursing_label', 'Nursing')}}</span>
         </a>
       </div>
       <div class="section">
