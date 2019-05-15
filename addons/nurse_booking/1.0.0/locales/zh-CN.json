@@ -1,11 +1,13 @@
 {
   "index": {
-    "title": "居家服务",
-    "vip_label": "VIP",
+    "title": "服务",
+    "cleaning_label": "常规家政",
+    "elderhome_label": "老人家政",
+    "extras_label": "陪同外出",
     "nursing_label": "护理",
-    "cleaning_label": "保洁",
     "massage_label": "按摩",
-    "booking_label": "预约",
+    "booking_label": "我的订单",
+    "vip_label": "VIP",
     "wallet_label": "钱包"
   },
   "vip": {
@@ -19,9 +21,12 @@
     "details_administration": "管理"
   },
   "service_list": {
+    "cleaning_title": "常规家政",
+    "elderhome_title": "老人家政",
+    "extras_title": "陪同外出",
     "nursing_title": "护理",
-    "cleaning_title": "保洁",
-    "massage_title": "按摩"
+    "massage_title": "按摩",
+    "empty_label": "等待中"
   },
   "service_details": {
     "service_details_label": "服务详情",
@@ -36,7 +41,7 @@
   "location": {
     "title": "地址",
     "default_label": "默认",
-    "select_button": "选择",
+    "select_button": "确认",
     "add_button": "添加新地址",
     "city_placeholder": "请填写城市和街道信息",
     "address_placeholder": "请填写详细住址和门牌号",
@@ -45,12 +50,12 @@
     "not_available": "托me服务暂未在您所在的地区开通，请邀请更多感兴趣的人加入，共同加速开启新地区服务。"
   },
   "date_time": {
-    "title": "日期和时间",
-    "determine_button": "预约",
+    "title": "预订服务时间",
+    "determine_button": "预订",
     "week_days": ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
   },
   "nurse_list": {
-    "title": "护士"
+    "title": "护工"
   },
   "order_confirm": {
     "title": "确认订单",
@@ -59,7 +64,7 @@
     "pay_button": "立即支付"
   },
   "order_success": {
-    "title": "预约成功",
+    "title": "服务预订成功",
     "details_button": "查看订单详情",
     "home_button": "返回主页 "
   },
@@ -75,13 +80,13 @@
   },
   "order_details": {
     "title": "订单详情",
-    "service_label": "服务",
-    "time_label": "时间",
+    "service_label": "服务项目",
+    "time_label": "服务时间",
     "coupons_label": "优惠券",
-    "total_label": "总计",
-    "payment_label": "付款",
+    "total_label": "金额",
+    "payment_label": "支付方式",
     "status_canceled": "订单已取消",
-    "status_progress": "订单正在进行中",
+    "status_progress": "订单等待中",
     "status_complete": "订单已完成！",
     "status_pending": "需要付款",
     "cancel_button": "取消",
@@ -90,17 +95,17 @@
     "cancel_confirm": "取消订单将无法享受上门服务，是否确认取消"
   },
   "history": {
-    "title": "预订",
+    "title": "我的订单",
     "status_canceled": "订单已取消",
-    "status_paid": "订单正在进行中",
-    "status_processing": "订单正在进行中",
+    "status_paid": "订单等待中",
+    "status_processing": "订单等待中",
     "status_complete": "订单已完成！",
     "status_pending": "需要付款"
   },
-  "title": "居家服务",
+  "title": "服务",
   "views": {
     "main": {
-      "title": "居家服务"
+      "title": "服务"
     }
   }
 }
