@@ -27,7 +27,7 @@
         <div class="myprogress-item-number">2.</div>
         <div class="myprogress-item-content">
           <div class="myprogress-item-label">{{$t('myprogress.points.national_id')}}</div>
-          <a href="#" class="myprogress-button">{{$t('myprogress.index.upload')}}</a>
+          <a href="#" class="myprogress-button" @click="nationalIdOpened = true">{{$t('myprogress.index.upload')}}</a>
         </div>
         <div class="myprogress-item-checkbox">
           <label class="myprogress-checkbox" :class="{ disabled: isNurse }">
@@ -40,7 +40,7 @@
         <div class="myprogress-item-number">3.</div>
         <div class="myprogress-item-content">
           <div class="myprogress-item-label">{{$t('myprogress.points.profile_photo')}}</div>
-          <a href="#" class="myprogress-button">{{$t('myprogress.index.upload')}}</a>
+          <a href="#" class="myprogress-button" @click="profilePhotoOpened = true">{{$t('myprogress.index.upload')}}</a>
         </div>
         <div class="myprogress-item-checkbox">
           <label class="myprogress-checkbox" :class="{ disabled: isNurse }">
@@ -53,7 +53,7 @@
         <div class="myprogress-item-number">4.</div>
         <div class="myprogress-item-content">
           <div class="myprogress-item-label">{{$t('myprogress.points.health_cert')}}</div>
-          <a href="#" class="myprogress-button">{{$t('myprogress.index.upload')}}</a>
+          <a href="#" class="myprogress-button" @click="healthCertOpened = true">{{$t('myprogress.index.upload')}}</a>
         </div>
         <div class="myprogress-item-checkbox">
           <label class="myprogress-checkbox" :class="{ disabled: isNurse }">
@@ -79,7 +79,7 @@
         <div class="myprogress-item-number">6.</div>
         <div class="myprogress-item-content">
           <div class="myprogress-item-label">{{$t('myprogress.points.residential_permit')}}</div>
-          <a href="#" class="myprogress-button">{{$t('myprogress.index.upload')}}</a>
+          <a href="#" class="myprogress-button" @click="residentialPermitOpened = true">{{$t('myprogress.index.upload')}}</a>
         </div>
         <div class="myprogress-item-checkbox">
           <label class="myprogress-checkbox" :class="{ disabled: isNurse }">
@@ -91,7 +91,7 @@
       <div class="myprogress-list-item">
         <div class="myprogress-item-number">7.</div>
         <div class="myprogress-item-content">
-          <div class="myprogress-item-label">{{$t('myprogress.points.approval')}}</div>
+          <div class="myprogress-item-label">{{$t('myprogress.points.approval')}} <span class="myprogress-pending-label" v-if="isPendingApproval">({{$t('myprogress.index.pending')}})</span></div>
         </div>
         <div class="myprogress-item-checkbox">
           <label class="myprogress-checkbox" :class="{ disabled: isNurse }">
@@ -137,20 +137,88 @@
         </div>
       </div>
     </div>
+
+    <UploadPopup
+      v-if="profilePhotoOpened"
+      slot="fixed"
+      :title="$t('myprogress.upload.profile_photo_title')"
+      :intro="$t('myprogress.upload.profile_photo_intro')"
+      :reminder="$t('myprogress.upload.profile_photo_reminder')"
+      :reminderImageSrc="`${$addonAssetsUrl}/reminder_profile_photo.png`"
+      :uploadText="$t('myprogress.upload.profile_photo_upload_text')"
+      @closed="profilePhotoOpened = false"
+    ></UploadPopup>
+
+    <UploadPopup
+      v-if="healthCertOpened"
+      slot="fixed"
+      :title="$t('myprogress.upload.health_cert_title')"
+      :intro="$t('myprogress.upload.health_cert_intro')"
+      :reminder="$t('myprogress.upload.health_cert_reminder')"
+      :reminderImageSrc="`${$addonAssetsUrl}/reminder_health_cert.png`"
+      :uploadText="$t('myprogress.upload.health_cert_upload_text')"
+      :multipleUpload="true"
+      @closed="healthCertOpened = false"
+    ></UploadPopup>
+
+    <UploadPopup
+      v-if="nationalIdOpened"
+      slot="fixed"
+      :title="$t('myprogress.upload.national_id_title')"
+      :intro="$t('myprogress.upload.national_id_intro')"
+      :reminder="$t('myprogress.upload.national_id_reminder')"
+      :reminderImageSrc="`${$addonAssetsUrl}/reminder_national_id.png`"
+      :uploadText="$t('myprogress.upload.national_id_upload_text')"
+      :multipleUpload="true"
+      @closed="nationalIdOpened = false"
+    ></UploadPopup>
+
+    <UploadPopup
+      v-if="residentialPermitOpened"
+      slot="fixed"
+      :title="$t('myprogress.upload.residential_permit_title')"
+      :intro="$t('myprogress.upload.residential_permit_intro')"
+      :reminder="$t('myprogress.upload.residential_permit_reminder')"
+      :reminderImageSrc="`${$addonAssetsUrl}/reminder_residential_permit.png`"
+      :uploadText="$t('myprogress.upload.residential_permit_upload_text')"
+      :multipleUpload="true"
+      @closed="residentialPermitOpened = false"
+    ></UploadPopup>
   </f7-page>
 </template>
 <script>
   import API from '../api';
+  import UploadPopup from './upload-popup.vue';
 
   export default {
+    components: {
+      UploadPopup,
+    },
     data() {
       return {
         fragment: null,
         items: null,
         actorId: this.$f7route.query.actor_id,
+
+        profilePhotoOpened: false,
+        healthCertOpened: false,
+        residentialPermitOpened: false,
+        nationalIdOpened: false,
       };
     },
     computed: {
+      isPendingApproval() {
+        const self = this;
+        const isPending = self.itemsProgressCount === 6 && (
+          self.items.training.checked
+          && self.items.national_id.checked
+          && self.items.profile_photo.checked
+          && self.items.health_cert.checked
+          && self.items.address.checked
+          && self.items.residential_permit.checked
+        );
+        return isPending;
+      },
       itemsProgress() {
         return this.itemsProgressCount / 10 * 100;
       },
