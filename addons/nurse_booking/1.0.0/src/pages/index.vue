@@ -33,7 +33,7 @@
       <div class="section">
         <a href="/nurse_booking/service-list/?category=Extras&masterDetailRoot=true" data-reload-detail="true">
           <img :src="`${$addonAssetUrl}icon-extras.svg`" />
-          <span>{{$t('nurse_booking.index.cleaning_label', 'Accompany to Go Out')}}</span>
+          <span>{{$t('nurse_booking.index.extras_label', 'Accompany to Go Out')}}</span>
         </a>
       </div>
       <div class="section">
