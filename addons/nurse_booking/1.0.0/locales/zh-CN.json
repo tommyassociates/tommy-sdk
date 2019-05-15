@@ -2,7 +2,7 @@
   "index": {
     "title": "服务",
     "cleaning_label": "常规家政",
-    "elderhome_label": "老人家政",
+    "elderservice_label": "老人家政",
     "extras_label": "陪同外出",
     "nursing_label": "护理",
     "massage_label": "按摩",
@@ -22,7 +22,7 @@
   },
   "service_list": {
     "cleaning_title": "常规家政",
-    "elderhome_title": "老人家政",
+    "elderservice_title": "老人家政",
     "extras_title": "陪同外出",
     "nursing_title": "护理",
     "massage_title": "按摩",
