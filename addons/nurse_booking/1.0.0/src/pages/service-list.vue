@@ -69,8 +69,10 @@
       Promise.all([API.getServiceList(teamId), API.getCouponList(teamId)]).then(([servicesData, couponsData]) => {
         const cnCategories = {
           Massage: '按摩',
-          Cleaning: '清洁',
+          Cleaning: '常规家政',
           Nursing: '护理',
+          Elderservice: '老人家政',
+          Extras: '外出陪同',
         };
         const services = servicesData.filter(el => el.category === self.category || el.category === cnCategories[self.category]);
 
