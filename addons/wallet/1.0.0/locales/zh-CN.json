@@ -1,10 +1,10 @@
 {
   "index": {
     "title": "钱包",
-    "tab_link_wallets": "钱包",
-    "tab_link_balance": "余额",
+    "tab_link_wallets": "卡包",
+    "tab_link_balance": "支付",
     "tab_link_transactions": "转账记录",
-    "tab_balance_title": "History",
+    "tab_balance_title": "交易记录",
     "tab_transactions_title": " 转账记录",
     "no_transactions_message": "对不起，你的账户还没有历史转账记录",
     "tab_wallets_title": "钱包",
@@ -16,23 +16,23 @@
     "inform_label": "信息提醒"
   },
   "transaction_status": {
-    "paid": "已支付"
+    "paid": "付款成功"
   },
   "transaction_details": {
     "title": "交易详情",
-    "payment_label": "支付",
-    "time_label": "时间",
-    "payee_label": "收款人"
+    "payment_label": "支付方式",
+    "time_label": "支付时间",
+    "payee_label": "服务项目"
   },
   "transaction_popup": {
     "confirm_button": "确认",
     "pay_label": "支付",
     "using_label": "账户",
-    "report_button": "查看报告",
+    "report_button": "交易详情",
     "error_title": "支付失败",
     "success_title": "已付款",
-    "success_message": "发送金额 {{currency}}{{amount}}.<br>收款人 {{to}}.<br>付款人 {{from}}.",
-    "error_insufficient": "Sorry. Your account balance is insufficient. Please use other payment method."
+    "success_message": "",
+    "error_insufficient": "对不起，余额不足，请重新选择支付工具"
   },
   "title": "钱包",
   "views": {
