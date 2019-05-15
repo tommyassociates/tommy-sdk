@@ -1,11 +1,13 @@
 {
   "index": {
     "title": "Home Service",
-    "vip_label": "VIP",
-    "nursing_label": "Nursing",
     "cleaning_label": "Cleaning",
+    "elderhome_label": "Elders Service",
+    "extras_label": "Accompany to Go Out",
+    "nursing_label": "Nursing",
     "massage_label": "Massage",
     "booking_label": "Booking",
+    "vip_label": "VIP",
     "wallet_label": "Wallet"
   },
   "vip": {
@@ -19,9 +21,12 @@
     "details_administration": "Administration"
   },
   "service_list": {
-    "nursing_title": "Nursing",
     "cleaning_title": "Cleaning",
-    "massage_title": "Massage"
+    "elderhome_title": "Elders Home Service",
+    "extras_title": "Accompany to Go Out",
+    "nursing_title": "Nursing",
+    "massage_title": "Massage",
+    "empty_label": "Coming Soon"
   },
   "service_details": {
     "service_details_label": "Service details",
