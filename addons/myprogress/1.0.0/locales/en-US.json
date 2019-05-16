@@ -22,6 +22,8 @@
     "button_upload": "Upload",
     "button_next": "Next",
     "button_submit": "Submit",
+    "button_continue": "Continue",
+    "button_save": "Save",
     "add_photos_label": "Add Photos",
     "reminder_label": "Reminder",
     "thank_you_label": "Thank you",
@@ -40,7 +42,11 @@
     "residential_permit_title": "Residential Permit",
     "residential_permit_intro": "If you require residential permit. Please take a photo of both front and back.",
     "residential_permit_reminder": "信息清晰可见",
-    "residential_permit_upload_text": "If you require a residential permit please take a photo of both front and back."
+    "residential_permit_upload_text": "If you require a residential permit please take a photo of both front and back.",
+    "address_title": "Postal Address",
+    "address_text": "托me will provide you with a 托me Bag and uniform. You must sign for this delivery. Please provide your best address.",
+    "address_city_placeholder": "Enter city and district…",
+    "address_address_placeholder": "Enter the street, building, and apartment details…"
   },
   "title": "My Progress",
   "summary": "",

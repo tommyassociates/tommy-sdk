@@ -66,7 +66,10 @@
         <div class="myprogress-item-number">5.</div>
         <div class="myprogress-item-content">
           <div class="myprogress-item-label">{{$t('myprogress.points.address')}}</div>
-          <a href="#" class="myprogress-button">{{$t('myprogress.index.fill_address')}}</a>
+          <div class="myprogress-item-data" v-if="items.address.checked && items.address.city && items.address.address">
+            <div>{{items.address.city}} {{items.address.address}}</div>
+          </div>
+          <a href="#" class="myprogress-button" @click="addressOpened = true">{{$t('myprogress.index.fill_address')}}</a>
         </div>
         <div class="myprogress-item-checkbox">
           <label class="myprogress-checkbox" :class="{ disabled: isNurse }">
@@ -184,15 +187,24 @@
       :multipleUpload="true"
       @closed="residentialPermitOpened = false"
     ></UploadPopup>
+
+    <AddressPopup
+      v-if="addressOpened"
+      slot="fixed"
+      @save="saveAddress"
+      @closed="addressOpened = false"
+    ></AddressPopup>
   </f7-page>
 </template>
 <script>
   import API from '../api';
   import UploadPopup from './upload-popup.vue';
+  import AddressPopup from './address-popup.vue';
 
   export default {
     components: {
       UploadPopup,
+      AddressPopup,
     },
     data() {
       return {
@@ -204,6 +216,7 @@
         healthCertOpened: false,
         residentialPermitOpened: false,
         nationalIdOpened: false,
+        addressOpened: false,
       };
     },
     computed: {
@@ -241,6 +254,13 @@
       toggleItem(item) {
         const self = this;
         self.items[item].checked = !self.items[item].checked;
+        self.saveData();
+      },
+      saveAddress({ city, address }) {
+        const self = this;
+        self.items.address.checked = true;
+        self.items.address.city = city;
+        self.items.address.address = address;
         self.saveData();
       },
       saveData() {
