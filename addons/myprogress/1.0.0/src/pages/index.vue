@@ -27,6 +27,15 @@
         <div class="myprogress-item-number">2.</div>
         <div class="myprogress-item-content">
           <div class="myprogress-item-label">{{$t('myprogress.points.national_id')}}</div>
+          <div class="myprogress-item-uploads" v-if="items.national_id.files">
+            <div
+              v-for="(file, index) in items.national_id.files"
+              :key="index"
+              :style="`background-image: url(${file})`"
+              class="myprogress-item-upload"
+              @click="previewImage(file)"
+            ></div>
+          </div>
           <a href="#" class="myprogress-button" @click="nationalIdOpened = true">{{$t('myprogress.index.upload')}}</a>
         </div>
         <div class="myprogress-item-checkbox">
@@ -40,6 +49,15 @@
         <div class="myprogress-item-number">3.</div>
         <div class="myprogress-item-content">
           <div class="myprogress-item-label">{{$t('myprogress.points.profile_photo')}}</div>
+          <div class="myprogress-item-uploads" v-if="items.profile_photo.files">
+            <div
+              v-for="(file, index) in items.profile_photo.files"
+              :key="index"
+              :style="`background-image: url(${file})`"
+              class="myprogress-item-upload"
+              @click="previewImage(file)"
+            ></div>
+          </div>
           <a href="#" class="myprogress-button" @click="profilePhotoOpened = true">{{$t('myprogress.index.upload')}}</a>
         </div>
         <div class="myprogress-item-checkbox">
@@ -53,6 +71,15 @@
         <div class="myprogress-item-number">4.</div>
         <div class="myprogress-item-content">
           <div class="myprogress-item-label">{{$t('myprogress.points.health_cert')}}</div>
+          <div class="myprogress-item-uploads" v-if="items.health_cert.files">
+            <div
+              v-for="(file, index) in items.health_cert.files"
+              :key="index"
+              :style="`background-image: url(${file})`"
+              class="myprogress-item-upload"
+              @click="previewImage(file)"
+            ></div>
+          </div>
           <a href="#" class="myprogress-button" @click="healthCertOpened = true">{{$t('myprogress.index.upload')}}</a>
         </div>
         <div class="myprogress-item-checkbox">
@@ -66,7 +93,7 @@
         <div class="myprogress-item-number">5.</div>
         <div class="myprogress-item-content">
           <div class="myprogress-item-label">{{$t('myprogress.points.address')}}</div>
-          <div class="myprogress-item-data" v-if="items.address.checked && items.address.city && items.address.address">
+          <div class="myprogress-item-data" v-if="items.address.city && items.address.address">
             <div>{{items.address.city}} {{items.address.address}}</div>
           </div>
           <a href="#" class="myprogress-button" @click="addressOpened = true">{{$t('myprogress.index.fill_address')}}</a>
@@ -82,6 +109,15 @@
         <div class="myprogress-item-number">6.</div>
         <div class="myprogress-item-content">
           <div class="myprogress-item-label">{{$t('myprogress.points.residential_permit')}}</div>
+          <div class="myprogress-item-uploads" v-if="items.residential_permit.files">
+            <div
+              v-for="(file, index) in items.residential_permit.files"
+              :key="index"
+              :style="`background-image: url(${file})`"
+              class="myprogress-item-upload"
+              @click="previewImage(file)"
+            ></div>
+          </div>
           <a href="#" class="myprogress-button" @click="residentialPermitOpened = true">{{$t('myprogress.index.upload')}}</a>
         </div>
         <div class="myprogress-item-checkbox">
@@ -150,6 +186,7 @@
       :reminderImageSrc="`${$addonAssetsUrl}/reminder_profile_photo.png`"
       :uploadText="$t('myprogress.upload.profile_photo_upload_text')"
       @closed="profilePhotoOpened = false"
+      @uploaded="updateUploaded('profile_photo', $event)"
     ></UploadPopup>
 
     <UploadPopup
@@ -161,6 +198,7 @@
       :reminderImageSrc="`${$addonAssetsUrl}/reminder_health_cert.png`"
       :uploadText="$t('myprogress.upload.health_cert_upload_text')"
       :multipleUpload="true"
+      @uploaded="updateUploaded('health_cert', $event)"
       @closed="healthCertOpened = false"
     ></UploadPopup>
 
@@ -173,6 +211,7 @@
       :reminderImageSrc="`${$addonAssetsUrl}/reminder_national_id.png`"
       :uploadText="$t('myprogress.upload.national_id_upload_text')"
       :multipleUpload="true"
+      @uploaded="updateUploaded('national_id', $event)"
       @closed="nationalIdOpened = false"
     ></UploadPopup>
 
@@ -185,6 +224,7 @@
       :reminderImageSrc="`${$addonAssetsUrl}/reminder_residential_permit.png`"
       :uploadText="$t('myprogress.upload.residential_permit_upload_text')"
       :multipleUpload="true"
+      @uploaded="updateUploaded('residential_permit', $event)"
       @closed="residentialPermitOpened = false"
     ></UploadPopup>
 
@@ -251,9 +291,48 @@
       this.getData();
     },
     methods: {
+      previewImage(url) {
+        const self = this;
+        let pb = self.$f7.photoBrowser.create({
+          photos: [url],
+          toolbar: false,
+          backLinkText: self.$t('label.back'),
+          type: 'standalone',
+          renderNavbar() {
+            return `
+              <div class="navbar">
+                <div class="navbar-inner sliding">
+                  <div class="left">
+                    <a href="#" class="link popup-close" data-popup=".photo-browser-popup">
+                      <i class="icon icon-back"></i>
+                      <span>${self.$t('label.back')}</span>
+                    </a>
+                  </div>
+                  <div class="right"></div>
+                </div>
+              </div>
+            `;
+          },
+        });
+        pb.once('closed', () => {
+          setTimeout(() => {
+            pb.destroy();
+            pb = null;
+          });
+        });
+        pb.open();
+      },
       toggleItem(item) {
         const self = this;
         self.items[item].checked = !self.items[item].checked;
+        self.saveData();
+      },
+      updateUploaded(key, files) {
+        const self = this;
+        self.items[key].checked = true;
+        self.items[key].files = files.map((f) => {
+          return `${self.$config.cdnUrl}/${f.signed_id}/${f.filename}`;
+        });
         self.saveData();
       },
       saveAddress({ city, address }) {
