@@ -5,6 +5,7 @@
   },
   "index": {
     "title": "Health Vitals",
+    "no_data": "No Data",
     "profile_age_label": "Age:",
     "profile_sex_label": "Sex:",
     "profile_sex_options": ["Male", "Female"],
@@ -55,6 +56,705 @@
   },
   "history": {
     "title": "History"
+  },
+  "blood_glucose": {
+    "index": {
+      "title": "Blood Glucose",
+      "vital_label": "No Data",
+      "vital_unit": ["mmol/L"],
+      "not_available": "Add new records by clicking '+' button.",
+      "loading_label": "Loading...",
+      "manual_button": "Enter Manually",
+      "device_button": "Device"
+    },
+    "device": {
+      "title": "Device",
+      "device_label": "Default Device",
+      "search_button": "Find new device",
+      "start_button": "Start Measuring",
+      "new_label": "New Device"
+    },
+    "bluetooth_error": {
+      "text": "Bluetooth is not turned on or does not support the device.",
+      "confirm_button": "OK"
+    },
+    "device_search": {
+      "title": "New device",
+      "scan_label": "Searching...",
+      "not_available": "No available devices found",
+      "search_button": "Search Again"
+    },
+    "device_found": {
+      "title": "Add new device",
+      "devices_label": "Devices Found"
+    },
+    "device_operate": {
+      "title": "Measurement",
+      "scan_label": "Measuring...",
+      "vital_variants_label": "Meals:",
+      "vital_variants": ["Unspecified", "Before meals", "After meals"],
+      "restart_button": "Restart",
+      "save_button": "Save"
+    },
+    "manual_enter": {
+      "title": "Add Measurement",
+      "vital_label": "Blood Glucose",
+      "vital_unit": ["mmol/L"],
+      "date_label": "Date",
+      "time_label": "Time",
+      "vital_variants_label": "Meal time",
+      "vital_variants": ["Unspecified", "Before meals", "After meals"],
+      "variants_button": "Done",
+      "save_text": "Saved successfully!",
+      "save_button": "OK"
+    },
+    "settings": {
+      "title": "Settings",
+      "vital_text": "Blood Glucose, also known as Glucose, is the most important sugar in the blood and the main source of energy for the body.",
+      "chat_label": "Receive the message",
+      "source_label": "Data Sources",
+      "add_label": "Add Data Source"
+    },
+    "device_details": {
+      "remove_button": "Remove Device"
+    },
+    "history": {
+      "title": "History",
+      "date_options": ["Day","Week","Month"],
+      "vital_unit": ["mmol/L"],
+      "vital_variants": ["Unspecified", "Before meals", "After meals"],
+      "week_days": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    },
+    "title": "Blood Glucose"
+  },
+  "blood_pressure": {
+    "index": {
+      "title": "Blood Pressure",
+      "vital_label": "No Data",
+      "vital_unit": ["mmHg"],
+      "bpm_unit": ["bpm"],
+      "not_available": "Add new records by clicking '+' button.",
+      "loading_label": "Loading...",
+      "manual_button": "Enter Manually",
+      "device_button": "Device"
+    },
+    "device": {
+      "title": "Device",
+      "device_label": "Default Device",
+      "search_button": "Find new device",
+      "start_button": "Start Measuring",
+      "new_label": "New Device"
+    },
+    "bluetooth_error": {
+      "text": "Bluetooth is not turned on or does not support the device.",
+      "confirm_button": "OK"
+    },
+    "device_search": {
+      "title": "New device",
+      "scan_label": "Searching...",
+      "not_available": "No available devices found",
+      "search_button": "Search Again"
+    },
+    "device_found": {
+      "title": "Add new device",
+      "devices_label": "Devices Found"
+    },
+    "device_operate": {
+      "title": "Measurement",
+      "scan_label": "Measuring...",
+      "bpm_label": "bpm",
+      "dia_label": "DIA",
+      "sys_label": "SYS",
+      "restart_button": "Restart",
+      "save_button": "Save"
+    },
+    "manual_enter": {
+      "title": "Add Measurement",
+      "sys_label": "Systolic pressure",
+      "sys_unit": ["mmHg"],
+      "dia_label": "Diastolic pressure",
+      "dia_unit": ["mmHg"],
+      "bpm_label": "Heart rate",
+      "bpm_unit": ["bpm"],
+      "date_label": "Date",
+      "time_label": "Time",
+      "variants_button": "Done",
+      "save_text": "Saved successfully!",
+      "save_button": "OK"
+    },
+    "settings": {
+      "title": "Settings",
+      "vital_text": "Blood pressure refers to the pressure of blood flow on the arterial wall when the heart delivers blood. The blood pressure value usually writes the systolic pressure value above or in front of the diastolic pressure value (eg 120/80).",
+      "chat_label": "Receive the message",
+      "source_label": "Data Sources",
+      "add_label": "Add Data Source"
+    },
+    "device_details": {
+      "remove_button": "Remove Device"
+    },
+    "history": {
+      "title": "History",
+      "date_options": ["Day","Week","Month"],
+      "vital_units": ["mmHg", "mmHg", "bpm"],
+      "week_days": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    },
+    "title": "Blood Pressure"
+  },
+  "heart_rate": {
+    "index": {
+      "title": "Heart Rate",
+      "vital_label": "No Data",
+      "vital_unit": ["bpm"],
+      "not_available": "Add new records by clicking \"+\" button.",
+      "loading_label": "Loading...",
+      "manual_button": "Enter Manually",
+      "device_button": "Device"
+    },
+    "device": {
+      "title": "Device",
+      "device_label": "Default Device",
+      "search_button": "Find new device",
+      "start_button": "Start Measuring",
+      "new_label": "New Device"
+    },
+    "bluetooth_error": {
+      "text": "Bluetooth is not turned on or does not support the device.",
+      "confirm_button": "OK"
+    },
+    "device_search": {
+      "title": "New device",
+      "scan_label": "Searching...",
+      "not_available": "No available devices found",
+      "search_button": "Search Again"
+    },
+    "device_found": {
+      "title": "Add new device",
+      "devices_label": "Devices Found"
+    },
+    "device_operate": {
+      "title": "Measurement",
+      "scan_label": "Measuring...",
+      "vital_variants_label": "State:",
+      "vital_variants": ["Resting", "Walking", "Running"],
+      "restart_button": "Restart",
+      "save_button": "Save"
+    },
+    "manual_enter": {
+      "title": "Add Measurement",
+      "vital_label": "Heart Rate",
+      "vital_unit": ["bpm"],
+      "date_label": "Date",
+      "time_label": "Time",
+      "vital_variants_label": "State",
+      "vital_variants": ["Resting", "Walking", "Running"],
+      "variants_button": "Done",
+      "save_text": "Saved successfully!",
+      "save_button": "OK"
+    },
+    "settings": {
+      "title": "Settings",
+      "vital_text": "Your heart beats about 100,000 times a day, and it accelerates and slows down during exercise and rest. Heart rate refers to the number of beats per minute of the heart and can be regarded as an indicator of cardiovascular health.",
+      "chat_label": "Receive the message",
+      "source_label": "Data Sources",
+      "add_label": "Add Data Source"
+    },
+    "device_details": {
+      "remove_button": "Remove Device"
+    },
+    "history": {
+      "title": "History",
+      "date_options": ["Day","Week","Month"],
+      "vital_unit": ["bpm"],
+      "average_label": "Avg.",
+      "vital_variants": ["Resting", "Walking", "Running"],
+      "week_days": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    },
+    "title": "Heart Rate"
+  },
+  "height": {
+    "index": {
+      "title": "Height",
+      "vital_label": "No Data",
+      "vital_unit": ["cm", "in"],
+      "not_available": "Add new records by clicking \"+\" button.",
+      "loading_label": "Loading...",
+      "manual_button": "Enter Manually",
+      "device_button": "Device"
+    },
+    "device": {
+      "title": "Device",
+      "device_label": "Default Device",
+      "search_button": "Find new device",
+      "start_button": "Start Measuring",
+      "new_label": "New Device"
+    },
+    "bluetooth_error": {
+      "text": "Bluetooth is not turned on or does not support the device.",
+      "confirm_button": "OK"
+    },
+    "device_search": {
+      "title": "New device",
+      "scan_label": "Searching...",
+      "not_available": "No available devices found",
+      "search_button": "Search Again"
+    },
+    "device_found": {
+      "title": "Add new device",
+      "devices_label": "Devices Found"
+    },
+    "device_operate": {
+      "title": "Measurement",
+      "scan_label": "Measuring...",
+      "vital_unit": ["cm", "in"],
+      "restart_button": "Restart",
+      "save_button": "Save"
+    },
+    "manual_enter": {
+      "title": "Add Measurement",
+      "vital_label": "Height",
+      "vital_unit": ["cm", "in"],
+      "date_label": "Date",
+      "time_label": "Time",
+      "variants_button": "Done",
+      "save_text": "Saved successfully!",
+      "save_button": "OK"
+    },
+    "settings": {
+      "title": "Settings",
+      "vital_text": "Measure height to determine growth, health status and fatigue. Middle-aged and older people can also assess the degree of aging to a certain extent as height decreases with age.",
+      "chat_label": "Receive the message",
+      "vital_unit_label": "Preference",
+      "vital_unit_options": ["cm", "in"],
+      "source_label": "Data Sources",
+      "add_label": "Add Data Source"
+    },
+    "device_details": {
+      "remove_button": "Remove Device"
+    },
+    "history": {
+      "title": "History",
+      "date_options": ["Day","Week","Month"],
+      "vital_unit": ["cm", "in"],
+      "week_days": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    },
+    "title": "Height"
+  },
+  "immunisations": {
+    "index": {
+      "title": "Immunisations",
+      "vital_label": "No Data",
+      "next_label": "Next vaccine:",
+      "days_label": "Days",
+      "not_available": "Add new Immunisations by clicking '+' button.",
+      "loading_label": "Loading..."
+    },
+    "due_alert": {
+      "text": "You are due to have an immunisation. Please select the vaccine and confirm when complete.",
+      "confirm_button": "Dismiss"
+    },
+    "immunisation_details": {
+      "title": "Details",
+      "vaccine_label": "Vaccine",
+      "date_label": "Scheduled date",
+      "status_label": "Status",
+      "status_options": ["Overdue injection","Injected","Waiting"],
+      "injection_confirmed_label": "Injection confirmed by",
+      "injection_date_label": "Injected date",
+      "next_due_label": "Next due date",
+      "prevent_disease_title": "Prevent Disease",
+      "precautions_title": "Precautions",
+      "confirm_injection_button": "Confirm Injection",
+      "archive_button": "Archive"
+    },
+    "injection_confirm": {
+      "title": "Details",
+      "date_label": "Injection date",
+      "cancel_button": "Cancel",
+      "confirm_button": "Confirm"
+    },
+    "add_vaccine": {
+      "title": "Add Vaccine",
+      "vaccine_label": "Vaccine",
+      "select_vaccine_label": "Select Vaccine",
+      "date_label": "Scheduled date"
+    },
+    "vaccine_selector": {
+      "title": "Vaccine Name",
+      "vaccine_search": "Search Vaccine",
+      "custom_title": "Custom"
+    },
+    "settings": {
+      "title": "Settings",
+      "vital_text": "Immunisation Reminder is a simple and beautiful vaccinations tracker and reminder application designed to keep you up to date with important vaccination schedules.",
+      "chat_label": "Receive the message",
+      "archive_label": "Archive",
+      "plan_label": "Immunisations plan"
+    },
+    "archive": {
+      "title": "Archive",
+      "no_available": "When you have archived previous records, they will show here.",
+      "delete_button": "Delete"
+    },
+    "archive_delete_confirm_prompt": {
+      "text": "Are you sure you wish to delete this entry?",
+      "cancel_button": "No",
+      "confirm_button": "Yes"
+    },
+    "archive_delete_success_prompt": {
+      "text": "Successfully deleted!",
+      "delete_button": "Dismiss"
+    },
+    "title": "Immunisations"
+  },
+  "medication_reminder": {
+    "index": {
+      "title": "Medication Reminder",
+      "vital_label": "No Data",
+      "dosage_unit": {"bag": "bag", "ml": "Ml", "pill": "Pill", "mg": "mg", "drop": "Drop"},
+      "not_available": "You have no medication today! Enjoy your day!",
+      "loading_label": "Loading..."
+    },
+    "medication_time": {
+      "text": "It's time to take a Pill!",
+      "snooze_button": "Snooze",
+      "confirm_button": "Taken"
+    },
+    "medication_add": {
+      "title": "Add Medication",
+      "vital_label": "Name",
+      "startdate_label": "Start Date",
+      "enddate_label": "End Date",
+      "frequency_label": "Frequency",
+      "frequency_units": ["Once per day", "Twice per day", "Three times per day", "Four times per day", "Five times per day", "Six times per day", "Seven times per day", "Eight times per day"],
+      "dosage_label": "Dosage",
+      "dosage_unit": {"bag": "bag", "ml": "Ml", "pill": "Pill", "mg": "mg", "drop": "Drop"},
+      "variants_button": "Done",
+      "save_text": "Saved successfully!",
+      "save_button": "OK"
+    },
+    "medication_edit": {
+      "title": "Edit Medication",
+      "vital_label": "Name",
+      "startdate_label": "Start Date",
+      "enddate_label": "End Date",
+      "frequency_label": "Frequency",
+      "frequency_units": ["Once per day", "Twice per day", "Three times per day", "Four times per day", "Five times per day", "Six times per day", "Seven times per day", "Eight times per day"],
+      "dosage_label": "Dosage",
+      "dosage_unit": {"bag": "bag", "ml": "Ml", "pill": "Pill", "mg": "mg", "drop": "Drop"},
+      "variants_button": "Done",
+      "delete_button": "Delete",
+      "pause_button": "Stop reminders",
+      "start_button": "Start reminders",
+      "save_text": "Saved successfully!",
+      "save_button": "OK"
+    },
+    "medication_plan": {
+      "title": "Medication Plan"
+    },
+    "settings": {
+      "title": "Settings",
+      "vital_text": "Medication Reminder is a simple and beautiful prescription reminder mini program.",
+      "chat_label": "Receive the message",
+      "source_label": "Data Sources"
+    },
+    "history": {
+      "title": "Record",
+      "notice_text": ["Good job! Keep it up!", "Remember to take the medicine!"],
+      "dosage_status": "Taken"
+    },
+    "title": "Medication Reminder"
+  },
+  "pedometer": {
+    "index": {
+      "title": "Pedometer",
+      "vital_label": "No Data",
+      "vital_unit": ["steps"],
+      "not_available": "Add new records by clicking \"+\" button.",
+      "loading_label": "Loading...",
+      "manual_button": "Enter Manually",
+      "device_button": "Device"
+    },
+    "device": {
+      "title": "Device",
+      "device_label": "Default Device",
+      "search_button": "Find new device",
+      "start_button": "Start Measuring",
+      "new_label": "New Device"
+    },
+    "bluetooth_error": {
+      "text": "Bluetooth is not turned on or does not support the device.",
+      "confirm_button": "OK"
+    },
+    "device_search": {
+      "title": "New device",
+      "scan_label": "Searching...",
+      "not_available": "No available devices found",
+      "search_button": "Search Again"
+    },
+    "device_found": {
+      "title": "Add new device",
+      "devices_label": "Devices Found"
+    },
+    "device_operate": {
+      "title": "Measurement",
+      "scan_label": "Measuring...",
+      "vital_label": "steps",
+      "vital_unit": ["steps"],
+      "restart_button": "Restart",
+      "save_button": "Save"
+    },
+    "manual_enter": {
+      "title": "Add Measurement",
+      "vital_label": "Steps",
+      "vital_unit": ["steps"],
+      "date_label": "Date",
+      "time_label": "Time",
+      "variants_button": "Done",
+      "save_text": "Saved successfully!",
+      "save_button": "OK"
+    },
+    "settings": {
+      "title": "Settings",
+      "vital_text": "The number of steps refers to how many steps you take in the course of a day. A pedometer or digital motion tracker helps you determine the number of steps. Built into your phone or you can connect to your phone for data to appear here.",
+      "chat_label": "Receive the message",
+      "source_label": "Data Sources",
+      "add_label": "Add Data Source"
+    },
+    "device_details": {
+      "remove_button": "Remove Device"
+    },
+    "history": {
+      "title": "History",
+      "date_options": ["Day","Week","Month"],
+      "vital_unit": ["Steps"],
+      "day_label": "Accumulated:",
+      "week_label": "Average:",
+      "month_label": "Average:",
+      "week_days": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    },
+    "title": "Pedometer"
+  },
+  "temperature": {
+    "index": {
+      "title": "Body Temperature",
+      "vital_label": "No Data",
+      "vital_unit": ["°C", "°F"],
+      "not_available": "Add new records by clicking \"+\" button.",
+      "loading_label": "Loading...",
+      "manual_button": "Enter Manually",
+      "device_button": "Device"
+    },
+    "device": {
+      "title": "Device",
+      "device_label": "Default Device",
+      "search_button": "Find new device",
+      "start_button": "Start Measuring",
+      "new_label": "New Device"
+    },
+    "bluetooth_error": {
+      "text": "Bluetooth is not turned on or does not support the device.",
+      "confirm_button": "OK"
+    },
+    "device_search": {
+      "title": "New device",
+      "scan_label": "Searching...",
+      "not_available": "No available devices found",
+      "search_button": "Search Again"
+    },
+    "device_found": {
+      "title": "Add new device",
+      "devices_label": "Devices Found"
+    },
+    "device_operate": {
+      "title": "Measurement",
+      "scan_label": "Measuring...",
+      "restart_button": "Restart",
+      "save_button": "Save"
+    },
+    "manual_enter": {
+      "title": "Add Measurement",
+      "vital_label": "Temperature",
+      "vital_unit": ["°C", "°F"],
+      "date_label": "Date",
+      "time_label": "Time",
+      "variants_button": "Done",
+      "save_text": "Saved successfully!",
+      "save_button": "OK"
+    },
+    "settings": {
+      "title": "Settings",
+      "vital_text": "Normal body temperature constantly changes throughout the day. The body temperature is low in the morning and high in the afternoon and evening. The normal average body temperature is 37C (98.6F). Your normal body temperature may be slightly higher or lower than this value.",
+      "chat_label": "Receive the message",
+      "vital_unit_label": "Preference",
+      "vital_unit_options": ["°C", "°F"],
+      "source_label": "Data Sources",
+      "add_label": "Add Data Source"
+    },
+    "device_details": {
+      "remove_button": "Remove Device"
+    },
+    "history": {
+      "title": "History",
+      "date_options": ["Day","Week","Month"],
+      "vital_unit": ["°C", "°F"],
+      "week_days": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    },
+    "title": "Body Temperature"
+  },
+  "water_tracker": {
+    "index": {
+      "title": "Water Tracker",
+      "vital_label": "No Data",
+      "vital_unit": ["cups (Imperial)", "cups (US)", "fl oz (Imperial)", "fl oz (US)", "L", "mL", "pt (Imperial)", "pt (US)"],
+      "goal_label": "Goal:",
+      "achieved_label": "Drunk:",
+      "not_available": "Add new records by clicking \"+\" button.",
+      "loading_label": "Loading...",
+      "manual_button": "Enter Manually",
+      "device_button": "Device"
+    },
+    "drink_time": {
+      "text": "Time to drink! Need to drink {{value}}{{unit}}.",
+      "confirm_button": "OK"
+    },
+    "manual_enter": {
+      "title": "Add Drink",
+      "vital_unit": ["cups (Imperial)", "cups (US)", "fl oz (Imperial)", "fl oz (US)", "L", "mL", "pt (Imperial)", "pt (US)"],
+      "option_a_label": "150",
+      "option_b_label": "220",
+      "option_c_label": "350",
+      "option_d_label": "400",
+      "custom_button": "Custom Amount"
+    },
+    "custom_amount": {
+      "text": "Enter the amount of water in {{unit}}:",
+      "cancel_button": "Cancel",
+      "confirm_button": "Confirm"
+    },
+    "drinking_plan": {
+      "title": "Drinking Plan",
+      "vital_label": "Daily Goal",
+      "vital_unit": ["cups (Imperial)", "cups (US)", "fl oz (Imperial)", "fl oz (US)", "L", "mL", "pt (Imperial)", "pt (US)"],
+      "reminder_label": "Remind",
+      "start_label": "Start Time",
+      "end_label": "End Time",
+      "interval_label": "Time Interval"
+    },
+    "settings": {
+      "title": "Settings",
+      "vital_text": "Drinking water is important to keep happy and healthy. When your brain reminds you that you are dehydrated it is already to late as your body is in an unhealthy state.",
+      "chat_label": "Receive the message",
+      "plan_label": "Drinking plan",
+      "vital_unit": ["cups (Imperial)", "cups (US)", "fl oz (Imperial)", "fl oz (US)", "L", "mL", "pt (Imperial)", "pt (US)"],
+      "source_label": "Data Sources",
+      "add_label": "Add Data Source"
+    },
+    "device": {
+      "title": "Device",
+      "device_label": "Default Device",
+      "search_button": "Find new device",
+      "start_button": "Start Measuring",
+      "new_label": "New Device"
+    },
+    "bluetooth_error": {
+      "text": "Bluetooth is not turned on or does not support the device.",
+      "confirm_button": "OK"
+    },
+    "device_search": {
+      "title": "New device",
+      "scan_label": "Searching...",
+      "not_available": "No available devices found",
+      "search_button": "Search Again"
+    },
+    "device_found": {
+      "title": "Add new device",
+      "devices_label": "Devices Found"
+    },
+    "device_operate": {
+      "title": "Measurement",
+      "scan_label": "Measuring...",
+      "vital_unit": ["cups (Imperial)", "cups (US)", "fl oz (Imperial)", "fl oz (US)", "L", "mL", "pt (Imperial)", "pt (US)"],
+      "restart_button": "Restart",
+      "save_button": "Save"
+    },
+    "device_details": {
+      "remove_button": "Remove Device"
+    },
+    "history": {
+      "title": "History",
+      "date_options": ["Day","Week","Month"],
+      "vital_unit": ["cups (Imperial)", "cups (US)", "fl oz (Imperial)", "fl oz (US)", "L", "mL", "pt (Imperial)", "pt (US)"],
+      "week_days": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    },
+    "title": "Water Tracker"
+  },
+  "weight": {
+    "index": {
+      "title": "Weight",
+      "vital_label": "No Data",
+      "vital_unit": ["kg", "lbs", "st"],
+      "not_available": "Add new records by clicking \"+\" button.",
+      "loading_label": "Loading...",
+      "manual_button": "Enter Manually",
+      "device_button": "Device"
+    },
+    "device": {
+      "title": "Device",
+      "device_label": "Default Device",
+      "search_button": "Find new device",
+      "start_button": "Start Measuring",
+      "new_label": "New Device"
+    },
+    "bluetooth_error": {
+      "text": "Bluetooth is not turned on or does not support the device.",
+      "confirm_button": "OK"
+    },
+    "device_search": {
+      "title": "New device",
+      "scan_label": "Searching...",
+      "not_available": "No available devices found",
+      "search_button": "Search Again"
+    },
+    "device_found": {
+      "title": "Add new device",
+      "devices_label": "Devices Found"
+    },
+    "device_operate": {
+      "title": "Measurement",
+      "scan_label": "Measuring...",
+      "vital_unit": ["kg", "lbs", "st"],
+      "restart_button": "Restart",
+      "save_button": "Save"
+    },
+    "manual_enter": {
+      "title": "Add Measurement",
+      "vital_label": "Body Weight",
+      "vital_unit": ["kg", "lbs", "st"],
+      "date_label": "Date",
+      "time_label": "Time",
+      "variants_button": "Done",
+      "save_text": "Saved successfully!",
+      "save_button": "OK"
+    },
+    "settings": {
+      "title": "Settings",
+      "vital_text": "Being overweight or underweight is not good for health, nor does it give a sense of fitness. Being consistent and within healthy range is a good sign of health.",
+      "chat_label": "Receive the message",
+      "vital_unit_label": "Preference",
+      "vital_unit": ["kg", "lbs", "st"],
+      "source_label": "Data Sources",
+      "add_label": "Add Data Source"
+    },
+    "device_details": {
+      "remove_button": "Remove Device"
+    },
+    "history": {
+      "title": "History",
+      "date_options": ["Day","Week","Month"],
+      "vital_unit": ["kg", "lbs", "st"],
+      "week_days": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    },
+    "title": "Weight"
   },
   "title": "Health Vitals",
   "summary": "",

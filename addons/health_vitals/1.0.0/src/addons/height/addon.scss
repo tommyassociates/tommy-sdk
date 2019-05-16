@@ -1,0 +1,35 @@
+$orange: #FF4500;
+.ios .vitals-height-fab {
+  > a {
+    background: linear-gradient(to right top, #A5D8FB, #0072DE);
+    &.active-state {
+      background-color: #0072DE;
+    }
+  }
+}
+.vitals-height-icon-settings {
+  background-image: url(../assets/height/icon-settings.svg);
+}
+.vitals-height-icon-chart {
+  background-image: url(../assets/height/icon-chart.svg);
+}
+.vitals-height-index-header {
+  background-image: url(../assets/height/header-bg.svg);
+}
+.vitals-height-index-header-icon {
+  background-image: url(../assets/height/header-icon.svg);
+}
+.vitals-height-index-no-data-img {
+  background-image: url(../assets/height/empty.svg);
+}
+.vitals-height-settings-page {
+  .vitals-height-settings-header {
+    background-image: url(../assets/height/header-bg.svg);
+  }
+  .vitals-height-settings-icon {
+    background-image: url(../assets/height/header-icon.svg);
+  }
+  .vitals-height-settings-center-icon {
+    background-image: url(../assets/height/settings-icon.svg);
+  }
+}

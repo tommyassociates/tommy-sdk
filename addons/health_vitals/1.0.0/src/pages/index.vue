@@ -3,6 +3,11 @@
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{t('title', 'Health Vitals')}}</f7-nav-title>
+      <f7-nav-right>
+        <f7-link href="/health_vitals/panel/" icon-only>
+          <i class="icon health-vitals-icon-settings"></i>
+        </f7-link>
+      </f7-nav-right>
     </f7-navbar>
 
     <div class="health-vitals-cards">
@@ -36,7 +41,7 @@
           </div>
         </div>
       </div> -->
-      <div class="health-vitals-card" v-if="blood_glucose">
+      <a href="/health_vitals/blood_glucose/" class="health-vitals-card" v-if="blood_glucose">
         <div class="health-vitals-card-title">{{t('vital_types.2')}}</div>
         <!-- <div class="health-vitals-card-subtitle">2 {{t('frequency_every_label')}} 2 {{t('frequency_options.2')}}</div> -->
         <!-- <div class="health-vitals-card-subtitle">{{t('between_label')}} 5 {{t('between_and_label')}} 6</div> -->
@@ -49,17 +54,17 @@
             <div class="health-vitals-subcard-value">{{blood_glucose.value}} <sub>{{t('blood_glucose_units')}}</sub></div>
           </div>
         </div>
-      </div>
+      </a>
 
       <!--
         ======= WATER TRACKER =======
       -->
 
-      <div class="health-vitals-card" v-if="water_tracker">
+      <a href="/health_vitals/water_tracker/" class="health-vitals-card" v-if="water_tracker || water_tracker === false">
         <div class="health-vitals-card-title">{{t('vital_types.4')}}</div>
         <!-- <div class="health-vitals-card-subtitle">{{t('frequency_everyday_label')}}</div> -->
         <!-- <div class="health-vitals-card-subtitle">{{t('between_label')}} 1000 {{t('between_and_label')}} 3500</div> -->
-        <div class="health-vitals-subcard">
+        <div class="health-vitals-subcard" v-if="water_tracker">
           <div class="health-vitals-subcard-title">{{$moment(water_tracker.date).format('DD MMM YYYY')}} {{water_tracker.time}}</div>
           <div class="health-vitals-subcard-content">
             <div class="health-vitals-card-icon">
@@ -70,13 +75,14 @@
             <div class="health-vitals-subcard-value">{{water_tracker.value}} <sub>{{t('water_units.5')}}</sub></div>
           </div>
         </div>
-      </div>
+        <div class="health-vitals-subcard health-vitals-subcard-empty" v-if="water_tracker === false">{{t('no_data')}}</div>
+      </a>
 
       <!--
         ======= MEDICATION REMINDER =======
       -->
 
-      <div class="health-vitals-card" v-if="medication_reminder">
+      <a href="/health_vitals/medication_reminder/" class="health-vitals-card" v-if="medication_reminder">
         <div class="health-vitals-card-title">{{t('vital_types.0')}}</div>
         <!-- <div class="health-vitals-card-subtitle">{{t('frequency_everyday_label')}}</div> -->
         <!-- <div class="health-vitals-card-subtitle">{{t('between_label')}} 80 {{t('between_and_label')}} 100</div> -->
@@ -98,7 +104,7 @@
             <div class="health-vitals-subcard-value">{{medication_reminder.takenPercentage}}%</div>
           </div>
         </div>
-      </div>
+      </a>
 
       <!--
         ======= TEMPERATURE =======
@@ -127,11 +133,11 @@
           </div>
         </div>
       </div> -->
-      <div class="health-vitals-card" v-if="temperature">
+      <a href="/health_vitals/temperature/" class="health-vitals-card" v-if="temperature || temperature === false">
         <div class="health-vitals-card-title">{{t('vital_types.5')}}</div>
         <!-- <div class="health-vitals-card-subtitle">{{t('frequency_everyday_label')}}</div> -->
         <!-- <div class="health-vitals-card-subtitle">{{t('between_label')}} 2000 {{t('between_and_label')}} 8000</div> -->
-        <div class="health-vitals-subcard">
+        <div class="health-vitals-subcard" v-if="temperature">
           <div class="health-vitals-subcard-title">{{$moment(temperature.date).format('DD MMM YYYY')}} {{temperature.time}}</div>
           <div class="health-vitals-subcard-content">
             <div class="health-vitals-card-icon">
@@ -140,12 +146,13 @@
             <div class="health-vitals-subcard-value">{{temperature.value}} <sub>{{t('body_temperature_units.0')}}</sub></div>
           </div>
         </div>
-      </div>
+        <div class="health-vitals-subcard health-vitals-subcard-empty" v-if="temperature === false">{{t('no_data')}}</div>
+      </a>
 
       <!--
         ======= PEDOMETER =======
       -->
-      <div class="health-vitals-card" v-if="pedometer">
+      <a href="/health_vitals/pedometer/" class="health-vitals-card" v-if="pedometer">
         <div class="health-vitals-card-title">{{t('vital_types.6')}}</div>
         <!-- <div class="health-vitals-card-subtitle">{{t('frequency_everyday_label')}}</div> -->
         <!-- <div class="health-vitals-card-subtitle">{{t('between_label')}} 2000 {{t('between_and_label')}} 8000</div> -->
@@ -158,16 +165,16 @@
             <div class="health-vitals-subcard-value">{{pedometer.value}} <sub>{{t('pedometer_units')}}</sub></div>
           </div>
         </div>
-      </div>
+      </a>
 
       <!--
         ======= HEIGHT =======
       -->
-      <div class="health-vitals-card" v-if="height">
+      <a href="/health_vitals/height/" class="health-vitals-card" v-if="height || height === false">
         <div class="health-vitals-card-title">{{t('vital_types.7')}}</div>
         <!-- <div class="health-vitals-card-subtitle">1 {{t('frequency_every_label')}} 2 {{t('frequency_options.2')}}</div> -->
         <!-- <div class="health-vitals-card-subtitle">{{t('between_label')}} 160 {{t('between_and_label')}} 170</div> -->
-        <div class="health-vitals-subcard">
+        <div class="health-vitals-subcard" v-if="height">
           <div class="health-vitals-subcard-title">{{$moment(height.date).format('DD MMM YYYY')}} {{height.time}}</div>
           <div class="health-vitals-subcard-content">
             <div class="health-vitals-card-icon">
@@ -176,12 +183,13 @@
             <div class="health-vitals-subcard-value">{{height.value}} <sub>{{t('height_units.0')}}</sub></div>
           </div>
         </div>
-      </div>
+        <div class="health-vitals-subcard health-vitals-subcard-empty" v-if="height === false">{{t('no_data')}}</div>
+      </a>
 
       <!--
         ======= HEART RATE =======
       -->
-      <div class="health-vitals-card" v-if="heart_rate">
+      <a href="/health_vitals/heart_rate/" class="health-vitals-card" v-if="heart_rate">
         <div class="health-vitals-card-title">{{t('vital_types.3')}}</div>
         <!-- <div class="health-vitals-card-subtitle">{{t('frequency_everyday_label')}}</div> -->
         <!-- <div class="health-vitals-card-subtitle">{{t('between_label')}} 60 {{t('between_and_label')}} 120</div> -->
@@ -194,7 +202,7 @@
             <div class="health-vitals-subcard-value">{{heart_rate.value}} <sub>{{t('heart_rate_units')}}</sub></div>
           </div>
         </div>
-      </div>
+      </a>
 
       <!--
         ======= BLOOD PRESSURE =======
@@ -219,27 +227,28 @@
         </div>
       </div> -->
 
-      <div class="health-vitals-card" v-if="blood_pressure">
+      <a href="/health_vitals/blood_pressure/" class="health-vitals-card" v-if="blood_pressure || blood_pressure === false">
         <div class="health-vitals-card-title">{{t('vital_types.1')}}</div>
         <!-- <div class="health-vitals-card-subtitle">2 {{t('frequency_every_label')}} {{t('frequency_options.2')}}</div> -->
         <!-- <div class="health-vitals-card-subtitle">{{t('between_label')}} 100/70 {{t('between_and_label')}} 140/90</div> -->
-        <div class="health-vitals-subcard">
+        <div class="health-vitals-subcard" v-if="blood_pressure">
           <div class="health-vitals-subcard-title">{{$moment(blood_pressure.date).format('DD MMM YYYY')}} {{blood_pressure.time}}</div>
           <div class="health-vitals-subcard-content">
             <div class="health-vitals-subcard-value">{{blood_pressure.value[0]}}/{{blood_pressure.value[1]}}</div>
             <div class="health-vitals-subcard-value"><sub>{{t('blood_pressure_units')}}</sub></div>
           </div>
         </div>
-      </div>
+        <div class="health-vitals-subcard health-vitals-subcard-empty" v-if="blood_pressure === false">{{t('no_data')}}</div>
+      </a>
 
       <!--
         ======= WEIGHT =======
       -->
-      <div class="health-vitals-card" v-if="weight">
+      <a href="/health_vitals/weight/" class="health-vitals-card" v-if="weight || weight === false">
         <div class="health-vitals-card-title">{{t('vital_types.8')}}</div>
         <!-- <div class="health-vitals-card-subtitle">{{t('frequency_everyday_label')}}</div> -->
         <!-- <div class="health-vitals-card-subtitle">{{t('between_label')}} 60 {{t('between_and_label')}} 85</div> -->
-        <div class="health-vitals-subcard">
+        <div class="health-vitals-subcard" v-if="weight">
           <div class="health-vitals-subcard-title">{{$moment(weight.date).format('DD MMM YYYY')}} {{weight.time}}</div>
           <!-- <div class="health-vitals-subcard-title">{{$t('health_vitals.dates.yesterday')}} 16:00</div> -->
           <div class="health-vitals-subcard-content">
@@ -249,13 +258,15 @@
             <div class="health-vitals-subcard-value">{{weight.value}} <sub>{{t('weight_units.0')}}</sub></div>
           </div>
         </div>
-      </div>
+        <div class="health-vitals-subcard health-vitals-subcard-empty" v-if="weight === false">{{t('no_data')}}</div>
+      </a>
     </div>
 
   </f7-page>
 </template>
 <script>
   import API from '../api';
+  import Actor from '../actor';
 
   const cachedVitals = {
     water_tracker: null,
@@ -290,14 +301,15 @@
     mounted() {
       const self = this;
       if (self.actorId) {
-        API.actorId = parseInt(self.actorId, 10);
+        Actor.id = parseInt(self.actorId, 10);
         self.$api.getContact(self.actorId).then((response) => {
           self.user = response;
+          Actor.user = response;
         });
       } else {
         self.user = self.$root.user;
-        delete API.actorId;
-        delete API.actor;
+        delete Actor.id;
+        delete Actor.user;
       }
       this.getData();
     },
@@ -319,47 +331,83 @@
       getData() {
         const self = this;
         API.getWaterTracker(self.$root.user).then((res) => {
-          if (!res || !res.length || !res[0].data) return;
+          if (!res || !res.length || !res[0].data) {
+            self.water_tracker = false;
+            cachedVitals.water_tracker = false;
+            return;
+          }
           self.water_tracker = res[0].data;
           cachedVitals.water_tracker = self.water_tracker;
         });
         API.getTemperature(self.$root.user).then((res) => {
-          if (!res || !res.length || !res[0].data) return;
+          if (!res || !res.length || !res[0].data) {
+            self.temperature = false;
+            cachedVitals.temperature = false;
+            return;
+          }
           self.temperature = res[0].data;
           cachedVitals.temperature = self.temperature;
         });
         API.getPedometer(self.$root.user).then((res) => {
-          if (!res || !res.length || !res[0].data) return;
+          if (!res || !res.length || !res[0].data) {
+            self.pedometer = false;
+            cachedVitals.pedometer = false;
+            return;
+          }
           self.pedometer = res[0].data;
           cachedVitals.pedometer = self.pedometer;
         });
         API.getHeight(self.$root.user).then((res) => {
-          if (!res || !res.length || !res[0].data) return;
+          if (!res || !res.length || !res[0].data) {
+            self.height = false;
+            cachedVitals.height = false;
+            return;
+          }
           self.height = res[0].data;
           cachedVitals.height = self.height;
         });
         API.getWeight(self.$root.user).then((res) => {
-          if (!res || !res.length || !res[0].data) return;
+          if (!res || !res.length || !res[0].data) {
+            self.weight = false;
+            cachedVitals.weight = false;
+            return;
+          }
           self.weight = res[0].data;
           cachedVitals.weight = self.weight;
         });
         API.getHeartRate(self.$root.user).then((res) => {
-          if (!res || !res.length || !res[0].data) return;
+          if (!res || !res.length || !res[0].data) {
+            self.heart_rate = false;
+            cachedVitals.heart_rate = false;
+            return;
+          }
           self.heart_rate = res[0].data;
           cachedVitals.heart_rate = self.heart_rate;
         });
         API.getBloodPressure(self.$root.user).then((res) => {
-          if (!res || !res.length || !res[0].data) return;
+          if (!res || !res.length || !res[0].data) {
+            self.blood_pressure = false;
+            cachedVitals.blood_pressure = false;
+            return;
+          }
           self.blood_pressure = res[0].data;
           cachedVitals.blood_pressure = self.blood_pressure;
         });
         API.getBloodGlucose(self.$root.user).then((res) => {
-          if (!res || !res.length || !res[0].data) return;
+          if (!res || !res.length || !res[0].data) {
+            self.blood_glucose = false;
+            cachedVitals.blood_glucose = false;
+            return;
+          }
           self.blood_glucose = res[0].data;
           cachedVitals.blood_glucose = self.blood_glucose;
         });
         API.getMedicationReminder(self.$root.user).then((res) => {
-          if (!res) return;
+          if (!res) {
+            self.medication_reminder = false;
+            cachedVitals.medication_reminder = false;
+            return;
+          }
           self.medication_reminder = res;
           cachedVitals.medication_reminder = self.medication_reminder;
         }).catch(() => {});

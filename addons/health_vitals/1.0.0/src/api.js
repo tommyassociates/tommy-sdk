@@ -5,7 +5,7 @@ const API = {
   actorId: undefined,
   getWaterTracker(user) {
     return api.getFragments({
-      addon: 'vitals_water_tracker',
+      addon: 'health_vitals',
       kind: 'VitalsWaterTrackerItem',
       with_filters: true,
       with_permission_to: true,
@@ -20,7 +20,7 @@ const API = {
   },
   getTemperature(user) {
     return api.getFragments({
-      addon: 'vitals_temperature',
+      addon: 'health_vitals',
       kind: 'VitalsTemperatureItem',
       with_filters: true,
       with_permission_to: true,
@@ -35,7 +35,7 @@ const API = {
   },
   getPedometer(user) {
     return api.getFragments({
-      addon: 'vitals_pedometer',
+      addon: 'health_vitals',
       kind: 'VitalsPedometerItem',
       with_filters: true,
       with_permission_to: true,
@@ -50,7 +50,7 @@ const API = {
   },
   getHeight(user) {
     return api.getFragments({
-      addon: 'vitals_height',
+      addon: 'health_vitals',
       kind: 'VitalsHeightItem',
       with_filters: true,
       with_permission_to: true,
@@ -65,7 +65,7 @@ const API = {
   },
   getWeight(user) {
     return api.getFragments({
-      addon: 'vitals_weight',
+      addon: 'health_vitals',
       kind: 'VitalsWeightItem',
       with_filters: true,
       with_permission_to: true,
@@ -80,7 +80,7 @@ const API = {
   },
   getHeartRate(user) {
     return api.getFragments({
-      addon: 'vitals_heart_rate',
+      addon: 'health_vitals',
       kind: 'VitalsHeartRateItem',
       with_filters: true,
       with_permission_to: true,
@@ -95,7 +95,7 @@ const API = {
   },
   getBloodPressure(user) {
     return api.getFragments({
-      addon: 'vitals_blood_pressure',
+      addon: 'health_vitals',
       kind: 'VitalsBloodPressureItem',
       with_filters: true,
       with_permission_to: true,
@@ -110,7 +110,7 @@ const API = {
   },
   getBloodGlucose(user) {
     return api.getFragments({
-      addon: 'vitals_blood_glucose',
+      addon: 'health_vitals',
       kind: 'VitalsBloodGlucoseItem',
       with_filters: true,
       with_permission_to: true,
@@ -126,7 +126,7 @@ const API = {
   getMedicationReminder(user) {
     return new Promise((resolve, reject) => {
       const medicationsRequest = api.getFragments({
-        addon: 'vitals_medication_reminder',
+        addon: 'health_vitals',
         kind: 'VitalsMedicationReminderMedication',
         with_filters: true,
         with_permission_to: true,
@@ -136,7 +136,7 @@ const API = {
         cache: false,
       });
       const takenRequest = api.getFragments({
-        addon: 'vitals_medication_reminder',
+        addon: 'health_vitals',
         kind: 'VitalsMedicationReminderTaken',
         with_filters: true,
         with_permission_to: true,
