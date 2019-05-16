@@ -22,7 +22,7 @@ const API = {
         data: {},
       }),
     ]).then(([products, packages]) => {
-      const services = [...products, ...packages];
+      const services = [...products, ...packages].filter(s => s.active);
       API.cache.services = services;
       return services;
     });

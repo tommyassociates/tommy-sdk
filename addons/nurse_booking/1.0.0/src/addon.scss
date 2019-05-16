@@ -84,6 +84,7 @@ $yellow: #FF7B00;
     box-sizing: border-box;
     display: inline-block;
     line-height: 1.25;
+    vertical-align: top;
     &:nth-child(n + 4) {
       margin-top: 20px;
     }
@@ -300,6 +301,17 @@ $yellow: #FF7B00;
   }
 }
 .page#nurse_booking__service-list {
+  .nurse_booking__empty-placeholder {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 90%;
+    transform: translate(-50%, -50%);
+    font-size: 22px;
+    font-weight: 500;
+    color: #717171;
+    text-align: center;
+  }
   .page-content {
     display: flex;
     align-items: center;
