@@ -53,6 +53,9 @@ $red: #FF4500;
   width: 100%;
   min-width: 0;
 }
+.myprogress-item-data {
+  font-size: 22px;
+}
 .myprogress-item-number {
   width: 40px;
   flex-shrink: 0;
@@ -245,5 +248,59 @@ label.myprogress-upload-camera,
   color: #333;
   i {
     background-image: url(../assets/icon-check.svg);
+  }
+}
+.ios .page.myprogress-address-page {
+  background: #F1F1F1;
+}
+.myprogress-address-card {
+  background: #fff;
+  margin: 20px 12px;
+  border-radius: 4px;
+  padding: 12px;
+  input, textarea {
+    background: #F1F1F1;
+    color: #000;
+    padding: 0 12px;
+    border-radius: 4px;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    font-size: 22px;
+    ::placeholder {
+      color: #999;
+    }
+  }
+  input {
+    height: 52px;
+  }
+  textarea {
+    padding: 12px;
+    height: 76px;
+    line-height: 1.2;
+    margin-top: 12px;
+    margin-bottom: 20px;
+  }
+  a {
+    display: block;
+    height: 52px;
+    border-radius: 6px;
+    background: #FF5413;
+    color: #fff;
+    font-size: 22px;
+    font-weight: 500;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition-duration: 200ms;
+    z-index: 500;
+    cursor: pointer;
+    &.active-state {
+      background: darken(#FF5413, 5%);
+    }
+    &.disabled {
+      opacity: 1 !important;
+      background: #999999;
+    }
   }
 }

@@ -22,6 +22,8 @@
     "button_upload": "上传",
     "button_next": "下一步",
     "button_submit": "提交",
+    "button_continue": "下一步",
+    "button_save": "保存",
     "add_photos_label": "添加照片",
     "reminder_label": "示例:",
     "thank_you_label": "谢谢",
@@ -40,7 +42,11 @@
     "residential_permit_title": "居住证",
     "residential_permit_intro": "如果您目前居住和工作的城市与身份证不一致，请上传居住证正反面照片",
     "residential_permit_reminder": "信息清晰可见",
-    "residential_permit_upload_text": "如果您目前居住和工作的城市与身份证不一致，请上传居住证正反面照片"
+    "residential_permit_upload_text": "如果您目前居住和工作的城市与身份证不一致，请上传居住证正反面照片",
+    "address_title": "托me工具包邮寄地址",
+    "address_text": "托me将为您提供服务所需的工具包和工作服，您必须亲自签收，请提供您的收件地址",
+    "address_city_placeholder": "输入省、市、区…",
+    "address_address_placeholder": "输入详细地址..."
   },
   "title": "我的进度",
   "summary": "",
