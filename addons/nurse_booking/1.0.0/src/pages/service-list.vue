@@ -4,15 +4,21 @@
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t(`nurse_booking.service_list.${category.toLowerCase()}_title`)}}</f7-nav-title>
     </f7-navbar>
-
-    <f7-swiper :params="{
-      centeredSlides: true,
-      slidesPerView: 'auto',
-      touchMoveStopPropagation: false,
-      on: {
-        tap: onSlideClick
-      },
-    }" class="service-cards no-swipe-panel" v-if="services">
+    <div class="nurse_booking__empty-placeholder" v-if="services && !services.length">
+      {{$t('nurse_booking.service_list.empty_label')}}
+    </div>
+    <f7-swiper
+      v-if="services && services.length"
+      class="service-cards no-swipe-panel"
+      :params="{
+        centeredSlides: true,
+        slidesPerView: 'auto',
+        touchMoveStopPropagation: false,
+        on: {
+          tap: onSlideClick
+        },
+      }"
+    >
       <f7-swiper-slide
         v-for="service in services"
         :key="`${serviceType(service)}-${service.id}`"
