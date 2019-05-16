@@ -69,15 +69,17 @@
             ></f7-list-input>
 
             <!-- Customer -->
-            <f7-list-item divider :title="$t('invoicing.order_details.customer')"></f7-list-item>
-            <f7-list-item
-              :title="orderUserName(order.user_id)"
-              :link="`/contact-details/?user_id=${order.user_id}&masterDetailRoot=true`"
-              view=".view-main"
-              :reload-all="true"
-            >
-              <tommy-circle-avatar :data="orderUser(order.user_id)" slot="media"></tommy-circle-avatar>
-            </f7-list-item>
+            <template v-if="orderUser">
+              <f7-list-item divider :title="$t('invoicing.order_details.customer')"></f7-list-item>
+              <f7-list-item
+                :title="orderUserName"
+                :link="`/contact-details/?user_id=${order.user_id}&masterDetailRoot=true`"
+                view=".view-main"
+                :reload-all="true"
+              >
+                <tommy-circle-avatar :data="orderUser" slot="media"></tommy-circle-avatar>
+              </f7-list-item>
+            </template>
 
             <!-- Items -->
             <f7-list-item divider :title="$t('invoicing.order_details.items')"></f7-list-item>
@@ -120,6 +122,7 @@
         promotions: null,
         isFeedback: false,
         orderDuration: 0,
+        orderUser: null,
       };
     },
     mounted() {
@@ -127,6 +130,15 @@
       Promise.all([
         API.loadOrder(self.id).then((order) => {
           self.order = order;
+          const orderUser = self.$root.teamMembers.filter(m => m.user_id === parseInt(order.user_id, 10))[0];
+          if (!orderUser) {
+            // assuming contact
+            self.$api.getContact(order.user_id).then((contact) => {
+              self.orderUser = contact;
+            });
+          } else {
+            self.orderUser = orderUser;
+          }
         }),
         API.loadProducts().then((products) => {
           self.products = products;
@@ -142,6 +154,17 @@
       });
     },
     computed: {
+      orderUserName() {
+        const self = this;
+        const user = self.orderUser;
+        if (!user) return '';
+        if (user.friend_team_name) {
+          return user.friend_team_name.trim();
+        }
+        if (user.name) return user.name.trim();
+        if (user.first_name) return `${user.first_name}${user.last_name ? ` ${user.last_name}` : ''}`.trim();
+        return '';
+      },
       showStartButton() {
         const self = this;
         if (self.order.status !== 'paid') return false;
@@ -212,18 +235,6 @@
         const self = this;
         const product = self[type === 'VendorProduct' ? 'products' : 'packages'].filter(el => el.id === parseInt(id, 10))[0];
         return product ? parseInt(product.data.duration, 10) : 0;
-      },
-      orderUserName(user_id) {
-        const self = this;
-        const user = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
-        if (!user) return '';
-        return `${user.first_name} ${user.last_name}`;
-      },
-      orderUser(user_id) {
-        const self = this;
-        const user = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
-        if (!user) return undefined;
-        return user;
       },
       formatOrderDate(date) {
         const self = this;
