@@ -1,0 +1,35 @@
+$orange: #FF4500;
+.ios .vitals-blood_pressure-fab {
+  > a {
+    background: linear-gradient(to right top, #F8B23E, #FF7B00);
+    &.active-state {
+      background-color: #FF7B00;
+    }
+  }
+}
+.vitals-blood_pressure-icon-settings {
+  background-image: url(../assets/blood_pressure/icon-settings.svg);
+}
+.vitals-blood_pressure-icon-chart {
+  background-image: url(../assets/blood_pressure/icon-chart.svg);
+}
+.vitals-blood_pressure-index-header {
+  background-image: url(../assets/blood_pressure/header-bg.svg);
+}
+.vitals-blood_pressure-index-header-icon {
+  background-image: url(../assets/blood_pressure/header-icon.svg);
+}
+.vitals-blood_pressure-index-no-data-img {
+  background-image: url(../assets/blood_pressure/empty.svg);
+}
+.vitals-blood_pressure-settings-page {
+  .vitals-blood_pressure-settings-header {
+    background-image: url(../assets/blood_pressure/header-bg.svg);
+  }
+  .vitals-blood_pressure-settings-icon {
+    background-image: url(../assets/blood_pressure/header-icon.svg);
+  }
+  .vitals-blood_pressure-settings-center-icon {
+    background-image: url(../assets/blood_pressure/settings-icon.svg);
+  }
+}

@@ -1,0 +1,299 @@
+$orange: #FF4500;
+.ios .vitals-medication_reminder-fab {
+  > a {
+    background: linear-gradient(to right top, #F8B23E, #FF7B00);
+    &.active-state {
+      background-color: #FF7B00;
+    }
+  }
+}
+
+.vitals-medicaton_reminder-header-date {
+  background: #fff;
+  width: 66px;
+  border-radius: 4px;
+  position: absolute;
+  left: 24px;
+  top: 68px;
+  .month, .day {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: 600;
+  }
+  .month {
+    font-size: 14px;
+  }
+  .day {
+    font-size: 36px;
+    height: 50px;
+    border-top: 1px solid #FF7B00;
+  }
+}
+.vitals-medication_reminder-dosage-input {
+  .item-inner {
+    justify-content: flex-end;
+  }
+  .input {
+    height: 25px;
+    border-radius: 3px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    padding: 0 3px;
+    flex-shrink: 10;
+    font-size: 18px !important;
+    color: #666 !important;
+    line-height: 23px;
+    width: 60px;
+    input, select {
+      height: 100% !important;
+      font-size: 18px !important;
+      color: #666 !important;
+      line-height: 18px !important;
+    }
+    + .input {
+      margin-left: 12px;
+    }
+  }
+}
+.medication-index-card {
+  padding: 12px;
+  background: #fff;
+  border-radius: 4px;
+  margin: 12px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  .medication-index-card-icon {
+    flex-shrink: 0;
+    width: 46px;
+    height: 46px;
+    margin-right: 12px;
+    background: url(../assets/medication_reminder/card-icon-pill.svg) no-repeat center;
+    background-size: contain;
+    &.taken {
+      background-image: url(../assets/medication_reminder/card-icon-complete.svg);
+    }
+    &.not-taken {
+      background-image: url(../assets/medication_reminder/card-icon-not-taken.svg);
+    }
+    &.need-to-take {
+      background-image: url(../assets/medication_reminder/card-icon-alarm.svg);
+    }
+  }
+  .medication-index-card-content {
+    flex-shrink: 10;
+    width: 100%;
+    min-width: 0;
+  }
+  .medication-index-card-time {
+    flex-shrink: 0;
+    font-size: 30px;
+    font-weight: 500;
+  }
+  .medication-index-card-name {
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1.2;
+  }
+  .medication-index-card-dosage {
+    font-size: 16px;
+    color: #666;
+  }
+}
+.medication-card {
+  margin: 8px 12px;
+  background: #fff;
+  border-radius: 4px;
+  display: block;
+  color: #333;
+  .ios & {
+    color: #333;
+  }
+  &.active-state {
+    background: #f7f7f7;
+  }
+}
+.medication-toolbar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 500;
+  height: 60px;
+  display: flex;
+  width: 100%;
+  background: #000;
+  a {
+    height: 60px;
+    width: 50%;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    &.active-state {
+      opacity: 0.9;
+    }
+    &:first-child {
+      background: #fff;
+      color: #FF4500;
+    }
+    &:last-child {
+      color: #fff;
+      background: #FF4500;
+    }
+  }
+  ~ .page-content {
+    padding-bottom: 60px;
+  }
+}
+.medication-card-date {
+  font-size: 14px;
+  color: #717171;
+  margin: 0 12px;
+  line-height: 30px;
+  border-bottom: 1px solid #EFEFEF;
+}
+.medication-card-content {
+  display: flex;
+  padding: 8px 12px;
+  align-items: center;
+  .medication-card-icon {
+    width: 32px;
+    height: 32px;
+    background: url(../assets/medication_reminder/card-icon-pill.svg) no-repeat center;
+    background-size: contain;
+    margin-right: 12px;
+  }
+  .medication-card-name {
+    font-size: 20px;
+    font-weight: 600;
+  }
+}
+.vitals-medication_reminder-dialog-time-picker {
+  height: 145px;
+  .picker-inline {
+    height: 145px;
+  }
+  .picker-item.picker-item-selected {
+    color: $orange;
+  }
+}
+.vitals-medication_reminder-icon-settings {
+  background-image: url(../assets/medication_reminder/icon-settings.svg);
+}
+.vitals-medication_reminder-icon-chart {
+  background-image: url(../assets/medication_reminder/icon-chart.svg);
+}
+.vitals-medication_reminder-index-header {
+  background-image: url(../assets/medication_reminder/header-bg.svg);
+}
+
+.vitals-medication_reminder-index-no-data-img {
+  background-image: url(../assets/medication_reminder/empty.svg);
+}
+.vitals-medication_reminder-settings-page {
+  .vitals-medication_reminder-settings-header {
+    background-image: url(../assets/medication_reminder/header-bg.svg);
+  }
+  .vitals-medication_reminder-settings-center-icon {
+    background-image: url(../assets/medication_reminder/settings-icon.svg);
+  }
+}
+.medication-history-header {
+  height: 40vw;
+  min-height: 150px;
+  max-height: 200px;
+  background: #F5E3D1;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  .medication-history-header-icon {
+    height: 80px;
+    background: url(../assets/medication_reminder/history-header-taken.svg) no-repeat center;
+    background-size: contain;
+    width: 120px;
+    margin-left: auto;
+    margin-right: auto;
+    margin-bottom: 10px;
+    &.not-taken {
+      background-image: url(../assets/medication_reminder/history-header-not-taken.svg);
+    }
+  }
+  .medication-history-header-text {
+    font-size: 20px;
+    font-weight: 500;
+    color: #666666;
+    line-height: 1.2;
+    text-align: center;
+  }
+}
+.medication-history-card {
+  background: #fff;
+  border-radius: 3px;
+  box-shadow: 0 0 4px 0 rgba(0,0,0,0.16);
+  margin: 12px;
+  .medication-history-card-date {
+    font-size: 18px;
+    color: #3D4647;
+    font-weight: 500;
+    margin-left: 12px;
+    margin-right: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 40px;
+    span + span {
+      margin-left: auto;
+      margin-right: 12px;
+      color: #FF4500;
+    }
+  }
+  .medication-history-card-content {
+    margin-left: 12px;
+    margin-right: 12px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 500;
+    border-top: 1px solid #EFEFEF;
+    .gauge {
+      margin-right: 12px;
+      display: block;
+      svg {
+        display: block;
+      }
+    }
+    .medication-history-card-icon {
+      width: 46px;
+      height: 46px;
+      margin-right: 12px;
+      flex-shrink: 0;
+      background: url(../assets/medication_reminder/card-icon-pill.svg) no-repeat center;
+      background-size: contain;
+      &.taken {
+        background-image: url(../assets/medication_reminder/card-icon-complete.svg);
+      }
+      &.not-taken {
+        background-image: url(../assets/medication_reminder/card-icon-not-taken.svg);
+      }
+    }
+    .medication-history-card-title {
+      font-size: 20px;
+      line-height: 1.2;
+      color: #333;
+      flex-shrink: 10;
+      min-width: 0;
+      margin-right: 12px;
+      width: 100%;
+    }
+    .medication-history-card-value {
+      font-size: 30px;
+      color: #333;
+    }
+  }
+
+}

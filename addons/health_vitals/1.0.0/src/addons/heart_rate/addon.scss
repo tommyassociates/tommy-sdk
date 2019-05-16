@@ -1,0 +1,64 @@
+$orange: #FF4500;
+.ios .vitals-heart_rate-fab {
+  > a {
+    background: linear-gradient(to right top, #FAA48E, #F97B6E);
+    &.active-state {
+      background-color: #F97B6E;
+    }
+  }
+}
+.vitals-heart_rate-icon-settings {
+  background-image: url(../assets/heart_rate/icon-settings.svg);
+}
+.vitals-heart_rate-icon-chart {
+  background-image: url(../assets/heart_rate/icon-chart.svg);
+}
+.vitals-heart_rate-index-header {
+  background-image: url(../assets/heart_rate/header-bg.svg);
+}
+.vitals-heart_rate-index-header-icon {
+  background-image: url(../assets/heart_rate/header-icon.svg);
+}
+.vitals-heart_rate-index-no-data-img {
+  background-image: url(../assets/heart_rate/empty.svg);
+}
+.vitals-heart_rate-settings-page {
+  .vitals-heart_rate-settings-header {
+    background-image: url(../assets/heart_rate/header-bg.svg);
+  }
+  .vitals-heart_rate-settings-icon {
+    background-image: url(../assets/heart_rate/header-icon.svg);
+  }
+  .vitals-heart_rate-settings-center-icon {
+    background-image: url(../assets/heart_rate/settings-icon.svg);
+  }
+}
+.vitals-heart_rate-chart-clicked {
+  height: auto !important;
+  min-height: 30px;
+}
+.vitals-heart_rate-chart-clicked-state-icon-rest,
+.vitals-heart_rate-chart-clicked-state-icon-walk,
+.vitals-heart_rate-chart-clicked-state-icon-run {
+  display: block;
+  width: 100%;
+  min-width: 56px;
+  height: 56px;
+  background-position: center right;
+  background-size: contain;
+  background-repeat: no-repeat;
+  margin-top: -28px;
+}
+.vitals-heart_rate-chart-clicked-state-icon-rest {
+  background-image: url(../assets/heart_rate/icon-rest.svg);
+}
+.vitals-heart_rate-chart-clicked-state-icon-walk {
+  background-image: url(../assets/heart_rate/icon-walk.svg);
+}
+.vitals-heart_rate-chart-clicked-state-icon-run {
+  background-image: url(../assets/heart_rate/icon-run.svg);
+}
+.vitals-heart_rate-chart-clicked-state-text {
+  font-size: 18px;
+  text-align: right;
+}

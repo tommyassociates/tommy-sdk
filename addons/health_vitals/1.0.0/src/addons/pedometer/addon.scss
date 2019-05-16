@@ -1,0 +1,35 @@
+$orange: #FF4500;
+.ios .vitals-pedometer-fab {
+  > a {
+    background: linear-gradient(to bottom, #62BE76, #7CE397);
+    &.active-state {
+      background-color: #62BE76;
+    }
+  }
+}
+.vitals-pedometer-icon-settings {
+  background-image: url(../assets/pedometer/icon-settings.svg);
+}
+.vitals-pedometer-icon-chart {
+  background-image: url(../assets/pedometer/icon-chart.svg);
+}
+.vitals-pedometer-index-header {
+  background-image: url(../assets/pedometer/header-bg.svg);
+}
+.vitals-pedometer-index-header-icon {
+  background-image: url(../assets/pedometer/header-icon.svg);
+}
+.vitals-pedometer-index-no-data-img {
+  background-image: url(../assets/pedometer/empty.svg);
+}
+.vitals-pedometer-settings-page {
+  .vitals-pedometer-settings-header {
+    background-image: url(../assets/pedometer/header-bg.svg);
+  }
+  .vitals-pedometer-settings-icon {
+    background-image: url(../assets/pedometer/header-icon.svg);
+  }
+  .vitals-pedometer-settings-center-icon {
+    background-image: url(../assets/pedometer/settings-icon.svg);
+  }
+}

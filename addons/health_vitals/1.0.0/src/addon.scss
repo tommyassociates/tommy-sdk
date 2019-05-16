@@ -1,6 +1,14 @@
 $red: #DC3232;
 
-.health-vitals-card {
+.health-vitals-icon-settings {
+  background-position: center;
+  background-size: contain;
+  width: 21px;
+  height: 19px;
+  background-image: url(../assets/icon-settings.svg);
+}
+.health-vitals-card, a.health-vitals-card {
+  display: block;
   background: #fff;
   box-shadow: 0 0 4px 0 rgba(0,0,0,0.16);
   border-radius: 4px;
@@ -31,6 +39,17 @@ $red: #DC3232;
   padding-right: 12px;
   margin-top: 12px;
   background: #fff;
+  &.health-vitals-subcard-empty {
+    height: 100px;
+    padding: 12px;
+    font-size: 18px;
+    color: #717171;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: none;
+  }
   .health-vitals-subcard-title {
     font-size: 20px;
     color: #717171;
@@ -84,7 +103,7 @@ $red: #DC3232;
     flex-direction: column;
     height: 100%;
   }
-  .health-vitals-card {
+  .health-vitals-card, a.health-vitals-card  {
     margin-left: 0;
     margin-right: 0;
     margin-bottom: 0;
@@ -124,3 +143,25 @@ $red: #DC3232;
     margin-right: 5px;
   }
 }
+.health-vitals-panel {
+  width: 300px;
+}
+.health-vitals-panel-list {
+  font-size: 18px !important;
+  .item-media img {
+    width: 44px;
+    height: auto;
+  }
+}
+
+@import './addons-common/addon.scss';
+@import './addons/blood_glucose/addon.scss';
+@import './addons/blood_pressure/addon.scss';
+@import './addons/heart_rate/addon.scss';
+@import './addons/height/addon.scss';
+@import './addons/immunisations/addon.scss';
+@import './addons/medication_reminder/addon.scss';
+@import './addons/pedometer/addon.scss';
+@import './addons/temperature/addon.scss';
+@import './addons/water_tracker/addon.scss';
+@import './addons/weight/addon.scss';
