@@ -304,3 +304,20 @@ label.myprogress-upload-camera,
     }
   }
 }
+.myprogress-item-uploads {
+  margin: 5px 0 10px;
+  display: flex;
+  .myprogress-item-upload {
+    width: 80px;
+    height: 80px;
+    cursor: pointer;
+    border-radius: 4px;
+    background-color: #f1f1f1;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    + .myprogress-item-upload {
+      margin-left: 10px;
+    }
+  }
+}

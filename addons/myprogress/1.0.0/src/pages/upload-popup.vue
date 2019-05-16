@@ -124,8 +124,21 @@
       },
       uploadFiles() {
         const self = this;
-        return self.$api.uploadFiles(self.files).then(() => {
-          return Promise.resolve(true);
+        self.uploading = true;
+        return new Promise((resolve, reject) => {
+          return Promise.all(
+            self.files.map(f => self.$api.uploadFiles([f]))
+          ).then((files) => {
+            const result = [];
+            files.forEach((filesArray) => {
+              result.push(...filesArray);
+            });
+            self.$emit('uploaded', result);
+            resolve(files);
+          }).catch((err) => {
+            reject(err);
+            console.error(err);
+          });
         });
       },
       onFilesChange(e) {
