@@ -53,6 +53,9 @@ $red: #FF4500;
   width: 100%;
   min-width: 0;
 }
+.myprogress-item-label {
+  cursor: pointer;
+}
 .myprogress-item-data {
   font-size: 22px;
 }
@@ -185,6 +188,11 @@ $red: #FF4500;
     padding-bottom: 70px;
   }
 }
+.myprogress-upload .swiper-container {
+  height: 320px;
+  width: 100%;
+  margin-top: -10px;
+}
 label.myprogress-upload-camera,
 .myprogress-thank-you {
   cursor: pointer;
@@ -195,11 +203,10 @@ label.myprogress-upload-camera,
   color: #fff;
   height: 300px;
   width: 300px;
-  margin-left: auto;
-  margin-right: auto;
+  margin: 0px auto;
   border-radius: 4px;
   background: #333;
-  box-shadow: 0 10px 20px 0 rgba(0,0,0,0.16);
+  box-shadow: 0 10px 10px 0 rgba(0,0,0,0.16);
   position: relative;
   overflow: hidden;
   i {
@@ -316,8 +323,58 @@ label.myprogress-upload-camera,
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
+    position: relative;
+    box-shadow: 0px 0px 0px 1px rgba(0,0,0,0.1) inset;
     + .myprogress-item-upload {
       margin-left: 10px;
+    }
+  }
+}
+.myprogress-item-delete {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  right: 2px;
+  top: 2px;
+  border-radius: 50%;
+  background: $red;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  &:after {
+    font-family: "Framework7 Icons";
+    content: 'close';
+    font-size: 16px;
+    height: 16px;
+    line-height: 16px;
+  }
+}
+.myprogress-address-radios-label {
+  font-size: 18px;
+}
+.myprogress-address-radios {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  .myprogress-address-radio {
+    border-radius: 4px;
+    width: calc(50% - 10px);
+    height: 40px;
+    box-sizing: border-box;
+    border: 1px solid #979797;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    font-size: 20px;
+    cursor: pointer;
+    margin-bottom: 10px;
+    &.checked {
+      background: $red;
+      color: #fff;
+      border-color: $red;
     }
   }
 }

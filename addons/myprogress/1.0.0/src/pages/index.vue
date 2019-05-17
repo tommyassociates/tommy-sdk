@@ -26,17 +26,19 @@
       <div class="myprogress-list-item">
         <div class="myprogress-item-number">2.</div>
         <div class="myprogress-item-content">
-          <div class="myprogress-item-label">{{$t('myprogress.points.national_id')}}</div>
+          <div class="myprogress-item-label" @click="nationalIdOpened = true">{{$t('myprogress.points.national_id')}}</div>
           <div class="myprogress-item-uploads" v-if="items.national_id.files">
             <div
               v-for="(file, index) in items.national_id.files"
               :key="index"
               :style="`background-image: url(${file})`"
               class="myprogress-item-upload"
-              @click="previewImage(file)"
-            ></div>
+              @click="previewImage(file, $event)"
+            >
+              <span class="myprogress-item-delete" @click="deleteImage('national_id', file)"></span>
+            </div>
           </div>
-          <a href="#" class="myprogress-button" @click="nationalIdOpened = true">{{$t('myprogress.index.upload')}}</a>
+          <a href="#" v-if="!items.national_id.checked" class="myprogress-button" @click="nationalIdOpened = true">{{$t('myprogress.index.upload')}}</a>
         </div>
         <div class="myprogress-item-checkbox">
           <label class="myprogress-checkbox" :class="{ disabled: isNurse }">
@@ -48,17 +50,19 @@
       <div class="myprogress-list-item">
         <div class="myprogress-item-number">3.</div>
         <div class="myprogress-item-content">
-          <div class="myprogress-item-label">{{$t('myprogress.points.profile_photo')}}</div>
+          <div class="myprogress-item-label" @click="profilePhotoOpened = true">{{$t('myprogress.points.profile_photo')}}</div>
           <div class="myprogress-item-uploads" v-if="items.profile_photo.files">
             <div
               v-for="(file, index) in items.profile_photo.files"
               :key="index"
               :style="`background-image: url(${file})`"
               class="myprogress-item-upload"
-              @click="previewImage(file)"
-            ></div>
+              @click="previewImage(file, $event)"
+            >
+              <span class="myprogress-item-delete" @click="deleteImage('profile_photo', file)"></span>
+            </div>
           </div>
-          <a href="#" class="myprogress-button" @click="profilePhotoOpened = true">{{$t('myprogress.index.upload')}}</a>
+          <a href="#" v-if="!items.profile_photo.checked" class="myprogress-button" @click="profilePhotoOpened = true">{{$t('myprogress.index.upload')}}</a>
         </div>
         <div class="myprogress-item-checkbox">
           <label class="myprogress-checkbox" :class="{ disabled: isNurse }">
@@ -70,17 +74,19 @@
       <div class="myprogress-list-item">
         <div class="myprogress-item-number">4.</div>
         <div class="myprogress-item-content">
-          <div class="myprogress-item-label">{{$t('myprogress.points.health_cert')}}</div>
+          <div class="myprogress-item-label" @click="healthCertOpened = true">{{$t('myprogress.points.health_cert')}}</div>
           <div class="myprogress-item-uploads" v-if="items.health_cert.files">
             <div
               v-for="(file, index) in items.health_cert.files"
               :key="index"
               :style="`background-image: url(${file})`"
               class="myprogress-item-upload"
-              @click="previewImage(file)"
-            ></div>
+              @click="previewImage(file, $event)"
+            >
+              <span class="myprogress-item-delete" @click="deleteImage('health_cert', file)"></span>
+            </div>
           </div>
-          <a href="#" class="myprogress-button" @click="healthCertOpened = true">{{$t('myprogress.index.upload')}}</a>
+          <a href="#" v-if="!items.health_cert.checked" class="myprogress-button" @click="healthCertOpened = true">{{$t('myprogress.index.upload')}}</a>
         </div>
         <div class="myprogress-item-checkbox">
           <label class="myprogress-checkbox" :class="{ disabled: isNurse }">
@@ -92,11 +98,12 @@
       <div class="myprogress-list-item">
         <div class="myprogress-item-number">5.</div>
         <div class="myprogress-item-content">
-          <div class="myprogress-item-label">{{$t('myprogress.points.address')}}</div>
+          <div class="myprogress-item-label" @click="addressOpened = true">{{$t('myprogress.points.address')}}</div>
           <div class="myprogress-item-data" v-if="items.address.city && items.address.address">
             <div>{{items.address.city}} {{items.address.address}}</div>
+            <div v-if="items.address.size">{{$t(`myprogress.upload.address_size_${items.address.size}`)}}</div>
           </div>
-          <a href="#" class="myprogress-button" @click="addressOpened = true">{{$t('myprogress.index.fill_address')}}</a>
+          <a href="#" v-if="!items.address.checked" class="myprogress-button" @click="addressOpened = true">{{$t('myprogress.index.fill_address')}}</a>
         </div>
         <div class="myprogress-item-checkbox">
           <label class="myprogress-checkbox" :class="{ disabled: isNurse }">
@@ -108,17 +115,19 @@
       <div class="myprogress-list-item">
         <div class="myprogress-item-number">6.</div>
         <div class="myprogress-item-content">
-          <div class="myprogress-item-label">{{$t('myprogress.points.residential_permit')}}</div>
+          <div class="myprogress-item-label" @click="residentialPermitOpened = true">{{$t('myprogress.points.residential_permit')}}</div>
           <div class="myprogress-item-uploads" v-if="items.residential_permit.files">
             <div
               v-for="(file, index) in items.residential_permit.files"
               :key="index"
               :style="`background-image: url(${file})`"
               class="myprogress-item-upload"
-              @click="previewImage(file)"
-            ></div>
+              @click="previewImage(file, $event)"
+            >
+              <span class="myprogress-item-delete" @click="deleteImage('residential_permit', file)"></span>
+            </div>
           </div>
-          <a href="#" class="myprogress-button" @click="residentialPermitOpened = true">{{$t('myprogress.index.upload')}}</a>
+          <a href="#" v-if="!items.residential_permit.checked" class="myprogress-button" @click="residentialPermitOpened = true">{{$t('myprogress.index.upload')}}</a>
         </div>
         <div class="myprogress-item-checkbox">
           <label class="myprogress-checkbox" :class="{ disabled: isNurse }">
@@ -231,6 +240,9 @@
     <AddressPopup
       v-if="addressOpened"
       slot="fixed"
+      :cityInitial="items.address.city"
+      :addressInitial="items.address.address"
+      :sizeInitial="items.address.size"
       @save="saveAddress"
       @closed="addressOpened = false"
     ></AddressPopup>
@@ -291,8 +303,19 @@
       this.getData();
     },
     methods: {
-      previewImage(url) {
+      deleteImage(key, file) {
         const self = this;
+        const filesLength = self.items[key].files.length;
+        self.items[key].files.splice(self.items[key].files.indexOf(file), 1);
+        const newFilesLength = self.items[key].files.length;
+        if (newFilesLength === 0 || (newFilesLength === 1 && filesLength === 2)) self.items[key].checked = false;
+        self.saveData();
+      },
+      previewImage(url, event) {
+        const self = this;
+        if (self.$$(event.target).closest('.myprogress-item-delete').length) {
+          return;
+        }
         let pb = self.$f7.photoBrowser.create({
           photos: [url],
           toolbar: false,
@@ -335,11 +358,12 @@
         });
         self.saveData();
       },
-      saveAddress({ city, address }) {
+      saveAddress({ city, address, size }) {
         const self = this;
         self.items.address.checked = true;
         self.items.address.city = city;
         self.items.address.address = address;
+        self.items.address.size = size;
         self.saveData();
       },
       saveData() {

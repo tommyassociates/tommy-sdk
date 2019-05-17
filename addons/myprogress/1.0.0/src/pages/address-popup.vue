@@ -36,7 +36,31 @@
               :value="address"
               :placeholder="$t('myprogress.upload.address_address_placeholder')"
             ></textarea>
-            <a :class="{disabled: !city || !address}" @click="save">{{$t('myprogress.upload.button_save')}}</a>
+
+            <p class="myprogress-address-radios-label">{{$t('myprogress.upload.address_choose_size')}}</p>
+            <div class="myprogress-address-radios">
+              <div
+                class="myprogress-address-radio"
+                :class="{checked: size === 'm'}"
+                @click="size = 'm'"
+              >{{$t('myprogress.upload.address_size_m')}}</div>
+              <div
+                class="myprogress-address-radio"
+                :class="{checked: size === 'l'}"
+                @click="size = 'l'"
+              >{{$t('myprogress.upload.address_size_l')}}</div>
+              <div
+                class="myprogress-address-radio"
+                :class="{checked: size === 'xl'}"
+                @click="size = 'xl'"
+              >{{$t('myprogress.upload.address_size_xl')}}</div>
+              <div
+                class="myprogress-address-radio"
+                :class="{checked: size === 'xxl'}"
+                @click="size = 'xxl'"
+              >{{$t('myprogress.upload.address_size_xxl')}}</div>
+            </div>
+            <a :class="{disabled: !city || !address || !size}" @click="save">{{$t('myprogress.upload.button_save')}}</a>
           </div>
         </template>
 
@@ -56,13 +80,17 @@
         type: Boolean,
         default: false,
       },
+      cityInitial: String,
+      addressInitial: String,
+      sizeInitial: String,
     },
     data() {
       return {
         opened: false,
         step: 'step-1',
-        city: '',
-        address: '',
+        city: this.cityInitial || '',
+        address: this.addressInitial || '',
+        size: this.sizeInitial || '',
       };
     },
     mounted() {
@@ -73,8 +101,8 @@
     methods: {
       save() {
         const self = this;
-        const { city, address } = self;
-        self.$emit('save', { city, address });
+        const { city, address, size } = self;
+        self.$emit('save', { city, address, size });
         self.$f7.popup.close();
       },
       setStep(step) {
