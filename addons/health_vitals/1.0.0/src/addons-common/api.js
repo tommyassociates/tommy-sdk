@@ -15,7 +15,7 @@ const API = {
       kind: `Vitals${vitalsElement}Item`,
       with_filters: true,
       with_permission_to: true,
-      user_id: Actor.id || user.id,
+      user_id: (Actor.user ? Actor.user.user_id : Actor.id) || user.id,
       actor_id: Actor.id,
       page: page || 1,
       limit: limit || 50,

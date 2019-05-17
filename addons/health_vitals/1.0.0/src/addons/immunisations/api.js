@@ -9,7 +9,7 @@ const API = {
       kind: 'VitalsImmunisationsVaccine',
       with_filters: true,
       with_permission_to: true,
-      user_id: Actor.id || user.id,
+      user_id: (Actor.user ? Actor.user.user_id : Actor.id) || user.id,
       actor_id: Actor.id,
     }, {
       cache: false,
@@ -21,7 +21,7 @@ const API = {
       kind: 'VitalsImmunisationsVaccine',
       with_filters: true,
       with_permission_to: true,
-      user_id: Actor.id || user.id,
+      user_id: (Actor.user ? Actor.user.user_id : Actor.id) || user.id,
       actor_id: Actor.id,
     }, {
       cache: false,

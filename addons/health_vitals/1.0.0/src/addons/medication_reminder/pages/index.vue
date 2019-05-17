@@ -65,15 +65,6 @@
     },
     mounted() {
       const self = this;
-      if (self.$f7route.query.actor_id) {
-        Actor.id = parseInt(self.actorId, 10);
-        self.$api.getContact(self.actorId).then((response) => {
-          Actor.user = response;
-        });
-      } else {
-        Actor.id = undefined;
-        Actor.user = undefined;
-      }
       self.getData();
       self.$events.$on(`${self.vitalsElement}:updateRecords`, self.getData);
     },

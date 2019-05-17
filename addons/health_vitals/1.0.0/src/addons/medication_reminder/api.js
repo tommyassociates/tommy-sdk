@@ -40,7 +40,7 @@ const API = {
       kind: 'VitalsMedicationReminderTaken',
       with_filters: true,
       with_permission_to: true,
-      user_id: Actor.id || user.id,
+      user_id: (Actor.user ? Actor.user.user_id : Actor.id) || user.id,
       actor_id: Actor.id,
       date_range,
     }, {
@@ -53,7 +53,7 @@ const API = {
       kind: 'VitalsMedicationReminderMedication',
       with_filters: true,
       with_permission_to: true,
-      user_id: Actor.id || user.id,
+      user_id: (Actor.user ? Actor.user.user_id : Actor.id) || user.id,
       actor_id: Actor.id,
     }, {
       cache: false,
@@ -65,7 +65,7 @@ const API = {
       kind: 'VitalsMedicationReminderMedication',
       with_filters: true,
       with_permission_to: true,
-      user_id: Actor.id || user.id,
+      user_id: (Actor.user ? Actor.user.user_id : Actor.id) || user.id,
       actor_id: Actor.id,
     }, {
       cache: false,
