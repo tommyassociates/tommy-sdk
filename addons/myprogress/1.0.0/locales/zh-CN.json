@@ -46,7 +46,12 @@
     "address_title": "托me工具包邮寄地址",
     "address_text": "托me将为您提供服务所需的工具包和工作服，您必须亲自签收，请提供您的收件地址",
     "address_city_placeholder": "输入省、市、区…",
-    "address_address_placeholder": "输入详细地址..."
+    "address_address_placeholder": "输入详细地址...",
+    "address_choose_size": "请选择您的工作服尺寸",
+    "address_size_m": "M 160",
+    "address_size_l": "L 165",
+    "address_size_xl": "XL 170",
+    "address_size_xxl": "XXL 175"
   },
   "title": "我的进度",
   "summary": "",

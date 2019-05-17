@@ -46,7 +46,12 @@
     "address_title": "Postal Address",
     "address_text": "托me will provide you with a 托me Bag and uniform. You must sign for this delivery. Please provide your best address.",
     "address_city_placeholder": "Enter city and district…",
-    "address_address_placeholder": "Enter the street, building, and apartment details…"
+    "address_address_placeholder": "Enter the street, building, and apartment details…",
+    "address_choose_size": "Please choose your work size",
+    "address_size_m": "M 160",
+    "address_size_l": "L 165",
+    "address_size_xl": "XL 170",
+    "address_size_xxl": "XXL 175"
   },
   "title": "My Progress",
   "summary": "",

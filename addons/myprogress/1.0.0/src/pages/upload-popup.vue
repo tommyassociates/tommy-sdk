@@ -20,7 +20,7 @@
         <div class="myprogress-upload-button"
           v-if="step === 'step-2'"
           slot="fixed"
-          :class="{disabled: !files.length || uploading}"
+          :class="{disabled: uploading || files.length < (multipleUpload ? 2 : 1)}"
           @click="setStep('step-3')"
         >{{$t('myprogress.upload.button_submit')}}</div>
 
@@ -40,7 +40,44 @@
 
         <template v-if="step === 'step-2'">
           <div class="myprogress-upload-text">{{uploadText}}</div>
+          <f7-swiper ref="swiper" v-if="multipleUpload" :params="{speed: 500}">
+            <f7-swiper-slide>
+              <label
+                class="myprogress-upload-camera"
+                :class="{
+                  'has-uploads': !!files[0],
+                }"
+              >
+                <template v-if="!files[0]">
+                  <i></i>
+                  <span>{{$t('myprogress.upload.add_photos_label')}}</span>
+                </template>
+                <template v-if="previews[0]">
+                  <img :src="previews[0]">
+                </template>
+                <input type="file" accept="image/*" capture @change="onFilesChange($event, 0)">
+              </label>
+            </f7-swiper-slide>
+            <f7-swiper-slide>
+              <label
+                class="myprogress-upload-camera"
+                :class="{
+                  'has-uploads': !!files[1],
+                }"
+              >
+                <template v-if="!files[1]">
+                  <i></i>
+                  <span>{{$t('myprogress.upload.add_photos_label')}}</span>
+                </template>
+                <template v-if="previews[1]">
+                  <img :src="previews[1]">
+                </template>
+                <input type="file" accept="image/*" capture @change="onFilesChange($event, 1)">
+              </label>
+            </f7-swiper-slide>
+          </f7-swiper>
           <label
+            v-else
             class="myprogress-upload-camera"
             :class="{
               'has-uploads': files.length > 0,
@@ -51,9 +88,9 @@
               <span>{{$t('myprogress.upload.add_photos_label')}}</span>
             </template>
             <template v-if="previews.length > 0">
-              <img v-for="(src, index) in previews" :src="src" :key="index">
+              <img :src="previews[0]" :key="index">
             </template>
-            <input type="file" :multiple="multipleUpload" @change="onFilesChange">
+            <input type="file" accept="image/*" capture @change="onFilesChange($event, 0)">
           </label>
         </template>
         <template v-if="step === 'step-3'">
@@ -94,11 +131,15 @@
       files() {
         const self = this;
         const files = self.files;
-        if (!files) return;
         self.previews = [];
+        console.log('wtf?!');
         files.forEach((file, index) => {
+          console.log(1);
+          if (!file) return;
+          console.log(2);
           const reader = new FileReader();
           reader.onload = (e) => {
+            console.log(3);
             self.$set(self.previews, index, e.target.result);
           };
           reader.readAsDataURL(file);
@@ -141,11 +182,17 @@
           });
         });
       },
-      onFilesChange(e) {
-        this.files = [];
-        for (let i = 0; i < Math.min(2, e.target.files.length); i += 1) {
-          this.files.push(e.target.files[i]);
-        }
+      onFilesChange(e, index) {
+        const self = this;
+        self.$set(self.files, index, e.target.files[0]);
+        self.$nextTick(() => {
+          if (index === 0 && !self.files[1] && self.multipleUpload) {
+            self.$refs.swiper.swiper.slideNext();
+          }
+          if (index === 1 && !self.files[0] && self.multipleUpload) {
+            self.$refs.swiper.swiper.slidePrev();
+          }
+        });
       },
       onClosed() {
         this.$emit('closed');
