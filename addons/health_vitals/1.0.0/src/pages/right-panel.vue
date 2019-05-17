@@ -36,27 +36,27 @@
           >
             <img :src="`${$addonAssetsUrl}height/icon.png`" slot="media">
           </f7-list-item>
-          <f7-list-item
+          <!-- <f7-list-item
             :title="$t('health_vitals.immunisations.title')"
             link="/health_vitals/immunisations/"
             panel-close
           >
             <img :src="`${$addonAssetsUrl}immunisations/icon.png`" slot="media">
-          </f7-list-item>
-          <f7-list-item
+          </f7-list-item> -->
+          <!-- <f7-list-item
             :title="$t('health_vitals.medication_reminder.title')"
             link="/health_vitals/medication_reminder/"
             panel-close
           >
             <img :src="`${$addonAssetsUrl}medication_reminder/icon.png`" slot="media">
-          </f7-list-item>
-          <f7-list-item
+          </f7-list-item> -->
+          <!-- <f7-list-item
             :title="$t('health_vitals.pedometer.title')"
             link="/health_vitals/pedometer/"
             panel-close
           >
             <img :src="`${$addonAssetsUrl}pedometer/icon.png`" slot="media">
-          </f7-list-item>
+          </f7-list-item> -->
           <f7-list-item
             :title="$t('health_vitals.temperature.title')"
             link="/health_vitals/temperature/"

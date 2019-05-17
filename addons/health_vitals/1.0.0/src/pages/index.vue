@@ -305,13 +305,16 @@
         self.$api.getContact(self.actorId).then((response) => {
           self.user = response;
           Actor.user = response;
+          self.getData();
+        }).catch(() => {
+          self.getData();
         });
       } else {
         self.user = self.$root.user;
         delete Actor.id;
         delete Actor.user;
+        self.getData();
       }
-      this.getData();
     },
     computed: {
       userAge() {
