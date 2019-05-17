@@ -171,7 +171,7 @@
         const orderDate = new Date(parseInt(self.order.data.date, 10)).getTime();
         const now = new Date().getTime();
         const diffMinutes = (orderDate - now) / 1000 / 60;
-        if (diffMinutes < 15) return true;
+        if (Math.abs(diffMinutes) <= 60) return true;
         return false;
       },
       showFinishButton() {
