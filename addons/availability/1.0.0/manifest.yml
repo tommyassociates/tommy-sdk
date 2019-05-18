@@ -79,14 +79,28 @@
     availability_lock_on_booking_created:
       title: "Lock availability on booking created"
       summary: "Update and lock availability when a new booking is created."
-      trigger: "bookings.booking_created"
-      activity: "availability.lock_availability"
+      trigger:
+        package: bookings
+        name: booking_created
+        scope:
+          user_parameter: user_id
+      activity:
+        package: availability
+        name: lock_availability
+      options:
+        target_user_parameter: user_id
       default: true
     availability_unlock_on_booking_deleted:
       title: "Lock availability on booking canceled"
       summary: "Update and lock availability when an existing booking is canceled."
-      trigger: "bookings.booking_deleted"
-      activity: "availability.unlock_availability"
+      trigger:
+        package: bookings
+        name: booking_deleted
+      activity:
+        package: availability
+        name: unlock_availability
+      options:
+        target_user_parameter: user_id
       default: true
   assets:
     -
@@ -102,3 +116,4 @@
       path: "/availability/"
       actor_permission: addon_actor_access
       type: "page"
+
