@@ -14,6 +14,7 @@
     - Team Manager
     - Team Admin
     - Nurse
+    - Employee
   permissions:
     addon_access:
       title: "Allow Team Member Access"
@@ -22,6 +23,7 @@
         - Team Manager
         - Team Admin
         - Nurse
+        - Employee
       operations:
         - read
     addon_actor_access:
