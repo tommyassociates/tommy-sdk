@@ -11,15 +11,13 @@
     - en-US
     - zh-CN
   roles:
-    - Team Member
-    - Team Manager
+    - Jobseeker
   permissions:
     addon_access:
       title: "Allow Team Member Access"
       hint: "Select Team Members who can access this addon"
       default_roles:
-        - Team Manager
-        - Nurse
+        - Employee
       operations:
         - read
     addon_actor_access:
