@@ -17,7 +17,6 @@
       title: "Allow Team Member Access"
       hint: "Select Team Members who can access this addon"
       default_roles:
-        - Employee
       operations:
         - read
     addon_actor_access:
