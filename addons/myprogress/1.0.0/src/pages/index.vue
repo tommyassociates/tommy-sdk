@@ -296,6 +296,7 @@
         const self = this;
         if (self.$root.user && self.$root.user.onboarding === 'job') return true;
         if (self.$root.account && (self.$root.account.kind === 'Nurse' || self.$root.account.roles.indexOf('Nurse') >= 0)) return true;
+        if (self.$root.account && (self.$root.account.kind === 'Jobseeker' || self.$root.account.roles.indexOf('Jobseeker') >= 0)) return true;
         return false;
       },
     },
