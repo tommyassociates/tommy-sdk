@@ -178,7 +178,7 @@ const transaction = {
       title: i18n.t('wallet.transaction_popup.success_title', 'Success'),
       status: 'success',
       message: i18n.t('wallet.transaction_popup.success_message', {
-        defaultValue: 'You sent {{currency}}{{amount}}.<br>To {{to}}.<br>From {{from}}.',
+        defaultValue: `You sent ${currency}${amount}.<br>To ${payee_name}.<br>From ${card_name}.`,
         currency: currencyMap(currency),
         amount,
         to: payee_name,
