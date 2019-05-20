@@ -132,7 +132,7 @@
       },
       toggle(item, key, shift) {
         const self = this;
-        if (item.data[`lock_${shift}`] === 'true' || item.data[`lock_${shift}`] === true) return;
+        if (item.data[`${shift}_locked`] === 'true' || item.data[`${shift}_locked`] === true) return;
         const itemAvail = item.data[shift];
         if (!itemAvail || itemAvail === '0') item.data[shift] = 1;
         if (itemAvail === 1 || itemAvail === '1') item.data[shift] = -1;
@@ -154,7 +154,7 @@
         return self.$moment(localTime).format(format);
       },
       availabilityClass(shift, data) {
-        if (data && data[`lock_${shift}`] === 'true' || data[`lock_${shift}`] === true) return 'locked';
+        if (data && data[`${shift}_locked`] === 'true' || data[`${shift}_locked`] === true) return 'locked';
         if (data && (data[shift] === -1 || data[shift] === '-1')) return 'unavailable';
         if (data && (data[shift] === 1 || data[shift] === '1')) return 'available';
         return '';
@@ -207,9 +207,9 @@
             pm: item.data.pm || 0,
             nd: item.data.nd || 0,
           };
-          if (item.data.lock_am === true || item.data.lock_am === 'true') itemData.lock_am = true;
-          if (item.data.lock_pm === true || item.data.lock_pm === 'true') itemData.lock_pm = true;
-          if (item.data.lock_nd === true || item.data.lock_nd === 'true') itemData.lock_nd = true;
+          if (item.data.am_locked === true || item.data.am_locked === 'true') itemData.am_locked = true;
+          if (item.data.pm_locked === true || item.data.pm_locked === 'true') itemData.pm_locked = true;
+          if (item.data.nd_locked === true || item.data.nd_locked === 'true') itemData.nd_locked = true;
           const itemToSend = {
             ...item,
             addon: 'availability',
