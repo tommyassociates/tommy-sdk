@@ -59,7 +59,7 @@ const API = {
       endpoint: `teams/${teamId}/members`,
       method: 'GET',
       data: {
-        tags: ['Nurse'],
+        tags: ['Employee'],
         is_available_between: [new Date(startTime).toJSON(), new Date(endTime).toJSON()],
       },
       cache: false,

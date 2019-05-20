@@ -88,7 +88,8 @@
   export default {
     data() {
       const self = this;
-      API.isNurse = self.$root.account && self.$root.account.roles.indexOf('Nurse') >= 0;
+      const roles = self.$root.account.roles;
+      API.isNurse = self.$root.account && (roles.indexOf('Nurse') >= 0 || roles.indexOf('Employee') >= 0);
       return {
         lists: null,
         actorId: self.$f7route.query.actor_id,
