@@ -31,7 +31,7 @@
             <div
               v-for="(file, index) in items.national_id.files"
               :key="index"
-              :style="`background-image: url(${file})`"
+              :style="`background-image: url(${fileUrl(file)})`"
               class="myprogress-item-upload"
               @click="previewImage(file, $event)"
             >
@@ -55,7 +55,7 @@
             <div
               v-for="(file, index) in items.profile_photo.files"
               :key="index"
-              :style="`background-image: url(${file})`"
+              :style="`background-image: url(${fileUrl(file)})`"
               class="myprogress-item-upload"
               @click="previewImage(file, $event)"
             >
@@ -79,7 +79,7 @@
             <div
               v-for="(file, index) in items.health_cert.files"
               :key="index"
-              :style="`background-image: url(${file})`"
+              :style="`background-image: url(${fileUrl(file)})`"
               class="myprogress-item-upload"
               @click="previewImage(file, $event)"
             >
@@ -120,7 +120,7 @@
             <div
               v-for="(file, index) in items.residential_permit.files"
               :key="index"
-              :style="`background-image: url(${file})`"
+              :style="`background-image: url(${fileUrl(file)})`"
               class="myprogress-item-upload"
               @click="previewImage(file, $event)"
             >
@@ -305,12 +305,24 @@
       this.getData();
     },
     methods: {
+      fileUrl(file) {
+        const self = this;
+        let url;
+        try {
+          url = self.fragment.attachments.filter(a => a.signed_id === file.signed_id)[0].url;
+        } catch (e) {
+          // error
+          url = `${self.$config.cdnUrl}/${file.signed_id}/${file.filename}`;
+        }
+        return url || '';
+      },
       deleteImage(key, file) {
         const self = this;
         const filesLength = self.items[key].files.length;
         self.items[key].files.splice(self.items[key].files.indexOf(file), 1);
         const newFilesLength = self.items[key].files.length;
         if (newFilesLength === 0 || (newFilesLength === 1 && filesLength === 2)) self.items[key].checked = false;
+        self.fragment.destroy_attachment = file.signed_id || file;
         self.saveData();
       },
       previewImage(url, event) {
@@ -367,7 +379,12 @@
         const self = this;
         self.items[key].checked = true;
         self.items[key].files = files.map((f) => {
-          return `${self.$config.cdnUrl}/${f.signed_id}/${f.filename}`;
+          if (self.fragment.attachments) self.fragment.attachments.push(f.signed_id);
+          else self.fragment.attachments = [f.signed.id];
+          return {
+            signed_id: f.signed_id,
+            filename: f.filename,
+          };
         });
         self.saveData();
       },
@@ -386,6 +403,7 @@
         API.saveData(self.actorId || self.$root.user.id, f).then((res) => {
           if (res && res.id) {
             self.fragment = res;
+            self.$set(self, 'fragment', res);
           }
         });
       },

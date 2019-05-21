@@ -10,10 +10,14 @@ const API = {
       with_permission_to: true,
       actor_id: userId,
       user_id: userId,
+      with_attachments: true,
     });
   },
   saveData(userId, f) {
+    f.attachments = f.attachments.filter(attachment => typeof attachment === 'string');
     if (f.id) {
+      f.with_attachments = true;
+
       return api.updateFragment(f.id, f, {
         dataType: 'json',
         contentType: 'application/json',
@@ -22,11 +26,13 @@ const API = {
     }
 
     return api.createFragment({
+      with_attachments: true,
       addon: 'myprogress',
       kind: 'Myprogress',
       with_filters: true,
       with_permission_to: true,
       data: f.data,
+      attachments: f.attachments,
       actor_id: userId,
       user_id: userId,
     }, {
