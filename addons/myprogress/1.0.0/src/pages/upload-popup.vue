@@ -132,14 +132,10 @@
         const self = this;
         const files = self.files;
         self.previews = [];
-        console.log('wtf?!');
         files.forEach((file, index) => {
-          console.log(1);
           if (!file) return;
-          console.log(2);
           const reader = new FileReader();
           reader.onload = (e) => {
-            console.log(3);
             self.$set(self.previews, index, e.target.result);
           };
           reader.readAsDataURL(file);
