@@ -152,6 +152,7 @@
         <div class="myprogress-item-number">8.</div>
         <div class="myprogress-item-content">
           <div class="myprogress-item-label">{{$t('myprogress.points.sign_contract')}}</div>
+          <a href="#" v-if="itemsProgressCount === 7" class="myprogress-button" @click="contractOpened = true">{{$t('myprogress.index.view_contract')}}</a>
         </div>
         <div class="myprogress-item-checkbox">
           <label class="myprogress-checkbox" :class="{ disabled: isNurse }">
@@ -246,17 +247,26 @@
       @save="saveAddress"
       @closed="addressOpened = false"
     ></AddressPopup>
+
+    <ContractPopup
+      v-if="contractOpened"
+      slot="fixed"
+      @submit="submitContract"
+      @closed="contractOpened = false"
+    ></ContractPopup>
   </f7-page>
 </template>
 <script>
   import API from '../api';
   import UploadPopup from './upload-popup.vue';
   import AddressPopup from './address-popup.vue';
+  import ContractPopup from './contract-popup.vue';
 
   export default {
     components: {
       UploadPopup,
       AddressPopup,
+      ContractPopup,
     },
     data() {
       return {
@@ -269,6 +279,7 @@
         residentialPermitOpened: false,
         nationalIdOpened: false,
         addressOpened: false,
+        contractOpened: false,
       };
     },
     computed: {
@@ -305,6 +316,11 @@
       this.getData();
     },
     methods: {
+      submitContract() {
+        const self = this;
+        self.items.sign_contract.checked = true;
+        self.saveData();
+      },
       fileUrl(file) {
         const self = this;
         let url;
@@ -363,7 +379,7 @@
         const self = this;
         self.items[item].checked = !self.items[item].checked;
         self.saveData();
-        if (self.itemsProgressCount === 10 && self.actorId) {
+        if (self.itemsProgressCount === 8 && self.actorId) {
           const member = self.$root.teamMembers.filter(t => t.user_id === parseInt(self.actorId, 10))[0];
           if (!member) return;
           if (member.roles && member.roles.indexOf('Jobseeker') >= 0) {
