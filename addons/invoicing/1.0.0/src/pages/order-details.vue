@@ -87,23 +87,33 @@
             ></f7-list-input>
 
             <!-- Customer -->
-            <f7-list-item divider :title="$t('invoicing.order_details.customer')"></f7-list-item>
-            <f7-list-item
-              :title="orderUserName(order.user_id)"
-              smart-select
-            >
-              <tommy-circle-avatar :data="orderUser(order.user_id)" slot="media"></tommy-circle-avatar>
-              <select name="customer" @change="onCustomerChange">
-                <option
-                  v-for="(teamMember) in $root.teamMembers"
-                  :key="teamMember.id"
-                  :value="teamMember.user_id"
-                  data-option-class="invoicing-smart-select-option"
-                  :data-option-image="teamMember.icon_url"
-                  :selected="order.user_id === teamMember.user_id"
-                >{{teamMember.first_name || ''}} {{teamMember.last_name || ''}}</option>
-              </select>
-            </f7-list-item>
+            <template>
+              <f7-list-item divider :title="$t('invoicing.order_details.customer')"></f7-list-item>
+              <f7-list-item
+                :title="orderUser ? orderUserName : ''"
+                smart-select
+              >
+                <tommy-circle-avatar :data="orderUser" slot="media"></tommy-circle-avatar>
+                <select name="customer" @change="onCustomerChange">
+                  <option
+                    v-for="(contact, index) in contacts"
+                    :key="`contact-${index}-${contact.friend_id}`"
+                    :value="contact.friend_id"
+                    data-option-class="invoicing-smart-select-option"
+                    :data-option-image="contact.icon_url"
+                    :selected="order.user_id === contact.friend_id"
+                  >{{contact.first_name || ''}} {{contact.last_name || ''}}</option>
+                  <option
+                    v-for="(teamMember,index) in $root.teamMembers"
+                    :key="`teamMember-${index}-${teamMember.id}`"
+                    :value="teamMember.user_id"
+                    data-option-class="invoicing-smart-select-option"
+                    :data-option-image="teamMember.icon_url"
+                    :selected="order.user_id === teamMember.user_id"
+                  >{{teamMember.first_name || ''}} {{teamMember.last_name || ''}}</option>
+                </select>
+              </f7-list-item>
+            </template>
 
 
             <!-- Items -->
@@ -305,6 +315,8 @@
         promotions: null,
         promotionsOpened: false,
         isFeedback: false,
+        orderUser: null,
+        contacts: API.contacts,
       };
     },
     mounted() {
@@ -312,6 +324,22 @@
       if (self.id) {
         API.loadOrder(self.id).then((order) => {
           self.order = order;
+          let orderUser = self.$root.teamMembers.filter(m => m.user_id === parseInt(order.user_id, 10))[0];
+          if (!orderUser) {
+            if (self.contacts) {
+              // assuming contact
+              orderUser = self.contacts.filter(c => c.friend_id === parseInt(order.user_id, 10))[0];
+              self.orderUser = orderUser;
+              return;
+            }
+            self.$api.getContacts.then((contacts) => {
+              self.contacts = contacts;
+              orderUser = self.contacts.filter(c => c.friend_id === parseInt(order.user_id, 10))[0];
+              self.orderUser = orderUser;
+            });
+            return;
+          }
+          self.orderUser = orderUser;
         });
       } else {
         self.order = {
@@ -350,6 +378,17 @@
       if (self.timePicker && self.timePicker.destroy) self.timePicker.destroy();
     },
     computed: {
+      orderUserName() {
+        const self = this;
+        const user = self.orderUser;
+        if (!user) return '';
+        if (user.friend_team_name) {
+          return user.friend_team_name.trim();
+        }
+        if (user.name) return user.name.trim();
+        if (user.first_name) return `${user.first_name}${user.last_name ? ` ${user.last_name}` : ''}`.trim();
+        return '';
+      },
       orderItemsTotal() {
         const self = this;
         let total = 0;
@@ -387,6 +426,13 @@
       },
       onCustomerChange(e) {
         const self = this;
+        const user_id = parseInt(e.target.value, 10);
+        let orderUser = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
+        if (!orderUser && self.contacts) {
+          // assuming contact
+          orderUser = self.contacts.filter(c => c.friend_id === parseInt(user_id, 10))[0];
+        }
+        self.orderUser = orderUser;
         self.order.user_id = parseInt(e.target.value, 10);
         self.showSave = true;
       },
@@ -505,18 +551,7 @@
         const product = self[type === 'VendorProduct' ? 'products' : 'packages'].filter(el => el.id === parseInt(id, 10))[0];
         return product ? parseInt(product.data.duration, 10) : 0;
       },
-      orderUserName(user_id) {
-        const self = this;
-        const user = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
-        if (!user) return '';
-        return `${user.first_name} ${user.last_name}`;
-      },
-      orderUser(user_id) {
-        const self = this;
-        const user = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
-        if (!user) return undefined;
-        return user;
-      },
+
       formatOrderDate(date) {
         const self = this;
         if (!date) return '';
