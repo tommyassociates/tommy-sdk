@@ -351,6 +351,17 @@
         const self = this;
         self.items[item].checked = !self.items[item].checked;
         self.saveData();
+        if (self.itemsProgressCount === 10 && self.actorId) {
+          const member = self.$root.teamMembers.filter(t => t.user_id === parseInt(self.actorId, 10))[0];
+          if (!member) return;
+          if (member.roles && member.roles.indexOf('Jobseeker') >= 0) {
+            member.roles.splice(member.roles.indexOf('Jobseeker'), 1);
+          }
+          if (member.roles.indexOf('Employee') < 0) {
+            member.roles.push('Employee');
+          }
+          self.$api.updateCurrentTeamMember(parseInt(self.actorId, 10), member);
+        }
       },
       updateUploaded(key, files) {
         const self = this;
