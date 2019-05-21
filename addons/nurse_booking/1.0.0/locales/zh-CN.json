@@ -69,7 +69,7 @@
     "home_button": "返回主页 "
   },
   "order_error": {
-    "title": "Error occured. Order is waiting for the payment",
+    "title": "出现错误，订单等待支付中",
     "details_button": "查看订单详情",
     "home_button": "返回主页"
   },
@@ -90,7 +90,7 @@
     "status_complete": "订单已完成！",
     "status_pending": "需要付款",
     "cancel_button": "取消",
-    "repeat_button": "Repeat",
+    "repeat_button": "重新支付",
     "pay_button": "立即付款",
     "cancel_confirm": "取消订单将无法享受上门服务，是否确认取消"
   },
