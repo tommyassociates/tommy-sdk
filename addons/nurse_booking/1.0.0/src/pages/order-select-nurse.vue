@@ -11,7 +11,7 @@
           <a class="nurse-content-wrap" @click="selectNurse(nurse)">
             <div class="nurse-media" :style="`background-image: url(${nurse.icon_url || ''})`"></div>
             <div class="nurse-content">
-              <div class="nurse-name">{{nurse.first_name}} {{nurse.last_name}}</div>
+              <div class="nurse-name">{{nurse.last_name}} {{nurse.first_name}}</div>
               <!-- <div class="nurse-level">Level 1</div> -->
             </div>
             <!-- <div class="nurse-extra">
