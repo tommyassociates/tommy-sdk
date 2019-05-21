@@ -22,7 +22,7 @@
     <f7-list no-hairlines>
       <f7-list-item
         v-if="nurse"
-        :title="`${nurse.first_name} ${nurse.last_name}`"
+        :title="`${nurse.last_name} ${nurse.first_name}`"
         :link="`/nurse_booking/order-select-nurse/?nurse_id=${nurse.id}&back=true`"
       >
         <img slot="media" :src="`${$addonAssetsUrl}icon-nurse.svg`">
