@@ -341,13 +341,13 @@
         self.fragment.destroy_attachment = file.signed_id || file;
         self.saveData();
       },
-      previewImage(url, event) {
+      previewImage(file, event) {
         const self = this;
         if (self.$$(event.target).closest('.myprogress-item-delete').length) {
           return;
         }
         let pb = self.$f7.photoBrowser.create({
-          photos: [url],
+          photos: [self.fileUrl(file)],
           toolbar: false,
           backLinkText: self.$t('label.back'),
           type: 'standalone',
