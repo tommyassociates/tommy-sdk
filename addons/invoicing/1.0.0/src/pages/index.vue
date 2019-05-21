@@ -217,6 +217,11 @@
     mounted() {
       const self = this;
       self.loadLists();
+      if (!API.contacts) {
+        self.$api.getContacts().then((c) => {
+          API.contacts = c;
+        });
+      }
       self.$events.$on('invoicing:reloadListsOrders', self.reloadListsOrders);
       self.$events.$on('invoicing:reloadLists', self.reloadLists);
     },

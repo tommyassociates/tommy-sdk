@@ -81,9 +81,19 @@
           <f7-searchbar search-container=".invoicing-promotion-customers-list"></f7-searchbar>
           <f7-list class="invoicing-promotion-customers-list">
             <f7-list-item
+              v-for="(contact, index) in contacts"
+              :key="`contact-${index}-${contact.friend_id}`"
+              :title="`${contact.first_name || ''} ${contact.last_name || ''}`"
+              @click="() => {item.user_id = contact.friend_id; customerPopupOpened = false; enableSave()}"
+              radio
+              :checked="item.user_id === contact.friend_id"
+            >
+              <tommy-circle-avatar :data="contact" slot="media"></tommy-circle-avatar>
+            </f7-list-item>
+            <f7-list-item
               v-for="user in $root.teamMembers"
-              :key="user.id"
-              :title="`${user.first_name} ${user.last_name}`"
+              :key="`user-${index}-${user.id}`"
+              :title="`${user.first_name || ''} ${user.last_name || ''}`"
               @click="() => {item.user_id = user.user_id; customerPopupOpened = false; enableSave()}"
               radio
               :checked="item.user_id === user.user_id"
@@ -143,6 +153,7 @@
         customerPopupOpened: false,
         itemsPopupOpened: false,
         products: null,
+        contacts: API.contacts,
       };
     },
     mounted() {
@@ -156,11 +167,12 @@
           user_id: null,
           vendor_product_id: null,
         };
-        return;
+      } else {
+        API.loadPromotion(self.id).then((item) => {
+          self.item = item;
+        });
       }
-      API.loadPromotion(self.id).then((item) => {
-        self.item = item;
-      });
+
       API.loadProducts().then((products) => {
         self.products = products;
       });
@@ -169,16 +181,24 @@
       customerAvatar() {
         const self = this;
         if (!self.item.user_id) return null;
-        const user = self.$root.teamMembers.filter(u => u.user_id === self.item.user_id)[0];
+        let user = self.$root.teamMembers.filter(m => m.user_id === self.item.user_id)[0];
+        if (!user && self.contacts) {
+          // assuming contact
+          user = self.contacts.filter(c => c.friend_id === self.item.user_id)[0];
+        }
         if (!user) return null;
         return user;
       },
       customerTitle() {
         const self = this;
         if (!self.item.user_id) return self.$t('invoicing.promotion.customer_placeholder');
-        const user = self.$root.teamMembers.filter(u => u.user_id === self.item.user_id)[0];
+        let user = self.$root.teamMembers.filter(m => m.user_id === self.item.user_id)[0];
+        if (!user && self.contacts) {
+          // assuming contact
+          user = self.contacts.filter(c => c.friend_id === self.item.user_id)[0];
+        }
         if (!user) return '';
-        return `${user.first_name} ${user.last_name}`;
+        return `${user.first_name || ''} ${user.last_name || ''}`;
       },
       itemAvatar() {
         const self = this;
