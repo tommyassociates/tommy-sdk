@@ -13,13 +13,13 @@ const API = {
       start_at: startAt,
       tags: [{
         context: 'members',
-        name: `${tagUser.first_name} ${tagUser.last_name}`,
+        name: tagUser.name || `${tagUser.first_name || ''} ${tagUser.last_name || ''}`,
         user_id: user.id,
       }],
       filters: [{
         context: 'members',
-        name: `${tagUser.first_name} ${tagUser.last_name}`,
-        user_id: tagUser.id,
+        name: tagUser.name || `${tagUser.first_name || ''} ${tagUser.last_name || ''}`,
+        user_id: Actor.id || user.id,
       }],
       data: JSON.stringify({ medication_id: id, taken, time, date: startAt }),
     };
@@ -40,7 +40,7 @@ const API = {
       kind: 'VitalsMedicationReminderTaken',
       with_filters: true,
       with_permission_to: true,
-      user_id: (Actor.user ? Actor.user.user_id : Actor.id) || user.id,
+      user_id: Actor.id || user.id,
       actor_id: Actor.id,
       date_range,
     }, {
@@ -53,7 +53,7 @@ const API = {
       kind: 'VitalsMedicationReminderMedication',
       with_filters: true,
       with_permission_to: true,
-      user_id: (Actor.user ? Actor.user.user_id : Actor.id) || user.id,
+      user_id: Actor.id || user.id,
       actor_id: Actor.id,
     }, {
       cache: false,
@@ -65,7 +65,7 @@ const API = {
       kind: 'VitalsMedicationReminderMedication',
       with_filters: true,
       with_permission_to: true,
-      user_id: (Actor.user ? Actor.user.user_id : Actor.id) || user.id,
+      user_id: Actor.id || user.id,
       actor_id: Actor.id,
     }, {
       cache: false,
@@ -81,13 +81,13 @@ const API = {
       end_at: new Date(data.endDate).toJSON(),
       tags: [{
         context: 'members',
-        name: `${tagUser.first_name} ${tagUser.last_name}`,
-        user_id: tagUser.id,
+        name: tagUser.name || `${tagUser.first_name || ''} ${tagUser.last_name || ''}`,
+        user_id: Actor.id || user.id,
       }],
       filters: [{
         context: 'members',
-        name: `${tagUser.first_name} ${tagUser.last_name}`,
-        user_id: tagUser.id,
+        name: tagUser.name || `${tagUser.first_name || ''} ${tagUser.last_name || ''}`,
+        user_id: Actor.id || user.id,
       }],
       data: JSON.stringify(data),
     };
@@ -107,13 +107,13 @@ const API = {
       start_at: startAt.toJSON(),
       tags: [{
         context: 'members',
-        name: `${tagUser.first_name} ${tagUser.last_name}`,
-        user_id: tagUser.id,
+        name: tagUser.name || `${tagUser.first_name || ''} ${tagUser.last_name || ''}`,
+        user_id: Actor.id || user.id,
       }],
       filters: [{
         context: 'members',
-        name: `${tagUser.first_name} ${tagUser.last_name}`,
-        user_id: tagUser.id,
+        name: tagUser.name || `${tagUser.first_name || ''} ${tagUser.last_name || ''}`,
+        user_id: Actor.id || user.id,
       }],
       data: JSON.stringify(data),
     };

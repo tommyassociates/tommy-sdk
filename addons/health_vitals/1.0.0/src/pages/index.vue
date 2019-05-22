@@ -14,7 +14,7 @@
       <div class="health-vitals-card health-vitals-user-card" v-if="user">
         <tommy-circle-avatar v-if="user" :data="user" />
         <div class="health-vitals-user-card-content">
-          <div class="name">{{user.first_name}} {{user.last_name}}</div>
+          <div class="name">{{user.name || `${user.first_name || ''} ${user.last_name || ''}`}}</div>
           <div class="props">
             <div class="prop" v-if="userAge">
               <div class="prop-label">{{t('profile_age_label')}}</div>
