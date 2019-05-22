@@ -38,6 +38,14 @@
         :value="item.data.duration"
         @input="onDurationChange"
       ></f7-list-input> -->
+      <!-- Duration -->
+      <f7-list-item divider :title="$t('invoicing.item.duration_label', 'Duration')"></f7-list-item>
+      <f7-list-input
+        :placeholder="$t('invoicing.item.duration_placeholder', 'Item duration in minutes')"
+        type="number"
+        :value="item.data.duration"
+        @input="onDurationChange"
+      ></f7-list-input>
       <!-- Category -->
       <f7-list-item divider :title="$t('invoicing.item.category_label', 'Cagegory')"></f7-list-item>
       <f7-list-input
@@ -180,6 +188,9 @@
         products: null,
         productsOpened: false,
         availabile_in: '',
+        data: {
+          duration: null,
+        },
       };
     },
     mounted() {
@@ -199,6 +210,7 @@
           vendor_package_products_attributes: [],
           data: {
             availabile_in: [],
+            duration: null,
           },
         };
         return;
@@ -219,6 +231,7 @@
         if (!item.data || typeof item.data === 'string') {
           item.data = {
             availabile_in: [],
+            duration: null,
           };
         }
         self.availabile_in = (item.data.availabile_in || []).join(',');
@@ -293,6 +306,11 @@
       removeItemTag(tag) {
         const self = this;
         self.item.filters.splice(self.item.filters.indexOf(tag), 1);
+        self.enableSave();
+      },
+      onDurationChange(e) {
+        const self = this;
+        self.item.data.duration = e.target.value;
         self.enableSave();
       },
       onFileChange(e) {

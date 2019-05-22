@@ -14,7 +14,9 @@ const API = {
     });
   },
   saveData(userId, f) {
-    f.attachments = f.attachments.filter(attachment => typeof attachment === 'string');
+    if (f.attachments && f.attachments.length) {
+      f.attachments = f.attachments.filter(attachment => typeof attachment === 'string');
+    }
     if (f.id) {
       f.with_attachments = true;
 
