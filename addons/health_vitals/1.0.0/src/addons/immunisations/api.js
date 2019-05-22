@@ -9,7 +9,7 @@ const API = {
       kind: 'VitalsImmunisationsVaccine',
       with_filters: true,
       with_permission_to: true,
-      user_id: (Actor.user ? Actor.user.user_id : Actor.id) || user.id,
+      user_id: Actor.id || user.id,
       actor_id: Actor.id,
     }, {
       cache: false,
@@ -21,7 +21,7 @@ const API = {
       kind: 'VitalsImmunisationsVaccine',
       with_filters: true,
       with_permission_to: true,
-      user_id: (Actor.user ? Actor.user.user_id : Actor.id) || user.id,
+      user_id: Actor.id || user.id,
       actor_id: Actor.id,
     }, {
       cache: false,
@@ -36,13 +36,13 @@ const API = {
       start_at: new Date(data.scheduledDate).toJSON(),
       tags: [{
         context: 'members',
-        name: `${tagUser.first_name} ${tagUser.last_name}`,
-        user_id: tagUser.id,
+        name: tagUser.name || `${tagUser.first_name || ''} ${tagUser.last_name || ''}`,
+        user_id: Actor.id || user.id,
       }],
       filters: [{
         context: 'members',
-        name: `${tagUser.first_name} ${tagUser.last_name}`,
-        user_id: tagUser.id,
+        name: tagUser.name || `${tagUser.first_name || ''} ${tagUser.last_name || ''}`,
+        user_id: Actor.id || user.id,
       }],
       data: JSON.stringify(data),
     };
@@ -62,13 +62,13 @@ const API = {
       start_at: startAt.toJSON(),
       tags: [{
         context: 'members',
-        name: `${tagUser.first_name} ${tagUser.last_name}`,
-        user_id: tagUser.id,
+        name: tagUser.name || `${tagUser.first_name || ''} ${tagUser.last_name || ''}`,
+        user_id: Actor.id || user.id,
       }],
       filters: [{
         context: 'members',
-        name: `${tagUser.first_name} ${tagUser.last_name}`,
-        user_id: tagUser.id,
+        name: tagUser.name || `${tagUser.first_name || ''} ${tagUser.last_name || ''}`,
+        user_id: Actor.id || user.id,
       }],
       data: JSON.stringify(data),
     };
