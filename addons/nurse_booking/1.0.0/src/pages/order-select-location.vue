@@ -60,23 +60,25 @@
       selectLocation(location) {
         const self = this;
         const city = location.city;
-        const service = self.service;
-        let available;
-        const availableIn = service.data ? service.data.available_in || service.data.availabile_in || [] : [];
+        const address = location.address;
+        const available = city.indexOf('山缘') >= 0 || address.indexOf('山缘') >= 0;
+        // const service = self.service;
+        // let available;
+        // const availableIn = service.data ? service.data.available_in || service.data.availabile_in || [] : [];
 
-        if (!availableIn || !availableIn.length) {
-          available = true;
-        } else {
-          availableIn.forEach((availableCity) => {
-            const parts = city.toLowerCase()
-              .split(/[,， ]/)
-              .map(c => c.replace(/,/g, '').trim())
-              .filter(f => f.trim());
-            parts.forEach((p) => {
-              if (availableCity.toLowerCase().trim() === p) available = true;
-            });
-          });
-        }
+        // if (!availableIn || !availableIn.length) {
+        //   available = true;
+        // } else {
+        //   availableIn.forEach((availableCity) => {
+        //     const parts = city.toLowerCase()
+        //       .split(/[,， ]/)
+        //       .map(c => c.replace(/,/g, '').trim())
+        //       .filter(f => f.trim());
+        //     parts.forEach((p) => {
+        //       if (availableCity.toLowerCase().trim() === p) available = true;
+        //     });
+        //   });
+        // }
 
         if (!available) {
           self.$f7.dialog.alert(self.$t('nurse_booking.location.not_available'));
