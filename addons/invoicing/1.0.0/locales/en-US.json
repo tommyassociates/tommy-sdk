@@ -167,6 +167,7 @@
   "order_feedback_results": {
     "time_clocking": "Time Clocking",
     "time_change": "Time Change",
+    "actual_time": "Actual Time",
     "feedback": "Feedback",
     "scheduled": "Scheduled",
     "start": "Start",
