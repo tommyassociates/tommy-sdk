@@ -217,6 +217,18 @@
                   :after="$moment(order.data.feedback.end_date).format('H:mm DD MMM YYYY')"
                 />
               </template>
+              <template v-if="order.data.feedback.actual_start_date && order.data.feedback.actual_end_date">
+                <f7-list-item divider :title="$t('invoicing.order_feedback_results.actual_time')"></f7-list-item>
+                <f7-list-item
+                  :title="$t('invoicing.order_feedback_results.start')"
+                  :after="$moment(order.data.feedback.actual_start_date).format('H:mm DD MMM YYYY')"
+                />
+                <f7-list-item
+                  :title="$t('invoicing.order_feedback_results.finish')"
+                  :after="$moment(order.data.feedback.actual_end_date).format('H:mm DD MMM YYYY')"
+                />
+              </template>
+
               <f7-list-item divider :title="$t('invoicing.order_feedback_results.feedback')"></f7-list-item>
               <f7-list-item
                 :title="$t('invoicing.order_feedback_results.question_1')"

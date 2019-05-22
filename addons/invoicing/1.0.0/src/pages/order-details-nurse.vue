@@ -254,6 +254,8 @@
         const self = this;
         const data = { ...self.order };
         data.status = 'processing';
+        if (!data.data.feedback) data.data.feedback = {};
+        data.data.feedback.actual_start_date = new Date().toJSON();
         API.saveOrder(data).then((order) => {
           self.order = order;
           self.$events.$emit('invoicing:reloadListsOrders');
@@ -269,7 +271,9 @@
         const feedback = obj.feedback;
         const data = { ...self.order };
         data.status = 'complete';
-        data.data.feedback = feedback;
+        if (!data.data.feedback) data.data.feedback = feedback;
+        else Object.assign(data.data.feedback, feedback);
+        data.data.feedback.actual_end_date = new Date().toJSON();
         delete data.vendor_order_items;
         API.saveOrder(data).then((order) => {
           self.order = order;

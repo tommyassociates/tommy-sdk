@@ -167,6 +167,7 @@
   "order_feedback_results": {
     "time_clocking": "订单工作时间",
     "time_change": "实际工作时间",
+    "actual_time": "Actual Time",
     "feedback": "反馈",
     "scheduled": "订单时长",
     "start": "开始",
