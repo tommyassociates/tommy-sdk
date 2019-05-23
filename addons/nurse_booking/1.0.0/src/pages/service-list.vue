@@ -78,9 +78,7 @@
         .all([API.getServiceList(teamId), API.getCouponList(teamId)])
         .then(([servicesData, couponsData]) => {
           const services = servicesData.filter(el => el.category === self.category || el.category === cnCategories[self.category]);
-
           services.forEach((service) => {
-            if (service.vendor_package_products) return;
             service.coupons = couponsForService(service, couponsData, self.$root.user.id);
           });
 

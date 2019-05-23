@@ -29,7 +29,6 @@ export default function (coupons, onConfirm, onSkip, selectedCoupon) {
           ` : `
           <div class="coupon-item-title">${coupon.amount * 100}%</div>
           `}
-          <div class="coupon-item-title">¥ ${coupon.amount}</div>
           <div class="coupon-item-name">${coupon.name}</div>
           ${coupon.expires_at || coupon.valid_to ? `
           <div class="coupon-item-date">${formatDate(coupon.expires_at || coupon.valid_to, 'D MMM YYYY')}</div>

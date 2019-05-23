@@ -418,7 +418,7 @@
             if (coupon.kind === 'fixed') {
               total = coupon.amount;
             } else {
-              total = self.order.total * coupon.amount;
+              total = self.orderItemsTotal * coupon.amount;
             }
           }
         }
@@ -553,7 +553,7 @@
         const promo = self.promotions.filter(el => el.id === parseInt(id, 10))[0];
         if (!promo) return 0;
         if (promo.kind === 'fixed') return promo.amount;
-        return self.order.total * promo.amount;
+        return self.orderItemsTotal * promo.amount;
       },
       productName(id, type = 'VendorProduct') {
         const self = this;
