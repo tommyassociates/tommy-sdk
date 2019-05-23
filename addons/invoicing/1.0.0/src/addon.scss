@@ -1026,3 +1026,18 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$red}
   color: #333;
   line-height: 1.3;
 }
+.invoicing-range-slider {
+  .range-bar {
+    height: 2px;
+    margin-top: -1px;
+  }
+  .range-knob-label {
+    min-width: 30px;
+  }
+}
+.invoicing-range-slider-value {
+  color: #F1823A;
+  font-size: 18px;
+  margin-left: 10px;
+  font-weight: bold;
+}

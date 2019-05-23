@@ -112,7 +112,13 @@
     "item_label": "Item",
     "item_placeholder": "Select item for this promotion",
     "customer_label": "Customer",
-    "customer_placeholder": "Select customer for this promotion"
+    "customer_placeholder": "Select customer for this promotion",
+    "type_label": "Discount type",
+    "type_fixed_label": "Fixed",
+    "type_percentage_label": "Percentage",
+    "category_label": "Category",
+    "max_uses_label": "Max uses",
+    "max_uses_placeholder": "Leave empty or 0 for infinite use"
   },
 
   "order_details": {
