@@ -17,6 +17,7 @@ const API = {
       with_permission_to: true,
       user_id: Actor.id || user.id,
       actor_id: Actor.id,
+      actor_type: Actor.id ? 'User' : undefined,
       page: page || 1,
       limit: limit || 50,
       date_range,

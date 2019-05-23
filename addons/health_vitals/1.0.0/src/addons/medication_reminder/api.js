@@ -42,6 +42,7 @@ const API = {
       with_permission_to: true,
       user_id: Actor.id || user.id,
       actor_id: Actor.id,
+      actor_type: Actor.id ? 'User' : undefined,
       date_range,
     }, {
       cache: false,
@@ -55,6 +56,7 @@ const API = {
       with_permission_to: true,
       user_id: Actor.id || user.id,
       actor_id: Actor.id,
+      actor_type: Actor.id ? 'User' : undefined,
     }, {
       cache: false,
     });
@@ -67,6 +69,7 @@ const API = {
       with_permission_to: true,
       user_id: Actor.id || user.id,
       actor_id: Actor.id,
+      actor_type: Actor.id ? 'User' : undefined,
     }, {
       cache: false,
     });
