@@ -30,7 +30,8 @@
   },
   "service_details": {
     "service_details_label": "服务详情",
-    "book_button": "立即预约"
+    "book_button": "立即预约",
+    "n_coupons_available": "{{n}} coupons available"
   },
   "coupon_picker": {
     "text": "您有可用的优惠券",

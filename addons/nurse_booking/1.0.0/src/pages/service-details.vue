@@ -19,7 +19,7 @@
         </div>
         <div class="service-details-price">¥ {{service.price}}</div>
       </div>
-      <a v-if="service.coupons && service.coupons.length" class="service-details-coupons-link" @click="chooseCoupon"><span>{{service.coupons.length}} coupons available</span></a>
+      <a v-if="service.coupons && service.coupons.length" class="service-details-coupons-link" @click="chooseCoupon"><span>{{$t('nurse_booking.service_details.n_coupons_available', {n: service.coupons.length})}}</span></a>
     </div>
     <div class="service-details-content">
       <div class="service-details-label">{{$t('nurse_booking.service_details.service_details_label')}}:</div>
@@ -44,6 +44,7 @@
 <script>
   import API from '../api';
   import couponPicker from '../coupon-picker';
+  import couponsForService from '../coupons-for-service';
 
   export default {
     props: {
@@ -58,9 +59,7 @@
         const serviceType = serviceData.vendor_package_products ? 'package' : 'product';
         if (serviceData.id === parseInt(self.id, 10) && serviceType === type) {
           service = serviceData;
-          if (serviceType === 'product') {
-            service.coupons = API.cache.coupons.filter(coupon => coupon.vendor_product_id === service.id);
-          }
+          service.coupons = couponsForService(service, API.cache.coupons, self.$root.user.id);
         }
       });
       if (service.vendor_package_products && service.vendor_package_products.length) {

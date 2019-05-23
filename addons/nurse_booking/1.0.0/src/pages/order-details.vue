@@ -113,7 +113,9 @@
         services.forEach((el) => {
           servicesTotal += el.price;
         });
-        return total || (servicesTotal - (coupon ? coupon.amount : 0));
+        let discount = 0;
+        if (coupon) discount = coupon.kind === 'fixed' ? coupon.amount : coupon.amount * servicesTotal;
+        return total || (servicesTotal - discount);
       },
       serviceName() {
         const self = this;
@@ -147,6 +149,7 @@
         if (order.vendor_coupon_id) {
           self.coupon = {
             id: order.vendor_coupon_id,
+            kind: 'fixed',
             amount: order.discount,
           };
         }

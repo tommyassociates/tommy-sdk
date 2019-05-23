@@ -24,9 +24,16 @@ export default function (coupons, onConfirm, onSkip, selectedCoupon) {
       <label>
         <input type="radio" name="nurse_booking-coupon-picker-radio" value="${coupon.id}" ${coupon.checked ? 'checked' : ''}>
         <div class="coupon-item-content">
+          ${coupon.kind === 'fixed' ? `
+          <div class="coupon-item-title">¥ ${coupon.amount}</div>
+          ` : `
+          <div class="coupon-item-title">${coupon.amount * 100}%</div>
+          `}
           <div class="coupon-item-title">¥ ${coupon.amount}</div>
           <div class="coupon-item-name">${coupon.name}</div>
-          <div class="coupon-item-date">${formatDate(coupon.expires_at, 'D MMM YYYY')}</div>
+          ${coupon.expires_at || coupon.valid_to ? `
+          <div class="coupon-item-date">${formatDate(coupon.expires_at || coupon.valid_to, 'D MMM YYYY')}</div>
+          ` : ''}
         </div>
         <div class="coupon-item-label">${tommy.i18n.t('nurse_booking.coupon_picker.use_label')}</div>
       </label>

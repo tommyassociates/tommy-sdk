@@ -39,6 +39,8 @@
 </template>
 <script>
   import API from '../api';
+  import cnCategories from '../cn-categories';
+  import couponsForService from '../coupons-for-service';
 
   export default {
     data() {
@@ -72,23 +74,18 @@
         }
       }
       const teamId = self.$root.team ? self.$root.team.id : self.$addons.addons.nurse_booking.data.nursing_team_id;
-      Promise.all([API.getServiceList(teamId), API.getCouponList(teamId)]).then(([servicesData, couponsData]) => {
-        const cnCategories = {
-          Massage: '按摩',
-          Cleaning: '常规家政',
-          Nursing: '护理',
-          Elderservice: '老人家政',
-          Extras: '外出陪同',
-        };
-        const services = servicesData.filter(el => el.category === self.category || el.category === cnCategories[self.category]);
+      Promise
+        .all([API.getServiceList(teamId), API.getCouponList(teamId)])
+        .then(([servicesData, couponsData]) => {
+          const services = servicesData.filter(el => el.category === self.category || el.category === cnCategories[self.category]);
 
-        services.forEach((service) => {
-          if (service.vendor_package_products) return;
-          service.coupons = couponsData.filter(coupon => coupon.vendor_product_id === service.id);
+          services.forEach((service) => {
+            if (service.vendor_package_products) return;
+            service.coupons = couponsForService(service, couponsData, self.$root.user.id);
+          });
+
+          self.services = services;
         });
-
-        self.services = services;
-      });
     },
   };
 </script>
