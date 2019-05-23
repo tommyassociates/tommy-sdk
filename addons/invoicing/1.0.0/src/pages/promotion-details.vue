@@ -30,20 +30,73 @@
       <!-- Date -->
       <f7-list-item divider :title="$t('invoicing.promotion.expires_label', 'Description')"></f7-list-item>
       <f7-list-input
-        :title="$t('invoicing.order_details.due')"
-        type="datetime-local"
-        :value="formatValueDate(item.expire_at)"
-        @change="onDateChange"
+        class="invoicing-valid-to-input"
+        :title="$t('invoicing.order_details.due_date')"
+        type="text"
+        readonly
+        :value="item.valid_to ? $moment(item.valid_to).format('D MMM YYYY') : ''"
+        @focus="openCalendar"
       >
+        <span slot="inner" class="input-clear-button margin-right" @click="item.valid_to = null; enableSave();"></span>
       </f7-list-input>
+
+
+      <!-- Kind -->
+      <f7-list-item divider :title="$t('invoicing.promotion.type_label')"></f7-list-item>
+      <f7-list-item
+        checkbox
+        :title="$t('invoicing.promotion.type_fixed_label')"
+        :checked="item.kind === 'fixed'"
+        @change="setKind('fixed')"
+      />
+      <f7-list-item
+        checkbox
+        :title="$t('invoicing.promotion.type_percentage_label')"
+        :checked="item.kind === 'percentage'"
+        @change="setKind('percentage')"
+      />
 
       <!-- Discount -->
       <f7-list-item divider :title="$t('invoicing.promotion.amount_label', 'Discount amount')"></f7-list-item>
       <f7-list-input
+        v-if="item.kind === 'fixed'"
         :placeholder="$t('invoicing.promotion.amount_placeholder', 'Enter promotion discount')"
         type="text"
         :value="item.amount ? `¥${item.amount}` : ''"
-        @input="setDiscount($event.target.value)"
+        @input="setAmount($event.target.value)"
+      ></f7-list-input>
+      <f7-list-item
+        v-if="item.kind === 'percentage'"
+      >
+        <f7-range
+          class="invoicing-range-slider"
+          :value="item.amount"
+          :min="0"
+          :max="1"
+          :step="0.01"
+          :format-label="(v) => `${Math.floor(v * 100)}%`"
+          label
+          @range:changed="(v) => setAmount(v)"
+        />
+        <div class="invoicing-range-slider-value">{{Math.floor(item.amount * 100)}}%</div>
+      </f7-list-item>
+
+      <!-- Category -->
+      <f7-list-item divider :title="$t('invoicing.promotion.category_label', 'Category')"></f7-list-item>
+      <f7-list-input
+        :placeholder="$t('invoicing.promotion.category_label', 'Category')"
+        type="text"
+        :value="item.category"
+        @input="($event) => {item.category = $event.target.value; enableSave()}"
+      ></f7-list-input>
+
+      <!-- Max uses -->
+      <f7-list-item divider :title="$t('invoicing.promotion.max_uses_label')"></f7-list-item>
+      <f7-list-input
+        :placeholder="$t('invoicing.promotion.max_uses_placeholder')"
+        type="number"
+        :value="item.max_uses"
+        @input="($event) => {item.max_uses = $event.target.value; enableSave()}"
       ></f7-list-input>
 
       <!-- Customer -->
@@ -59,7 +112,7 @@
       <!-- Item -->
       <f7-list-item divider :title="$t('invoicing.promotion.item_label', 'Item')"></f7-list-item>
       <f7-list-item
-        v-if="products"
+        v-if="products && packages"
         :title="itemTitle"
         link
         @click="itemsPopupOpened = true"
@@ -71,7 +124,7 @@
     <!-- Customer Popup -->
     <f7-popup :opened="customerPopupOpened" @popup:closed="customerPopupOpened = false" v-if="item">
       <f7-view :init="false">
-        <f7-page>
+        <f7-page class="invoicing-page">
           <f7-navbar>
             <f7-nav-title>{{$t('invoicing.promotion.customer_label')}}</f7-nav-title>
             <f7-nav-right>
@@ -106,9 +159,9 @@
     </f7-popup>
 
     <!-- Item Popup -->
-    <f7-popup :opened="itemsPopupOpened" @popup:closed="itemsPopupOpened = false" v-if="item && products">
+    <f7-popup :opened="itemsPopupOpened" @popup:closed="itemsPopupOpened = false" v-if="item && products && packages">
       <f7-view :init="false">
-        <f7-page>
+        <f7-page class="invoicing-page">
           <f7-navbar>
             <f7-nav-title>{{$t('invoicing.promotion.item_label')}}</f7-nav-title>
             <f7-nav-right>
@@ -117,15 +170,27 @@
           </f7-navbar>
           <f7-searchbar search-container=".invoicing-promotion-items-list" :disable-button="false"></f7-searchbar>
           <f7-list class="invoicing-promotion-items-list">
+            <f7-list-item v-if="products.length" divider :title="$t('invoicing.item_service_management.items_tab')" />
             <f7-list-item
               v-for="product in products"
               :key="product.id"
               :title="product.name"
-              @click="() => {item.vendor_product_id = product.id; itemsPopupOpened = false; enableSave()}"
+              @click="() => {item.vendor_product_id = product.id; item.vendor_package_id = null; itemsPopupOpened = false; enableSave()}"
               radio
               :checked="item.vendor_product_id === product.id"
             >
               <tommy-circle-avatar :url="product.image_url" slot="media"></tommy-circle-avatar>
+            </f7-list-item>
+            <f7-list-item  v-if="packages.length" divider :title="$t('invoicing.item_service_management.packages_tab')" />
+            <f7-list-item
+              v-for="pkg in packages"
+              :key="pkg.id"
+              :title="pkg.name"
+              @click="() => {item.vendor_product_id = null; item.vendor_package_id = pkg.id; itemsPopupOpened = false; enableSave()}"
+              radio
+              :checked="item.vendor_package_id === pkg.id"
+            >
+              <tommy-circle-avatar :url="pkg.image_url" slot="media"></tommy-circle-avatar>
             </f7-list-item>
           </f7-list>
         </f7-page>
@@ -153,6 +218,7 @@
         customerPopupOpened: false,
         itemsPopupOpened: false,
         products: null,
+        packages: null,
         contacts: API.contacts,
       };
     },
@@ -160,12 +226,19 @@
       const self = this;
       if (!self.id) {
         self.item = {
-          expire_at: '',
+          // expire_at: '',
           description: '',
           name: '',
           amount: 0,
           user_id: null,
           vendor_product_id: null,
+
+          vendor_package_id: null,
+          category: null,
+          kind: 'fixed',
+          valid_from: null,
+          valid_to: null,
+          max_uses: null,
         };
       } else {
         API.loadPromotion(self.id).then((item) => {
@@ -173,9 +246,14 @@
         });
       }
 
-      API.loadProducts().then((products) => {
+      Promise.all([
+        API.loadProducts(),
+        API.loadPackages(),
+      ]).then(([products, packages]) => {
         self.products = products;
+        self.packages = packages;
       });
+
     },
     computed: {
       customerAvatar() {
@@ -202,20 +280,51 @@
       },
       itemAvatar() {
         const self = this;
-        if (!self.item.vendor_product_id) return null;
-        const product = self.products.filter(p => p.id === self.item.vendor_product_id)[0];
+        if (!self.item.vendor_product_id && !self.item.vendor_package_id) return null;
+        let product;
+        if (self.item.vendor_product_id) {
+          product = self.products.filter(p => p.id === self.item.vendor_product_id)[0];
+        }
+        if (self.item.vendor_package_id) {
+          product = self.packages.filter(p => p.id === self.item.vendor_package_id)[0];
+        }
         if (!product) return null;
         return product.image_url;
       },
       itemTitle() {
         const self = this;
-        if (!self.item.vendor_product_id) return self.$t('invoicing.promotion.item_placeholder');
-        const product = self.products.filter(p => p.id === self.item.vendor_product_id)[0];
+        if (!self.item.vendor_product_id && !self.item.vendor_package_id) return self.$t('invoicing.promotion.item_placeholder');
+        let product;
+        if (self.item.vendor_product_id) {
+          product = self.products.filter(p => p.id === self.item.vendor_product_id)[0];
+        }
+        if (self.item.vendor_package_id) {
+          product = self.packages.filter(p => p.id === self.item.vendor_package_id)[0];
+        }
         if (!product) return '';
         return product.name;
       },
     },
     methods: {
+      openCalendar() {
+        const self = this;
+        self.calendarTo = self.$f7.calendar.create({
+          openIn: 'customModal',
+          value: self.item.valid_to ? [new Date(self.item.valid_to)] : [],
+          backdrop: true,
+          closeByOutsideClick: false,
+          on: {
+            change(c, v) {
+              self.item.valid_to = new Date(v[0]).toJSON();
+              self.enableSave();
+            },
+          },
+        });
+        self.calendarTo.once('closed', () => {
+          self.calendarTo.destroy();
+        });
+        self.calendarTo.open();
+      },
       formatValueDate(date) {
         const self = this;
         if (!date) return '';
@@ -225,16 +334,31 @@
         const self = this;
         const value = e.target.value;
         clearTimeout(self.dateChangeTimeout);
-        self.item.expire_at = new Date(value).toJSON();
+        self.item.valid_to = new Date(value).toJSON();
         self.enableSave();
       },
-      setDiscount(value) {
+      setKind(kind) {
         const self = this;
-        const newPrice = value.replace(/[¥ ]*/, '').replace(/,/g, '.').trim();
-        self.item.amount = newPrice;
-        self.$set(self.item, 'amount', newPrice);
-        self.item.amount_cents = self.item.amount * 100;
-        if (Number.isNaN(self.item.amount_cents)) self.item.amount_cents = 0;
+        if (self.item.kind === kind) return;
+        if (kind === 'fixed') {
+          self.setAmount(0);
+        } else {
+          self.setAmount(0.5);
+        }
+        self.item.kind = kind;
+        self.enableSave();
+      },
+      setAmount(value) {
+        const self = this;
+        let newAmount = value;
+        if (typeof newAmount === 'string') {
+          newAmount = value.replace(/[¥ ]*/, '').replace(/,/g, '.').trim();
+        } else {
+          newAmount = Math.floor(newAmount * 1000 / 10);
+          newAmount = parseFloat(`0.${newAmount}`);
+        }
+        self.item.amount = newAmount;
+        self.$set(self.item, 'amount', newAmount);
         self.enableSave();
       },
       enableSave() {
@@ -244,6 +368,18 @@
       save() {
         const self = this;
         self.showSave = false;
+        if (typeof self.item.amount === 'string') {
+          self.item.amount = parseFloat(self.item.amount);
+          if (Number.isNaN(self.item.amount)) {
+            self.item.amount = 0;
+          }
+        }
+        if (self.item.vendor_product_id) {
+          delete self.item.vendor_package_id;
+        }
+        if (self.item.vendor_package_id) {
+          delete self.item.vendor_product_id;
+        }
         API.savePromotion(self.item).then(() => {
           self.$events.$emit('invoicing:reloadPromotions');
           self.$f7router.back();

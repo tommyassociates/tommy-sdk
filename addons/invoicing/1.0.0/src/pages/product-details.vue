@@ -39,7 +39,7 @@
         @input="onDurationChange"
       ></f7-list-input>
       <!-- Category -->
-      <f7-list-item divider :title="$t('invoicing.item.category_label', 'Cagegory')"></f7-list-item>
+      <f7-list-item divider :title="$t('invoicing.item.category_label', 'Category')"></f7-list-item>
       <f7-list-input
         :placeholder="$t('invoicing.item.category_placeholder', 'Enter item/service category')"
         type="text"

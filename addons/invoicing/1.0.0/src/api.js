@@ -160,6 +160,9 @@ const API = {
       endpoint: `vendor/manager/coupons/${item.id || ''}`,
       method: item.id ? 'PUT' : 'POST',
       data: item,
+      dataType: 'json',
+      contentType: 'application/json',
+      processData: false,
     });
   },
   loadProducts() {
