@@ -294,7 +294,7 @@
                     :key="promotion.id"
                     link
                     :title="promotion.name"
-                    :after="`- ¥${promotion.amount}`"
+                    :after="`- ¥${promotion.kind === 'fixed' ? promotion.amount : promotion.amount * order.total}`"
                     @click="addOrderPromotion(promotion)"
                   ></f7-list-item>
                 </f7-list>
@@ -415,7 +415,11 @@
         if (self.order.vendor_coupon_id) {
           const coupon = self.promotions.filter(el => el.id === self.order.vendor_coupon_id)[0];
           if (coupon) {
-            total = coupon.amount;
+            if (coupon.kind === 'fixed') {
+              total = coupon.amount;
+            } else {
+              total = self.order.total * coupon.amount;
+            }
           }
         }
         return total;
@@ -546,7 +550,10 @@
       },
       promotionDiscount(id) {
         const self = this;
-        return self.promotions.filter(el => el.id === parseInt(id, 10))[0].amount;
+        const promo = self.promotions.filter(el => el.id === parseInt(id, 10))[0];
+        if (!promo) return 0;
+        if (promo.kind === 'fixed') return promo.amount;
+        return self.order.total * promo.amount;
       },
       productName(id, type = 'VendorProduct') {
         const self = this;
