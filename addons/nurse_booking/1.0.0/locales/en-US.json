@@ -30,7 +30,8 @@
   },
   "service_details": {
     "service_details_label": "Service details",
-    "book_button": "Book now"
+    "book_button": "Book now",
+    "n_coupons_available": "{{n}} coupons available"
   },
   "coupon_picker": {
     "text": "You have available coupons that you can choose to use.",

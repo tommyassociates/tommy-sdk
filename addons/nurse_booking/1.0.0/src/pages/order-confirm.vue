@@ -61,7 +61,7 @@
         v-if="coupon"
         link="#"
         :title="$t('nurse_booking.order_confirm.coupons_label')"
-        :after="`-¥${coupon.amount}`"
+        :after="`${coupon.kind === 'fixed' ? `-¥${coupon.amount}` : `-${coupon.amount * 100}%`}`"
         @click="selectCoupon"
       ></f7-list-item>
       <f7-list-item
@@ -99,7 +99,11 @@
         services.forEach((service) => {
           price += service.price;
         });
-        return price - (coupon ? coupon.amount : 0);
+        let discount = 0;
+        if (coupon) {
+          discount = coupon.kind === 'fixed' ? coupon.amount : coupon.amount * price;
+        }
+        return price - discount;
       },
       servicePrice() {
         const self = this;
@@ -156,6 +160,9 @@
           if (el.data && el.data.duration) duration += parseInt(el.data.duration, 10);
         });
 
+        let discount = 0;
+        if (coupon) discount = coupon.kind === 'fixed' ? coupon.amount : coupon.amount * self.servicePrice;
+
         payOrder({
           vendor_order_items_attributes,
           teamId,
@@ -163,7 +170,7 @@
           productId: services[0].id,
           total,
           couponId: coupon ? coupon.id : null,
-          discount: coupon ? coupon.amount : 0,
+          discount,
           location,
           date,
           nurse,
