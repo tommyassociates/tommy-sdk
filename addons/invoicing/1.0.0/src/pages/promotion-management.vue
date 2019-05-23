@@ -14,7 +14,7 @@
         v-for="item in orderedPromotions"
         :key="item.id"
         :title="item.name"
-        :link="`/invoicing/promotion-details/${item.id}/?title=${item.name || ''}`"
+        :link="`/invoicing/promotion-details/${item.id}/?title=${encodeURIComponent(item.name || '')}`"
       ></f7-list-item>
     </f7-list>
 

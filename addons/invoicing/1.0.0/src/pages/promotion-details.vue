@@ -353,9 +353,14 @@
         let newAmount = value;
         if (typeof newAmount === 'string') {
           newAmount = value.replace(/[¥ ]*/, '').replace(/,/g, '.').trim();
-        } else {
-          newAmount = Math.floor(newAmount * 1000 / 10);
-          newAmount = parseFloat(`0.${newAmount}`);
+        } else { // eslint-disable-next-line
+          if (newAmount >= 1) {
+            newAmount = 1;
+          } else {
+            newAmount = Math.floor(newAmount * 1000 / 10);
+            if (newAmount < 10) newAmount = parseFloat(`0.0${newAmount}`);
+            else newAmount = parseFloat(`0.${newAmount}`);
+          }
         }
         self.item.amount = newAmount;
         self.$set(self.item, 'amount', newAmount);
@@ -375,10 +380,10 @@
           }
         }
         if (self.item.vendor_product_id) {
-          delete self.item.vendor_package_id;
+          self.item.vendor_package_id = null;
         }
         if (self.item.vendor_package_id) {
-          delete self.item.vendor_product_id;
+          self.item.vendor_product_id = null;
         }
         API.savePromotion(self.item).then(() => {
           self.$events.$emit('invoicing:reloadPromotions');
