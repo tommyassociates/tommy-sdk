@@ -119,7 +119,6 @@
         orderStatuses,
         products: null,
         packages: null,
-        promotions: null,
         isFeedback: false,
         orderDuration: 0,
         orderUser: null,
@@ -145,9 +144,6 @@
         }),
         API.loadPackages().then((packages) => {
           self.packages = packages;
-        }),
-        API.loadPromotions().then((promotions) => {
-          self.promotions = promotions;
         }),
       ]).then(() => {
         self.orderDuration = self.calcOrderDuration();
@@ -186,21 +182,6 @@
         });
         return total;
       },
-      orderDiscountTotal() {
-        const self = this;
-        let total = 0;
-        if (self.order.vendor_coupon_id) {
-          const coupon = self.promotions.filter(el => el.id === self.order.vendor_coupon_id)[0];
-          if (coupon) {
-            total = coupon.amount;
-          }
-        }
-        return total;
-      },
-      orderTotal() {
-        const self = this;
-        return Math.max(self.orderItemsTotal - self.orderDiscountTotal, 0);
-      },
     },
     methods: {
       calcOrderDuration() {
@@ -212,14 +193,6 @@
           });
         }
         return duration;
-      },
-      promotionName(id) {
-        const self = this;
-        return self.promotions.filter(el => el.id === parseInt(id, 10))[0].name;
-      },
-      promotionDiscount(id) {
-        const self = this;
-        return self.promotions.filter(el => el.id === parseInt(id, 10))[0].amount;
       },
       productName(id, type = 'VendorProduct') {
         const self = this;
