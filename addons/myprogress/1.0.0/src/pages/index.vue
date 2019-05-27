@@ -379,10 +379,14 @@
         const self = this;
         self.items[item].checked = !self.items[item].checked;
         self.saveData();
-        if (self.itemsProgressCount === 8 && self.actorId) {
+        if (self.itemsProgressCount >= 8 && self.actorId) {
           const member = self.$root.teamMembers.filter(t => t.user_id === parseInt(self.actorId, 10))[0];
           if (!member) return;
-          if (member.roles && member.roles.indexOf('Jobseeker') >= 0) {
+          if (!member.roles) member.roles = [];
+          if (member.roles.indexOf('Employee') >= 0) {
+            return;
+          }
+          if (member.roles.indexOf('Jobseeker') >= 0) {
             member.roles.splice(member.roles.indexOf('Jobseeker'), 1);
           }
           if (member.roles.indexOf('Employee') < 0) {
