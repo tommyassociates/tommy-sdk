@@ -115,7 +115,7 @@
         });
         let discount = 0;
         if (coupon) discount = coupon.kind !== 'percentage' ? coupon.amount : coupon.amount * servicesTotal;
-        return total || (servicesTotal - discount);
+        return total || Math.max((servicesTotal - discount), 0);
       },
       serviceName() {
         const self = this;

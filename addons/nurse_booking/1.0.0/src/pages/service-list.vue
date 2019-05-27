@@ -28,8 +28,8 @@
           <div class="service-card-pic" :style="`background-image:url(${serviceImage(service)})`"></div>
           <div class="service-card-content">
             <div class="service-card-title">{{service.name}}</div>
-            <div class="service-card-duration" v-if="service.data && service.data.duration">{{service.data.duration}}min</div>
-            <div v-if="service.coupons && service.coupons.length" class="service-card-coupons">{{service.coupons.length}} Coupons</div>
+            <div class="service-card-duration" v-if="service.data && service.data.duration">{{service.data.duration}}{{$t('nurse_booking.service_list.min_label')}}</div>
+            <div v-if="service.coupons && service.coupons.length" class="service-card-coupons">{{service.coupons.length}} {{$t('nurse_booking.service_list.coupons_label')}}</div>
             <div v-else class="service-card-price">¥ {{service.price}}</div>
           </div>
         </a>
