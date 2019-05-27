@@ -61,7 +61,7 @@
         v-if="coupon"
         link="#"
         :title="$t('nurse_booking.order_confirm.coupons_label')"
-        :after="`${coupon.kind !== 'percentage' ? `-¥${coupon.amount}` : `-${coupon.amount * 100}%`}`"
+        :after="`${coupon.kind !== 'percentage' ? `-¥${couponDiscount}` : `-${coupon.amount * 100}%`}`"
         @click="selectCoupon"
       ></f7-list-item>
       <f7-list-item
@@ -92,18 +92,19 @@
       };
     },
     computed: {
-      total() {
+      couponDiscount() {
         const self = this;
-        const { services, coupon } = self;
-        let price = 0;
-        services.forEach((service) => {
-          price += service.price;
-        });
+        const { coupon } = self;
         let discount = 0;
         if (coupon) {
-          discount = coupon.kind !== 'percentage' ? coupon.amount : coupon.amount * price;
+          discount = coupon.kind !== 'percentage' ? coupon.amount : coupon.amount * self.servicePrice;
         }
-        return price - discount;
+        if (discount > self.servicePrice) discount = self.servicePrice;
+        return discount;
+      },
+      total() {
+        const self = this;
+        return Math.max(self.servicePrice - self.couponDiscount, 0);
       },
       servicePrice() {
         const self = this;
@@ -127,6 +128,7 @@
     },
     methods: {
       formatDate,
+
       selectCoupon() {
         const self = this;
         const service = self.services[0];
@@ -161,7 +163,7 @@
         });
 
         let discount = 0;
-        if (coupon) discount = coupon.kind !== 'percentage' ? coupon.amount : coupon.amount * self.servicePrice;
+        if (coupon) discount = self.couponDiscount;
 
         payOrder({
           vendor_order_items_attributes,

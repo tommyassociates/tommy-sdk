@@ -21,6 +21,8 @@
     "details_administration": "管理"
   },
   "service_list": {
+    "min_label": "分钟",
+    "coupons_label": "张优惠券",
     "cleaning_title": "常规家政",
     "elderservice_title": "老人家政",
     "extras_title": "陪同外出",
@@ -29,9 +31,10 @@
     "empty_label": "等待中"
   },
   "service_details": {
+    "coupons_label": "张优惠券",
     "service_details_label": "服务详情",
     "book_button": "立即预约",
-    "n_coupons_available": "{{n}} coupons available"
+    "n_coupons_available": "{{n}} 张优惠券"
   },
   "coupon_picker": {
     "text": "您有可用的优惠券",

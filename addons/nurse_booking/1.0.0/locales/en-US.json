@@ -21,6 +21,8 @@
     "details_administration": "Administration"
   },
   "service_list": {
+    "min_label": "min",
+    "coupons_label": "Coupons",
     "cleaning_title": "Cleaning",
     "elderservice_title": "Elders Home Service",
     "extras_title": "Accompany to Go Out",
@@ -29,6 +31,7 @@
     "empty_label": "Coming Soon"
   },
   "service_details": {
+    "coupons_label": "Coupons",
     "service_details_label": "Service details",
     "book_button": "Book now",
     "n_coupons_available": "{{n}} coupons available"
