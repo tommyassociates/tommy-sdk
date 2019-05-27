@@ -99,10 +99,13 @@
     },
     created() {
       const self = this;
-
       if (self.actorId) {
         API.actorId = parseInt(self.actorId, 10);
         API.actor = self.actor;
+        if (API.actor.roles && (API.actor.roles.indexOf('Nurse') >= 0 || API.actor.roles.indexOf('Employee') >= 0)) {
+          API.isNurse = true;
+          self.isNurse = true;
+        }
       } else {
         delete API.actorId;
         delete API.actor;
@@ -156,7 +159,7 @@
       },
       loadListOrders(list) {
         const self = this;
-        API.loadListOrders(list).then((orders) => {
+        API.loadListOrders(list, self.isNurse ? self.$root.team.id : undefined).then((orders) => {
           list.orders = orders;
           self.$nextTick(() => {
             if (self.listHasScroll(list)) {
