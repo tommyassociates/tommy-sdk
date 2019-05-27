@@ -61,7 +61,7 @@
         v-if="coupon"
         link="#"
         :title="$t('nurse_booking.order_confirm.coupons_label')"
-        :after="`${coupon.kind === 'fixed' ? `-¥${coupon.amount}` : `-${coupon.amount * 100}%`}`"
+        :after="`${coupon.kind !== 'percentage' ? `-¥${coupon.amount}` : `-${coupon.amount * 100}%`}`"
         @click="selectCoupon"
       ></f7-list-item>
       <f7-list-item
@@ -101,7 +101,7 @@
         });
         let discount = 0;
         if (coupon) {
-          discount = coupon.kind === 'fixed' ? coupon.amount : coupon.amount * price;
+          discount = coupon.kind !== 'percentage' ? coupon.amount : coupon.amount * price;
         }
         return price - discount;
       },
@@ -161,7 +161,7 @@
         });
 
         let discount = 0;
-        if (coupon) discount = coupon.kind === 'fixed' ? coupon.amount : coupon.amount * self.servicePrice;
+        if (coupon) discount = coupon.kind !== 'percentage' ? coupon.amount : coupon.amount * self.servicePrice;
 
         payOrder({
           vendor_order_items_attributes,

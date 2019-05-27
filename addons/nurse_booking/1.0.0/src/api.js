@@ -40,6 +40,7 @@ const API = {
       endpoint: `vendors/${teamId}/coupons`,
       method: 'GET',
       data: {},
+      cache: false,
     }).then((data) => {
       API.cache.coupons = data;
       return data;

@@ -24,7 +24,7 @@ export default function (coupons, onConfirm, onSkip, selectedCoupon) {
       <label>
         <input type="radio" name="nurse_booking-coupon-picker-radio" value="${coupon.id}" ${coupon.checked ? 'checked' : ''}>
         <div class="coupon-item-content">
-          ${coupon.kind === 'fixed' ? `
+          ${coupon.kind !== 'percentage' ? `
           <div class="coupon-item-title">¥ ${coupon.amount}</div>
           ` : `
           <div class="coupon-item-title">${coupon.amount * 100}%</div>

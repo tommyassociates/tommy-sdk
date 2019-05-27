@@ -114,7 +114,7 @@
           servicesTotal += el.price;
         });
         let discount = 0;
-        if (coupon) discount = coupon.kind === 'fixed' ? coupon.amount : coupon.amount * servicesTotal;
+        if (coupon) discount = coupon.kind !== 'percentage' ? coupon.amount : coupon.amount * servicesTotal;
         return total || (servicesTotal - discount);
       },
       serviceName() {
