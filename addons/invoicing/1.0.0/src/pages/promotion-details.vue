@@ -45,6 +45,12 @@
       <f7-list-item divider :title="$t('invoicing.promotion.type_label')"></f7-list-item>
       <f7-list-item
         checkbox
+        :title="$t('invoicing.promotion.type_voucher_label')"
+        :checked="item.kind === 'voucher'"
+        @change="setKind('voucher')"
+      />
+      <f7-list-item
+        checkbox
         :title="$t('invoicing.promotion.type_fixed_label')"
         :checked="item.kind === 'fixed'"
         @change="setKind('fixed')"
@@ -59,7 +65,7 @@
       <!-- Discount -->
       <f7-list-item divider :title="$t('invoicing.promotion.amount_label', 'Discount amount')"></f7-list-item>
       <f7-list-input
-        v-if="item.kind === 'fixed'"
+        v-if="item.kind === 'fixed' || item.kind === 'voucher'"
         :placeholder="$t('invoicing.promotion.amount_placeholder', 'Enter promotion discount')"
         type="text"
         :value="item.amount ? `¥${item.amount}` : ''"
@@ -339,10 +345,11 @@
       },
       setKind(kind) {
         const self = this;
+        const prevKind = self.item.kind;
         if (self.item.kind === kind) return;
-        if (kind === 'fixed') {
+        if ((kind === 'fixed' || kind === 'voucher') && prevKind === 'percentage') {
           self.setAmount(0);
-        } else {
+        } else if (kind === 'percentage') {
           self.setAmount(0.5);
         }
         self.item.kind = kind;

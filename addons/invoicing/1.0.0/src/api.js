@@ -4,25 +4,26 @@ const api = tommy.api;
 const API = {
   actor: undefined,
   actorId: undefined,
-  loadOrder(orderId) {
+  isNurse: false,
+  loadOrder(orderId, teamId) {
     const params = {
       with_filters: true,
       with_permission_to: true,
       actor_id: API.actorId,
     };
     return api.call({
-      endpoint: `vendor/manager/orders/${orderId}`,
+      endpoint: teamId ? `vendors/${teamId}/orders/${orderId}` : `vendor/manager/orders/${orderId}`,
       data: params,
     });
   },
-  saveOrder(order) {
+  saveOrder(order, teamId) {
     return api.call({
       method: order.id ? 'PUT' : 'POST',
-      endpoint: `vendor/manager/orders/${order.id || ''}`,
+      endpoint: teamId ? `vendors/${teamId}/orders/${order.id || ''}` : `vendor/manager/orders/${order.id || ''}`,
       data: order,
     });
   },
-  loadListOrders(list) {
+  loadListOrders(list, teamId) {
     const tags = [];
     if (list.data && list.filters) {
       for (let i = 0; i < list.filters.length; i += 1) {
@@ -81,7 +82,7 @@ const API = {
     params.data = JSON.stringify(params.data);
 
     return api.call({
-      endpoint: '/vendor/manager/orders',
+      endpoint: teamId ? `/vendors/${teamId}/orders` : '/vendor/manager/orders',
       data: params,
     });
   },
