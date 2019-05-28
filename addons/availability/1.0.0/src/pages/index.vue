@@ -4,7 +4,7 @@
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{$t('availability.index.title', 'Availabilities')}}</f7-nav-title>
       <f7-nav-right v-if="formChanged">
-        <a href="#" class="save link" @click="save">{{$t('label.save', 'Save')}}</a>
+        <f7-link @click="save" icon-f7="check"></f7-link>
       </f7-nav-right>
     </f7-navbar>
 
