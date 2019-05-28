@@ -96,6 +96,7 @@
         actorId: self.$f7route.query.actor_id,
         listWithScroll: {},
         isNurse: API.isNurse,
+        contacts: API.contacts,
       };
     },
     created() {
@@ -144,13 +145,16 @@
       orderDate(date) {
         const self = this;
         if (!date) return '';
-        return self.$moment(parseInt(date, 10)).format('D MMM YYYY');
+        return self.$moment(parseInt(date, 10)).format('HH:mm D MMM YYYY');
       },
       orderUserName(user_id) {
         const self = this;
-        const user = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
+        let user = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
+        if (!user && self.contacts && self.contacts.length) {
+          user = self.contacts.filter(c => c.friend_id === parseInt(user_id, 10))[0];
+        }
         if (!user) return '';
-        return `${user.first_name} ${user.last_name}`;
+        return user.name || `${user.first_name} ${user.last_name}`;
       },
       listHasScroll(list) {
         const self = this;
@@ -224,6 +228,7 @@
       self.loadLists();
       if (!API.contacts) {
         self.$api.getContacts().then((c) => {
+          self.contacts = c;
           API.contacts = c;
         });
       }

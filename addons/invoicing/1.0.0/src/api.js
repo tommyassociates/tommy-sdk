@@ -6,6 +6,7 @@ const API = {
   actorId: undefined,
   isNurse: false,
   assignee_id: null,
+  contacts: null,
   loadOrder(orderId) {
     const params = {
       with_filters: true,
