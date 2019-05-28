@@ -41,7 +41,12 @@
           </div>
           <div class="orders-list-content">
             <template v-if="list.orders && list.orders.length">
-              <a v-for="(order, index) in list.orders" :key="index" :data-url="`/invoicing/order-details/${order.id}/`" class="card invoicing-order-card">
+              <a
+                v-for="(order, index) in list.orders"
+                :key="index"
+                :data-url="`/invoicing/order-details/${order.id}/`"
+                class="card invoicing-order-card"
+              >
                 <div class="card-header">
                   <span class="order-date" v-if="order.data && order.data.date">{{orderDate(order.data ? order.data.date : null)}}</span>
                   <span class="order-status" v-if="!isNurse">{{$t(`invoicing.order_status.${order.status}`)}}</span>
@@ -97,6 +102,8 @@
         listWithScroll: {},
         isNurse: API.isNurse,
         contacts: API.contacts,
+        orderContacts: {},
+        orderContactsLoading: {},
       };
     },
     created() {
@@ -149,12 +156,18 @@
       },
       orderUserName(user_id) {
         const self = this;
-        let user = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
+        let user;
+        if (self.isNurse) {
+          user = self.orderContacts[user_id];
+        }
+        if (!user) {
+          user = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
+        }
         if (!user && self.contacts && self.contacts.length) {
           user = self.contacts.filter(c => c.friend_id === parseInt(user_id, 10))[0];
         }
         if (!user) return '';
-        return user.name || `${user.first_name} ${user.last_name}`;
+        return user.name || `${user.first_name || ''} ${user.last_name || ''}`;
       },
       listHasScroll(list) {
         const self = this;
@@ -167,6 +180,18 @@
         const self = this;
         API.loadListOrders(list).then((orders) => {
           list.orders = orders;
+          orders.forEach((order) => {
+            if (!self.isNurse) return;
+            if (!self.orderContacts[order.user_id] && !self.orderContactsLoading[order.user_id]) {
+              self.orderContacts[order.user_id] = {};
+              self.orderContactsLoading[order.user_id] = true;
+              self.$api.getContact(order.user_id).then((contact) => {
+                self.orderContacts[order.user_id] = contact;
+                self.orderContactsLoading[order.user_id] = false;
+                self.$forceUpdate();
+              });
+            }
+          });
           self.$nextTick(() => {
             if (self.listHasScroll(list)) {
               self.$set(self.listWithScroll, list.id, true);
