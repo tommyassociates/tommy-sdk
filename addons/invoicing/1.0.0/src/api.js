@@ -5,25 +5,26 @@ const API = {
   actor: undefined,
   actorId: undefined,
   isNurse: false,
-  loadOrder(orderId, teamId) {
+  assignee_id: null,
+  loadOrder(orderId) {
     const params = {
       with_filters: true,
       with_permission_to: true,
       actor_id: API.actorId,
     };
     return api.call({
-      endpoint: teamId ? `vendors/${teamId}/orders/${orderId}` : `vendor/manager/orders/${orderId}`,
+      endpoint: `vendor/manager/orders/${orderId}`,
       data: params,
     });
   },
-  saveOrder(order, teamId) {
+  saveOrder(order) {
     return api.call({
       method: order.id ? 'PUT' : 'POST',
-      endpoint: teamId ? `vendors/${teamId}/orders/${order.id || ''}` : `vendor/manager/orders/${order.id || ''}`,
+      endpoint: `vendor/manager/orders/${order.id || ''}`,
       data: order,
     });
   },
-  loadListOrders(list, teamId) {
+  loadListOrders(list) {
     const tags = [];
     if (list.data && list.filters) {
       for (let i = 0; i < list.filters.length; i += 1) {
@@ -35,6 +36,7 @@ const API = {
       with_filters: true,
       with_permission_to: true,
       actor_id: API.actorId,
+      assignee_id: API.assignee_id || undefined,
     };
     if (list.data.date_range) {
       params.date_range = list.data.date_range;
@@ -82,7 +84,7 @@ const API = {
     params.data = JSON.stringify(params.data);
 
     return api.call({
-      endpoint: teamId ? `/vendors/${teamId}/orders` : '/vendor/manager/orders',
+      endpoint: '/vendor/manager/orders',
       data: params,
     });
   },

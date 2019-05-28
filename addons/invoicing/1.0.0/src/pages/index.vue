@@ -90,6 +90,7 @@
       const self = this;
       const roles = self.$root.account.roles;
       API.isNurse = self.$root.account && (roles.indexOf('Nurse') >= 0 || roles.indexOf('Employee') >= 0);
+      API.assignee_id = API.isNurse ? self.$root.account.user_id : null;
       return {
         lists: null,
         actorId: self.$f7route.query.actor_id,
@@ -105,6 +106,7 @@
         if (API.actor.roles && (API.actor.roles.indexOf('Nurse') >= 0 || API.actor.roles.indexOf('Employee') >= 0)) {
           API.isNurse = true;
           self.isNurse = true;
+          API.assignee_id = API.actor.user_id;
         }
       } else {
         delete API.actorId;
@@ -159,7 +161,7 @@
       },
       loadListOrders(list) {
         const self = this;
-        API.loadListOrders(list, self.isNurse ? self.$root.team.id : undefined).then((orders) => {
+        API.loadListOrders(list).then((orders) => {
           list.orders = orders;
           self.$nextTick(() => {
             if (self.listHasScroll(list)) {
