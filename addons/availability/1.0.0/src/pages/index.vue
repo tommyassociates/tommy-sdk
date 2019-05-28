@@ -4,7 +4,7 @@
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{$t('availability.index.title', 'Availabilities')}}</f7-nav-title>
       <f7-nav-right v-if="formChanged">
-        <a href="#" class="save link" @click="save">{{$t('common.save', 'Save')}}</a>
+        <a href="#" class="save link" @click="save">{{$t('label.save', 'Save')}}</a>
       </f7-nav-right>
     </f7-navbar>
 
@@ -14,7 +14,7 @@
       <a href="#" class="refresh" @click="loadAvailabilities">{{$t('availability.index.refresh', 'Refresh')}}</a>
     </div>
 
-    <f7-list class="no-margin-top" no-hairlines>
+    <f7-list class="no-margin-top" no-hairlines v-if="!isNurse">
       <f7-list-item
         :title="$t('availability.index.available_button')"
       >
@@ -70,6 +70,7 @@
       const startAt = self.$moment().subtract(1, 'day').startOf('day');
       const endAt = self.$moment().add(2, 'weeks').endOf('week');
       const current = startAt.clone();
+      const isNurse = self.$root.account && (self.$root.account.roles.indexOf('Nurse') >= 0 || self.$root.account.roles.indexOf('Employee') >= 0);
       while (current.add(1, 'day') < endAt) {
         const date = current.format('YYYY-MM-DD');
         if (!items[date]) {
@@ -101,6 +102,7 @@
         refreshPanelText: '1 min ago',
         actor_id,
         availableForWork,
+        isNurse,
       };
     },
     methods: {
