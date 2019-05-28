@@ -68,6 +68,9 @@ const API = {
     if (list.data.customer) {
       params.user_id = list.data.customer;
     }
+    if (API.assignee_id) {
+      params.status = ['complete', 'paid'];
+    }
     /*
     sort: [price_high, price_low, newest]
     # status: [quote, paid, processing, complete]
