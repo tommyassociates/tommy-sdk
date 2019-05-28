@@ -24,6 +24,7 @@ export default function (data, createNewOrder = true) {
         status: 'paid',
         comment: '',
         assignee_id: nurse.user_id,
+        assignee_team_id: teamId,
         data: {
           location,
           date,
@@ -37,18 +38,22 @@ export default function (data, createNewOrder = true) {
 
       const successUrl = '/nurse_booking/order-success/';
       if (createNewOrder) {
-        API.sendOrder(teamId, order).then((response) => {
-          API.createBookingEvent(teamId, { id: response.id, ...order }).then(() => {
+        API.sendOrder(teamId, order).then((responseOrder) => {
+          API.createBookingEvent(teamId, { id: responseOrder.id, ...order }).then((event) => {
             API.cache.booking.transaction = transaction;
-            f7.views.main.router.navigate(`${successUrl}?id=${response.id}`);
+            f7.views.main.router.navigate(`${successUrl}?id=${responseOrder.id}`);
+            responseOrder.event_id = event.id;
+            API.updateOrder(teamId, responseOrder);
           });
           // API.setAvailabilityLock(order);
         });
       } else {
-        API.updateOrder(teamId, { id: orderId, status: 'paid' }).then(() => {
-          API.createBookingEvent(teamId, { id: orderId, ...order }).then(() => {
+        API.updateOrder(teamId, { id: orderId, status: 'paid' }).then((responseOrder) => {
+          API.createBookingEvent(teamId, { id: orderId, ...order }).then((event) => {
             API.cache.booking.transaction = transaction;
             f7.views.main.router.navigate(`${successUrl}?id=${orderId}`);
+            responseOrder.event_id = event.id;
+            API.updateOrder(teamId, responseOrder);
           });
           // API.setAvailabilityLock(order);
         });
@@ -64,6 +69,7 @@ export default function (data, createNewOrder = true) {
         status: 'pending',
         comment: '',
         assignee_id: nurse.user_id,
+        assignee_team_id: teamId,
         data: {
           location,
           date,
