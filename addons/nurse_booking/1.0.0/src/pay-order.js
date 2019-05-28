@@ -23,6 +23,7 @@ export default function (data, createNewOrder = true) {
         name: productName,
         status: 'paid',
         comment: '',
+        assignee_id: nurse.user_id,
         data: {
           location,
           date,
@@ -62,6 +63,7 @@ export default function (data, createNewOrder = true) {
         name: productName,
         status: 'pending',
         comment: '',
+        assignee_id: nurse.user_id,
         data: {
           location,
           date,
