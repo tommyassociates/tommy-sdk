@@ -7,6 +7,19 @@ import formatTransactionStatus from './utils/format-transaction-status';
 const tommy = window.tommy;
 const i18n = tommy.i18n;
 
+let wechatInstalled;
+if (window.cordova) {
+  document.addEventListener('deviceready', () => {
+    if (!window.Wechat) return;
+    window.Wechat.isInstalled((installed) => {
+      wechatInstalled = installed;
+      // alert("Wechat installed: " + (installed ? "Yes" : "No"));
+    }, (/* reason */) => {
+      // alert("Failed: " + reason);
+    });
+  });
+}
+
 function renderPopup(data) {
   return `
   <div class="page">
@@ -30,11 +43,7 @@ function renderPopup(data) {
         <div class="transaction-popup-list-item">${data.payee_name}</div>
         <div class="transaction-popup-list-item">${data.currency}${data.amount}</div>
         <div class="transaction-popup-list-item">${i18n.t('wallet.transaction_popup.using_label', 'Using')}</div>
-        ${data.multiple ? `
           <div class="transaction-popup-list-item transaction-popup-list-item-link transaction-popup-select-wallet">${data.card_name}</div>
-        ` : `
-          <div class="transaction-popup-list-item">${data.card_name}</div>
-        `}
       </div>
     </div>
   </div>
@@ -55,7 +64,9 @@ function renderPopupStatus(data) {
         </div>
       </div>
     </div>
+    ${data.paymentMethod === 'card' ? `
     <a class="transaction-popup-report-button transaction-popup-fade-in">${i18n.t('wallet.transaction_popup.report_button', 'View Report')}</a>
+    ` : ''}
     <div class="page-content">
       <i class="transaction-popup-status-icon transaction-popup-${data.status}-icon"></i>
       <div class="transaction-popup-status-title">${data.title}</div>
@@ -65,7 +76,7 @@ function renderPopupStatus(data) {
   `.trim();
 }
 
-function renderPopupReport(transaction) {
+function renderPopupReport(transaction, data) {
   return `
   <div class="page">
     <div class="navbar">
@@ -132,19 +143,85 @@ const transaction = {
     popup: null,
     params: null,
   },
-  selectWallet(cards, callback) {
+  selectWallet(currentMethod, cards, callback) {
     const { f7 } = tommy.app;
-    const walletButtons = cards.map((card) => {
-      return {
-        text: card.name,
-        onClick() {
-          if (callback) callback(card);
+
+    const card = cards && cards[0];
+    const sheet = f7.sheet.create({
+      backdrop: true,
+      content: `
+        <div class="sheet-modal wallet-payments-sheet">
+          <div class="toolbar">
+            <div class="toolbar-inner">
+              <a class="link color-gray sheet-close">Cancel</a>
+              <a class="link sheet-close wallet-payment-done">Done</a>
+            </div>
+          </div>
+          <div class="sheet-modal-inner">
+            <div class="list no-hairlines no-margin">
+              <ul>
+                ${card ? `
+                <li>
+                  <label class="item-content item-radio">
+                    <input type="radio" ${currentMethod === 'card' ? 'checked' : ''} name="payment-method" value="${card.id}">
+                    <i class="icon icon-radio"></i>
+                    ${card.icon_url ? `
+                    <div class="item-media">
+                      <img src="${card.icon_url}">
+                    </div>
+                    ` : ''}
+                    <div class="item-inner">
+                      <div class="item-title">${card.name}</div>
+                    </div>
+                  </label>
+                </li>
+                ` : ''}
+                ${wechatInstalled ? `
+                <li>
+                  <label class="item-content item-radio">
+                    <input type="radio" ${currentMethod === 'wechat' ? 'checked' : ''} name="payment-method" value="wechat">
+                    <i class="icon icon-radio"></i>
+                    <div class="item-media">
+                      <i class="wallet-icon-wechat"></i>
+                    </div>
+                    <div class="item-inner">
+                      <div class="item-title">${i18n.t('wallet.index.wechat_label')}</div>
+                    </div>
+                  </label>
+                </li>
+                ` : ''}
+                ${window.cordova ? `
+                <li>
+                  <label class="item-content item-radio">
+                    <input type="radio" ${currentMethod === 'alipay' ? 'checked' : ''} name="payment-method" value="alipay">
+                    <i class="icon icon-radio"></i>
+                    <div class="item-media">
+                      <i class="wallet-icon-alipay"></i>
+                    </div>
+                    <div class="item-inner">
+                      <div class="item-title">${i18n.t('wallet.index.alipay_label')}</div>
+                    </div>
+                  </label>
+                </li>
+                ` : ''}
+              </ul>
+            </div>
+          </div>
+        </div>
+      `,
+      on: {
+        closed() {
+          sheet.$el.off('click');
+          sheet.destroy();
         },
-      };
-    });
-    f7.actions.create({
-      buttons: walletButtons,
+      },
     }).open();
+    sheet.$el.once('click', '.wallet-payment-done', () => {
+      const selectedMethod = sheet.$el.find('input:checked').val();
+      if (selectedMethod === 'alipay') callback(null, 'alipay');
+      else if (selectedMethod === 'wechat') callback(null, 'wechat');
+      else callback(cards[selectedMethod], 'card');
+    });
   },
   showLoader() {
     if (transaction.cache.popup.$el.find('.transaction-preloader').length) return;
@@ -158,7 +235,7 @@ const transaction = {
     if (transaction.cache.popup.destroy) transaction.cache.popup.destroy();
     transaction.cache = {};
   },
-  renderError(error) {
+  renderError(error, data) {
     const { popup } = transaction.cache;
     const message = typeof error === 'string' ? error : (error && error.message || '');
 
@@ -166,13 +243,14 @@ const transaction = {
       title: i18n.t('wallet.transaction_popup.error_title', 'Fail'),
       status: 'error',
       message,
+      paymentMethod: data.paymentMethod,
     });
     transaction.cache.onReportBack = () => popup.$el.html(html);
     popup.$el.html(html);
   },
-  renderSuccess(data) {
+  renderSuccess(e, data) {
     const { popup } = transaction.cache;
-    const { payee_name, card_name, amount, currency } = data;
+    const { payee_name, card_name, amount, currency, paymentMethod } = data;
 
     const html = renderPopupStatus({
       title: i18n.t('wallet.transaction_popup.success_title', 'Success'),
@@ -183,15 +261,90 @@ const transaction = {
         currency: currencyMap(currency),
         amount,
         to: payee_name,
-        from: card_name,
+        from: paymentMethod === 'card' ? card_name : i18n.t(`wallet.index.${paymentMethod}_label`),
       }),
+      paymentMethod: data.paymentMethod,
     });
     transaction.cache.onReportBack = () => popup.$el.html(html);
     popup.$el.html(html);
   },
+  aliPay(data) {
+    const { payee_name, amount, order_id } = data;
+    transaction.showLoader();
+    const { f7 } = tommy.app;
+    f7.request({
+      method: 'POST',
+      url: 'http://pay.ncxinjiang.com/test/alipay-app.php',
+      data: {
+        out_trade_no: order_id,
+        total_amount: amount,
+        subject: payee_name,
+      },
+      success(response) {
+        window.cordova.plugins.alipay.payment(
+          response,
+          (e) => {
+            transaction.hideLoader();
+            transaction.renderSuccess(e, data);
+            if (transaction.cache.onSuccess) transaction.cache.onSuccess(e, data);
+          },
+          (e) => {
+            transaction.hideLoader();
+            transaction.renderError(e, data);
+            if (transaction.cache.onError) transaction.cache.onError(e, data);
+          }
+        );
+      },
+    });
+  },
+  wxPay(data) {
+    const { payee_name, amount, order_id } = data;
+    transaction.showLoader();
+    const { f7 } = tommy.app;
+    f7.request({
+      method: 'POST',
+      url: 'http://pay.ncxinjiang.com/test/wxpay-app.php',
+      data: {
+        out_trade_no: order_id,
+        total_amount: amount,
+        subject: payee_name,
+      },
+      dataType: 'json',
+      success(response) {
+        const sendParams = {
+          partnerid: response.partnerid, // merchant id
+          prepayid: response.prepayid, // prepay id
+          noncestr: response.noncestr, // nonce
+          timestamp: response.timestamp, // timestamp
+          sign: response.sign, // signed string
+        };
+        window.Wechat.sendPaymentRequest(
+          sendParams,
+          (e) => {
+            transaction.hideLoader();
+            transaction.renderSuccess(e, data);
+            if (transaction.cache.onSuccess) transaction.cache.onSuccess(e, data);
+          },
+          (e) => {
+            transaction.hideLoader();
+            transaction.renderError(e, data);
+            if (transaction.cache.onError) transaction.cache.onError(e, data);
+          }
+        );
+      },
+    });
+  },
   createTransaction(data) {
     const { card_name } = data;
     const { f7 } = tommy.app;
+    if (data.paymentMethod === 'alipay') {
+      transaction.aliPay(data);
+      return;
+    }
+    if (data.paymentMethod === 'wechat') {
+      transaction.wxPay(data);
+      return;
+    }
     transaction.showLoader();
     API.createWalletTransaction(data).then(
       (response) => {
@@ -200,22 +353,22 @@ const transaction = {
         transaction.cache.transactionDetails = transactionDetails;
 
         if (transactionDetails.status && transactionDetails.status !== 'failed') {
-          transaction.renderSuccess(transactionDetails);
+          transaction.renderSuccess(transactionDetails, data);
           f7.$(document).trigger('wallet:transaction', transactionDetails);
           tommy.events.$emit('walletTransaction', transactionDetails);
-          if (transaction.cache.onSuccess) transaction.cache.onSuccess(transactionDetails);
+          if (transaction.cache.onSuccess) transaction.cache.onSuccess(transactionDetails, data);
         } else if (transactionDetails.status === 'failed') {
           transaction.renderError(Object.assign(transactionDetails, {
             message: i18n.t('wallet.transaction_popup.error_insufficient', 'Sorry. Your Tommy account balance is insufficient. Please use other payment methods'),
-          }));
-          if (transaction.cache.onError) transaction.cache.onError(transactionDetails);
+          }), data);
+          if (transaction.cache.onError) transaction.cache.onError(transactionDetails, data);
         }
       }, (error) => {
         const transactionDetails = Object.assign({}, data, { status: 'failed' });
         transaction.hideLoader();
         transaction.cache.transactionDetails = transactionDetails;
-        transaction.renderError(error);
-        if (transaction.cache.onError) transaction.cache.onError(error);
+        transaction.renderError(error, data);
+        if (transaction.cache.onError) transaction.cache.onError(error, data);
       }
     );
   },
@@ -229,36 +382,38 @@ const transaction = {
   render() {
     const { f7 } = tommy.app;
     const { popup, params } = transaction.cache;
-    const { addon, addon_id, addon_install_id, payee_name, amount, currency } = params;
+    const { addon, addon_id, addon_install_id, payee_name, amount, currency, order_id } = params;
 
     transaction.showLoader();
 
     // get wallet cards
     API.getWalletCards().then((cards) => {
-      const multiple = cards.length > 1;
       let { id: wallet_card_id, wallet_account_id, name: card_name } = cards[0];
+      let paymentMethod = 'card';
       const html = renderPopup({
         payee_name,
         currency: currencyMap(currency),
         amount,
         card_name,
-        multiple,
       });
 
       transaction.hideLoader();
       popup.$el.append(html);
 
       popup.$el.on('click', '.transaction-popup-select-wallet', () => {
-        if (!multiple) return;
-        transaction.selectWallet(cards, (card) => {
-          card_name = card.name;
-          wallet_card_id = card.id;
-          wallet_account_id = card.wallet_account_id;
-          popup.$el.find('.transaction-popup-select-wallet').text(card_name);
+        transaction.selectWallet(paymentMethod, cards, (card, method) => {
+          paymentMethod = method;
+          if (method === 'card') {
+            card_name = card.name;
+            wallet_card_id = card.id;
+            wallet_account_id = card.wallet_account_id;
+          }
+          popup.$el.find('.transaction-popup-select-wallet').text(method === 'card' ? card_name : i18n.t(`wallet.index.${method}_label`));
         });
       });
       popup.$el.once('click', '.transaction-popup-confirm-button', () => {
         transaction.createTransaction({
+          paymentMethod,
           addon,
           addon_id,
           addon_install_id,
@@ -268,6 +423,7 @@ const transaction = {
           wallet_card_id,
           wallet_account_id,
           card_name,
+          order_id,
         });
       });
       popup.$el.on('click', '.transaction-popup-report-button', () => {

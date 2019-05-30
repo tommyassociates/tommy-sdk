@@ -319,6 +319,7 @@
     position: relative;
     padding-right: 28px;
     transition-duration: 200ms;
+    cursor: pointer;
     &.active-state {
       background-color: rgba(255,255,255,0.1);
     }
@@ -412,8 +413,36 @@
       color: rgba(255,255,255,0.8);
     }
   }
-
 }
+.wallet-payments-sheet.sheet-modal {
+  background: #fff;
+  height: auto;
+  .toolbar {
+    background: #fff;
+    a {
+      font-size: 18px;
+    }
+  }
+  img {
+    width: 40px;
+    height: 40px;
+  }
+  .wallet-icon-wechat,
+  .wallet-icon-alipay {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+  }
+  .wallet-icon-wechat {
+    background: url(../assets/icon-wechat.svg) no-repeat center;
+    background-size: contain;
+  }
+  .wallet-icon-alipay {
+    background: url(../assets/icon-alipay.svg) no-repeat center;
+    background-size: contain;
+  }
+}
+
 @keyframes wallet-preloader-in {
   from {
     opacity: 0;

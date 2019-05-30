@@ -8,7 +8,9 @@
     "tab_transactions_title": " 转账记录",
     "no_transactions_message": "对不起，你的账户还没有历史转账记录",
     "tab_wallets_title": "钱包",
-    "no_accounts_message": "你的注册账号将会出现在你的钱包账户里"
+    "no_accounts_message": "你的注册账号将会出现在你的钱包账户里",
+    "wechat_label": "微信",
+    "alipay_label": "支付宝"
   },
   "settings": {
     "title": "设置",
@@ -32,7 +34,10 @@
     "error_title": "支付失败",
     "success_title": "已付款",
     "success_message": "",
-    "error_insufficient": "对不起，余额不足，请重新选择支付工具"
+    "error_insufficient": "对不起，余额不足，请重新选择支付工具",
+    "cancel_button": "取消",
+    "done_button": "完成"
+
   },
   "title": "钱包",
   "views": {

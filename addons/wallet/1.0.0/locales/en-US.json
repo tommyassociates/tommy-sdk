@@ -8,7 +8,9 @@
     "tab_transactions_title": "Transactions",
     "no_transactions_message": "Sorry. You do not have any transactions history yet.",
     "tab_wallets_title": "Wallets",
-    "no_accounts_message": "When you have Accounts, they will appear within your Wallet here."
+    "no_accounts_message": "When you have Accounts, they will appear within your Wallet here.",
+    "wechat_label": "WeChat",
+    "alipay_label": "Alipay"
   },
   "settings": {
     "title": "Settings",
@@ -32,7 +34,10 @@
     "error_title": "Fail",
     "success_title": "Success",
     "success_message": "You sent {{currency}}{{amount}}.<br>To {{to}}.<br>From {{from}}.",
-    "error_insufficient": "Sorry. Your Tommy account balance is insufficient. Please use other payment methods"
+    "error_insufficient": "Sorry. Your Tommy account balance is insufficient. Please use other payment methods",
+    "cancel_button": "Cancel",
+    "done_button": "Done"
+
   },
   "title": "Wallet",
   "views": {
