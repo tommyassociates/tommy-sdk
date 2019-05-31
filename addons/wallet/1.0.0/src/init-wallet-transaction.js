@@ -6,6 +6,7 @@ import formatTransactionStatus from './utils/format-transaction-status';
 
 const tommy = window.tommy;
 const i18n = tommy.i18n;
+const isTuome = tommy.root.isTuome;
 
 let wechatInstalled;
 if (window.cordova) {
@@ -176,7 +177,7 @@ const transaction = {
                   </label>
                 </li>
                 ` : ''}
-                ${wechatInstalled ? `
+                ${wechatInstalled || window.nativeProxy ? `
                 <li>
                   <label class="item-content item-radio">
                     <input type="radio" ${currentMethod === 'wechat' ? 'checked' : ''} name="payment-method" value="wechat">
@@ -190,7 +191,7 @@ const transaction = {
                   </label>
                 </li>
                 ` : ''}
-                ${window.cordova ? `
+                ${window.nativeProxy || window.cordova ? /* `
                 <li>
                   <label class="item-content item-radio">
                     <input type="radio" ${currentMethod === 'alipay' ? 'checked' : ''} name="payment-method" value="alipay">
@@ -203,7 +204,7 @@ const transaction = {
                     </div>
                   </label>
                 </li>
-                ` : ''}
+                ` */ '' : ''}
               </ul>
             </div>
           </div>
@@ -298,7 +299,27 @@ const transaction = {
     });
   },
   wxPay(data) {
-    const { payee_name, amount, order_id } = data;
+    const { payee_name, amount, order_id, currency } = data;
+    if (window.nativeProxy) {
+      window.tommy.onPayment = function onPayment(paymentType, actorID, error) {
+        if (!paymentType === 'wechat') return;
+        if (error) {
+          transaction.renderError(error, { paymentMethod: 'wechat' });
+          if (transaction.cache.onError) transaction.cache.onError({}, { paymentMethod: 'wechat' });
+        } else {
+          const dt = {
+            order_id,
+            payee_name,
+            amount,
+            currency,
+            paymentMethod: 'wechat',
+          };
+          transaction.renderSuccess({}, dt);
+          if (transaction.cache.onSuccess) transaction.cache.onSuccess({}, dt);
+        }
+      };
+      window.location.href = `${isTuome ? 'tuome' : 'tommy'}://wechat?trade-no=${order_id}&amount=${amount * 100}&subject=${payee_name}`;
+    }
     transaction.showLoader();
     const { f7 } = tommy.app;
     f7.request({
@@ -306,7 +327,7 @@ const transaction = {
       url: 'http://pay.ncxinjiang.com/test/wxpay-app.php',
       data: {
         out_trade_no: order_id,
-        total_amount: amount,
+        total_amount: amount * 100,
         subject: payee_name,
       },
       dataType: 'json',
