@@ -59,7 +59,7 @@
       <f7-list-item
         class="item-total-price"
         :title="`${$t('nurse_booking.order_details.payment_label')}:`"
-        :after="transaction ? transaction.card_name : null"
+        :after="transaction && transaction.card_name ? transaction.card_name : null"
       ></f7-list-item>
 
       <template v-if="status">
@@ -143,7 +143,7 @@
         self.date = parseInt(order.data.date, 10);
         self.nurse = order.data.nurse;
         self.transaction = {
-          card_name: order.wallet_transaction.card_name,
+          card_name: order.wallet_transaction ? order.wallet_transaction.card_name : null,
         };
         self.total = order.total;
         if (order.vendor_coupon_id) {
