@@ -94,7 +94,7 @@
     data() {
       const self = this;
       const roles = self.$root.account.roles;
-      API.isNurse = self.$root.account && (roles.indexOf('Nurse') >= 0 || roles.indexOf('Employee') >= 0);
+      API.isNurse = !roles || (roles && roles.length === 0) || (roles && (roles.indexOf('Nurse') >= 0 || roles.indexOf('Employee') >= 0));
       API.assignee_id = API.isNurse ? self.$root.account.user_id : null;
       return {
         lists: null,

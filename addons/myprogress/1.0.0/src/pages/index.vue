@@ -309,6 +309,7 @@
         if (self.$root.account && (self.$root.account.kind === 'Nurse' || self.$root.account.roles.indexOf('Nurse') >= 0)) return true;
         if (self.$root.account && (self.$root.account.kind === 'Jobseeker' || self.$root.account.roles.indexOf('Jobseeker') >= 0)) return true;
         if (self.$root.account && (self.$root.account.kind === 'Employee' || self.$root.account.roles.indexOf('Employee') >= 0)) return true;
+        if (self.$root.account && (!self.$root.account.roles || !self.$root.account.roles.length)) return true;
         return false;
       },
     },

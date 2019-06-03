@@ -70,7 +70,8 @@
       const startAt = self.$moment().subtract(1, 'day').startOf('day');
       const endAt = self.$moment().add(2, 'weeks').endOf('week');
       const current = startAt.clone();
-      const isNurse = self.$root.account && (self.$root.account.roles.indexOf('Nurse') >= 0 || self.$root.account.roles.indexOf('Employee') >= 0);
+      const roles = self.$root.account.roles;
+      const isNurse = !roles || (roles && roles.length === 0) || (roles && (roles.indexOf('Nurse') >= 0 || roles.indexOf('Employee') >= 0));
       while (current.add(1, 'day') < endAt) {
         const date = current.format('YYYY-MM-DD');
         if (!items[date]) {
