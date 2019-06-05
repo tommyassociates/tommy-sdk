@@ -37,6 +37,7 @@
     "filter_status": "状态",
     "activity_from": "活动列表",
     "customer": "客户",
+    "assignee": "代理人",
     "bill_to": "账单接收人",
     "type": "种类",
     "type_all": "All",
@@ -140,6 +141,7 @@
     "comment": "备注",
     "comment_placeholder": "添加备注",
     "customer": "客户",
+    "assignee": "代理人",
     "items": "项目",
     "packages": "套餐",
     "promotions": "优惠",
@@ -205,19 +207,19 @@
       "title": "Filter Orders",
       "hint": "Select which orders will appear on the list"
     },
-    "invoicing_order_list_read_access": {
+    "order_list_read_access": {
       "title": "可以看列表的人",
       "hint": "Select who can view this list"
     },
-    "invoicing_order_list_edit_access": {
+    "order_list_edit_access": {
       "title": "Who Can Edit List",
       "hint": "Select who can edit this list"
     },
-    "invoicing_item_create_access": {
+    "item_create_access": {
       "title": "Who Can Create Items",
       "hint": "Select who can create items/services"
     },
-    "invoicing_item_edit_access": {
+    "item_edit_access": {
       "title": "Who Can Edit Items",
       "hint": "Select who can edit items/services"
     }

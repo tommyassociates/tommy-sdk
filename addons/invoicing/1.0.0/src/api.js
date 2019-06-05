@@ -69,6 +69,9 @@ const API = {
     if (list.data.customer) {
       params.user_id = list.data.customer;
     }
+    if (list.data.assignee) {
+      params.assignee_id = list.data.assignee;
+    }
     if (API.assignee_id) {
       params.status = ['complete', 'paid'];
     }
@@ -112,6 +115,7 @@ const API = {
       with_permission_to: true,
       actor_id: API.actorId,
       user_id: API.actorId,
+      only_owned: !API.actorId,
     }, params), options);
   },
 

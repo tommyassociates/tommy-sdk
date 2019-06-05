@@ -37,6 +37,7 @@
     "filter_status": "Status",
     "activity_from": "Activity From",
     "customer": "Customer",
+    "assignee": "Assignee",
     "bill_to": "Bill To",
     "type": "Type",
     "type_all": "All",
@@ -140,6 +141,7 @@
     "comment": "Comments",
     "comment_placeholder": "Add comments",
     "customer": "Customer",
+    "assignee": "Assignee",
     "items": "Items",
     "packages": "Packages",
     "promotions": "Promotions",
@@ -205,19 +207,19 @@
       "title": "Filter Orders",
       "hint": "Select which orders will appear on the list"
     },
-    "invoicing_order_list_read_access": {
+    "order_list_read_access": {
       "title": "Who Can See List",
       "hint": "Select who can view this list"
     },
-    "invoicing_order_list_edit_access": {
+    "order_list_edit_access": {
       "title": "Who Can Edit List",
       "hint": "Select who can edit this list"
     },
-    "invoicing_item_create_access": {
+    "item_create_access": {
       "title": "Who Can Create Items",
       "hint": "Select who can create items/services"
     },
-    "invoicing_item_edit_access": {
+    "item_edit_access": {
       "title": "Who Can Edit Items",
       "hint": "Select who can edit items/services"
     }
