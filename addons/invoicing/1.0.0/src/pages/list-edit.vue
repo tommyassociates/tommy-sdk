@@ -80,6 +80,20 @@
       <!-- Specific Items -->
       <!-- Auto Renew -->
 
+      <!-- Assignee -->
+      <f7-list-item smart-select :smart-select-params="{searchbar: true}" v-if="$root.team && $root.teamMembers" :title="$t('invoicing.list_edit.assignee', 'Assignee')">
+        <select name="assignee" multiple @change="onAssigneeChange">
+          <option
+            v-for="(teamMember) in $root.teamMembers"
+            :key="teamMember.id"
+            :value="teamMember.user_id"
+            data-option-class="invoicing-smart-select-option"
+            :data-option-image="teamMember.icon_url"
+            :selected="list.data.assignee.indexOf(teamMember.user_id) >= 0"
+          >{{teamMember.first_name || ''}} {{teamMember.last_name || ''}}</option>
+        </select>
+      </f7-list-item>
+
       <!-- Customer -->
       <f7-list-item smart-select :smart-select-params="{searchbar: true}" v-if="$root.team && $root.teamMembers" :title="$t('invoicing.list_edit.customer', 'Customer')">
         <select name="customer" multiple @change="onCustomerChange">
@@ -147,6 +161,7 @@
         if (!list.data) list.data = {};
         if (!list.data.status) list.data.status = [];
         if (!list.data.customer) list.data.customer = [];
+        if (!list.data.assignee) list.data.assignee = [];
         self.list = list;
         self.$api.getInstalledAddonPermission('invoicing', 'order_list_read_access', {
           taggable_id: list.id,
@@ -200,6 +215,12 @@
         const self = this;
         if (self.saving) return;
         self.list.data.customer = self.$$(e.target).val().map(el => parseInt(el, 10));
+        self.showSave = true;
+      },
+      onAssigneeChange(e) {
+        const self = this;
+        if (self.saving) return;
+        self.list.data.assignee = self.$$(e.target).val().map(el => parseInt(el, 10));
         self.showSave = true;
       },
       showDateRange() {

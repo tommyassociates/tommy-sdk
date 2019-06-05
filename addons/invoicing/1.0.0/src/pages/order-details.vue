@@ -86,6 +86,17 @@
               resizable
             ></f7-list-input>
 
+            <!-- Nurse -->
+            <template v-if="orderAssignee">
+              <f7-list-item divider :title="$t('invoicing.order_details.assignee')"></f7-list-item>
+              <f7-list-item
+                :title="orderAssignee ? orderAssigneeName : ''"
+                :link="`/team-member-details/?user_id=${order.assignee_id}&name=${orderAssigneeName}`"
+              >
+                <tommy-circle-avatar :data="orderAssignee" slot="media"></tommy-circle-avatar>
+              </f7-list-item>
+            </template>
+
             <!-- Customer -->
             <template>
               <f7-list-item divider :title="$t('invoicing.order_details.customer')"></f7-list-item>
@@ -257,17 +268,17 @@
                 <f7-list class="list-custom invoicing-order-details-products invoicing-order-details-items">
                   <f7-list-item divider :title="$t('invoicing.order_details.packages')"></f7-list-item>
                   <f7-list-item
-                    v-for="product in packages"
-                    :key="product.id"
+                    v-for="pkg in packages"
+                    :key="`package-${pkg.id}`"
                     link
-                    :title="product.name"
-                    :after="`¥${product.price}`"
-                    @click="addOrderItem(product, 'VendorPackage')"
+                    :title="pkg.name"
+                    :after="`¥${pkg.price}`"
+                    @click="addOrderItem(pkg, 'VendorPackage')"
                   ></f7-list-item>
                   <f7-list-item divider :title="$t('invoicing.order_details.items')"></f7-list-item>
                   <f7-list-item
                     v-for="product in products"
-                    :key="product.id"
+                    :key="`product-${product.id}`"
                     link
                     :title="product.name"
                     :after="`¥${product.price}`"
@@ -328,6 +339,7 @@
         promotionsOpened: false,
         isFeedback: false,
         orderUser: null,
+        orderAssignee: null,
         contacts: API.contacts,
       };
     },
@@ -337,6 +349,8 @@
         API.loadOrder(self.id).then((order) => {
           self.order = order;
           let orderUser = self.$root.teamMembers.filter(m => m.user_id === parseInt(order.user_id, 10))[0];
+          const orderAssignee = self.$root.teamMembers.filter(m => m.user_id === parseInt(order.assignee_id, 10))[0];
+          self.orderAssignee = orderAssignee;
           if (!orderUser) {
             if (self.contacts) {
               // assuming contact
@@ -390,6 +404,17 @@
       if (self.timePicker && self.timePicker.destroy) self.timePicker.destroy();
     },
     computed: {
+      orderAssigneeName() {
+        const self = this;
+        const user = self.orderAssignee;
+        if (!user) return '';
+        if (user.friend_team_name) {
+          return user.friend_team_name.trim();
+        }
+        if (user.name) return user.name.trim();
+        if (user.first_name) return `${user.first_name}${user.last_name ? ` ${user.last_name}` : ''}`.trim();
+        return '';
+      },
       orderUserName() {
         const self = this;
         const user = self.orderUser;
