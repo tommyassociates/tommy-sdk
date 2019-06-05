@@ -112,8 +112,10 @@ const API = {
       start_at: new Date(date).toJSON(),
       end_at: new Date(end_at).toJSON(),
       location: `${order.data.location.city} ${order.data.location.address}`,
-      user_id: order.data.nurse.user_id,
-      team_id: teamId,
+      user_id: order.user_id,
+      team_id: null,
+      assignee_id: order.data.nurse.user_id,
+      assignee_team_id: teamId,
       kind: 'Booking',
       resource_id: order.id,
       resource_type: 'VendorOrder',
@@ -245,14 +247,6 @@ const API = {
     return api.call({
       endpoint: `vendors/${teamId}/orders/${id}`,
       method: 'DELETE',
-    }).then(() => {
-      return Promise.all([
-        // API.deleteBookingEvent(id),
-        api.call({
-          endpoint: `/wallet/transactions/${transactionId}/refund`,
-          method: 'POST',
-        }),
-      ]);
     });
   },
 };
