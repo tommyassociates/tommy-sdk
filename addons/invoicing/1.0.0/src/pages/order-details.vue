@@ -616,7 +616,11 @@
       },
       onStatusChange(e) {
         const self = this;
+        const prevStatus = self.order.status;
         self.order.status = e.target.value;
+        if (prevStatus !== 'paid' && self.order.status === 'paid') {
+          self.orderChangedToPaid = true;
+        }
         self.showSave = true;
       },
       onTypeChange(e) {
@@ -688,6 +692,30 @@
         data.total = self.orderItemsTotal;
         data.discount = self.orderDiscountTotal;
         delete data.vendor_order_items;
+
+        const needNewEvent = self.orderChangedToPaid && !data.event_id && data.data.date && data.data.nurse && data.data.location && data.id && data.user_id;
+        if (needNewEvent) {
+          let orderDate = data.data.date;
+          if (typeof orderDate === 'string') orderDate = parseInt(orderDate, 10);
+          let end_at;
+          if (data.data.duration && data.data.duration > 0)  {
+            end_at = orderDate + parseInt(data.data.duration, 10) * 60 * 1000;
+          }
+          data.event_attributes = {
+            addon: 'nurse_booking',
+            title: data.name,
+            start_at: new Date(orderDate).toJSON(),
+            end_at: new Date(end_at).toJSON(),
+            location: `${data.data.location.city} ${data.data.location.address}`,
+            user_id: data.user_id,
+            team_id: null,
+            assignee_id: data.data.nurse.user_id,
+            assignee_team_id: self.$root.team.id,
+            kind: 'Booking',
+            resource_id: data.id,
+            resource_type: 'VendorOrder',
+          };
+        }
         API.saveOrder(data).then((order) => {
           self.order = order;
           self.$events.$emit('invoicing:reloadListsOrders');
