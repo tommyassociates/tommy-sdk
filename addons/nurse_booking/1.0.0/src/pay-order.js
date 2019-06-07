@@ -30,6 +30,19 @@ export default function (data, createNewOrder = true) {
   };
 
   function pay(responseOrder) {
+    if (total === 0) {
+      // free no wallet
+      API.createBookingEvent(teamId, { id: responseOrder.id, ...order }).then((event) => {
+        API.cache.booking.transaction = {};
+        f7.views.main.router.navigate(`${successUrl}?id=${responseOrder.id}`);
+        responseOrder.event_id = event.id;
+        responseOrder.status = 'paid';
+        // responseOrder.wallet_transaction_id = transaction.id;
+        // responseOrder.payment_method = walletData.paymentMethod || 'card';
+        API.updateOrder(teamId, responseOrder);
+      });
+      return;
+    }
     tommy.initWalletTransaction(
       {
         addon: 'nurse_booking',
@@ -46,6 +59,7 @@ export default function (data, createNewOrder = true) {
           responseOrder.status = 'paid';
           responseOrder.wallet_transaction_id = transaction.id;
           responseOrder.payment_method = walletData.paymentMethod || 'card';
+          responseOrder.data.payment_method = walletData.paymentMethod || 'card';
           API.updateOrder(teamId, responseOrder);
         });
       },
@@ -54,6 +68,7 @@ export default function (data, createNewOrder = true) {
         f7.views.main.router.navigate(`${errorUrl}?id=${responseOrder.id}`);
         responseOrder.wallet_transaction_id = transaction.id;
         responseOrder.payment_method = walletData.paymentMethod || 'card';
+        responseOrder.data.payment_method = walletData.paymentMethod || 'card';
         API.updateOrder(teamId, responseOrder);
       }
     );
