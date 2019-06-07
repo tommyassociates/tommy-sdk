@@ -190,8 +190,8 @@
             items.forEach((item) => {
               const date = self.$moment(item.start_at).format('YYYY-MM-DD');
               if (!item.data) item.data = {};
-              if (self.items[date] && self.items[date].data) {
-                Object.assign(item.data, self.items[date].data);
+              if (self.items[date] && new Date(item.created_at).getTime() < new Date(self.items[date].created_at).getTime()) {
+                return;
               }
               self.items[date] = item;
               self.$forceUpdate();
