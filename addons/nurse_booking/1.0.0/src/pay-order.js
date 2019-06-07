@@ -29,17 +29,33 @@ export default function (data, createNewOrder = true) {
     total,
   };
 
+  let orderDate = order.data.date;
+  if (typeof orderDate === 'string') orderDate = parseInt(orderDate, 10);
+  let end_at;
+  if (order.data.duration && order.data.duration > 0)  {
+    end_at = orderDate + parseInt(order.data.duration, 10) * 60 * 1000;
+  }
+  order.event_attributes = {
+    addon: 'nurse_booking',
+    title: order.name,
+    start_at: new Date(orderDate).toJSON(),
+    end_at: new Date(end_at).toJSON(),
+    location: `${order.data.location.city} ${order.data.location.address}`,
+    user_id: order.user_id,
+    team_id: null,
+    assignee_id: order.data.nurse.user_id,
+    assignee_team_id: teamId,
+    kind: 'Booking',
+    resource_id: order.id,
+    resource_type: 'VendorOrder',
+  };
+
   function pay(responseOrder) {
     if (total === 0) {
-      // free no wallet
-      API.createBookingEvent(teamId, { id: responseOrder.id, ...order }).then((event) => {
-        API.cache.booking.transaction = {};
+      API.cache.booking.transaction = {};
+      responseOrder.status = 'paid';
+      API.updateOrder(teamId, responseOrder).then(() => {
         f7.views.main.router.navigate(`${successUrl}?id=${responseOrder.id}`);
-        responseOrder.event_id = event.id;
-        responseOrder.status = 'paid';
-        // responseOrder.wallet_transaction_id = transaction.id;
-        // responseOrder.payment_method = walletData.paymentMethod || 'card';
-        API.updateOrder(teamId, responseOrder);
       });
       return;
     }
@@ -52,24 +68,18 @@ export default function (data, createNewOrder = true) {
         order_id: responseOrder.id,
       },
       (transaction, walletData = {}) => {
-        API.createBookingEvent(teamId, { id: responseOrder.id, ...order }).then((event) => {
-          API.cache.booking.transaction = transaction;
-          f7.views.main.router.navigate(`${successUrl}?id=${responseOrder.id}`);
-          responseOrder.event_id = event.id;
-          responseOrder.status = 'paid';
-          responseOrder.wallet_transaction_id = transaction.id;
-          responseOrder.payment_method = walletData.paymentMethod || 'card';
-          responseOrder.data.payment_method = walletData.paymentMethod || 'card';
-          API.updateOrder(teamId, responseOrder);
-        });
-      },
-      (transaction, walletData = {}) => {
         API.cache.booking.transaction = transaction;
-        f7.views.main.router.navigate(`${errorUrl}?id=${responseOrder.id}`);
+        responseOrder.status = 'paid';
         responseOrder.wallet_transaction_id = transaction.id;
         responseOrder.payment_method = walletData.paymentMethod || 'card';
         responseOrder.data.payment_method = walletData.paymentMethod || 'card';
-        API.updateOrder(teamId, responseOrder);
+        API.updateOrder(teamId, responseOrder).then(() => {
+          f7.views.main.router.navigate(`${successUrl}?id=${responseOrder.id}`);
+        });
+      },
+      (transaction, walletData = {}) => {
+        f7.views.main.router.navigate(`${errorUrl}?id=${responseOrder.id}`);
+        API.cancelOrder(teamId, responseOrder.id);
       }
     );
   }
