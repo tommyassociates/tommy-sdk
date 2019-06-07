@@ -73,7 +73,7 @@ const API = {
       params.assignee_id = list.data.assignee;
     }
     if (API.assignee_id) {
-      params.status = ['complete', 'paid'];
+      params.status = ['complete', 'paid', 'processing'];
     }
     /*
     sort: [price_high, price_low, newest]

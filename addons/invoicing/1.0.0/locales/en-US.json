@@ -149,7 +149,11 @@
     "add_item_label": "Add Item/Service",
     "add_promotion_label": "Add Promotion",
     "start_button": "Start",
-    "finish_button": "Finish"
+    "finish_button": "Finish",
+    "via_label": "Via",
+    "via_card": "Internal balance",
+    "via_wechat": "WeChat",
+    "via_alipay": "Alipay"
   },
   "order_feedback": {
     "confirm_title": "Confirm",
