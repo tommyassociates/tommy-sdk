@@ -95,16 +95,16 @@
       </f7-list-item>
 
       <!-- Customer -->
-      <f7-list-item smart-select :smart-select-params="{searchbar: true}" v-if="$root.team && $root.teamMembers" :title="$t('invoicing.list_edit.customer', 'Customer')">
+      <f7-list-item  smart-select :smart-select-params="{searchbar: true}" v-if="contacts" :title="$t('invoicing.list_edit.customer', 'Customer')">
         <select name="customer" multiple @change="onCustomerChange">
           <option
-            v-for="(teamMember) in $root.teamMembers"
-            :key="teamMember.id"
-            :value="teamMember.user_id"
+            v-for="(contact, contactIndex) in contacts"
+            :key="`${contactIndex}-${contact.id}-${contact.friend_id}`"
+            :value="contact.friend_id"
             data-option-class="invoicing-smart-select-option"
-            :data-option-image="teamMember.icon_url"
-            :selected="list.data.customer.indexOf(teamMember.user_id) >= 0"
-          >{{teamMember.first_name || ''}} {{teamMember.last_name || ''}}</option>
+            :data-option-image="contact.icon_url"
+            :selected="list.data.customer.indexOf(contact.friend_id) >= 0"
+          >{{contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`}}</option>
         </select>
       </f7-list-item>
 
@@ -149,6 +149,7 @@
         orderStatuses,
         list: null,
         permissions: [],
+        contacts: API.contacts,
       };
     },
     beforeDestroy() {
@@ -177,6 +178,12 @@
           permission.taggable_id = list.id;
           self.permissions.push(permission);
         });
+        if (!API.contacts) {
+          self.$api.getContacts().then((c) => {
+            self.contacts = c;
+            API.contacts = c;
+          });
+        }
       });
       self.$events.$on('invoicing:setListDateRange', self.updateListDateRange);
     },

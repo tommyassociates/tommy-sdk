@@ -149,7 +149,11 @@
     "add_item_label": "添加 项目/服务",
     "add_promotion_label": "添加 优惠",
     "start_button": "开始",
-    "finish_button": "结束"
+    "finish_button": "结束",
+    "via_label": "Via",
+    "via_card": "Internal balance",
+    "via_wechat": "WeChat",
+    "via_alipay": "Alipay"
   },
   "order_feedback": {
     "confirm_title": "确认",

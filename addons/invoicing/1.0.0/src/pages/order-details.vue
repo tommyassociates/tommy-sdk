@@ -195,6 +195,10 @@
                   <div class="invoicing-order-total-label">{{$t('invoicing.order_details.promotions')}}</div>
                   <div class="invoicing-order-total-value">-{{orderDiscountTotal}}</div>
                 </div>
+                <div class="invoicing-order-total-row" v-if="order.data.payment_method">
+                  <div class="invoicing-order-total-label">{{$t('invoicing.order_details.via_label')}}</div>
+                  <div class="invoicing-order-total-value">{{$t(`invoicing.order_details.via_${order.data.payment_method}`)}}</div>
+                </div>
                 <div class="invoicing-order-total-row invoicing-order-final-row">
                   <div class="invoicing-order-total-label">{{$t('invoicing.order_details.total')}}</div>
                   <div class="invoicing-order-total-value">{{orderTotal}}</div>

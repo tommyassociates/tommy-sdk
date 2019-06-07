@@ -93,12 +93,22 @@
   export default {
     data() {
       const self = this;
-      const roles = self.$root.account.roles;
+      let account;
+      const actorId = self.$f7route.query.actor_id;
+      if (actorId) {
+        account = self.$root.teamMembers.filter(user => user.user_id === parseInt(self.actorId, 10))[0];
+      } else {
+        account = self.$root.account;
+      }
+      if (!account) {
+        account = self.$root.account;
+      }
+      const roles = account.roles;
       API.isNurse = !roles || (roles && roles.length === 0) || (roles && (roles.indexOf('Nurse') >= 0 || roles.indexOf('Employee') >= 0));
-      API.assignee_id = API.isNurse ? self.$root.account.user_id : null;
+      API.assignee_id = API.isNurse ? account.user_id : null;
       return {
         lists: null,
-        actorId: self.$f7route.query.actor_id,
+        actorId,
         listWithScroll: {},
         isNurse: API.isNurse,
         contacts: API.contacts,
