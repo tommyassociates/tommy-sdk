@@ -40,7 +40,7 @@ const API = {
       assignee_id: API.assignee_id || undefined,
     };
     if (list.data.date_range) {
-      params.date_range = list.data.date_range;
+      params.date_range = list.data.date_range.map(d => d / 1000);
     }
     if (list.data.status) {
       params.status = list.data.status;

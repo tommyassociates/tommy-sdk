@@ -70,8 +70,8 @@
       const range = list.data.date_range;
       return {
         showSave: false,
-        dateFrom: Array.isArray(range) && range[0] ? range : new Date().getTime(),
-        dateTo: Array.isArray(range) && range[1] ? range : new Date().getTime(),
+        dateFrom: Array.isArray(range) && range[0] ? range[0] : new Date().getTime(),
+        dateTo: Array.isArray(range) && range[1] ? range[1] : new Date().getTime(),
         range,
       };
     },
