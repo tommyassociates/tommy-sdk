@@ -34,6 +34,8 @@ export default function (data, createNewOrder = true) {
   let end_at;
   if (order.data.duration && order.data.duration > 0)  {
     end_at = orderDate + parseInt(order.data.duration, 10) * 60 * 1000;
+  } else {
+    end_at = orderDate + 60 * 60 * 1000;
   }
   order.event_attributes = {
     addon: 'nurse_booking',
