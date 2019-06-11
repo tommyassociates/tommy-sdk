@@ -86,3 +86,4 @@
       type: "page"
       index: true
       path: "/invoicing/"
+      actor_permission: addon_actor_access
