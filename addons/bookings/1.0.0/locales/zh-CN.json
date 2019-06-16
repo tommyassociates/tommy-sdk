@@ -21,6 +21,18 @@
   "summary": "代理和员工预约管理。",
   "description": "一个简单的代理和员工预约管理系统。",
   "developer": "杭州托秘网络科技有限公司",
+  "actions": {
+    "notify_assignee_on_booking_created": {
+      "mappings": {
+        "message": "You have a new booking"
+      }
+    },
+    "notify_assignee_on_booking_canceled": {
+      "mappings": {
+        "message": "Your booking has been canceled"
+      }
+    }
+  },
   "triggers": {
     "booking_created": {
       "title": "预约创建"

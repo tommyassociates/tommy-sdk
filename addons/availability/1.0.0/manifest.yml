@@ -38,14 +38,22 @@
       description: "Lock availability for a roster time slot."
       execute: "Activity::LockAvailability"
       parameters:
-        user_id:
-          title: "User ID"
+        # user_id:
+        #   title: "User ID"
+        #   type: "integer"
+        #   # required: true
+        # team_id:
+        #   title: "Team ID"
+        #   type: "integer"
+        #   # required: true
+        assignee_id:
+          title: "Assignee ID"
           type: "integer"
-          required: true
-        team_id:
-          title: "Team ID"
+          # required: true
+        assignee_team_id:
+          title: "Assignee Team ID"
           type: "integer"
-          required: true
+          # required: true
         start_at:
           title: "Start time"
           type: "time"
@@ -59,14 +67,22 @@
       description: "Unlock availability for a roster time slot."
       execute: "Activity::UnlockAvailability"
       parameters:
-        user_id:
-          title: "User ID"
+        # user_id:
+        #   title: "User ID"
+        #   type: "integer"
+        #   # required: true
+        # team_id:
+        #   title: "Team ID"
+        #   type: "integer"
+        #   # required: true
+        assignee_id:
+          title: "Assignee ID"
           type: "integer"
-          required: true
-        team_id:
-          title: "Team ID"
+          # required: true
+        assignee_team_id:
+          title: "Assignee Team ID"
           type: "integer"
-          required: true
+          # required: true
         start_at:
           title: "Start time"
           type: "time"
@@ -83,24 +99,24 @@
         package: bookings
         name: booking_created
         scope:
-          user_parameter: user_id
+          user_parameter: assignee_id
       activity:
         package: availability
         name: lock_availability
       options:
-        target_user_parameter: user_id
+        target_user_parameter: assignee_id
       default: true
-    availability_unlock_on_booking_deleted:
+    availability_unlock_on_booking_canceled:
       title: "Lock availability on booking canceled"
       summary: "Update and lock availability when an existing booking is canceled."
       trigger:
         package: bookings
-        name: booking_deleted
+        name: booking_canceled
       activity:
         package: availability
         name: unlock_availability
       options:
-        target_user_parameter: user_id
+        target_user_parameter: assignee_id
       default: true
   assets:
     -
@@ -116,4 +132,3 @@
       path: "/availability/"
       actor_permission: addon_actor_access
       type: "page"
-

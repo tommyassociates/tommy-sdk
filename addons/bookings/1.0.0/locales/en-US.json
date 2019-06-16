@@ -21,6 +21,18 @@
   "summary": "Booking management for agencies and employees.",
   "description": "A simple booking management system for agencies and employees.",
   "developer": "Tommy Labs GmbH",
+  "actions": {
+    "notify_assignee_on_booking_created": {
+      "mappings": {
+        "message": "You have a new booking"
+      }
+    },
+    "notify_assignee_on_booking_canceled": {
+      "mappings": {
+        "message": "Your booking has been canceled"
+      }
+    }
+  },
   "triggers": {
     "booking_created": {
       "title": "Booking created"
