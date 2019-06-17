@@ -37,6 +37,7 @@
     "filter_status": "状态",
     "activity_from": "活动列表",
     "customer": "客户",
+    "only_assigned": "仅显示已分配",
     "assignee": "代理人",
     "bill_to": "账单接收人",
     "type": "种类",

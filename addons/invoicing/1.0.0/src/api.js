@@ -47,6 +47,8 @@ const API = {
     }
     if (list.data.status) {
       params.status = list.data.status;
+    } else if (API.assignee_id) {
+      params.status = ['complete', 'paid', 'processing'];
     }
     if (list.data.sort) {
       params.sort = list.data.sort;
@@ -75,9 +77,10 @@ const API = {
     if (list.data.assignee) {
       params.assignee_id = list.data.assignee;
     }
-    if (API.assignee_id) {
-      params.status = ['complete', 'paid', 'processing'];
+    if (list.data.only_assigned) {
+      params.only_assigned = true;
     }
+
     /*
     sort: [price_high, price_low, newest]
     # status: [quote, paid, processing, complete]
@@ -118,12 +121,12 @@ const API = {
       with_permission_to: true,
       actor_id: API.actorId,
       user_id: API.actorId,
-      only_owned: !API.actorId,
+      only_owned: !API.actorId && !API.isNurse,
     }, params), options);
   },
 
-  deleteList(listId) {
-    return api.deleteFragment(listId);
+  deleteList(listId, list) {
+    return api.deleteFragment(listId, { data: list });
   },
 
   saveList(list) {

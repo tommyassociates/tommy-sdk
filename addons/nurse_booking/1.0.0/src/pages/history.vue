@@ -13,13 +13,13 @@
         class="order-item"
       >
         <div class="order-item-header">
-          <div class="order-item-date">{{formatDate(order.data.date, 'D MMM YYYY')}}</div>
+          <div class="order-item-date" v-if="order.data">{{formatDate(order.data.date, 'D MMM YYYY')}}</div>
           <div class="order-item-status">{{$t(order.statusKey)}}</div>
         </div>
         <div class="order-item-content">
           <div class="order-item-details">
             <div class="order-item-details-row">{{order.name}}</div>
-            <div class="order-item-details-row order-item-details-date">{{formatDate(order.data.date, 'MMM D, YYYY H:mm')}}</div>
+            <div class="order-item-details-row order-item-details-date" v-if="order.data">{{formatDate(order.data.date, 'MMM D, YYYY H:mm')}}</div>
           </div>
           <div class="order-item-amount">¥{{order.total}}</div>
         </div>

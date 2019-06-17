@@ -245,9 +245,11 @@
       },
       canEditList(list) {
         const self = this;
-        if (self.isNurse) return false;
+        if (self.isNurse && !self.actorId) return false;
         const account = self.$root.account;
-        const isOwnerOrManager = (account.type === 'Team') || (account.type === 'TeamMember');
+        const isOwnerOrManager = (account.type === 'Team') || (account.type === 'TeamMember') || (account.roles.indexOf('Team Manager') >= 0);
+        const isManager = account.roles.indexOf('Team Manager') >= 0;
+        if (list.data.default && isManager) return true;
         if (list.data.default && !isOwnerOrManager) return false;
         if (list.permission_to.indexOf('update') !== -1) return true;
         return false;

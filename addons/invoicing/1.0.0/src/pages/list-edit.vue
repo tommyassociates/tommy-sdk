@@ -108,6 +108,18 @@
         </select>
       </f7-list-item>
 
+      <!-- Only assigned -->
+      <f7-list-item
+        :title="$t('invoicing.list_edit.only_assigned', 'Show only assigned')"
+      >
+        <f7-toggle
+          slot="after"
+          :checked="!!list.data.only_assigned"
+          @change="setOnlyAssigned($event.target.checked)"
+        />
+      </f7-list-item>
+
+
       <tag-select
         v-for="(permission, index) in permissions"
         :key="index"
@@ -193,6 +205,11 @@
         const self = this;
         if (self.list.id !== listId) return;
         self.list.data.date_range = range;
+      },
+      setOnlyAssigned(checked) {
+        const self = this;
+        self.list.data.only_assigned = checked;
+        self.showSave = true;
       },
       onNameChange(name) {
         const self = this;
@@ -282,7 +299,7 @@
         self.saving = true;
         self.showSave = false;
         API.saveList(self.list).then(() => {
-          self.$events.$emit('invoicing:reloadLists');
+          self.$events.$emit('invoicing:reloadLists', self.listId);
           self.$f7router.back();
         });
       },
@@ -291,8 +308,8 @@
         if (self.saving) return;
         self.saving = true;
         self.showSave = false;
-        API.deleteList(self.list.id).then(() => {
-          self.$events.$emit('invoicing:reloadLists');
+        API.deleteList(self.list.id, self.list).then(() => {
+          self.$events.$emit('invoicing:reloadLists', self.listId);
           self.$f7router.back();
         });
       },

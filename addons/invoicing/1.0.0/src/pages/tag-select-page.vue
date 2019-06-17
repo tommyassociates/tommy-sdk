@@ -62,6 +62,7 @@
         self.tags.forEach((f) => {
           let isTeamTag;
           self.teamTags.forEach((t) => {
+            if (isTeamTag) return;
             isTeamTag = f.context === t.context && f.name === t.name && f.label === t.label;
           });
           if (!isTeamTag) addTags.push(f);
