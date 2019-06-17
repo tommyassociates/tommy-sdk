@@ -37,6 +37,7 @@
     "filter_status": "Status",
     "activity_from": "Activity From",
     "customer": "Customer",
+    "only_assigned": "Show only assigned",
     "assignee": "Assignee",
     "bill_to": "Bill To",
     "type": "Type",
