@@ -81,7 +81,7 @@
       <!-- Auto Renew -->
 
       <!-- Assignee -->
-      <f7-list-item smart-select :smart-select-params="{searchbar: true}" v-if="$root.team && $root.teamMembers" :title="$t('invoicing.list_edit.assignee', 'Assignee')">
+      <f7-list-item smart-select :smart-select-params="{searchbar: true}" v-if="$root.team && $root.teamMembers && !list.data.only_assigned" :title="$t('invoicing.list_edit.assignee', 'Assignee')">
         <select name="assignee" multiple @change="onAssigneeChange">
           <option
             v-for="(teamMember) in $root.teamMembers"
@@ -206,11 +206,7 @@
         if (self.list.id !== listId) return;
         self.list.data.date_range = range;
       },
-      setOnlyAssigned(checked) {
-        const self = this;
-        self.list.data.only_assigned = checked;
-        self.showSave = true;
-      },
+
       onNameChange(name) {
         const self = this;
         if (self.saving) return;
@@ -246,6 +242,14 @@
         if (self.saving) return;
         self.list.data.assignee = self.$$(e.target).val().map(el => parseInt(el, 10));
         self.showSave = true;
+      },
+      setOnlyAssigned(checked) {
+        const self = this;
+        self.list.data.only_assigned = checked;
+        self.showSave = true;
+        if (checked) {
+          self.list.data.assignee = [];
+        }
       },
       showDateRange() {
         const self = this;
