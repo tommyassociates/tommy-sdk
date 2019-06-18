@@ -91,6 +91,7 @@
     "payment_label": "支付方式",
     "status_canceled": "订单已取消",
     "status_progress": "订单等待中",
+    "status_qa": "质量保证",
     "status_complete": "订单已完成！",
     "status_pending": "需要付款",
     "cancel_button": "取消",
@@ -103,6 +104,7 @@
     "status_canceled": "订单已取消",
     "status_paid": "订单等待中",
     "status_processing": "订单等待中",
+    "status_qa": "质量保证",
     "status_complete": "订单已完成！",
     "status_pending": "需要付款"
   },

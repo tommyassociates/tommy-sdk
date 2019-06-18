@@ -91,6 +91,7 @@
     "payment_label": "Payment",
     "status_canceled": "Order canceled",
     "status_progress": "Order in progress",
+    "status_qa": "QA",
     "status_complete": "Order completed!",
     "status_pending": "Need to be paid",
     "cancel_button": "Cancel",
@@ -101,10 +102,11 @@
   "history": {
     "title": "History",
     "status_canceled": "Order canceled",
+    "status_pending": "Need to be paid",
     "status_paid": "Order in progress",
     "status_processing": "Order in progress",
-    "status_complete": "Order completed!",
-    "status_pending": "Need to be paid"
+    "status_qa": "QA",
+    "status_complete": "Order completed!"
   },
   "title": "Home Service",
   "views": {
