@@ -28,6 +28,7 @@
     "pending": "未完成",
     "paid": "已经支付",
     "processing": "进行中",
+    "qa": "质量保证",
     "complete": "已完成"
   },
   "list_edit": {

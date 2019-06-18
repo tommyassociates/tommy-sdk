@@ -74,12 +74,11 @@ const API = {
     if (list.data.customer) {
       params.user_id = list.data.customer;
     }
-    if (list.data.assignee) {
+    if (list.data.only_assigned) {
+      params.assignee_id = API.actorId || tommy.root.user.id;
+    } else if (list.data.assignee) {
       params.assignee_id = list.data.assignee;
     }
-    // if (list.data.only_assigned) {
-    //   params.only_assigned = true;
-    // }
 
     /*
     sort: [price_high, price_low, newest]

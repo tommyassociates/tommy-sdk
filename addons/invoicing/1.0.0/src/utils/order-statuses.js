@@ -1,1 +1,1 @@
-export default ['pending', 'paid', 'processing', 'complete'];
+export default ['pending', 'paid', 'processing', 'qa', 'complete'];

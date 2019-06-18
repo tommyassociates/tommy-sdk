@@ -28,6 +28,7 @@
     "pending": "Pending",
     "paid": "Paid",
     "processing": "Processing",
+    "qa": "QA",
     "complete": "Complete"
   },
   "list_edit": {
