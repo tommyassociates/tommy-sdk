@@ -77,9 +77,9 @@ const API = {
     if (list.data.assignee) {
       params.assignee_id = list.data.assignee;
     }
-    if (list.data.only_assigned) {
-      params.only_assigned = true;
-    }
+    // if (list.data.only_assigned) {
+    //   params.only_assigned = true;
+    // }
 
     /*
     sort: [price_high, price_low, newest]
@@ -114,7 +114,7 @@ const API = {
   },
 
   loadLists(params = {}, options = {}) {
-    return api.getFragments(Object.assign({
+    const data = Object.assign({
       addon: 'invoicing',
       kind: 'OrderList',
       with_filters: true,
@@ -122,7 +122,11 @@ const API = {
       actor_id: API.actorId,
       user_id: API.actorId,
       only_owned: !API.actorId && !API.isNurse,
-    }, params), options);
+    }, params);
+    if (!API.actorId && !API.isNurse && typeof data.only_owned === 'undefined') {
+      data.only_owned = true;
+    }
+    return api.getFragments(data, options);
   },
 
   deleteList(listId, list) {
