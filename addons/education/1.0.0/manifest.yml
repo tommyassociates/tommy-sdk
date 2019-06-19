@@ -1,0 +1,46 @@
+---
+  title: Education
+  package: "education"
+  summary: ""
+  description: ""
+  version: "1.0.0"
+  developer: "Tommy Labs GmbH"
+  homepage: "https://mytommy.com"
+  private: false
+  locales:
+    - en-US
+    - zh-CN
+  roles:
+    - Jobseeker
+    - Employee
+  permissions:
+    addon_access:
+      title: "Allow Team Member Access"
+      hint: "Select Team Members who can access this addon"
+      default_roles:
+      operations:
+        - read
+    addon_actor_access:
+      title: "Who Can View Other Team Members' Progress"
+      hint: "Select who can view progress on behalf of other users"
+      resource_type: Fragment
+      resource_kind: Myprogress
+      default_roles:
+        - Team Manager
+        - Team Admin
+      operations:
+        - read
+  assets:
+    -
+      type: "stylesheet"
+      file: "build/addon.css"
+    -
+      type: "javascript"
+      file: "build/addon.js"
+  views:
+    index:
+      title: Education
+      index: true
+      path: "/education/"
+      actor_permission: addon_actor_access
+      type: "page"
