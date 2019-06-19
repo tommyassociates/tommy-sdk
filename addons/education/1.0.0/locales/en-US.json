@@ -1,0 +1,25 @@
+{
+  "splash": {
+    "title": "Training",
+    "text": "Welcome to 托 me Training! Here you will find training courses to improve your skill and improve job prospects.",
+    "continue_button": "Continue"
+  },
+  "index": {
+    "title": "Training",
+    "continue_button": "Continue",
+    "price_label": "Price",
+    "free_label": "Free",
+    "duration_label": "Duration",
+    "hours_label": "hours",
+    "outcome_label": "Outcome",
+    "date_obtained_label": "Date obtained",
+    "valid_until_label": "Valid until",
+    "estimate_data_label": "Estimate Data",
+    "mb_label": "MB",
+    "required_label": "Required"
+  },
+  "title": "Education",
+  "summary": "",
+  "description": "",
+  "developer": "Tommy Labs GmbH"
+}
