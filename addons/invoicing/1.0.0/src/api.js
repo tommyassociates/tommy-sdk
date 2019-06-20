@@ -27,7 +27,7 @@ const API = {
   },
   cancelOrder(order) {
     return api.call({
-      endpoint: `vendors/manager/orders/${order.id}`,
+      endpoint: `vendor/manager/orders/${order.id}`,
       method: 'DELETE',
     });
   },
