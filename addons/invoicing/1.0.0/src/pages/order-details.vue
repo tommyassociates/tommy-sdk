@@ -501,6 +501,8 @@
         API.cancelOrder(self.order)
           .then((order) => {
             self.order = order;
+            self.order.canceled = true;
+            self.$events.$emit('invoicing:reloadListsOrders');
           })
           .catch(() => {
             self.order.canceled = false;
