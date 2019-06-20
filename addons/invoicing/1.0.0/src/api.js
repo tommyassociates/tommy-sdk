@@ -25,6 +25,12 @@ const API = {
       data: order,
     });
   },
+  cancelOrder(order) {
+    return api.call({
+      endpoint: `vendors/manager/orders/${order.id}`,
+      method: 'DELETE',
+    });
+  },
   loadListOrders(list) {
     const tags = [];
     if (list.data && list.filters) {

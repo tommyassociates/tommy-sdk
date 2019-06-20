@@ -89,11 +89,31 @@
             <!-- Nurse -->
             <template v-if="orderAssignee">
               <f7-list-item divider :title="$t('invoicing.order_details.assignee')"></f7-list-item>
-              <f7-list-item
+              <!-- <f7-list-item
                 :title="orderAssignee ? orderAssigneeName : ''"
                 :link="`/team-member-details/?user_id=${order.assignee_id}&name=${orderAssigneeName}`"
               >
                 <tommy-circle-avatar :data="orderAssignee" slot="media"></tommy-circle-avatar>
+              </f7-list-item> -->
+              <f7-list-item
+                :title="orderAssignee ? orderAssigneeName : ''"
+                smart-select
+              >
+                <tommy-circle-avatar :data="orderAssignee" slot="media"></tommy-circle-avatar>
+                <select name="assignee" @change="onAssigneeChange">
+                  <option
+                    v-for="(teamMember,index) in $root.teamMembers"
+                    :key="`teamMember-${index}-${teamMember.id}`"
+                    :value="teamMember.user_id"
+                    data-option-class="invoicing-smart-select-option"
+                    :data-option-image="teamMember.icon_url"
+                    :selected="order.user_id === teamMember.user_id"
+                  >{{teamMember.first_name || ''}} {{teamMember.last_name || ''}}</option>
+                </select>
+                <f7-link slot="root" style="margin-left: 80px; padding: 8px 0" :href="`/team-member-details/?user_id=${order.assignee_id}&name=${orderAssigneeName}`">
+                  <span>{{$t('invoicing.order_details.assignee_profile')}}</span>
+                  <f7-icon f7="chevron_right" :size="16" />
+                </f7-link>
               </f7-list-item>
             </template>
 
@@ -123,6 +143,10 @@
                     :selected="order.user_id === teamMember.user_id"
                   >{{teamMember.first_name || ''}} {{teamMember.last_name || ''}}</option>
                 </select>
+                <f7-link slot="root" style="margin-left: 80px; padding: 8px 0" :href="`/contact-details/?user_id=${order.assignee_id}`">
+                  <span>{{$t('invoicing.order_details.customer_profile')}}</span>
+                  <f7-icon f7="chevron_right" :size="16" />
+                </f7-link>
               </f7-list-item>
             </template>
 
@@ -259,6 +283,12 @@
               />
             </template>
           </f7-list>
+
+          <!-- Cancel order -->
+          <f7-list v-if="orderCancelable" class="margin-top margin-bottom">
+            <f7-list-button color="custom" class="color-custom" @click="cancelOrder">{{$t('invoicing.order_details.cancel_button', 'Cancel Order')}}</f7-list-button>
+          </f7-list>
+
           <f7-popup :opened="productsOpened" @popup:closed="productsOpened = false" v-if="products && packages">
             <f7-view :init="false">
               <f7-page class="invoicing-page">
@@ -457,8 +487,25 @@
         const self = this;
         return Math.max(self.orderItemsTotal - self.orderDiscountTotal, 0);
       },
+      orderCancelable() {
+        const self = this;
+        const order = self.order;
+        const canceled = order.canceled;
+        return !canceled && (order.status === 'paid' || order.status === 'pending');
+      },
     },
     methods: {
+      cancelOrder() {
+        const self = this;
+        self.order.canceled = true;
+        API.cancelOrder(self.order)
+          .then((order) => {
+            self.order = order;
+          })
+          .catch(() => {
+            self.order.canceled = false;
+          });
+      },
       calcOrderDuration() {
         const self = this;
         let duration = 0;
@@ -468,6 +515,14 @@
           });
         }
         return duration;
+      },
+      onAssigneeChange(e) {
+        const self = this;
+        const user_id = parseInt(e.target.value, 10);
+        const assignee = self.$root.teamMembers.filter(m => m.user_id === parseInt(user_id, 10))[0];
+        self.order.assignee_id = assignee.user_id;
+        self.order.data.nurse = assignee;
+        self.showSave = true;
       },
       onCustomerChange(e) {
         const self = this;
