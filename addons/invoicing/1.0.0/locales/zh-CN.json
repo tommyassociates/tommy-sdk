@@ -155,7 +155,10 @@
     "via_label": "Via",
     "via_card": "Internal balance",
     "via_wechat": "WeChat",
-    "via_alipay": "Alipay"
+    "via_alipay": "Alipay",
+    "cancel_button": "取消",
+    "customer_profile": "Customer profile",
+    "assignee_profile": "Assignee profile"
   },
   "order_feedback": {
     "confirm_title": "确认",
