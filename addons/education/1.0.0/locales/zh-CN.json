@@ -1,1 +1,25 @@
-{}
+{
+  "splash": {
+    "title": "培训",
+    "text": "欢迎来到托me培训。你可以学习培训课程，提高技能，获得更好的工作机会。",
+    "continue_button": "下一步"
+  },
+  "index": {
+    "title": "培训",
+    "continue_button": "下一步",
+    "price_label": "价格",
+    "free_label": "免费",
+    "duration_label": "时长",
+    "hours_label": "小时",
+    "outcome_label": "结果",
+    "date_obtained_label": "获取日期",
+    "valid_until_label": "有效期直到",
+    "estimate_data_label": "预计数据",
+    "mb_label": "MB",
+    "required_label": "要求"
+  },
+  "title": "培训",
+  "summary": "",
+  "description": "",
+  "developer": "Tommy Labs GmbH"
+}
