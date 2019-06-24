@@ -106,14 +106,16 @@
       ></f7-list-input>
 
       <!-- Customer -->
-      <f7-list-item divider :title="$t('invoicing.promotion.customer_label', 'Customer')"></f7-list-item>
-      <f7-list-item
-        :title="customerTitle"
-        link
-        @click="customerPopupOpened = true"
-      >
-        <tommy-circle-avatar v-if="customerAvatar" :data="customerAvatar" slot="media"></tommy-circle-avatar>
-      </f7-list-item>
+      <template v-if="contacts">
+        <f7-list-item divider :title="$t('invoicing.promotion.customer_label', 'Customer')"></f7-list-item>
+        <f7-list-item
+          :title="customerTitle"
+          link
+          @click="customerPopupOpened = true"
+        >
+          <tommy-circle-avatar v-if="customerAvatar" :data="customerAvatar" slot="media"></tommy-circle-avatar>
+        </f7-list-item>
+      </template>
 
       <!-- Item -->
       <f7-list-item divider :title="$t('invoicing.promotion.item_label', 'Item')"></f7-list-item>
@@ -251,6 +253,13 @@
           self.item = item;
         });
       }
+      if (!self.contacts) {
+        self.$api.getContacts.then((contacts) => {
+          self.contacts = contacts;
+          API.contacts = contacts;
+        });
+        return;
+      }
 
       Promise.all([
         API.loadProducts(),
@@ -265,7 +274,10 @@
       customerAvatar() {
         const self = this;
         if (!self.item.user_id) return null;
-        let user = self.$root.teamMembers.filter(m => m.user_id === self.item.user_id)[0];
+        let user;
+        if (self.$root.teamMembers) {
+          user = self.$root.teamMembers.filter(m => m.user_id === self.item.user_id)[0];
+        }
         if (!user && self.contacts) {
           // assuming contact
           user = self.contacts.filter(c => c.friend_id === self.item.user_id)[0];
@@ -276,7 +288,10 @@
       customerTitle() {
         const self = this;
         if (!self.item.user_id) return self.$t('invoicing.promotion.customer_placeholder');
-        let user = self.$root.teamMembers.filter(m => m.user_id === self.item.user_id)[0];
+        let user;
+        if (self.$root.teamMembers) {
+          user = self.$root.teamMembers.filter(m => m.user_id === self.item.user_id)[0];
+        }
         if (!user && self.contacts) {
           // assuming contact
           user = self.contacts.filter(c => c.friend_id === self.item.user_id)[0];
