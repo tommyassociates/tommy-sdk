@@ -1,12 +1,13 @@
 {
+  "continue_button": "Continue",
+  "next_button": "Next",
+  "back_button": "Back",
   "splash": {
     "title": "Training",
-    "text": "Welcome to 托 me Training! Here you will find training courses to improve your skill and improve job prospects.",
-    "continue_button": "Continue"
+    "text": "Welcome to 托 me Training! Here you will find training courses to improve your skill and improve job prospects."
   },
   "index": {
     "title": "Training",
-    "continue_button": "Continue",
     "price_label": "Price",
     "free_label": "Free",
     "duration_label": "Duration",
@@ -17,6 +18,14 @@
     "estimate_data_label": "Estimate Data",
     "mb_label": "MB",
     "required_label": "Required"
+  },
+  "course": {
+    "courses_label": "Courses"
+  },
+  "lesson": {
+    "video_complete_text": "You have finished this video, do you want to continue?",
+    "exit_confirm_text": "The video is {{required}} long and you have been on page for {{current}}",
+    "dismiss_button": "Dismiss"
   },
   "title": "Education",
   "summary": "",
