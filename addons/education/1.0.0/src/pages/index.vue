@@ -5,7 +5,7 @@
       <f7-nav-title>{{$t('education.index.title')}}</f7-nav-title>
     </f7-navbar>
 
-    <a href="#" v-if="!currentCourse.locked" @click="openCourse(currentCourse)" class="education-toolbar-button" slot="fixed">{{$t('education.splash.continue_button')}}</a>
+    <a href="#" v-if="!currentCourse.locked" @click="openCourse(currentCourse)" class="education-toolbar-button" slot="fixed">{{$t('education.continue_button')}}</a>
 
     <f7-swiper class="education-swiper" :params="{slidesPerView: 'auto', touchMoveStopPropagation: false}">
       <f7-swiper-slide
@@ -18,20 +18,20 @@
         }"
       >
         <div class="education-swiper-slide-icon" @click="currentCourseId = course.id">
-          <img :src="`${$addonAssetsUrl}/courses/${course.icon}`" >
+          <img :src="`${$addonAssetsUrl}courses-icons/${course.icon}`" >
         </div>
-        <div class="education-swiper-slide-name">{{course.name}}</div>
+        <div class="education-swiper-slide-name">{{course.indexName}}</div>
       </f7-swiper-slide>
     </f7-swiper>
 
     <div class="education-course-content">
-      <div class="education-course-content-name">{{currentCourse.name}}</div>
-      <div class="education-course-content-description" v-html="currentCourse.description"></div>
+      <div class="education-course-content-name">{{currentCourse.indexName}}</div>
+      <div class="education-course-content-description" v-html="currentCourse.indexDescription"></div>
     </div>
     <f7-list class="no-margin-top no-hairline-top">
       <f7-list-item
         :title="t('price_label')"
-        :after="currentCourse.price === 'free' ? t('free_label') : `¥${currentCourse.price}`"
+        :after="!currentCourse.price ? t('free_label') : `¥${currentCourse.price}`"
       />
       <f7-list-item
         :title="t('duration_label')"
@@ -50,7 +50,7 @@
         <f7-list-item
           v-for="(required, index) in requiredCourses"
           :key="index"
-          :title="required.name"
+          :title="required.indexName"
         />
       </template>
     </f7-list>
@@ -86,7 +86,8 @@
         return this.$t(`education.index.${key}`);
       },
       openCourse(course) {
-
+        const self = this;
+        self.$f7router.navigate(`/education/course/${course.id}/`);
       },
     },
   };

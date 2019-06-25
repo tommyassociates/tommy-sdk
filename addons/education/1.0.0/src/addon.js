@@ -1,5 +1,8 @@
 import Splash from './pages/splash.vue';
 import Index from './pages/index.vue';
+import Course from './pages/course.vue';
+import LessonVideo from './pages/lesson-video.vue';
+import LessonQuiz from './pages/lesson-quiz.vue';
 
 const routes = [
   {
@@ -8,7 +11,7 @@ const routes = [
   },
   {
     path: '/education/',
-    async(to, from, resolve, reject) {
+    async(to, from, resolve) {
       if (localStorage.getItem('education.splash')) {
         resolve({
           component: Index,
@@ -20,6 +23,18 @@ const routes = [
         });
       }
     },
+  },
+  {
+    path: '/education/course/:courseId/',
+    component: Course,
+  },
+  {
+    path: '/education/lesson-video/',
+    component: LessonVideo,
+  },
+  {
+    path: '/education/lesson-quiz/',
+    component: LessonQuiz,
   },
 ];
 export default routes;
