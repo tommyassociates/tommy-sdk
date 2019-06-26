@@ -8,7 +8,8 @@
     </f7-navbar>
     <a href="#" v-if="showContinueButton && nextLesson" @click="openNextLesson()" class="education-toolbar-button" slot="fixed">{{$t('education.continue_button')}}</a>
     <video
-      :src="`${$addonAssetsUrl}courses-videos/${lesson.video}`"
+      v-if="lesson.video || lesson.videoUrl"
+      :src="lesson.videoUrl ? lesson.videoUrl : `${$addonAssetsUrl}courses-videos/${lesson.video}`"
       class="no-fastclick"
       controls
       @playing="onVideoStart"
