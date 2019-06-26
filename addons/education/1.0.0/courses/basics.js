@@ -1,22 +1,25 @@
 export default {
-  id: 'basics',
-  icon: 'basics.svg',
+  id: 'basics', // every course must have unique id
+  icon: 'basics.svg', // name of icon file in ../assets/courses-icons/ folder
   indexName: "托me's Basic",
   indexDescription: 'Before you can receive bookings you must first complete the 托me Basics Certificate. This certificate includes training on tasks you will perform during bookings and demonstrates the standard that needs to be maintained.',
   pageName: "托me's Basic",
   pageDescription: 'Before you can receive bookings you must first complete the 托me Basics Certificate. This certificate includes training on tasks you will perform during bookings and demonstrates the standard that needs to be maintained.',
-  price: 0,
-  duration: 3,
+  price: 0, // 0 if free
+  duration: 3, // hours
   outcome: 'Certificate of Completion',
-  valid: 12,
-  estimate_data: 300,
-  required: [],
+  valid: 12, // months
+  estimate_data: 300, // mb
+  required: [], // ids of required courses
   locked: false,
   lessons: [
     {
-      id: 'welcome',
+      id: 'welcome', // every lesson must have unique id
       type: 'video',
-      video: 'welcome.mp4',
+      video: 'welcome.mp4', // video file name in ../assets/courses-videos/ folder
+      /* or in case of external CDN video, specify "videoUrl" prop
+      videoUrl: 'https://cdn.something.com/welcome.mp4'
+      */
       indexName: 'Welcome',
       indexDescription: 'Introduction to 托me’s Basic and Assistant Nurse training.',
       pageName: 'Welcome',
@@ -26,8 +29,8 @@ export default {
       - How to train using Tuome.<br>
       - The progressive steps involved<br>
       `,
-      videoLength: 45,
-      minimumStay: 45,
+      videoLength: 45, // in minutes
+      minimumStay: 45, // in minutes
     },
     {
       id: 'hand-hygiene',
@@ -41,8 +44,8 @@ export default {
       Ensuring you maintain good hand hygiene reduces the risk you will contract something or carry it to another.
       Learn the correct technique to ensure your hands are clear and free from germs and the times you should pay attention to clean your hands.
       `,
-      videoLength: 69,
-      minimumStay: 69,
+      videoLength: 69, // in minutes
+      minimumStay: 69, // in minutes
     },
     {
       id: 'hand-hygiene-quiz',
@@ -55,6 +58,7 @@ export default {
       `,
       questions: [
         {
+          // $$$ will be replaced with placeholder for answer text
           question: 'There are $$$ times you should clean your hands.',
           options: [
             'Many',

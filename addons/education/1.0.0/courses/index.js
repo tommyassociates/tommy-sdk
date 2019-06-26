@@ -1,5 +1,5 @@
-import basics from './basics/index';
-import level1 from './level-1/index';
+import basics from './basics';
+import level1 from './level-1';
 
 export default [
   basics,
