@@ -85,10 +85,10 @@
     },
     mounted() {
       this.getData();
-      this.$events.on('edication:updatedata', this.getData);
+      this.$events.$on('edication:updatedata', this.getData);
     },
     beforeDestroy() {
-      this.$events.off('edication:updatedata', this.getData);
+      this.$events.$off('edication:updatedata', this.getData);
     },
     methods: {
       t(key) {
@@ -102,7 +102,15 @@
         const self = this;
         API.getData(self.$root.user.id).then((fragments) => {
           if (!fragments.length) {
-            self.fragment = {};
+            self.fragment = {
+              data: {
+                completed_lessons: {},
+              },
+            };
+            API.fragment = self.fragment;
+          } else {
+            self.fragment = fragments[0];
+            API.fragment = self.fragment;
           }
         });
       },

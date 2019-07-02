@@ -21,6 +21,8 @@
   </f7-page>
 </template>
 <script>
+  import API from '../api';
+
   function formatDuration(t) {
     let minutes = Math.floor(t / 60);
     let seconds = Math.floor(t - minutes * 60);
@@ -107,10 +109,14 @@
       onVideoStart() {
         const self = this;
         if (self.startTime) return;
-        // TODO: check if it is already certified
+        const completed = !!API.fragment.data.completed_lessons[self.lesson.id];
+        if (completed) return;
         self.startTime = new Date().getTime();
         self.timeout = setTimeout(() => {
-          // TODO: save correct lesson
+          API.completeLesson(self.$root.user.id, self.lesson.id).then((f) => {
+            API.fragment = f;
+            self.$events.$emit('edication:updatedata');
+          });
           self.minimumStayReached = true;
           self.showContinueButton = true;
           self.showContinueDialog();

@@ -3,6 +3,7 @@ import Index from './pages/index.vue';
 import Course from './pages/course.vue';
 import LessonVideo from './pages/lesson-video.vue';
 import LessonQuiz from './pages/lesson-quiz.vue';
+import Certificate from './pages/certificate.vue';
 
 const routes = [
   {
@@ -35,6 +36,10 @@ const routes = [
   {
     path: '/education/lesson-quiz/',
     component: LessonQuiz,
+  },
+  {
+    path: '/education/certificate/',
+    component: Certificate,
   },
 ];
 export default routes;

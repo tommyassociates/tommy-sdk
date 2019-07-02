@@ -28,6 +28,8 @@
   </f7-page>
 </template>
 <script>
+  import API from '../api';
+
   export default {
     props: {
       course: Object,
@@ -38,11 +40,13 @@
       const currentLesson = self.course.lessons.filter(l => l.id === self.lesson.id)[0];
       const currentLessonIndex = self.course.lessons.indexOf(currentLesson);
       const previousLesson = self.course.lessons[currentLessonIndex - 1];
+      const nextLesson = self.course.lessons[currentLessonIndex + 1];
       return {
         startTime: null,
         minimumStayReached: false,
         showContinueButton: false,
         previousLesson,
+        nextLesson,
         current: 0,
         total: self.lesson.questions.length,
         answer: null,
@@ -78,9 +82,43 @@
             self.current += 1;
           } else {
             // TODO: save correct quiz
-            self.$f7router.back();
+            API.completeLesson(self.$root.user.id, self.lesson.id).then((f) => {
+              API.fragment = f;
+              self.$events.$emit('edication:updatedata');
+              self.openNextLesson();
+            });
           }
         }
+      },
+      openNextLesson() {
+        const self = this;
+        if (!self.nextLesson) {
+          const course = self.course;
+          const lessonIds = course.lessons.map(l => l.id);
+          const completedLessonsIds = Object.keys(API.fragment.data.completed_lessons);
+          let completed = true;
+          lessonIds.forEach((id) => {
+            if (completedLessonsIds.indexOf(id) < 0) completed = false;
+          });
+          if (!completed) {
+            self.$f7router.back();
+            return;
+          }
+          self.$f7router.navigate('/education/certificate/', {
+            reloadCurrent: true,
+            props: {
+              course: self.course,
+            },
+          });
+          return;
+        }
+        self.$f7router.navigate(`/education/lesson-${self.nextLesson.type}/`, {
+          reloadCurrent: true,
+          props: {
+            course: self.course,
+            lesson: self.nextLesson,
+          },
+        });
       },
       openPreviousLesson() {
         const self = this;
