@@ -13,7 +13,7 @@ export default {
   required: [], // ids of required courses
   locked: false,
   lessons: [
-       {
+    {
       id: 'pre-service', // every lesson must have unique id
       type: 'video',
       videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/1-pre-service.mp4',
@@ -121,7 +121,7 @@ export default {
       indexDescription: '',
       pageName: '地面清洁',
       pageDescription: `
-      
+
       `,
       videoLength: 114,
       minimumStay: 60,
@@ -156,7 +156,7 @@ export default {
       indexDescription: '',
       pageName: '床品更换清洗',
       pageDescription: `
-      
+
       `,
       videoLength: 4 * 50 + 53,
       minimumStay: 150,
@@ -201,7 +201,7 @@ export default {
       indexDescription: '',
       pageName: '窗户清洁',
       pageDescription: `
-      
+
       `,
       videoLength: 240, // in seconds
       minimumStay: 120, // in seconds
@@ -246,7 +246,7 @@ export default {
       indexDescription: '',
       pageName: '台盆清洁',
       pageDescription: `
-      
+
       `,
       videoLength: 180,
       minimumStay: 90,
@@ -281,7 +281,7 @@ export default {
       indexDescription: '',
       pageName: '马桶清洁',
       pageDescription: `
-      
+
       `,
       videoLength: 240,
       minimumStay: 120,
@@ -326,7 +326,7 @@ export default {
       indexDescription: '',
       pageName: '淋浴房清洁',
       pageDescription: `
-      
+
       `,
       videoLength: 240,
       minimumStay: 120,
@@ -361,7 +361,7 @@ export default {
       indexDescription: '',
       pageName: '浴缸清洁',
       pageDescription: `
-      
+
       `,
       videoLength: 202,
       minimumStay: 100,
@@ -396,7 +396,7 @@ export default {
       indexDescription: '',
       pageName: '厨房台面清洁',
       pageDescription: `
-      
+
       `,
       videoLength: 85,
       minimumStay: 60,
@@ -431,7 +431,7 @@ export default {
       indexDescription: '',
       pageName: '灶具清洁',
       pageDescription: `
-      
+
       `,
       videoLength: 180,
       minimumStay: 90,
@@ -466,7 +466,7 @@ export default {
       indexDescription: '',
       pageName: '冰箱清洁',
       pageDescription: `
-      
+
       `,
       videoLength: 110,
       minimumStay: 60,
@@ -501,7 +501,7 @@ export default {
       indexDescription: '',
       pageName: '油烟机清洁',
       pageDescription: `
-      
+
       `,
       videoLength: 262,
       minimumStay: 120,
@@ -536,7 +536,7 @@ export default {
       indexDescription: '',
       pageName: '餐具清洁',
       pageDescription: `
-      
+
       `,
       videoLength: 200,
       minimumStay: 100,
@@ -581,7 +581,7 @@ export default {
       indexDescription: '',
       pageName: '掸尘培训',
       pageDescription: `
-      
+
       `,
       videoLength: 40,
       minimumStay: 40,
@@ -626,7 +626,7 @@ export default {
       indexDescription: '',
       pageName: '吸尘培训',
       pageDescription: `
-      
+
       `,
       videoLength: 200,
       minimumStay: 100,
@@ -661,7 +661,7 @@ export default {
       indexDescription: '',
       pageName: '手部清洁',
       pageDescription: `
-      
+
       `,
       videoLength: 70,
       minimumStay: 70,
@@ -696,7 +696,7 @@ export default {
       indexDescription: '',
       pageName: '家用电器清洁',
       pageDescription: `
-      
+
       `,
       videoLength: 155,
       minimumStay: 90,
@@ -731,7 +731,7 @@ export default {
       indexDescription: '',
       pageName: '家具清洁',
       pageDescription: `
-      
+
       `,
       videoLength: 180,
       minimumStay: 90,
@@ -776,7 +776,7 @@ export default {
       indexDescription: '',
       pageName: '门的清洁',
       pageDescription: `
-      
+
       `,
       videoLength: 140,
       minimumStay: 60,
@@ -810,7 +810,7 @@ export default {
       indexDescription: '',
       pageName: '服务结束培训',
       pageDescription: `
-      
+
       `,
       videoLength: 100,
       minimumStay: 60,
