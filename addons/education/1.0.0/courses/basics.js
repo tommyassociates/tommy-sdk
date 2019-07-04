@@ -2,9 +2,9 @@ export default {
   id: 'basics', // every course must have unique id
   icon: 'basics.svg', // name of icon file in ../assets/courses-icons/ folder
   indexName: '托me岗前培训',
-  indexDescription: 'Before you can receive bookings you must first complete the 托me Basics Certificate. This certificate includes training on tasks you will perform during bookings and demonstrates the standard that needs to be maintained.',
+  indexDescription: '在你接单前，必须先完成托me岗前培训培训获得上岗证。这项培训包括每项服务内容的培训，并提供了服务需要达到的标准。',
   pageName: '托me岗前培训',
-  pageDescription: 'Before you can receive bookings you must first complete the 托me Basics Certificate. This certificate includes training on tasks you will perform during bookings and demonstrates the standard that needs to be maintained.',
+  pageDescription: '在你接单前，必须先完成托me岗前培训培训获得上岗证。这项培训包括每项服务内容的培训，并提供了服务需要达到的标准。',
   price: 0, // 0 if free
   duration: 1, // hours
   outcome: '托me上岗证',
@@ -13,23 +13,70 @@ export default {
   required: [], // ids of required courses
   locked: false,
   lessons: [
+       {
+      id: 'pre-service', // every lesson must have unique id
+      type: 'video',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/1-pre-service.mp4',
+      /* or in case of internet video, specify "video" prop
+      videoUrl: '桌面清洁(Table Cleaning).mp4' // video file name in ../assets/courses-videos/ folder
+      */
+      indexName: '托me护工准备工作',
+      indexDescription: '通过本视频的学习后，托me护工上门前，需做到工作服干净整洁；工具齐备无破损并核对自己手机的订单时间和地址。到客户家里后开始工作前，需跟老人确认服务内容及时间并打开手机订单的开始按钮。',
+      pageName: '托me护工准备工作',
+      pageDescription: `
+      通过本视频的学习后，托me护工上门前，需做到工作服干净整洁；工具齐备无破损并核对自己手机的订单时间和地址。到客户家里后开始工作前，需跟老人确认服务内容及时间并打开手机订单的开始按钮。
+      `,
+      videoLength: 180, // in seconds
+      minimumStay: 90, // in seconds
+    },
+    {
+      id: 'pre-service-quiz',
+      type: 'quiz',
+      indexName: '测试',
+      indexDescription: '',
+      pageName: '桌面清洁测试',
+      pageDescription: `
+      请选择最合适的选项
+      `,
+      questions: [
+        {
+          // $$$ will be replaced with placeholder for answer text
+          question: '托me护工上门前，需检查$$$。',
+          options: [
+            '工作服和工具包',
+            '工具车',
+            '手机',
+          ],
+          wrongText: '错误选项,请重新观看视频。',
+          correct: '工作服和工具包',
+        },
+        {
+          // $$$ will be replaced with placeholder for answer text
+          question: '托me到老人家里后开始工作前，需跟老人确认$$$。',
+          options: [
+            '身体状况',
+            '服务内容及时间',
+            '有没有吃饭',
+          ],
+          wrongText: '错误选项,请重新观看视频。',
+          correct: '服务内容及时间',
+        },
+      ],
+    },
     {
       id: 'table-cleaning', // every lesson must have unique id
       type: 'video',
-      video: '桌面清洁(Table Cleaning).mp4', // video file name in ../assets/courses-videos/ folder
-      /* or in case of external CDN video, specify "videoUrl" prop
-      videoUrl: 'https://cdn.something.com/welcome.mp4'
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/2-table-cleaning.mp4',
+      /* or in case of internet video, specify "video" prop
+      videoUrl: '桌面清洁(Table Cleaning).mp4' // video file name in ../assets/courses-videos/ folder
       */
       indexName: '桌面清洁',
-      indexDescription: 'Waiting from Yan',
+      indexDescription: '',
       pageName: '桌面清洁',
       pageDescription: `
-      Waiting from Yan.<br>
-      Waiting from Yan:<br>
-      - Waiting from Yan.<br>
-      - Waiting from Yan<br>
+      通过本视频的学习后，托me护工会使用澳大利亚的精油对桌面进行杀菌和消毒，做到桌面洁净无异味。
       `,
-      videoLength: 60 + 56, // in seconds
+      videoLength: 115, // in seconds
       minimumStay: 60, // in seconds
     },
     {
@@ -39,12 +86,12 @@ export default {
       indexDescription: '',
       pageName: '桌面清洁测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
           // $$$ will be replaced with placeholder for answer text
-          question: '澳大利亚的精油对桌面有$$$和消毒作用。',
+          question: '澳大利亚的精油对桌面有[]和消毒作用。',
           options: [
             '清洁',
             '杀菌',
@@ -53,20 +100,31 @@ export default {
           wrongText: '错误选项,请重新观看视频。',
           correct: '杀菌',
         },
+        {
+          // $$$ will be replaced with placeholder for answer text
+          question: '澳大利亚的桌面精油需要在桌面喷洒$$$。',
+          options: [
+            '2-3下',
+            '7-10下',
+            '10下以上',
+          ],
+          wrongText: '错误选项,请重新观看视频。',
+          correct: '2-3下',
+        },
       ],
     },
     {
       id: 'floor-cleaning',
       type: 'video',
-      video: '地面清洁培训教程(Floor Cleaning).mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/3-floor-cleaning.mp4',
       indexName: '地面清洁',
       indexDescription: '',
       pageName: '地面清洁',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
-      videoLength: 60 + 53,
-      minimumStay: 60 + 53,
+      videoLength: 114,
+      minimumStay: 60,
     },
     {
       id: 'floor-cleaning-quiz',
@@ -75,7 +133,7 @@ export default {
       indexDescription: '',
       pageName: '地面清洁测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -93,12 +151,12 @@ export default {
     {
       id: 'change-bedding',
       type: 'video',
-      video: '床品更换清洗培训教程(Change the Bedding).mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/4-change-the-bedding.mp4',
       indexName: '床品更换清洗',
       indexDescription: '',
       pageName: '床品更换清洗',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
       videoLength: 4 * 50 + 53,
       minimumStay: 150,
@@ -110,7 +168,7 @@ export default {
       indexDescription: '',
       pageName: '床品更换清洗测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -138,12 +196,12 @@ export default {
     {
       id: 'window-cleaning',
       type: 'video',
-      video: '窗户清洁培训教程(Window Cleaning）.mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/5-window-cleaning.mp4',
       indexName: '窗户清洁',
       indexDescription: '',
       pageName: '窗户清洁',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
       videoLength: 240, // in seconds
       minimumStay: 120, // in seconds
@@ -155,7 +213,7 @@ export default {
       indexDescription: '',
       pageName: '窗户清洁测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -183,12 +241,12 @@ export default {
     {
       id: 'basin-cleaning',
       type: 'video',
-      video: '台盆清洁培训教程（Basin Cleaning）.mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/6-basin-cleaning.mp4',
       indexName: '台盆清洁',
       indexDescription: '',
       pageName: '台盆清洁',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
       videoLength: 180,
       minimumStay: 90,
@@ -200,7 +258,7 @@ export default {
       indexDescription: '',
       pageName: '台盆清洁测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -218,12 +276,12 @@ export default {
     {
       id: 'toilet-cleaning',
       type: 'video',
-      video: '清洁马桶培训教程(Toilet Cleaning).mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/7-toilet-cleaning.mp4',
       indexName: '马桶清洁',
       indexDescription: '',
       pageName: '马桶清洁',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
       videoLength: 240,
       minimumStay: 120,
@@ -235,7 +293,7 @@ export default {
       indexDescription: '',
       pageName: '马桶清洁测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -263,12 +321,12 @@ export default {
     {
       id: 'shower-room-cleaning',
       type: 'video',
-      video: '淋浴房清洁培训教程（Shower Room Cleaning）.mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/8-shower-room-cleaning.mp4',
       indexName: '淋浴房清洁',
       indexDescription: '',
       pageName: '淋浴房清洁',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
       videoLength: 240,
       minimumStay: 120,
@@ -280,7 +338,7 @@ export default {
       indexDescription: '',
       pageName: '淋浴房清洁测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -298,14 +356,14 @@ export default {
     {
       id: 'bathtub-cleaning',
       type: 'video',
-      video: '浴缸清洁培训视频（Bathtub Cleaning）.mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/9-bathtub-cleaning.mp4',
       indexName: '浴缸清洁',
       indexDescription: '',
       pageName: '浴缸清洁',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
-      videoLength: 180 + 22,
+      videoLength: 202,
       minimumStay: 100,
     },
     {
@@ -315,7 +373,7 @@ export default {
       indexDescription: '',
       pageName: '浴缸清洁测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -333,12 +391,12 @@ export default {
     {
       id: 'kitchen-countertop-cleaning',
       type: 'video',
-      video: '清洁厨房台面培训教程（Kitchen Countertop Cleaning）.mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/10-kitchen-countertop-cleaning.mp4',
       indexName: '厨房台面清洁',
       indexDescription: '',
       pageName: '厨房台面清洁',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
       videoLength: 85,
       minimumStay: 60,
@@ -350,7 +408,7 @@ export default {
       indexDescription: '',
       pageName: '厨房台面清洁测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -368,12 +426,12 @@ export default {
     {
       id: 'stove-cleaning',
       type: 'video',
-      video: '灶具清洁培训教程（Stove Cleaning）.mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/11-stove-cleaning.mp4',
       indexName: '灶具清洁',
       indexDescription: '',
       pageName: '灶具清洁',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
       videoLength: 180,
       minimumStay: 90,
@@ -385,7 +443,7 @@ export default {
       indexDescription: '',
       pageName: '灶具清洁测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -403,12 +461,12 @@ export default {
     {
       id: 'fridge-cleaning',
       type: 'video',
-      video: '冰箱清洁培训教程（Fridge Cleaning）.mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/12-fridge-cleaning.mp4',
       indexName: '冰箱清洁',
       indexDescription: '',
       pageName: '冰箱清洁',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
       videoLength: 110,
       minimumStay: 60,
@@ -420,7 +478,7 @@ export default {
       indexDescription: '',
       pageName: '冰箱清洁测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -438,14 +496,14 @@ export default {
     {
       id: 'cooker-hood-cleaning',
       type: 'video',
-      video: '油烟机清洁培训教程（Cooker Hood Cleaning）.mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/13-cooker-hood-cleaning.mp4',
       indexName: '油烟机清洁',
       indexDescription: '',
       pageName: '油烟机清洁',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
-      videoLength: 60 * 4 + 22,
+      videoLength: 262,
       minimumStay: 120,
     },
     {
@@ -455,7 +513,7 @@ export default {
       indexDescription: '',
       pageName: '油烟机清洁测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -473,12 +531,12 @@ export default {
     {
       id: 'tableware-cleaning',
       type: 'video',
-      video: '餐具清洁培训教程(Tableware Cleaning).mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/14-tableware-cleaning.mp4',
       indexName: '餐具清洁',
       indexDescription: '',
       pageName: '餐具清洁',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
       videoLength: 200,
       minimumStay: 100,
@@ -490,7 +548,7 @@ export default {
       indexDescription: '',
       pageName: '餐具清洁测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -518,12 +576,12 @@ export default {
     {
       id: 'dusting-training',
       type: 'video',
-      video: '掸尘培训教程（Dusting Training）.mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/15-dusting-training.mp4',
       indexName: '掸尘培训',
       indexDescription: '',
       pageName: '掸尘培训',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
       videoLength: 40,
       minimumStay: 40,
@@ -535,7 +593,7 @@ export default {
       indexDescription: '',
       pageName: '掸尘测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -563,12 +621,12 @@ export default {
     {
       id: 'vacuuming-training',
       type: 'video',
-      video: '吸尘培训教程（Vacuuming Training）.mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/16-vacuuming-training.mp4',
       indexName: '吸尘培训',
       indexDescription: '',
       pageName: '吸尘培训',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
       videoLength: 200,
       minimumStay: 100,
@@ -580,7 +638,7 @@ export default {
       indexDescription: '',
       pageName: '吸尘测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -598,12 +656,12 @@ export default {
     {
       id: 'hand-hygiene',
       type: 'video',
-      video: '手部清洁培训视频（Hand Hygiene）.mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/17-hand-hygiene.mp4',
       indexName: '手部清洁',
       indexDescription: '',
       pageName: '手部清洁',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
       videoLength: 70,
       minimumStay: 70,
@@ -615,7 +673,7 @@ export default {
       indexDescription: '',
       pageName: '手部清洁测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -633,14 +691,14 @@ export default {
     {
       id: 'household-appliance-cleaning',
       type: 'video',
-      video: '家用电器清洁培训教程（Household Appliance Cleaning）.mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/18-household-appliance-cleaning.mp4',
       indexName: '家用电器清洁',
       indexDescription: '',
       pageName: '家用电器清洁',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
-      videoLength: 120 + 35,
+      videoLength: 155,
       minimumStay: 90,
     },
     {
@@ -650,7 +708,7 @@ export default {
       indexDescription: '',
       pageName: '家用电器清洁测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -668,12 +726,12 @@ export default {
     {
       id: 'furniture-cleaning',
       type: 'video',
-      video: '家具清洁培训教程（Furniture Cleaning）.mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/19-furniture-cleaning.mp4',
       indexName: '家具清洁',
       indexDescription: '',
       pageName: '家具清洁',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
       videoLength: 180,
       minimumStay: 90,
@@ -685,7 +743,7 @@ export default {
       indexDescription: '',
       pageName: '家具清洁测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -713,14 +771,14 @@ export default {
     {
       id: 'door-cleaning',
       type: 'video',
-      video: '门的清洁培训教程（Door Cleaning）.mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/20-door-cleaning.mp4',
       indexName: '门的清洁',
       indexDescription: '',
       pageName: '门的清洁',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
-      videoLength: 120 + 20,
+      videoLength: 140,
       minimumStay: 60,
     },
     {
@@ -730,7 +788,7 @@ export default {
       indexDescription: '',
       pageName: '门的清洁测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
@@ -747,12 +805,12 @@ export default {
     {
       id: 'post-service-training',
       type: 'video',
-      video: '服务结束培训教程(Post-service Training）.mp4',
+      videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/21-post-service-training.mp4',
       indexName: '服务结束培训',
       indexDescription: '',
       pageName: '服务结束培训',
       pageDescription: `
-      Waiting from Yan.
+      
       `,
       videoLength: 100,
       minimumStay: 60,
@@ -762,20 +820,20 @@ export default {
       type: 'quiz',
       indexName: '测试',
       indexDescription: '',
-      pageName: '服务结束培训测试',
+      pageName: '服务结束测试',
       pageDescription: `
-      Please select the best word for the sentence:
+      请选择最合适的选项
       `,
       questions: [
         {
-          question: 'After checking the kit, you should say "Goodbye. $$$!"',
+          question: '检查工具包完成后，与客户示意道别说："再见，$$$!"',
           options: [
-            'Have a good day',
-            'See you next time',
-            'Bye',
+            '祝您好心情',
+            '下次见',
+            '白白',
           ],
           wrongText: '错误选项。请重新观看视频。',
-          correct: 'Have a good day',
+          correct: '祝您好心情',
         },
       ],
     },
