@@ -60,7 +60,7 @@
         if (self.startTime && !self.minimumStayReached) {
           const dialog = self.$f7.dialog.create({
             text: self.$t('education.lesson.exit_confirm_text', {
-              required: formatDuration(self.lesson.minimumStay),
+              required: formatDuration(self.lesson.videoLength),
               current: formatDuration((new Date().getTime() - self.startTime) / 1000),
             }),
             buttons: [
