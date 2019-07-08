@@ -1,12 +1,15 @@
 {
+  "continue_button": "下一步",
+  "next_button": "Next",
+  "back_button": "Back",
+  "start_button": "Start",
+  "resume_button": "Resume",
   "splash": {
     "title": "培训",
-    "text": "欢迎来到托me培训。你可以学习培训课程，提高技能，获得更好的工作机会。",
-    "continue_button": "下一步"
+    "text": "欢迎来到托me培训。你可以学习培训课程，提高技能，获得更好的工作机会。"
   },
   "index": {
     "title": "培训",
-    "continue_button": "下一步",
     "price_label": "价格",
     "free_label": "免费",
     "duration_label": "时长",
@@ -17,6 +20,20 @@
     "estimate_data_label": "预计数据",
     "mb_label": "MB",
     "required_label": "要求"
+  },
+  "course": {
+    "courses_label": "Courses",
+    "certificate_of_completion": "Certificate of Completion",
+    "certificates_label": "Certificates"
+  },
+  "lesson": {
+    "video_complete_text": "You have finished this video, do you want to continue?",
+    "exit_confirm_text": "The video is {{required}} long and you have been on page for {{current}}",
+    "dismiss_button": "Dismiss"
+  },
+  "certificate": {
+    "title": "Congratulations!",
+    "text": "You are now certified for {{course.indexName}}"
   },
   "title": "培训",
   "summary": "",
