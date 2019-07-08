@@ -7,7 +7,7 @@ import Certificate from './pages/certificate.vue';
 
 const routes = [
   {
-    path: '/education-index/',
+    path: '/education/index/',
     component: Index,
   },
   {

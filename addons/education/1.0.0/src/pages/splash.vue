@@ -4,7 +4,7 @@
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{$t('education.splash.title')}}</f7-nav-title>
     </f7-navbar>
-    <a href="/education-index/" class="education-toolbar-button" slot="fixed">{{$t('education.continue_button')}}</a>
+    <a href="/education/index/" class="education-toolbar-button" slot="fixed">{{$t('education.continue_button')}}</a>
     <div class="education-splash-text">{{$t('education.splash.text')}}</div>
   </f7-page>
 </template>
