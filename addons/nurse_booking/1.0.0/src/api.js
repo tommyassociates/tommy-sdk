@@ -56,12 +56,15 @@ const API = {
     });
   },
   getNurseList(teamId, startTime, endTime) {
+    const startDate = tommy.moment(new Date(startTime)).toISOString(true);
+    const endDate = tommy.moment(new Date(endTime)).toISOString(true);
     return api.call({
       endpoint: `teams/${teamId}/members`,
       method: 'GET',
       data: {
         tags: ['Employee'],
-        is_available_between: [new Date(startTime).toJSON(), new Date(endTime).toJSON()],
+        is_available_between: [startDate, endDate],
+        timezone_offset: new Date().getTimezoneOffset(),
       },
       cache: false,
     }).then((res) => {
