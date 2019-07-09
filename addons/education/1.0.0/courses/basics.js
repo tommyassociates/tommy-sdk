@@ -13,7 +13,7 @@ export default {
   required: [], // ids of required courses
   locked: false,
   lessons: [
-       {
+    {
       id: 'pre-service', // every lesson must have unique id
       type: 'video',
       videoUrl: 'https://tommy-education.s3.cn-north-1.amazonaws.com.cn/Training/1-tuome-certificate/1-pre-service.mp4',
@@ -146,7 +146,7 @@ export default {
           wrongText: '错误选项。请重新观看视频。',
           correct: '8-10',
         },
-		{
+        {
           question: '澳大利亚的地面精油需要在拖把水桶内按压$$$。',
           options: [
             '2-3下',
