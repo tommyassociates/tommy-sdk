@@ -243,7 +243,7 @@
         const self = this;
         const feedback = obj.feedback;
         const data = { ...self.order };
-        data.status = 'complete';
+        data.status = 'qa';
         if (!data.data.feedback) data.data.feedback = feedback;
         else Object.assign(data.data.feedback, feedback);
         data.data.feedback.actual_end_date = new Date().toJSON();
