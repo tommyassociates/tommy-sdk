@@ -39,5 +39,6 @@ module.exports = {
       ObjectExpression: { minProperties: 9, multiline: true, consistent: true },
       ObjectPattern: { minProperties: 9, multiline: true, consistent: true }
     }],
+    "linebreak-style": ["error", "windows"]
   },
 };
