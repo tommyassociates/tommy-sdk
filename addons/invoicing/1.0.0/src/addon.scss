@@ -126,8 +126,17 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$red}
       justify-content: space-between;
       align-items: center;
       font-size: 16px;
-      img {
-        display: block
+
+      >.order-list-header-right{
+        display: flex;
+        flex-direction: row;
+
+        >a+a{
+          margin-left: 8px;
+        }
+        img {
+          display: block
+        }
       }
     }
     >div {

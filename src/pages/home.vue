@@ -8,7 +8,6 @@
       </f7-nav-right>
     </f7-navbar>
 
-
     <!-- Main addons list -->
     <f7-block-title>Addons</f7-block-title>
     <f7-list media-list>
@@ -41,6 +40,8 @@
 </template>
 <script>
   export default {
+    mounted() {
+    },
     methods: {
       addonUrl(addon) {
         const self = this;
