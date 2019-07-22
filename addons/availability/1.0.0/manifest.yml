@@ -38,22 +38,14 @@
       description: "Lock availability for a roster time slot."
       execute: "Activity::LockAvailability"
       parameters:
-        # user_id:
-        #   title: "User ID"
-        #   type: "integer"
-        #   # required: true
-        # team_id:
-        #   title: "Team ID"
-        #   type: "integer"
-        #   # required: true
         assignee_id:
           title: "Assignee ID"
           type: "integer"
-          # required: true
+          required: true
         assignee_team_id:
           title: "Assignee Team ID"
           type: "integer"
-          # required: true
+          required: true
         start_at:
           title: "Start time"
           type: "time"
@@ -67,22 +59,14 @@
       description: "Unlock availability for a roster time slot."
       execute: "Activity::UnlockAvailability"
       parameters:
-        # user_id:
-        #   title: "User ID"
-        #   type: "integer"
-        #   # required: true
-        # team_id:
-        #   title: "Team ID"
-        #   type: "integer"
-        #   # required: true
         assignee_id:
           title: "Assignee ID"
           type: "integer"
-          # required: true
+          required: true
         assignee_team_id:
           title: "Assignee Team ID"
           type: "integer"
-          # required: true
+          required: true
         start_at:
           title: "Start time"
           type: "time"
@@ -98,8 +82,6 @@
       trigger:
         package: bookings
         name: booking_created
-        scope:
-          user_parameter: assignee_id
       activity:
         package: availability
         name: lock_availability
@@ -132,3 +114,4 @@
       path: "/availability/"
       actor_permission: addon_actor_access
       type: "page"
+
