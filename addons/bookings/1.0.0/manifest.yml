@@ -37,27 +37,20 @@
   triggers:
     booking_created:
       title: "Booking created"
-      # execute: "Trigger::BookingCreated"
       observe:
         object: Event
         conditions:
           kind: Booking
         event: create
-      # resource_type: Event
-      # resource_kind: Booking
     booking_updated:
       title: "Booking updated"
-      # execute: "Trigger::BookingUpdated"
       observe:
         object: Event
         conditions:
           kind: Booking
         event: update
-      # resource_type: Event
-      # resource_kind: Booking
     booking_canceled:
       title: "Booking canceled"
-      # execute: "Trigger::BookingDeleted"
       observe:
         object: Event
         conditions:
@@ -65,23 +58,11 @@
         event: cancel
     booking_deleted:
       title: "Booking deleted"
-      # execute: "Trigger::BookingDeleted"
       observe:
         object: Event
         conditions:
           kind: Booking
         event: delete
-      # resource_type: Event
-      # resource_kind: Booking
-    # booking_viewed:
-    #   title: "Booking viewed"
-    #   observe:
-    #     object: Event
-    #     conditions:
-    #       kind: Booking
-    #     event: delete
-    #   # resource_type: Event
-    #   # resource_kind: Booking
   actions:
     notify_assignee_on_booking_created:
       title: "Notify assignee on booking created"
@@ -100,7 +81,7 @@
         message:
           title: "Message text"
           type: "string"
-          value: "You have a new booking at %{trigger.start_at}"
+          value: "You have a new booking. See Bookings for more details."
       default: true
     notify_assignee_on_booking_canceled:
       title: "Notify assignee on booking canceled"
@@ -117,8 +98,7 @@
         message:
           title: "Message text"
           type: "string"
-          value: "Your booking at %{trigger.start_at} has been canceled"
-      default: true
+          value: "One of your bookings have been cancelled. Please see Bookings for details."
   assets:
     -
       type: "stylesheet"
