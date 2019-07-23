@@ -331,6 +331,7 @@ var addon = (function () {
         orderContactsLoading: {},
         csvKeys: [],
         csvValues: [],
+        promotions: null,
       };
     },
     created: function created() {
@@ -405,12 +406,13 @@ var addon = (function () {
 
         // eslint-disable-next-line no-restricted-syntax
         for (var i in order) {
-          if (typeof order[i] === 'object') {
+          if (typeof order[i] === 'object' && order[i] !== null) {
             this.traversalObject(order[i], index); // 递归遍历
           } else if (i === 'id' || i === 'user_id') {
             if (index === 0 && isFirst) {
               this.csvKeys.push(i);
-            } else if (isFirst) {
+            }
+            if (isFirst) {
               if (i === 'user_id') {
                 order[i] = this.orderUserName(order[i]);
               }
@@ -419,27 +421,44 @@ var addon = (function () {
           } else if (i === 'date') {
             if (index === 0) {
               this.csvKeys.push(i);
-            } else {
-              this.csvValues.push(this.orderDate(order[i]));
             }
+            this.csvValues.push(this.orderDate(order[i]));
+          } else if (i === 'assignee_id') {
+            // 护工名字
+            if (index === 0) {
+              this.csvKeys.push(i);
+            }
+            var name = order[i] ? this.getAssigneeName(order[i]) : 'null';
+            this.csvValues.push(name);
+          } else if (i === 'vendor_coupon_id') {
+            if (index === 0) {
+              this.csvKeys.push('couponName', 'couponDiscount');
+            }
+            var name$1 = order[i] ? this.promotionName(order[i]) : 'null';
+            var disCount = order[i] ? this.promotionDiscount(order[i]) : 'null';
+            this.csvValues.push(name$1, disCount);
           } else if (
             i === 'status'
             || i === 'city'
             || i === 'created_at'
             || i === 'total'
+            || i === 'address'
           ) {
             if (index === 0) {
               this.csvKeys.push(i);
-            } else {
-              if (typeof order[i] === 'string') {
-                order[i] = order[i].split(',').join(' ');
-              } else if (!order[i]) {
-                order[i] = 'null';
-              }
-              this.csvValues.push(order[i]);
             }
+            if (typeof order[i] === 'string') {
+              order[i] = order[i].split(',').join(' ');
+            }
+            this.csvValues.push(order[i] ? order[i] : 'null');
           }
         }
+      },
+      getAssigneeName: function getAssigneeName(id) {
+        var name = this.$root.teamMembers.filter(
+          function (m) { return m.user_id === parseInt(id, 10); }
+        )[0];
+        return name.last_name + name.first_name;
       },
       onSlideClick: function onSlideClick(e) {
         var self = this;
@@ -562,6 +581,17 @@ var addon = (function () {
         if (list.permission_to.indexOf('update') !== -1) { return true; }
         return false;
       },
+      promotionName: function promotionName(id) {
+        var self = this;
+        return self.promotions.filter(function (el) { return el.id === parseInt(id, 10); })[0].name;
+      },
+      promotionDiscount: function promotionDiscount(id) {
+        var self = this;
+        var promo = self.promotions.filter(function (el) { return el.id === parseInt(id, 10); })[0];
+        if (!promo) { return 0; }
+        if (promo.kind !== 'percentage') { return promo.amount; }
+        return self.orderItemsTotal * promo.amount;
+      },
     },
     beforeDestroy: function beforeDestroy() {
       var self = this;
@@ -579,6 +609,10 @@ var addon = (function () {
       }
       self.$events.$on('invoicing:reloadListsOrders', self.reloadListsOrders);
       self.$events.$on('invoicing:reloadLists', self.reloadLists);
+
+      API.loadPromotions().then(function (promotions) {
+        self.promotions = promotions;
+      });
     },
   };
 
@@ -8890,4 +8924,3 @@ var addon = (function () {
   return routes;
 
 }());
-));

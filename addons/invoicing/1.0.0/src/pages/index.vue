@@ -131,6 +131,7 @@ export default {
       orderContactsLoading: {},
       csvKeys: [],
       csvValues: [],
+      promotions: null,
     };
   },
   created() {
@@ -201,12 +202,13 @@ export default {
     traversalObject(order, index, isFirst = false) {
       // eslint-disable-next-line no-restricted-syntax
       for (const i in order) {
-        if (typeof order[i] === 'object') {
+        if (typeof order[i] === 'object' && order[i] !== null) {
           this.traversalObject(order[i], index); // 递归遍历
         } else if (i === 'id' || i === 'user_id') {
           if (index === 0 && isFirst) {
             this.csvKeys.push(i);
-          } else if (isFirst) {
+          }
+          if (isFirst) {
             if (i === 'user_id') {
               order[i] = this.orderUserName(order[i]);
             }
@@ -215,27 +217,44 @@ export default {
         } else if (i === 'date') {
           if (index === 0) {
             this.csvKeys.push(i);
-          } else {
-            this.csvValues.push(this.orderDate(order[i]));
           }
+          this.csvValues.push(this.orderDate(order[i]));
+        } else if (i === 'assignee_id') {
+          // 护工名字
+          if (index === 0) {
+            this.csvKeys.push(i);
+          }
+          const name = order[i] ? this.getAssigneeName(order[i]) : 'null';
+          this.csvValues.push(name);
+        } else if (i === 'vendor_coupon_id') {
+          if (index === 0) {
+            this.csvKeys.push('couponName', 'couponDiscount');
+          }
+          const name = order[i] ? this.promotionName(order[i]) : 'null';
+          const disCount = order[i] ? this.promotionDiscount(order[i]) : 'null';
+          this.csvValues.push(name, disCount);
         } else if (
           i === 'status'
           || i === 'city'
           || i === 'created_at'
           || i === 'total'
+          || i === 'address'
         ) {
           if (index === 0) {
             this.csvKeys.push(i);
-          } else {
-            if (typeof order[i] === 'string') {
-              order[i] = order[i].split(',').join(' ');
-            } else if (!order[i]) {
-              order[i] = 'null';
-            }
-            this.csvValues.push(order[i]);
           }
+          if (typeof order[i] === 'string') {
+            order[i] = order[i].split(',').join(' ');
+          }
+          this.csvValues.push(order[i] ? order[i] : 'null');
         }
       }
+    },
+    getAssigneeName(id) {
+      const name = this.$root.teamMembers.filter(
+        m => m.user_id === parseInt(id, 10)
+      )[0];
+      return name.last_name + name.first_name;
     },
     onSlideClick(e) {
       const self = this;
@@ -356,6 +375,17 @@ export default {
       if (list.permission_to.indexOf('update') !== -1) return true;
       return false;
     },
+    promotionName(id) {
+      const self = this;
+      return self.promotions.filter(el => el.id === parseInt(id, 10))[0].name;
+    },
+    promotionDiscount(id) {
+      const self = this;
+      const promo = self.promotions.filter(el => el.id === parseInt(id, 10))[0];
+      if (!promo) return 0;
+      if (promo.kind !== 'percentage') return promo.amount;
+      return self.orderItemsTotal * promo.amount;
+    },
   },
   beforeDestroy() {
     const self = this;
@@ -373,6 +403,10 @@ export default {
     }
     self.$events.$on('invoicing:reloadListsOrders', self.reloadListsOrders);
     self.$events.$on('invoicing:reloadLists', self.reloadLists);
+
+    API.loadPromotions().then((promotions) => {
+      self.promotions = promotions;
+    });
   },
 };
 </script>
