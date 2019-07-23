@@ -182,9 +182,7 @@ export default {
     downloadCSV(orders, name) {
       orders.forEach((order, index) => {
         this.traversalObject(order, index, true);
-        this.csvValues[this.csvValues.length - 1] = `${
-          this.csvValues[this.csvValues.length - 1]
-        }\n`;
+        this.csvValues[this.csvValues.length - 1] += '\n';
       });
       const text = `${this.csvKeys.join(',')}\n${this.csvValues
         .join(',')
@@ -218,18 +216,7 @@ export default {
           if (index === 0) {
             this.csvKeys.push(i);
           } else {
-            const date = new Date(parseInt(order[i]));
-            const Y = `${date.getFullYear()}-`;
-            const M = `${
-              date.getMonth() + 1 < 10
-                ? '0' + (date.getMonth() + 1)
-                : date.getMonth() + 1
-            }-`;
-            const D = `${date.getDate()} `;
-            const h = `${date.getHours()}:`;
-            const m = `${date.getMinutes()}:`;
-            const s = date.getSeconds();
-            this.csvValues.push(Y + M + D + h + m + s);
+            this.csvValues.push(this.orderDate(order[i]));
           }
         } else if (
           i === 'status'
@@ -264,7 +251,7 @@ export default {
     orderDate(date) {
       const self = this;
       if (!date) return '';
-      return self.$moment(parseInt(date, 10)).format('HH:mm D MMM YYYY');
+      return self.$moment(parseInt(date, 10)).format('YYYY/MM/DD HH:mm');
     },
     orderUserName(user_id) {
       const self = this;
