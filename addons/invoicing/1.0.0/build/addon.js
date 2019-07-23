@@ -1,1 +1,8893 @@
-var addon=function(){var r=window.tommy,o=r.api,n={actor:void 0,actorId:void 0,isNurse:!1,assignee_id:null,contacts:null,loadOrder:function loadOrder(t){var e={with_filters:!0,with_permission_to:!0,actor_id:n.actorId};return o.call({endpoint:"vendor/manager/orders/"+t,data:e})},saveOrder:function saveOrder(t){return o.call({method:t.id?"PUT":"POST",endpoint:"vendor/manager/orders/"+(t.id||""),data:t})},cancelOrder:function cancelOrder(t){return o.call({endpoint:"vendor/manager/orders/"+t.id,method:"DELETE"})},loadListOrders:function loadListOrders(t){var e=[];if(t.data&&t.filters)for(var i=0;i<t.filters.length;i+=1)e.indexOf(t.filters[i].name)<0&&e.push(t.filters[i].name);var a={tags:e,with_filters:!0,with_permission_to:!0,actor_id:n.actorId,assignee_id:n.assignee_id||void 0};return t.data.date_range&&(a.date_range=t.data.date_range,Array.isArray(a.date_range)&&(a.date_range=a.date_range.map(function(t){return t/1e3}))),t.data.status?a.status=t.data.status:n.assignee_id&&(a.status=["complete","paid","processing"]),t.data.sort&&(a.sort=t.data.sort),t.data.price_min&&(a.price_min=t.data.price_min),t.data.price_max&&(a.price_max=t.data.price_max),t.data.balance_min&&(a.balance_min=t.data.balance_min),t.data.balance_max&&(a.balance_max=t.data.balance_max),"invoice"===t.data.type&&(a.invoices=!0),"quote"===t.data.type&&(a.quotes=!0),t.data.customer&&(a.user_id=t.data.customer),t.data.only_assigned?a.assignee_id=n.actorId||r.root.user.id:t.data.assignee&&(a.assignee_id=t.data.assignee),a.data=JSON.stringify(a.data),o.call({endpoint:"/vendor/manager/orders",data:a})},loadList:function loadList(t){return o.getFragment(t,{data:{addon:"invoicing",kind:"OrderList",with_filters:!0,with_permission_to:!0}})},loadLists:function loadLists(t,e){void 0===t&&(t={}),void 0===e&&(e={});var i=Object.assign({addon:"invoicing",kind:"OrderList",with_filters:!0,with_permission_to:!0,actor_id:n.actorId,user_id:n.actorId,only_owned:!n.actorId&&!n.isNurse},t);return n.actorId||n.isNurse||void 0!==i.only_owned||(i.only_owned=!0),o.getFragments(i,e)},deleteList:function deleteList(t,e){return o.deleteFragment(t,{data:e})},saveList:function saveList(t){t.addon="invoicing",t.kind="OrderList",t.with_filters=!0,t.with_permission_to=!0,t.data||(t.data={}),void 0===t.data.position&&(t.data.position=0),void 0===t.data.active&&(t.data.active=!0),t.id||(t.with_permissions=["order_list_read_access","order_list_edit_access"]);var e=Object.assign({},t,{data:JSON.stringify(t.data),filters:JSON.stringify(t.filters)});return t.id?o.updateFragment(t.id,e):o.createFragment(e)},createDefaultList:function createDefaultList(){var t={name:r.i18n.t("invoicing.index.default_list_name"),data:{default:!0},filters:[]};return n.saveList(t)},loadPromotions:function loadPromotions(){return o.call({endpoint:"vendor/manager/coupons",method:"GET",cache:!1})},loadPromotion:function loadPromotion(t){return o.call({endpoint:"vendor/manager/coupons/"+t,method:"GET",cache:!1})},savePromotion:function savePromotion(t){return o.call({endpoint:"vendor/manager/coupons/"+(t.id||""),method:t.id?"PUT":"POST",data:t,dataType:"json",contentType:"application/json",processData:!1})},loadProducts:function loadProducts(){return o.call({endpoint:"vendor/manager/products",method:"GET",cache:!1})},loadProduct:function loadProduct(t){return o.call({endpoint:"vendor/manager/products/"+t,method:"GET",cache:!1})},saveProduct:function saveProduct(t,e){var a=new FormData,n=Object.assign({},t);return n.data&&"object"==typeof n.data&&(n.data=Object.assign({},n.data)),Object.keys(n).forEach(function(t){var e,i=n[t];if(null===i&&(i=""),"null"===i&&(i=""),("data"===t||"filters"===t||"vendor_product_ids"===t)&&i||Array.isArray(i))return"string"==typeof i&&"[object Object]"!==i&&(i=JSON.parse(i)),"[object Object]"===i?(i="",void a.append(t,i)):Array.isArray(i)&&!i.length?(i=null,void a.append(t,i)):void(Object.keys(i).length?i=r.app.f7.utils.serializeObject(((e={})[t]=i,e)).split("&").forEach(function(t){a.append(t.split("=")[0],decodeURIComponent(t.split("=")[1]))}):(i="",a.append(t,i)));"image"!==t||i||(i=null),"image_url"!==t||i||(i=null),a.append(t,i)}),o.call({endpoint:"vendor/manager/"+(e?"packages":"products")+"/"+(t.id||""),method:t.id?"PUT":"POST",data:a,contentType:"multipart/form-data"})},loadPackages:function loadPackages(t,e){return void 0===t&&(t={}),void 0===e&&(e={}),o.call({endpoint:"vendor/manager/packages",method:"GET",cache:!1})},loadPackage:function loadPackage(t){return o.call({endpoint:"vendor/manager/packages/"+t,method:"GET",cache:!1})}};function g(){var i=this,t=i.$createElement,a=i._self._c||t;return a("f7-page",{staticClass:"invoicing-page",attrs:{id:"invoicing__index",name:"invoicing__index"}},[a("f7-navbar",[a("tommy-nav-menu"),i._v(" "),a("f7-nav-title",[i._v(i._s(i.pageTitle))]),i._v(" "),i.isNurse?i._e():a("f7-nav-right",[a("f7-link",{attrs:{href:"/invoicing/settings/","icon-f7":"gear"}}),i._v(" "),a("f7-link",{attrs:{href:"/invoicing/order-details/","icon-f7":"add"}})],1)],1),i._v(" "),i.orderedLists&&i.orderedLists.length?a("f7-swiper",{staticClass:"no-swipe-panel",attrs:{params:{slidesPerView:"auto",breakpointsInverse:!0,centeredSlides:!1,touchMoveStopPropagation:!1,on:{tap:i.onSlideClick},breakpoints:{768:{centeredSlides:!0}}}}},i._l(i.orderedLists,function(e){return a("f7-swiper-slide",{key:e.id},[a("div",{staticClass:"orders-list",class:{hasScroll:i.listWithScroll[e.id]},attrs:{"data-id":e.id}},[a("div",{staticClass:"orders-list-header"},[a("div",[i._v(i._s(e.name))]),i._v(" "),a("div",{staticClass:"order-list-header-right"},[i.canEditList(e)?a("a",{attrs:{"data-url":"/invoicing/list-edit/"+e.id+"/"}},[a("img",{attrs:{src:i.$addonAssetsUrl+"slice6.png",srcset:i.$addonAssetsUrl+"slice6@2x.png 2x, "+i.$addonAssetsUrl+"slice6@3x.png 3x"}})]):i._e(),i._v(" "),i.canEditList(e)&&0<e.orders.length?a("a",{ref:"download",refInFor:!0,on:{click:function(t){return i.downloadCSV(e.orders,e.name)}}},[a("img",{attrs:{src:i.$addonAssetsUrl+"slice20.png",srcset:i.$addonAssetsUrl+"slice20@2x.png 2x, "+i.$addonAssetsUrl+"slice20@3x.png 3x"}})]):i._e()])]),i._v(" "),a("div",{staticClass:"orders-list-content"},[e.orders&&e.orders.length?i._l(e.orders,function(t,e){return a("a",{key:e,staticClass:"card invoicing-order-card",attrs:{"data-url":"/invoicing/order-details/"+t.id+"/"}},[a("div",{staticClass:"card-header"},[t.data&&t.data.date?a("span",{staticClass:"order-date"},[i._v(i._s(i.orderDate(t.data?t.data.date:null)))]):i._e(),i._v(" "),i.isNurse?i._e():a("span",{staticClass:"order-status"},[i._v(i._s(i.$t("invoicing.order_status."+t.status)))])]),i._v(" "),a("div",{staticClass:"card-content"},[a("f7-list",{staticClass:"no-hairlines no-hairlines-between"},[t.user_id?a("f7-list-item",{attrs:{title:i.orderUserName(t.user_id)}},[a("img",{attrs:{slot:"media",src:i.$addonAssetsUrl+"icon-user.svg"},slot:"media"})]):i._e(),i._v(" "),a("f7-list-item",{attrs:{title:t.name}},[a("img",{attrs:{slot:"media",src:i.$addonAssetsUrl+"icon-product.svg"},slot:"media"})]),i._v(" "),t.total&&!i.isNurse?a("f7-list-item",{attrs:{title:t.total}},[a("img",{attrs:{slot:"media",src:i.$addonAssetsUrl+"icon-money.svg"},slot:"media"})]):i._e(),i._v(" "),t.data&&t.data.location?a("f7-list-item",{attrs:{title:t.data.location.address+" "+t.data.location.city}},[a("img",{attrs:{slot:"media",src:i.$addonAssetsUrl+"icon-location.svg"},slot:"media"})]):i._e()],1)],1)])}):i._e()],2)])])}),1):i._e()],1)}function p(){var t=this,e=t.$createElement,i=t._self._c||e;return i("f7-page",{staticClass:"invoicing-page",attrs:{id:"invoicing__settings","data-name":"invoicing__settings"}},[i("f7-navbar",[i("tommy-nav-back"),t._v(" "),i("f7-nav-title",[t._v(t._s(t.$t("invoicing.settings.title","Settings")))])],1),t._v(" "),i("f7-list",{staticClass:"list-custom"},[t.hasActorId?t._e():i("f7-list-item",{attrs:{link:"/invoicing/list-management/",title:t.$t("invoicing.settings.list_management","List Management")}}),t._v(" "),t.isNurse?t._e():i("f7-list-item",{attrs:{link:"/invoicing/item-service-management/",title:t.$t("invoicing.settings.item_service_management","Item/Service Management")}}),t._v(" "),t.isNurse?t._e():i("f7-list-item",{attrs:{link:"/invoicing/promotion-management/",title:t.$t("invoicing.settings.promotion_management","Promotion Management")}})],1)],1)}function z(){var e=this,t=e.$createElement,i=e._self._c||t;return i("f7-page",{staticClass:"invoicing-page",attrs:{name:"invoicing__item-service-management",id:"invoicing__item-service-management"}},[i("f7-navbar",[i("tommy-nav-back"),e._v(" "),i("f7-nav-title",[e._v(e._s(e.$t("invoicing.item_service_management.title","Items / Service")))]),e._v(" "),i("f7-nav-right",[i("f7-link",{attrs:{"icon-f7":"add"},on:{click:e.addItem}})],1)],1),e._v(" "),i("div",{staticClass:"item-service-tabs-links"},[i("f7-link",{class:{active:"items"===e.activeTab},on:{click:function(t){e.activeTab="items"}}},[e._v(e._s(e.$t("invoicing.item_service_management.items_tab")))]),e._v(" "),i("f7-link",{class:{active:"packages"===e.activeTab},on:{click:function(t){e.activeTab="packages"}}},[e._v(e._s(e.$t("invoicing.item_service_management.packages_tab")))])],1),e._v(" "),i("div",{directives:[{name:"show",rawName:"v-show",value:"items"===e.activeTab,expression:"activeTab === 'items'"}],staticClass:"item-service-tab"},[e.items&&e.items.length?i("f7-searchbar",{attrs:{"search-container":".invoicing-list-items",backdrop:!1,"disable-button":!1,placeholder:e.$t("invoicing.item_service_management.search_items")}}):e._e(),e._v(" "),e.items&&e.items.length?i("f7-list",{staticClass:"list-custom invoicing-list-items",attrs:{"no-hairlines":""}},e._l(e.orderedProducts,function(t){return i("f7-list-item",{key:t.id,attrs:{title:t.name,link:"/invoicing/product-details/"+t.id+"/?title="+(t.name||"")}})}),1):e._e()],1),e._v(" "),i("div",{directives:[{name:"show",rawName:"v-show",value:"packages"===e.activeTab,expression:"activeTab === 'packages'"}],staticClass:"item-service-tab"},[e.packages&&e.packages.length?i("f7-searchbar",{attrs:{"search-container":".invoicing-list-packages",backdrop:!1,"disable-button":!1,placeholder:e.$t("invoicing.item_service_management.search_packages")}}):e._e(),e._v(" "),e.packages&&e.packages.length?i("f7-list",{staticClass:"list-custom invoicing-list-packages",attrs:{"no-hairlines":""}},e._l(e.orderedPackages,function(t){return i("f7-list-item",{key:t.id,attrs:{title:t.name,link:"/invoicing/package-details/"+t.id+"/?title="+(t.name||"")}})}),1):e._e()],1)],1)}function I(){var i=this,t=i.$createElement,a=i._self._c||t;return a("f7-page",{staticClass:"invoicing-page",attrs:{name:"invoicing__list-management",id:"invoicing__list-management"}},[a("f7-navbar",[a("tommy-nav-back"),i._v(" "),a("f7-nav-title",[i._v(i._s(i.$t("invoicing.list_management.title","List Management")))]),i._v(" "),a("f7-nav-right",[i.showSave?a("f7-link",{attrs:{"icon-f7":"check"},on:{click:i.save}}):i._e()],1)],1),i._v(" "),i.lists?a("f7-list",{staticClass:"list-custom",attrs:{sortable:"",sortableEnabled:"",inset:""},on:{"sortable:sort":i.onSort}},i._l(i.orderedLists,function(e){return a("f7-list-item",{key:e.id,attrs:{checkbox:"",checked:e.data.active,title:e.name},on:{change:function(t){return i.toggleListActive(e,t.target.checked)}}})}),1):i._e(),i._v(" "),a("f7-list",{staticClass:"list-custom margin-bottom",attrs:{inset:""}},[a("f7-list-item",{attrs:{link:"/invoicing/list-add/",title:i.$t("invoicing.list_management.create_list","Create New List")}})],1)],1)}function R(){var e=this,t=e.$createElement,i=e._self._c||t;return i("f7-page",{staticClass:"invoicing-page",attrs:{name:"invoicing__list-add",id:"invoicing__list-add"}},[i("f7-navbar",[i("tommy-nav-back"),e._v(" "),i("f7-nav-title",[e._v(e._s(e.$t("invoicing.list_add.title","Add List")))]),e._v(" "),i("f7-nav-right",[e.showSave?i("f7-link",{attrs:{"icon-f7":"check"},on:{click:e.save}}):e._e()],1)],1),e._v(" "),i("f7-list",{staticClass:"top-0 list-custom"},[i("f7-list-item",[i("f7-input",{attrs:{type:"text",placeholder:e.$t("invoicing.list_add.name_placeholder","Name"),value:e.name},on:{input:function(t){e.name=t.target.value}}})],1)],1)],1)}var t=function normalizeComponent(t,e,i,a,n,r,o,s,d,c){"boolean"!=typeof o&&(d=s,s=o,o=!1);var l,u="function"==typeof i?i.options:i;if(t&&t.render&&(u.render=t.render,u.staticRenderFns=t.staticRenderFns,u._compiled=!0,n&&(u.functional=!0)),a&&(u._scopeId=a),r?(l=function hook(t){(t=t||this.$vnode&&this.$vnode.ssrContext||this.parent&&this.parent.$vnode&&this.parent.$vnode.ssrContext)||"undefined"==typeof __VUE_SSR_CONTEXT__||(t=__VUE_SSR_CONTEXT__),e&&e.call(this,d(t)),t&&t._registeredComponents&&t._registeredComponents.add(r)},u._ssrRegister=l):e&&(l=o?function(){e.call(this,c(this.$root.$options.shadowRoot))}:function(t){e.call(this,s(t))}),l)if(u.functional){var v=u.render;u.render=function renderWithStyleInjection(t,e){return l.call(e),v(t,e)}}else{var m=u.beforeCreate;u.beforeCreate=m?[].concat(m,l):[l]}return i},e={data:function data(){var t,e=this,i=e.$f7route.query.actor_id,a=(t=(t=i?e.$root.teamMembers.filter(function(t){return t.user_id===parseInt(e.actorId,10)})[0]:e.$root.account)||e.$root.account).roles;return n.isNurse=!a||a&&0===a.length||a&&(0<=a.indexOf("Nurse")||0<=a.indexOf("Employee")),n.assignee_id=n.isNurse?t.user_id:null,{lists:null,actorId:i,listWithScroll:{},isNurse:n.isNurse,contacts:n.contacts,orderContacts:{},orderContactsLoading:{},csvKeys:[],csvValues:[]}},created:function created(){this.actorId?(n.actorId=parseInt(this.actorId,10),n.actor=this.actor,n.actor.roles&&(0<=n.actor.roles.indexOf("Nurse")||0<=n.actor.roles.indexOf("Employee"))&&(n.isNurse=!0,this.isNurse=!0,n.assignee_id=n.actor.user_id)):(delete n.actorId,delete n.actor)},computed:{actor:function actor(){var e=this;return e.actorId?e.$root.teamMembers.filter(function(t){return t.user_id===parseInt(e.actorId,10)})[0]:null},pageTitle:function pageTitle(){var e=this;if(!e.actorId)return e.$t("invoicing.index.title","Orders");var t=e.$root.teamMembers.filter(function(t){return t.user_id===parseInt(e.actorId,10)})[0].first_name;return e.$t("invoicing.index.title_user",{user:t})},orderedLists:function orderedLists(){return this.lists?this.lists.sort(function(t,e){return t.data.position-e.data.position}).filter(function(t){return t.data.active}):null}},methods:{downloadCSV:function downloadCSV(t,e){var i=this;t.forEach(function(t,e){i.traversalObject(t,e,!0),i.csvValues[i.csvValues.length-1]=i.csvValues[i.csvValues.length-1]+"\n"});var a=this.csvKeys.join(",")+"\n"+this.csvValues.join(",").replace(/\n,/g,"\n"),n=e+".csv",r=document.createElement("a");r.href="data:attachment/csv;charset=utf-8,\ufeff"+encodeURIComponent(a),r.target="_blank",r.download=n,r.click()},traversalObject:function traversalObject(t,e,i){for(var a in void 0===i&&(i=!1),t)if("object"==typeof t[a])this.traversalObject(t[a],e);else if("id"===a||"user_id"===a)0===e&&i?this.csvKeys.push(a):i&&("user_id"===a&&(t[a]=this.orderUserName(t[a])),this.csvValues.push(t[a]));else if("date"===a)if(0===e)this.csvKeys.push(a);else{var n=new Date(parseInt(t[a])),r=n.getFullYear()+"-",o=(n.getMonth()+1<10?"0"+(n.getMonth()+1):n.getMonth()+1)+"-",s=n.getDate()+" ",d=n.getHours()+":",c=n.getMinutes()+":",l=n.getSeconds();this.csvValues.push(r+o+s+d+c+l)}else"status"!==a&&"city"!==a&&"created_at"!==a&&"total"!==a||(0===e?this.csvKeys.push(a):("string"==typeof t[a]?t[a]=t[a].split(",").join(" "):t[a]||(t[a]="null"),this.csvValues.push(t[a])))},onSlideClick:function onSlideClick(t){var e=this.$$(t.target).closest("a").eq(0).attr("data-url");e&&this.$f7router.navigate(e)},humanTime:function humanTime(t){var e=window.tommy.moment,i=e.utc(t).toDate();if(e(i).isValid()){var a=e().diff(e(i),"days");if(1===a)return"Yesterday "+e(i).format("h:mm A");if(0===a)return"Today "+e(i).format("h:mm A");if(-1===a)return"Yesterday "+e(i).format("h:mm A");if(1<=a&&a<=8||-8<=a&&a<=-1)return e(i).format("ddd h:mm A");if(365<=a||a<=-365)return e(i).format("MMM D, YYYY h:mm A");if(8<=a||a<=-8)return e(i).format("MMM D h:mm A")}return"None"},orderDate:function orderDate(t){return t?this.$moment(parseInt(t,10)).format("HH:mm D MMM YYYY"):""},orderUserName:function orderUserName(e){var t,i=this;return i.isNurse&&(t=i.orderContacts[e]),!(t=t||i.$root.teamMembers.filter(function(t){return t.user_id===parseInt(e,10)})[0])&&i.contacts&&i.contacts.length&&(t=i.contacts.filter(function(t){return t.friend_id===parseInt(e,10)})[0]),t?t.name||(t.first_name||"")+" "+(t.last_name||""):""},listHasScroll:function listHasScroll(t){if(!t.orders||0===t.orders.length)return!1;var e=this.$$('.orders-list[data-id="'+t.id+'"] .orders-list-content')[0];return!!e&&e.scrollHeight>e.offsetHeight},loadListOrders:function loadListOrders(e){var i=this;n.loadListOrders(e).then(function(t){(e.orders=t).forEach(function(e){i.isNurse&&(i.orderContacts[e.user_id]||i.orderContactsLoading[e.user_id]||(i.orderContacts[e.user_id]={},i.orderContactsLoading[e.user_id]=!0,i.$api.getContact(e.user_id).then(function(t){i.orderContacts[e.user_id]=t,i.orderContactsLoading[e.user_id]=!1,i.$forceUpdate()})))}),i.$nextTick(function(){i.listHasScroll(e)?i.$set(i.listWithScroll,e.id,!0):i.$set(i.listWithScroll,e.id,!1)})})},reloadListsOrders:function reloadListsOrders(){var e=this;e.lists&&e.lists.forEach(function(t){e.loadListOrders(t)})},loadLists:function loadLists(t,e){void 0===e&&(e=!0);var i=this;n.loadLists({},{cache:!t}).then(function(t){t.forEach(function(t){t.orders=[]}),i.lists=t,!i.lists.length&&e?n.createDefaultList(i.$root.user).then(function(){i.loadLists(!0,!1)}).catch(function(){i.loadLists(!0,!1)}):i.lists.forEach(function(t){t.data.active&&i.loadListOrders(t)})})},reloadLists:function reloadLists(){this.loadLists(!0)},canEditList:function canEditList(t){if(this.isNurse&&!this.actorId)return!1;var e=this.$root.account,i="Team"===e.type||"TeamMember"===e.type||0<=e.roles.indexOf("Team Manager"),a=0<=e.roles.indexOf("Team Manager");return!(!t.data.default||!a)||(!t.data.default||i)&&-1!==t.permission_to.indexOf("update")}},beforeDestroy:function beforeDestroy(){this.$events.$off("invoicing:reloadListsOrders",this.reloadListsOrders),this.$events.$off("invoicing:reloadLists",this.reloadLists)},mounted:function mounted(){var e=this;e.loadLists(),n.contacts||e.$api.getContacts().then(function(t){e.contacts=t,n.contacts=t}),e.$events.$on("invoicing:reloadListsOrders",e.reloadListsOrders),e.$events.$on("invoicing:reloadLists",e.reloadLists)}},i=(g._withStripped=!0,t({render:g,staticRenderFns:[]},void 0,e,void 0,!(g._withStripped=!0),void 0,void 0,void 0)),a={data:function data(){return{isNurse:n.isNurse}}},s=(p._withStripped=!0,t({render:p,staticRenderFns:[]},void 0,a,void 0,!(p._withStripped=!0),void 0,void 0,void 0)),d={data:function data(){return{items:null,packages:null,activeTab:"items"}},mounted:function mounted(){var t=this;t.loadProducts(),t.loadPackages(),t.$events.$on("invoicing:reloadProducts",t.loadProducts),t.$events.$on("invoicing:reloadPackages",t.loadPackages)},beforeDestroy:function beforeDestroy(){this.$events.$off("invoicing:reloadProducts",this.loadProducts),this.$events.$off("invoicing:reloadPackages",this.loadPackages)},computed:{orderedProducts:function orderedProducts(){return this.items?this.items.sort(function(t,e){return t.id-e.id}):[]},orderedPackages:function orderedPackages(){return this.packages?this.packages.sort(function(t,e){return t.id-e.id}):[]}},methods:{addItem:function addItem(){"items"===this.activeTab?this.$f7router.navigate("/invoicing/product-details/"):this.$f7router.navigate("/invoicing/package-details/")},loadPackages:function loadPackages(){var e=this;n.loadPackages({},{cache:!1}).then(function(t){e.packages=t})},loadProducts:function loadProducts(){var e=this;n.loadProducts({},{cache:!1}).then(function(t){e.items=t})},add:function add(){}}},c=(z._withStripped=!0,t({render:z,staticRenderFns:[]},void 0,d,void 0,!(z._withStripped=!0),void 0,void 0,void 0)),l={data:function data(){return{saving:!1,showSave:!1,lists:null}},mounted:function mounted(){var e=this;n.loadLists({},{cache:!1}).then(function(t){e.lists=t})},computed:{orderedLists:function orderedLists(){return this.lists?this.lists.sort(function(t,e){return t.data.position-e.data.position}):null}},methods:{onSort:function onSort(t,e){void 0===e&&(e={});var i=e.from,a=e.to,n=this;n.saving||(n.showSave=!0,n.$nextTick(function(){var t;n.lists[i].data.position=a,(t=n.lists).splice.apply(t,[a,0].concat(n.lists.splice(i,1))),n.$forceUpdate()}))},toggleListActive:function toggleListActive(t,e){this.saving||(this.showSave=!0,t.data.active=e)},save:function save(){var t=this;t.showSave=!1;var i=[];t.lists.forEach(function(t,e){t.data.position=e,i.push(n.saveList(t))}),Promise.all(i).then(function(){t.$events.$emit("invoicing:reloadLists"),t.$f7router.back()})}}},u=(I._withStripped=!0,t({render:I,staticRenderFns:[]},void 0,l,void 0,!(I._withStripped=!0),void 0,void 0,void 0)),v={data:function data(){return{saving:!1,name:""}},computed:{showSave:function showSave(){return this.name.trim().length}},methods:{save:function save(){var t=this;t.saving||(t.saving=!0,n.saveList({name:t.name}).then(function(){t.$events.$emit("invoicing:reloadLists"),t.$f7router.back("/invoicing/"+(n.actorId?"?actor_id="+n.actorId:""),{force:!0})}))}}},m=(R._withStripped=!0,t({render:R,staticRenderFns:[]},void 0,v,void 0,!(R._withStripped=!0),void 0,void 0,void 0)),f=["pending","paid","processing","qa","complete"];function formatDate(t){var e=new Date(t),i=e.getFullYear(),a=e.getMonth()+1,n=e.getDate();return a<10&&(a="0"+a),n<10&&(n="0"+n),i+"-"+a+"-"+n}function _(){var i=this,t=i.$createElement,a=i._self._c||t;return a("div",{staticClass:"tag-select tasks-tag-select orders-list-tags-select"},[a("ul",[a("li",{staticClass:"item-divider"},[i._v(i._s(i.data.title))]),i._v(" "),a("li",[a("a",{staticClass:"item-link tag-search",attrs:{href:"#"},on:{click:i.openSelector}},[a("div",{staticClass:"item-content"},[i._m(0),i._v(" "),a("div",{staticClass:"item-inner"},[a("div",{staticClass:"item-title"},[i._v(i._s(i.data.placeholder))])])])])])]),i._v(" "),a("ul",{staticClass:"tag-items"},i._l(i.data.tags,function(e,t){return a("li",{key:t,staticClass:"tag-item"},[a("div",{staticClass:"item-content"},[a("div",{staticClass:"item-inner"},[a("div",{staticClass:"item-title"},[i._v(i._s(e.name))]),i._v(" "),a("div",{staticClass:"item-after"},[a("a",{staticClass:"item-link",staticStyle:{height:"24px"},attrs:{href:"#"},on:{click:function(t){return i.removeTag(e)}}},[a("i",{staticClass:"material-icons"},[i._v("close")])])])])])])}),0)])}function ia(){var i=this,t=i.$createElement,a=i._self._c||t;return a("f7-page",{staticClass:"invoicing-page",attrs:{name:"invoicing__list-edit",id:"invoicing__list-edit"}},[a("f7-navbar",[a("tommy-nav-back"),i._v(" "),a("f7-nav-title",[i._v(i._s(i.$t("invoicing.list_edit.title","Edit List")))]),i._v(" "),a("f7-nav-right",[i.showSave?a("f7-link",{attrs:{"icon-f7":"check"},on:{click:i.save}}):i._e()],1)],1),i._v(" "),i.list?a("f7-list",{staticClass:"list-custom"},[a("f7-list-item",[a("f7-label",[i._v(i._s(i.$t("invoicing.list_edit.name","Name")))]),i._v(" "),a("f7-input",{attrs:{type:"text",value:i.list.name},on:{input:function(t){return i.onNameChange(t.target.value)}}})],1),i._v(" "),a("f7-list-item",{attrs:{"smart-select":"","smart-select-params":{closeOnSelect:!0},title:i.$t("invoicing.list_edit.sort","Sort")}},[a("select",{staticClass:"toggle-save",attrs:{name:"sort"},on:{change:i.onSortChange}},i._l(["default","price_high","price_low","newest"],function(t,e){return a("option",{key:e,domProps:{value:t,selected:i.list.data.sort===t||"default"===t&&!i.list.data.sort}},[i._v(i._s(i.$t("invoicing.list_edit.sort_"+t)))])}),0)]),i._v(" "),a("f7-list-item",{attrs:{link:"#",title:i.$t("invoicing.common.date_range","Date Range"),after:i.formatDateRange(i.list.data.date_range)},on:{click:i.showDateRange}}),i._v(" "),a("f7-list-item",{attrs:{"smart-select":"","smart-select-params":{openIn:"popover",closeOnSelect:!0},title:i.$t("invoicing.list_edit.filter_status","Status")}},[a("select",{staticClass:"toggle-save",attrs:{name:"statuses",multiple:""},on:{change:i.onStatusChange}},i._l(i.orderStatuses,function(t,e){return a("option",{key:e,domProps:{value:t,selected:0<=i.list.data.status.indexOf(t)||!i.list.data.status}},[i._v(i._s(i.$t("invoicing.order_status."+t)))])}),0)]),i._v(" "),a("f7-list-item",{attrs:{"smart-select":"","smart-select-params":{openIn:"popover",closeOnSelect:!0},title:i.$t("invoicing.list_edit.type")}},[a("select",{attrs:{name:"type"},on:{change:i.onTypeChange}},[a("option",{attrs:{value:"all"},domProps:{selected:"all"===i.list.data.type||!i.list.data.type}},[i._v(i._s(i.$t("invoicing.list_edit.type_all")))]),i._v(" "),a("option",{attrs:{value:"invoice"},domProps:{selected:"invoice"===i.list.data.type}},[i._v(i._s(i.$t("invoicing.list_edit.type_invoice")))]),i._v(" "),a("option",{attrs:{value:"quote"},domProps:{selected:"quote"===i.list.data.type}},[i._v(i._s(i.$t("invoicing.list_edit.type_quote")))])])]),i._v(" "),a("f7-list-item",{attrs:{link:"",title:i.$t("invoicing.list_edit.payment_range"),after:void 0!==i.list.data.price_min&&void 0!==i.list.data.price_max?i.list.data.price_min+" - "+i.list.data.price_max:""},on:{click:i.showPaymentRange}}),i._v(" "),i.$root.team&&i.$root.teamMembers&&!i.list.data.only_assigned?a("f7-list-item",{attrs:{"smart-select":"","smart-select-params":{searchbar:!0},title:i.$t("invoicing.list_edit.assignee","Assignee")}},[a("select",{attrs:{name:"assignee",multiple:""},on:{change:i.onAssigneeChange}},i._l(i.$root.teamMembers,function(t){return a("option",{key:t.id,attrs:{"data-option-class":"invoicing-smart-select-option","data-option-image":t.icon_url},domProps:{value:t.user_id,selected:0<=i.list.data.assignee.indexOf(t.user_id)}},[i._v(i._s(t.first_name||"")+" "+i._s(t.last_name||""))])}),0)]):i._e(),i._v(" "),i.contacts?a("f7-list-item",{attrs:{"smart-select":"","smart-select-params":{searchbar:!0},title:i.$t("invoicing.list_edit.customer","Customer")}},[a("select",{attrs:{name:"customer",multiple:""},on:{change:i.onCustomerChange}},i._l(i.contacts,function(t,e){return a("option",{key:e+"-"+t.id+"-"+t.friend_id,attrs:{"data-option-class":"invoicing-smart-select-option","data-option-image":t.icon_url},domProps:{value:t.friend_id,selected:0<=i.list.data.customer.indexOf(t.friend_id)}},[i._v(i._s(t.name||(t.first_name||"")+" "+(t.last_name||"")))])}),0)]):i._e(),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.list_edit.only_assigned","Show only assigned")}},[a("f7-toggle",{attrs:{slot:"after",checked:!!i.list.data.only_assigned},on:{change:function(t){return i.setOnlyAssigned(t.target.checked)}},slot:"after"})],1),i._v(" "),i._l(i.permissions,function(e,t){return a("tag-select",{key:t,attrs:{listId:i.list.id,data:{title:i.$t("invoicing.permissions."+e.name+".title"),placeholder:i.$t("invoicing.common.search_members_tags","Search Members, Tags"),pageTitle:i.$t("invoicing.common.search_members_tags","Search Members, Tags"),tags:e.filters}},on:{tagAdd:function(t){return i.addListPermission(e,t)},tagRemove:function(t){return i.removeListPermission(e,t)}}})})],2):i._e(),i._v(" "),i.list?a("f7-list",{staticClass:"margin-top"},[a("f7-list-button",{staticClass:"color-custom",attrs:{color:"custom"},on:{click:i.deleteList}},[i._v(i._s(i.$t("invoicing.list_edit.delete-list","Delete List")))])],1):i._e()],1)}function ra(){var e=this,t=e.$createElement,i=e._self._c||t;return i("f7-page",{staticClass:"invoicing-page",attrs:{name:"invoicing__date-range-select",id:"invoicing__date-range-select"}},[i("f7-navbar",[i("tommy-nav-back"),e._v(" "),i("f7-nav-title",[e._v(e._s(e.$t("invoicing.common.date_range","Date Range")))]),e._v(" "),i("f7-nav-right",[e.showSave?i("f7-link",{attrs:{"icon-f7":"check"},on:{click:e.save}}):e._e()],1)],1),e._v(" "),i("f7-list",[i("f7-list-item",{attrs:{radio:"",value:"",checked:!(e.isCustomRange||""!==e.range&&e.range),title:e.$t("invoicing.date_range.none","None")},on:{change:function(t){return e.setPlainRange("")}}}),e._v(" "),i("f7-list-item",{attrs:{radio:"",value:"today",checked:!e.isCustomRange&&"today"===e.range,title:e.$t("invoicing.date_range.today","Today")},on:{change:function(t){return e.setPlainRange("today")}}}),e._v(" "),i("f7-list-item",{attrs:{radio:"",value:"week",checked:!e.isCustomRange&&"week"===e.range,title:e.$t("invoicing.date_range.week","This Week")},on:{change:function(t){return e.setPlainRange("week")}}}),e._v(" "),i("f7-list-item",{attrs:{radio:"",value:"month",checked:!e.isCustomRange&&"month"===e.range,title:e.$t("invoicing.date_range.month","This Month")},on:{change:function(t){return e.setPlainRange("month")}}})],1),e._v(" "),i("f7-list",{staticClass:"top-10 list-custom"},[i("f7-list-item",{attrs:{title:e.$t("invoicing.common.choose_range","Choose Range")}},[i("f7-toggle",{attrs:{slot:"after",checked:e.isCustomRange},on:{change:function(t){return e.toggleCustomRange(t.target.checked)}},slot:"after"})],1),e._v(" "),i("f7-list-item",{directives:[{name:"show",rawName:"v-show",value:e.isCustomRange,expression:"isCustomRange"}]},[i("f7-label",[e._v(e._s(e.$t("invoicing.common.start_date","Start Date")))]),e._v(" "),i("f7-input",{ref:"rangeStart",attrs:{type:"text"}})],1),e._v(" "),i("f7-list-item",{directives:[{name:"show",rawName:"v-show",value:e.isCustomRange,expression:"isCustomRange"}]},[i("f7-label",[e._v(e._s(e.$t("invoicing.common.end_date","End Date")))]),e._v(" "),i("f7-input",{ref:"rangeEnd",attrs:{type:"text"}})],1)],1)],1)}function Aa(){var i=this,t=i.$createElement,a=i._self._c||t;return a("f7-page",{staticClass:"invoicing-page"},[a("f7-navbar",[a("tommy-nav-back"),i._v(" "),a("f7-nav-title",[i._v(i._s(i.pageTitle))]),i._v(" "),a("f7-subnavbar",{attrs:{inner:!1}},[a("f7-searchbar",{attrs:{"search-container":"#list-edit-tag-select","search-in":".item-title"},on:{"searchbar:search":i.onSearch}})],1)],1),i._v(" "),i.query&&i.query.length?a("f7-list",[a("f7-list-item",{staticClass:"tasks-tag-select-tags-list",attrs:{checkbox:"",title:i.query},on:{change:function(t){return i.toggleTag({context:"tags",name:i.query,label:"Tag"},t.target.checked,!0)}}},[a("span",{staticClass:"tag-select-list-icon",attrs:{slot:"media"},slot:"media"},[a("img",{attrs:{src:i.contextIconSrc({context:"tags",name:i.query,label:"Tag"}),srcset:i.contextIconSrcset({context:"tags",name:i.query,label:"Tag"})}})])])],1):i._e(),i._v(" "),a("f7-list",{staticClass:"no-margin no-hairlines tasks-tag-select-tags-list",attrs:{id:"list-edit-tag-select"}},i._l(i.allTags,function(e,t){return a("f7-list-item",{key:t,attrs:{checkbox:"",checked:i.isTagSelected(e),title:e.name},on:{change:function(t){return i.toggleTag(e,t.target.checked)}}},["members"===e.context?a("span",{staticClass:"tag-select-list-avatar",style:"background-image: url("+(e.icon||"")+")",attrs:{slot:"media"},slot:"media"}):a("span",{staticClass:"tag-select-list-icon",attrs:{slot:"media"},slot:"media"},[a("img",{attrs:{src:i.contextIconSrc(e),srcset:i.contextIconSrcset(e)}})])])}),1)],1)}function Ja(){var e=this,t=e.$createElement,i=e._self._c||t;return i("f7-page",{staticClass:"invoicing-page",attrs:{id:"invoicing__item-details","data-name":"invoicing__item-details"}},[i("f7-navbar",[i("tommy-nav-back"),e._v(" "),i("f7-nav-title",[e._v(e._s(e.pageTitle))]),e._v(" "),i("f7-nav-right",[e.showSave?i("f7-link",{attrs:{"icon-f7":"check"},on:{click:e.save}}):e._e()],1)],1),e._v(" "),e.item?i("f7-list",{staticClass:"list-custom"},[i("f7-list-input",{attrs:{label:e.$t("invoicing.item.name_label","Name"),placeholder:e.$t("invoicing.item.name_placeholder","Enter item/service name"),type:"text",value:e.item.name},on:{input:function(t){e.item.name=t.target.value,e.enableSave()}}}),e._v(" "),i("f7-list-item",{attrs:{title:e.$t("invoicing.item.enabled_label","Enabled")}},[i("f7-toggle",{attrs:{checked:e.item.active},on:{change:function(t){e.item.active=t.target.checked,e.enableSave()}}})],1),e._v(" "),i("f7-list-item",{attrs:{divider:"",title:e.$t("invoicing.item.description_label","Description")}}),e._v(" "),i("f7-list-input",{attrs:{placeholder:e.$t("invoicing.item.description_placeholder","Enter item/service description"),type:"textarea",resizable:"",value:e.item.description},on:{input:function(t){e.item.description=t.target.value,e.enableSave()}}}),e._v(" "),i("f7-list-item",{attrs:{divider:"",title:e.$t("invoicing.item.duration_label","Duration")}}),e._v(" "),i("f7-list-input",{attrs:{placeholder:e.$t("invoicing.item.duration_placeholder","Item duration in minutes"),type:"number",value:e.item.data.duration},on:{input:e.onDurationChange}}),e._v(" "),i("f7-list-item",{attrs:{divider:"",title:e.$t("invoicing.item.category_label","Category")}}),e._v(" "),i("f7-list-input",{attrs:{placeholder:e.$t("invoicing.item.category_placeholder","Enter item/service category"),type:"text",value:e.item.category},on:{input:function(t){e.item.category=t.target.value,e.enableSave()}}}),e._v(" "),i("f7-list-item",{attrs:{divider:"",title:e.$t("invoicing.item.available_in_label","Available in")}}),e._v(" "),i("f7-list-input",{attrs:{placeholder:e.$t("invoicing.item.available_in_placeholder","City where it is available"),type:"text",value:e.availabile_in},on:{input:function(t){return e.setAvailable(t.target.value)}}}),e._v(" "),i("f7-list-item",{attrs:{divider:"",title:e.$t("invoicing.item.photo_label","Photo")}}),e._v(" "),i("li",[i("div",{staticClass:"invoicing-product-photo-container"},[e.item.image_url||e.imagePreview?i("div",{staticClass:"invoicing-product-photo"},[i("img",{attrs:{src:e.item.image_url||e.imagePreview}}),e._v(" "),i("f7-link",{attrs:{"icon-f7":"close_round_fill"},on:{click:e.deleteImage}})],1):i("label",{staticClass:"invoicing-product-photo-add"},[i("input",{attrs:{type:"file"},on:{change:e.onFileChange}}),e._v(" "),i("f7-icon",{attrs:{f7:"add"}})],1)])]),e._v(" "),i("tag-select",{attrs:{slot:"after-list",data:{title:e.$t("invoicing.item.tags_label"),placeholder:e.$t("invoicing.common.search_members_tags","Search Members, Tags"),pageTitle:e.$t("invoicing.common.search_members_tags","Search Members, Tags"),tags:e.item.filters}},on:{tagAdd:e.addItemTag,tagRemove:e.removeItemTag},slot:"after-list"})],1):e._e(),e._v(" "),e.item?i("f7-list",{staticClass:"list-custom margin-top"},[i("f7-list-input",{attrs:{label:e.$t("invoicing.item.price_label","Price"),placeholder:e.$t("invoicing.item.price_placeholder","Enter item/service price"),type:"number",value:e.item.price},on:{input:function(t){return e.setPrice(t.target.value)}}}),e._v(" "),i("f7-list-input",{attrs:{label:e.$t("invoicing.item.barcode_label","Barcode ID"),placeholder:e.$t("invoicing.item.barcode_placeholder","Enter item/service barcode ID"),type:"text",value:e.item.code},on:{input:function(t){e.item.code=t.target.value,e.enableSave()}}})],1):e._e()],1)}function Sa(){var i=this,t=i.$createElement,a=i._self._c||t;return a("f7-page",{staticClass:"invoicing-page",attrs:{id:"invoicing__item-details","data-name":"invoicing__item-details"}},[a("f7-navbar",[a("tommy-nav-back"),i._v(" "),a("f7-nav-title",[i._v(i._s(i.pageTitle))]),i._v(" "),a("f7-nav-right",[i.showSave?a("f7-link",{attrs:{"icon-f7":"check"},on:{click:i.save}}):i._e()],1)],1),i._v(" "),i.item?a("f7-list",{staticClass:"list-custom"},[a("f7-list-input",{attrs:{label:i.$t("invoicing.item.name_label","Name"),placeholder:i.$t("invoicing.item.name_placeholder","Enter item/service name"),type:"text",value:i.item.name},on:{input:function(t){i.item.name=t.target.value,i.enableSave()}}}),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.item.enabled_label","Enabled")}},[a("f7-toggle",{attrs:{checked:i.item.active},on:{change:function(t){i.item.active=t.target.checked,i.enableSave()}}})],1),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.item.description_label","Description")}}),i._v(" "),a("f7-list-input",{attrs:{placeholder:i.$t("invoicing.item.description_placeholder","Enter item/service description"),type:"textarea",resizable:"",value:i.item.description},on:{input:function(t){i.item.description=t.target.value,i.enableSave()}}}),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.item.duration_label","Duration")}}),i._v(" "),a("f7-list-input",{attrs:{placeholder:i.$t("invoicing.item.duration_placeholder","Item duration in minutes"),type:"number",value:i.item.data.duration},on:{input:i.onDurationChange}}),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.item.category_label","Cagegory")}}),i._v(" "),a("f7-list-input",{attrs:{placeholder:i.$t("invoicing.item.category_placeholder","Enter item/service category"),type:"text",value:i.item.category},on:{input:function(t){i.item.category=t.target.value,i.enableSave()}}}),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.item.available_in_label","Available in")}}),i._v(" "),a("f7-list-input",{attrs:{placeholder:i.$t("invoicing.item.available_in_placeholder","City where it is available"),type:"text",value:i.availabile_in},on:{input:function(t){return i.setAvailable(t.target.value)}}}),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.item.photo_label","Photo")}}),i._v(" "),a("li",[a("div",{staticClass:"invoicing-product-photo-container"},[i.item.image_url||i.imagePreview?a("div",{staticClass:"invoicing-product-photo"},[a("img",{attrs:{src:i.item.image_url||i.imagePreview}}),i._v(" "),a("f7-link",{attrs:{"icon-f7":"close_round_fill"},on:{click:i.deleteImage}})],1):a("label",{staticClass:"invoicing-product-photo-add"},[a("input",{attrs:{type:"file"},on:{change:i.onFileChange}}),i._v(" "),a("f7-icon",{attrs:{f7:"add"}})],1)])]),i._v(" "),a("tag-select",{attrs:{slot:"after-list",data:{title:i.$t("invoicing.item.tags_label"),placeholder:i.$t("invoicing.common.search_members_tags","Search Members, Tags"),pageTitle:i.$t("invoicing.common.search_members_tags","Search Members, Tags"),tags:i.item.filters}},on:{tagAdd:i.addItemTag,tagRemove:i.removeItemTag},slot:"after-list"}),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.package.items_label")}}),i._v(" "),i.products?a("li",{staticClass:"invoicing-order-items"},[a("div",{staticClass:"invoicing-order-add-box",on:{click:function(t){i.productsOpened=!0}}},[a("f7-icon",{attrs:{f7:"add"}}),i._v(" "),a("div",{staticClass:"invoicing-order-add-box-placeholder"},[i._v(i._s(i.$t("invoicing.package.add_item_label")))])],1),i._v(" "),i._l(i.item.vendor_package_products_attributes,function(t,e){return t._destroy?i._e():a("div",{key:e,staticClass:"invoicing-order-item"},[a("div",{staticClass:"invoicing-order-item-name"},[i._v(i._s(i.productName(t.vendor_product_id)))]),i._v(" "),a("div",{staticClass:"invoicing-order-item-selector"},[a("f7-link",{attrs:{"icon-f7":"delete_round"},on:{click:function(t){return i.decreaseProduct(e)}}}),i._v(" "),a("div",{staticClass:"invoicing-order-item-qty"},[i._v(i._s(t.quantity))]),i._v(" "),a("f7-link",{attrs:{"icon-f7":"add_round_fill"},on:{click:function(t){return i.increaseProduct(e)}}})],1)])})],2):i._e()],1):i._e(),i._v(" "),i.item?a("f7-list",{staticClass:"list-custom margin-top"},[a("f7-list-input",{attrs:{label:i.$t("invoicing.item.price_label","Price"),placeholder:i.$t("invoicing.item.price_placeholder","Enter item/service price"),type:"text",value:i.item.price},on:{input:function(t){return i.setPrice(t.target.value)}}}),i._v(" "),a("f7-list-input",{attrs:{label:i.$t("invoicing.item.barcode_label","Barcode ID"),placeholder:i.$t("invoicing.item.barcode_placeholder","Enter item/service barcode ID"),type:"text",value:i.item.code},on:{input:function(t){i.item.code=t.target.value,i.enableSave()}}})],1):i._e(),i._v(" "),i.products?a("f7-popup",{attrs:{opened:i.productsOpened},on:{"popup:closed":function(t){i.productsOpened=!1}}},[a("f7-view",{attrs:{init:!1}},[a("f7-page",{staticClass:"invoicing-page"},[a("f7-navbar",[a("f7-nav-right",[a("f7-link",{attrs:{"popup-close":"","icon-f7":"close"}})],1),i._v(" "),a("f7-nav-title",[i._v(i._s(i.$t("invoicing.package.add_item_label")))])],1),i._v(" "),a("f7-searchbar",{attrs:{"search-container":".invoicing-package-details-products","disable-button":!1}}),i._v(" "),a("f7-list",{staticClass:"list-custom invoicing-order-details-products invoicing-package-details-products"},i._l(i.products,function(e){return a("f7-list-item",{key:e.id,attrs:{link:"",title:e.name,after:"¥"+e.price},on:{click:function(t){return i.addProduct(e)}}})}),1)],1)],1)],1):i._e()],1)}function _a(){var e=this,t=e.$createElement,i=e._self._c||t;return i("f7-page",{staticClass:"invoicing-page",attrs:{name:"invoicing__range-select",id:"invoicing__range-select"}},[i("f7-navbar",[i("tommy-nav-back"),e._v(" "),i("f7-nav-title",[e._v(e._s(e.pageTitle))]),e._v(" "),i("f7-nav-right",[e.showSave?i("f7-link",{attrs:{"icon-f7":"check"},on:{click:e.save}}):e._e()],1)],1),e._v(" "),i("f7-list",{staticClass:"list-custom"},[i("f7-list-item",{attrs:{title:e.$t("invoicing.common.choose_range","Choose Range")}},[i("f7-toggle",{attrs:{slot:"after",checked:e.isCustomRange},on:{change:function(t){return e.toggleCustomRange(t.target.checked)}},slot:"after"})],1),e._v(" "),e.isCustomRange?i("f7-list-input",{attrs:{label:e.$t("invoicing.common.amount_min","From"),type:"number",value:e.amount_min},on:{input:function(t){return e.setMin(t.target.value)}}}):e._e(),e._v(" "),e.isCustomRange?i("f7-list-input",{attrs:{label:e.$t("invoicing.common.amount_max","To"),type:"number",value:e.amount_max},on:{input:function(t){return e.setMax(t.target.value)}}}):e._e()],1)],1)}function ib(){var i=this,t=i.$createElement,a=i._self._c||t;return a("f7-popup",{ref:"popup"},[a("f7-view",{attrs:{"ios-dynamic-navbar":!1}},[a("f7-page",{staticClass:"invoicing-page",attrs:{name:"invoicing__order-details",id:"invoicing__order-details"}},[a("f7-navbar",[a("f7-nav-left",[a("f7-link",{attrs:{"popup-close":"","icon-f7":"close"}})],1),i._v(" "),a("f7-nav-title",[i._v(i._s(i.pageTitle))]),i._v(" "),a("f7-nav-right",[i.showSave?a("f7-link",{attrs:{"icon-f7":"check"},on:{click:i.save}}):i._e()],1)],1),i._v(" "),i.order?[a("f7-list",{staticClass:"list-custom"},[i.order.created_at&&i.order.id?a("f7-list-item",{attrs:{title:i.$t("invoicing.order_details.created"),after:i.formatDate(i.order.created_at)}}):i._e(),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.order_details.due_date"),link:!0,after:i.formatOrderDate(i.order.data?parseInt(i.order.data.date,10):null)},on:{click:i.openDateSelect}}),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.order_details.due_time"),link:!0,after:i.formatOrderTime(i.order.data?parseInt(i.order.data.date,10):null)},on:{click:i.openTimeSelect}}),i._v(" "),i.order.data&&i.order.data.location?a("f7-list-input",{attrs:{label:i.$t("invoicing.order_details.city"),placeholder:i.$t("invoicing.order_details.city_placeholder"),type:"text",value:i.order.data.location.city},on:{input:i.onCityChange}}):i._e(),i._v(" "),i.order.data&&i.order.data.location?a("f7-list-input",{attrs:{label:i.$t("invoicing.order_details.address"),placeholder:i.$t("invoicing.order_details.address_placeholder"),type:"text",value:i.order.data.location.address},on:{input:i.onAddressChange}}):i._e(),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.order_details.status"),"smart-select":"","smart-select-params":{openIn:"popover",closeOnSelect:!0,routableModals:!1}}},[a("select",{on:{change:i.onStatusChange}},i._l(i.orderStatuses,function(t,e){return a("option",{key:e,domProps:{value:t,selected:i.order.status===t}},[i._v(i._s(i.$t("invoicing.order_status."+t)))])}),0)]),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.order_details.type"),"smart-select":"","smart-select-params":{openIn:"popover",closeOnSelect:!0,routableModals:!1}}},[a("select",{on:{change:i.onTypeChange}},[a("option",{attrs:{value:"invoice"},domProps:{selected:!i.order.quote}},[i._v(i._s(i.$t("invoicing.list_edit.type_invoice")))]),i._v(" "),a("option",{attrs:{value:"quote"},domProps:{selected:i.order.quote}},[i._v(i._s(i.$t("invoicing.list_edit.type_quote")))])])]),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.order_details.comment")}}),i._v(" "),a("f7-list-input",{attrs:{type:"textarea",value:i.order.comment,placeholder:i.$t("invoicing.order_details.comment_placeholder"),resizable:""},on:{input:i.onCommentChange}}),i._v(" "),i.orderAssignee?[a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.order_details.assignee")}}),i._v(" "),a("f7-list-item",{attrs:{title:i.orderAssignee?i.orderAssigneeName:"","smart-select":""}},[a("tommy-circle-avatar",{attrs:{slot:"media",data:i.orderAssignee},slot:"media"}),i._v(" "),a("select",{attrs:{name:"assignee"},on:{change:i.onAssigneeChange}},i._l(i.$root.teamMembers,function(t,e){return a("option",{key:"teamMember-"+e+"-"+t.id,attrs:{"data-option-class":"invoicing-smart-select-option","data-option-image":t.icon_url},domProps:{value:t.user_id,selected:i.order.user_id===t.user_id}},[i._v("\n                  "+i._s(t.first_name||"")+" "+i._s(t.last_name||""))])}),0),i._v(" "),a("f7-link",{staticStyle:{"margin-left":"80px",padding:"8px 0"},attrs:{slot:"root",href:"/team-member-details/?user_id="+i.order.assignee_id+"&name="+i.orderAssigneeName},slot:"root"},[a("span",[i._v(i._s(i.$t("invoicing.order_details.assignee_profile")))]),i._v(" "),a("f7-icon",{attrs:{f7:"chevron_right",size:16}})],1)],1)]:i._e(),i._v(" "),[a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.order_details.customer")}}),i._v(" "),a("f7-list-item",{attrs:{title:i.orderUser?i.orderUserName:"","smart-select":""}},[a("tommy-circle-avatar",{attrs:{slot:"media",data:i.orderUser},slot:"media"}),i._v(" "),a("select",{attrs:{name:"customer"},on:{change:i.onCustomerChange}},[i._l(i.contacts,function(t,e){return a("option",{key:"contact-"+e+"-"+t.friend_id,attrs:{"data-option-class":"invoicing-smart-select-option","data-option-image":t.icon_url},domProps:{value:t.friend_id,selected:i.order.user_id===t.friend_id}},[i._v("\n                  "+i._s(t.first_name||"")+" "+i._s(t.last_name||""))])}),i._v(" "),i._l(i.$root.teamMembers,function(t,e){return a("option",{key:"teamMember-"+e+"-"+t.id,attrs:{"data-option-class":"invoicing-smart-select-option","data-option-image":t.icon_url},domProps:{value:t.user_id,selected:i.order.user_id===t.user_id}},[i._v("\n                  "+i._s(t.first_name||"")+" "+i._s(t.last_name||""))])})],2),i._v(" "),a("f7-link",{staticStyle:{"margin-left":"80px",padding:"8px 0"},attrs:{slot:"root",href:"/contact-details/?user_id="+i.order.assignee_id},slot:"root"},[a("span",[i._v(i._s(i.$t("invoicing.order_details.customer_profile")))]),i._v(" "),a("f7-icon",{attrs:{f7:"chevron_right",size:16}})],1)],1)],i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.order_details.items")}}),i._v(" "),i.products&&i.packages?a("li",{staticClass:"invoicing-order-items"},[a("div",{staticClass:"invoicing-order-add-box",on:{click:function(t){i.productsOpened=!0}}},[a("f7-icon",{attrs:{f7:"add"}}),i._v(" "),a("div",{staticClass:"invoicing-order-add-box-placeholder"},[i._v(i._s(i.$t("invoicing.order_details.add_item_label")))])],1),i._v(" "),i._l(i.order.vendor_order_items,function(t,e){return t._destroy?i._e():a("div",{key:t.orderable_id+"-"+e,staticClass:"invoicing-order-item"},[a("div",{staticClass:"invoicing-order-item-name"},[i._v(i._s(i.productName(t.orderable_id,t.orderable_type))+"\n              ")]),i._v(" "),a("div",{staticClass:"invoicing-order-item-details"},[a("div",{staticClass:"invoicing-order-item-price"},[i._v(i._s(i.productPrice(t.orderable_id,t.orderable_type))+"\n                ")]),i._v(" "),a("div",{staticClass:"invoicing-order-item-selector"},[a("f7-link",{attrs:{"icon-f7":"delete_round"},on:{click:function(t){return i.decreaseOrderItem(e)}}}),i._v(" "),a("div",{staticClass:"invoicing-order-item-qty"},[i._v(i._s(t.quantity))]),i._v(" "),a("f7-link",{attrs:{"icon-f7":"add_round_fill"},on:{click:function(t){return i.increaseOrderItem(e)}}})],1)])])}),i._v(" "),i.orderItemsTotal?a("div",{staticClass:"invoicing-order-total"},[a("div",{staticClass:"invoicing-order-total-row"},[a("div",{staticClass:"invoicing-order-total-label"},[i._v(i._s(i.$t("invoicing.order_details.total")))]),i._v(" "),a("div",{staticClass:"invoicing-order-total-value"},[i._v(i._s(i.orderItemsTotal))])])]):i._e()],2):i._e(),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.order_details.promotions")}}),i._v(" "),i.promotions?a("li",{staticClass:"invoicing-order-items"},[a("div",{staticClass:"invoicing-order-add-box",on:{click:function(t){i.promotionsOpened=!0}}},[a("f7-icon",{attrs:{f7:"add"}}),i._v(" "),a("div",{staticClass:"invoicing-order-add-box-placeholder"},[i._v(i._s(i.$t("invoicing.order_details.add_promotion_label"))+"\n              ")])],1),i._v(" "),i.order.vendor_coupon_id?a("div",{staticClass:"invoicing-order-item"},[a("div",{staticClass:"invoicing-order-item-name"},[i._v(i._s(i.promotionName(i.order.vendor_coupon_id)))]),i._v(" "),a("div",{staticClass:"invoicing-order-item-details"},[a("div",{staticClass:"invoicing-order-item-price"},[i._v("-"+i._s(i.promotionDiscount(i.order.vendor_coupon_id)))]),i._v(" "),a("div",{staticClass:"invoicing-order-item-selector"},[a("f7-link",{attrs:{"icon-f7":"delete_round"},on:{click:function(t){return i.deleteOrderPromotion()}}})],1)])]):i._e(),i._v(" "),i.orderDiscountTotal?a("div",{staticClass:"invoicing-order-total"},[a("div",{staticClass:"invoicing-order-total-row"},[a("div",{staticClass:"invoicing-order-total-label"},[i._v(i._s(i.$t("invoicing.order_details.total")))]),i._v(" "),a("div",{staticClass:"invoicing-order-total-value"},[i._v("-"+i._s(i.orderDiscountTotal))])])]):i._e()]):i._e(),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.order_details.payment")}}),i._v(" "),i.products&&i.packages&&i.promotions?a("li",{staticClass:"invoicing-order-items"},[a("div",{staticClass:"invoicing-order-total"},[i.orderItemsTotal?a("div",{staticClass:"invoicing-order-total-row"},[a("div",{staticClass:"invoicing-order-total-label"},[i._v(i._s(i.$t("invoicing.order_details.items")))]),i._v(" "),a("div",{staticClass:"invoicing-order-total-value"},[i._v(i._s(i.orderItemsTotal))])]):i._e(),i._v(" "),i.orderDiscountTotal?a("div",{staticClass:"invoicing-order-total-row"},[a("div",{staticClass:"invoicing-order-total-label"},[i._v(i._s(i.$t("invoicing.order_details.promotions")))]),i._v(" "),a("div",{staticClass:"invoicing-order-total-value"},[i._v("-"+i._s(i.orderDiscountTotal))])]):i._e(),i._v(" "),i.order.data.payment_method?a("div",{staticClass:"invoicing-order-total-row"},[a("div",{staticClass:"invoicing-order-total-label"},[i._v(i._s(i.$t("invoicing.order_details.via_label")))]),i._v(" "),a("div",{staticClass:"invoicing-order-total-value"},[i._v("\n                  "+i._s(i.$t("invoicing.order_details.via_"+i.order.data.payment_method)))])]):i._e(),i._v(" "),a("div",{staticClass:"invoicing-order-total-row invoicing-order-final-row"},[a("div",{staticClass:"invoicing-order-total-label"},[i._v(i._s(i.$t("invoicing.order_details.total")))]),i._v(" "),a("div",{staticClass:"invoicing-order-total-value"},[i._v(i._s(i.orderTotal))])])])]):i._e(),i._v(" "),i.order&&i.order.data.feedback&&i.products&&i.packages?[a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.order_feedback_results.time_clocking")}}),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.order_feedback_results.scheduled"),after:i.calcOrderDuration()}}),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.order_feedback_results.start"),after:i.$moment(parseInt(i.order.data.date,10)).format("H:mm DD MMM YYYY")}}),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.order_feedback_results.finish"),after:i.$moment(parseInt(i.order.data.date,10)+60*i.calcOrderDuration()*1e3).format("H:mm DD MMM YYYY")}}),i._v(" "),i.order.data.feedback.start_date&&i.order.data.feedback.end_date?[a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.order_feedback_results.time_change")}}),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.order_feedback_results.start"),after:i.$moment(i.order.data.feedback.start_date).format("H:mm DD MMM YYYY")}}),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.order_feedback_results.finish"),after:i.$moment(i.order.data.feedback.end_date).format("H:mm DD MMM YYYY")}})]:i._e(),i._v(" "),i.order.data.feedback.actual_start_date&&i.order.data.feedback.actual_end_date?[a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.order_feedback_results.actual_time")}}),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.order_feedback_results.start"),after:i.$moment(i.order.data.feedback.actual_start_date).format("H:mm DD MMM YYYY")}}),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.order_feedback_results.finish"),after:i.$moment(i.order.data.feedback.actual_end_date).format("H:mm DD MMM YYYY")}})]:i._e(),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.order_feedback_results.feedback")}}),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.order_feedback_results.question_1"),after:i.$t("invoicing.order_feedback_results."+i.order.data.feedback.question1)}}),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.order_feedback_results.question_2"),after:i.$t("invoicing.order_feedback_results."+i.order.data.feedback.question2)}}),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.order_feedback_results.question_3"),after:i.$t("invoicing.order_feedback_results."+i.order.data.feedback.question3)}})]:i._e()],2),i._v(" "),i.orderCancelable?a("f7-list",{staticClass:"margin-top margin-bottom"},[a("f7-list-button",{staticClass:"color-custom",attrs:{color:"custom"},on:{click:i.cancelOrder}},[i._v("\n            "+i._s(i.$t("invoicing.order_details.cancel_button","Cancel Order")))])],1):i._e(),i._v(" "),i.products&&i.packages?a("f7-popup",{attrs:{opened:i.productsOpened},on:{"popup:closed":function(t){i.productsOpened=!1}}},[a("f7-view",{attrs:{init:!1}},[a("f7-page",{staticClass:"invoicing-page"},[a("f7-navbar",[a("f7-nav-right",[a("f7-link",{attrs:{"icon-f7":"close"},on:{click:function(t){i.productsOpened=!1}}})],1),i._v(" "),a("f7-nav-title",[i._v(i._s(i.$t("invoicing.order_details.add_item_label")))])],1),i._v(" "),a("f7-searchbar",{attrs:{"search-container":".invoicing-order-details-items","disable-button":!1}}),i._v(" "),a("f7-list",{staticClass:"list-custom invoicing-order-details-products invoicing-order-details-items"},[a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.order_details.packages")}}),i._v(" "),i._l(i.packages,function(e){return a("f7-list-item",{key:"package-"+e.id,attrs:{link:"",title:e.name,after:"¥"+e.price},on:{click:function(t){return i.addOrderItem(e,"VendorPackage")}}})}),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.order_details.items")}}),i._v(" "),i._l(i.products,function(e){return a("f7-list-item",{key:"product-"+e.id,attrs:{link:"",title:e.name,after:"¥"+e.price},on:{click:function(t){return i.addOrderItem(e,"VendorProduct")}}})})],2)],1)],1)],1):i._e(),i._v(" "),i.promotions?a("f7-popup",{attrs:{opened:i.promotionsOpened},on:{"popup:closed":function(t){i.promotionsOpened=!1}}},[a("f7-view",{attrs:{init:!1}},[a("f7-page",[a("f7-navbar",[a("f7-nav-right",[a("f7-link",{attrs:{"icon-f7":"close"},on:{click:function(t){i.promotionsOpened=!1}}})],1),i._v(" "),a("f7-nav-title",[i._v(i._s(i.$t("invoicing.order_details.add_promotion_label")))])],1),i._v(" "),a("f7-searchbar",{attrs:{"search-container":".invoicing-order-details-promotions","disable-button":!1}}),i._v(" "),a("f7-list",{staticClass:"list-custom invoicing-order-details-products invoicing-order-details-promotions"},i._l(i.promotions,function(e){return a("f7-list-item",{key:e.id,attrs:{link:"",title:e.name,after:"- ¥"+("percentage"!==e.kind?e.amount:e.amount*i.order.total)},on:{click:function(t){return i.addOrderPromotion(e)}}})}),1)],1)],1)],1):i._e()]:i._e()],2)],1)],1)}function rb(){var e=this,t=e.$createElement,i=e._self._c||t;return i("f7-page",{staticClass:"invoicing-feedback"},[i("f7-navbar",[e.saved?i("f7-nav-left",[i("f7-link",{attrs:{"icon-f7":"close"},on:{click:e.closeFeedback}})],1):e._e(),e._v(" "),e.saved||"step-1"===e.step||"step-4"===e.step?e._e():i("f7-nav-left",[i("f7-link",{attrs:{icon:"icon-back"},on:{click:e.stepBack}})],1),e._v(" "),i("f7-nav-title",[e._v(e._s(e.navTitle))])],1),e._v(" "),"step-1"===e.step?i("div",{staticClass:"invoicing-feedback-buttons",attrs:{slot:"fixed"},slot:"fixed"},[i("a",{staticClass:"invoicing-feedback-button-no",on:{click:function(t){return e.setStep("step-1-2")}}},[e._v(e._s(e.t("button_no")))]),e._v(" "),i("a",{staticClass:"invoicing-feedback-button-yes",on:{click:function(t){return e.setStep("step-2")}}},[e._v(e._s(e.t("button_yes")))])]):e._e(),e._v(" "),"step-1-2"===e.step?i("div",{staticClass:"invoicing-feedback-buttons",attrs:{slot:"fixed"},slot:"fixed"},[i("a",{staticClass:"invoicing-feedback-button-submit",on:{click:function(t){return e.setStep("step-2")}}},[e._v(e._s(e.t("button_submit")))])]):e._e(),e._v(" "),"step-2"===e.step?i("div",{staticClass:"invoicing-feedback-buttons",attrs:{slot:"fixed"},slot:"fixed"},[i("a",{staticClass:"invoicing-feedback-button-submit",on:{click:function(t){return e.setStep("step-3")}}},[e._v(e._s(e.t("button_start")))])]):e._e(),e._v(" "),"step-3"===e.step?i("div",{staticClass:"invoicing-feedback-buttons",attrs:{slot:"fixed"},slot:"fixed"},[i("a",{staticClass:"invoicing-feedback-button-submit",on:{click:function(t){return e.setStep("question-1")}}},[e._v(e._s(e.t("button_next")))])]):e._e(),e._v(" "),"question-1"===e.step?i("div",{staticClass:"invoicing-feedback-buttons",attrs:{slot:"fixed"},slot:"fixed"},[i("a",{staticClass:"invoicing-feedback-button-no",on:{click:function(t){return e.setStep("question-2","no")}}},[e._v(e._s(e.t("button_no")))]),e._v(" "),i("a",{staticClass:"invoicing-feedback-button-yes",on:{click:function(t){return e.setStep("question-2","yes")}}},[e._v(e._s(e.t("button_yes")))])]):e._e(),e._v(" "),"question-2"===e.step?i("div",{staticClass:"invoicing-feedback-buttons",attrs:{slot:"fixed"},slot:"fixed"},[i("a",{staticClass:"invoicing-feedback-button-no",on:{click:function(t){return e.setStep("question-3","no")}}},[e._v(e._s(e.t("button_no")))]),e._v(" "),i("a",{staticClass:"invoicing-feedback-button-yes",on:{click:function(t){return e.setStep("question-3","yes")}}},[e._v(e._s(e.t("button_yes")))])]):e._e(),e._v(" "),"question-3"===e.step?i("div",{staticClass:"invoicing-feedback-buttons",attrs:{slot:"fixed"},slot:"fixed"},[i("a",{staticClass:"invoicing-feedback-button-no",on:{click:function(t){return e.setStep("step-4","no")}}},[e._v(e._s(e.t("button_no")))]),e._v(" "),i("a",{staticClass:"invoicing-feedback-button-yes",on:{click:function(t){return e.setStep("step-4","yes")}}},[e._v(e._s(e.t("button_yes")))])]):e._e(),e._v(" "),"step-1"===e.step?[i("div",{staticClass:"invoicing-feedback-confirm-title"},[e._v(e._s(e.t("time_confirm_title")))]),e._v(" "),e.orderDuration?i("div",{staticClass:"invoicing-feedback-confirm-time"},[e._v(e._s(e.durationFormatted)+" "+e._s(e.t("hours")))]):e._e()]:e._e(),e._v(" "),"step-1-2"===e.step?[i("div",{staticClass:"invoicing-feedback-confirm-title"},[e._v(e._s(e.t("time_select_title")))]),e._v(" "),i("div",{staticClass:"invoicing-feedback-confirm-text",domProps:{innerHTML:e._s(e.t("time_select_text"))}}),e._v(" "),i("f7-list",[i("f7-list-input",{attrs:{label:e.t("time_select_start"),"inline-label":"",type:"text",inputId:"start_date"}}),e._v(" "),i("f7-list-input",{attrs:{label:e.t("time_select_end"),"inline-label":"",type:"text",inputId:"end_date"}})],1)]:e._e(),e._v(" "),"step-2"===e.step?[i("div",{staticClass:"invoicing-feedback-question-text",domProps:{innerHTML:e._s(e.t("feedback_start_text"))}})]:e._e(),e._v(" "),"step-3"===e.step?[i("div",{staticClass:"invoicing-feedback-question-text",domProps:{innerHTML:e._s(e.t("feedback_info_text"))}})]:e._e(),e._v(" "),"question-1"===e.step?[i("div",{staticClass:"invoicing-feedback-question-text",domProps:{innerHTML:e._s(e.t("feedback_question_1"))}})]:e._e(),e._v(" "),"question-2"===e.step?[i("div",{staticClass:"invoicing-feedback-question-text",domProps:{innerHTML:e._s(e.t("feedback_question_2"))}})]:e._e(),e._v(" "),"question-3"===e.step?[i("div",{staticClass:"invoicing-feedback-question-text",domProps:{innerHTML:e._s(e.t("feedback_question_3"))}})]:e._e(),e._v(" "),"step-4"===e.step?[i("div",{staticClass:"invoicing-feedback-end-image"},[i("img",{attrs:{src:e.$addonAssetsUrl+"/feedback-image.svg"}})]),e._v(" "),i("div",{staticClass:"invoicing-feedback-end-title"},[e._v(e._s(e.t("feedback_end_title")))]),e._v(" "),i("div",{staticClass:"invoicing-feedback-end-text",domProps:{innerHTML:e._s(e.t("feedback_end_text"))}})]:e._e()],2)}function Ab(){var i=this,t=i.$createElement,a=i._self._c||t;return a("f7-popup",{ref:"popup"},[a("f7-view",{attrs:{"ios-dynamic-navbar":!1}},[i.isFeedback?a("order-feedback",{attrs:{order:i.order,orderDuration:i.orderDuration},on:{feedbackComplete:i.onFeedbackComplete,close:i.onFeedbackClose}}):i._e(),i._v(" "),i.isFeedback?i._e():a("f7-page",{staticClass:"invoicing-page",attrs:{name:"invoicing__order-details",id:"invoicing__order-details"}},[a("f7-navbar",[a("f7-nav-left",[a("f7-link",{attrs:{"popup-close":"","icon-f7":"close"}})],1),i._v(" "),a("f7-nav-title",[i._v(i._s(i.pageTitle))]),i._v(" "),a("f7-nav-right",[i.showSave?a("f7-link",{attrs:{"icon-f7":"check"},on:{click:i.save}}):i._e()],1)],1),i._v(" "),i.order&&i.showStartButton?a("div",{staticClass:"invoicing-toolbar-button",attrs:{slot:"fixed"},on:{click:i.startOrder},slot:"fixed"},[i._v(i._s(i.$t("invoicing.order_details.start_button")))]):i._e(),i._v(" "),i.order&&i.showFinishButton?a("div",{staticClass:"invoicing-toolbar-button",attrs:{slot:"fixed"},on:{click:i.finishOrder},slot:"fixed"},[i._v(i._s(i.$t("invoicing.order_details.finish_button")))]):i._e(),i._v(" "),i.order?[a("f7-list",{staticClass:"list-custom"},[a("f7-list-item",{attrs:{title:i.$t("invoicing.order_details.due_date"),link:!1,after:i.formatOrderDate(i.order.data?parseInt(i.order.data.date,10):null)}}),i._v(" "),a("f7-list-item",{attrs:{title:i.$t("invoicing.order_details.due_time"),link:!1,after:i.formatOrderTime(i.order.data?parseInt(i.order.data.date,10):null)}}),i._v(" "),i.order.data&&i.order.data.location?a("f7-list-item",{attrs:{title:i.$t("invoicing.order_details.city"),type:"text",after:i.order.data.location.city}}):i._e(),i._v(" "),i.order.data&&i.order.data.location?a("f7-list-item",{attrs:{title:i.$t("invoicing.order_details.address"),type:"text",after:i.order.data.location.address}}):i._e(),i._v(" "),i.order.comment?a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.order_details.comment")}}):i._e(),i._v(" "),i.order.comment?a("f7-list-input",{attrs:{type:"textarea",value:i.order.comment,placeholder:i.$t("invoicing.order_details.comment_placeholder"),resizable:"",readonly:!0}}):i._e(),i._v(" "),i.orderUser?[a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.order_details.customer")}}),i._v(" "),a("f7-list-item",{attrs:{title:i.orderUserName,link:"/contact-details/?user_id="+i.order.user_id+"&masterDetailRoot=true",view:".view-main","reload-all":!0}},[a("tommy-circle-avatar",{attrs:{slot:"media",data:i.orderUser},slot:"media"})],1)]:i._e(),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.order_details.items")}}),i._v(" "),i.products&&i.packages?a("li",{staticClass:"invoicing-order-items"},i._l(i.order.vendor_order_items,function(t,e){return t._destroy?i._e():a("div",{key:t.orderable_id+"-"+e,staticClass:"invoicing-order-item"},[a("div",{staticClass:"invoicing-order-item-name"},[i._v(i._s(i.productName(t.orderable_id,t.orderable_type)))])])}),0):i._e()],2)]:i._e()],2)],1)],1)}function Jb(){var t=this,e=t.$createElement,i=t._self._c||e;return i("f7-page",{staticClass:"invoicing-page",attrs:{name:"invoicing__promotion-management",id:"invoicing__promotion-management"}},[i("f7-navbar",[i("tommy-nav-back"),t._v(" "),i("f7-nav-title",[t._v(t._s(t.$t("invoicing.promotion_management.title","Promotions")))]),t._v(" "),i("f7-nav-right",[i("f7-link",{attrs:{href:"/invoicing/promotion-details/","icon-f7":"add"}})],1)],1),t._v(" "),t.items&&t.items.length?i("f7-searchbar",{attrs:{slot:"static","search-container":".invoicing-list-items",backdrop:!1,"disable-button":!1,placeholder:t.$t("invoicing.promotion_management.search_placeholder")},slot:"static"}):t._e(),t._v(" "),t.items&&t.items.length?i("f7-list",{staticClass:"list-custom invoicing-list-items",attrs:{slot:"static","no-hairlines":""},slot:"static"},t._l(t.orderedPromotions,function(t){return i("f7-list-item",{key:t.id,attrs:{title:t.name,link:"/invoicing/promotion-details/"+t.id+"/?title="+encodeURIComponent(t.name||"")}})}),1):t._e()],1)}function Sb(){var i=this,t=i.$createElement,a=i._self._c||t;return a("f7-page",{staticClass:"invoicing-page",attrs:{id:"invoicing__promotion-details","data-name":"invoicing__promotion-details"}},[a("f7-navbar",[a("tommy-nav-back"),i._v(" "),a("f7-nav-title",[i._v(i._s(i.pageTitle))]),i._v(" "),a("f7-nav-right",[i.showSave?a("f7-link",{attrs:{"icon-f7":"check"},on:{click:i.save}}):i._e()],1)],1),i._v(" "),i.item?a("f7-list",{staticClass:"list-custom"},[a("f7-list-input",{attrs:{label:i.$t("invoicing.promotion.name_label","Name"),placeholder:i.$t("invoicing.promotion.name_placeholder","Enter promotion name"),type:"text",value:i.item.name},on:{input:function(t){i.item.name=t.target.value,i.enableSave()}}}),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.promotion.description_label","Description")}}),i._v(" "),a("f7-list-input",{attrs:{placeholder:i.$t("invoicing.promotion.description_placeholder","Enter promotion description"),type:"textarea",resizable:"",value:i.item.description},on:{input:function(t){i.item.description=t.target.value,i.enableSave()}}}),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.promotion.expires_label","Description")}}),i._v(" "),a("f7-list-input",{staticClass:"invoicing-valid-to-input",attrs:{title:i.$t("invoicing.order_details.due_date"),type:"text",readonly:"",value:i.item.valid_to?i.$moment(i.item.valid_to).format("D MMM YYYY"):""},on:{focus:i.openCalendar}},[a("span",{staticClass:"input-clear-button margin-right",attrs:{slot:"inner"},on:{click:function(t){i.item.valid_to=null,i.enableSave()}},slot:"inner"})]),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.promotion.type_label")}}),i._v(" "),a("f7-list-item",{attrs:{checkbox:"",title:i.$t("invoicing.promotion.type_voucher_label"),checked:"voucher"===i.item.kind},on:{change:function(t){return i.setKind("voucher")}}}),i._v(" "),a("f7-list-item",{attrs:{checkbox:"",title:i.$t("invoicing.promotion.type_fixed_label"),checked:"fixed"===i.item.kind},on:{change:function(t){return i.setKind("fixed")}}}),i._v(" "),a("f7-list-item",{attrs:{checkbox:"",title:i.$t("invoicing.promotion.type_percentage_label"),checked:"percentage"===i.item.kind},on:{change:function(t){return i.setKind("percentage")}}}),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.promotion.amount_label","Discount amount")}}),i._v(" "),"fixed"===i.item.kind||"voucher"===i.item.kind?a("f7-list-input",{attrs:{placeholder:i.$t("invoicing.promotion.amount_placeholder","Enter promotion discount"),type:"text",value:i.item.amount?"¥"+i.item.amount:""},on:{input:function(t){return i.setAmount(t.target.value)}}}):i._e(),i._v(" "),"percentage"===i.item.kind?a("f7-list-item",[a("f7-range",{staticClass:"invoicing-range-slider",attrs:{value:i.item.amount,min:0,max:1,step:.01,"format-label":function(t){return Math.floor(100*t)+"%"},label:""},on:{"range:changed":function(t){return i.setAmount(t)}}}),i._v(" "),a("div",{staticClass:"invoicing-range-slider-value"},[i._v(i._s(Math.floor(100*i.item.amount))+"%")])],1):i._e(),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.promotion.category_label","Category")}}),i._v(" "),a("f7-list-input",{attrs:{placeholder:i.$t("invoicing.promotion.category_label","Category"),type:"text",value:i.item.category},on:{input:function(t){i.item.category=t.target.value,i.enableSave()}}}),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.promotion.max_uses_label")}}),i._v(" "),a("f7-list-input",{attrs:{placeholder:i.$t("invoicing.promotion.max_uses_placeholder"),type:"number",value:i.item.max_uses},on:{input:function(t){i.item.max_uses=t.target.value,i.enableSave()}}}),i._v(" "),i.contacts?[a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.promotion.customer_label","Customer")}}),i._v(" "),a("f7-list-item",{attrs:{title:i.customerTitle,link:""},on:{click:function(t){i.customerPopupOpened=!0}}},[i.customerAvatar?a("tommy-circle-avatar",{attrs:{slot:"media",data:i.customerAvatar},slot:"media"}):i._e()],1)]:i._e(),i._v(" "),a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.promotion.item_label","Item")}}),i._v(" "),i.products&&i.packages?a("f7-list-item",{attrs:{title:i.itemTitle,link:""},on:{click:function(t){i.itemsPopupOpened=!0}}},[i.itemAvatar?a("tommy-circle-avatar",{attrs:{slot:"media",url:i.itemAvatar},slot:"media"}):i._e()],1):i._e()],2):i._e(),i._v(" "),i.item?a("f7-popup",{attrs:{opened:i.customerPopupOpened},on:{"popup:closed":function(t){i.customerPopupOpened=!1}}},[a("f7-view",{attrs:{init:!1}},[a("f7-page",{staticClass:"invoicing-page"},[a("f7-navbar",[a("f7-nav-title",[i._v(i._s(i.$t("invoicing.promotion.customer_label")))]),i._v(" "),a("f7-nav-right",[a("f7-link",{attrs:{"popup-close":"","icon-f7":"close"}})],1)],1),i._v(" "),a("f7-searchbar",{attrs:{"search-container":".invoicing-promotion-customers-list"}}),i._v(" "),a("f7-list",{staticClass:"invoicing-promotion-customers-list"},[i._l(i.contacts,function(t,e){return a("f7-list-item",{key:"contact-"+e+"-"+t.friend_id,attrs:{title:(t.first_name||"")+" "+(t.last_name||""),radio:"",checked:i.item.user_id===t.friend_id},on:{click:function(){i.item.user_id=t.friend_id,i.customerPopupOpened=!1,i.enableSave()}}},[a("tommy-circle-avatar",{attrs:{slot:"media",data:t},slot:"media"})],1)}),i._v(" "),i._l(i.$root.teamMembers,function(t){return a("f7-list-item",{key:"user-"+i.index+"-"+t.id,attrs:{title:(t.first_name||"")+" "+(t.last_name||""),radio:"",checked:i.item.user_id===t.user_id},on:{click:function(){i.item.user_id=t.user_id,i.customerPopupOpened=!1,i.enableSave()}}},[a("tommy-circle-avatar",{attrs:{slot:"media",data:t},slot:"media"})],1)})],2)],1)],1)],1):i._e(),i._v(" "),i.item&&i.products&&i.packages?a("f7-popup",{attrs:{opened:i.itemsPopupOpened},on:{"popup:closed":function(t){i.itemsPopupOpened=!1}}},[a("f7-view",{attrs:{init:!1}},[a("f7-page",{staticClass:"invoicing-page"},[a("f7-navbar",[a("f7-nav-title",[i._v(i._s(i.$t("invoicing.promotion.item_label")))]),i._v(" "),a("f7-nav-right",[a("f7-link",{attrs:{"popup-close":"","icon-f7":"close"}})],1)],1),i._v(" "),a("f7-searchbar",{attrs:{"search-container":".invoicing-promotion-items-list","disable-button":!1}}),i._v(" "),a("f7-list",{staticClass:"invoicing-promotion-items-list"},[i.products.length?a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.item_service_management.items_tab")}}):i._e(),i._v(" "),i._l(i.products,function(t){return a("f7-list-item",{key:t.id,attrs:{title:t.name,radio:"",checked:i.item.vendor_product_id===t.id},on:{click:function(){i.item.vendor_product_id=t.id,i.item.vendor_package_id=null,i.itemsPopupOpened=!1,i.enableSave()}}},[a("tommy-circle-avatar",{attrs:{slot:"media",url:t.image_url},slot:"media"})],1)}),i._v(" "),i.packages.length?a("f7-list-item",{attrs:{divider:"",title:i.$t("invoicing.item_service_management.packages_tab")}}):i._e(),i._v(" "),i._l(i.packages,function(t){return a("f7-list-item",{key:t.id,attrs:{title:t.name,radio:"",checked:i.item.vendor_package_id===t.id},on:{click:function(){i.item.vendor_product_id=null,i.item.vendor_package_id=t.id,i.itemsPopupOpened=!1,i.enableSave()}}},[a("tommy-circle-avatar",{attrs:{slot:"media",url:t.image_url},slot:"media"})],1)})],2)],1)],1)],1):i._e()],1)}var h={props:{data:Object},data:function data(){return{teamTags:null}},mounted:function mounted(){var e=this;e.$api.getCurrentTeamTags({cache:!1}).then(function(t){e.teamTags=t})},methods:{openSelector:function openSelector(){var i=this;i.$f7router.navigate("/invoicing/tag-select/",{props:{tags:i.data.tags,pageTitle:i.data.pageTitle,teamTags:i.teamTags,onChange:function onChange(t,e){e?i.$emit("tagAdd",t):i.$emit("tagRemove",t)}}})},removeTag:function removeTag(t){this.$emit("tagRemove",t)}}},b=(_._withStripped=!0,t({render:_,staticRenderFns:[function(){var t=this.$createElement,e=this._self._c||t;return e("div",{staticClass:"item-media"},[e("i",{staticClass:"material-icons md-36"},[this._v("search")])])}]},void 0,h,void 0,!(_._withStripped=!0),void 0,void 0,void 0)),k={components:{tagSelect:b},props:{listId:[String,Number]},data:function data(){return{showSave:!1,id:parseInt(this.listId,10),orderStatuses:f,list:null,permissions:[],contacts:n.contacts}},beforeDestroy:function beforeDestroy(){this.$events.$off("invoicing:setListDateRange",this.updateListDateRange)},mounted:function mounted(){var i=this;n.loadList(i.id).then(function(e){e.data||(e.data={}),e.data.status||(e.data.status=[]),e.data.customer||(e.data.customer=[]),e.data.assignee||(e.data.assignee=[]),i.list=e,i.$api.getInstalledAddonPermission("invoicing","order_list_read_access",{taggable_id:e.id,with_filters:!0}).then(function(t){t.taggable_id=e.id,i.permissions.push(t)}),i.$api.getInstalledAddonPermission("invoicing","order_list_edit_access",{taggable_id:e.id,with_filters:!0}).then(function(t){t.taggable_id=e.id,i.permissions.push(t)}),n.contacts||i.$api.getContacts().then(function(t){i.contacts=t,n.contacts=t})}),i.$events.$on("invoicing:setListDateRange",i.updateListDateRange)},methods:{formatDateRange:function formatDateRange(t){return t?"string"==typeof t?window.tommy.i18n.t("invoicing.date_range."+t):Array.isArray(t)?formatDate(t[0])+" - "+formatDate(t[1]):t||"":""},updateListDateRange:function updateListDateRange(t,e){this.list.id===t&&(this.list.data.date_range=e)},onNameChange:function onNameChange(t){this.saving||(this.list.name=t,this.showSave=!0)},onSortChange:function onSortChange(t){this.saving||(this.list.data.sort=this.$$(t.target).val(),this.showSave=!0)},onStatusChange:function onStatusChange(t){this.saving||(this.list.data.status=this.$$(t.target).val(),this.showSave=!0)},onTypeChange:function onTypeChange(t){this.saving||(this.list.data.type=t.target.value,this.showSave=!0)},onCustomerChange:function onCustomerChange(t){this.saving||(this.list.data.customer=this.$$(t.target).val().map(function(t){return parseInt(t,10)}),this.showSave=!0)},onAssigneeChange:function onAssigneeChange(t){this.saving||(this.list.data.assignee=this.$$(t.target).val().map(function(t){return parseInt(t,10)}),this.showSave=!0)},setOnlyAssigned:function setOnlyAssigned(t){this.list.data.only_assigned=t,this.showSave=!0,t&&(this.list.data.assignee=[])},showDateRange:function showDateRange(){this.$f7router.navigate("/invoicing/list-edit/date-range/",{props:{list:this.list}})},showBalanceRange:function showBalanceRange(){var a=this,t=a.list.data,e=t.balance_min,i=t.balance_max;a.$f7router.navigate("/invoicing/range-select/",{props:{pageTitle:a.$t("invoicing.list_edit.balance_range"),from:e?parseFloat(e):e,to:i?parseFloat(i):i,onSave:function onSave(t){var e=t.from,i=t.to;a.list.data.balance_min=e,a.list.data.balance_max=i,a.list=a.list,n.saveList(a.list).then(function(){a.$f7router.back()})}}})},showPaymentRange:function showPaymentRange(){var a=this,t=a.list.data,e=t.price_min,i=t.price_max;a.$f7router.navigate("/invoicing/range-select/",{props:{pageTitle:a.$t("invoicing.list_edit.payment_range"),from:e?parseFloat(e):e,to:i?parseFloat(i):i,onSave:function onSave(t){var e=t.from,i=t.to;a.list.data.price_min=e,a.list.data.price_max=i,a.list=a.list,n.saveList(a.list).then(function(){a.$f7router.back()})}}})},save:function save(){var t=this;t.saving||(t.saving=!0,t.showSave=!1,n.saveList(t.list).then(function(){t.$events.$emit("invoicing:reloadLists",t.listId),t.$f7router.back()}))},deleteList:function deleteList(){var t=this;t.saving||(t.saving=!0,t.showSave=!1,n.deleteList(t.list.id,t.list).then(function(){t.$events.$emit("invoicing:reloadLists",t.listId),t.$f7router.back()}))},saveListPermission:function saveListPermission(t){this.$api.updateInstalledAddonPermission("invoicing",t.name,{taggable_id:t.taggable_id,with_filters:!0,filters:JSON.stringify(t.filters)})},addListPermission:function addListPermission(t,e){t.filters.push(e),this.saveListPermission(t)},removeListPermission:function removeListPermission(t,e){t.filters.splice(t.filters.indexOf(e),1),this.saveListPermission(t)}}},$=(ia._withStripped=!0,t({render:ia,staticRenderFns:[]},void 0,k,void 0,!(ia._withStripped=!0),void 0,void 0,void 0)),C={props:{list:Object},data:function data(){var t=this.list.data.date_range;return{showSave:!1,dateFrom:Array.isArray(t)&&t[0]?t[0]:(new Date).getTime(),dateTo:Array.isArray(t)&&t[1]?t[1]:(new Date).getTime(),range:t}},computed:{isCustomRange:function isCustomRange(){var t=this.range;return Array.isArray(t)||!(!t||"string"==typeof t)}},mounted:function mounted(){var i=this,a=!1,n=!1;i.calendarFrom=i.$f7.calendar.create({inputEl:i.$$(i.$refs.rangeStart.$el).find("input"),closeOnSelect:!0,value:[i.dateFrom],on:{change:function change(t,e){a&&(i.showSave=!0),a=!0,i.dateFrom=new Date(e[0]).getTime(),Array.isArray(i.range)&&i.range[0]&&(i.range[0]=i.dateFrom),i.dateFrom>i.dateTo&&i.calendarTo.setValue([i.dateFrom])}}}),i.calendarTo=i.$f7.calendar.create({inputEl:i.$$(i.$refs.rangeEnd.$el).find("input"),closeOnSelect:!0,value:[i.dateTo],on:{change:function change(t,e){n&&(i.showSave=!0),n=!0,i.dateTo=new Date(e[0]).getTime(),Array.isArray(i.range)&&i.range[1]&&(i.range[1]=i.dateTo),i.dateTo<i.dateFrom&&i.calendarFrom.setValue([i.dateTo])}}})},methods:{setPlainRange:function setPlainRange(t){this.range=t,this.showSave=!0},toggleCustomRange:function toggleCustomRange(t){var e=this;e.showSave=!0,e.range=t?[e.dateFrom,e.dateTo]:""},save:function save(){var t=this;if(!t.saving){t.saving=!0,t.showSave=!1;var e=Object.assign({},t.list);e.data.date_range=t.range,n.saveList(e).then(function(){t.$events.$emit("invoicing:setListDateRange",t.list.id,t.range),t.$f7router.back()})}}}},y=(ra._withStripped=!0,t({render:ra,staticRenderFns:[]},void 0,C,void 0,!(ra._withStripped=!0),void 0,void 0,void 0)),S={props:{listId:[String,Number],pageTitle:String,tags:Array,teamTags:Array,onChange:Function},data:function data(){return{query:null}},computed:{allTags:function allTags(){var t=this,a=[];return t.tags.forEach(function(e){var i;t.teamTags.forEach(function(t){i=i||e.context===t.context&&e.name===t.name&&e.label===t.label}),i||a.push(e)}),t.teamTags.concat(a)}},methods:{onSearch:function onSearch(t,e){this.query=e},isTagSelected:function isTagSelected(e){return 0<this.tags.filter(function(t){return t.name===e.name&&t.id===e.id&&t.type===e.type}).length},contextIconSrc:function contextIconSrc(t){return this.$addonAssetsUrl+"icons/"+t.context.slice(0,-1)+".png"},contextIconSrcset:function contextIconSrcset(t){var e=this.$addonAssetsUrl;return e+"icons/"+t.context.slice(0,-1)+"@2x.png 2x,"+e+"icons/"+t.context.slice(0,-1)+"@3x.png 3x"},toggleTag:function toggleTag(t,e,i){this.onChange&&(this.onChange(t,e),i&&this.$f7router.back())}}},w=(Aa._withStripped=!0,t({render:Aa,staticRenderFns:[]},void 0,S,void 0,!(Aa._withStripped=!0),void 0,void 0,void 0)),P={components:{tagSelect:b},props:{id:[String,Number]},data:function data(){return{pageTitle:this.$f7route.query.title||this.$t("invoicing.product.new_title"),item:null,showSave:!1,imagePreview:null,availabile_in:""}},mounted:function mounted(){var e=this;e.id?n.loadProduct(e.id).then(function(t){t.data&&"string"!=typeof t.data||(t.data={duration:null,availabile_in:[]}),e.availabile_in=(t.data.availabile_in||[]).join(","),"string"==typeof t.filters&&(t.filters=JSON.parse(decodeURIComponent(t.filters))),t.filters||(t.filters=[]),e.item=t}):e.item={active:!1,category:"",code:"",data:{duration:null,availabile_in:[]},filters:[],description:"",name:"",price:0}},methods:{setAvailable:function setAvailable(t){this.availabile_in=t,this.item.data.availabile_in=t.split(",").map(function(t){return t.trim()}).filter(function(t){return t}),this.enableSave()},setPrice:function setPrice(t){var e=this;e.item.price=t,e.item.price_cents=100*parseFloat(e.item.price),Number.isNaN(e.item.price_cents)&&(e.item.price_cents=0),e.enableSave()},enableSave:function enableSave(){this.item.name?this.showSave=!0:this.showSave=!1},addItemTag:function addItemTag(t){this.item.filters.push(t),this.enableSave()},removeItemTag:function removeItemTag(t){this.item.filters.splice(this.item.filters.indexOf(t),1),this.enableSave()},onDurationChange:function onDurationChange(t){this.item.data.duration=t.target.value,this.enableSave()},onFileChange:function onFileChange(t){var e=this,i=t.target.files[0],a=new FileReader;a.onload=function(t){e.imagePreview=t.target.result},a.readAsDataURL(i),e.item.image=i,e.enableSave()},deleteImage:function deleteImage(){this.item.image=null,this.item.image_url=null,this.imagePreview=null,this.enableSave()},save:function save(){var t=this;t.showSave=!1,n.saveProduct(t.item).then(function(){t.$events.$emit("invoicing:reloadProducts"),t.$f7router.back()})}}},T=(Ja._withStripped=!0,t({render:Ja,staticRenderFns:[]},void 0,P,void 0,!(Ja._withStripped=!0),void 0,void 0,void 0)),O={components:{tagSelect:b},props:{id:[String,Number]},data:function data(){return{pageTitle:this.$f7route.query.title||this.$t("invoicing.package.new_title"),item:null,showSave:!1,imagePreview:null,products:null,productsOpened:!1,availabile_in:"",data:{duration:null}}},mounted:function mounted(){var e=this;n.loadProducts().then(function(t){e.products=t}),e.id?n.loadPackage(e.id).then(function(t){t.vendor_package_products_attributes||(t.vendor_package_products_attributes=[]),t.vendor_package_products&&(t.vendor_package_products_attributes=t.vendor_package_products.map(function(t){return{id:t.id,vendor_product_id:t.vendor_product_id,quantity:t.quantity,vendor_package_id:t.vendor_package_id}}),delete t.vendor_package_products),t.data&&"string"!=typeof t.data||(t.data={availabile_in:[],duration:null}),e.availabile_in=(t.data.availabile_in||[]).join(","),"string"==typeof t.filters&&(t.filters=JSON.parse(decodeURIComponent(t.filters))),t.filters||(t.filters=[]),e.item=t}):e.item={active:!1,category:"",code:"",filters:[],description:"",name:"",price:0,vendor_package_products_attributes:[],data:{availabile_in:[],duration:null}}},methods:{setAvailable:function setAvailable(t){this.availabile_in=t,this.item.data.availabile_in=t.split(",").map(function(t){return t.trim()}).filter(function(t){return t}),this.enableSave()},productName:function productName(e){return this.products.filter(function(t){return t.id===parseInt(e,10)})[0].name},increaseProduct:function increaseProduct(t){this.item.vendor_package_products_attributes[t].quantity+=1,this.enableSave()},decreaseProduct:function decreaseProduct(t){var e=this;e.item.vendor_package_products_attributes[t].quantity-=1,0===e.item.vendor_package_products_attributes[t].quantity&&(e.item.vendor_package_products_attributes[t].id?e.item.vendor_package_products_attributes[t]._destroy=!0:e.item.vendor_package_products_attributes.splice(t,1)),e.enableSave()},addProduct:function addProduct(e){var i;this.productsOpened=!1,this.item.vendor_package_products_attributes.forEach(function(t){t.vendor_product_id===e.id&&(i=!0)}),i||(this.item.vendor_package_products_attributes.push({vendor_product_id:e.id,quantity:1}),this.showSave=!0)},setPrice:function setPrice(t){var e=this;e.item.price=t,e.item.price_cents=100*parseFloat(e.item.price),Number.isNaN(e.item.price_cents)&&(e.item.price_cents=0),e.enableSave()},enableSave:function enableSave(){this.item.name?this.showSave=!0:this.showSave=!1},addItemTag:function addItemTag(t){this.item.filters.push(t),this.enableSave()},removeItemTag:function removeItemTag(t){this.item.filters.splice(this.item.filters.indexOf(t),1),this.enableSave()},onDurationChange:function onDurationChange(t){this.item.data.duration=t.target.value,this.enableSave()},onFileChange:function onFileChange(t){var e=this,i=t.target.files[0],a=new FileReader;a.onload=function(t){e.imagePreview=t.target.result},a.readAsDataURL(i),e.item.image=i,e.enableSave()},deleteImage:function deleteImage(){this.item.image=null,this.item.image_url=null,this.imagePreview=null,this.enableSave()},save:function save(){var t=this;t.showSave=!1,n.saveProduct(t.item,!0).then(function(){t.$events.$emit("invoicing:reloadPackages"),t.$f7router.back()})}}},D=(Sa._withStripped=!0,t({render:Sa,staticRenderFns:[]},void 0,O,void 0,!(Sa._withStripped=!0),void 0,void 0,void 0)),x={props:{from:Number,to:Number,pageTitle:String,onSave:Function},data:function data(){var t=this.from,e=this.to;return{showSave:!1,amount_min:t,amount_max:e,isCustomRange:void 0!==t||void 0!==e}},methods:{save:function save(){var t=this;if(!t.saving){t.saving=!0,t.showSave=!1;var e,i,a=t.amount_min,n=t.amount_max;t.isCustomRange?(e=(e=a)||void 0,i=(i=n)||void 0,a&&n&&n<a&&(i=a)):i=e=void 0,t.onSave({from:e,to:i})}},setMin:function setMin(t){this.amount_min=t,this.showSave=!0},setMax:function setMax(t){this.amount_max=t,this.showSave=!0},toggleCustomRange:function toggleCustomRange(t){var e=this;e.showSave=!0,t?(e.isCustomRange=!0,e.amount_min=e.from,e.amount_max=e.to):(e.isCustomRange=!1,e.amount_min=void 0,e.amount_max=void 0)}}},M=(_a._withStripped=!0,t({render:_a,staticRenderFns:[]},void 0,x,void 0,!(_a._withStripped=!0),void 0,void 0,void 0)),L={props:{id:[Number,String]},data:function data(){return{pageTitle:this.id?this.$t("invoicing.order_details.title","Order")+" #"+this.id:this.$t("invoicing.order_details.new_title"),order:null,showSave:!1,orderStatuses:f,products:null,packages:null,productsOpened:!1,promotions:null,promotionsOpened:!1,isFeedback:!1,orderUser:null,orderAssignee:null,contacts:n.contacts}},mounted:function mounted(){var a=this;a.id?n.loadOrder(a.id).then(function(e){a.order=e;var i=a.$root.teamMembers.filter(function(t){return t.user_id===parseInt(e.user_id,10)})[0],t=a.$root.teamMembers.filter(function(t){return t.user_id===parseInt(e.assignee_id,10)})[0];if(a.orderAssignee=t,!i)return a.contacts?(i=a.contacts.filter(function(t){return t.friend_id===parseInt(e.user_id,10)})[0],void(a.orderUser=i)):void a.$api.getContacts.then(function(t){a.contacts=t,i=a.contacts.filter(function(t){return t.friend_id===parseInt(e.user_id,10)})[0],a.orderUser=i});a.orderUser=i}):a.order={comment:"",discount:0,total:0,user_id:null,vendor_coupon_id:null,vendor_order_items:[],wallet_transaction_id:null,status:"pending",canceled:!1,data:{location:{address:"",city:""},date:(new Date).getTime()}},n.loadProducts().then(function(t){a.products=t}),n.loadPackages().then(function(t){a.packages=t}),n.loadPromotions().then(function(t){a.promotions=t})},beforeDestroy:function beforeDestroy(){var t=this;t.dateCalendar&&t.dateCalendar.destroy&&t.dateCalendar.destroy(),t.timePicker&&t.timePicker.destroy&&t.timePicker.destroy()},computed:{orderAssigneeName:function orderAssigneeName(){var t=this.orderAssignee;return t?t.friend_team_name?t.friend_team_name.trim():t.name?t.name.trim():t.first_name?(t.first_name+(t.last_name?" "+t.last_name:"")).trim():"":""},orderUserName:function orderUserName(){var t=this.orderUser;return t?t.friend_team_name?t.friend_team_name.trim():t.name?t.name.trim():t.first_name?(t.first_name+(t.last_name?" "+t.last_name:"")).trim():"":""},orderItemsTotal:function orderItemsTotal(){var e=this,i=0;return e.order.vendor_order_items.forEach(function(t){i+=e.productPrice(t.orderable_id,t.orderable_type)*t.quantity}),i},orderDiscountTotal:function orderDiscountTotal(){var e=this,t=0;if(e.order.vendor_coupon_id){var i=e.promotions.filter(function(t){return t.id===e.order.vendor_coupon_id})[0];i&&(t="percentage"!==i.kind?i.amount:e.orderItemsTotal*i.amount)}return t},orderTotal:function orderTotal(){return Math.max(this.orderItemsTotal-this.orderDiscountTotal,0)},orderCancelable:function orderCancelable(){var t=this.order;return!t.canceled&&("paid"===t.status||"pending"===t.status)}},methods:{cancelOrder:function cancelOrder(){var e=this;e.order.canceled=!0,n.cancelOrder(e.order).then(function(t){e.order=t,e.order.canceled=!0,e.$events.$emit("invoicing:reloadListsOrders")}).catch(function(){e.order.canceled=!1})},calcOrderDuration:function calcOrderDuration(){var e=this,i=0;return e.order&&e.products&&e.packages&&e.order.vendor_order_items.forEach(function(t){i+=e.productDuration(t.orderable_id,t.orderable_type)*t.quantity}),i},onAssigneeChange:function onAssigneeChange(t){var e=parseInt(t.target.value,10),i=this.$root.teamMembers.filter(function(t){return t.user_id===parseInt(e,10)})[0];this.order.assignee_id=i.user_id,this.order.data.nurse=i,this.showSave=!0},onCustomerChange:function onCustomerChange(t){var e=this,i=parseInt(t.target.value,10),a=e.$root.teamMembers.filter(function(t){return t.user_id===parseInt(i,10)})[0];!a&&e.contacts&&(a=e.contacts.filter(function(t){return t.friend_id===parseInt(i,10)})[0]),e.orderUser=a,e.order.user_id=parseInt(t.target.value,10),e.showSave=!0},onCommentChange:function onCommentChange(t){this.order.comment=t.target.value,this.showSave=!0},onCityChange:function onCityChange(t){var e=this;e.order.data||(e.order.data={}),e.order.data.location||(e.order.data.location={}),e.order.data.location.city=t.target.value,e.showSave=!0},onAddressChange:function onAddressChange(t){var e=this;e.order.data||(e.order.data={}),e.order.data.location||(e.order.data.location={}),e.order.data.location.address=t.target.value,e.showSave=!0},openTimeSelect:function openTimeSelect(){var a=this,t=a.order;if(a.timePicker)a.timePicker.open();else{var n,e=a.formatOrderTime(t.data?parseInt(t.data.date,10):null);a.timePicker=a.$f7.picker.create({value:e?e.split(":"):[],cols:[{values:"00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23".split(" ")},{divider:!0,content:" : "},{values:function(){for(var t=[],e=0;e<=59;e+=1)t.push(e<10?"0"+e:""+e);return t}()}],on:{change:function change(t,e){if(n){var i=new Date(parseInt(a.order.data.date,10));i.setHours(parseInt(e[0],10),parseInt(e[1],10)),a.order.data.date=i.getTime(),a.showSave=!0}else n=!0}}}),a.timePicker.open()}},openDateSelect:function openDateSelect(){var n,r=this;r.dateCalendar?r.dateCalendar.open():(r.dateCalendar=r.$f7.calendar.create({value:r.order.data.date?[parseInt(r.order.data.date,10)]:[],on:{change:function change(t,e){if(n){var i=new Date(parseInt(r.order.data.date,10)),a=new Date(e[0]);i.setFullYear(a.getFullYear()),i.setMonth(a.getMonth()),i.setDate(a.getDate()),r.order.data.date=i.getTime(),r.showSave=!0}else n=!0}}}),r.dateCalendar.open())},promotionName:function promotionName(e){return this.promotions.filter(function(t){return t.id===parseInt(e,10)})[0].name},promotionDiscount:function promotionDiscount(e){var t=this.promotions.filter(function(t){return t.id===parseInt(e,10)})[0];return t?"percentage"!==t.kind?t.amount:this.orderItemsTotal*t.amount:0},productName:function productName(e,t){void 0===t&&(t="VendorProduct");var i=this["VendorProduct"===t?"products":"packages"].filter(function(t){return t.id===parseInt(e,10)})[0];return i?i.name:""},productPrice:function productPrice(e,t){void 0===t&&(t="VendorProduct");var i=this["VendorProduct"===t?"products":"packages"].filter(function(t){return t.id===parseInt(e,10)})[0];return i?i.price:0},productDuration:function productDuration(e,t){void 0===t&&(t="VendorProduct");var i=this["VendorProduct"===t?"products":"packages"].filter(function(t){return t.id===parseInt(e,10)})[0];return i?parseInt(i.data.duration,10):0},formatOrderDate:function formatOrderDate(t){return t?this.$moment(new Date(parseInt(t,10))).format("D MMM YYYY"):""},formatOrderTime:function formatOrderTime(t){return t?this.$moment(new Date(parseInt(t,10))).format("HH:mm"):""},formatDate:function formatDate(t){return this.$moment(new Date(t)).format("HH:mm D MMM YYYY")},onStatusChange:function onStatusChange(t){var e=this,i=e.order.status;e.order.status=t.target.value,"paid"!==i&&"paid"===e.order.status&&(e.orderChangedToPaid=!0),e.showSave=!0},onTypeChange:function onTypeChange(t){"quote"===t.target.value?this.order.quote=!0:this.order.quote=!1,this.showSave=!0},increaseOrderItem:function increaseOrderItem(t){this.order.vendor_order_items[t].quantity+=1,this.showSave=!0},decreaseOrderItem:function decreaseOrderItem(t){var e=this;e.order.vendor_order_items[t].quantity-=1,0===e.order.vendor_order_items[t].quantity&&(e.order.vendor_order_items[t].id?e.order.vendor_order_items[t]._destroy=!0:e.order.vendor_order_items.splice(t,1)),e.showSave=!0},addOrderItem:function addOrderItem(e,t){var i,a=this;a.productsOpened=!1,a.order.vendor_order_items.forEach(function(t){t.orderable_id===e.id&&(i=!0,t._destroy&&(t._destroy=!1,delete t._destroy,t.quantity=1,a.showSave=!0))}),i||(a.order.vendor_order_items.push({orderable_id:e.id,orderable_type:t,quantity:1}),a.showSave=!0)},addOrderPromotion:function addOrderPromotion(t){this.promotionsOpened=!1,this.order.vendor_coupon_id=t.id,this.showSave=!0},deleteOrderPromotion:function deleteOrderPromotion(){this.order.vendor_coupon_id=null,this.showSave=!0},save:function save(){var e=this,t=Object.assign({},e.order);if(e.showSave=!1,!t.name&&t.vendor_order_items.length&&(t.name=e.productName(t.vendor_order_items[0].orderable_id,t.vendor_order_items[0].orderable_type)),t.vendor_order_items_attributes=[].concat(t.vendor_order_items),t.total=e.orderItemsTotal,t.discount=e.orderDiscountTotal,delete t.vendor_order_items,e.orderChangedToPaid&&!t.event_id&&t.data.date&&t.data.nurse&&t.data.location&&t.id&&t.user_id){var i,a=t.data.date;"string"==typeof a&&(a=parseInt(a,10)),t.data.duration&&0<t.data.duration&&(i=a+60*parseInt(t.data.duration,10)*1e3),t.event_attributes={addon:"nurse_booking",title:t.name,start_at:new Date(a).toJSON(),end_at:new Date(i).toJSON(),location:t.data.location.city+" "+t.data.location.address,user_id:t.user_id,team_id:null,assignee_id:t.data.nurse.user_id,assignee_team_id:e.$root.team.id,kind:"Booking",resource_id:t.id,resource_type:"VendorOrder"}}n.saveOrder(t).then(function(t){e.order=t,e.$events.$emit("invoicing:reloadListsOrders")})}}},A=(ib._withStripped=!0,t({render:ib,staticRenderFns:[]},void 0,L,void 0,!(ib._withStripped=!0),void 0,void 0,void 0)),N={props:{order:Object,orderDuration:Number},data:function data(){return{navTitle:this.t("confirm_title"),step:"step-1",q1:null,q2:null,q3:null,saved:!1,start_date:null,end_date:null}},computed:{durationFormatted:function durationFormatted(){return Math.floor(this.orderDuration/60*10)/10}},mounted:function mounted(){this.$f7.navbar.size(this.$el.querySelector(".navbar"))},methods:{t:function t(e,i){return this.$t("invoicing.order_feedback."+e,i)},stepBack:function stepBack(){var t=this,e=t.step;"step-1-2"===e&&(t.start_date=null,t.end_date=null,t.step="step-1"),"step-2"===e&&t.start_date?(t.step="step-1-2",t.$nextTick(function(){t.initTimePickers()})):"step-2"===e&&(t.step="step-1"),"step-3"===e&&(t.step="step-2"),"question-1"===e&&(t.step="step-3"),"question-2"===e&&(t.step="question-1"),"question-3"===e&&(t.step="question-2")},setStep:function setStep(t,e){var i=this;"step-1-2"===t&&(i.step=t,i.$nextTick(function(){i.initTimePickers()})),"step-2"===t&&(i.step=t),"step-3"===t&&(i.step=t),"question-1"===t&&(i.step=t),"question-2"===t&&(i.step=t,i.q1=e),"question-3"===t&&(i.step=t,i.q2=e),"step-4"===t&&(i.step=t,i.q3=e,i.saveFeedback())},initTimePickers:function initTimePickers(){for(var a=this,t=new Date(parseInt(a.order.data.date,10)),e=t.getTime()-864e6,i=[],n=0;n<21;n+=1)i.push(e+24*n*60*60*1e3);for(var r=[],o=0;o<24;o+=1)r.push(o<10?"0"+o:o);for(var s=[],d=0;d<60;d+=1)s.push(d<10?"0"+d:d);var c=t.getHours();c<10&&(c="0"+c);var l=t.getMinutes();l<10&&(l="0"+l),a.$f7.picker.create({inputEl:a.$el.querySelector("#start_date"),openIn:"popover",value:[t.getTime(),c,l],cols:[{values:i,displayValues:i.map(function(t){return a.$moment(t).format("ddd, DD MMM")})},{values:r},{divider:!0,content:":"},{values:s}],formatValue:function formatValue(t,e){return e[0]+" "+e[1]+":"+e[2]},on:{change:function change(t,e){var i=new Date(parseInt(e[0],10));i.setHours(parseInt(e[1],10),parseInt(e[2],10),0,0),a.start_date=i}}});var u=new Date(t.getTime()+60*a.orderDuration*1e3),v=u.getHours();v<10&&(v="0"+v);var m=u.getMinutes();m<10&&(m="0"+m),a.$f7.picker.create({inputEl:a.$el.querySelector("#end_date"),openIn:"popover",value:[t.getTime(),v,m],cols:[{values:i,displayValues:i.map(function(t){return a.$moment(t).format("ddd, DD MMM")})},{values:r},{divider:!0,content:":"},{values:s}],formatValue:function formatValue(t,e){return e[0]+" "+e[1]+":"+e[2]},on:{change:function change(t,e){var i=new Date(parseInt(e[0],10));i.setHours(parseInt(e[1],10),parseInt(e[2],10),0,0),a.end_date=i}}})},saveFeedback:function saveFeedback(){var t=this;t.$emit("feedbackComplete",{feedback:{question1:t.q1,question2:t.q2,question3:t.q2,start_date:t.start_date?t.start_date.toJSON():null,end_date:t.end_date?t.end_date.toJSON():null},callback:function callback(){t.saved=!0}})},closeFeedback:function closeFeedback(){this.$emit("close")}}},q=(rb._withStripped=!0,{components:{OrderFeedback:t({render:rb,staticRenderFns:[]},void 0,N,void 0,!(rb._withStripped=!0),void 0,void 0,void 0)},props:{id:[Number,String]},data:function data(){return{pageTitle:this.id?this.$t("invoicing.order_details.title","Order")+" #"+this.id:this.$t("invoicing.order_details.new_title"),order:null,showSave:!1,orderStatuses:f,products:null,packages:null,isFeedback:!1,orderDuration:0,orderUser:null}},mounted:function mounted(){var i=this;Promise.all([n.loadOrder(i.id).then(function(e){i.order=e;var t=i.$root.teamMembers.filter(function(t){return t.user_id===parseInt(e.user_id,10)})[0];t?i.orderUser=t:i.$api.getContact(e.user_id).then(function(t){i.orderUser=t})}),n.loadProducts().then(function(t){i.products=t}),n.loadPackages().then(function(t){i.packages=t})]).then(function(){i.orderDuration=i.calcOrderDuration()})},computed:{orderUserName:function orderUserName(){var t=this.orderUser;return t?t.friend_team_name?t.friend_team_name.trim():t.name?t.name.trim():t.first_name?(t.first_name+(t.last_name?" "+t.last_name:"")).trim():"":""},showStartButton:function showStartButton(){if("paid"!==this.order.status)return!1;var t=(new Date(parseInt(this.order.data.date,10)).getTime()-(new Date).getTime())/1e3/60;return Math.abs(t)<=60},showFinishButton:function showFinishButton(){return"processing"===this.order.status},orderItemsTotal:function orderItemsTotal(){var e=this,i=0;return e.order.vendor_order_items.forEach(function(t){i+=e.productPrice(t.orderable_id,t.orderable_type)*t.quantity}),i}},methods:{calcOrderDuration:function calcOrderDuration(){var e=this,i=0;return e.order&&e.products&&e.packages&&e.order.vendor_order_items.forEach(function(t){i+=e.productDuration(t.orderable_id,t.orderable_type)*t.quantity}),i},productName:function productName(e,t){void 0===t&&(t="VendorProduct");var i=this["VendorProduct"===t?"products":"packages"].filter(function(t){return t.id===parseInt(e,10)})[0];return i?i.name:""},productPrice:function productPrice(e,t){void 0===t&&(t="VendorProduct");var i=this["VendorProduct"===t?"products":"packages"].filter(function(t){return t.id===parseInt(e,10)})[0];return i?i.price:0},productDuration:function productDuration(e,t){void 0===t&&(t="VendorProduct");var i=this["VendorProduct"===t?"products":"packages"].filter(function(t){return t.id===parseInt(e,10)})[0];return i?parseInt(i.data.duration,10):0},formatOrderDate:function formatOrderDate(t){return t?this.$moment(new Date(parseInt(t,10))).format("D MMM YYYY"):""},formatOrderTime:function formatOrderTime(t){return t?this.$moment(new Date(parseInt(t,10))).format("HH:mm"):""},formatDate:function formatDate(t){return this.$moment(new Date(t)).format("HH:mm D MMM YYYY")},startOrder:function startOrder(){var e=this,t=Object.assign({},e.order);t.status="processing",t.data.feedback||(t.data.feedback={}),t.data.feedback.actual_start_date=(new Date).toJSON(),n.saveOrder(t).then(function(t){e.order=t,e.$events.$emit("invoicing:reloadListsOrders")})},finishOrder:function finishOrder(){this.$refs.popup.f7Popup.params.closeByBackdropClick=!1,this.isFeedback=!0},onFeedbackComplete:function onFeedbackComplete(e){var i=this,t=e.feedback,a=Object.assign({},i.order);a.status="qa",a.data.feedback?Object.assign(a.data.feedback,t):a.data.feedback=t,a.data.feedback.actual_end_date=(new Date).toJSON(),delete a.vendor_order_items,n.saveOrder(a).then(function(t){i.order=t,i.$events.$emit("invoicing:reloadListsOrders"),e.callback&&e.callback()})},onFeedbackClose:function onFeedbackClose(){this.isFeedback=!1,this.$refs.popup.f7Popup.close()}}}),F=(Ab._withStripped=!0,t({render:Ab,staticRenderFns:[]},void 0,q,void 0,!(Ab._withStripped=!0),void 0,void 0,void 0)),E={data:function data(){return{items:null,packages:null,activeTab:"items"}},mounted:function mounted(){this.loadPromotions(),this.$events.$on("invoicing:reloadPromotions",this.loadPromotions)},beforeDestroy:function beforeDestroy(){this.$events.$off("invoicing:reloadPromotions",this.loadPromotions)},computed:{orderedPromotions:function orderedPromotions(){return this.items?this.items.sort(function(t,e){return t.id-e.id}):[]}},methods:{loadPromotions:function loadPromotions(){var e=this;n.loadPromotions({},{cache:!1}).then(function(t){e.items=t})}}},Y=(Jb._withStripped=!0,t({render:Jb,staticRenderFns:[]},void 0,E,void 0,!(Jb._withStripped=!0),void 0,void 0,void 0)),U={components:{tagSelect:b},props:{id:[String,Number]},data:function data(){return{pageTitle:this.$f7route.query.title||this.$t("invoicing.promotion.new_title"),item:null,showSave:!1,customerPopupOpened:!1,itemsPopupOpened:!1,products:null,packages:null,contacts:n.contacts}},mounted:function mounted(){var a=this;a.id?n.loadPromotion(a.id).then(function(t){a.item=t}):a.item={description:"",name:"",amount:0,user_id:null,vendor_product_id:null,vendor_package_id:null,category:null,kind:"fixed",valid_from:null,valid_to:null,max_uses:null},a.contacts?Promise.all([n.loadProducts(),n.loadPackages()]).then(function(t){var e=t[0],i=t[1];a.products=e,a.packages=i}):a.$api.getContacts.then(function(t){a.contacts=t,n.contacts=t})},computed:{customerAvatar:function customerAvatar(){var t,e=this;return e.item.user_id?(e.$root.teamMembers&&(t=e.$root.teamMembers.filter(function(t){return t.user_id===e.item.user_id})[0]),!t&&e.contacts&&(t=e.contacts.filter(function(t){return t.friend_id===e.item.user_id})[0]),t||null):null},customerTitle:function customerTitle(){var t,e=this;return e.item.user_id?(e.$root.teamMembers&&(t=e.$root.teamMembers.filter(function(t){return t.user_id===e.item.user_id})[0]),!t&&e.contacts&&(t=e.contacts.filter(function(t){return t.friend_id===e.item.user_id})[0]),t?(t.first_name||"")+" "+(t.last_name||""):""):e.$t("invoicing.promotion.customer_placeholder")},itemAvatar:function itemAvatar(){var t,e=this;return e.item.vendor_product_id||e.item.vendor_package_id?(e.item.vendor_product_id&&(t=e.products.filter(function(t){return t.id===e.item.vendor_product_id})[0]),e.item.vendor_package_id&&(t=e.packages.filter(function(t){return t.id===e.item.vendor_package_id})[0]),t?t.image_url:null):null},itemTitle:function itemTitle(){var t,e=this;return e.item.vendor_product_id||e.item.vendor_package_id?(e.item.vendor_product_id&&(t=e.products.filter(function(t){return t.id===e.item.vendor_product_id})[0]),e.item.vendor_package_id&&(t=e.packages.filter(function(t){return t.id===e.item.vendor_package_id})[0]),t?t.name:""):e.$t("invoicing.promotion.item_placeholder")}},methods:{openCalendar:function openCalendar(){var i=this;i.calendarTo=i.$f7.calendar.create({openIn:"customModal",value:i.item.valid_to?[new Date(i.item.valid_to)]:[],backdrop:!0,closeByOutsideClick:!1,on:{change:function change(t,e){i.item.valid_to=new Date(e[0]).toJSON(),i.enableSave()}}}),i.calendarTo.once("closed",function(){i.calendarTo.destroy()}),i.calendarTo.open()},formatValueDate:function formatValueDate(t){return t?this.$moment(new Date(t)).format("YYYY-MM-DDTHH:mm"):""},onDateChange:function onDateChange(t){var e=t.target.value;clearTimeout(this.dateChangeTimeout),this.item.valid_to=new Date(e).toJSON(),this.enableSave()},setKind:function setKind(t){var e=this,i=e.item.kind;e.item.kind!==t&&("fixed"!==t&&"voucher"!==t||"percentage"!==i?"percentage"===t&&e.setAmount(.5):e.setAmount(0),e.item.kind=t,e.enableSave())},setAmount:function setAmount(t){var e=t;e="string"==typeof e?t.replace(/[¥ ]*/,"").replace(/,/g,".").trim():1<=e?1:(e=Math.floor(1e3*e/10))<10?parseFloat("0.0"+e):parseFloat("0."+e),this.item.amount=e,this.$set(this.item,"amount",e),this.enableSave()},enableSave:function enableSave(){this.showSave=!0},save:function save(){var t=this;t.showSave=!1,"string"==typeof t.item.amount&&(t.item.amount=parseFloat(t.item.amount),Number.isNaN(t.item.amount)&&(t.item.amount=0)),t.item.vendor_product_id&&(t.item.vendor_package_id=null),t.item.vendor_package_id&&(t.item.vendor_product_id=null),n.savePromotion(t.item).then(function(){t.$events.$emit("invoicing:reloadPromotions"),t.$f7router.back()})}}};Sb._withStripped=!0;return[{path:"/invoicing/",component:i},{path:"/invoicing/settings/",component:s},{path:"/invoicing/item-service-management/",component:c},{path:"/invoicing/list-management/",component:u},{path:"/invoicing/promotion-management/",component:Y},{path:"/invoicing/list-add/",component:m},{path:"/invoicing/list-edit/date-range/",component:y},{path:"/invoicing/list-edit/:listId/",component:$},{path:"/invoicing/tag-select/",component:w},{path:"/invoicing/product-details/:id?/",component:T},{path:"/invoicing/package-details/:id?/",component:D},{path:"/invoicing/range-select/",component:M},{path:"/invoicing/order-details/:id?/",popup:{async:function async(t,e,i){i({component:n.isNurse?F:A})}}},{path:"/invoicing/promotion-details/:id?/",component:t({render:Sb,staticRenderFns:[]},void 0,U,void 0,!(Sb._withStripped=!0),void 0,void 0,void 0)}]}();
+var addon = (function () {
+  var tommy = window.tommy;
+  var api = tommy.api;
+
+  var API = {
+    actor: undefined,
+    actorId: undefined,
+    isNurse: false,
+    assignee_id: null,
+    contacts: null,
+    loadOrder: function loadOrder(orderId) {
+      var params = {
+        with_filters: true,
+        with_permission_to: true,
+        actor_id: API.actorId,
+      };
+      return api.call({
+        endpoint: ("vendor/manager/orders/" + orderId),
+        data: params,
+      });
+    },
+    saveOrder: function saveOrder(order) {
+      return api.call({
+        method: order.id ? 'PUT' : 'POST',
+        endpoint: ("vendor/manager/orders/" + (order.id || '')),
+        data: order,
+      });
+    },
+    cancelOrder: function cancelOrder(order) {
+      return api.call({
+        endpoint: ("vendor/manager/orders/" + (order.id)),
+        method: 'DELETE',
+      });
+    },
+    loadListOrders: function loadListOrders(list) {
+      var tags = [];
+      if (list.data && list.filters) {
+        for (var i = 0; i < list.filters.length; i += 1) {
+          if (tags.indexOf(list.filters[i].name) < 0) { tags.push(list.filters[i].name); }
+        }
+      }
+      var params = {
+        tags: tags,
+        with_filters: true,
+        with_permission_to: true,
+        actor_id: API.actorId,
+        assignee_id: API.assignee_id || undefined,
+      };
+      if (list.data.date_range) {
+        params.date_range = list.data.date_range;
+        if (Array.isArray(params.date_range)) {
+          params.date_range = params.date_range.map(function (d) { return d / 1000; });
+        }
+      }
+      if (list.data.status) {
+        params.status = list.data.status;
+      } else if (API.assignee_id) {
+        params.status = ['complete', 'paid', 'processing'];
+      }
+      if (list.data.sort) {
+        params.sort = list.data.sort;
+      }
+      if (list.data.price_min) {
+        params.price_min = list.data.price_min;
+      }
+      if (list.data.price_max) {
+        params.price_max = list.data.price_max;
+      }
+      if (list.data.balance_min) {
+        params.balance_min = list.data.balance_min;
+      }
+      if (list.data.balance_max) {
+        params.balance_max = list.data.balance_max;
+      }
+      if (list.data.type === 'invoice') {
+        params.invoices = true;
+      }
+      if (list.data.type === 'quote') {
+        params.quotes = true;
+      }
+      if (list.data.customer) {
+        params.user_id = list.data.customer;
+      }
+      if (list.data.only_assigned) {
+        params.assignee_id = API.actorId || tommy.root.user.id;
+      } else if (list.data.assignee) {
+        params.assignee_id = list.data.assignee;
+      }
+
+      /*
+      sort: [price_high, price_low, newest]
+      # status: [quote, paid, processing, complete]
+      # price_min: integer
+      # price_max: integer
+      # quotes: boolean
+      # invoices: boolean
+      # user_id: integer (customer)
+      # kind: string
+      # tags:object
+      # resource_id:integer
+      # resource_type:string
+      */
+      params.data = JSON.stringify(params.data);
+
+      return api.call({
+        endpoint: '/vendor/manager/orders',
+        data: params,
+      });
+    },
+
+    loadList: function loadList(listId) {
+      return api.getFragment(listId, {
+        data: {
+          addon: 'invoicing',
+          kind: 'OrderList',
+          with_filters: true,
+          with_permission_to: true,
+        },
+      });
+    },
+
+    loadLists: function loadLists(params, options) {
+      if ( params === void 0 ) params = {};
+      if ( options === void 0 ) options = {};
+
+      var data = Object.assign({
+        addon: 'invoicing',
+        kind: 'OrderList',
+        with_filters: true,
+        with_permission_to: true,
+        actor_id: API.actorId,
+        user_id: API.actorId,
+        only_owned: !API.actorId && !API.isNurse,
+      }, params);
+      if (!API.actorId && !API.isNurse && typeof data.only_owned === 'undefined') {
+        data.only_owned = true;
+      }
+      return api.getFragments(data, options);
+    },
+
+    deleteList: function deleteList(listId, list) {
+      return api.deleteFragment(listId, { data: list });
+    },
+
+    saveList: function saveList(list) {
+      list.addon = 'invoicing';
+      list.kind = 'OrderList';
+      list.with_filters = true;
+      list.with_permission_to = true;
+      if (!list.data) { list.data = {}; }
+      if (typeof (list.data.position) === 'undefined') { list.data.position = 0; }
+      if (typeof (list.data.active) === 'undefined') { list.data.active = true; }
+      if (!list.id) { list.with_permissions = ['order_list_read_access', 'order_list_edit_access']; }
+
+      var params = Object.assign({}, list, {
+        data: JSON.stringify(list.data),
+        filters: JSON.stringify(list.filters),
+      });
+      if (list.id) {
+        return api.updateFragment(list.id, params);
+      }
+      return api.createFragment(params);
+    },
+    createDefaultList: function createDefaultList(user) {
+      var list = {
+        name: tommy.i18n.t('invoicing.index.default_list_name'),
+        data: {
+          default: true,
+        },
+        filters: [],
+      };
+      return API.saveList(list);
+    },
+    loadPromotions: function loadPromotions() {
+      return api.call({
+        endpoint: 'vendor/manager/coupons',
+        method: 'GET',
+        cache: false,
+      });
+    },
+    loadPromotion: function loadPromotion(itemId) {
+      return api.call({
+        endpoint: ("vendor/manager/coupons/" + itemId),
+        method: 'GET',
+        cache: false,
+      });
+    },
+    savePromotion: function savePromotion(item) {
+      return api.call({
+        endpoint: ("vendor/manager/coupons/" + (item.id || '')),
+        method: item.id ? 'PUT' : 'POST',
+        data: item,
+        dataType: 'json',
+        contentType: 'application/json',
+        processData: false,
+      });
+    },
+    loadProducts: function loadProducts() {
+      return api.call({
+        endpoint: 'vendor/manager/products',
+        method: 'GET',
+        cache: false,
+      });
+    },
+    loadProduct: function loadProduct(itemId) {
+      return api.call({
+        endpoint: ("vendor/manager/products/" + itemId),
+        method: 'GET',
+        cache: false,
+      });
+    },
+    saveProduct: function saveProduct(item, isPackage) {
+      var fd = new FormData();
+      var data = Object.assign({}, item);
+      if (data.data && typeof data.data === 'object') { data.data = Object.assign({}, data.data); }
+      Object.keys(data).forEach(function (key) {
+        var obj;
+
+        var value = data[key];
+        if (value === null) { value = ''; }
+        if (value === 'null') { value = ''; }
+        if ((key === 'data' || key === 'filters' || key === 'vendor_product_ids') && value || Array.isArray(value)) {
+          if (typeof value === 'string' && value !== '[object Object]') { value = JSON.parse(value); }
+          if (value === '[object Object]') {
+            value = '';
+            fd.append(key, value);
+            return;
+          }
+          if (Array.isArray(value) && !value.length) {
+            value = null;
+            fd.append(key, value);
+            return;
+          }
+          if (!Object.keys(value).length) {
+            value = '';
+            fd.append(key, value);
+          } else {
+            value = tommy.app.f7.utils.serializeObject(( obj = {}, obj[key] = value, obj )).split('&').forEach(function (group) {
+              fd.append(group.split('=')[0], decodeURIComponent(group.split('=')[1]));
+            });
+          }
+          return;
+        }
+        if (key === 'image' && !value) {
+          value = null;
+        }
+        if (key === 'image_url' && !value) {
+          value = null;
+        }
+        fd.append(key, value);
+      });
+      return api.call({
+        endpoint: ("vendor/manager/" + (isPackage ? 'packages' : 'products') + "/" + (item.id || '')),
+        method: item.id ? 'PUT' : 'POST',
+        data: fd,
+        contentType: 'multipart/form-data',
+      });
+    },
+
+    loadPackages: function loadPackages(params, options) {
+      if ( params === void 0 ) params = {};
+      if ( options === void 0 ) options = {};
+
+      return api.call({
+        endpoint: 'vendor/manager/packages',
+        method: 'GET',
+        cache: false,
+      });
+    },
+    loadPackage: function loadPackage(itemId) {
+      return api.call({
+        endpoint: ("vendor/manager/packages/" + itemId),
+        method: 'GET',
+        cache: false,
+      });
+    },
+  };
+
+  function humanTime(date) {
+    var moment = window.tommy.moment;
+    var localTime = moment.utc(date).toDate();
+    if (moment(localTime).isValid()) {
+      var now = moment();
+      var diff = now.diff(moment(localTime), 'days');
+      if (diff === 1) { return ("Yesterday " + (moment(localTime).format('h:mm A'))); }
+      if (diff === 0) {
+        return ("Today " + (moment(localTime).format('h:mm A')));
+      }
+      if (diff === -1) {
+        return ("Yesterday " + (moment(localTime).format('h:mm A')));
+      }
+      if (diff >= 1 && diff <= 8 || diff >= -8 && diff <= -1) {
+        return moment(localTime).format('ddd h:mm A');
+      }
+      if (diff >= 365 || diff <= -365) { return moment(localTime).format('MMM D, YYYY h:mm A'); }
+      if (diff >= 8 || diff <= -8) { return moment(localTime).format('MMM D h:mm A'); }
+    }
+    return 'None';
+  }
+
+  //
+
+  var script = {
+    data: function data() {
+      var self = this;
+      var account;
+      var actorId = self.$f7route.query.actor_id;
+      if (actorId) {
+        account = self.$root.teamMembers.filter(
+          function (user) { return user.user_id === parseInt(self.actorId, 10); }
+        )[0];
+      } else {
+        account = self.$root.account;
+      }
+      if (!account) {
+        account = self.$root.account;
+      }
+      var roles = account.roles;
+      API.isNurse =      !roles
+        || (roles && roles.length === 0)
+        || (roles
+          && (roles.indexOf('Nurse') >= 0 || roles.indexOf('Employee') >= 0));
+      API.assignee_id = API.isNurse ? account.user_id : null;
+      return {
+        lists: null,
+        actorId: actorId,
+        listWithScroll: {},
+        isNurse: API.isNurse,
+        contacts: API.contacts,
+        orderContacts: {},
+        orderContactsLoading: {},
+        csvKeys: [],
+        csvValues: [],
+      };
+    },
+    created: function created() {
+      var self = this;
+      if (self.actorId) {
+        API.actorId = parseInt(self.actorId, 10);
+        API.actor = self.actor;
+        if (
+          API.actor.roles
+          && (API.actor.roles.indexOf('Nurse') >= 0
+            || API.actor.roles.indexOf('Employee') >= 0)
+        ) {
+          API.isNurse = true;
+          self.isNurse = true;
+          API.assignee_id = API.actor.user_id;
+        }
+      } else {
+        delete API.actorId;
+        delete API.actor;
+      }
+    },
+    computed: {
+      actor: function actor() {
+        var self = this;
+        if (!self.actorId) { return null; }
+        return self.$root.teamMembers.filter(
+          function (user) { return user.user_id === parseInt(self.actorId, 10); }
+        )[0];
+      },
+      pageTitle: function pageTitle() {
+        var self = this;
+        if (!self.actorId) { return self.$t('invoicing.index.title', 'Orders'); }
+        var actorName = self.$root.teamMembers.filter(
+          function (user) { return user.user_id === parseInt(self.actorId, 10); }
+        )[0].first_name;
+        return self.$t('invoicing.index.title_user', { user: actorName });
+      },
+      orderedLists: function orderedLists() {
+        var self = this;
+        if (!self.lists) { return null; }
+        return self.lists
+          .sort(function (a, b) {
+            return a.data.position - b.data.position;
+          })
+          .filter(function (list) { return list.data.active; });
+      },
+    },
+    methods: {
+      downloadCSV: function downloadCSV(orders, name) {
+        var this$1 = this;
+
+        orders.forEach(function (order, index) {
+          this$1.traversalObject(order, index, true);
+          this$1.csvValues[this$1.csvValues.length - 1] += '\n';
+        });
+        var text = (this.csvKeys.join(',')) + "\n" + (this.csvValues
+          .join(',')
+          .replace(/\n,/g, '\n'));
+        var BOM = '\uFEFF';
+        var fileName = name + ".csv";
+
+        var downloadLink = document.createElement('a');
+        downloadLink.href = "data:attachment/csv;charset=utf-8," + BOM + (encodeURIComponent(
+          text
+        ));
+        downloadLink.target = '_blank';
+        downloadLink.download = fileName;
+        downloadLink.click();
+      },
+      traversalObject: function traversalObject(order, index, isFirst) {
+        if ( isFirst === void 0 ) isFirst = false;
+
+        // eslint-disable-next-line no-restricted-syntax
+        for (var i in order) {
+          if (typeof order[i] === 'object') {
+            this.traversalObject(order[i], index); // 递归遍历
+          } else if (i === 'id' || i === 'user_id') {
+            if (index === 0 && isFirst) {
+              this.csvKeys.push(i);
+            } else if (isFirst) {
+              if (i === 'user_id') {
+                order[i] = this.orderUserName(order[i]);
+              }
+              this.csvValues.push(order[i]);
+            }
+          } else if (i === 'date') {
+            if (index === 0) {
+              this.csvKeys.push(i);
+            } else {
+              this.csvValues.push(this.orderDate(order[i]));
+            }
+          } else if (
+            i === 'status'
+            || i === 'city'
+            || i === 'created_at'
+            || i === 'total'
+          ) {
+            if (index === 0) {
+              this.csvKeys.push(i);
+            } else {
+              if (typeof order[i] === 'string') {
+                order[i] = order[i].split(',').join(' ');
+              } else if (!order[i]) {
+                order[i] = 'null';
+              }
+              this.csvValues.push(order[i]);
+            }
+          }
+        }
+      },
+      onSlideClick: function onSlideClick(e) {
+        var self = this;
+        var url = self
+          .$$(e.target)
+          .closest('a')
+          .eq(0)
+          .attr('data-url');
+        if (!url) { return; }
+        self.$f7router.navigate(url);
+      },
+      humanTime: humanTime,
+      orderDate: function orderDate(date) {
+        var self = this;
+        if (!date) { return ''; }
+        return self.$moment(parseInt(date, 10)).format('YYYY/MM/DD HH:mm');
+      },
+      orderUserName: function orderUserName(user_id) {
+        var self = this;
+        var user;
+        if (self.isNurse) {
+          user = self.orderContacts[user_id];
+        }
+        if (!user) {
+          user = self.$root.teamMembers.filter(
+            function (m) { return m.user_id === parseInt(user_id, 10); }
+          )[0];
+        }
+        if (!user && self.contacts && self.contacts.length) {
+          user = self.contacts.filter(
+            function (c) { return c.friend_id === parseInt(user_id, 10); }
+          )[0];
+        }
+        if (!user) { return ''; }
+        return user.name || ((user.first_name || '') + " " + (user.last_name || ''));
+      },
+      listHasScroll: function listHasScroll(list) {
+        var self = this;
+        if (!list.orders || list.orders.length === 0) { return false; }
+        var listContentEl = self.$$(
+          (".orders-list[data-id=\"" + (list.id) + "\"] .orders-list-content")
+        )[0];
+        if (!listContentEl) { return false; }
+        return listContentEl.scrollHeight > listContentEl.offsetHeight;
+      },
+      loadListOrders: function loadListOrders(list) {
+        var self = this;
+        API.loadListOrders(list).then(function (orders) {
+          list.orders = orders;
+          orders.forEach(function (order) {
+            if (!self.isNurse) { return; }
+            if (
+              !self.orderContacts[order.user_id]
+              && !self.orderContactsLoading[order.user_id]
+            ) {
+              self.orderContacts[order.user_id] = {};
+              self.orderContactsLoading[order.user_id] = true;
+              self.$api.getContact(order.user_id).then(function (contact) {
+                self.orderContacts[order.user_id] = contact;
+                self.orderContactsLoading[order.user_id] = false;
+                self.$forceUpdate();
+              });
+            }
+          });
+          self.$nextTick(function () {
+            if (self.listHasScroll(list)) {
+              self.$set(self.listWithScroll, list.id, true);
+            } else {
+              self.$set(self.listWithScroll, list.id, false);
+            }
+          });
+        });
+      },
+      reloadListsOrders: function reloadListsOrders() {
+        var self = this;
+        if (!self.lists) { return; }
+        self.lists.forEach(function (list) {
+          self.loadListOrders(list);
+        });
+      },
+      loadLists: function loadLists(ignoreCache, createDefault) {
+        if ( createDefault === void 0 ) createDefault = true;
+
+        var self = this;
+        API.loadLists({}, { cache: !ignoreCache }).then(function (lists) {
+          lists.forEach(function (list) {
+            list.orders = [];
+          });
+          self.lists = lists;
+          if (!self.lists.length && createDefault) {
+            API.createDefaultList(self.$root.user)
+              .then(function () {
+                self.loadLists(true, false);
+              })
+              .catch(function () {
+                self.loadLists(true, false);
+              });
+          } else {
+            self.lists.forEach(function (list) {
+              if (!list.data.active) { return; }
+              self.loadListOrders(list);
+            });
+          }
+        });
+      },
+      reloadLists: function reloadLists() {
+        var self = this;
+        self.loadLists(true);
+      },
+      canEditList: function canEditList(list) {
+        var self = this;
+        if (self.isNurse && !self.actorId) { return false; }
+        var account = self.$root.account;
+        var isOwnerOrManager =        account.type === 'Team'
+          || account.type === 'TeamMember'
+          || account.roles.indexOf('Team Manager') >= 0;
+        var isManager = account.roles.indexOf('Team Manager') >= 0;
+        if (list.data.default && isManager) { return true; }
+        if (list.data.default && !isOwnerOrManager) { return false; }
+        if (list.permission_to.indexOf('update') !== -1) { return true; }
+        return false;
+      },
+    },
+    beforeDestroy: function beforeDestroy() {
+      var self = this;
+      self.$events.$off('invoicing:reloadListsOrders', self.reloadListsOrders);
+      self.$events.$off('invoicing:reloadLists', self.reloadLists);
+    },
+    mounted: function mounted() {
+      var self = this;
+      self.loadLists();
+      if (!API.contacts) {
+        self.$api.getContacts().then(function (c) {
+          self.contacts = c;
+          API.contacts = c;
+        });
+      }
+      self.$events.$on('invoicing:reloadListsOrders', self.reloadListsOrders);
+      self.$events.$on('invoicing:reloadLists', self.reloadLists);
+    },
+  };
+
+  function normalizeComponent(template, style, script, scopeId, isFunctionalTemplate, moduleIdentifier
+  /* server only */
+  , shadowMode, createInjector, createInjectorSSR, createInjectorShadow) {
+    if (typeof shadowMode !== 'boolean') {
+      createInjectorSSR = createInjector;
+      createInjector = shadowMode;
+      shadowMode = false;
+    } // Vue.extend constructor export interop.
+
+
+    var options = typeof script === 'function' ? script.options : script; // render functions
+
+    if (template && template.render) {
+      options.render = template.render;
+      options.staticRenderFns = template.staticRenderFns;
+      options._compiled = true; // functional template
+
+      if (isFunctionalTemplate) {
+        options.functional = true;
+      }
+    } // scopedId
+
+
+    if (scopeId) {
+      options._scopeId = scopeId;
+    }
+
+    var hook;
+
+    if (moduleIdentifier) {
+      // server build
+      hook = function hook(context) {
+        // 2.3 injection
+        context = context || // cached call
+        this.$vnode && this.$vnode.ssrContext || // stateful
+        this.parent && this.parent.$vnode && this.parent.$vnode.ssrContext; // functional
+        // 2.2 with runInNewContext: true
+
+        if (!context && typeof __VUE_SSR_CONTEXT__ !== 'undefined') {
+          context = __VUE_SSR_CONTEXT__;
+        } // inject component styles
+
+
+        if (style) {
+          style.call(this, createInjectorSSR(context));
+        } // register component module identifier for async chunk inference
+
+
+        if (context && context._registeredComponents) {
+          context._registeredComponents.add(moduleIdentifier);
+        }
+      }; // used by ssr in case component is cached and beforeCreate
+      // never gets called
+
+
+      options._ssrRegister = hook;
+    } else if (style) {
+      hook = shadowMode ? function () {
+        style.call(this, createInjectorShadow(this.$root.$options.shadowRoot));
+      } : function (context) {
+        style.call(this, createInjector(context));
+      };
+    }
+
+    if (hook) {
+      if (options.functional) {
+        // register for functional component in vue file
+        var originalRender = options.render;
+
+        options.render = function renderWithStyleInjection(h, context) {
+          hook.call(context);
+          return originalRender(h, context);
+        };
+      } else {
+        // inject component registration as beforeCreate hook
+        var existing = options.beforeCreate;
+        options.beforeCreate = existing ? [].concat(existing, hook) : [hook];
+      }
+    }
+
+    return script;
+  }
+
+  var normalizeComponent_1 = normalizeComponent;
+
+  /* script */
+  var __vue_script__ = script;
+
+  /* template */
+  var __vue_render__ = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "f7-page",
+      {
+        staticClass: "invoicing-page",
+        attrs: { id: "invoicing__index", name: "invoicing__index" }
+      },
+      [
+        _c(
+          "f7-navbar",
+          [
+            _c("tommy-nav-menu"),
+            _vm._v(" "),
+            _c("f7-nav-title", [_vm._v(_vm._s(_vm.pageTitle))]),
+            _vm._v(" "),
+            !_vm.isNurse
+              ? _c(
+                  "f7-nav-right",
+                  [
+                    _c("f7-link", {
+                      attrs: { href: "/invoicing/settings/", "icon-f7": "gear" }
+                    }),
+                    _vm._v(" "),
+                    _c("f7-link", {
+                      attrs: {
+                        href: "/invoicing/order-details/",
+                        "icon-f7": "add"
+                      }
+                    })
+                  ],
+                  1
+                )
+              : _vm._e()
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _vm.orderedLists && _vm.orderedLists.length
+          ? _c(
+              "f7-swiper",
+              {
+                staticClass: "no-swipe-panel",
+                attrs: {
+                  params: {
+                    slidesPerView: "auto",
+                    breakpointsInverse: true,
+                    centeredSlides: false,
+                    touchMoveStopPropagation: false,
+                    on: {
+                      tap: _vm.onSlideClick
+                    },
+                    breakpoints: {
+                      768: {
+                        centeredSlides: true
+                      }
+                    }
+                  }
+                }
+              },
+              _vm._l(_vm.orderedLists, function(list) {
+                return _c("f7-swiper-slide", { key: list.id }, [
+                  _c(
+                    "div",
+                    {
+                      staticClass: "orders-list",
+                      class: { hasScroll: _vm.listWithScroll[list.id] },
+                      attrs: { "data-id": list.id }
+                    },
+                    [
+                      _c("div", { staticClass: "orders-list-header" }, [
+                        _c("div", [_vm._v(_vm._s(list.name))]),
+                        _vm._v(" "),
+                        _c("div", { staticClass: "order-list-header-right" }, [
+                          _vm.canEditList(list)
+                            ? _c(
+                                "a",
+                                {
+                                  attrs: {
+                                    "data-url":
+                                      "/invoicing/list-edit/" + list.id + "/"
+                                  }
+                                },
+                                [
+                                  _c("img", {
+                                    attrs: {
+                                      src: _vm.$addonAssetsUrl + "slice6.png",
+                                      srcset:
+                                        _vm.$addonAssetsUrl +
+                                        "slice6@2x.png 2x, " +
+                                        _vm.$addonAssetsUrl +
+                                        "slice6@3x.png 3x"
+                                    }
+                                  })
+                                ]
+                              )
+                            : _vm._e(),
+                          _vm._v(" "),
+                          _vm.canEditList(list) && list.orders.length > 0
+                            ? _c(
+                                "a",
+                                {
+                                  ref: "download",
+                                  refInFor: true,
+                                  on: {
+                                    click: function($event) {
+                                      return _vm.downloadCSV(
+                                        list.orders,
+                                        list.name
+                                      )
+                                    }
+                                  }
+                                },
+                                [
+                                  _c("img", {
+                                    attrs: {
+                                      src: _vm.$addonAssetsUrl + "slice20.png",
+                                      srcset:
+                                        _vm.$addonAssetsUrl +
+                                        "slice20@2x.png 2x, " +
+                                        _vm.$addonAssetsUrl +
+                                        "slice20@3x.png 3x"
+                                    }
+                                  })
+                                ]
+                              )
+                            : _vm._e()
+                        ])
+                      ]),
+                      _vm._v(" "),
+                      _c(
+                        "div",
+                        { staticClass: "orders-list-content" },
+                        [
+                          list.orders && list.orders.length
+                            ? _vm._l(list.orders, function(order, index) {
+                                return _c(
+                                  "a",
+                                  {
+                                    key: index,
+                                    staticClass: "card invoicing-order-card",
+                                    attrs: {
+                                      "data-url":
+                                        "/invoicing/order-details/" +
+                                        order.id +
+                                        "/"
+                                    }
+                                  },
+                                  [
+                                    _c("div", { staticClass: "card-header" }, [
+                                      order.data && order.data.date
+                                        ? _c(
+                                            "span",
+                                            { staticClass: "order-date" },
+                                            [
+                                              _vm._v(
+                                                _vm._s(
+                                                  _vm.orderDate(
+                                                    order.data
+                                                      ? order.data.date
+                                                      : null
+                                                  )
+                                                )
+                                              )
+                                            ]
+                                          )
+                                        : _vm._e(),
+                                      _vm._v(" "),
+                                      !_vm.isNurse
+                                        ? _c(
+                                            "span",
+                                            { staticClass: "order-status" },
+                                            [
+                                              _vm._v(
+                                                _vm._s(
+                                                  _vm.$t(
+                                                    "invoicing.order_status." +
+                                                      order.status
+                                                  )
+                                                )
+                                              )
+                                            ]
+                                          )
+                                        : _vm._e()
+                                    ]),
+                                    _vm._v(" "),
+                                    _c(
+                                      "div",
+                                      { staticClass: "card-content" },
+                                      [
+                                        _c(
+                                          "f7-list",
+                                          {
+                                            staticClass:
+                                              "no-hairlines no-hairlines-between"
+                                          },
+                                          [
+                                            order.user_id
+                                              ? _c(
+                                                  "f7-list-item",
+                                                  {
+                                                    attrs: {
+                                                      title: _vm.orderUserName(
+                                                        order.user_id
+                                                      )
+                                                    }
+                                                  },
+                                                  [
+                                                    _c("img", {
+                                                      attrs: {
+                                                        slot: "media",
+                                                        src:
+                                                          _vm.$addonAssetsUrl +
+                                                          "icon-user.svg"
+                                                      },
+                                                      slot: "media"
+                                                    })
+                                                  ]
+                                                )
+                                              : _vm._e(),
+                                            _vm._v(" "),
+                                            _c(
+                                              "f7-list-item",
+                                              { attrs: { title: order.name } },
+                                              [
+                                                _c("img", {
+                                                  attrs: {
+                                                    slot: "media",
+                                                    src:
+                                                      _vm.$addonAssetsUrl +
+                                                      "icon-product.svg"
+                                                  },
+                                                  slot: "media"
+                                                })
+                                              ]
+                                            ),
+                                            _vm._v(" "),
+                                            order.total && !_vm.isNurse
+                                              ? _c(
+                                                  "f7-list-item",
+                                                  {
+                                                    attrs: { title: order.total }
+                                                  },
+                                                  [
+                                                    _c("img", {
+                                                      attrs: {
+                                                        slot: "media",
+                                                        src:
+                                                          _vm.$addonAssetsUrl +
+                                                          "icon-money.svg"
+                                                      },
+                                                      slot: "media"
+                                                    })
+                                                  ]
+                                                )
+                                              : _vm._e(),
+                                            _vm._v(" "),
+                                            order.data && order.data.location
+                                              ? _c(
+                                                  "f7-list-item",
+                                                  {
+                                                    attrs: {
+                                                      title:
+                                                        order.data.location
+                                                          .address +
+                                                        " " +
+                                                        order.data.location.city
+                                                    }
+                                                  },
+                                                  [
+                                                    _c("img", {
+                                                      attrs: {
+                                                        slot: "media",
+                                                        src:
+                                                          _vm.$addonAssetsUrl +
+                                                          "icon-location.svg"
+                                                      },
+                                                      slot: "media"
+                                                    })
+                                                  ]
+                                                )
+                                              : _vm._e()
+                                          ],
+                                          1
+                                        )
+                                      ],
+                                      1
+                                    )
+                                  ]
+                                )
+                              })
+                            : _vm._e()
+                        ],
+                        2
+                      )
+                    ]
+                  )
+                ])
+              }),
+              1
+            )
+          : _vm._e()
+      ],
+      1
+    )
+  };
+  var __vue_staticRenderFns__ = [];
+  __vue_render__._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__ = undefined;
+    /* scoped */
+    var __vue_scope_id__ = undefined;
+    /* module identifier */
+    var __vue_module_identifier__ = undefined;
+    /* functional template */
+    var __vue_is_functional_template__ = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var IndexPage = normalizeComponent_1(
+      { render: __vue_render__, staticRenderFns: __vue_staticRenderFns__ },
+      __vue_inject_styles__,
+      __vue_script__,
+      __vue_scope_id__,
+      __vue_is_functional_template__,
+      __vue_module_identifier__,
+      undefined,
+      undefined
+    );
+
+  //
+
+  var script$1 = {
+    data: function data() {
+      return {
+        isNurse: API.isNurse,
+      };
+    },
+  };
+
+  /* script */
+  var __vue_script__$1 = script$1;
+
+  /* template */
+  var __vue_render__$1 = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "f7-page",
+      {
+        staticClass: "invoicing-page",
+        attrs: { id: "invoicing__settings", "data-name": "invoicing__settings" }
+      },
+      [
+        _c(
+          "f7-navbar",
+          [
+            _c("tommy-nav-back"),
+            _vm._v(" "),
+            _c("f7-nav-title", [
+              _vm._v(_vm._s(_vm.$t("invoicing.settings.title", "Settings")))
+            ])
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _c(
+          "f7-list",
+          { staticClass: "list-custom" },
+          [
+            !_vm.hasActorId
+              ? _c("f7-list-item", {
+                  attrs: {
+                    link: "/invoicing/list-management/",
+                    title: _vm.$t(
+                      "invoicing.settings.list_management",
+                      "List Management"
+                    )
+                  }
+                })
+              : _vm._e(),
+            _vm._v(" "),
+            !_vm.isNurse
+              ? _c("f7-list-item", {
+                  attrs: {
+                    link: "/invoicing/item-service-management/",
+                    title: _vm.$t(
+                      "invoicing.settings.item_service_management",
+                      "Item/Service Management"
+                    )
+                  }
+                })
+              : _vm._e(),
+            _vm._v(" "),
+            !_vm.isNurse
+              ? _c("f7-list-item", {
+                  attrs: {
+                    link: "/invoicing/promotion-management/",
+                    title: _vm.$t(
+                      "invoicing.settings.promotion_management",
+                      "Promotion Management"
+                    )
+                  }
+                })
+              : _vm._e()
+          ],
+          1
+        )
+      ],
+      1
+    )
+  };
+  var __vue_staticRenderFns__$1 = [];
+  __vue_render__$1._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__$1 = undefined;
+    /* scoped */
+    var __vue_scope_id__$1 = undefined;
+    /* module identifier */
+    var __vue_module_identifier__$1 = undefined;
+    /* functional template */
+    var __vue_is_functional_template__$1 = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var SettingsPage = normalizeComponent_1(
+      { render: __vue_render__$1, staticRenderFns: __vue_staticRenderFns__$1 },
+      __vue_inject_styles__$1,
+      __vue_script__$1,
+      __vue_scope_id__$1,
+      __vue_is_functional_template__$1,
+      __vue_module_identifier__$1,
+      undefined,
+      undefined
+    );
+
+  //
+
+  var script$2 = {
+    data: function data() {
+      return {
+        items: null,
+        packages: null,
+        activeTab: 'items',
+      };
+    },
+    mounted: function mounted() {
+      var self = this;
+      self.loadProducts();
+      self.loadPackages();
+      self.$events.$on('invoicing:reloadProducts', self.loadProducts);
+      self.$events.$on('invoicing:reloadPackages', self.loadPackages);
+    },
+    beforeDestroy: function beforeDestroy() {
+      var self = this;
+      self.$events.$off('invoicing:reloadProducts', self.loadProducts);
+      self.$events.$off('invoicing:reloadPackages', self.loadPackages);
+    },
+    computed: {
+      orderedProducts: function orderedProducts() {
+        var self = this;
+        if (!self.items) { return []; }
+        return self.items.sort(function (a, b) { return a.id - b.id; });
+      },
+      orderedPackages: function orderedPackages() {
+        var self = this;
+        if (!self.packages) { return []; }
+        return self.packages.sort(function (a, b) { return a.id - b.id; });
+      },
+    },
+    methods: {
+      addItem: function addItem() {
+        var self = this;
+        if (self.activeTab === 'items') {
+          self.$f7router.navigate('/invoicing/product-details/');
+        } else {
+          self.$f7router.navigate('/invoicing/package-details/');
+        }
+      },
+      loadPackages: function loadPackages() {
+        var self = this;
+        API.loadPackages({}, { cache: false }).then(function (packages) {
+          self.packages = packages;
+        });
+      },
+      loadProducts: function loadProducts() {
+        var self = this;
+        API.loadProducts({}, { cache: false }).then(function (items) {
+          self.items = items;
+        });
+      },
+      add: function add() {},
+    },
+  };
+
+  /* script */
+  var __vue_script__$2 = script$2;
+
+  /* template */
+  var __vue_render__$2 = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "f7-page",
+      {
+        staticClass: "invoicing-page",
+        attrs: {
+          name: "invoicing__item-service-management",
+          id: "invoicing__item-service-management"
+        }
+      },
+      [
+        _c(
+          "f7-navbar",
+          [
+            _c("tommy-nav-back"),
+            _vm._v(" "),
+            _c("f7-nav-title", [
+              _vm._v(
+                _vm._s(
+                  _vm.$t(
+                    "invoicing.item_service_management.title",
+                    "Items / Service"
+                  )
+                )
+              )
+            ]),
+            _vm._v(" "),
+            _c(
+              "f7-nav-right",
+              [
+                _c("f7-link", {
+                  attrs: { "icon-f7": "add" },
+                  on: { click: _vm.addItem }
+                })
+              ],
+              1
+            )
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _c(
+          "div",
+          { staticClass: "item-service-tabs-links" },
+          [
+            _c(
+              "f7-link",
+              {
+                class: { active: _vm.activeTab === "items" },
+                on: {
+                  click: function($event) {
+                    _vm.activeTab = "items";
+                  }
+                }
+              },
+              [
+                _vm._v(
+                  _vm._s(_vm.$t("invoicing.item_service_management.items_tab"))
+                )
+              ]
+            ),
+            _vm._v(" "),
+            _c(
+              "f7-link",
+              {
+                class: { active: _vm.activeTab === "packages" },
+                on: {
+                  click: function($event) {
+                    _vm.activeTab = "packages";
+                  }
+                }
+              },
+              [
+                _vm._v(
+                  _vm._s(_vm.$t("invoicing.item_service_management.packages_tab"))
+                )
+              ]
+            )
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _c(
+          "div",
+          {
+            directives: [
+              {
+                name: "show",
+                rawName: "v-show",
+                value: _vm.activeTab === "items",
+                expression: "activeTab === 'items'"
+              }
+            ],
+            staticClass: "item-service-tab"
+          },
+          [
+            _vm.items && _vm.items.length
+              ? _c("f7-searchbar", {
+                  attrs: {
+                    "search-container": ".invoicing-list-items",
+                    backdrop: false,
+                    "disable-button": false,
+                    placeholder: _vm.$t(
+                      "invoicing.item_service_management.search_items"
+                    )
+                  }
+                })
+              : _vm._e(),
+            _vm._v(" "),
+            _vm.items && _vm.items.length
+              ? _c(
+                  "f7-list",
+                  {
+                    staticClass: "list-custom invoicing-list-items",
+                    attrs: { "no-hairlines": "" }
+                  },
+                  _vm._l(_vm.orderedProducts, function(item) {
+                    return _c("f7-list-item", {
+                      key: item.id,
+                      attrs: {
+                        title: item.name,
+                        link:
+                          "/invoicing/product-details/" +
+                          item.id +
+                          "/?title=" +
+                          (item.name || "")
+                      }
+                    })
+                  }),
+                  1
+                )
+              : _vm._e()
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _c(
+          "div",
+          {
+            directives: [
+              {
+                name: "show",
+                rawName: "v-show",
+                value: _vm.activeTab === "packages",
+                expression: "activeTab === 'packages'"
+              }
+            ],
+            staticClass: "item-service-tab"
+          },
+          [
+            _vm.packages && _vm.packages.length
+              ? _c("f7-searchbar", {
+                  attrs: {
+                    "search-container": ".invoicing-list-packages",
+                    backdrop: false,
+                    "disable-button": false,
+                    placeholder: _vm.$t(
+                      "invoicing.item_service_management.search_packages"
+                    )
+                  }
+                })
+              : _vm._e(),
+            _vm._v(" "),
+            _vm.packages && _vm.packages.length
+              ? _c(
+                  "f7-list",
+                  {
+                    staticClass: "list-custom invoicing-list-packages",
+                    attrs: { "no-hairlines": "" }
+                  },
+                  _vm._l(_vm.orderedPackages, function(item) {
+                    return _c("f7-list-item", {
+                      key: item.id,
+                      attrs: {
+                        title: item.name,
+                        link:
+                          "/invoicing/package-details/" +
+                          item.id +
+                          "/?title=" +
+                          (item.name || "")
+                      }
+                    })
+                  }),
+                  1
+                )
+              : _vm._e()
+          ],
+          1
+        )
+      ],
+      1
+    )
+  };
+  var __vue_staticRenderFns__$2 = [];
+  __vue_render__$2._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__$2 = undefined;
+    /* scoped */
+    var __vue_scope_id__$2 = undefined;
+    /* module identifier */
+    var __vue_module_identifier__$2 = undefined;
+    /* functional template */
+    var __vue_is_functional_template__$2 = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var ItemServiceManagementPage = normalizeComponent_1(
+      { render: __vue_render__$2, staticRenderFns: __vue_staticRenderFns__$2 },
+      __vue_inject_styles__$2,
+      __vue_script__$2,
+      __vue_scope_id__$2,
+      __vue_is_functional_template__$2,
+      __vue_module_identifier__$2,
+      undefined,
+      undefined
+    );
+
+  //
+
+  var script$3 = {
+    data: function data() {
+      return {
+        saving: false,
+        showSave: false,
+        lists: null,
+      };
+    },
+    mounted: function mounted() {
+      var self = this;
+      API.loadLists({}, { cache: false }).then(function (lists) {
+        self.lists = lists;
+      });
+    },
+    computed: {
+      orderedLists: function orderedLists() {
+        var self = this;
+        if (!self.lists) { return null; }
+        return self.lists.sort(function (a, b) {
+          return a.data.position - b.data.position;
+        });
+      },
+    },
+    methods: {
+      onSort: function onSort(e, ref) {
+        if ( ref === void 0 ) ref = {};
+        var from = ref.from;
+        var to = ref.to;
+
+        var self = this;
+        if (self.saving) { return; }
+        self.showSave = true;
+        self.$nextTick(function () {
+          var ref;
+
+          self.lists[from].data.position = to;
+          (ref = self.lists).splice.apply(ref, [ to, 0 ].concat( self.lists.splice(from, 1) ));
+          self.$forceUpdate();
+        });
+      },
+      toggleListActive: function toggleListActive(list, active) {
+        var self = this;
+        if (self.saving) { return; }
+        self.showSave = true;
+        list.data.active = active;
+      },
+      save: function save() {
+        var self = this;
+        self.showSave = false;
+        var promises = [];
+        self.lists.forEach(function (list, index) {
+          list.data.position = index;
+          promises.push(API.saveList(list));
+        });
+        Promise.all(promises).then(function () {
+          self.$events.$emit('invoicing:reloadLists');
+          self.$f7router.back();
+        });
+      },
+    },
+  };
+
+  /* script */
+  var __vue_script__$3 = script$3;
+
+  /* template */
+  var __vue_render__$3 = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "f7-page",
+      {
+        staticClass: "invoicing-page",
+        attrs: {
+          name: "invoicing__list-management",
+          id: "invoicing__list-management"
+        }
+      },
+      [
+        _c(
+          "f7-navbar",
+          [
+            _c("tommy-nav-back"),
+            _vm._v(" "),
+            _c("f7-nav-title", [
+              _vm._v(
+                _vm._s(
+                  _vm.$t("invoicing.list_management.title", "List Management")
+                )
+              )
+            ]),
+            _vm._v(" "),
+            _c(
+              "f7-nav-right",
+              [
+                _vm.showSave
+                  ? _c("f7-link", {
+                      attrs: { "icon-f7": "check" },
+                      on: { click: _vm.save }
+                    })
+                  : _vm._e()
+              ],
+              1
+            )
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _vm.lists
+          ? _c(
+              "f7-list",
+              {
+                staticClass: "list-custom",
+                attrs: { sortable: "", sortableEnabled: "", inset: "" },
+                on: { "sortable:sort": _vm.onSort }
+              },
+              _vm._l(_vm.orderedLists, function(list) {
+                return _c("f7-list-item", {
+                  key: list.id,
+                  attrs: {
+                    checkbox: "",
+                    checked: list.data.active,
+                    title: list.name
+                  },
+                  on: {
+                    change: function($event) {
+                      return _vm.toggleListActive(list, $event.target.checked)
+                    }
+                  }
+                })
+              }),
+              1
+            )
+          : _vm._e(),
+        _vm._v(" "),
+        _c(
+          "f7-list",
+          { staticClass: "list-custom margin-bottom", attrs: { inset: "" } },
+          [
+            _c("f7-list-item", {
+              attrs: {
+                link: "/invoicing/list-add/",
+                title: _vm.$t(
+                  "invoicing.list_management.create_list",
+                  "Create New List"
+                )
+              }
+            })
+          ],
+          1
+        )
+      ],
+      1
+    )
+  };
+  var __vue_staticRenderFns__$3 = [];
+  __vue_render__$3._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__$3 = undefined;
+    /* scoped */
+    var __vue_scope_id__$3 = undefined;
+    /* module identifier */
+    var __vue_module_identifier__$3 = undefined;
+    /* functional template */
+    var __vue_is_functional_template__$3 = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var ListManagementPage = normalizeComponent_1(
+      { render: __vue_render__$3, staticRenderFns: __vue_staticRenderFns__$3 },
+      __vue_inject_styles__$3,
+      __vue_script__$3,
+      __vue_scope_id__$3,
+      __vue_is_functional_template__$3,
+      __vue_module_identifier__$3,
+      undefined,
+      undefined
+    );
+
+  //
+
+  var script$4 = {
+    data: function data() {
+      return {
+        saving: false,
+        name: '',
+      };
+    },
+    computed: {
+      showSave: function showSave() {
+        return this.name.trim().length;
+      },
+    },
+    methods: {
+      save: function save() {
+        var self = this;
+        if (self.saving) { return; }
+        self.saving = true;
+
+        API
+          .saveList({
+            name: self.name,
+          })
+          .then(function () {
+            self.$events.$emit('invoicing:reloadLists');
+            self.$f7router.back(("/invoicing/" + (API.actorId ? ("?actor_id=" + (API.actorId)) : '')), { force: true });
+          });
+      },
+    },
+  };
+
+  /* script */
+  var __vue_script__$4 = script$4;
+
+  /* template */
+  var __vue_render__$4 = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "f7-page",
+      {
+        staticClass: "invoicing-page",
+        attrs: { name: "invoicing__list-add", id: "invoicing__list-add" }
+      },
+      [
+        _c(
+          "f7-navbar",
+          [
+            _c("tommy-nav-back"),
+            _vm._v(" "),
+            _c("f7-nav-title", [
+              _vm._v(_vm._s(_vm.$t("invoicing.list_add.title", "Add List")))
+            ]),
+            _vm._v(" "),
+            _c(
+              "f7-nav-right",
+              [
+                _vm.showSave
+                  ? _c("f7-link", {
+                      attrs: { "icon-f7": "check" },
+                      on: { click: _vm.save }
+                    })
+                  : _vm._e()
+              ],
+              1
+            )
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _c(
+          "f7-list",
+          { staticClass: "top-0 list-custom" },
+          [
+            _c(
+              "f7-list-item",
+              [
+                _c("f7-input", {
+                  attrs: {
+                    type: "text",
+                    placeholder: _vm.$t(
+                      "invoicing.list_add.name_placeholder",
+                      "Name"
+                    ),
+                    value: _vm.name
+                  },
+                  on: {
+                    input: function($event) {
+                      _vm.name = $event.target.value;
+                    }
+                  }
+                })
+              ],
+              1
+            )
+          ],
+          1
+        )
+      ],
+      1
+    )
+  };
+  var __vue_staticRenderFns__$4 = [];
+  __vue_render__$4._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__$4 = undefined;
+    /* scoped */
+    var __vue_scope_id__$4 = undefined;
+    /* module identifier */
+    var __vue_module_identifier__$4 = undefined;
+    /* functional template */
+    var __vue_is_functional_template__$4 = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var ListAddPage = normalizeComponent_1(
+      { render: __vue_render__$4, staticRenderFns: __vue_staticRenderFns__$4 },
+      __vue_inject_styles__$4,
+      __vue_script__$4,
+      __vue_scope_id__$4,
+      __vue_is_functional_template__$4,
+      __vue_module_identifier__$4,
+      undefined,
+      undefined
+    );
+
+  var orderStatuses = ['pending', 'paid', 'processing', 'qa', 'complete'];
+
+  function formatDate(date) {
+    var d = new Date(date);
+    var year = d.getFullYear();
+    var month = d.getMonth() + 1;
+    var day = d.getDate();
+    if (month < 10) { month = "0" + month; }
+    if (day < 10) { day = "0" + day; }
+    return (year + "-" + month + "-" + day);
+  }
+  function formatDateRange (range) {
+    if (!range) { return ''; }
+    if (typeof range === 'string') {
+      return window.tommy.i18n.t(("invoicing.date_range." + range));
+    }
+    if (Array.isArray(range)) {
+      return ((formatDate(range[0])) + " - " + (formatDate(range[1])));
+    }
+    return range || '';
+  }
+
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+
+  var script$5 = {
+    props: {
+      data: Object,
+    },
+    data: function data() {
+      return {
+        teamTags: null,
+        // sheetOpened: false,
+        // popoverOpened: false,
+      };
+    },
+    mounted: function mounted() {
+      var self = this;
+      self.$api.getCurrentTeamTags({ cache: false }).then(function (tagItems) {
+        self.teamTags = tagItems;
+      });
+    },
+    methods: {
+      openSelector: function openSelector() {
+        var self = this;
+        self.$f7router.navigate('/invoicing/tag-select/', {
+          props: {
+            tags: self.data.tags,
+            pageTitle: self.data.pageTitle,
+            teamTags: self.teamTags,
+            onChange: function onChange(tag, selected) {
+              if (selected) {
+                self.$emit('tagAdd', tag);
+              } else {
+                self.$emit('tagRemove', tag);
+              }
+            },
+          },
+        });
+      },
+      removeTag: function removeTag(tag) {
+        var self = this;
+        self.$emit('tagRemove', tag);
+      },
+    },
+  };
+
+  /* script */
+  var __vue_script__$5 = script$5;
+
+  /* template */
+  var __vue_render__$5 = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "div",
+      { staticClass: "tag-select tasks-tag-select orders-list-tags-select" },
+      [
+        _c("ul", [
+          _c("li", { staticClass: "item-divider" }, [
+            _vm._v(_vm._s(_vm.data.title))
+          ]),
+          _vm._v(" "),
+          _c("li", [
+            _c(
+              "a",
+              {
+                staticClass: "item-link tag-search",
+                attrs: { href: "#" },
+                on: { click: _vm.openSelector }
+              },
+              [
+                _c("div", { staticClass: "item-content" }, [
+                  _vm._m(0),
+                  _vm._v(" "),
+                  _c("div", { staticClass: "item-inner" }, [
+                    _c("div", { staticClass: "item-title" }, [
+                      _vm._v(_vm._s(_vm.data.placeholder))
+                    ])
+                  ])
+                ])
+              ]
+            )
+          ])
+        ]),
+        _vm._v(" "),
+        _c(
+          "ul",
+          { staticClass: "tag-items" },
+          _vm._l(_vm.data.tags, function(tag, index) {
+            return _c("li", { key: index, staticClass: "tag-item" }, [
+              _c("div", { staticClass: "item-content" }, [
+                _c("div", { staticClass: "item-inner" }, [
+                  _c("div", { staticClass: "item-title" }, [
+                    _vm._v(_vm._s(tag.name))
+                  ]),
+                  _vm._v(" "),
+                  _c("div", { staticClass: "item-after" }, [
+                    _c(
+                      "a",
+                      {
+                        staticClass: "item-link",
+                        staticStyle: { height: "24px" },
+                        attrs: { href: "#" },
+                        on: {
+                          click: function($event) {
+                            return _vm.removeTag(tag)
+                          }
+                        }
+                      },
+                      [
+                        _c("i", { staticClass: "material-icons" }, [
+                          _vm._v("close")
+                        ])
+                      ]
+                    )
+                  ])
+                ])
+              ])
+            ])
+          }),
+          0
+        )
+      ]
+    )
+  };
+  var __vue_staticRenderFns__$5 = [
+    function() {
+      var _vm = this;
+      var _h = _vm.$createElement;
+      var _c = _vm._self._c || _h;
+      return _c("div", { staticClass: "item-media" }, [
+        _c("i", { staticClass: "material-icons md-36" }, [_vm._v("search")])
+      ])
+    }
+  ];
+  __vue_render__$5._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__$5 = undefined;
+    /* scoped */
+    var __vue_scope_id__$5 = undefined;
+    /* module identifier */
+    var __vue_module_identifier__$5 = undefined;
+    /* functional template */
+    var __vue_is_functional_template__$5 = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var tagSelect = normalizeComponent_1(
+      { render: __vue_render__$5, staticRenderFns: __vue_staticRenderFns__$5 },
+      __vue_inject_styles__$5,
+      __vue_script__$5,
+      __vue_scope_id__$5,
+      __vue_is_functional_template__$5,
+      __vue_module_identifier__$5,
+      undefined,
+      undefined
+    );
+
+  //
+
+  var script$6 = {
+    components: {
+      tagSelect: tagSelect,
+    },
+    props: {
+      listId: [String, Number],
+    },
+    data: function data() {
+      return {
+        showSave: false,
+        id: parseInt(this.listId, 10),
+        orderStatuses: orderStatuses,
+        list: null,
+        permissions: [],
+        contacts: API.contacts,
+      };
+    },
+    beforeDestroy: function beforeDestroy() {
+      var self = this;
+      self.$events.$off('invoicing:setListDateRange', self.updateListDateRange);
+    },
+    mounted: function mounted() {
+      var self = this;
+      API.loadList(self.id).then(function (list) {
+        if (!list.data) { list.data = {}; }
+        if (!list.data.status) { list.data.status = []; }
+        if (!list.data.customer) { list.data.customer = []; }
+        if (!list.data.assignee) { list.data.assignee = []; }
+        self.list = list;
+        self.$api.getInstalledAddonPermission('invoicing', 'order_list_read_access', {
+          taggable_id: list.id,
+          with_filters: true,
+        }).then(function (permission) {
+          permission.taggable_id = list.id;
+          self.permissions.push(permission);
+        });
+        self.$api.getInstalledAddonPermission('invoicing', 'order_list_edit_access', {
+          taggable_id: list.id,
+          with_filters: true,
+        }).then(function (permission) {
+          permission.taggable_id = list.id;
+          self.permissions.push(permission);
+        });
+        if (!API.contacts) {
+          self.$api.getContacts().then(function (c) {
+            self.contacts = c;
+            API.contacts = c;
+          });
+        }
+      });
+      self.$events.$on('invoicing:setListDateRange', self.updateListDateRange);
+    },
+    methods: {
+      formatDateRange: formatDateRange,
+      updateListDateRange: function updateListDateRange(listId, range) {
+        var self = this;
+        if (self.list.id !== listId) { return; }
+        self.list.data.date_range = range;
+      },
+
+      onNameChange: function onNameChange(name) {
+        var self = this;
+        if (self.saving) { return; }
+        self.list.name = name;
+        self.showSave = true;
+      },
+      onSortChange: function onSortChange(e) {
+        var self = this;
+        if (self.saving) { return; }
+        self.list.data.sort = self.$$(e.target).val();
+        self.showSave = true;
+      },
+      onStatusChange: function onStatusChange(e) {
+        var self = this;
+        if (self.saving) { return; }
+        self.list.data.status = self.$$(e.target).val();
+        self.showSave = true;
+      },
+      onTypeChange: function onTypeChange(e) {
+        var self = this;
+        if (self.saving) { return; }
+        self.list.data.type = e.target.value;
+        self.showSave = true;
+      },
+      onCustomerChange: function onCustomerChange(e) {
+        var self = this;
+        if (self.saving) { return; }
+        self.list.data.customer = self.$$(e.target).val().map(function (el) { return parseInt(el, 10); });
+        self.showSave = true;
+      },
+      onAssigneeChange: function onAssigneeChange(e) {
+        var self = this;
+        if (self.saving) { return; }
+        self.list.data.assignee = self.$$(e.target).val().map(function (el) { return parseInt(el, 10); });
+        self.showSave = true;
+      },
+      setOnlyAssigned: function setOnlyAssigned(checked) {
+        var self = this;
+        self.list.data.only_assigned = checked;
+        self.showSave = true;
+        if (checked) {
+          self.list.data.assignee = [];
+        }
+      },
+      showDateRange: function showDateRange() {
+        var self = this;
+        self.$f7router.navigate('/invoicing/list-edit/date-range/', {
+          props: {
+            list: self.list,
+          },
+        });
+      },
+      showBalanceRange: function showBalanceRange() {
+        var self = this;
+        var ref = self.list.data;
+        var balance_min = ref.balance_min;
+        var balance_max = ref.balance_max;
+        self.$f7router.navigate('/invoicing/range-select/', {
+          props: {
+            pageTitle: self.$t('invoicing.list_edit.balance_range'),
+            from: balance_min ? parseFloat(balance_min) : balance_min,
+            to: balance_max ? parseFloat(balance_max) : balance_max,
+            onSave: function onSave(ref) {
+              var from = ref.from;
+              var to = ref.to;
+
+              self.list.data.balance_min = from;
+              self.list.data.balance_max = to;
+              self.list = self.list;
+              API.saveList(self.list).then(function () {
+                self.$f7router.back();
+              });
+            },
+          },
+        });
+      },
+      showPaymentRange: function showPaymentRange() {
+        var self = this;
+        var ref = self.list.data;
+        var price_min = ref.price_min;
+        var price_max = ref.price_max;
+        self.$f7router.navigate('/invoicing/range-select/', {
+          props: {
+            pageTitle: self.$t('invoicing.list_edit.payment_range'),
+            from: price_min ? parseFloat(price_min) : price_min,
+            to: price_max ? parseFloat(price_max) : price_max,
+            onSave: function onSave(ref) {
+              var from = ref.from;
+              var to = ref.to;
+
+              self.list.data.price_min = from;
+              self.list.data.price_max = to;
+              self.list = self.list;
+              API.saveList(self.list).then(function () {
+                self.$f7router.back();
+              });
+            },
+          },
+        });
+      },
+      save: function save() {
+        var self = this;
+        if (self.saving) { return; }
+        self.saving = true;
+        self.showSave = false;
+        API.saveList(self.list).then(function () {
+          self.$events.$emit('invoicing:reloadLists', self.listId);
+          self.$f7router.back();
+        });
+      },
+      deleteList: function deleteList() {
+        var self = this;
+        if (self.saving) { return; }
+        self.saving = true;
+        self.showSave = false;
+        API.deleteList(self.list.id, self.list).then(function () {
+          self.$events.$emit('invoicing:reloadLists', self.listId);
+          self.$f7router.back();
+        });
+      },
+      saveListPermission: function saveListPermission(permission) {
+        var self = this;
+        self.$api.updateInstalledAddonPermission('invoicing', permission.name, {
+          taggable_id: permission.taggable_id,
+          with_filters: true,
+          filters: JSON.stringify(permission.filters),
+        });
+      },
+      addListPermission: function addListPermission(permission, tag) {
+        var self = this;
+        permission.filters.push(tag);
+        self.saveListPermission(permission);
+      },
+      removeListPermission: function removeListPermission(permission, tag) {
+        var self = this;
+        permission.filters.splice(permission.filters.indexOf(tag), 1);
+        self.saveListPermission(permission);
+      },
+    },
+  };
+
+  /* script */
+  var __vue_script__$6 = script$6;
+
+  /* template */
+  var __vue_render__$6 = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "f7-page",
+      {
+        staticClass: "invoicing-page",
+        attrs: { name: "invoicing__list-edit", id: "invoicing__list-edit" }
+      },
+      [
+        _c(
+          "f7-navbar",
+          [
+            _c("tommy-nav-back"),
+            _vm._v(" "),
+            _c("f7-nav-title", [
+              _vm._v(_vm._s(_vm.$t("invoicing.list_edit.title", "Edit List")))
+            ]),
+            _vm._v(" "),
+            _c(
+              "f7-nav-right",
+              [
+                _vm.showSave
+                  ? _c("f7-link", {
+                      attrs: { "icon-f7": "check" },
+                      on: { click: _vm.save }
+                    })
+                  : _vm._e()
+              ],
+              1
+            )
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _vm.list
+          ? _c(
+              "f7-list",
+              { staticClass: "list-custom" },
+              [
+                _c(
+                  "f7-list-item",
+                  [
+                    _c("f7-label", [
+                      _vm._v(_vm._s(_vm.$t("invoicing.list_edit.name", "Name")))
+                    ]),
+                    _vm._v(" "),
+                    _c("f7-input", {
+                      attrs: { type: "text", value: _vm.list.name },
+                      on: {
+                        input: function($event) {
+                          return _vm.onNameChange($event.target.value)
+                        }
+                      }
+                    })
+                  ],
+                  1
+                ),
+                _vm._v(" "),
+                _c(
+                  "f7-list-item",
+                  {
+                    attrs: {
+                      "smart-select": "",
+                      "smart-select-params": { closeOnSelect: true },
+                      title: _vm.$t("invoicing.list_edit.sort", "Sort")
+                    }
+                  },
+                  [
+                    _c(
+                      "select",
+                      {
+                        staticClass: "toggle-save",
+                        attrs: { name: "sort" },
+                        on: { change: _vm.onSortChange }
+                      },
+                      _vm._l(
+                        ["default", "price_high", "price_low", "newest"],
+                        function(sorting, index) {
+                          return _c(
+                            "option",
+                            {
+                              key: index,
+                              domProps: {
+                                value: sorting,
+                                selected:
+                                  _vm.list.data.sort === sorting ||
+                                  (sorting === "default" && !_vm.list.data.sort)
+                              }
+                            },
+                            [
+                              _vm._v(
+                                _vm._s(
+                                  _vm.$t("invoicing.list_edit.sort_" + sorting)
+                                )
+                              )
+                            ]
+                          )
+                        }
+                      ),
+                      0
+                    )
+                  ]
+                ),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    link: "#",
+                    title: _vm.$t("invoicing.common.date_range", "Date Range"),
+                    after: _vm.formatDateRange(_vm.list.data.date_range)
+                  },
+                  on: { click: _vm.showDateRange }
+                }),
+                _vm._v(" "),
+                _c(
+                  "f7-list-item",
+                  {
+                    attrs: {
+                      "smart-select": "",
+                      "smart-select-params": {
+                        openIn: "popover",
+                        closeOnSelect: true
+                      },
+                      title: _vm.$t("invoicing.list_edit.filter_status", "Status")
+                    }
+                  },
+                  [
+                    _c(
+                      "select",
+                      {
+                        staticClass: "toggle-save",
+                        attrs: { name: "statuses", multiple: "" },
+                        on: { change: _vm.onStatusChange }
+                      },
+                      _vm._l(_vm.orderStatuses, function(status, index) {
+                        return _c(
+                          "option",
+                          {
+                            key: index,
+                            domProps: {
+                              value: status,
+                              selected:
+                                _vm.list.data.status.indexOf(status) >= 0 ||
+                                !_vm.list.data.status
+                            }
+                          },
+                          [
+                            _vm._v(
+                              _vm._s(_vm.$t("invoicing.order_status." + status))
+                            )
+                          ]
+                        )
+                      }),
+                      0
+                    )
+                  ]
+                ),
+                _vm._v(" "),
+                _c(
+                  "f7-list-item",
+                  {
+                    attrs: {
+                      "smart-select": "",
+                      "smart-select-params": {
+                        openIn: "popover",
+                        closeOnSelect: true
+                      },
+                      title: _vm.$t("invoicing.list_edit.type")
+                    }
+                  },
+                  [
+                    _c(
+                      "select",
+                      {
+                        attrs: { name: "type" },
+                        on: { change: _vm.onTypeChange }
+                      },
+                      [
+                        _c(
+                          "option",
+                          {
+                            attrs: { value: "all" },
+                            domProps: {
+                              selected:
+                                _vm.list.data.type === "all" ||
+                                !_vm.list.data.type
+                            }
+                          },
+                          [_vm._v(_vm._s(_vm.$t("invoicing.list_edit.type_all")))]
+                        ),
+                        _vm._v(" "),
+                        _c(
+                          "option",
+                          {
+                            attrs: { value: "invoice" },
+                            domProps: {
+                              selected: _vm.list.data.type === "invoice"
+                            }
+                          },
+                          [
+                            _vm._v(
+                              _vm._s(_vm.$t("invoicing.list_edit.type_invoice"))
+                            )
+                          ]
+                        ),
+                        _vm._v(" "),
+                        _c(
+                          "option",
+                          {
+                            attrs: { value: "quote" },
+                            domProps: { selected: _vm.list.data.type === "quote" }
+                          },
+                          [
+                            _vm._v(
+                              _vm._s(_vm.$t("invoicing.list_edit.type_quote"))
+                            )
+                          ]
+                        )
+                      ]
+                    )
+                  ]
+                ),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    link: "",
+                    title: _vm.$t("invoicing.list_edit.payment_range"),
+                    after:
+                      typeof _vm.list.data.price_min !== "undefined" &&
+                      typeof _vm.list.data.price_max !== "undefined"
+                        ? _vm.list.data.price_min +
+                          " - " +
+                          _vm.list.data.price_max
+                        : ""
+                  },
+                  on: { click: _vm.showPaymentRange }
+                }),
+                _vm._v(" "),
+                _vm.$root.team &&
+                _vm.$root.teamMembers &&
+                !_vm.list.data.only_assigned
+                  ? _c(
+                      "f7-list-item",
+                      {
+                        attrs: {
+                          "smart-select": "",
+                          "smart-select-params": { searchbar: true },
+                          title: _vm.$t(
+                            "invoicing.list_edit.assignee",
+                            "Assignee"
+                          )
+                        }
+                      },
+                      [
+                        _c(
+                          "select",
+                          {
+                            attrs: { name: "assignee", multiple: "" },
+                            on: { change: _vm.onAssigneeChange }
+                          },
+                          _vm._l(_vm.$root.teamMembers, function(teamMember) {
+                            return _c(
+                              "option",
+                              {
+                                key: teamMember.id,
+                                attrs: {
+                                  "data-option-class":
+                                    "invoicing-smart-select-option",
+                                  "data-option-image": teamMember.icon_url
+                                },
+                                domProps: {
+                                  value: teamMember.user_id,
+                                  selected:
+                                    _vm.list.data.assignee.indexOf(
+                                      teamMember.user_id
+                                    ) >= 0
+                                }
+                              },
+                              [
+                                _vm._v(
+                                  _vm._s(teamMember.first_name || "") +
+                                    " " +
+                                    _vm._s(teamMember.last_name || "")
+                                )
+                              ]
+                            )
+                          }),
+                          0
+                        )
+                      ]
+                    )
+                  : _vm._e(),
+                _vm._v(" "),
+                _vm.contacts
+                  ? _c(
+                      "f7-list-item",
+                      {
+                        attrs: {
+                          "smart-select": "",
+                          "smart-select-params": { searchbar: true },
+                          title: _vm.$t(
+                            "invoicing.list_edit.customer",
+                            "Customer"
+                          )
+                        }
+                      },
+                      [
+                        _c(
+                          "select",
+                          {
+                            attrs: { name: "customer", multiple: "" },
+                            on: { change: _vm.onCustomerChange }
+                          },
+                          _vm._l(_vm.contacts, function(contact, contactIndex) {
+                            return _c(
+                              "option",
+                              {
+                                key:
+                                  contactIndex +
+                                  "-" +
+                                  contact.id +
+                                  "-" +
+                                  contact.friend_id,
+                                attrs: {
+                                  "data-option-class":
+                                    "invoicing-smart-select-option",
+                                  "data-option-image": contact.icon_url
+                                },
+                                domProps: {
+                                  value: contact.friend_id,
+                                  selected:
+                                    _vm.list.data.customer.indexOf(
+                                      contact.friend_id
+                                    ) >= 0
+                                }
+                              },
+                              [
+                                _vm._v(
+                                  _vm._s(
+                                    contact.name ||
+                                      (contact.first_name || "") +
+                                        " " +
+                                        (contact.last_name || "")
+                                  )
+                                )
+                              ]
+                            )
+                          }),
+                          0
+                        )
+                      ]
+                    )
+                  : _vm._e(),
+                _vm._v(" "),
+                _c(
+                  "f7-list-item",
+                  {
+                    attrs: {
+                      title: _vm.$t(
+                        "invoicing.list_edit.only_assigned",
+                        "Show only assigned"
+                      )
+                    }
+                  },
+                  [
+                    _c("f7-toggle", {
+                      attrs: {
+                        slot: "after",
+                        checked: !!_vm.list.data.only_assigned
+                      },
+                      on: {
+                        change: function($event) {
+                          return _vm.setOnlyAssigned($event.target.checked)
+                        }
+                      },
+                      slot: "after"
+                    })
+                  ],
+                  1
+                ),
+                _vm._v(" "),
+                _vm._l(_vm.permissions, function(permission, index) {
+                  return _c("tag-select", {
+                    key: index,
+                    attrs: {
+                      listId: _vm.list.id,
+                      data: {
+                        title: _vm.$t(
+                          "invoicing.permissions." + permission.name + ".title"
+                        ),
+                        placeholder: _vm.$t(
+                          "invoicing.common.search_members_tags",
+                          "Search Members, Tags"
+                        ),
+                        pageTitle: _vm.$t(
+                          "invoicing.common.search_members_tags",
+                          "Search Members, Tags"
+                        ),
+                        tags: permission.filters
+                      }
+                    },
+                    on: {
+                      tagAdd: function(tag) {
+                        return _vm.addListPermission(permission, tag)
+                      },
+                      tagRemove: function(tag) {
+                        return _vm.removeListPermission(permission, tag)
+                      }
+                    }
+                  })
+                })
+              ],
+              2
+            )
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.list
+          ? _c(
+              "f7-list",
+              { staticClass: "margin-top" },
+              [
+                _c(
+                  "f7-list-button",
+                  {
+                    staticClass: "color-custom",
+                    attrs: { color: "custom" },
+                    on: { click: _vm.deleteList }
+                  },
+                  [
+                    _vm._v(
+                      _vm._s(
+                        _vm.$t("invoicing.list_edit.delete-list", "Delete List")
+                      )
+                    )
+                  ]
+                )
+              ],
+              1
+            )
+          : _vm._e()
+      ],
+      1
+    )
+  };
+  var __vue_staticRenderFns__$6 = [];
+  __vue_render__$6._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__$6 = undefined;
+    /* scoped */
+    var __vue_scope_id__$6 = undefined;
+    /* module identifier */
+    var __vue_module_identifier__$6 = undefined;
+    /* functional template */
+    var __vue_is_functional_template__$6 = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var ListEditPage = normalizeComponent_1(
+      { render: __vue_render__$6, staticRenderFns: __vue_staticRenderFns__$6 },
+      __vue_inject_styles__$6,
+      __vue_script__$6,
+      __vue_scope_id__$6,
+      __vue_is_functional_template__$6,
+      __vue_module_identifier__$6,
+      undefined,
+      undefined
+    );
+
+  //
+
+  var script$7 = {
+    props: {
+      list: Object,
+    },
+    data: function data() {
+      var self = this;
+      var list = self.list;
+      var range = list.data.date_range;
+      return {
+        showSave: false,
+        dateFrom: Array.isArray(range) && range[0] ? range[0] : new Date().getTime(),
+        dateTo: Array.isArray(range) && range[1] ? range[1] : new Date().getTime(),
+        range: range,
+      };
+    },
+    computed: {
+      isCustomRange: function isCustomRange() {
+        var range = this.range;
+        return Array.isArray(range) || !(!range || typeof range === 'string');
+      },
+    },
+    mounted: function mounted() {
+      var self = this;
+      var fromInitialChange = false;
+      var toInitialChange = false;
+      self.calendarFrom = self.$f7.calendar.create({
+        inputEl: self.$$(self.$refs.rangeStart.$el).find('input'),
+        closeOnSelect: true,
+        value: [self.dateFrom],
+        on: {
+          change: function change(calendar, values) {
+            if (fromInitialChange) {
+              self.showSave = true;
+            }
+            fromInitialChange = true;
+            self.dateFrom = new Date(values[0]).getTime();
+            if (Array.isArray(self.range) && self.range[0]) { self.range[0] = self.dateFrom; }
+            if (self.dateFrom > self.dateTo) {
+              self.calendarTo.setValue([self.dateFrom]);
+            }
+          },
+        },
+      });
+      self.calendarTo = self.$f7.calendar.create({
+        inputEl: self.$$(self.$refs.rangeEnd.$el).find('input'),
+        closeOnSelect: true,
+        value: [self.dateTo],
+        on: {
+          change: function change(calendar, values) {
+            if (toInitialChange) {
+              self.showSave = true;
+            }
+            toInitialChange = true;
+            self.dateTo = new Date(values[0]).getTime();
+            if (Array.isArray(self.range) && self.range[1]) { self.range[1] = self.dateTo; }
+            if (self.dateTo < self.dateFrom) {
+              self.calendarFrom.setValue([self.dateTo]);
+            }
+          },
+        },
+      });
+    },
+    methods: {
+      setPlainRange: function setPlainRange(range) {
+        var self = this;
+        self.range = range;
+        self.showSave = true;
+      },
+      toggleCustomRange: function toggleCustomRange(isCustom) {
+        var self = this;
+        self.showSave = true;
+        if (isCustom) {
+          self.range = [self.dateFrom, self.dateTo];
+        } else {
+          self.range = '';
+        }
+      },
+      save: function save() {
+        var self = this;
+        if (self.saving) { return; }
+        self.saving = true;
+        self.showSave = false;
+        var newList = Object.assign({}, self.list);
+        newList.data.date_range = self.range;
+        API.saveList(newList).then(function () {
+          self.$events.$emit('invoicing:setListDateRange', self.list.id, self.range);
+          self.$f7router.back();
+        });
+      },
+    },
+  };
+
+  /* script */
+  var __vue_script__$7 = script$7;
+
+  /* template */
+  var __vue_render__$7 = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "f7-page",
+      {
+        staticClass: "invoicing-page",
+        attrs: {
+          name: "invoicing__date-range-select",
+          id: "invoicing__date-range-select"
+        }
+      },
+      [
+        _c(
+          "f7-navbar",
+          [
+            _c("tommy-nav-back"),
+            _vm._v(" "),
+            _c("f7-nav-title", [
+              _vm._v(_vm._s(_vm.$t("invoicing.common.date_range", "Date Range")))
+            ]),
+            _vm._v(" "),
+            _c(
+              "f7-nav-right",
+              [
+                _vm.showSave
+                  ? _c("f7-link", {
+                      attrs: { "icon-f7": "check" },
+                      on: { click: _vm.save }
+                    })
+                  : _vm._e()
+              ],
+              1
+            )
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _c(
+          "f7-list",
+          [
+            _c("f7-list-item", {
+              attrs: {
+                radio: "",
+                value: "",
+                checked: !_vm.isCustomRange && (_vm.range === "" || !_vm.range),
+                title: _vm.$t("invoicing.date_range.none", "None")
+              },
+              on: {
+                change: function($event) {
+                  return _vm.setPlainRange("")
+                }
+              }
+            }),
+            _vm._v(" "),
+            _c("f7-list-item", {
+              attrs: {
+                radio: "",
+                value: "today",
+                checked: !_vm.isCustomRange && _vm.range === "today",
+                title: _vm.$t("invoicing.date_range.today", "Today")
+              },
+              on: {
+                change: function($event) {
+                  return _vm.setPlainRange("today")
+                }
+              }
+            }),
+            _vm._v(" "),
+            _c("f7-list-item", {
+              attrs: {
+                radio: "",
+                value: "week",
+                checked: !_vm.isCustomRange && _vm.range === "week",
+                title: _vm.$t("invoicing.date_range.week", "This Week")
+              },
+              on: {
+                change: function($event) {
+                  return _vm.setPlainRange("week")
+                }
+              }
+            }),
+            _vm._v(" "),
+            _c("f7-list-item", {
+              attrs: {
+                radio: "",
+                value: "month",
+                checked: !_vm.isCustomRange && _vm.range === "month",
+                title: _vm.$t("invoicing.date_range.month", "This Month")
+              },
+              on: {
+                change: function($event) {
+                  return _vm.setPlainRange("month")
+                }
+              }
+            })
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _c(
+          "f7-list",
+          { staticClass: "top-10 list-custom" },
+          [
+            _c(
+              "f7-list-item",
+              {
+                attrs: {
+                  title: _vm.$t("invoicing.common.choose_range", "Choose Range")
+                }
+              },
+              [
+                _c("f7-toggle", {
+                  attrs: { slot: "after", checked: _vm.isCustomRange },
+                  on: {
+                    change: function($event) {
+                      return _vm.toggleCustomRange($event.target.checked)
+                    }
+                  },
+                  slot: "after"
+                })
+              ],
+              1
+            ),
+            _vm._v(" "),
+            _c(
+              "f7-list-item",
+              {
+                directives: [
+                  {
+                    name: "show",
+                    rawName: "v-show",
+                    value: _vm.isCustomRange,
+                    expression: "isCustomRange"
+                  }
+                ]
+              },
+              [
+                _c("f7-label", [
+                  _vm._v(
+                    _vm._s(_vm.$t("invoicing.common.start_date", "Start Date"))
+                  )
+                ]),
+                _vm._v(" "),
+                _c("f7-input", { ref: "rangeStart", attrs: { type: "text" } })
+              ],
+              1
+            ),
+            _vm._v(" "),
+            _c(
+              "f7-list-item",
+              {
+                directives: [
+                  {
+                    name: "show",
+                    rawName: "v-show",
+                    value: _vm.isCustomRange,
+                    expression: "isCustomRange"
+                  }
+                ]
+              },
+              [
+                _c("f7-label", [
+                  _vm._v(_vm._s(_vm.$t("invoicing.common.end_date", "End Date")))
+                ]),
+                _vm._v(" "),
+                _c("f7-input", { ref: "rangeEnd", attrs: { type: "text" } })
+              ],
+              1
+            )
+          ],
+          1
+        )
+      ],
+      1
+    )
+  };
+  var __vue_staticRenderFns__$7 = [];
+  __vue_render__$7._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__$7 = undefined;
+    /* scoped */
+    var __vue_scope_id__$7 = undefined;
+    /* module identifier */
+    var __vue_module_identifier__$7 = undefined;
+    /* functional template */
+    var __vue_is_functional_template__$7 = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var DateRangePage = normalizeComponent_1(
+      { render: __vue_render__$7, staticRenderFns: __vue_staticRenderFns__$7 },
+      __vue_inject_styles__$7,
+      __vue_script__$7,
+      __vue_scope_id__$7,
+      __vue_is_functional_template__$7,
+      __vue_module_identifier__$7,
+      undefined,
+      undefined
+    );
+
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+
+  var script$8 = {
+    props: {
+      listId: [String, Number],
+      pageTitle: String,
+      tags: Array,
+      teamTags: Array,
+      onChange: Function,
+    },
+    data: function data() {
+      return {
+        query: null,
+      };
+    },
+    computed: {
+      allTags: function allTags() {
+        var self = this;
+        var addTags = [];
+        self.tags.forEach(function (f) {
+          var isTeamTag;
+          self.teamTags.forEach(function (t) {
+            if (isTeamTag) { return; }
+            isTeamTag = f.context === t.context && f.name === t.name && f.label === t.label;
+          });
+          if (!isTeamTag) { addTags.push(f); }
+        });
+        return ( self.teamTags ).concat( addTags);
+      },
+    },
+    methods: {
+      onSearch: function onSearch(sb, query) {
+        var self = this;
+        self.query = query;
+      },
+      isTagSelected: function isTagSelected(tag) {
+        var self = this;
+        return self.tags.filter(function (t) { return t.name === tag.name && t.id === tag.id && t.type === tag.type; }).length > 0;
+      },
+      contextIconSrc: function contextIconSrc(tag) {
+        var self = this;
+        var $addonAssetsUrl = self.$addonAssetsUrl;
+        return ($addonAssetsUrl + "icons/" + (tag.context.slice(0, -1)) + ".png");
+      },
+      contextIconSrcset: function contextIconSrcset(tag) {
+        var self = this;
+        var $addonAssetsUrl = self.$addonAssetsUrl;
+        return ($addonAssetsUrl + "icons/" + (tag.context.slice(0, -1)) + "@2x.png 2x," + $addonAssetsUrl + "icons/" + (tag.context.slice(0, -1)) + "@3x.png 3x");
+      },
+      toggleTag: function toggleTag(tag, selected, close) {
+        var self = this;
+        if (self.onChange) {
+          self.onChange(tag, selected);
+          if (close) {
+            self.$f7router.back();
+          }
+        }
+      },
+    },
+  };
+
+  /* script */
+  var __vue_script__$8 = script$8;
+
+  /* template */
+  var __vue_render__$8 = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "f7-page",
+      { staticClass: "invoicing-page" },
+      [
+        _c(
+          "f7-navbar",
+          [
+            _c("tommy-nav-back"),
+            _vm._v(" "),
+            _c("f7-nav-title", [_vm._v(_vm._s(_vm.pageTitle))]),
+            _vm._v(" "),
+            _c(
+              "f7-subnavbar",
+              { attrs: { inner: false } },
+              [
+                _c("f7-searchbar", {
+                  attrs: {
+                    "search-container": "#list-edit-tag-select",
+                    "search-in": ".item-title"
+                  },
+                  on: { "searchbar:search": _vm.onSearch }
+                })
+              ],
+              1
+            )
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _vm.query && _vm.query.length
+          ? _c(
+              "f7-list",
+              [
+                _c(
+                  "f7-list-item",
+                  {
+                    staticClass: "tasks-tag-select-tags-list",
+                    attrs: { checkbox: "", title: _vm.query },
+                    on: {
+                      change: function($event) {
+                        return _vm.toggleTag(
+                          { context: "tags", name: _vm.query, label: "Tag" },
+                          $event.target.checked,
+                          true
+                        )
+                      }
+                    }
+                  },
+                  [
+                    _c(
+                      "span",
+                      {
+                        staticClass: "tag-select-list-icon",
+                        attrs: { slot: "media" },
+                        slot: "media"
+                      },
+                      [
+                        _c("img", {
+                          attrs: {
+                            src: _vm.contextIconSrc({
+                              context: "tags",
+                              name: _vm.query,
+                              label: "Tag"
+                            }),
+                            srcset: _vm.contextIconSrcset({
+                              context: "tags",
+                              name: _vm.query,
+                              label: "Tag"
+                            })
+                          }
+                        })
+                      ]
+                    )
+                  ]
+                )
+              ],
+              1
+            )
+          : _vm._e(),
+        _vm._v(" "),
+        _c(
+          "f7-list",
+          {
+            staticClass: "no-margin no-hairlines tasks-tag-select-tags-list",
+            attrs: { id: "list-edit-tag-select" }
+          },
+          _vm._l(_vm.allTags, function(tag, index) {
+            return _c(
+              "f7-list-item",
+              {
+                key: index,
+                attrs: {
+                  checkbox: "",
+                  checked: _vm.isTagSelected(tag),
+                  title: tag.name
+                },
+                on: {
+                  change: function($event) {
+                    return _vm.toggleTag(tag, $event.target.checked)
+                  }
+                }
+              },
+              [
+                tag.context === "members"
+                  ? _c("span", {
+                      staticClass: "tag-select-list-avatar",
+                      style: "background-image: url(" + (tag.icon || "") + ")",
+                      attrs: { slot: "media" },
+                      slot: "media"
+                    })
+                  : _c(
+                      "span",
+                      {
+                        staticClass: "tag-select-list-icon",
+                        attrs: { slot: "media" },
+                        slot: "media"
+                      },
+                      [
+                        _c("img", {
+                          attrs: {
+                            src: _vm.contextIconSrc(tag),
+                            srcset: _vm.contextIconSrcset(tag)
+                          }
+                        })
+                      ]
+                    )
+              ]
+            )
+          }),
+          1
+        )
+      ],
+      1
+    )
+  };
+  var __vue_staticRenderFns__$8 = [];
+  __vue_render__$8._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__$8 = undefined;
+    /* scoped */
+    var __vue_scope_id__$8 = undefined;
+    /* module identifier */
+    var __vue_module_identifier__$8 = undefined;
+    /* functional template */
+    var __vue_is_functional_template__$8 = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var TagSelectPage = normalizeComponent_1(
+      { render: __vue_render__$8, staticRenderFns: __vue_staticRenderFns__$8 },
+      __vue_inject_styles__$8,
+      __vue_script__$8,
+      __vue_scope_id__$8,
+      __vue_is_functional_template__$8,
+      __vue_module_identifier__$8,
+      undefined,
+      undefined
+    );
+
+  //
+
+  var script$9 = {
+    components: {
+      tagSelect: tagSelect,
+    },
+    props: {
+      id: [String, Number],
+    },
+    data: function data() {
+      var self = this;
+      return {
+        pageTitle: self.$f7route.query.title || self.$t('invoicing.product.new_title'),
+        item: null,
+        showSave: false,
+        imagePreview: null,
+        availabile_in: '',
+      };
+    },
+    mounted: function mounted() {
+      var self = this;
+      if (!self.id) {
+        self.item = {
+          active: false,
+          category: '',
+          code: '',
+          data: {
+            duration: null,
+            availabile_in: [],
+          },
+          filters: [],
+          description: '',
+          name: '',
+          price: 0,
+        };
+        return;
+      }
+      API.loadProduct(self.id).then(function (item) {
+        if (!item.data || typeof item.data === 'string') {
+          item.data = {
+            duration: null,
+            availabile_in: [],
+          };
+        }
+        self.availabile_in = (item.data.availabile_in || []).join(',');
+        if (typeof item.filters === 'string') { item.filters = JSON.parse(decodeURIComponent(item.filters)); }
+        if (!item.filters) { item.filters = []; }
+        self.item = item;
+      });
+    },
+    methods: {
+      setAvailable: function setAvailable(value) {
+        var self = this;
+        self.availabile_in = value;
+        self.item.data.availabile_in = value.split(',').map(function (el) { return el.trim(); }).filter(function (el) { return el; });
+        self.enableSave();
+      },
+      setPrice: function setPrice(value) {
+        var self = this;
+        self.item.price = value;
+        self.item.price_cents = parseFloat(self.item.price) * 100;
+        if (Number.isNaN(self.item.price_cents)) { self.item.price_cents = 0; }
+        self.enableSave();
+      },
+      enableSave: function enableSave() {
+        var self = this;
+        if (!self.item.name) {
+          self.showSave = false;
+          return;
+        }
+        self.showSave = true;
+      },
+      addItemTag: function addItemTag(tag) {
+        var self = this;
+        self.item.filters.push(tag);
+        self.enableSave();
+      },
+      removeItemTag: function removeItemTag(tag) {
+        var self = this;
+        self.item.filters.splice(self.item.filters.indexOf(tag), 1);
+        self.enableSave();
+      },
+      onDurationChange: function onDurationChange(e) {
+        var self = this;
+        self.item.data.duration = e.target.value;
+        self.enableSave();
+      },
+      onFileChange: function onFileChange(e) {
+        var self = this;
+        var file = e.target.files[0];
+        var reader = new FileReader();
+        reader.onload = function (ev) {
+          self.imagePreview = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+        self.item.image = file;
+        self.enableSave();
+      },
+      deleteImage: function deleteImage() {
+        var self = this;
+        self.item.image = null;
+        self.item.image_url = null;
+        self.imagePreview = null;
+        self.enableSave();
+      },
+      save: function save() {
+        var self = this;
+        self.showSave = false;
+        API.saveProduct(self.item).then(function () {
+          self.$events.$emit('invoicing:reloadProducts');
+          self.$f7router.back();
+        });
+      },
+    },
+  };
+
+  /* script */
+  var __vue_script__$9 = script$9;
+
+  /* template */
+  var __vue_render__$9 = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "f7-page",
+      {
+        staticClass: "invoicing-page",
+        attrs: {
+          id: "invoicing__item-details",
+          "data-name": "invoicing__item-details"
+        }
+      },
+      [
+        _c(
+          "f7-navbar",
+          [
+            _c("tommy-nav-back"),
+            _vm._v(" "),
+            _c("f7-nav-title", [_vm._v(_vm._s(_vm.pageTitle))]),
+            _vm._v(" "),
+            _c(
+              "f7-nav-right",
+              [
+                _vm.showSave
+                  ? _c("f7-link", {
+                      attrs: { "icon-f7": "check" },
+                      on: { click: _vm.save }
+                    })
+                  : _vm._e()
+              ],
+              1
+            )
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _vm.item
+          ? _c(
+              "f7-list",
+              { staticClass: "list-custom" },
+              [
+                _c("f7-list-input", {
+                  attrs: {
+                    label: _vm.$t("invoicing.item.name_label", "Name"),
+                    placeholder: _vm.$t(
+                      "invoicing.item.name_placeholder",
+                      "Enter item/service name"
+                    ),
+                    type: "text",
+                    value: _vm.item.name
+                  },
+                  on: {
+                    input: function($event) {
+                      _vm.item.name = $event.target.value;
+                      _vm.enableSave();
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _c(
+                  "f7-list-item",
+                  {
+                    attrs: {
+                      title: _vm.$t("invoicing.item.enabled_label", "Enabled")
+                    }
+                  },
+                  [
+                    _c("f7-toggle", {
+                      attrs: { checked: _vm.item.active },
+                      on: {
+                        change: function($event) {
+                          _vm.item.active = $event.target.checked;
+                          _vm.enableSave();
+                        }
+                      }
+                    })
+                  ],
+                  1
+                ),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t(
+                      "invoicing.item.description_label",
+                      "Description"
+                    )
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-input", {
+                  attrs: {
+                    placeholder: _vm.$t(
+                      "invoicing.item.description_placeholder",
+                      "Enter item/service description"
+                    ),
+                    type: "textarea",
+                    resizable: "",
+                    value: _vm.item.description
+                  },
+                  on: {
+                    input: function($event) {
+                      _vm.item.description = $event.target.value;
+                      _vm.enableSave();
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t("invoicing.item.duration_label", "Duration")
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-input", {
+                  attrs: {
+                    placeholder: _vm.$t(
+                      "invoicing.item.duration_placeholder",
+                      "Item duration in minutes"
+                    ),
+                    type: "number",
+                    value: _vm.item.data.duration
+                  },
+                  on: { input: _vm.onDurationChange }
+                }),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t("invoicing.item.category_label", "Category")
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-input", {
+                  attrs: {
+                    placeholder: _vm.$t(
+                      "invoicing.item.category_placeholder",
+                      "Enter item/service category"
+                    ),
+                    type: "text",
+                    value: _vm.item.category
+                  },
+                  on: {
+                    input: function($event) {
+                      _vm.item.category = $event.target.value;
+                      _vm.enableSave();
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t(
+                      "invoicing.item.available_in_label",
+                      "Available in"
+                    )
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-input", {
+                  attrs: {
+                    placeholder: _vm.$t(
+                      "invoicing.item.available_in_placeholder",
+                      "City where it is available"
+                    ),
+                    type: "text",
+                    value: _vm.availabile_in
+                  },
+                  on: {
+                    input: function($event) {
+                      return _vm.setAvailable($event.target.value)
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t("invoicing.item.photo_label", "Photo")
+                  }
+                }),
+                _vm._v(" "),
+                _c("li", [
+                  _c(
+                    "div",
+                    { staticClass: "invoicing-product-photo-container" },
+                    [
+                      _vm.item.image_url || _vm.imagePreview
+                        ? _c(
+                            "div",
+                            { staticClass: "invoicing-product-photo" },
+                            [
+                              _c("img", {
+                                attrs: {
+                                  src: _vm.item.image_url || _vm.imagePreview
+                                }
+                              }),
+                              _vm._v(" "),
+                              _c("f7-link", {
+                                attrs: { "icon-f7": "close_round_fill" },
+                                on: { click: _vm.deleteImage }
+                              })
+                            ],
+                            1
+                          )
+                        : _c(
+                            "label",
+                            { staticClass: "invoicing-product-photo-add" },
+                            [
+                              _c("input", {
+                                attrs: { type: "file" },
+                                on: { change: _vm.onFileChange }
+                              }),
+                              _vm._v(" "),
+                              _c("f7-icon", { attrs: { f7: "add" } })
+                            ],
+                            1
+                          )
+                    ]
+                  )
+                ]),
+                _vm._v(" "),
+                _c("tag-select", {
+                  attrs: {
+                    slot: "after-list",
+                    data: {
+                      title: _vm.$t("invoicing.item.tags_label"),
+                      placeholder: _vm.$t(
+                        "invoicing.common.search_members_tags",
+                        "Search Members, Tags"
+                      ),
+                      pageTitle: _vm.$t(
+                        "invoicing.common.search_members_tags",
+                        "Search Members, Tags"
+                      ),
+                      tags: _vm.item.filters
+                    }
+                  },
+                  on: { tagAdd: _vm.addItemTag, tagRemove: _vm.removeItemTag },
+                  slot: "after-list"
+                })
+              ],
+              1
+            )
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.item
+          ? _c(
+              "f7-list",
+              { staticClass: "list-custom margin-top" },
+              [
+                _c("f7-list-input", {
+                  attrs: {
+                    label: _vm.$t("invoicing.item.price_label", "Price"),
+                    placeholder: _vm.$t(
+                      "invoicing.item.price_placeholder",
+                      "Enter item/service price"
+                    ),
+                    type: "number",
+                    value: _vm.item.price
+                  },
+                  on: {
+                    input: function($event) {
+                      return _vm.setPrice($event.target.value)
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-input", {
+                  attrs: {
+                    label: _vm.$t("invoicing.item.barcode_label", "Barcode ID"),
+                    placeholder: _vm.$t(
+                      "invoicing.item.barcode_placeholder",
+                      "Enter item/service barcode ID"
+                    ),
+                    type: "text",
+                    value: _vm.item.code
+                  },
+                  on: {
+                    input: function($event) {
+                      _vm.item.code = $event.target.value;
+                      _vm.enableSave();
+                    }
+                  }
+                })
+              ],
+              1
+            )
+          : _vm._e()
+      ],
+      1
+    )
+  };
+  var __vue_staticRenderFns__$9 = [];
+  __vue_render__$9._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__$9 = undefined;
+    /* scoped */
+    var __vue_scope_id__$9 = undefined;
+    /* module identifier */
+    var __vue_module_identifier__$9 = undefined;
+    /* functional template */
+    var __vue_is_functional_template__$9 = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var ProductDetailsPage = normalizeComponent_1(
+      { render: __vue_render__$9, staticRenderFns: __vue_staticRenderFns__$9 },
+      __vue_inject_styles__$9,
+      __vue_script__$9,
+      __vue_scope_id__$9,
+      __vue_is_functional_template__$9,
+      __vue_module_identifier__$9,
+      undefined,
+      undefined
+    );
+
+  //
+
+  var script$a = {
+    components: {
+      tagSelect: tagSelect,
+    },
+    props: {
+      id: [String, Number],
+    },
+    data: function data() {
+      var self = this;
+      return {
+        pageTitle: self.$f7route.query.title || self.$t('invoicing.package.new_title'),
+        item: null,
+        showSave: false,
+        imagePreview: null,
+        products: null,
+        productsOpened: false,
+        availabile_in: '',
+        data: {
+          duration: null,
+        },
+      };
+    },
+    mounted: function mounted() {
+      var self = this;
+      API.loadProducts().then(function (products) {
+        self.products = products;
+      });
+      if (!self.id) {
+        self.item = {
+          active: false,
+          category: '',
+          code: '',
+          filters: [],
+          description: '',
+          name: '',
+          price: 0,
+          vendor_package_products_attributes: [],
+          data: {
+            availabile_in: [],
+            duration: null,
+          },
+        };
+        return;
+      }
+      API.loadPackage(self.id).then(function (item) {
+        if (!item.vendor_package_products_attributes) { item.vendor_package_products_attributes = []; }
+        if (item.vendor_package_products) {
+          item.vendor_package_products_attributes = item.vendor_package_products.map(function (el) {
+            return {
+              id: el.id,
+              vendor_product_id: el.vendor_product_id,
+              quantity: el.quantity,
+              vendor_package_id: el.vendor_package_id,
+            };
+          });
+          delete item.vendor_package_products;
+        }
+        if (!item.data || typeof item.data === 'string') {
+          item.data = {
+            availabile_in: [],
+            duration: null,
+          };
+        }
+        self.availabile_in = (item.data.availabile_in || []).join(',');
+        if (typeof item.filters === 'string') { item.filters = JSON.parse(decodeURIComponent(item.filters)); }
+        if (!item.filters) { item.filters = []; }
+        self.item = item;
+      });
+    },
+    methods: {
+      setAvailable: function setAvailable(value) {
+        var self = this;
+        self.availabile_in = value;
+        self.item.data.availabile_in = value.split(',').map(function (el) { return el.trim(); }).filter(function (el) { return el; });
+        self.enableSave();
+      },
+      productName: function productName(id) {
+        var self = this;
+        return self.products.filter(function (el) { return el.id === parseInt(id, 10); })[0].name;
+      },
+      increaseProduct: function increaseProduct(index) {
+        var self = this;
+        self.item.vendor_package_products_attributes[index].quantity += 1;
+        self.enableSave();
+      },
+      decreaseProduct: function decreaseProduct(index) {
+        var self = this;
+        self.item.vendor_package_products_attributes[index].quantity -= 1;
+        if (self.item.vendor_package_products_attributes[index].quantity === 0) {
+          if (self.item.vendor_package_products_attributes[index].id) {
+            self.item.vendor_package_products_attributes[index]._destroy = true;
+          } else {
+            self.item.vendor_package_products_attributes.splice(index, 1);
+          }
+        }
+        self.enableSave();
+      },
+      addProduct: function addProduct(product) {
+        var self = this;
+        self.productsOpened = false;
+        var hasProduct;
+        self.item.vendor_package_products_attributes.forEach(function (el) {
+          if (el.vendor_product_id === product.id) { hasProduct = true; }
+        });
+        if (hasProduct) { return; }
+
+        self.item.vendor_package_products_attributes.push({
+          vendor_product_id: product.id,
+          quantity: 1,
+        });
+        self.showSave = true;
+      },
+      setPrice: function setPrice(value) {
+        var self = this;
+        self.item.price = value;
+        self.item.price_cents = parseFloat(self.item.price) * 100;
+        if (Number.isNaN(self.item.price_cents)) { self.item.price_cents = 0; }
+        self.enableSave();
+      },
+      enableSave: function enableSave() {
+        var self = this;
+        if (!self.item.name) {
+          self.showSave = false;
+          return;
+        }
+        self.showSave = true;
+      },
+      addItemTag: function addItemTag(tag) {
+        var self = this;
+        self.item.filters.push(tag);
+        self.enableSave();
+      },
+      removeItemTag: function removeItemTag(tag) {
+        var self = this;
+        self.item.filters.splice(self.item.filters.indexOf(tag), 1);
+        self.enableSave();
+      },
+      onDurationChange: function onDurationChange(e) {
+        var self = this;
+        self.item.data.duration = e.target.value;
+        self.enableSave();
+      },
+      onFileChange: function onFileChange(e) {
+        var self = this;
+        var file = e.target.files[0];
+        var reader = new FileReader();
+        reader.onload = function (ev) {
+          self.imagePreview = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+        self.item.image = file;
+        self.enableSave();
+      },
+      deleteImage: function deleteImage() {
+        var self = this;
+        self.item.image = null;
+        self.item.image_url = null;
+        self.imagePreview = null;
+        self.enableSave();
+      },
+      save: function save() {
+        var self = this;
+        self.showSave = false;
+        API.saveProduct(self.item, true).then(function () {
+          self.$events.$emit('invoicing:reloadPackages');
+          self.$f7router.back();
+        });
+      },
+    },
+  };
+
+  /* script */
+  var __vue_script__$a = script$a;
+
+  /* template */
+  var __vue_render__$a = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "f7-page",
+      {
+        staticClass: "invoicing-page",
+        attrs: {
+          id: "invoicing__item-details",
+          "data-name": "invoicing__item-details"
+        }
+      },
+      [
+        _c(
+          "f7-navbar",
+          [
+            _c("tommy-nav-back"),
+            _vm._v(" "),
+            _c("f7-nav-title", [_vm._v(_vm._s(_vm.pageTitle))]),
+            _vm._v(" "),
+            _c(
+              "f7-nav-right",
+              [
+                _vm.showSave
+                  ? _c("f7-link", {
+                      attrs: { "icon-f7": "check" },
+                      on: { click: _vm.save }
+                    })
+                  : _vm._e()
+              ],
+              1
+            )
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _vm.item
+          ? _c(
+              "f7-list",
+              { staticClass: "list-custom" },
+              [
+                _c("f7-list-input", {
+                  attrs: {
+                    label: _vm.$t("invoicing.item.name_label", "Name"),
+                    placeholder: _vm.$t(
+                      "invoicing.item.name_placeholder",
+                      "Enter item/service name"
+                    ),
+                    type: "text",
+                    value: _vm.item.name
+                  },
+                  on: {
+                    input: function($event) {
+                      _vm.item.name = $event.target.value;
+                      _vm.enableSave();
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _c(
+                  "f7-list-item",
+                  {
+                    attrs: {
+                      title: _vm.$t("invoicing.item.enabled_label", "Enabled")
+                    }
+                  },
+                  [
+                    _c("f7-toggle", {
+                      attrs: { checked: _vm.item.active },
+                      on: {
+                        change: function($event) {
+                          _vm.item.active = $event.target.checked;
+                          _vm.enableSave();
+                        }
+                      }
+                    })
+                  ],
+                  1
+                ),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t(
+                      "invoicing.item.description_label",
+                      "Description"
+                    )
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-input", {
+                  attrs: {
+                    placeholder: _vm.$t(
+                      "invoicing.item.description_placeholder",
+                      "Enter item/service description"
+                    ),
+                    type: "textarea",
+                    resizable: "",
+                    value: _vm.item.description
+                  },
+                  on: {
+                    input: function($event) {
+                      _vm.item.description = $event.target.value;
+                      _vm.enableSave();
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t("invoicing.item.duration_label", "Duration")
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-input", {
+                  attrs: {
+                    placeholder: _vm.$t(
+                      "invoicing.item.duration_placeholder",
+                      "Item duration in minutes"
+                    ),
+                    type: "number",
+                    value: _vm.item.data.duration
+                  },
+                  on: { input: _vm.onDurationChange }
+                }),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t("invoicing.item.category_label", "Cagegory")
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-input", {
+                  attrs: {
+                    placeholder: _vm.$t(
+                      "invoicing.item.category_placeholder",
+                      "Enter item/service category"
+                    ),
+                    type: "text",
+                    value: _vm.item.category
+                  },
+                  on: {
+                    input: function($event) {
+                      _vm.item.category = $event.target.value;
+                      _vm.enableSave();
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t(
+                      "invoicing.item.available_in_label",
+                      "Available in"
+                    )
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-input", {
+                  attrs: {
+                    placeholder: _vm.$t(
+                      "invoicing.item.available_in_placeholder",
+                      "City where it is available"
+                    ),
+                    type: "text",
+                    value: _vm.availabile_in
+                  },
+                  on: {
+                    input: function($event) {
+                      return _vm.setAvailable($event.target.value)
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t("invoicing.item.photo_label", "Photo")
+                  }
+                }),
+                _vm._v(" "),
+                _c("li", [
+                  _c(
+                    "div",
+                    { staticClass: "invoicing-product-photo-container" },
+                    [
+                      _vm.item.image_url || _vm.imagePreview
+                        ? _c(
+                            "div",
+                            { staticClass: "invoicing-product-photo" },
+                            [
+                              _c("img", {
+                                attrs: {
+                                  src: _vm.item.image_url || _vm.imagePreview
+                                }
+                              }),
+                              _vm._v(" "),
+                              _c("f7-link", {
+                                attrs: { "icon-f7": "close_round_fill" },
+                                on: { click: _vm.deleteImage }
+                              })
+                            ],
+                            1
+                          )
+                        : _c(
+                            "label",
+                            { staticClass: "invoicing-product-photo-add" },
+                            [
+                              _c("input", {
+                                attrs: { type: "file" },
+                                on: { change: _vm.onFileChange }
+                              }),
+                              _vm._v(" "),
+                              _c("f7-icon", { attrs: { f7: "add" } })
+                            ],
+                            1
+                          )
+                    ]
+                  )
+                ]),
+                _vm._v(" "),
+                _c("tag-select", {
+                  attrs: {
+                    slot: "after-list",
+                    data: {
+                      title: _vm.$t("invoicing.item.tags_label"),
+                      placeholder: _vm.$t(
+                        "invoicing.common.search_members_tags",
+                        "Search Members, Tags"
+                      ),
+                      pageTitle: _vm.$t(
+                        "invoicing.common.search_members_tags",
+                        "Search Members, Tags"
+                      ),
+                      tags: _vm.item.filters
+                    }
+                  },
+                  on: { tagAdd: _vm.addItemTag, tagRemove: _vm.removeItemTag },
+                  slot: "after-list"
+                }),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t("invoicing.package.items_label")
+                  }
+                }),
+                _vm._v(" "),
+                _vm.products
+                  ? _c(
+                      "li",
+                      { staticClass: "invoicing-order-items" },
+                      [
+                        _c(
+                          "div",
+                          {
+                            staticClass: "invoicing-order-add-box",
+                            on: {
+                              click: function($event) {
+                                _vm.productsOpened = true;
+                              }
+                            }
+                          },
+                          [
+                            _c("f7-icon", { attrs: { f7: "add" } }),
+                            _vm._v(" "),
+                            _c(
+                              "div",
+                              {
+                                staticClass: "invoicing-order-add-box-placeholder"
+                              },
+                              [
+                                _vm._v(
+                                  _vm._s(
+                                    _vm.$t("invoicing.package.add_item_label")
+                                  )
+                                )
+                              ]
+                            )
+                          ],
+                          1
+                        ),
+                        _vm._v(" "),
+                        _vm._l(
+                          _vm.item.vendor_package_products_attributes,
+                          function(product, index) {
+                            return !product._destroy
+                              ? _c(
+                                  "div",
+                                  {
+                                    key: index,
+                                    staticClass: "invoicing-order-item"
+                                  },
+                                  [
+                                    _c(
+                                      "div",
+                                      {
+                                        staticClass: "invoicing-order-item-name"
+                                      },
+                                      [
+                                        _vm._v(
+                                          _vm._s(
+                                            _vm.productName(
+                                              product.vendor_product_id
+                                            )
+                                          )
+                                        )
+                                      ]
+                                    ),
+                                    _vm._v(" "),
+                                    _c(
+                                      "div",
+                                      {
+                                        staticClass:
+                                          "invoicing-order-item-selector"
+                                      },
+                                      [
+                                        _c("f7-link", {
+                                          attrs: { "icon-f7": "delete_round" },
+                                          on: {
+                                            click: function($event) {
+                                              return _vm.decreaseProduct(index)
+                                            }
+                                          }
+                                        }),
+                                        _vm._v(" "),
+                                        _c(
+                                          "div",
+                                          {
+                                            staticClass:
+                                              "invoicing-order-item-qty"
+                                          },
+                                          [_vm._v(_vm._s(product.quantity))]
+                                        ),
+                                        _vm._v(" "),
+                                        _c("f7-link", {
+                                          attrs: { "icon-f7": "add_round_fill" },
+                                          on: {
+                                            click: function($event) {
+                                              return _vm.increaseProduct(index)
+                                            }
+                                          }
+                                        })
+                                      ],
+                                      1
+                                    )
+                                  ]
+                                )
+                              : _vm._e()
+                          }
+                        )
+                      ],
+                      2
+                    )
+                  : _vm._e()
+              ],
+              1
+            )
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.item
+          ? _c(
+              "f7-list",
+              { staticClass: "list-custom margin-top" },
+              [
+                _c("f7-list-input", {
+                  attrs: {
+                    label: _vm.$t("invoicing.item.price_label", "Price"),
+                    placeholder: _vm.$t(
+                      "invoicing.item.price_placeholder",
+                      "Enter item/service price"
+                    ),
+                    type: "text",
+                    value: _vm.item.price
+                  },
+                  on: {
+                    input: function($event) {
+                      return _vm.setPrice($event.target.value)
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-input", {
+                  attrs: {
+                    label: _vm.$t("invoicing.item.barcode_label", "Barcode ID"),
+                    placeholder: _vm.$t(
+                      "invoicing.item.barcode_placeholder",
+                      "Enter item/service barcode ID"
+                    ),
+                    type: "text",
+                    value: _vm.item.code
+                  },
+                  on: {
+                    input: function($event) {
+                      _vm.item.code = $event.target.value;
+                      _vm.enableSave();
+                    }
+                  }
+                })
+              ],
+              1
+            )
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.products
+          ? _c(
+              "f7-popup",
+              {
+                attrs: { opened: _vm.productsOpened },
+                on: {
+                  "popup:closed": function($event) {
+                    _vm.productsOpened = false;
+                  }
+                }
+              },
+              [
+                _c(
+                  "f7-view",
+                  { attrs: { init: false } },
+                  [
+                    _c(
+                      "f7-page",
+                      { staticClass: "invoicing-page" },
+                      [
+                        _c(
+                          "f7-navbar",
+                          [
+                            _c(
+                              "f7-nav-right",
+                              [
+                                _c("f7-link", {
+                                  attrs: { "popup-close": "", "icon-f7": "close" }
+                                })
+                              ],
+                              1
+                            ),
+                            _vm._v(" "),
+                            _c("f7-nav-title", [
+                              _vm._v(
+                                _vm._s(_vm.$t("invoicing.package.add_item_label"))
+                              )
+                            ])
+                          ],
+                          1
+                        ),
+                        _vm._v(" "),
+                        _c("f7-searchbar", {
+                          attrs: {
+                            "search-container":
+                              ".invoicing-package-details-products",
+                            "disable-button": false
+                          }
+                        }),
+                        _vm._v(" "),
+                        _c(
+                          "f7-list",
+                          {
+                            staticClass:
+                              "list-custom invoicing-order-details-products invoicing-package-details-products"
+                          },
+                          _vm._l(_vm.products, function(product) {
+                            return _c("f7-list-item", {
+                              key: product.id,
+                              attrs: {
+                                link: "",
+                                title: product.name,
+                                after: "¥" + product.price
+                              },
+                              on: {
+                                click: function($event) {
+                                  return _vm.addProduct(product)
+                                }
+                              }
+                            })
+                          }),
+                          1
+                        )
+                      ],
+                      1
+                    )
+                  ],
+                  1
+                )
+              ],
+              1
+            )
+          : _vm._e()
+      ],
+      1
+    )
+  };
+  var __vue_staticRenderFns__$a = [];
+  __vue_render__$a._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__$a = undefined;
+    /* scoped */
+    var __vue_scope_id__$a = undefined;
+    /* module identifier */
+    var __vue_module_identifier__$a = undefined;
+    /* functional template */
+    var __vue_is_functional_template__$a = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var PackageDetailsPage = normalizeComponent_1(
+      { render: __vue_render__$a, staticRenderFns: __vue_staticRenderFns__$a },
+      __vue_inject_styles__$a,
+      __vue_script__$a,
+      __vue_scope_id__$a,
+      __vue_is_functional_template__$a,
+      __vue_module_identifier__$a,
+      undefined,
+      undefined
+    );
+
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+
+  var script$b = {
+    props: {
+      from: Number,
+      to: Number,
+      pageTitle: String,
+      onSave: Function,
+    },
+    data: function data() {
+      var self = this;
+      var amount_min = self.from;
+      var amount_max = self.to;
+      return {
+        showSave: false,
+        amount_min: amount_min,
+        amount_max: amount_max,
+        isCustomRange: (typeof amount_min !== 'undefined' || typeof amount_max !== 'undefined'),
+      };
+    },
+    methods: {
+      save: function save() {
+        var self = this;
+        if (self.saving) { return; }
+        self.saving = true;
+        self.showSave = false;
+        // const newList = Object.assign({}, self.list);
+        var amount_min = self.amount_min;
+        var amount_max = self.amount_max;
+        var from;
+        var to;
+
+        if (self.isCustomRange) {
+          from = amount_min;
+          to = amount_max;
+          if (!from) {
+            from = undefined;
+          }
+          if (!to) {
+            to = undefined;
+          }
+          if (amount_min && amount_max && (amount_max < amount_min)) {
+            to = amount_min;
+          }
+        } else {
+          from = undefined;
+          to = undefined;
+        }
+
+        self.onSave({
+          from: from,
+          to: to,
+        });
+      },
+      setMin: function setMin(value) {
+        var self = this;
+        self.amount_min = value;
+        self.showSave = true;
+      },
+      setMax: function setMax(value) {
+        var self = this;
+        self.amount_max = value;
+        self.showSave = true;
+      },
+      toggleCustomRange: function toggleCustomRange(isCustom) {
+        var self = this;
+        self.showSave = true;
+        if (!isCustom) {
+          self.isCustomRange = false;
+          self.amount_min = undefined;
+          self.amount_max = undefined;
+        } else {
+          self.isCustomRange = true;
+          self.amount_min = self.from;
+          self.amount_max = self.to;
+        }
+      },
+    },
+  };
+
+  /* script */
+  var __vue_script__$b = script$b;
+
+  /* template */
+  var __vue_render__$b = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "f7-page",
+      {
+        staticClass: "invoicing-page",
+        attrs: { name: "invoicing__range-select", id: "invoicing__range-select" }
+      },
+      [
+        _c(
+          "f7-navbar",
+          [
+            _c("tommy-nav-back"),
+            _vm._v(" "),
+            _c("f7-nav-title", [_vm._v(_vm._s(_vm.pageTitle))]),
+            _vm._v(" "),
+            _c(
+              "f7-nav-right",
+              [
+                _vm.showSave
+                  ? _c("f7-link", {
+                      attrs: { "icon-f7": "check" },
+                      on: { click: _vm.save }
+                    })
+                  : _vm._e()
+              ],
+              1
+            )
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _c(
+          "f7-list",
+          { staticClass: "list-custom" },
+          [
+            _c(
+              "f7-list-item",
+              {
+                attrs: {
+                  title: _vm.$t("invoicing.common.choose_range", "Choose Range")
+                }
+              },
+              [
+                _c("f7-toggle", {
+                  attrs: { slot: "after", checked: _vm.isCustomRange },
+                  on: {
+                    change: function($event) {
+                      return _vm.toggleCustomRange($event.target.checked)
+                    }
+                  },
+                  slot: "after"
+                })
+              ],
+              1
+            ),
+            _vm._v(" "),
+            _vm.isCustomRange
+              ? _c("f7-list-input", {
+                  attrs: {
+                    label: _vm.$t("invoicing.common.amount_min", "From"),
+                    type: "number",
+                    value: _vm.amount_min
+                  },
+                  on: {
+                    input: function($event) {
+                      return _vm.setMin($event.target.value)
+                    }
+                  }
+                })
+              : _vm._e(),
+            _vm._v(" "),
+            _vm.isCustomRange
+              ? _c("f7-list-input", {
+                  attrs: {
+                    label: _vm.$t("invoicing.common.amount_max", "To"),
+                    type: "number",
+                    value: _vm.amount_max
+                  },
+                  on: {
+                    input: function($event) {
+                      return _vm.setMax($event.target.value)
+                    }
+                  }
+                })
+              : _vm._e()
+          ],
+          1
+        )
+      ],
+      1
+    )
+  };
+  var __vue_staticRenderFns__$b = [];
+  __vue_render__$b._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__$b = undefined;
+    /* scoped */
+    var __vue_scope_id__$b = undefined;
+    /* module identifier */
+    var __vue_module_identifier__$b = undefined;
+    /* functional template */
+    var __vue_is_functional_template__$b = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var RangeSelectPage = normalizeComponent_1(
+      { render: __vue_render__$b, staticRenderFns: __vue_staticRenderFns__$b },
+      __vue_inject_styles__$b,
+      __vue_script__$b,
+      __vue_scope_id__$b,
+      __vue_is_functional_template__$b,
+      __vue_module_identifier__$b,
+      undefined,
+      undefined
+    );
+
+  //
+
+  var script$c = {
+    props: {
+      id: [Number, String],
+    },
+    data: function data() {
+      var self = this;
+      return {
+        pageTitle: self.id
+          ? ((self.$t('invoicing.order_details.title', 'Order')) + " #" + (self.id))
+          : self.$t('invoicing.order_details.new_title'),
+        order: null,
+        showSave: false,
+        orderStatuses: orderStatuses,
+        products: null,
+        packages: null,
+        productsOpened: false,
+        promotions: null,
+        promotionsOpened: false,
+        isFeedback: false,
+        orderUser: null,
+        orderAssignee: null,
+        contacts: API.contacts,
+      };
+    },
+    mounted: function mounted() {
+      var self = this;
+      if (self.id) {
+        API.loadOrder(self.id).then(function (order) {
+          self.order = order;
+          var orderUser = self.$root.teamMembers.filter(
+            function (m) { return m.user_id === parseInt(order.user_id, 10); }
+          )[0];
+          var orderAssignee = self.$root.teamMembers.filter(
+            function (m) { return m.user_id === parseInt(order.assignee_id, 10); }
+          )[0];
+          self.orderAssignee = orderAssignee;
+          if (!orderUser) {
+            if (self.contacts) {
+              // assuming contact
+              orderUser = self.contacts.filter(
+                function (c) { return c.friend_id === parseInt(order.user_id, 10); }
+              )[0];
+              self.orderUser = orderUser;
+              return;
+            }
+            self.$api.getContacts.then(function (contacts) {
+              self.contacts = contacts;
+              orderUser = self.contacts.filter(
+                function (c) { return c.friend_id === parseInt(order.user_id, 10); }
+              )[0];
+              self.orderUser = orderUser;
+            });
+            return;
+          }
+          self.orderUser = orderUser;
+        });
+      } else {
+        self.order = {
+          comment: '',
+          discount: 0,
+          total: 0,
+          user_id: null,
+          vendor_coupon_id: null,
+          vendor_order_items: [],
+          wallet_transaction_id: null,
+          status: 'pending',
+          canceled: false,
+          data: {
+            location: {
+              address: '',
+              city: '',
+            },
+            date: new Date().getTime(),
+          },
+        };
+      }
+
+      API.loadProducts().then(function (products) {
+        self.products = products;
+      });
+      API.loadPackages().then(function (packages) {
+        self.packages = packages;
+      });
+      API.loadPromotions().then(function (promotions) {
+        self.promotions = promotions;
+      });
+
+    },
+    beforeDestroy: function beforeDestroy() {
+      var self = this;
+      if (self.dateCalendar && self.dateCalendar.destroy) {
+        self.dateCalendar.destroy();
+      }
+      if (self.timePicker && self.timePicker.destroy) { self.timePicker.destroy(); }
+    },
+    computed: {
+      orderAssigneeName: function orderAssigneeName() {
+        var self = this;
+        var user = self.orderAssignee;
+        if (!user) { return ''; }
+        if (user.friend_team_name) {
+          return user.friend_team_name.trim();
+        }
+        if (user.name) { return user.name.trim(); }
+        if (user.first_name) {
+          return ("" + (user.first_name) + (user.last_name ? (" " + (user.last_name)) : '')).trim();
+        }
+        return '';
+      },
+      orderUserName: function orderUserName() {
+        var self = this;
+        var user = self.orderUser;
+        if (!user) { return ''; }
+        if (user.friend_team_name) {
+          return user.friend_team_name.trim();
+        }
+        if (user.name) { return user.name.trim(); }
+        if (user.first_name) {
+          return ("" + (user.first_name) + (user.last_name ? (" " + (user.last_name)) : '')).trim();
+        }
+        return '';
+      },
+      orderItemsTotal: function orderItemsTotal() {
+        var self = this;
+        var total = 0;
+        self.order.vendor_order_items.forEach(function (el) {
+          total
+            += self.productPrice(el.orderable_id, el.orderable_type) * el.quantity;
+        });
+        return total;
+      },
+      orderDiscountTotal: function orderDiscountTotal() {
+        var self = this;
+        var total = 0;
+        if (self.order.vendor_coupon_id) {
+          var coupon = self.promotions.filter(
+            function (el) { return el.id === self.order.vendor_coupon_id; }
+          )[0];
+          if (coupon) {
+            if (coupon.kind !== 'percentage') {
+              total = coupon.amount;
+            } else {
+              total = self.orderItemsTotal * coupon.amount;
+            }
+          }
+        }
+        return total;
+      },
+      orderTotal: function orderTotal() {
+        var self = this;
+        return Math.max(self.orderItemsTotal - self.orderDiscountTotal, 0);
+      },
+      orderCancelable: function orderCancelable() {
+        var self = this;
+        var order = self.order;
+        var canceled = order.canceled;
+        return (
+          !canceled && (order.status === 'paid' || order.status === 'pending')
+        );
+      },
+    },
+    methods: {
+      cancelOrder: function cancelOrder() {
+        var self = this;
+        self.order.canceled = true;
+        API.cancelOrder(self.order)
+          .then(function (order) {
+            self.order = order;
+            self.order.canceled = true;
+            self.$events.$emit('invoicing:reloadListsOrders');
+          })
+          .catch(function () {
+            self.order.canceled = false;
+          });
+      },
+      calcOrderDuration: function calcOrderDuration() {
+        var self = this;
+        var duration = 0;
+        if (self.order && self.products && self.packages) {
+          self.order.vendor_order_items.forEach(function (el) {
+            duration
+              += self.productDuration(el.orderable_id, el.orderable_type)
+              * el.quantity;
+          });
+        }
+        return duration;
+      },
+      onAssigneeChange: function onAssigneeChange(e) {
+        var self = this;
+        var user_id = parseInt(e.target.value, 10);
+        var assignee = self.$root.teamMembers.filter(
+          function (m) { return m.user_id === parseInt(user_id, 10); }
+        )[0];
+        self.order.assignee_id = assignee.user_id;
+        self.order.data.nurse = assignee;
+        self.showSave = true;
+      },
+      onCustomerChange: function onCustomerChange(e) {
+        var self = this;
+        var user_id = parseInt(e.target.value, 10);
+        var orderUser = self.$root.teamMembers.filter(
+          function (m) { return m.user_id === parseInt(user_id, 10); }
+        )[0];
+        if (!orderUser && self.contacts) {
+          // assuming contact
+          orderUser = self.contacts.filter(
+            function (c) { return c.friend_id === parseInt(user_id, 10); }
+          )[0];
+        }
+        self.orderUser = orderUser;
+        self.order.user_id = parseInt(e.target.value, 10);
+        self.showSave = true;
+      },
+      onCommentChange: function onCommentChange(e) {
+        var self = this;
+        self.order.comment = e.target.value;
+        self.showSave = true;
+      },
+      onCityChange: function onCityChange(e) {
+        var self = this;
+        if (!self.order.data) { self.order.data = {}; }
+        if (!self.order.data.location) { self.order.data.location = {}; }
+        self.order.data.location.city = e.target.value;
+        self.showSave = true;
+      },
+      onAddressChange: function onAddressChange(e) {
+        var self = this;
+        if (!self.order.data) { self.order.data = {}; }
+        if (!self.order.data.location) { self.order.data.location = {}; }
+        self.order.data.location.address = e.target.value;
+        self.showSave = true;
+      },
+      openTimeSelect: function openTimeSelect() {
+        var self = this;
+        var order = self.order;
+        if (self.timePicker) {
+          self.timePicker.open();
+          return;
+        }
+        var initialValue = self.formatOrderTime(
+          order.data ? parseInt(order.data.date, 10) : null
+        );
+        var initiallChanged;
+        self.timePicker = self.$f7.picker.create({
+          value: initialValue ? initialValue.split(':') : [],
+          cols: [
+            {
+              values: '00 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23'.split(
+                ' '
+              ),
+            },
+            {
+              divider: true,
+              content: ' : ',
+            },
+            {
+              values: (function () {
+                var m = [];
+                for (var i = 0; i <= 59; i += 1) {
+                  m.push(i < 10 ? ("0" + i) : ("" + i));
+                }
+                return m;
+              })(),
+            } ],
+          on: {
+            change: function change(picker, values) {
+              if (!initiallChanged) {
+                initiallChanged = true;
+                return;
+              }
+              var currentOrderDate = new Date(
+                parseInt(self.order.data.date, 10)
+              );
+              currentOrderDate.setHours(
+                parseInt(values[0], 10),
+                parseInt(values[1], 10)
+              );
+              self.order.data.date = currentOrderDate.getTime();
+              self.showSave = true;
+            },
+          },
+        });
+        self.timePicker.open();
+      },
+      openDateSelect: function openDateSelect() {
+        var self = this;
+        if (self.dateCalendar) {
+          self.dateCalendar.open();
+          return;
+        }
+        var initiallChanged;
+        self.dateCalendar = self.$f7.calendar.create({
+          value: self.order.data.date ? [parseInt(self.order.data.date, 10)] : [],
+          on: {
+            change: function change(calendar, value) {
+              if (!initiallChanged) {
+                initiallChanged = true;
+                return;
+              }
+
+              var currentOrderDate = new Date(
+                parseInt(self.order.data.date, 10)
+              );
+              var newOrderDate = new Date(value[0]);
+
+              currentOrderDate.setFullYear(newOrderDate.getFullYear());
+              currentOrderDate.setMonth(newOrderDate.getMonth());
+              currentOrderDate.setDate(newOrderDate.getDate());
+              self.order.data.date = currentOrderDate.getTime();
+              self.showSave = true;
+            },
+          },
+        });
+        self.dateCalendar.open();
+      },
+      promotionName: function promotionName(id) {
+        var self = this;
+        return self.promotions.filter(function (el) { return el.id === parseInt(id, 10); })[0].name;
+      },
+      promotionDiscount: function promotionDiscount(id) {
+        var self = this;
+        var promo = self.promotions.filter(function (el) { return el.id === parseInt(id, 10); })[0];
+        if (!promo) { return 0; }
+        if (promo.kind !== 'percentage') { return promo.amount; }
+        return self.orderItemsTotal * promo.amount;
+      },
+      productName: function productName(id, type) {
+        if ( type === void 0 ) type = 'VendorProduct';
+
+        var self = this;
+        var product = self[
+          type === 'VendorProduct' ? 'products' : 'packages'
+        ].filter(function (el) { return el.id === parseInt(id, 10); })[0];
+        return product ? product.name : '';
+      },
+      productPrice: function productPrice(id, type) {
+        if ( type === void 0 ) type = 'VendorProduct';
+
+        var self = this;
+        var product = self[
+          type === 'VendorProduct' ? 'products' : 'packages'
+        ].filter(function (el) { return el.id === parseInt(id, 10); })[0];
+        return product ? product.price : 0;
+      },
+      productDuration: function productDuration(id, type) {
+        if ( type === void 0 ) type = 'VendorProduct';
+
+        var self = this;
+        var product = self[
+          type === 'VendorProduct' ? 'products' : 'packages'
+        ].filter(function (el) { return el.id === parseInt(id, 10); })[0];
+        return product ? parseInt(product.data.duration, 10) : 0;
+      },
+
+      formatOrderDate: function formatOrderDate(date) {
+        var self = this;
+        if (!date) { return ''; }
+        return self.$moment(new Date(parseInt(date, 10))).format('D MMM YYYY');
+      },
+      formatOrderTime: function formatOrderTime(date) {
+        var self = this;
+        if (!date) { return ''; }
+        return self.$moment(new Date(parseInt(date, 10))).format('HH:mm');
+      },
+      formatDate: function formatDate(date) {
+        var self = this;
+        return self.$moment(new Date(date)).format('HH:mm D MMM YYYY');
+      },
+      onStatusChange: function onStatusChange(e) {
+        var self = this;
+        var prevStatus = self.order.status;
+        self.order.status = e.target.value;
+        if (prevStatus !== 'paid' && self.order.status === 'paid') {
+          self.orderChangedToPaid = true;
+        }
+        self.showSave = true;
+      },
+      onTypeChange: function onTypeChange(e) {
+        var self = this;
+        if (e.target.value === 'quote') { self.order.quote = true; }
+        else { self.order.quote = false; }
+        self.showSave = true;
+      },
+      increaseOrderItem: function increaseOrderItem(index) {
+        var self = this;
+        self.order.vendor_order_items[index].quantity += 1;
+        self.showSave = true;
+      },
+      decreaseOrderItem: function decreaseOrderItem(index) {
+        var self = this;
+        self.order.vendor_order_items[index].quantity -= 1;
+        if (self.order.vendor_order_items[index].quantity === 0) {
+          if (self.order.vendor_order_items[index].id) {
+            self.order.vendor_order_items[index]._destroy = true;
+          } else {
+            self.order.vendor_order_items.splice(index, 1);
+          }
+        }
+        self.showSave = true;
+      },
+      addOrderItem: function addOrderItem(product, type) {
+        var self = this;
+        self.productsOpened = false;
+        var hasProduct;
+        self.order.vendor_order_items.forEach(function (el) {
+          if (el.orderable_id === product.id) {
+            hasProduct = true;
+            if (el._destroy) {
+              el._destroy = false;
+              delete el._destroy;
+              el.quantity = 1;
+              self.showSave = true;
+            }
+          }
+        });
+        if (hasProduct) { return; }
+
+        self.order.vendor_order_items.push({
+          orderable_id: product.id,
+          orderable_type: type,
+          quantity: 1,
+        });
+        self.showSave = true;
+      },
+      addOrderPromotion: function addOrderPromotion(promotion) {
+        var self = this;
+        self.promotionsOpened = false;
+        self.order.vendor_coupon_id = promotion.id;
+        self.showSave = true;
+      },
+      deleteOrderPromotion: function deleteOrderPromotion() {
+        var self = this;
+        self.order.vendor_coupon_id = null;
+        self.showSave = true;
+      },
+      save: function save() {
+        var self = this;
+        var data = Object.assign({}, self.order);
+        self.showSave = false;
+        if (!data.name && data.vendor_order_items.length) {
+          data.name = self.productName(
+            data.vendor_order_items[0].orderable_id,
+            data.vendor_order_items[0].orderable_type
+          );
+        }
+        data.vendor_order_items_attributes = [].concat( data.vendor_order_items );
+        data.total = self.orderItemsTotal;
+        data.discount = self.orderDiscountTotal;
+        delete data.vendor_order_items;
+
+        var needNewEvent =        self.orderChangedToPaid
+          && !data.event_id
+          && data.data.date
+          && data.data.nurse
+          && data.data.location
+          && data.id
+          && data.user_id;
+        if (needNewEvent) {
+          var orderDate = data.data.date;
+          if (typeof orderDate === 'string') { orderDate = parseInt(orderDate, 10); }
+          var end_at;
+          if (data.data.duration && data.data.duration > 0) {
+            end_at = orderDate + parseInt(data.data.duration, 10) * 60 * 1000;
+          }
+          data.event_attributes = {
+            addon: 'nurse_booking',
+            title: data.name,
+            start_at: new Date(orderDate).toJSON(),
+            end_at: new Date(end_at).toJSON(),
+            location: ((data.data.location.city) + " " + (data.data.location.address)),
+            user_id: data.user_id,
+            team_id: null,
+            assignee_id: data.data.nurse.user_id,
+            assignee_team_id: self.$root.team.id,
+            kind: 'Booking',
+            resource_id: data.id,
+            resource_type: 'VendorOrder',
+          };
+        }
+        API.saveOrder(data).then(function (order) {
+          self.order = order;
+          self.$events.$emit('invoicing:reloadListsOrders');
+        });
+      },
+    },
+  };
+
+  /* script */
+  var __vue_script__$c = script$c;
+
+  /* template */
+  var __vue_render__$c = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "f7-popup",
+      { ref: "popup" },
+      [
+        _c(
+          "f7-view",
+          { attrs: { "ios-dynamic-navbar": false } },
+          [
+            _c(
+              "f7-page",
+              {
+                staticClass: "invoicing-page",
+                attrs: {
+                  name: "invoicing__order-details",
+                  id: "invoicing__order-details"
+                }
+              },
+              [
+                _c(
+                  "f7-navbar",
+                  [
+                    _c(
+                      "f7-nav-left",
+                      [
+                        _c("f7-link", {
+                          attrs: { "popup-close": "", "icon-f7": "close" }
+                        })
+                      ],
+                      1
+                    ),
+                    _vm._v(" "),
+                    _c("f7-nav-title", [_vm._v(_vm._s(_vm.pageTitle))]),
+                    _vm._v(" "),
+                    _c(
+                      "f7-nav-right",
+                      [
+                        _vm.showSave
+                          ? _c("f7-link", {
+                              attrs: { "icon-f7": "check" },
+                              on: { click: _vm.save }
+                            })
+                          : _vm._e()
+                      ],
+                      1
+                    )
+                  ],
+                  1
+                ),
+                _vm._v(" "),
+                _vm.order
+                  ? [
+                      _c(
+                        "f7-list",
+                        { staticClass: "list-custom" },
+                        [
+                          _vm.order.created_at && _vm.order.id
+                            ? _c("f7-list-item", {
+                                attrs: {
+                                  title: _vm.$t(
+                                    "invoicing.order_details.created"
+                                  ),
+                                  after: _vm.formatDate(_vm.order.created_at)
+                                }
+                              })
+                            : _vm._e(),
+                          _vm._v(" "),
+                          _c("f7-list-item", {
+                            attrs: {
+                              title: _vm.$t("invoicing.order_details.due_date"),
+                              link: true,
+                              after: _vm.formatOrderDate(
+                                _vm.order.data
+                                  ? parseInt(_vm.order.data.date, 10)
+                                  : null
+                              )
+                            },
+                            on: { click: _vm.openDateSelect }
+                          }),
+                          _vm._v(" "),
+                          _c("f7-list-item", {
+                            attrs: {
+                              title: _vm.$t("invoicing.order_details.due_time"),
+                              link: true,
+                              after: _vm.formatOrderTime(
+                                _vm.order.data
+                                  ? parseInt(_vm.order.data.date, 10)
+                                  : null
+                              )
+                            },
+                            on: { click: _vm.openTimeSelect }
+                          }),
+                          _vm._v(" "),
+                          _vm.order.data && _vm.order.data.location
+                            ? _c("f7-list-input", {
+                                attrs: {
+                                  label: _vm.$t("invoicing.order_details.city"),
+                                  placeholder: _vm.$t(
+                                    "invoicing.order_details.city_placeholder"
+                                  ),
+                                  type: "text",
+                                  value: _vm.order.data.location.city
+                                },
+                                on: { input: _vm.onCityChange }
+                              })
+                            : _vm._e(),
+                          _vm._v(" "),
+                          _vm.order.data && _vm.order.data.location
+                            ? _c("f7-list-input", {
+                                attrs: {
+                                  label: _vm.$t(
+                                    "invoicing.order_details.address"
+                                  ),
+                                  placeholder: _vm.$t(
+                                    "invoicing.order_details.address_placeholder"
+                                  ),
+                                  type: "text",
+                                  value: _vm.order.data.location.address
+                                },
+                                on: { input: _vm.onAddressChange }
+                              })
+                            : _vm._e(),
+                          _vm._v(" "),
+                          _c(
+                            "f7-list-item",
+                            {
+                              attrs: {
+                                title: _vm.$t("invoicing.order_details.status"),
+                                "smart-select": "",
+                                "smart-select-params": {
+                                  openIn: "popover",
+                                  closeOnSelect: true,
+                                  routableModals: false
+                                }
+                              }
+                            },
+                            [
+                              _c(
+                                "select",
+                                { on: { change: _vm.onStatusChange } },
+                                _vm._l(_vm.orderStatuses, function(
+                                  status,
+                                  index
+                                ) {
+                                  return _c(
+                                    "option",
+                                    {
+                                      key: index,
+                                      domProps: {
+                                        value: status,
+                                        selected: _vm.order.status === status
+                                      }
+                                    },
+                                    [
+                                      _vm._v(
+                                        _vm._s(
+                                          _vm.$t(
+                                            "invoicing.order_status." + status
+                                          )
+                                        )
+                                      )
+                                    ]
+                                  )
+                                }),
+                                0
+                              )
+                            ]
+                          ),
+                          _vm._v(" "),
+                          _c(
+                            "f7-list-item",
+                            {
+                              attrs: {
+                                title: _vm.$t("invoicing.order_details.type"),
+                                "smart-select": "",
+                                "smart-select-params": {
+                                  openIn: "popover",
+                                  closeOnSelect: true,
+                                  routableModals: false
+                                }
+                              }
+                            },
+                            [
+                              _c("select", { on: { change: _vm.onTypeChange } }, [
+                                _c(
+                                  "option",
+                                  {
+                                    attrs: { value: "invoice" },
+                                    domProps: { selected: !_vm.order.quote }
+                                  },
+                                  [
+                                    _vm._v(
+                                      _vm._s(
+                                        _vm.$t("invoicing.list_edit.type_invoice")
+                                      )
+                                    )
+                                  ]
+                                ),
+                                _vm._v(" "),
+                                _c(
+                                  "option",
+                                  {
+                                    attrs: { value: "quote" },
+                                    domProps: { selected: _vm.order.quote }
+                                  },
+                                  [
+                                    _vm._v(
+                                      _vm._s(
+                                        _vm.$t("invoicing.list_edit.type_quote")
+                                      )
+                                    )
+                                  ]
+                                )
+                              ])
+                            ]
+                          ),
+                          _vm._v(" "),
+                          _c("f7-list-item", {
+                            attrs: {
+                              divider: "",
+                              title: _vm.$t("invoicing.order_details.comment")
+                            }
+                          }),
+                          _vm._v(" "),
+                          _c("f7-list-input", {
+                            attrs: {
+                              type: "textarea",
+                              value: _vm.order.comment,
+                              placeholder: _vm.$t(
+                                "invoicing.order_details.comment_placeholder"
+                              ),
+                              resizable: ""
+                            },
+                            on: { input: _vm.onCommentChange }
+                          }),
+                          _vm._v(" "),
+                          _vm.orderAssignee
+                            ? [
+                                _c("f7-list-item", {
+                                  attrs: {
+                                    divider: "",
+                                    title: _vm.$t(
+                                      "invoicing.order_details.assignee"
+                                    )
+                                  }
+                                }),
+                                _vm._v(" "),
+                                _c(
+                                  "f7-list-item",
+                                  {
+                                    attrs: {
+                                      title: _vm.orderAssignee
+                                        ? _vm.orderAssigneeName
+                                        : "",
+                                      "smart-select": ""
+                                    }
+                                  },
+                                  [
+                                    _c("tommy-circle-avatar", {
+                                      attrs: {
+                                        slot: "media",
+                                        data: _vm.orderAssignee
+                                      },
+                                      slot: "media"
+                                    }),
+                                    _vm._v(" "),
+                                    _c(
+                                      "select",
+                                      {
+                                        attrs: { name: "assignee" },
+                                        on: { change: _vm.onAssigneeChange }
+                                      },
+                                      _vm._l(_vm.$root.teamMembers, function(
+                                        teamMember,
+                                        index
+                                      ) {
+                                        return _c(
+                                          "option",
+                                          {
+                                            key:
+                                              "teamMember-" +
+                                              index +
+                                              "-" +
+                                              teamMember.id,
+                                            attrs: {
+                                              "data-option-class":
+                                                "invoicing-smart-select-option",
+                                              "data-option-image":
+                                                teamMember.icon_url
+                                            },
+                                            domProps: {
+                                              value: teamMember.user_id,
+                                              selected:
+                                                _vm.order.user_id ===
+                                                teamMember.user_id
+                                            }
+                                          },
+                                          [
+                                            _vm._v(
+                                              "\n                  " +
+                                                _vm._s(
+                                                  teamMember.first_name || ""
+                                                ) +
+                                                " " +
+                                                _vm._s(teamMember.last_name || "")
+                                            )
+                                          ]
+                                        )
+                                      }),
+                                      0
+                                    ),
+                                    _vm._v(" "),
+                                    _c(
+                                      "f7-link",
+                                      {
+                                        staticStyle: {
+                                          "margin-left": "80px",
+                                          padding: "8px 0"
+                                        },
+                                        attrs: {
+                                          slot: "root",
+                                          href:
+                                            "/team-member-details/?user_id=" +
+                                            _vm.order.assignee_id +
+                                            "&name=" +
+                                            _vm.orderAssigneeName
+                                        },
+                                        slot: "root"
+                                      },
+                                      [
+                                        _c("span", [
+                                          _vm._v(
+                                            _vm._s(
+                                              _vm.$t(
+                                                "invoicing.order_details.assignee_profile"
+                                              )
+                                            )
+                                          )
+                                        ]),
+                                        _vm._v(" "),
+                                        _c("f7-icon", {
+                                          attrs: { f7: "chevron_right", size: 16 }
+                                        })
+                                      ],
+                                      1
+                                    )
+                                  ],
+                                  1
+                                )
+                              ]
+                            : _vm._e(),
+                          _vm._v(" "),
+                          [
+                            _c("f7-list-item", {
+                              attrs: {
+                                divider: "",
+                                title: _vm.$t("invoicing.order_details.customer")
+                              }
+                            }),
+                            _vm._v(" "),
+                            _c(
+                              "f7-list-item",
+                              {
+                                attrs: {
+                                  title: _vm.orderUser ? _vm.orderUserName : "",
+                                  "smart-select": ""
+                                }
+                              },
+                              [
+                                _c("tommy-circle-avatar", {
+                                  attrs: { slot: "media", data: _vm.orderUser },
+                                  slot: "media"
+                                }),
+                                _vm._v(" "),
+                                _c(
+                                  "select",
+                                  {
+                                    attrs: { name: "customer" },
+                                    on: { change: _vm.onCustomerChange }
+                                  },
+                                  [
+                                    _vm._l(_vm.contacts, function(
+                                      contact,
+                                      index
+                                    ) {
+                                      return _c(
+                                        "option",
+                                        {
+                                          key:
+                                            "contact-" +
+                                            index +
+                                            "-" +
+                                            contact.friend_id,
+                                          attrs: {
+                                            "data-option-class":
+                                              "invoicing-smart-select-option",
+                                            "data-option-image": contact.icon_url
+                                          },
+                                          domProps: {
+                                            value: contact.friend_id,
+                                            selected:
+                                              _vm.order.user_id ===
+                                              contact.friend_id
+                                          }
+                                        },
+                                        [
+                                          _vm._v(
+                                            "\n                  " +
+                                              _vm._s(contact.first_name || "") +
+                                              " " +
+                                              _vm._s(contact.last_name || "")
+                                          )
+                                        ]
+                                      )
+                                    }),
+                                    _vm._v(" "),
+                                    _vm._l(_vm.$root.teamMembers, function(
+                                      teamMember,
+                                      index
+                                    ) {
+                                      return _c(
+                                        "option",
+                                        {
+                                          key:
+                                            "teamMember-" +
+                                            index +
+                                            "-" +
+                                            teamMember.id,
+                                          attrs: {
+                                            "data-option-class":
+                                              "invoicing-smart-select-option",
+                                            "data-option-image":
+                                              teamMember.icon_url
+                                          },
+                                          domProps: {
+                                            value: teamMember.user_id,
+                                            selected:
+                                              _vm.order.user_id ===
+                                              teamMember.user_id
+                                          }
+                                        },
+                                        [
+                                          _vm._v(
+                                            "\n                  " +
+                                              _vm._s(
+                                                teamMember.first_name || ""
+                                              ) +
+                                              " " +
+                                              _vm._s(teamMember.last_name || "")
+                                          )
+                                        ]
+                                      )
+                                    })
+                                  ],
+                                  2
+                                ),
+                                _vm._v(" "),
+                                _c(
+                                  "f7-link",
+                                  {
+                                    staticStyle: {
+                                      "margin-left": "80px",
+                                      padding: "8px 0"
+                                    },
+                                    attrs: {
+                                      slot: "root",
+                                      href:
+                                        "/contact-details/?user_id=" +
+                                        _vm.order.assignee_id
+                                    },
+                                    slot: "root"
+                                  },
+                                  [
+                                    _c("span", [
+                                      _vm._v(
+                                        _vm._s(
+                                          _vm.$t(
+                                            "invoicing.order_details.customer_profile"
+                                          )
+                                        )
+                                      )
+                                    ]),
+                                    _vm._v(" "),
+                                    _c("f7-icon", {
+                                      attrs: { f7: "chevron_right", size: 16 }
+                                    })
+                                  ],
+                                  1
+                                )
+                              ],
+                              1
+                            )
+                          ],
+                          _vm._v(" "),
+                          _c("f7-list-item", {
+                            attrs: {
+                              divider: "",
+                              title: _vm.$t("invoicing.order_details.items")
+                            }
+                          }),
+                          _vm._v(" "),
+                          _vm.products && _vm.packages
+                            ? _c(
+                                "li",
+                                { staticClass: "invoicing-order-items" },
+                                [
+                                  _c(
+                                    "div",
+                                    {
+                                      staticClass: "invoicing-order-add-box",
+                                      on: {
+                                        click: function($event) {
+                                          _vm.productsOpened = true;
+                                        }
+                                      }
+                                    },
+                                    [
+                                      _c("f7-icon", { attrs: { f7: "add" } }),
+                                      _vm._v(" "),
+                                      _c(
+                                        "div",
+                                        {
+                                          staticClass:
+                                            "invoicing-order-add-box-placeholder"
+                                        },
+                                        [
+                                          _vm._v(
+                                            _vm._s(
+                                              _vm.$t(
+                                                "invoicing.order_details.add_item_label"
+                                              )
+                                            )
+                                          )
+                                        ]
+                                      )
+                                    ],
+                                    1
+                                  ),
+                                  _vm._v(" "),
+                                  _vm._l(_vm.order.vendor_order_items, function(
+                                    product,
+                                    index
+                                  ) {
+                                    return !product._destroy
+                                      ? _c(
+                                          "div",
+                                          {
+                                            key:
+                                              product.orderable_id + "-" + index,
+                                            staticClass: "invoicing-order-item"
+                                          },
+                                          [
+                                            _c(
+                                              "div",
+                                              {
+                                                staticClass:
+                                                  "invoicing-order-item-name"
+                                              },
+                                              [
+                                                _vm._v(
+                                                  _vm._s(
+                                                    _vm.productName(
+                                                      product.orderable_id,
+                                                      product.orderable_type
+                                                    )
+                                                  ) + "\n              "
+                                                )
+                                              ]
+                                            ),
+                                            _vm._v(" "),
+                                            _c(
+                                              "div",
+                                              {
+                                                staticClass:
+                                                  "invoicing-order-item-details"
+                                              },
+                                              [
+                                                _c(
+                                                  "div",
+                                                  {
+                                                    staticClass:
+                                                      "invoicing-order-item-price"
+                                                  },
+                                                  [
+                                                    _vm._v(
+                                                      _vm._s(
+                                                        _vm.productPrice(
+                                                          product.orderable_id,
+                                                          product.orderable_type
+                                                        )
+                                                      ) + "\n                "
+                                                    )
+                                                  ]
+                                                ),
+                                                _vm._v(" "),
+                                                _c(
+                                                  "div",
+                                                  {
+                                                    staticClass:
+                                                      "invoicing-order-item-selector"
+                                                  },
+                                                  [
+                                                    _c("f7-link", {
+                                                      attrs: {
+                                                        "icon-f7": "delete_round"
+                                                      },
+                                                      on: {
+                                                        click: function($event) {
+                                                          return _vm.decreaseOrderItem(
+                                                            index
+                                                          )
+                                                        }
+                                                      }
+                                                    }),
+                                                    _vm._v(" "),
+                                                    _c(
+                                                      "div",
+                                                      {
+                                                        staticClass:
+                                                          "invoicing-order-item-qty"
+                                                      },
+                                                      [
+                                                        _vm._v(
+                                                          _vm._s(product.quantity)
+                                                        )
+                                                      ]
+                                                    ),
+                                                    _vm._v(" "),
+                                                    _c("f7-link", {
+                                                      attrs: {
+                                                        "icon-f7":
+                                                          "add_round_fill"
+                                                      },
+                                                      on: {
+                                                        click: function($event) {
+                                                          return _vm.increaseOrderItem(
+                                                            index
+                                                          )
+                                                        }
+                                                      }
+                                                    })
+                                                  ],
+                                                  1
+                                                )
+                                              ]
+                                            )
+                                          ]
+                                        )
+                                      : _vm._e()
+                                  }),
+                                  _vm._v(" "),
+                                  _vm.orderItemsTotal
+                                    ? _c(
+                                        "div",
+                                        { staticClass: "invoicing-order-total" },
+                                        [
+                                          _c(
+                                            "div",
+                                            {
+                                              staticClass:
+                                                "invoicing-order-total-row"
+                                            },
+                                            [
+                                              _c(
+                                                "div",
+                                                {
+                                                  staticClass:
+                                                    "invoicing-order-total-label"
+                                                },
+                                                [
+                                                  _vm._v(
+                                                    _vm._s(
+                                                      _vm.$t(
+                                                        "invoicing.order_details.total"
+                                                      )
+                                                    )
+                                                  )
+                                                ]
+                                              ),
+                                              _vm._v(" "),
+                                              _c(
+                                                "div",
+                                                {
+                                                  staticClass:
+                                                    "invoicing-order-total-value"
+                                                },
+                                                [
+                                                  _vm._v(
+                                                    _vm._s(_vm.orderItemsTotal)
+                                                  )
+                                                ]
+                                              )
+                                            ]
+                                          )
+                                        ]
+                                      )
+                                    : _vm._e()
+                                ],
+                                2
+                              )
+                            : _vm._e(),
+                          _vm._v(" "),
+                          _c("f7-list-item", {
+                            attrs: {
+                              divider: "",
+                              title: _vm.$t("invoicing.order_details.promotions")
+                            }
+                          }),
+                          _vm._v(" "),
+                          _vm.promotions
+                            ? _c("li", { staticClass: "invoicing-order-items" }, [
+                                _c(
+                                  "div",
+                                  {
+                                    staticClass: "invoicing-order-add-box",
+                                    on: {
+                                      click: function($event) {
+                                        _vm.promotionsOpened = true;
+                                      }
+                                    }
+                                  },
+                                  [
+                                    _c("f7-icon", { attrs: { f7: "add" } }),
+                                    _vm._v(" "),
+                                    _c(
+                                      "div",
+                                      {
+                                        staticClass:
+                                          "invoicing-order-add-box-placeholder"
+                                      },
+                                      [
+                                        _vm._v(
+                                          _vm._s(
+                                            _vm.$t(
+                                              "invoicing.order_details.add_promotion_label"
+                                            )
+                                          ) + "\n              "
+                                        )
+                                      ]
+                                    )
+                                  ],
+                                  1
+                                ),
+                                _vm._v(" "),
+                                _vm.order.vendor_coupon_id
+                                  ? _c(
+                                      "div",
+                                      { staticClass: "invoicing-order-item" },
+                                      [
+                                        _c(
+                                          "div",
+                                          {
+                                            staticClass:
+                                              "invoicing-order-item-name"
+                                          },
+                                          [
+                                            _vm._v(
+                                              _vm._s(
+                                                _vm.promotionName(
+                                                  _vm.order.vendor_coupon_id
+                                                )
+                                              )
+                                            )
+                                          ]
+                                        ),
+                                        _vm._v(" "),
+                                        _c(
+                                          "div",
+                                          {
+                                            staticClass:
+                                              "invoicing-order-item-details"
+                                          },
+                                          [
+                                            _c(
+                                              "div",
+                                              {
+                                                staticClass:
+                                                  "invoicing-order-item-price"
+                                              },
+                                              [
+                                                _vm._v(
+                                                  "-" +
+                                                    _vm._s(
+                                                      _vm.promotionDiscount(
+                                                        _vm.order.vendor_coupon_id
+                                                      )
+                                                    )
+                                                )
+                                              ]
+                                            ),
+                                            _vm._v(" "),
+                                            _c(
+                                              "div",
+                                              {
+                                                staticClass:
+                                                  "invoicing-order-item-selector"
+                                              },
+                                              [
+                                                _c("f7-link", {
+                                                  attrs: {
+                                                    "icon-f7": "delete_round"
+                                                  },
+                                                  on: {
+                                                    click: function($event) {
+                                                      return _vm.deleteOrderPromotion()
+                                                    }
+                                                  }
+                                                })
+                                              ],
+                                              1
+                                            )
+                                          ]
+                                        )
+                                      ]
+                                    )
+                                  : _vm._e(),
+                                _vm._v(" "),
+                                _vm.orderDiscountTotal
+                                  ? _c(
+                                      "div",
+                                      { staticClass: "invoicing-order-total" },
+                                      [
+                                        _c(
+                                          "div",
+                                          {
+                                            staticClass:
+                                              "invoicing-order-total-row"
+                                          },
+                                          [
+                                            _c(
+                                              "div",
+                                              {
+                                                staticClass:
+                                                  "invoicing-order-total-label"
+                                              },
+                                              [
+                                                _vm._v(
+                                                  _vm._s(
+                                                    _vm.$t(
+                                                      "invoicing.order_details.total"
+                                                    )
+                                                  )
+                                                )
+                                              ]
+                                            ),
+                                            _vm._v(" "),
+                                            _c(
+                                              "div",
+                                              {
+                                                staticClass:
+                                                  "invoicing-order-total-value"
+                                              },
+                                              [
+                                                _vm._v(
+                                                  "-" +
+                                                    _vm._s(_vm.orderDiscountTotal)
+                                                )
+                                              ]
+                                            )
+                                          ]
+                                        )
+                                      ]
+                                    )
+                                  : _vm._e()
+                              ])
+                            : _vm._e(),
+                          _vm._v(" "),
+                          _c("f7-list-item", {
+                            attrs: {
+                              divider: "",
+                              title: _vm.$t("invoicing.order_details.payment")
+                            }
+                          }),
+                          _vm._v(" "),
+                          _vm.products && _vm.packages && _vm.promotions
+                            ? _c("li", { staticClass: "invoicing-order-items" }, [
+                                _c(
+                                  "div",
+                                  { staticClass: "invoicing-order-total" },
+                                  [
+                                    _vm.orderItemsTotal
+                                      ? _c(
+                                          "div",
+                                          {
+                                            staticClass:
+                                              "invoicing-order-total-row"
+                                          },
+                                          [
+                                            _c(
+                                              "div",
+                                              {
+                                                staticClass:
+                                                  "invoicing-order-total-label"
+                                              },
+                                              [
+                                                _vm._v(
+                                                  _vm._s(
+                                                    _vm.$t(
+                                                      "invoicing.order_details.items"
+                                                    )
+                                                  )
+                                                )
+                                              ]
+                                            ),
+                                            _vm._v(" "),
+                                            _c(
+                                              "div",
+                                              {
+                                                staticClass:
+                                                  "invoicing-order-total-value"
+                                              },
+                                              [
+                                                _vm._v(
+                                                  _vm._s(_vm.orderItemsTotal)
+                                                )
+                                              ]
+                                            )
+                                          ]
+                                        )
+                                      : _vm._e(),
+                                    _vm._v(" "),
+                                    _vm.orderDiscountTotal
+                                      ? _c(
+                                          "div",
+                                          {
+                                            staticClass:
+                                              "invoicing-order-total-row"
+                                          },
+                                          [
+                                            _c(
+                                              "div",
+                                              {
+                                                staticClass:
+                                                  "invoicing-order-total-label"
+                                              },
+                                              [
+                                                _vm._v(
+                                                  _vm._s(
+                                                    _vm.$t(
+                                                      "invoicing.order_details.promotions"
+                                                    )
+                                                  )
+                                                )
+                                              ]
+                                            ),
+                                            _vm._v(" "),
+                                            _c(
+                                              "div",
+                                              {
+                                                staticClass:
+                                                  "invoicing-order-total-value"
+                                              },
+                                              [
+                                                _vm._v(
+                                                  "-" +
+                                                    _vm._s(_vm.orderDiscountTotal)
+                                                )
+                                              ]
+                                            )
+                                          ]
+                                        )
+                                      : _vm._e(),
+                                    _vm._v(" "),
+                                    _vm.order.data.payment_method
+                                      ? _c(
+                                          "div",
+                                          {
+                                            staticClass:
+                                              "invoicing-order-total-row"
+                                          },
+                                          [
+                                            _c(
+                                              "div",
+                                              {
+                                                staticClass:
+                                                  "invoicing-order-total-label"
+                                              },
+                                              [
+                                                _vm._v(
+                                                  _vm._s(
+                                                    _vm.$t(
+                                                      "invoicing.order_details.via_label"
+                                                    )
+                                                  )
+                                                )
+                                              ]
+                                            ),
+                                            _vm._v(" "),
+                                            _c(
+                                              "div",
+                                              {
+                                                staticClass:
+                                                  "invoicing-order-total-value"
+                                              },
+                                              [
+                                                _vm._v(
+                                                  "\n                  " +
+                                                    _vm._s(
+                                                      _vm.$t(
+                                                        "invoicing.order_details.via_" +
+                                                          _vm.order.data
+                                                            .payment_method
+                                                      )
+                                                    )
+                                                )
+                                              ]
+                                            )
+                                          ]
+                                        )
+                                      : _vm._e(),
+                                    _vm._v(" "),
+                                    _c(
+                                      "div",
+                                      {
+                                        staticClass:
+                                          "invoicing-order-total-row invoicing-order-final-row"
+                                      },
+                                      [
+                                        _c(
+                                          "div",
+                                          {
+                                            staticClass:
+                                              "invoicing-order-total-label"
+                                          },
+                                          [
+                                            _vm._v(
+                                              _vm._s(
+                                                _vm.$t(
+                                                  "invoicing.order_details.total"
+                                                )
+                                              )
+                                            )
+                                          ]
+                                        ),
+                                        _vm._v(" "),
+                                        _c(
+                                          "div",
+                                          {
+                                            staticClass:
+                                              "invoicing-order-total-value"
+                                          },
+                                          [_vm._v(_vm._s(_vm.orderTotal))]
+                                        )
+                                      ]
+                                    )
+                                  ]
+                                )
+                              ])
+                            : _vm._e(),
+                          _vm._v(" "),
+                          _vm.order &&
+                          _vm.order.data.feedback &&
+                          _vm.products &&
+                          _vm.packages
+                            ? [
+                                _c("f7-list-item", {
+                                  attrs: {
+                                    divider: "",
+                                    title: _vm.$t(
+                                      "invoicing.order_feedback_results.time_clocking"
+                                    )
+                                  }
+                                }),
+                                _vm._v(" "),
+                                _c("f7-list-item", {
+                                  attrs: {
+                                    title: _vm.$t(
+                                      "invoicing.order_feedback_results.scheduled"
+                                    ),
+                                    after: _vm.calcOrderDuration()
+                                  }
+                                }),
+                                _vm._v(" "),
+                                _c("f7-list-item", {
+                                  attrs: {
+                                    title: _vm.$t(
+                                      "invoicing.order_feedback_results.start"
+                                    ),
+                                    after: _vm
+                                      .$moment(parseInt(_vm.order.data.date, 10))
+                                      .format("H:mm DD MMM YYYY")
+                                  }
+                                }),
+                                _vm._v(" "),
+                                _c("f7-list-item", {
+                                  attrs: {
+                                    title: _vm.$t(
+                                      "invoicing.order_feedback_results.finish"
+                                    ),
+                                    after: _vm
+                                      .$moment(
+                                        parseInt(_vm.order.data.date, 10) +
+                                          _vm.calcOrderDuration() * 60 * 1000
+                                      )
+                                      .format("H:mm DD MMM YYYY")
+                                  }
+                                }),
+                                _vm._v(" "),
+                                _vm.order.data.feedback.start_date &&
+                                _vm.order.data.feedback.end_date
+                                  ? [
+                                      _c("f7-list-item", {
+                                        attrs: {
+                                          divider: "",
+                                          title: _vm.$t(
+                                            "invoicing.order_feedback_results.time_change"
+                                          )
+                                        }
+                                      }),
+                                      _vm._v(" "),
+                                      _c("f7-list-item", {
+                                        attrs: {
+                                          title: _vm.$t(
+                                            "invoicing.order_feedback_results.start"
+                                          ),
+                                          after: _vm
+                                            .$moment(
+                                              _vm.order.data.feedback.start_date
+                                            )
+                                            .format("H:mm DD MMM YYYY")
+                                        }
+                                      }),
+                                      _vm._v(" "),
+                                      _c("f7-list-item", {
+                                        attrs: {
+                                          title: _vm.$t(
+                                            "invoicing.order_feedback_results.finish"
+                                          ),
+                                          after: _vm
+                                            .$moment(
+                                              _vm.order.data.feedback.end_date
+                                            )
+                                            .format("H:mm DD MMM YYYY")
+                                        }
+                                      })
+                                    ]
+                                  : _vm._e(),
+                                _vm._v(" "),
+                                _vm.order.data.feedback.actual_start_date &&
+                                _vm.order.data.feedback.actual_end_date
+                                  ? [
+                                      _c("f7-list-item", {
+                                        attrs: {
+                                          divider: "",
+                                          title: _vm.$t(
+                                            "invoicing.order_feedback_results.actual_time"
+                                          )
+                                        }
+                                      }),
+                                      _vm._v(" "),
+                                      _c("f7-list-item", {
+                                        attrs: {
+                                          title: _vm.$t(
+                                            "invoicing.order_feedback_results.start"
+                                          ),
+                                          after: _vm
+                                            .$moment(
+                                              _vm.order.data.feedback
+                                                .actual_start_date
+                                            )
+                                            .format("H:mm DD MMM YYYY")
+                                        }
+                                      }),
+                                      _vm._v(" "),
+                                      _c("f7-list-item", {
+                                        attrs: {
+                                          title: _vm.$t(
+                                            "invoicing.order_feedback_results.finish"
+                                          ),
+                                          after: _vm
+                                            .$moment(
+                                              _vm.order.data.feedback
+                                                .actual_end_date
+                                            )
+                                            .format("H:mm DD MMM YYYY")
+                                        }
+                                      })
+                                    ]
+                                  : _vm._e(),
+                                _vm._v(" "),
+                                _c("f7-list-item", {
+                                  attrs: {
+                                    divider: "",
+                                    title: _vm.$t(
+                                      "invoicing.order_feedback_results.feedback"
+                                    )
+                                  }
+                                }),
+                                _vm._v(" "),
+                                _c("f7-list-item", {
+                                  attrs: {
+                                    title: _vm.$t(
+                                      "invoicing.order_feedback_results.question_1"
+                                    ),
+                                    after: _vm.$t(
+                                      "invoicing.order_feedback_results." +
+                                        _vm.order.data.feedback.question1
+                                    )
+                                  }
+                                }),
+                                _vm._v(" "),
+                                _c("f7-list-item", {
+                                  attrs: {
+                                    title: _vm.$t(
+                                      "invoicing.order_feedback_results.question_2"
+                                    ),
+                                    after: _vm.$t(
+                                      "invoicing.order_feedback_results." +
+                                        _vm.order.data.feedback.question2
+                                    )
+                                  }
+                                }),
+                                _vm._v(" "),
+                                _c("f7-list-item", {
+                                  attrs: {
+                                    title: _vm.$t(
+                                      "invoicing.order_feedback_results.question_3"
+                                    ),
+                                    after: _vm.$t(
+                                      "invoicing.order_feedback_results." +
+                                        _vm.order.data.feedback.question3
+                                    )
+                                  }
+                                })
+                              ]
+                            : _vm._e()
+                        ],
+                        2
+                      ),
+                      _vm._v(" "),
+                      _vm.orderCancelable
+                        ? _c(
+                            "f7-list",
+                            { staticClass: "margin-top margin-bottom" },
+                            [
+                              _c(
+                                "f7-list-button",
+                                {
+                                  staticClass: "color-custom",
+                                  attrs: { color: "custom" },
+                                  on: { click: _vm.cancelOrder }
+                                },
+                                [
+                                  _vm._v(
+                                    "\n            " +
+                                      _vm._s(
+                                        _vm.$t(
+                                          "invoicing.order_details.cancel_button",
+                                          "Cancel Order"
+                                        )
+                                      )
+                                  )
+                                ]
+                              )
+                            ],
+                            1
+                          )
+                        : _vm._e(),
+                      _vm._v(" "),
+                      _vm.products && _vm.packages
+                        ? _c(
+                            "f7-popup",
+                            {
+                              attrs: { opened: _vm.productsOpened },
+                              on: {
+                                "popup:closed": function($event) {
+                                  _vm.productsOpened = false;
+                                }
+                              }
+                            },
+                            [
+                              _c(
+                                "f7-view",
+                                { attrs: { init: false } },
+                                [
+                                  _c(
+                                    "f7-page",
+                                    { staticClass: "invoicing-page" },
+                                    [
+                                      _c(
+                                        "f7-navbar",
+                                        [
+                                          _c(
+                                            "f7-nav-right",
+                                            [
+                                              _c("f7-link", {
+                                                attrs: { "icon-f7": "close" },
+                                                on: {
+                                                  click: function($event) {
+                                                    _vm.productsOpened = false;
+                                                  }
+                                                }
+                                              })
+                                            ],
+                                            1
+                                          ),
+                                          _vm._v(" "),
+                                          _c("f7-nav-title", [
+                                            _vm._v(
+                                              _vm._s(
+                                                _vm.$t(
+                                                  "invoicing.order_details.add_item_label"
+                                                )
+                                              )
+                                            )
+                                          ])
+                                        ],
+                                        1
+                                      ),
+                                      _vm._v(" "),
+                                      _c("f7-searchbar", {
+                                        attrs: {
+                                          "search-container":
+                                            ".invoicing-order-details-items",
+                                          "disable-button": false
+                                        }
+                                      }),
+                                      _vm._v(" "),
+                                      _c(
+                                        "f7-list",
+                                        {
+                                          staticClass:
+                                            "list-custom invoicing-order-details-products invoicing-order-details-items"
+                                        },
+                                        [
+                                          _c("f7-list-item", {
+                                            attrs: {
+                                              divider: "",
+                                              title: _vm.$t(
+                                                "invoicing.order_details.packages"
+                                              )
+                                            }
+                                          }),
+                                          _vm._v(" "),
+                                          _vm._l(_vm.packages, function(pkg) {
+                                            return _c("f7-list-item", {
+                                              key: "package-" + pkg.id,
+                                              attrs: {
+                                                link: "",
+                                                title: pkg.name,
+                                                after: "¥" + pkg.price
+                                              },
+                                              on: {
+                                                click: function($event) {
+                                                  return _vm.addOrderItem(
+                                                    pkg,
+                                                    "VendorPackage"
+                                                  )
+                                                }
+                                              }
+                                            })
+                                          }),
+                                          _vm._v(" "),
+                                          _c("f7-list-item", {
+                                            attrs: {
+                                              divider: "",
+                                              title: _vm.$t(
+                                                "invoicing.order_details.items"
+                                              )
+                                            }
+                                          }),
+                                          _vm._v(" "),
+                                          _vm._l(_vm.products, function(product) {
+                                            return _c("f7-list-item", {
+                                              key: "product-" + product.id,
+                                              attrs: {
+                                                link: "",
+                                                title: product.name,
+                                                after: "¥" + product.price
+                                              },
+                                              on: {
+                                                click: function($event) {
+                                                  return _vm.addOrderItem(
+                                                    product,
+                                                    "VendorProduct"
+                                                  )
+                                                }
+                                              }
+                                            })
+                                          })
+                                        ],
+                                        2
+                                      )
+                                    ],
+                                    1
+                                  )
+                                ],
+                                1
+                              )
+                            ],
+                            1
+                          )
+                        : _vm._e(),
+                      _vm._v(" "),
+                      _vm.promotions
+                        ? _c(
+                            "f7-popup",
+                            {
+                              attrs: { opened: _vm.promotionsOpened },
+                              on: {
+                                "popup:closed": function($event) {
+                                  _vm.promotionsOpened = false;
+                                }
+                              }
+                            },
+                            [
+                              _c(
+                                "f7-view",
+                                { attrs: { init: false } },
+                                [
+                                  _c(
+                                    "f7-page",
+                                    [
+                                      _c(
+                                        "f7-navbar",
+                                        [
+                                          _c(
+                                            "f7-nav-right",
+                                            [
+                                              _c("f7-link", {
+                                                attrs: { "icon-f7": "close" },
+                                                on: {
+                                                  click: function($event) {
+                                                    _vm.promotionsOpened = false;
+                                                  }
+                                                }
+                                              })
+                                            ],
+                                            1
+                                          ),
+                                          _vm._v(" "),
+                                          _c("f7-nav-title", [
+                                            _vm._v(
+                                              _vm._s(
+                                                _vm.$t(
+                                                  "invoicing.order_details.add_promotion_label"
+                                                )
+                                              )
+                                            )
+                                          ])
+                                        ],
+                                        1
+                                      ),
+                                      _vm._v(" "),
+                                      _c("f7-searchbar", {
+                                        attrs: {
+                                          "search-container":
+                                            ".invoicing-order-details-promotions",
+                                          "disable-button": false
+                                        }
+                                      }),
+                                      _vm._v(" "),
+                                      _c(
+                                        "f7-list",
+                                        {
+                                          staticClass:
+                                            "list-custom invoicing-order-details-products invoicing-order-details-promotions"
+                                        },
+                                        _vm._l(_vm.promotions, function(
+                                          promotion
+                                        ) {
+                                          return _c("f7-list-item", {
+                                            key: promotion.id,
+                                            attrs: {
+                                              link: "",
+                                              title: promotion.name,
+                                              after:
+                                                "- ¥" +
+                                                (promotion.kind !== "percentage"
+                                                  ? promotion.amount
+                                                  : promotion.amount *
+                                                    _vm.order.total)
+                                            },
+                                            on: {
+                                              click: function($event) {
+                                                return _vm.addOrderPromotion(
+                                                  promotion
+                                                )
+                                              }
+                                            }
+                                          })
+                                        }),
+                                        1
+                                      )
+                                    ],
+                                    1
+                                  )
+                                ],
+                                1
+                              )
+                            ],
+                            1
+                          )
+                        : _vm._e()
+                    ]
+                  : _vm._e()
+              ],
+              2
+            )
+          ],
+          1
+        )
+      ],
+      1
+    )
+  };
+  var __vue_staticRenderFns__$c = [];
+  __vue_render__$c._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__$c = undefined;
+    /* scoped */
+    var __vue_scope_id__$c = undefined;
+    /* module identifier */
+    var __vue_module_identifier__$c = undefined;
+    /* functional template */
+    var __vue_is_functional_template__$c = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var OrderDetailsPage = normalizeComponent_1(
+      { render: __vue_render__$c, staticRenderFns: __vue_staticRenderFns__$c },
+      __vue_inject_styles__$c,
+      __vue_script__$c,
+      __vue_scope_id__$c,
+      __vue_is_functional_template__$c,
+      __vue_module_identifier__$c,
+      undefined,
+      undefined
+    );
+
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+  //
+
+  var script$d = {
+    props: {
+      order: Object,
+      orderDuration: Number,
+    },
+    data: function data() {
+      return {
+        navTitle: this.t('confirm_title'),
+        step: 'step-1',
+        q1: null,
+        q2: null,
+        q3: null,
+        saved: false,
+        start_date: null,
+        end_date: null,
+      };
+    },
+    computed: {
+      durationFormatted: function durationFormatted() {
+        return Math.floor(this.orderDuration / 60 * 10) / 10;
+      },
+    },
+    mounted: function mounted() {
+      var self = this;
+      self.$f7.navbar.size(self.$el.querySelector('.navbar'));
+    },
+    methods: {
+      t: function t(s, data) {
+        return this.$t(("invoicing.order_feedback." + s), data);
+      },
+      stepBack: function stepBack() {
+        var self = this;
+        var step = self.step;
+        if (step === 'step-1-2') {
+          self.start_date = null;
+          self.end_date = null;
+          self.step = 'step-1';
+        }
+        if (step === 'step-2' && self.start_date) {
+          self.step = 'step-1-2';
+          self.$nextTick(function () {
+            self.initTimePickers();
+          });
+        } else if (step === 'step-2') {
+          self.step = 'step-1';
+        }
+        if (step === 'step-3') {
+          self.step = 'step-2';
+        }
+        if (step === 'question-1') {
+          self.step = 'step-3';
+        }
+        if (step === 'question-2') {
+          self.step = 'question-1';
+        }
+        if (step === 'question-3') {
+          self.step = 'question-2';
+        }
+      },
+      setStep: function setStep(step, data) {
+        var self = this;
+        if (step === 'step-1-2') {
+          self.step = step;
+          self.$nextTick(function () {
+            self.initTimePickers();
+          });
+        }
+        if (step === 'step-2') {
+          self.step = step;
+        }
+        if (step === 'step-3') {
+          self.step = step;
+        }
+        if (step === 'question-1') {
+          self.step = step;
+        }
+        if (step === 'question-2') {
+          self.step = step;
+          self.q1 = data;
+        }
+        if (step === 'question-3') {
+          self.step = step;
+          self.q2 = data;
+        }
+        if (step === 'step-4') {
+          self.step = step;
+          self.q3 = data;
+          self.saveFeedback();
+        }
+      },
+      initTimePickers: function initTimePickers() {
+        var self = this;
+        var orderDate = new Date(parseInt(self.order.data.date, 10));
+        var minDate = orderDate.getTime() - 10 * 24 * 60 * 60 * 1000;
+        var dates = [];
+        for (var i = 0; i < 21; i += 1) {
+          dates.push(minDate + i * 24 * 60 * 60 * 1000);
+        }
+        var hours = [];
+        for (var i$1 = 0; i$1 < 24; i$1 += 1) {
+          hours.push(i$1 < 10 ? ("0" + i$1) : i$1);
+        }
+        var minutes = [];
+        for (var i$2 = 0; i$2 < 60; i$2 += 1) {
+          minutes.push(i$2 < 10 ? ("0" + i$2) : i$2);
+        }
+        var orderHours = orderDate.getHours();
+        if (orderHours < 10) { orderHours = "0" + orderHours; }
+
+        var orderMinutes = orderDate.getMinutes();
+        if (orderMinutes < 10) { orderMinutes = "0" + orderMinutes; }
+
+        self.$f7.picker.create({
+          inputEl: self.$el.querySelector('#start_date'),
+          openIn: 'popover',
+          value: [orderDate.getTime(), orderHours, orderMinutes],
+          cols: [
+            {
+              values: dates,
+              displayValues: dates.map(function (d) { return self.$moment(d).format('ddd, DD MMM'); }),
+            },
+            { values: hours },
+            { divider: true, content: ':' },
+            { values: minutes } ],
+          formatValue: function formatValue(values, displayValues) {
+            return ((displayValues[0]) + " " + (displayValues[1]) + ":" + (displayValues[2]));
+          },
+          on: {
+            change: function change(p, value) {
+              var d = new Date(parseInt(value[0], 10));
+              d.setHours(parseInt(value[1], 10), parseInt(value[2], 10), 0, 0);
+              self.start_date = d;
+            },
+          },
+        });
+
+        var endDate = new Date(orderDate.getTime() + self.orderDuration * 60 * 1000);
+        var endHours = endDate.getHours();
+        if (endHours < 10) { endHours = "0" + endHours; }
+
+        var endMinutes = endDate.getMinutes();
+        if (endMinutes < 10) { endMinutes = "0" + endMinutes; }
+
+        self.$f7.picker.create({
+          inputEl: self.$el.querySelector('#end_date'),
+          openIn: 'popover',
+          value: [orderDate.getTime(), endHours, endMinutes],
+          cols: [
+            {
+              values: dates,
+              displayValues: dates.map(function (d) { return self.$moment(d).format('ddd, DD MMM'); }),
+            },
+            { values: hours },
+            { divider: true, content: ':' },
+            { values: minutes } ],
+          formatValue: function formatValue(values, displayValues) {
+            return ((displayValues[0]) + " " + (displayValues[1]) + ":" + (displayValues[2]));
+          },
+          on: {
+            change: function change(p, value) {
+              var d = new Date(parseInt(value[0], 10));
+              d.setHours(parseInt(value[1], 10), parseInt(value[2], 10), 0, 0);
+              self.end_date = d;
+            },
+          },
+        });
+      },
+      saveFeedback: function saveFeedback() {
+        var self = this;
+        self.$emit('feedbackComplete', {
+          feedback: {
+            question1: self.q1,
+            question2: self.q2,
+            question3: self.q2,
+            start_date: self.start_date ? self.start_date.toJSON() : null,
+            end_date: self.end_date ? self.end_date.toJSON() : null,
+          },
+          callback: function callback() {
+            self.saved = true;
+          },
+        });
+      },
+      closeFeedback: function closeFeedback() {
+        var self = this;
+        self.$emit('close');
+      },
+    },
+  };
+
+  /* script */
+  var __vue_script__$d = script$d;
+
+  /* template */
+  var __vue_render__$d = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "f7-page",
+      { staticClass: "invoicing-feedback" },
+      [
+        _c(
+          "f7-navbar",
+          [
+            _vm.saved
+              ? _c(
+                  "f7-nav-left",
+                  [
+                    _c("f7-link", {
+                      attrs: { "icon-f7": "close" },
+                      on: { click: _vm.closeFeedback }
+                    })
+                  ],
+                  1
+                )
+              : _vm._e(),
+            _vm._v(" "),
+            !_vm.saved && _vm.step !== "step-1" && _vm.step !== "step-4"
+              ? _c(
+                  "f7-nav-left",
+                  [
+                    _c("f7-link", {
+                      attrs: { icon: "icon-back" },
+                      on: { click: _vm.stepBack }
+                    })
+                  ],
+                  1
+                )
+              : _vm._e(),
+            _vm._v(" "),
+            _c("f7-nav-title", [_vm._v(_vm._s(_vm.navTitle))])
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _vm.step === "step-1"
+          ? _c(
+              "div",
+              {
+                staticClass: "invoicing-feedback-buttons",
+                attrs: { slot: "fixed" },
+                slot: "fixed"
+              },
+              [
+                _c(
+                  "a",
+                  {
+                    staticClass: "invoicing-feedback-button-no",
+                    on: {
+                      click: function($event) {
+                        return _vm.setStep("step-1-2")
+                      }
+                    }
+                  },
+                  [_vm._v(_vm._s(_vm.t("button_no")))]
+                ),
+                _vm._v(" "),
+                _c(
+                  "a",
+                  {
+                    staticClass: "invoicing-feedback-button-yes",
+                    on: {
+                      click: function($event) {
+                        return _vm.setStep("step-2")
+                      }
+                    }
+                  },
+                  [_vm._v(_vm._s(_vm.t("button_yes")))]
+                )
+              ]
+            )
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.step === "step-1-2"
+          ? _c(
+              "div",
+              {
+                staticClass: "invoicing-feedback-buttons",
+                attrs: { slot: "fixed" },
+                slot: "fixed"
+              },
+              [
+                _c(
+                  "a",
+                  {
+                    staticClass: "invoicing-feedback-button-submit",
+                    on: {
+                      click: function($event) {
+                        return _vm.setStep("step-2")
+                      }
+                    }
+                  },
+                  [_vm._v(_vm._s(_vm.t("button_submit")))]
+                )
+              ]
+            )
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.step === "step-2"
+          ? _c(
+              "div",
+              {
+                staticClass: "invoicing-feedback-buttons",
+                attrs: { slot: "fixed" },
+                slot: "fixed"
+              },
+              [
+                _c(
+                  "a",
+                  {
+                    staticClass: "invoicing-feedback-button-submit",
+                    on: {
+                      click: function($event) {
+                        return _vm.setStep("step-3")
+                      }
+                    }
+                  },
+                  [_vm._v(_vm._s(_vm.t("button_start")))]
+                )
+              ]
+            )
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.step === "step-3"
+          ? _c(
+              "div",
+              {
+                staticClass: "invoicing-feedback-buttons",
+                attrs: { slot: "fixed" },
+                slot: "fixed"
+              },
+              [
+                _c(
+                  "a",
+                  {
+                    staticClass: "invoicing-feedback-button-submit",
+                    on: {
+                      click: function($event) {
+                        return _vm.setStep("question-1")
+                      }
+                    }
+                  },
+                  [_vm._v(_vm._s(_vm.t("button_next")))]
+                )
+              ]
+            )
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.step === "question-1"
+          ? _c(
+              "div",
+              {
+                staticClass: "invoicing-feedback-buttons",
+                attrs: { slot: "fixed" },
+                slot: "fixed"
+              },
+              [
+                _c(
+                  "a",
+                  {
+                    staticClass: "invoicing-feedback-button-no",
+                    on: {
+                      click: function($event) {
+                        return _vm.setStep("question-2", "no")
+                      }
+                    }
+                  },
+                  [_vm._v(_vm._s(_vm.t("button_no")))]
+                ),
+                _vm._v(" "),
+                _c(
+                  "a",
+                  {
+                    staticClass: "invoicing-feedback-button-yes",
+                    on: {
+                      click: function($event) {
+                        return _vm.setStep("question-2", "yes")
+                      }
+                    }
+                  },
+                  [_vm._v(_vm._s(_vm.t("button_yes")))]
+                )
+              ]
+            )
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.step === "question-2"
+          ? _c(
+              "div",
+              {
+                staticClass: "invoicing-feedback-buttons",
+                attrs: { slot: "fixed" },
+                slot: "fixed"
+              },
+              [
+                _c(
+                  "a",
+                  {
+                    staticClass: "invoicing-feedback-button-no",
+                    on: {
+                      click: function($event) {
+                        return _vm.setStep("question-3", "no")
+                      }
+                    }
+                  },
+                  [_vm._v(_vm._s(_vm.t("button_no")))]
+                ),
+                _vm._v(" "),
+                _c(
+                  "a",
+                  {
+                    staticClass: "invoicing-feedback-button-yes",
+                    on: {
+                      click: function($event) {
+                        return _vm.setStep("question-3", "yes")
+                      }
+                    }
+                  },
+                  [_vm._v(_vm._s(_vm.t("button_yes")))]
+                )
+              ]
+            )
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.step === "question-3"
+          ? _c(
+              "div",
+              {
+                staticClass: "invoicing-feedback-buttons",
+                attrs: { slot: "fixed" },
+                slot: "fixed"
+              },
+              [
+                _c(
+                  "a",
+                  {
+                    staticClass: "invoicing-feedback-button-no",
+                    on: {
+                      click: function($event) {
+                        return _vm.setStep("step-4", "no")
+                      }
+                    }
+                  },
+                  [_vm._v(_vm._s(_vm.t("button_no")))]
+                ),
+                _vm._v(" "),
+                _c(
+                  "a",
+                  {
+                    staticClass: "invoicing-feedback-button-yes",
+                    on: {
+                      click: function($event) {
+                        return _vm.setStep("step-4", "yes")
+                      }
+                    }
+                  },
+                  [_vm._v(_vm._s(_vm.t("button_yes")))]
+                )
+              ]
+            )
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.step === "step-1"
+          ? [
+              _c("div", { staticClass: "invoicing-feedback-confirm-title" }, [
+                _vm._v(_vm._s(_vm.t("time_confirm_title")))
+              ]),
+              _vm._v(" "),
+              _vm.orderDuration
+                ? _c("div", { staticClass: "invoicing-feedback-confirm-time" }, [
+                    _vm._v(
+                      _vm._s(_vm.durationFormatted) + " " + _vm._s(_vm.t("hours"))
+                    )
+                  ])
+                : _vm._e()
+            ]
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.step === "step-1-2"
+          ? [
+              _c("div", { staticClass: "invoicing-feedback-confirm-title" }, [
+                _vm._v(_vm._s(_vm.t("time_select_title")))
+              ]),
+              _vm._v(" "),
+              _c("div", {
+                staticClass: "invoicing-feedback-confirm-text",
+                domProps: { innerHTML: _vm._s(_vm.t("time_select_text")) }
+              }),
+              _vm._v(" "),
+              _c(
+                "f7-list",
+                [
+                  _c("f7-list-input", {
+                    attrs: {
+                      label: _vm.t("time_select_start"),
+                      "inline-label": "",
+                      type: "text",
+                      inputId: "start_date"
+                    }
+                  }),
+                  _vm._v(" "),
+                  _c("f7-list-input", {
+                    attrs: {
+                      label: _vm.t("time_select_end"),
+                      "inline-label": "",
+                      type: "text",
+                      inputId: "end_date"
+                    }
+                  })
+                ],
+                1
+              )
+            ]
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.step === "step-2"
+          ? [
+              _c("div", {
+                staticClass: "invoicing-feedback-question-text",
+                domProps: { innerHTML: _vm._s(_vm.t("feedback_start_text")) }
+              })
+            ]
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.step === "step-3"
+          ? [
+              _c("div", {
+                staticClass: "invoicing-feedback-question-text",
+                domProps: { innerHTML: _vm._s(_vm.t("feedback_info_text")) }
+              })
+            ]
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.step === "question-1"
+          ? [
+              _c("div", {
+                staticClass: "invoicing-feedback-question-text",
+                domProps: { innerHTML: _vm._s(_vm.t("feedback_question_1")) }
+              })
+            ]
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.step === "question-2"
+          ? [
+              _c("div", {
+                staticClass: "invoicing-feedback-question-text",
+                domProps: { innerHTML: _vm._s(_vm.t("feedback_question_2")) }
+              })
+            ]
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.step === "question-3"
+          ? [
+              _c("div", {
+                staticClass: "invoicing-feedback-question-text",
+                domProps: { innerHTML: _vm._s(_vm.t("feedback_question_3")) }
+              })
+            ]
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.step === "step-4"
+          ? [
+              _c("div", { staticClass: "invoicing-feedback-end-image" }, [
+                _c("img", {
+                  attrs: { src: _vm.$addonAssetsUrl + "/feedback-image.svg" }
+                })
+              ]),
+              _vm._v(" "),
+              _c("div", { staticClass: "invoicing-feedback-end-title" }, [
+                _vm._v(_vm._s(_vm.t("feedback_end_title")))
+              ]),
+              _vm._v(" "),
+              _c("div", {
+                staticClass: "invoicing-feedback-end-text",
+                domProps: { innerHTML: _vm._s(_vm.t("feedback_end_text")) }
+              })
+            ]
+          : _vm._e()
+      ],
+      2
+    )
+  };
+  var __vue_staticRenderFns__$d = [];
+  __vue_render__$d._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__$d = undefined;
+    /* scoped */
+    var __vue_scope_id__$d = undefined;
+    /* module identifier */
+    var __vue_module_identifier__$d = undefined;
+    /* functional template */
+    var __vue_is_functional_template__$d = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var OrderFeedback = normalizeComponent_1(
+      { render: __vue_render__$d, staticRenderFns: __vue_staticRenderFns__$d },
+      __vue_inject_styles__$d,
+      __vue_script__$d,
+      __vue_scope_id__$d,
+      __vue_is_functional_template__$d,
+      __vue_module_identifier__$d,
+      undefined,
+      undefined
+    );
+
+  //
+
+  var script$e = {
+    components: {
+      OrderFeedback: OrderFeedback,
+    },
+    props: {
+      id: [Number, String],
+    },
+    data: function data() {
+      var self = this;
+      return {
+        pageTitle: self.id ? ((self.$t('invoicing.order_details.title', 'Order')) + " #" + (self.id)) : self.$t('invoicing.order_details.new_title'),
+        order: null,
+        showSave: false,
+        orderStatuses: orderStatuses,
+        products: null,
+        packages: null,
+        isFeedback: false,
+        orderDuration: 0,
+        orderUser: null,
+      };
+    },
+    mounted: function mounted() {
+      var self = this;
+      Promise.all([
+        API.loadOrder(self.id).then(function (order) {
+          self.order = order;
+          var orderUser = self.$root.teamMembers.filter(function (m) { return m.user_id === parseInt(order.user_id, 10); })[0];
+          if (!orderUser) {
+            // assuming contact
+            self.$api.getContact(order.user_id).then(function (contact) {
+              self.orderUser = contact;
+            });
+          } else {
+            self.orderUser = orderUser;
+          }
+        }),
+        API.loadProducts().then(function (products) {
+          self.products = products;
+        }),
+        API.loadPackages().then(function (packages) {
+          self.packages = packages;
+        }) ]).then(function () {
+        self.orderDuration = self.calcOrderDuration();
+      });
+    },
+    computed: {
+      orderUserName: function orderUserName() {
+        var self = this;
+        var user = self.orderUser;
+        if (!user) { return ''; }
+        if (user.friend_team_name) {
+          return user.friend_team_name.trim();
+        }
+        if (user.name) { return user.name.trim(); }
+        if (user.first_name) { return ("" + (user.first_name) + (user.last_name ? (" " + (user.last_name)) : '')).trim(); }
+        return '';
+      },
+      showStartButton: function showStartButton() {
+        var self = this;
+        if (self.order.status !== 'paid') { return false; }
+        var orderDate = new Date(parseInt(self.order.data.date, 10)).getTime();
+        var now = new Date().getTime();
+        var diffMinutes = (orderDate - now) / 1000 / 60;
+        if (Math.abs(diffMinutes) <= 60) { return true; }
+        return false;
+      },
+      showFinishButton: function showFinishButton() {
+        var self = this;
+        return self.order.status === 'processing';
+      },
+      orderItemsTotal: function orderItemsTotal() {
+        var self = this;
+        var total = 0;
+        self.order.vendor_order_items.forEach(function (el) {
+          total += self.productPrice(el.orderable_id, el.orderable_type) * el.quantity;
+        });
+        return total;
+      },
+    },
+    methods: {
+      calcOrderDuration: function calcOrderDuration() {
+        var self = this;
+        var duration = 0;
+        if (self.order && self.products && self.packages) {
+          self.order.vendor_order_items.forEach(function (el) {
+            duration += self.productDuration(el.orderable_id, el.orderable_type) * el.quantity;
+          });
+        }
+        return duration;
+      },
+      productName: function productName(id, type) {
+        if ( type === void 0 ) type = 'VendorProduct';
+
+        var self = this;
+        var product = self[type === 'VendorProduct' ? 'products' : 'packages'].filter(function (el) { return el.id === parseInt(id, 10); })[0];
+        return product ? product.name : '';
+      },
+      productPrice: function productPrice(id, type) {
+        if ( type === void 0 ) type = 'VendorProduct';
+
+        var self = this;
+        var product = self[type === 'VendorProduct' ? 'products' : 'packages'].filter(function (el) { return el.id === parseInt(id, 10); })[0];
+        return product ? product.price : 0;
+      },
+      productDuration: function productDuration(id, type) {
+        if ( type === void 0 ) type = 'VendorProduct';
+
+        var self = this;
+        var product = self[type === 'VendorProduct' ? 'products' : 'packages'].filter(function (el) { return el.id === parseInt(id, 10); })[0];
+        return product ? parseInt(product.data.duration, 10) : 0;
+      },
+      formatOrderDate: function formatOrderDate(date) {
+        var self = this;
+        if (!date) { return ''; }
+        return self.$moment(new Date(parseInt(date, 10))).format('D MMM YYYY');
+      },
+      formatOrderTime: function formatOrderTime(date) {
+        var self = this;
+        if (!date) { return ''; }
+        return self.$moment(new Date(parseInt(date, 10))).format('HH:mm');
+      },
+      formatDate: function formatDate(date) {
+        var self = this;
+        return self.$moment(new Date(date)).format('HH:mm D MMM YYYY');
+      },
+      startOrder: function startOrder() {
+        var self = this;
+        var data = Object.assign({}, self.order);
+        data.status = 'processing';
+        if (!data.data.feedback) { data.data.feedback = {}; }
+        data.data.feedback.actual_start_date = new Date().toJSON();
+        API.saveOrder(data).then(function (order) {
+          self.order = order;
+          self.$events.$emit('invoicing:reloadListsOrders');
+        });
+      },
+      finishOrder: function finishOrder() {
+        var self = this;
+        self.$refs.popup.f7Popup.params.closeByBackdropClick = false;
+        self.isFeedback = true;
+      },
+      onFeedbackComplete: function onFeedbackComplete(obj) {
+        var self = this;
+        var feedback = obj.feedback;
+        var data = Object.assign({}, self.order);
+        data.status = 'qa';
+        if (!data.data.feedback) { data.data.feedback = feedback; }
+        else { Object.assign(data.data.feedback, feedback); }
+        data.data.feedback.actual_end_date = new Date().toJSON();
+        delete data.vendor_order_items;
+        API.saveOrder(data).then(function (order) {
+          self.order = order;
+          self.$events.$emit('invoicing:reloadListsOrders');
+          if (obj.callback) { obj.callback(); }
+        });
+      },
+      onFeedbackClose: function onFeedbackClose() {
+        var self = this;
+        self.isFeedback = false;
+        self.$refs.popup.f7Popup.close();
+      },
+    },
+  };
+
+  /* script */
+  var __vue_script__$e = script$e;
+
+  /* template */
+  var __vue_render__$e = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "f7-popup",
+      { ref: "popup" },
+      [
+        _c(
+          "f7-view",
+          { attrs: { "ios-dynamic-navbar": false } },
+          [
+            _vm.isFeedback
+              ? _c("order-feedback", {
+                  attrs: { order: _vm.order, orderDuration: _vm.orderDuration },
+                  on: {
+                    feedbackComplete: _vm.onFeedbackComplete,
+                    close: _vm.onFeedbackClose
+                  }
+                })
+              : _vm._e(),
+            _vm._v(" "),
+            !_vm.isFeedback
+              ? _c(
+                  "f7-page",
+                  {
+                    staticClass: "invoicing-page",
+                    attrs: {
+                      name: "invoicing__order-details",
+                      id: "invoicing__order-details"
+                    }
+                  },
+                  [
+                    _c(
+                      "f7-navbar",
+                      [
+                        _c(
+                          "f7-nav-left",
+                          [
+                            _c("f7-link", {
+                              attrs: { "popup-close": "", "icon-f7": "close" }
+                            })
+                          ],
+                          1
+                        ),
+                        _vm._v(" "),
+                        _c("f7-nav-title", [_vm._v(_vm._s(_vm.pageTitle))]),
+                        _vm._v(" "),
+                        _c(
+                          "f7-nav-right",
+                          [
+                            _vm.showSave
+                              ? _c("f7-link", {
+                                  attrs: { "icon-f7": "check" },
+                                  on: { click: _vm.save }
+                                })
+                              : _vm._e()
+                          ],
+                          1
+                        )
+                      ],
+                      1
+                    ),
+                    _vm._v(" "),
+                    _vm.order && _vm.showStartButton
+                      ? _c(
+                          "div",
+                          {
+                            staticClass: "invoicing-toolbar-button",
+                            attrs: { slot: "fixed" },
+                            on: { click: _vm.startOrder },
+                            slot: "fixed"
+                          },
+                          [
+                            _vm._v(
+                              _vm._s(
+                                _vm.$t("invoicing.order_details.start_button")
+                              )
+                            )
+                          ]
+                        )
+                      : _vm._e(),
+                    _vm._v(" "),
+                    _vm.order && _vm.showFinishButton
+                      ? _c(
+                          "div",
+                          {
+                            staticClass: "invoicing-toolbar-button",
+                            attrs: { slot: "fixed" },
+                            on: { click: _vm.finishOrder },
+                            slot: "fixed"
+                          },
+                          [
+                            _vm._v(
+                              _vm._s(
+                                _vm.$t("invoicing.order_details.finish_button")
+                              )
+                            )
+                          ]
+                        )
+                      : _vm._e(),
+                    _vm._v(" "),
+                    _vm.order
+                      ? [
+                          _c(
+                            "f7-list",
+                            { staticClass: "list-custom" },
+                            [
+                              _c("f7-list-item", {
+                                attrs: {
+                                  title: _vm.$t(
+                                    "invoicing.order_details.due_date"
+                                  ),
+                                  link: false,
+                                  after: _vm.formatOrderDate(
+                                    _vm.order.data
+                                      ? parseInt(_vm.order.data.date, 10)
+                                      : null
+                                  )
+                                }
+                              }),
+                              _vm._v(" "),
+                              _c("f7-list-item", {
+                                attrs: {
+                                  title: _vm.$t(
+                                    "invoicing.order_details.due_time"
+                                  ),
+                                  link: false,
+                                  after: _vm.formatOrderTime(
+                                    _vm.order.data
+                                      ? parseInt(_vm.order.data.date, 10)
+                                      : null
+                                  )
+                                }
+                              }),
+                              _vm._v(" "),
+                              _vm.order.data && _vm.order.data.location
+                                ? _c("f7-list-item", {
+                                    attrs: {
+                                      title: _vm.$t(
+                                        "invoicing.order_details.city"
+                                      ),
+                                      type: "text",
+                                      after: _vm.order.data.location.city
+                                    }
+                                  })
+                                : _vm._e(),
+                              _vm._v(" "),
+                              _vm.order.data && _vm.order.data.location
+                                ? _c("f7-list-item", {
+                                    attrs: {
+                                      title: _vm.$t(
+                                        "invoicing.order_details.address"
+                                      ),
+                                      type: "text",
+                                      after: _vm.order.data.location.address
+                                    }
+                                  })
+                                : _vm._e(),
+                              _vm._v(" "),
+                              _vm.order.comment
+                                ? _c("f7-list-item", {
+                                    attrs: {
+                                      divider: "",
+                                      title: _vm.$t(
+                                        "invoicing.order_details.comment"
+                                      )
+                                    }
+                                  })
+                                : _vm._e(),
+                              _vm._v(" "),
+                              _vm.order.comment
+                                ? _c("f7-list-input", {
+                                    attrs: {
+                                      type: "textarea",
+                                      value: _vm.order.comment,
+                                      placeholder: _vm.$t(
+                                        "invoicing.order_details.comment_placeholder"
+                                      ),
+                                      resizable: "",
+                                      readonly: true
+                                    }
+                                  })
+                                : _vm._e(),
+                              _vm._v(" "),
+                              _vm.orderUser
+                                ? [
+                                    _c("f7-list-item", {
+                                      attrs: {
+                                        divider: "",
+                                        title: _vm.$t(
+                                          "invoicing.order_details.customer"
+                                        )
+                                      }
+                                    }),
+                                    _vm._v(" "),
+                                    _c(
+                                      "f7-list-item",
+                                      {
+                                        attrs: {
+                                          title: _vm.orderUserName,
+                                          link:
+                                            "/contact-details/?user_id=" +
+                                            _vm.order.user_id +
+                                            "&masterDetailRoot=true",
+                                          view: ".view-main",
+                                          "reload-all": true
+                                        }
+                                      },
+                                      [
+                                        _c("tommy-circle-avatar", {
+                                          attrs: {
+                                            slot: "media",
+                                            data: _vm.orderUser
+                                          },
+                                          slot: "media"
+                                        })
+                                      ],
+                                      1
+                                    )
+                                  ]
+                                : _vm._e(),
+                              _vm._v(" "),
+                              _c("f7-list-item", {
+                                attrs: {
+                                  divider: "",
+                                  title: _vm.$t("invoicing.order_details.items")
+                                }
+                              }),
+                              _vm._v(" "),
+                              _vm.products && _vm.packages
+                                ? _c(
+                                    "li",
+                                    { staticClass: "invoicing-order-items" },
+                                    _vm._l(_vm.order.vendor_order_items, function(
+                                      product,
+                                      index
+                                    ) {
+                                      return !product._destroy
+                                        ? _c(
+                                            "div",
+                                            {
+                                              key:
+                                                product.orderable_id +
+                                                "-" +
+                                                index,
+                                              staticClass: "invoicing-order-item"
+                                            },
+                                            [
+                                              _c(
+                                                "div",
+                                                {
+                                                  staticClass:
+                                                    "invoicing-order-item-name"
+                                                },
+                                                [
+                                                  _vm._v(
+                                                    _vm._s(
+                                                      _vm.productName(
+                                                        product.orderable_id,
+                                                        product.orderable_type
+                                                      )
+                                                    )
+                                                  )
+                                                ]
+                                              )
+                                            ]
+                                          )
+                                        : _vm._e()
+                                    }),
+                                    0
+                                  )
+                                : _vm._e()
+                            ],
+                            2
+                          )
+                        ]
+                      : _vm._e()
+                  ],
+                  2
+                )
+              : _vm._e()
+          ],
+          1
+        )
+      ],
+      1
+    )
+  };
+  var __vue_staticRenderFns__$e = [];
+  __vue_render__$e._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__$e = undefined;
+    /* scoped */
+    var __vue_scope_id__$e = undefined;
+    /* module identifier */
+    var __vue_module_identifier__$e = undefined;
+    /* functional template */
+    var __vue_is_functional_template__$e = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var OrderDetailsNursePage = normalizeComponent_1(
+      { render: __vue_render__$e, staticRenderFns: __vue_staticRenderFns__$e },
+      __vue_inject_styles__$e,
+      __vue_script__$e,
+      __vue_scope_id__$e,
+      __vue_is_functional_template__$e,
+      __vue_module_identifier__$e,
+      undefined,
+      undefined
+    );
+
+  //
+
+  var script$f = {
+    data: function data() {
+      return {
+        items: null,
+        packages: null,
+        activeTab: 'items',
+      };
+    },
+    mounted: function mounted() {
+      var self = this;
+      self.loadPromotions();
+      self.$events.$on('invoicing:reloadPromotions', self.loadPromotions);
+    },
+    beforeDestroy: function beforeDestroy() {
+      var self = this;
+      self.$events.$off('invoicing:reloadPromotions', self.loadPromotions);
+    },
+    computed: {
+      orderedPromotions: function orderedPromotions() {
+        var self = this;
+        if (!self.items) { return []; }
+        return self.items.sort(function (a, b) { return a.id - b.id; });
+      },
+    },
+    methods: {
+      loadPromotions: function loadPromotions() {
+        var self = this;
+        API.loadPromotions({}, { cache: false }).then(function (items) {
+          self.items = items;
+        });
+      },
+    },
+  };
+
+  /* script */
+  var __vue_script__$f = script$f;
+
+  /* template */
+  var __vue_render__$f = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "f7-page",
+      {
+        staticClass: "invoicing-page",
+        attrs: {
+          name: "invoicing__promotion-management",
+          id: "invoicing__promotion-management"
+        }
+      },
+      [
+        _c(
+          "f7-navbar",
+          [
+            _c("tommy-nav-back"),
+            _vm._v(" "),
+            _c("f7-nav-title", [
+              _vm._v(
+                _vm._s(
+                  _vm.$t("invoicing.promotion_management.title", "Promotions")
+                )
+              )
+            ]),
+            _vm._v(" "),
+            _c(
+              "f7-nav-right",
+              [
+                _c("f7-link", {
+                  attrs: {
+                    href: "/invoicing/promotion-details/",
+                    "icon-f7": "add"
+                  }
+                })
+              ],
+              1
+            )
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _vm.items && _vm.items.length
+          ? _c("f7-searchbar", {
+              attrs: {
+                slot: "static",
+                "search-container": ".invoicing-list-items",
+                backdrop: false,
+                "disable-button": false,
+                placeholder: _vm.$t(
+                  "invoicing.promotion_management.search_placeholder"
+                )
+              },
+              slot: "static"
+            })
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.items && _vm.items.length
+          ? _c(
+              "f7-list",
+              {
+                staticClass: "list-custom invoicing-list-items",
+                attrs: { slot: "static", "no-hairlines": "" },
+                slot: "static"
+              },
+              _vm._l(_vm.orderedPromotions, function(item) {
+                return _c("f7-list-item", {
+                  key: item.id,
+                  attrs: {
+                    title: item.name,
+                    link:
+                      "/invoicing/promotion-details/" +
+                      item.id +
+                      "/?title=" +
+                      encodeURIComponent(item.name || "")
+                  }
+                })
+              }),
+              1
+            )
+          : _vm._e()
+      ],
+      1
+    )
+  };
+  var __vue_staticRenderFns__$f = [];
+  __vue_render__$f._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__$f = undefined;
+    /* scoped */
+    var __vue_scope_id__$f = undefined;
+    /* module identifier */
+    var __vue_module_identifier__$f = undefined;
+    /* functional template */
+    var __vue_is_functional_template__$f = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var PromotionManagementPage = normalizeComponent_1(
+      { render: __vue_render__$f, staticRenderFns: __vue_staticRenderFns__$f },
+      __vue_inject_styles__$f,
+      __vue_script__$f,
+      __vue_scope_id__$f,
+      __vue_is_functional_template__$f,
+      __vue_module_identifier__$f,
+      undefined,
+      undefined
+    );
+
+  //
+
+  var script$g = {
+    components: {
+      tagSelect: tagSelect,
+    },
+    props: {
+      id: [String, Number],
+    },
+    data: function data() {
+      var self = this;
+      return {
+        pageTitle: self.$f7route.query.title || self.$t('invoicing.promotion.new_title'),
+        item: null,
+        showSave: false,
+        customerPopupOpened: false,
+        itemsPopupOpened: false,
+        products: null,
+        packages: null,
+        contacts: API.contacts,
+      };
+    },
+    mounted: function mounted() {
+      var self = this;
+      if (!self.id) {
+        self.item = {
+          // expire_at: '',
+          description: '',
+          name: '',
+          amount: 0,
+          user_id: null,
+          vendor_product_id: null,
+
+          vendor_package_id: null,
+          category: null,
+          kind: 'fixed',
+          valid_from: null,
+          valid_to: null,
+          max_uses: null,
+        };
+      } else {
+        API.loadPromotion(self.id).then(function (item) {
+          self.item = item;
+        });
+      }
+      if (!self.contacts) {
+        self.$api.getContacts.then(function (contacts) {
+          self.contacts = contacts;
+          API.contacts = contacts;
+        });
+        return;
+      }
+
+      Promise.all([
+        API.loadProducts(),
+        API.loadPackages() ]).then(function (ref) {
+        var products = ref[0];
+        var packages = ref[1];
+
+        self.products = products;
+        self.packages = packages;
+      });
+
+    },
+    computed: {
+      customerAvatar: function customerAvatar() {
+        var self = this;
+        if (!self.item.user_id) { return null; }
+        var user;
+        if (self.$root.teamMembers) {
+          user = self.$root.teamMembers.filter(function (m) { return m.user_id === self.item.user_id; })[0];
+        }
+        if (!user && self.contacts) {
+          // assuming contact
+          user = self.contacts.filter(function (c) { return c.friend_id === self.item.user_id; })[0];
+        }
+        if (!user) { return null; }
+        return user;
+      },
+      customerTitle: function customerTitle() {
+        var self = this;
+        if (!self.item.user_id) { return self.$t('invoicing.promotion.customer_placeholder'); }
+        var user;
+        if (self.$root.teamMembers) {
+          user = self.$root.teamMembers.filter(function (m) { return m.user_id === self.item.user_id; })[0];
+        }
+        if (!user && self.contacts) {
+          // assuming contact
+          user = self.contacts.filter(function (c) { return c.friend_id === self.item.user_id; })[0];
+        }
+        if (!user) { return ''; }
+        return ((user.first_name || '') + " " + (user.last_name || ''));
+      },
+      itemAvatar: function itemAvatar() {
+        var self = this;
+        if (!self.item.vendor_product_id && !self.item.vendor_package_id) { return null; }
+        var product;
+        if (self.item.vendor_product_id) {
+          product = self.products.filter(function (p) { return p.id === self.item.vendor_product_id; })[0];
+        }
+        if (self.item.vendor_package_id) {
+          product = self.packages.filter(function (p) { return p.id === self.item.vendor_package_id; })[0];
+        }
+        if (!product) { return null; }
+        return product.image_url;
+      },
+      itemTitle: function itemTitle() {
+        var self = this;
+        if (!self.item.vendor_product_id && !self.item.vendor_package_id) { return self.$t('invoicing.promotion.item_placeholder'); }
+        var product;
+        if (self.item.vendor_product_id) {
+          product = self.products.filter(function (p) { return p.id === self.item.vendor_product_id; })[0];
+        }
+        if (self.item.vendor_package_id) {
+          product = self.packages.filter(function (p) { return p.id === self.item.vendor_package_id; })[0];
+        }
+        if (!product) { return ''; }
+        return product.name;
+      },
+    },
+    methods: {
+      openCalendar: function openCalendar() {
+        var self = this;
+        self.calendarTo = self.$f7.calendar.create({
+          openIn: 'customModal',
+          value: self.item.valid_to ? [new Date(self.item.valid_to)] : [],
+          backdrop: true,
+          closeByOutsideClick: false,
+          on: {
+            change: function change(c, v) {
+              self.item.valid_to = new Date(v[0]).toJSON();
+              self.enableSave();
+            },
+          },
+        });
+        self.calendarTo.once('closed', function () {
+          self.calendarTo.destroy();
+        });
+        self.calendarTo.open();
+      },
+      formatValueDate: function formatValueDate(date) {
+        var self = this;
+        if (!date) { return ''; }
+        return self.$moment(new Date(date)).format('YYYY-MM-DDTHH:mm');
+      },
+      onDateChange: function onDateChange(e) {
+        var self = this;
+        var value = e.target.value;
+        clearTimeout(self.dateChangeTimeout);
+        self.item.valid_to = new Date(value).toJSON();
+        self.enableSave();
+      },
+      setKind: function setKind(kind) {
+        var self = this;
+        var prevKind = self.item.kind;
+        if (self.item.kind === kind) { return; }
+        if ((kind === 'fixed' || kind === 'voucher') && prevKind === 'percentage') {
+          self.setAmount(0);
+        } else if (kind === 'percentage') {
+          self.setAmount(0.5);
+        }
+        self.item.kind = kind;
+        self.enableSave();
+      },
+      setAmount: function setAmount(value) {
+        var self = this;
+        var newAmount = value;
+        if (typeof newAmount === 'string') {
+          newAmount = value.replace(/[¥ ]*/, '').replace(/,/g, '.').trim();
+        } else { // eslint-disable-next-line
+          if (newAmount >= 1) {
+            newAmount = 1;
+          } else {
+            newAmount = Math.floor(newAmount * 1000 / 10);
+            if (newAmount < 10) { newAmount = parseFloat(("0.0" + newAmount)); }
+            else { newAmount = parseFloat(("0." + newAmount)); }
+          }
+        }
+        self.item.amount = newAmount;
+        self.$set(self.item, 'amount', newAmount);
+        self.enableSave();
+      },
+      enableSave: function enableSave() {
+        var self = this;
+        self.showSave = true;
+      },
+      save: function save() {
+        var self = this;
+        self.showSave = false;
+        if (typeof self.item.amount === 'string') {
+          self.item.amount = parseFloat(self.item.amount);
+          if (Number.isNaN(self.item.amount)) {
+            self.item.amount = 0;
+          }
+        }
+        if (self.item.vendor_product_id) {
+          self.item.vendor_package_id = null;
+        }
+        if (self.item.vendor_package_id) {
+          self.item.vendor_product_id = null;
+        }
+        API.savePromotion(self.item).then(function () {
+          self.$events.$emit('invoicing:reloadPromotions');
+          self.$f7router.back();
+        });
+      },
+    },
+  };
+
+  /* script */
+  var __vue_script__$g = script$g;
+
+  /* template */
+  var __vue_render__$g = function() {
+    var _vm = this;
+    var _h = _vm.$createElement;
+    var _c = _vm._self._c || _h;
+    return _c(
+      "f7-page",
+      {
+        staticClass: "invoicing-page",
+        attrs: {
+          id: "invoicing__promotion-details",
+          "data-name": "invoicing__promotion-details"
+        }
+      },
+      [
+        _c(
+          "f7-navbar",
+          [
+            _c("tommy-nav-back"),
+            _vm._v(" "),
+            _c("f7-nav-title", [_vm._v(_vm._s(_vm.pageTitle))]),
+            _vm._v(" "),
+            _c(
+              "f7-nav-right",
+              [
+                _vm.showSave
+                  ? _c("f7-link", {
+                      attrs: { "icon-f7": "check" },
+                      on: { click: _vm.save }
+                    })
+                  : _vm._e()
+              ],
+              1
+            )
+          ],
+          1
+        ),
+        _vm._v(" "),
+        _vm.item
+          ? _c(
+              "f7-list",
+              { staticClass: "list-custom" },
+              [
+                _c("f7-list-input", {
+                  attrs: {
+                    label: _vm.$t("invoicing.promotion.name_label", "Name"),
+                    placeholder: _vm.$t(
+                      "invoicing.promotion.name_placeholder",
+                      "Enter promotion name"
+                    ),
+                    type: "text",
+                    value: _vm.item.name
+                  },
+                  on: {
+                    input: function($event) {
+                      _vm.item.name = $event.target.value;
+                      _vm.enableSave();
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t(
+                      "invoicing.promotion.description_label",
+                      "Description"
+                    )
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-input", {
+                  attrs: {
+                    placeholder: _vm.$t(
+                      "invoicing.promotion.description_placeholder",
+                      "Enter promotion description"
+                    ),
+                    type: "textarea",
+                    resizable: "",
+                    value: _vm.item.description
+                  },
+                  on: {
+                    input: function($event) {
+                      _vm.item.description = $event.target.value;
+                      _vm.enableSave();
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t(
+                      "invoicing.promotion.expires_label",
+                      "Description"
+                    )
+                  }
+                }),
+                _vm._v(" "),
+                _c(
+                  "f7-list-input",
+                  {
+                    staticClass: "invoicing-valid-to-input",
+                    attrs: {
+                      title: _vm.$t("invoicing.order_details.due_date"),
+                      type: "text",
+                      readonly: "",
+                      value: _vm.item.valid_to
+                        ? _vm.$moment(_vm.item.valid_to).format("D MMM YYYY")
+                        : ""
+                    },
+                    on: { focus: _vm.openCalendar }
+                  },
+                  [
+                    _c("span", {
+                      staticClass: "input-clear-button margin-right",
+                      attrs: { slot: "inner" },
+                      on: {
+                        click: function($event) {
+                          _vm.item.valid_to = null;
+                          _vm.enableSave();
+                        }
+                      },
+                      slot: "inner"
+                    })
+                  ]
+                ),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t("invoicing.promotion.type_label")
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    checkbox: "",
+                    title: _vm.$t("invoicing.promotion.type_voucher_label"),
+                    checked: _vm.item.kind === "voucher"
+                  },
+                  on: {
+                    change: function($event) {
+                      return _vm.setKind("voucher")
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    checkbox: "",
+                    title: _vm.$t("invoicing.promotion.type_fixed_label"),
+                    checked: _vm.item.kind === "fixed"
+                  },
+                  on: {
+                    change: function($event) {
+                      return _vm.setKind("fixed")
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    checkbox: "",
+                    title: _vm.$t("invoicing.promotion.type_percentage_label"),
+                    checked: _vm.item.kind === "percentage"
+                  },
+                  on: {
+                    change: function($event) {
+                      return _vm.setKind("percentage")
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t(
+                      "invoicing.promotion.amount_label",
+                      "Discount amount"
+                    )
+                  }
+                }),
+                _vm._v(" "),
+                _vm.item.kind === "fixed" || _vm.item.kind === "voucher"
+                  ? _c("f7-list-input", {
+                      attrs: {
+                        placeholder: _vm.$t(
+                          "invoicing.promotion.amount_placeholder",
+                          "Enter promotion discount"
+                        ),
+                        type: "text",
+                        value: _vm.item.amount ? "¥" + _vm.item.amount : ""
+                      },
+                      on: {
+                        input: function($event) {
+                          return _vm.setAmount($event.target.value)
+                        }
+                      }
+                    })
+                  : _vm._e(),
+                _vm._v(" "),
+                _vm.item.kind === "percentage"
+                  ? _c(
+                      "f7-list-item",
+                      [
+                        _c("f7-range", {
+                          staticClass: "invoicing-range-slider",
+                          attrs: {
+                            value: _vm.item.amount,
+                            min: 0,
+                            max: 1,
+                            step: 0.01,
+                            "format-label": function(v) {
+                              return Math.floor(v * 100) + "%"
+                            },
+                            label: ""
+                          },
+                          on: {
+                            "range:changed": function(v) {
+                              return _vm.setAmount(v)
+                            }
+                          }
+                        }),
+                        _vm._v(" "),
+                        _c(
+                          "div",
+                          { staticClass: "invoicing-range-slider-value" },
+                          [
+                            _vm._v(
+                              _vm._s(Math.floor(_vm.item.amount * 100)) + "%"
+                            )
+                          ]
+                        )
+                      ],
+                      1
+                    )
+                  : _vm._e(),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t(
+                      "invoicing.promotion.category_label",
+                      "Category"
+                    )
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-input", {
+                  attrs: {
+                    placeholder: _vm.$t(
+                      "invoicing.promotion.category_label",
+                      "Category"
+                    ),
+                    type: "text",
+                    value: _vm.item.category
+                  },
+                  on: {
+                    input: function($event) {
+                      _vm.item.category = $event.target.value;
+                      _vm.enableSave();
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t("invoicing.promotion.max_uses_label")
+                  }
+                }),
+                _vm._v(" "),
+                _c("f7-list-input", {
+                  attrs: {
+                    placeholder: _vm.$t(
+                      "invoicing.promotion.max_uses_placeholder"
+                    ),
+                    type: "number",
+                    value: _vm.item.max_uses
+                  },
+                  on: {
+                    input: function($event) {
+                      _vm.item.max_uses = $event.target.value;
+                      _vm.enableSave();
+                    }
+                  }
+                }),
+                _vm._v(" "),
+                _vm.contacts
+                  ? [
+                      _c("f7-list-item", {
+                        attrs: {
+                          divider: "",
+                          title: _vm.$t(
+                            "invoicing.promotion.customer_label",
+                            "Customer"
+                          )
+                        }
+                      }),
+                      _vm._v(" "),
+                      _c(
+                        "f7-list-item",
+                        {
+                          attrs: { title: _vm.customerTitle, link: "" },
+                          on: {
+                            click: function($event) {
+                              _vm.customerPopupOpened = true;
+                            }
+                          }
+                        },
+                        [
+                          _vm.customerAvatar
+                            ? _c("tommy-circle-avatar", {
+                                attrs: {
+                                  slot: "media",
+                                  data: _vm.customerAvatar
+                                },
+                                slot: "media"
+                              })
+                            : _vm._e()
+                        ],
+                        1
+                      )
+                    ]
+                  : _vm._e(),
+                _vm._v(" "),
+                _c("f7-list-item", {
+                  attrs: {
+                    divider: "",
+                    title: _vm.$t("invoicing.promotion.item_label", "Item")
+                  }
+                }),
+                _vm._v(" "),
+                _vm.products && _vm.packages
+                  ? _c(
+                      "f7-list-item",
+                      {
+                        attrs: { title: _vm.itemTitle, link: "" },
+                        on: {
+                          click: function($event) {
+                            _vm.itemsPopupOpened = true;
+                          }
+                        }
+                      },
+                      [
+                        _vm.itemAvatar
+                          ? _c("tommy-circle-avatar", {
+                              attrs: { slot: "media", url: _vm.itemAvatar },
+                              slot: "media"
+                            })
+                          : _vm._e()
+                      ],
+                      1
+                    )
+                  : _vm._e()
+              ],
+              2
+            )
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.item
+          ? _c(
+              "f7-popup",
+              {
+                attrs: { opened: _vm.customerPopupOpened },
+                on: {
+                  "popup:closed": function($event) {
+                    _vm.customerPopupOpened = false;
+                  }
+                }
+              },
+              [
+                _c(
+                  "f7-view",
+                  { attrs: { init: false } },
+                  [
+                    _c(
+                      "f7-page",
+                      { staticClass: "invoicing-page" },
+                      [
+                        _c(
+                          "f7-navbar",
+                          [
+                            _c("f7-nav-title", [
+                              _vm._v(
+                                _vm._s(
+                                  _vm.$t("invoicing.promotion.customer_label")
+                                )
+                              )
+                            ]),
+                            _vm._v(" "),
+                            _c(
+                              "f7-nav-right",
+                              [
+                                _c("f7-link", {
+                                  attrs: { "popup-close": "", "icon-f7": "close" }
+                                })
+                              ],
+                              1
+                            )
+                          ],
+                          1
+                        ),
+                        _vm._v(" "),
+                        _c("f7-searchbar", {
+                          attrs: {
+                            "search-container":
+                              ".invoicing-promotion-customers-list"
+                          }
+                        }),
+                        _vm._v(" "),
+                        _c(
+                          "f7-list",
+                          { staticClass: "invoicing-promotion-customers-list" },
+                          [
+                            _vm._l(_vm.contacts, function(contact, index) {
+                              return _c(
+                                "f7-list-item",
+                                {
+                                  key:
+                                    "contact-" + index + "-" + contact.friend_id,
+                                  attrs: {
+                                    title:
+                                      (contact.first_name || "") +
+                                      " " +
+                                      (contact.last_name || ""),
+                                    radio: "",
+                                    checked:
+                                      _vm.item.user_id === contact.friend_id
+                                  },
+                                  on: {
+                                    click: function() {
+                                      _vm.item.user_id = contact.friend_id;
+                                      _vm.customerPopupOpened = false;
+                                      _vm.enableSave();
+                                    }
+                                  }
+                                },
+                                [
+                                  _c("tommy-circle-avatar", {
+                                    attrs: { slot: "media", data: contact },
+                                    slot: "media"
+                                  })
+                                ],
+                                1
+                              )
+                            }),
+                            _vm._v(" "),
+                            _vm._l(_vm.$root.teamMembers, function(user) {
+                              return _c(
+                                "f7-list-item",
+                                {
+                                  key: "user-" + _vm.index + "-" + user.id,
+                                  attrs: {
+                                    title:
+                                      (user.first_name || "") +
+                                      " " +
+                                      (user.last_name || ""),
+                                    radio: "",
+                                    checked: _vm.item.user_id === user.user_id
+                                  },
+                                  on: {
+                                    click: function() {
+                                      _vm.item.user_id = user.user_id;
+                                      _vm.customerPopupOpened = false;
+                                      _vm.enableSave();
+                                    }
+                                  }
+                                },
+                                [
+                                  _c("tommy-circle-avatar", {
+                                    attrs: { slot: "media", data: user },
+                                    slot: "media"
+                                  })
+                                ],
+                                1
+                              )
+                            })
+                          ],
+                          2
+                        )
+                      ],
+                      1
+                    )
+                  ],
+                  1
+                )
+              ],
+              1
+            )
+          : _vm._e(),
+        _vm._v(" "),
+        _vm.item && _vm.products && _vm.packages
+          ? _c(
+              "f7-popup",
+              {
+                attrs: { opened: _vm.itemsPopupOpened },
+                on: {
+                  "popup:closed": function($event) {
+                    _vm.itemsPopupOpened = false;
+                  }
+                }
+              },
+              [
+                _c(
+                  "f7-view",
+                  { attrs: { init: false } },
+                  [
+                    _c(
+                      "f7-page",
+                      { staticClass: "invoicing-page" },
+                      [
+                        _c(
+                          "f7-navbar",
+                          [
+                            _c("f7-nav-title", [
+                              _vm._v(
+                                _vm._s(_vm.$t("invoicing.promotion.item_label"))
+                              )
+                            ]),
+                            _vm._v(" "),
+                            _c(
+                              "f7-nav-right",
+                              [
+                                _c("f7-link", {
+                                  attrs: { "popup-close": "", "icon-f7": "close" }
+                                })
+                              ],
+                              1
+                            )
+                          ],
+                          1
+                        ),
+                        _vm._v(" "),
+                        _c("f7-searchbar", {
+                          attrs: {
+                            "search-container": ".invoicing-promotion-items-list",
+                            "disable-button": false
+                          }
+                        }),
+                        _vm._v(" "),
+                        _c(
+                          "f7-list",
+                          { staticClass: "invoicing-promotion-items-list" },
+                          [
+                            _vm.products.length
+                              ? _c("f7-list-item", {
+                                  attrs: {
+                                    divider: "",
+                                    title: _vm.$t(
+                                      "invoicing.item_service_management.items_tab"
+                                    )
+                                  }
+                                })
+                              : _vm._e(),
+                            _vm._v(" "),
+                            _vm._l(_vm.products, function(product) {
+                              return _c(
+                                "f7-list-item",
+                                {
+                                  key: product.id,
+                                  attrs: {
+                                    title: product.name,
+                                    radio: "",
+                                    checked:
+                                      _vm.item.vendor_product_id === product.id
+                                  },
+                                  on: {
+                                    click: function() {
+                                      _vm.item.vendor_product_id = product.id;
+                                      _vm.item.vendor_package_id = null;
+                                      _vm.itemsPopupOpened = false;
+                                      _vm.enableSave();
+                                    }
+                                  }
+                                },
+                                [
+                                  _c("tommy-circle-avatar", {
+                                    attrs: {
+                                      slot: "media",
+                                      url: product.image_url
+                                    },
+                                    slot: "media"
+                                  })
+                                ],
+                                1
+                              )
+                            }),
+                            _vm._v(" "),
+                            _vm.packages.length
+                              ? _c("f7-list-item", {
+                                  attrs: {
+                                    divider: "",
+                                    title: _vm.$t(
+                                      "invoicing.item_service_management.packages_tab"
+                                    )
+                                  }
+                                })
+                              : _vm._e(),
+                            _vm._v(" "),
+                            _vm._l(_vm.packages, function(pkg) {
+                              return _c(
+                                "f7-list-item",
+                                {
+                                  key: pkg.id,
+                                  attrs: {
+                                    title: pkg.name,
+                                    radio: "",
+                                    checked: _vm.item.vendor_package_id === pkg.id
+                                  },
+                                  on: {
+                                    click: function() {
+                                      _vm.item.vendor_product_id = null;
+                                      _vm.item.vendor_package_id = pkg.id;
+                                      _vm.itemsPopupOpened = false;
+                                      _vm.enableSave();
+                                    }
+                                  }
+                                },
+                                [
+                                  _c("tommy-circle-avatar", {
+                                    attrs: { slot: "media", url: pkg.image_url },
+                                    slot: "media"
+                                  })
+                                ],
+                                1
+                              )
+                            })
+                          ],
+                          2
+                        )
+                      ],
+                      1
+                    )
+                  ],
+                  1
+                )
+              ],
+              1
+            )
+          : _vm._e()
+      ],
+      1
+    )
+  };
+  var __vue_staticRenderFns__$g = [];
+  __vue_render__$g._withStripped = true;
+
+    /* style */
+    var __vue_inject_styles__$g = undefined;
+    /* scoped */
+    var __vue_scope_id__$g = undefined;
+    /* module identifier */
+    var __vue_module_identifier__$g = undefined;
+    /* functional template */
+    var __vue_is_functional_template__$g = false;
+    /* style inject */
+    
+    /* style inject SSR */
+    
+
+    
+    var PromotionDetailsPage = normalizeComponent_1(
+      { render: __vue_render__$g, staticRenderFns: __vue_staticRenderFns__$g },
+      __vue_inject_styles__$g,
+      __vue_script__$g,
+      __vue_scope_id__$g,
+      __vue_is_functional_template__$g,
+      __vue_module_identifier__$g,
+      undefined,
+      undefined
+    );
+
+  var routes = [
+    {
+      path: '/invoicing/',
+      component: IndexPage,
+    },
+    {
+      path: '/invoicing/settings/',
+      component: SettingsPage,
+    },
+    {
+      path: '/invoicing/item-service-management/',
+      component: ItemServiceManagementPage,
+    },
+    {
+      path: '/invoicing/list-management/',
+      component: ListManagementPage,
+    },
+    {
+      path: '/invoicing/promotion-management/',
+      component: PromotionManagementPage,
+    },
+    {
+      path: '/invoicing/list-add/',
+      component: ListAddPage,
+    },
+    {
+      path: '/invoicing/list-edit/date-range/',
+      component: DateRangePage,
+    },
+    {
+      path: '/invoicing/list-edit/:listId/',
+      component: ListEditPage,
+    },
+    {
+      path: '/invoicing/tag-select/',
+      component: TagSelectPage,
+    },
+    {
+      path: '/invoicing/product-details/:id?/',
+      component: ProductDetailsPage,
+    },
+    {
+      path: '/invoicing/package-details/:id?/',
+      component: PackageDetailsPage,
+    },
+    {
+      path: '/invoicing/range-select/',
+      component: RangeSelectPage,
+    },
+    {
+      path: '/invoicing/order-details/:id?/',
+      popup: {
+        async: function async(to, from, resolve) {
+          resolve({
+            component: API.isNurse ? OrderDetailsNursePage : OrderDetailsPage,
+          });
+        },
+      },
+    },
+    {
+      path: '/invoicing/promotion-details/:id?/',
+      component: PromotionDetailsPage,
+    } ];
+
+  return routes;
+
+}());
+));
