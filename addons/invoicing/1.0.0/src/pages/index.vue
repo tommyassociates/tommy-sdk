@@ -10,7 +10,10 @@
       </f7-nav-right>
     </f7-navbar>
 
-    <f7-swiper v-if="orderedLists && orderedLists.length" class="no-swipe-panel" :params="{
+    <f7-swiper
+      v-if="orderedLists && orderedLists.length"
+      class="no-swipe-panel"
+      :params="{
       slidesPerView: 'auto',
       breakpointsInverse: true,
       centeredSlides: false,
@@ -23,46 +26,65 @@
           centeredSlides: true,
         }
       },
-    }">
+    }"
+    >
       <f7-swiper-slide v-for="list in orderedLists" :key="list.id">
         <div class="orders-list" :data-id="list.id" :class="{'hasScroll': listWithScroll[list.id]}">
           <div class="orders-list-header">
             <div>{{list.name}}</div>
             <div class="order-list-header-right">
               <a :data-url="`/invoicing/list-edit/${list.id}/`" v-if="canEditList(list)">
-                <img :src="`${$addonAssetsUrl}slice6.png`"
-                  :srcset="`${$addonAssetsUrl}slice6@2x.png 2x, ${$addonAssetsUrl}slice6@3x.png 3x`">
+                <img
+                  :src="`${$addonAssetsUrl}slice6.png`"
+                  :srcset="`${$addonAssetsUrl}slice6@2x.png 2x, ${$addonAssetsUrl}slice6@3x.png 3x`"
+                />
               </a>
-              <a @click="downloadCSV(list.orders, list.name)" v-if="canEditList(list) && list.orders.length > 0"
-                ref="download">
-                <img :src="`${$addonAssetsUrl}slice20.png`"
-                  :srcset="`${$addonAssetsUrl}slice20@2x.png 2x, ${$addonAssetsUrl}slice20@3x.png 3x`">
+              <a
+                @click="downloadCSV(list.orders, list.name)"
+                v-if="canEditList(list) && list.orders.length > 0"
+                ref="download"
+              >
+                <img
+                  :src="`${$addonAssetsUrl}slice20.png`"
+                  :srcset="`${$addonAssetsUrl}slice20@2x.png 2x, ${$addonAssetsUrl}slice20@3x.png 3x`"
+                />
               </a>
             </div>
           </div>
           <div class="orders-list-content">
             <template v-if="list.orders && list.orders.length">
-              <a v-for="(order, index) in list.orders" :key="index" :data-url="`/invoicing/order-details/${order.id}/`"
-                class="card invoicing-order-card">
+              <a
+                v-for="(order, index) in list.orders"
+                :key="index"
+                :data-url="`/invoicing/order-details/${order.id}/`"
+                class="card invoicing-order-card"
+              >
                 <div class="card-header">
-                  <span class="order-date"
-                    v-if="order.data && order.data.date">{{orderDate(order.data ? order.data.date : null)}}</span>
-                  <span class="order-status" v-if="!isNurse">{{$t(`invoicing.order_status.${order.status}`)}}</span>
+                  <span
+                    class="order-date"
+                    v-if="order.data && order.data.date"
+                  >{{orderDate(order.data ? order.data.date : null)}}</span>
+                  <span
+                    class="order-status"
+                    v-if="!isNurse"
+                  >{{$t(`invoicing.order_status.${order.status}`)}}</span>
                 </div>
                 <div class="card-content">
                   <f7-list class="no-hairlines no-hairlines-between">
                     <f7-list-item v-if="order.user_id" :title="orderUserName(order.user_id)">
-                      <img :src="`${$addonAssetsUrl}icon-user.svg`" slot="media">
+                      <img :src="`${$addonAssetsUrl}icon-user.svg`" slot="media" />
                     </f7-list-item>
                     <f7-list-item :title="order.name">
-                      <img :src="`${$addonAssetsUrl}icon-product.svg`" slot="media">
+                      <img :src="`${$addonAssetsUrl}icon-product.svg`" slot="media" />
                     </f7-list-item>
                     <f7-list-item v-if="order.total && !isNurse" :title="order.total">
-                      <img :src="`${$addonAssetsUrl}icon-money.svg`" slot="media">
+                      <img :src="`${$addonAssetsUrl}icon-money.svg`" slot="media" />
                     </f7-list-item>
-                    <f7-list-item v-if="order.data && order.data.location"
-                      :title="`${order.data.location.address} ${order.data.location.city}`">
-                      <img :src="`${$addonAssetsUrl}icon-location.svg`" slot="media">
+                    <f7-list-item
+                      v-if="order.data && order.data.location"
+                      :title="`${order.data.location.address} ${order.data.location.city}`"
+                    >
+                      <img :src="`${$addonAssetsUrl}icon-location.svg`" slot="media" />
                     </f7-list-item>
                   </f7-list>
                 </div>
@@ -158,16 +180,17 @@ export default {
   },
   methods: {
     downloadCSV(orders, name) {
-      console.log(orders);
       orders.forEach((order, index) => {
         this.traversalObject(order, index, true);
-        this.csvValues.push('\n');
+        this.csvValues[this.csvValues.length - 1] = `${
+          this.csvValues[this.csvValues.length - 1]
+        }\n`;
       });
-      this.csvKeys.unshift('');
-      const text = `${this.csvKeys.join(',')}\n${this.csvValues.join(',')}`;
+      const text = `${this.csvKeys.join(',')}\n${this.csvValues
+        .join(',')
+        .replace(/\n,/g, '\n')}`;
       const BOM = '\uFEFF';
       const fileName = `${name}.csv`;
-      const csvData = new Blob([BOM + text], { type: 'text/csv' });
 
       const downloadLink = document.createElement('a');
       downloadLink.href = `data:attachment/csv;charset=utf-8,${BOM}${encodeURIComponent(
