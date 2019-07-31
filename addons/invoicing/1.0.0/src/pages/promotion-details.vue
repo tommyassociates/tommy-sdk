@@ -384,6 +384,10 @@
             else newAmount = parseFloat(`0.${newAmount}`);
           }
         }
+        if (newAmount < 0) {
+          this.$f7.dialog.alert(this.$t('invoicing.promotion_management.wrong_amount'));
+          return;
+        }
         self.item.amount = newAmount;
         self.$set(self.item, 'amount', newAmount);
         self.enableSave();
