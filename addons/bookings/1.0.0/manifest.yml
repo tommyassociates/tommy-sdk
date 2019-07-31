@@ -63,42 +63,42 @@
         conditions:
           kind: Booking
         event: delete
-  actions:
-    notify_assignee_on_booking_created:
-      title: "Notify assignee on booking created"
-      summary: "Notify assignee when a new booking is created."
-      trigger:
-        package: bookings
-        name: booking_created
-        scope:
-          user_parameter: assignee_id
-      activity:
-        package: chat
-        name: send_message
-      options:
-        target_user_parameter: assignee_id
-      mappings:
-        message:
-          title: "Message text"
-          type: "string"
-          value: "You have a new booking. See Bookings for more details."
-      default: true
-    notify_assignee_on_booking_canceled:
-      title: "Notify assignee on booking canceled"
-      summary: "Notify assignee when an existing booking is canceled."
-      trigger:
-        package: bookings
-        name: booking_canceled
-      activity:
-        package: chat
-        name: send_message
-      options:
-        target_user_parameter: assignee_id
-      mappings:
-        message:
-          title: "Message text"
-          type: "string"
-          value: "One of your bookings have been cancelled. Please see Bookings for details."
+  # actions:
+  #   notify_assignee_on_booking_created:
+  #     title: "Notify assignee on booking created"
+  #     summary: "Notify assignee when a new booking is created."
+  #     trigger:
+  #       package: bookings
+  #       name: booking_created
+  #       scope:
+  #         user_parameter: assignee_id
+  #     activity:
+  #       package: chat
+  #       name: send_message
+  #     options:
+  #       target_user_parameter: assignee_id
+  #     mappings:
+  #       message:
+  #         title: "Message text"
+  #         type: "string"
+  #         value: "You have a new booking. See Bookings for more details."
+  #     default: true
+  #   notify_assignee_on_booking_canceled:
+  #     title: "Notify assignee on booking canceled"
+  #     summary: "Notify assignee when an existing booking is canceled."
+  #     trigger:
+  #       package: bookings
+  #       name: booking_canceled
+  #     activity:
+  #       package: chat
+  #       name: send_message
+  #     options:
+  #       target_user_parameter: assignee_id
+  #     mappings:
+  #       message:
+  #         title: "Message text"
+  #         type: "string"
+  #         value: "One of your bookings have been cancelled. Please see Bookings for details."
   assets:
     -
       type: "stylesheet"
@@ -114,3 +114,4 @@
       path: "/bookings/"
       type: "page"
       file: ""
+
