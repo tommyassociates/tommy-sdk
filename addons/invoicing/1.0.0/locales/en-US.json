@@ -68,7 +68,8 @@
   },
   "promotion_management": {
     "title": "Promotions",
-    "search_placeholder": "Search promotions"
+    "search_placeholder": "Search promotions",
+    "wrong_amount": "The coupon amount should be greater than 0"
   },
   "item": {
     "name_label": "Name",

@@ -68,7 +68,8 @@
   },
   "promotion_management": {
     "title": "优惠",
-    "search_placeholder": "搜索优惠"
+    "search_placeholder": "搜索优惠",
+    "wrong_amount": "优惠券金额应该大于0"
   },
   "item": {
     "name_label": "名字",
