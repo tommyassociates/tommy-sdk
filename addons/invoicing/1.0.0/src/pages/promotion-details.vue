@@ -127,6 +127,13 @@
       >
         <tommy-circle-avatar v-if="itemAvatar" :url="itemAvatar" slot="media"></tommy-circle-avatar>
       </f7-list-item>
+
+      <!-- coupon switch -->
+      <!-- <f7-list-item divider title="111"></f7-list-item> -->
+      <f7-list-item>
+        <span>{{$t('invoicing.promotion.valid')}}</span>
+        <f7-toggle :checked="couponStatus" @change="toggleCouponStatus" color="#FF5413"></f7-toggle>
+      </f7-list-item>
     </f7-list>
 
     <!-- Customer Popup -->
@@ -228,6 +235,7 @@
         products: null,
         packages: null,
         contacts: API.contacts,
+        couponStatus: true,
       };
     },
     mounted() {
@@ -327,6 +335,11 @@
       },
     },
     methods: {
+      toggleCouponStatus() {
+        this.couponStatus = !this.couponStatus
+        // this.item.couponStatus = !this.couponStatus
+        this.enableSave();
+      },
       openCalendar() {
         const self = this;
         self.calendarTo = self.$f7.calendar.create({
@@ -336,7 +349,7 @@
           closeByOutsideClick: false,
           on: {
             change(c, v) {
-              self.item.valid_to = new Date(v[0]).toJSON();
+              self.item.valid_to = self.$moment(new Date(v[0])).format();
               self.enableSave();
             },
           },
@@ -419,4 +432,3 @@
     },
   };
 </script>
-

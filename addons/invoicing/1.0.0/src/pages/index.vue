@@ -129,7 +129,7 @@ export default {
       orderContactsLoading: {},
       csvKeys: [],
       csvValues: [],
-      promotions: null
+      promotions: null,
     };
   },
   created() {
