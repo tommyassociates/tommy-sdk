@@ -123,7 +123,8 @@
     "type_percentage_label": "Percentage",
     "category_label": "类型",
     "max_uses_label": "Max uses",
-    "max_uses_placeholder": "Leave empty or 0 for infinite use"
+    "max_uses_placeholder": "Leave empty or 0 for infinite use",
+    "valid": "优惠券有效"
   },
 
   "order_details": {

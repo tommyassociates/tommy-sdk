@@ -7,7 +7,6 @@
 
     <f7-list class="list-custom">
       <f7-list-item
-        v-if="!hasActorId"
         link="/invoicing/list-management/"
         :title="$t('invoicing.settings.list_management',  'List Management')"
       ></f7-list-item>
@@ -32,7 +31,7 @@
       return {
         isNurse: API.isNurse,
       };
-    },
+    }
   };
 </script>
 

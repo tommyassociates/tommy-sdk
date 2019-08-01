@@ -123,7 +123,8 @@
     "type_percentage_label": "Percentage",
     "category_label": "Category",
     "max_uses_label": "Max uses",
-    "max_uses_placeholder": "Leave empty or 0 for infinite use"
+    "max_uses_placeholder": "Leave empty or 0 for infinite use",
+    "valid": "valid"
   },
 
   "order_details": {
