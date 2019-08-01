@@ -37,27 +37,20 @@
   triggers:
     booking_created:
       title: "Booking created"
-      # execute: "Trigger::BookingCreated"
       observe:
         object: Event
         conditions:
           kind: Booking
         event: create
-      # resource_type: Event
-      # resource_kind: Booking
     booking_updated:
       title: "Booking updated"
-      # execute: "Trigger::BookingUpdated"
       observe:
         object: Event
         conditions:
           kind: Booking
         event: update
-      # resource_type: Event
-      # resource_kind: Booking
     booking_canceled:
       title: "Booking canceled"
-      # execute: "Trigger::BookingDeleted"
       observe:
         object: Event
         conditions:
@@ -65,60 +58,47 @@
         event: cancel
     booking_deleted:
       title: "Booking deleted"
-      # execute: "Trigger::BookingDeleted"
       observe:
         object: Event
         conditions:
           kind: Booking
         event: delete
-      # resource_type: Event
-      # resource_kind: Booking
-    # booking_viewed:
-    #   title: "Booking viewed"
-    #   observe:
-    #     object: Event
-    #     conditions:
-    #       kind: Booking
-    #     event: delete
-    #   # resource_type: Event
-    #   # resource_kind: Booking
-  actions:
-    notify_assignee_on_booking_created:
-      title: "Notify assignee on booking created"
-      summary: "Notify assignee when a new booking is created."
-      trigger:
-        package: bookings
-        name: booking_created
-        scope:
-          user_parameter: assignee_id
-      activity:
-        package: chat
-        name: send_message
-      options:
-        target_user_parameter: assignee_id
-      mappings:
-        message:
-          title: "Message text"
-          type: "string"
-          value: "You have a new booking at %{trigger.start_at}"
-      default: true
-    notify_assignee_on_booking_canceled:
-      title: "Notify assignee on booking canceled"
-      summary: "Notify assignee when an existing booking is canceled."
-      trigger:
-        package: bookings
-        name: booking_canceled
-      activity:
-        package: chat
-        name: send_message
-      options:
-        target_user_parameter: assignee_id
-      mappings:
-        message:
-          title: "Message text"
-          type: "string"
-          value: "Your booking at %{trigger.start_at} has been canceled"
-      default: true
+  # actions:
+  #   notify_assignee_on_booking_created:
+  #     title: "Notify assignee on booking created"
+  #     summary: "Notify assignee when a new booking is created."
+  #     trigger:
+  #       package: bookings
+  #       name: booking_created
+  #       scope:
+  #         user_parameter: assignee_id
+  #     activity:
+  #       package: chat
+  #       name: send_message
+  #     options:
+  #       target_user_parameter: assignee_id
+  #     mappings:
+  #       message:
+  #         title: "Message text"
+  #         type: "string"
+  #         value: "You have a new booking. See Bookings for more details."
+  #     default: true
+  #   notify_assignee_on_booking_canceled:
+  #     title: "Notify assignee on booking canceled"
+  #     summary: "Notify assignee when an existing booking is canceled."
+  #     trigger:
+  #       package: bookings
+  #       name: booking_canceled
+  #     activity:
+  #       package: chat
+  #       name: send_message
+  #     options:
+  #       target_user_parameter: assignee_id
+  #     mappings:
+  #       message:
+  #         title: "Message text"
+  #         type: "string"
+  #         value: "One of your bookings have been cancelled. Please see Bookings for details."
   assets:
     -
       type: "stylesheet"
@@ -134,3 +114,4 @@
       path: "/bookings/"
       type: "page"
       file: ""
+

@@ -24,12 +24,12 @@
   "actions": {
     "notify_assignee_on_booking_created": {
       "mappings": {
-        "message": "You have a new booking"
+        "message": "收到新的订单，请在“订单”中查看。"
       }
     },
     "notify_assignee_on_booking_canceled": {
       "mappings": {
-        "message": "Your booking has been canceled"
+        "message": "您有一单订单被取消，请在“订单”中查看。"
       }
     }
   },

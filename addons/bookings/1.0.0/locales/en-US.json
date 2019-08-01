@@ -24,12 +24,12 @@
   "actions": {
     "notify_assignee_on_booking_created": {
       "mappings": {
-        "message": "You have a new booking"
+        "message": "You have a new booking. See Bookings for more details."
       }
     },
     "notify_assignee_on_booking_canceled": {
       "mappings": {
-        "message": "Your booking has been canceled"
+        "message": "One of your bookings have been cancelled. Please see Bookings for details."
       }
     }
   },
