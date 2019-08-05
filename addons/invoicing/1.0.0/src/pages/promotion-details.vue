@@ -147,27 +147,30 @@
             </f7-nav-right>
           </f7-navbar>
           <f7-searchbar search-container=".invoicing-promotion-customers-list"></f7-searchbar>
-          <f7-list class="invoicing-promotion-customers-list">
-            <f7-list-item
-              v-for="(contact, index) in contacts"
-              :key="`contact-${index}-${contact.friend_id}`"
-              :title="`${contact.first_name || ''} ${contact.last_name || ''}`"
-              @click="() => {item.user_id = contact.friend_id; customerPopupOpened = false; enableSave()}"
-              radio
-              :checked="item.user_id === contact.friend_id"
-            >
-              <tommy-circle-avatar :data="contact" slot="media"></tommy-circle-avatar>
-            </f7-list-item>
-            <f7-list-item
-              v-for="user in $root.teamMembers"
-              :key="`user-${index}-${user.id}`"
-              :title="`${user.first_name || ''} ${user.last_name || ''}`"
-              @click="() => {item.user_id = user.user_id; customerPopupOpened = false; enableSave()}"
-              radio
-              :checked="item.user_id === user.user_id"
-            >
-              <tommy-circle-avatar :data="user" slot="media"></tommy-circle-avatar>
-            </f7-list-item>
+          <f7-list
+            class="invoicing-promotion-customers-list"
+            virtual-list
+            :virtual-list-params="{
+              items: contactsSorted,
+              searchAll: contactsSearchAll,
+              renderExternal: contactsRenderExternal,
+              height: 65,
+            }"
+          >
+            <ul>
+              <f7-list-item
+                v-for="(contact, index) in contactsVlData.items"
+                :key="`contact-${index}-${contact.friend_id || contact.id}`"
+                :title="`${contact.first_name || ''} ${contact.last_name || ''}`"
+                :virtual-list-index="contactsSorted.indexOf(item)"
+                :checked="contact.friend_id ? item.user_id === contact.friend_id : item.user_id === contact.user_id"
+                :style="`top: ${contactsVlData.topPosition}px`"
+                radio
+                @click="() => {item.user_id = contact.friend_id || contact.user_id; customerPopupOpened = false; enableSave()}"
+              >
+                <tommy-circle-avatar :data="contact" slot="media"></tommy-circle-avatar>
+              </f7-list-item>
+            </ul>
           </f7-list>
         </f7-page>
       </f7-view>
@@ -236,6 +239,9 @@
         packages: null,
         contacts: API.contacts,
         couponValid: true,
+        contactsVlData: {
+          items: [],
+        },
       };
     },
     mounted() {
@@ -282,6 +288,13 @@
 
     },
     computed: {
+      contactsSorted() {
+        const self = this;
+        return [
+          ...(self.contacts || []),
+          ...self.$root.teamMembers,
+        ];
+      },
       customerAvatar() {
         const self = this;
         if (!self.item.user_id) return null;
@@ -338,6 +351,19 @@
       },
     },
     methods: {
+      contactsSearchAll(query, items) {
+        const found = [];
+        console.log(query);
+        for (let i = 0; i < items.length; i += 1) {
+          const name = `${items[i].first_name || ''} ${items[i].last_name || ''}`;
+          if (name.toLowerCase().indexOf(query.toLowerCase()) >= 0 || query.trim() === '') found.push(i);
+        }
+        console.log(found);
+        return found; // return array with mathced indexes
+      },
+      contactsRenderExternal(vl, vlData) {
+        this.contactsVlData = vlData;
+      },
       toggleCouponValid() {
         this.couponValid = !this.couponValid;
         this.item.used = !this.couponValid;
