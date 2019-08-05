@@ -62,7 +62,7 @@
               >
                 <tommy-circle-avatar :data="orderAssignee" slot="media"></tommy-circle-avatar>
               </f7-list-item> -->
-              <f7-list-item :title="orderAssignee ? orderAssigneeName : ''" smart-select>
+              <f7-list-item :title="orderAssignee ? orderAssigneeName : ''" smart-select :smart-select-params="{virtualList: true}">
                 <tommy-circle-avatar :data="orderAssignee" slot="media"></tommy-circle-avatar>
                 <select name="assignee" @change="onAssigneeChange">
                   <option v-for="(teamMember,index) in $root.teamMembers" :key="`teamMember-${index}-${teamMember.id}`"
@@ -81,7 +81,7 @@
             <!-- Customer -->
             <template>
               <f7-list-item divider :title="$t('invoicing.order_details.customer')"></f7-list-item>
-              <f7-list-item :title="orderUser ? orderUserName : ''" smart-select>
+              <f7-list-item :title="orderUser ? orderUserName : ''" smart-select  :smart-select-params="{virtualList: true}">
                 <tommy-circle-avatar :data="orderUser" slot="media"></tommy-circle-avatar>
                 <select name="customer" @change="onCustomerChange">
                   <option v-for="(contact, index) in contacts" :key="`contact-${index}-${contact.friend_id}`"
