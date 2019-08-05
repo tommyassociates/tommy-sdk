@@ -132,7 +132,7 @@
       <!-- <f7-list-item divider title="111"></f7-list-item> -->
       <f7-list-item>
         <span>{{$t('invoicing.promotion.valid')}}</span>
-        <f7-toggle :checked="couponStatus" @change="toggleCouponStatus" color="#FF5413"></f7-toggle>
+        <f7-toggle :checked="couponValid" @change="toggleCouponValid" color="#FF5413"></f7-toggle>
       </f7-list-item>
     </f7-list>
 
@@ -235,7 +235,7 @@
         products: null,
         packages: null,
         contacts: API.contacts,
-        couponStatus: true,
+        couponValid: true,
       };
     },
     mounted() {
@@ -255,12 +255,15 @@
           valid_from: null,
           valid_to: null,
           max_uses: null,
+          used: !self.couponValid,
         };
       } else {
         API.loadPromotion(self.id).then((item) => {
           self.item = item;
+          self.couponValid = self.item.used ? !self.item.used : self.couponValid;
         });
       }
+
       if (!self.contacts) {
         self.$api.getContacts.then((contacts) => {
           self.contacts = contacts;
@@ -335,9 +338,9 @@
       },
     },
     methods: {
-      toggleCouponStatus() {
-        this.couponStatus = !this.couponStatus
-        // this.item.couponStatus = !this.couponStatus
+      toggleCouponValid() {
+        this.couponValid = !this.couponValid;
+        this.item.used = !this.couponValid;
         this.enableSave();
       },
       openCalendar() {
