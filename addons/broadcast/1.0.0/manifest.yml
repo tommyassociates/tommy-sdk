@@ -1,0 +1,86 @@
+---
+  title: "Broadcast"
+  package: "Broadcast"
+  summary: "Send individual messages to many team members at once."
+  description: "Send individual messages to many team members at once."
+  version: "1.0.0"
+  developer: "Tommy Labs GmbH"
+  homepage: "https://mytommy.com"
+  private: false
+  locales:
+    - en-US
+    - zh-CN
+  permissions:
+    addon_access:
+      title: "Allow Team Member Access"
+      hint: "Select Team Members who can access this Add-on"
+      default_roles:
+        - Team Admin
+        - Team Manager
+        - Team Member
+      operations:
+        - read
+    addon_actor_access:
+      title: "Who Can View Other Team Members' Tasks"
+      hint: "Select who can view tasks on behalf of other users"
+      resource_type: Fragment
+      resource_kind: "Task"
+      default_roles:
+        - Team Manager
+        - Team Admin
+      operations:
+        - read
+        - create
+    task_create_access:
+      title: "Who Can Create Tasks"
+      hint: "Select who can create tasks"
+      resource_type: Fragment
+      resource_kind: "Task"
+      default_roles:
+        - Team Manager
+        - Team Admin
+      operations:
+        - create
+    task_edit_access:
+      title: "Who Can Edit Tasks"
+      hint: "Select who can edit tasks"
+      resource_type: Fragment
+      resource_kind: "Task"
+      default_roles:
+        - Team Manager
+        - Team Admin
+      operations:
+        - update
+    task_list_read_access:
+      title: "Who Can See List"
+      hint: "Select who can view this list"
+      resource_type: Fragment
+      resource_kind: TaskList
+      default_roles:
+        - Team Manager
+        - Team Admin
+      operations:
+        - read
+    task_list_edit_access:
+      title: "Who Can Edit List"
+      hint: "Select who can edit this list"
+      resource_type: Fragment
+      resource_kind: TaskList
+      default_roles:
+        - Team Manager
+        - Team Admin
+      operations:
+        - update
+  assets:
+    -
+      type: "stylesheet"
+      file: "build/addon.css"
+    -
+      type: "javascript"
+      file: "build/addon.js"
+  views:
+    index:
+      title: "Broadcast"
+      type: "page"
+      index: true
+      path: "/broadcast/"
