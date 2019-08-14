@@ -68,6 +68,13 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
       flex-direction: row;
       align-items: center;
       width: 100%;
+
+      p.icon{
+        width: 60px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
     }
 
     .message-list-tag {
@@ -106,6 +113,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
         padding: 0px 16px;
         .name{
           flex: 1;
+          line-height: 40px;
         }
       }
     }

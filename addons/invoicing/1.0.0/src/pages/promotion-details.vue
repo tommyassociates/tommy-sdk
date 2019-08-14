@@ -285,7 +285,6 @@
         self.products = products;
         self.packages = packages;
       });
-
     },
     computed: {
       contactsSorted() {
