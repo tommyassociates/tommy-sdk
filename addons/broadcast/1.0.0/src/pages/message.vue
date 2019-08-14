@@ -12,16 +12,9 @@
 
     <div class="message-title">FILTERS</div>
     <div class="message-filters">
-      <div class="message-list-tag">
-        <div class="tag">
-          <span class="tag1">#</span>
-          <span>Tag</span>
-        </div>
-        <div class="title">
-          <p class="name">Elder</p>
-          <p>icon x</p>
-        </div>
-      </div>
+      <tag-cmp 
+        name="name"
+      ></tag-cmp>
     </div>
 
     <div class="message-title">MESSAGE</div>
@@ -35,11 +28,16 @@
   </f7-page>
 </template>
 <script>
+  import TagCmp from '../components/tag.vue';
+
   export default {
     data() {
       return {
         lists: null,
       };
+    },
+    components: {
+      TagCmp,
     },
     computed: {
       pageTitle() {

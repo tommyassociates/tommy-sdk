@@ -1,6 +1,6 @@
 ---
   title: "Broadcast"
-  package: "Broadcast"
+  package: "broadcast"
   summary: "Send individual messages to many team members at once."
   description: "Send individual messages to many team members at once."
   version: "1.0.0"

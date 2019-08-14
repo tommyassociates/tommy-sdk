@@ -10,7 +10,9 @@
     "noListTxt": "No existing Messages. Click + to send your first message"
   },
   "message": {
-    "title": "New Message"
+    "title": "New Message",
+    "no_message": "Message content cannot be empty",
+    "tag": "people group" 
   },
   "setting": {
     "title": "Setting"
