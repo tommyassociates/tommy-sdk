@@ -1,7 +1,11 @@
 import API from './api';
 
-
+let paying = false;
 export default function (data, createNewOrder = true) {
+  if (paying) return;
+  paying = true;
+  let succeed;
+  let errored;
   const tommy = window.tommy;
   const f7 = tommy.app.f7;
   const {
@@ -32,7 +36,7 @@ export default function (data, createNewOrder = true) {
   let orderDate = order.data.date;
   if (typeof orderDate === 'string') orderDate = parseInt(orderDate, 10);
   let end_at;
-  if (order.data.duration && order.data.duration > 0)  {
+  if (order.data.duration && order.data.duration > 0) {
     end_at = orderDate + parseInt(order.data.duration, 10) * 60 * 1000;
   } else {
     end_at = orderDate + 60 * 60 * 1000;
@@ -57,7 +61,10 @@ export default function (data, createNewOrder = true) {
       API.cache.booking.transaction = {};
       responseOrder.status = 'paid';
       API.updateOrder(teamId, responseOrder).then(() => {
+        paying = false;
         f7.views.main.router.navigate(`${successUrl}?id=${responseOrder.id}`);
+      }).catch(() => {
+        paying = false;
       });
       return;
     }
@@ -70,6 +77,9 @@ export default function (data, createNewOrder = true) {
         order_id: responseOrder.id,
       },
       (transaction, walletData = {}) => {
+        paying = false;
+        succeed = true;
+        if (errored) return;
         API.cache.booking.transaction = transaction;
         responseOrder.status = 'paid';
         responseOrder.wallet_transaction_id = transaction.id;
@@ -77,17 +87,27 @@ export default function (data, createNewOrder = true) {
         responseOrder.data.payment_method = walletData.paymentMethod || 'card';
         API.updateOrder(teamId, responseOrder).then(() => {
           f7.views.main.router.navigate(`${successUrl}?id=${responseOrder.id}`);
+        }).catch(() => {
+          paying = false;
         });
       },
       (transaction, walletData = {}) => {
-        f7.views.main.router.navigate(`${errorUrl}?id=${responseOrder.id}`);
-        API.cancelOrder(teamId, responseOrder.id);
+        paying = false;
+        errored = true;
+        if (succeed) return;
+        API.cancelOrder(teamId, responseOrder.id).then(() => {
+          f7.views.main.router.navigate(`${errorUrl}?id=${responseOrder.id}`);
+        }).catch(() => {
+          f7.views.main.router.navigate(`${errorUrl}?id=${responseOrder.id}`);
+        });
       }
     );
   }
 
   if (createNewOrder) {
-    API.sendOrder(teamId, order).then(pay);
+    API.sendOrder(teamId, order).then(pay).catch(() => {
+      paying = false;
+    });
   } else {
     pay({ id: orderId, ...order });
   }
