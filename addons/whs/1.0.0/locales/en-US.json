@@ -1,0 +1,15 @@
+{
+  "index" : {
+    "title" : "Inventory"
+  },
+  "views": {
+    "index": {
+      "title": "Inventory"
+    }
+  },
+  "title": "Inventory",
+  "summary": "Manage your inventory.",
+  "description": "Manage your inventory.",
+  "developer": "Tommy Labs GmbH",
+  "permissions": {}
+}
