@@ -100,7 +100,64 @@
       </div>
     </template>
     <template v-if="activeTab === 'locations'">
-
+      <div class="whs-table">
+        <table>
+          <thead>
+            <tr>
+              <th class="sort-cell">
+                <a class="link">
+                  <i class="whs-icon whs-icon-sort-black"></i>
+                </a>
+              </th>
+              <th>Location</th>
+              <th>Parent</th>
+              <th>Items</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="media-cell"></td>
+              <td>1000348671</td>
+              <td>BF-02-01</td>
+              <td>500</td>
+            </tr>
+            <tr>
+              <td class="media-cell"></td>
+              <td>1000348671</td>
+              <td>BF-02-01</td>
+              <td>500</td>
+            </tr>
+            <tr>
+              <td class="media-cell"></td>
+              <td>1000348671</td>
+              <td>BF-02-01</td>
+              <td>500</td>
+            </tr>
+            <tr>
+              <td class="media-cell"></td>
+              <td>1000348671</td>
+              <td>BF-02-01</td>
+              <td>500</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="whs-pagination" slot="fixed">
+        <div class="whs-pagination-rows">4 {{$t('whs.pagination.rows')}}</div>
+        <div class="whs-pagination-nav">
+          <a class="link"><i class="f7-icons">chevron_left</i></a>
+          <span>{{$t('whs.pagination.page', { current: 1, total: 4 })}}</span>
+          <a class="link"><i class="f7-icons">chevron_right</i></a>
+        </div>
+        <div class="whs-pagination-actions">
+          <a class="link">
+            <i class="icon f7-icons">share</i>
+          </a>
+          <a class="link">
+            <i class="icon f7-icons">gear</i>
+          </a>
+        </div>
+      </div>
     </template>
     <template v-if="activeTab === 'tags'">
 

@@ -3,7 +3,44 @@
     "title" : "Inventory"
   },
   "common": {
-    "search_placeholder": "Search..."
+    "search_placeholder": "Search...",
+    "required_placeholder": "Required...",
+    "name_label": "Name",
+    "icon_label": "Icon",
+    "sku_barcode_label": "SKU / Barcode",
+    "sku_barcode_placeholder": "E.g. 1234567890...",
+    "price_label": "Price",
+    "price_placeholder": "",
+    "tags_label": "Tags",
+    "tags_placeholder": "",
+    "minimum_stock_level_label": "Minimum Stock Level",
+    "minimum_stock_level_placeholder": "E.g. 12345...",
+    "location_quantity_label": "Quantity",
+    "location_quantity_placeholder": "Add to Location",
+    "notes_label": "Notes",
+    "notes_placeholder": "Optional",
+    "storage_label": "Storage",
+    "storage_placeholder": "Select option",
+    "add_photo_label": "Add Photo",
+    "parent_location_label": "Parent Location",
+    "parent_location_placeholder": "Select Location",
+    "pallet_capacity_label": "Pallet Capacity",
+    "active_location_label": "Active Location",
+    "location_category_label": "Location Category",
+    "location_category_placeholder": "Select Category"
+  },
+  "pagination": {
+    "rows": "Rows",
+    "page": "Page {{current}} of {{total}}"
+  },
+  "tag_add": {
+    "title": "Add Tag"
+  },
+  "item_add": {
+    "title": "Add Item"
+  },
+  "location_add": {
+    "title": "Add Location"
   },
   "views": {
     "index": {
