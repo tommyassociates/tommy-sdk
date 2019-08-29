@@ -17,19 +17,19 @@
     </f7-navbar>
     <f7-popover class="whs-popover whs-popover-add" :backdrop="false">
       <f7-list no-chevron>
-        <f7-list-item link>
+        <f7-list-item link="/whs/item-add/" popover-close>
           <i slot="media" class="whs-icon whs-icon-box-black"></i>
           <span slot="title">New Item</span>
         </f7-list-item>
-        <f7-list-item link>
+        <f7-list-item link="/whs/location-add/" popover-close>
           <i slot="media" class="whs-icon whs-icon-drawer-black"></i>
           <span slot="title">New Location</span>
         </f7-list-item>
-        <f7-list-item link>
+        <f7-list-item link="/whs/tag-add/" popover-close>
           <i slot="media" class="whs-icon whs-icon-tag-black"></i>
           <span slot="title">New Tag</span>
         </f7-list-item>
-        <f7-list-item link>
+        <f7-list-item link="/whs/activity-add/" popover-close>
           <i slot="media" class="whs-icon whs-icon-clock-black"></i>
           <span slot="title">New Activity</span>
         </f7-list-item>

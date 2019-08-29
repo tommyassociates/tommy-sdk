@@ -3,133 +3,11 @@ $orange: #FF5413;
 @mixin encoded-svg-background($svg) {
   background-image: url("data:image/svg+xml;charset=utf-8,#{$svg}");
 }
-@import "./icons.scss";
+@import "./scss/icons.scss";
 
 .whs-navbar-links {
   .link + .link {
     margin-left: 0 !important;
-  }
-}
-
-.searchbar.whs-searchbar {
-  border: none;
-  input[type=search] {
-    font-size: 20px !important;
-    padding-left: 34px !important;
-  }
-  .searchbar-icon {
-    width: 18px;
-    height: 18px;
-    background-size: contain;
-    margin-top: -9px;
-  }
-  .link.icon-only {
-    width: 44px;
-    height: 44px;
-    flex-shrink: 0;
-    color: #000;
-  }
-  .input-clear-button, .input-clear-button:after {
-    transition: 0ms;
-  }
-  &.searchbar-enabled {
-    background: $red;
-    color: #fff;
-    input[type=search] {
-      color: #fff;
-      &::placeholder {
-        color: rgba(255, 255, 255, 0.5);
-      }
-    }
-    .link.icon-only {
-      display: none;
-    }
-    .searchbar-icon {
-      @include encoded-svg-background("%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2013%2013'%20enable-background%3D'new%200%200%2013%2013'%3E%3Cg%3E%3Cpath%20fill%3D'%23fff'%20d%3D'M5%2C1c2.2%2C0%2C4%2C1.8%2C4%2C4S7.2%2C9%2C5%2C9S1%2C7.2%2C1%2C5S2.8%2C1%2C5%2C1%20M5%2C0C2.2%2C0%2C0%2C2.2%2C0%2C5s2.2%2C5%2C5%2C5s5-2.2%2C5-5S7.8%2C0%2C5%2C0%20L5%2C0z'%2F%3E%3C%2Fg%3E%3Cline%20stroke%3D'%23fff'%20stroke-miterlimit%3D'10'%20stroke-width%3D'1.5'%20x1%3D'12.6'%20y1%3D'12.6'%20x2%3D'8.2'%20y2%3D'8.2'%2F%3E%3C%2Fsvg%3E");
-    }
-    .input-clear-button {
-      opacity: 1;
-      pointer-events: auto;
-      visibility: visible;
-    }
-    .input-clear-button:after {
-      @include encoded-svg-background("%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%2028%2028'%3E%3Ccircle%20cx%3D'14'%20cy%3D'14'%20r%3D'14'%20fill%3D'%23ffffff'%2F%3E%3Cline%20stroke%3D'%23ff4500'%20stroke-width%3D'3'%20stroke-miterlimit%3D'10'%20x1%3D'8'%20y1%3D'8'%20x2%3D'20'%20y2%3D'20'%2F%3E%3Cline%20fill%3D'none'%20stroke%3D'%23ff4500'%20stroke-width%3D'3'%20stroke-miterlimit%3D'10'%20x1%3D'20'%20y1%3D'8'%20x2%3D'8'%20y2%3D'20'%2F%3E%3C%2Fsvg%3E");
-    }
-  }
-}
-.whs-menubar {
-  display: flex;
-  background: #fff;
-  margin-top: 1px;
-  a {
-    width: 25%;
-    flex-shrink: 10;
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
-    flex-direction: column;
-    color: #000;
-  }
-  i {
-    width: 50px;
-    height: 50px;
-    line-height: 50px;
-    flex-shrink: 0;
-  }
-  i.f7-icons {
-    font-size: 30px;
-  }
-  span {
-    text-transform: uppercase;
-    font-size: 16px;
-    line-height: 1;
-    margin-top: 4px;
-    margin-left: 0 !important;
-    position: relative;
-    padding-bottom: 10px;
-    flex-shrink: 0;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-  }
-  &.whs-menubar-labels {
-    overflow: auto;
-    padding: 0 12px;
-    &:after {
-      content: '';
-      width: 12px;
-      flex-shrink: 0;
-      height: 12px;
-    }
-    &::-webkit-scrollbar {
-      display: none;
-    }
-    a {
-      flex-shrink: 0;
-      width: auto;
-      + a {
-        margin-left: 20px;
-      }
-    }
-    span {
-      padding: 10px 0;
-      margin-top: 0;
-    }
-
-
-  }
-  a.whs-menubar-active {
-    color: $orange;
-    span:after {
-      content: '';
-      height: 2px;
-      background: $orange;
-      left: 0;
-      right: 0;
-      pointer-events: none;
-      bottom: 0;
-      position: absolute;
-    }
   }
 }
 
@@ -238,3 +116,9 @@ $orange: #FF5413;
     font-size: 16px;
   }
 }
+
+
+@import "./scss/searchbar.scss";
+@import "./scss/menubar.scss";
+@import "./scss/table.scss";
+@import "./scss/form.scss";
