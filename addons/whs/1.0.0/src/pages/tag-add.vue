@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="whs-details-page">
+  <f7-page>
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('whs.tag_add.title')}}</f7-nav-title>

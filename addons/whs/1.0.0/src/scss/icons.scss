@@ -1,3 +1,9 @@
+.whs-list-search-icon {
+  width: 28px;
+  height: 28px;
+  background: url(../assets/search-icon.svg) no-repeat center;
+  background-size: contain;
+}
 .whs-icon-barcode {
   width: 28px;
   height: 28px;
@@ -53,6 +59,7 @@
   background-repeat: no-repeat;
   background-size: contain;
   display: block;
+  margin-right: 5px;
 }
 .whs-form-icon-aa {
   background-image: url(../assets/form-icon-aa.svg);
@@ -83,4 +90,11 @@
 }
 .whs-form-icon-toggle {
   background-image: url(../assets/form-icon-toggle.svg);
+}
+
+.whs-icon-empty {
+  background: url(../assets/empty-icon.svg) no-repeat center;
+  background-size: contain;
+  width: 180px;
+  height: 150px;
 }

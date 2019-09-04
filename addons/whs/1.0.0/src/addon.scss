@@ -116,7 +116,69 @@ $orange: #FF5413;
     font-size: 16px;
   }
 }
+.whs-list-search-item {
+  .item-title {
+    color: #999999;
+  }
+  .item-inner {
+    margin-left: 5px !important;
+  }
+}
+.whs-toolbar-button {
+  background: $red;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff !important;
+  font-size: 24px;
+  font-weight: 500;
+  height: 70px;
+  z-index: 500;
+  transition-duration: 200ms;
+  text-transform: uppercase;
+  &.active-state {
+    color: rgba(255, 255, 255, 0.5) !important;
+  }
+  ~ .page-content {
+    padding-bottom: 70px;
+  }
+}
 
+.whs-empty-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #999999;
+  font-size: 26px;
+  text-align: center;
+  margin: 50px auto;
+  i {
+    margin-bottom: 20px;
+  }
+}
+
+.list.whs-settings-list {
+  .item-divider {
+    font-size: 16px;
+    color: #999;
+    text-transform: uppercase;
+  }
+  input[type="text"] {
+    text-align: right;
+    font-size: 16px;
+  }
+  .item-after {
+    font-size: 16px;
+  }
+  .item-title {
+    font-size: 18px;
+  }
+}
 
 @import "./scss/searchbar.scss";
 @import "./scss/menubar.scss";
