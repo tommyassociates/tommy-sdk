@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="whs-details-page">
+  <f7-page>
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('whs.item_add.title')}}</f7-nav-title>
@@ -9,6 +9,8 @@
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
+
+    <a class="whs-toolbar-button" slot="fixed">{{$t('whs.item_add.add_more_button')}}</a>
 
     <f7-list class="whs-form">
       <ul>
@@ -51,11 +53,7 @@
           <i class="whs-form-icon whs-form-icon-hash"></i>
           {{$t('whs.common.tags_label')}}
         </f7-list-item>
-        <f7-list-input
-          type="text"
-          :placeholder="$t('whs.common.tags_placeholder')"
-        />
-
+        <tags-picker />
         <f7-list-item divider>
           <i class="whs-form-icon whs-form-icon-1"></i>
           {{$t('whs.common.minimum_stock_level_label')}}
@@ -105,10 +103,12 @@
 <script>
 import API from "../api";
 import FormImagesPicker from '../components/form-images-picker.vue';
+import TagsPicker from '../components/tags-picker.vue';
 
 export default {
   components: {
     FormImagesPicker,
+    TagsPicker,
   },
   data() {
     return {

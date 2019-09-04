@@ -10,7 +10,7 @@
         <f7-link icon-only>
           <f7-icon f7="bell" />
         </f7-link>
-        <f7-link icon-only>
+        <f7-link href="/whs/settings/" icon-only>
           <f7-icon f7="gear" />
         </f7-link>
       </f7-nav-right>

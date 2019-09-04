@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="whs-details-page">
+  <f7-page>
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('whs.location_add.title')}}</f7-nav-title>
@@ -81,10 +81,7 @@
           <i class="whs-form-icon whs-form-icon-hash"></i>
           {{$t('whs.common.tags_label')}}
         </f7-list-item>
-        <f7-list-input
-          type="text"
-          :placeholder="$t('whs.common.tags_placeholder')"
-        />
+        <tags-picker />
 
         <!-- Active Location -->
         <f7-list-item divider>
@@ -115,10 +112,12 @@
 <script>
 import API from "../api";
 import FormImagesPicker from '../components/form-images-picker.vue';
+import TagsPicker from '../components/tags-picker.vue';
 
 export default {
   components: {
     FormImagesPicker,
+    TagsPicker,
   },
   data() {
     return {

@@ -160,18 +160,22 @@
       </div>
     </template>
     <template v-if="activeTab === 'tags'">
-
+      <empty-block :text="$t('whs.common.no_tags')" />
     </template>
     <template v-if="activeTab === 'activity'">
-
+      <empty-block :text="$t('whs.common.no_activity')" />
     </template>
 
   </f7-page>
 </template>
 <script>
 import API from "../api";
+import EmptyBlock from '../components/empty-block.vue';
 
 export default {
+  components: {
+    EmptyBlock,
+  },
   data() {
     return {
       activeTab: 'summary',
