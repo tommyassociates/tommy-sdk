@@ -40,7 +40,7 @@
                 />
               </a>
               <a
-                @click="downloadCSV(list.orders, list.name)"
+                @click="makeCSV(list.orders, list.name)"
                 v-if="canEditList(list) && list.orders.length > 0"
                 ref="download"
               >
@@ -178,17 +178,88 @@ export default {
     }
   },
   methods: {
+    makeCSV(orders, name) {
+      var head = [
+        'id', 'user_id','couponName','couponDiscount',
+        'Create Time','Booking Time',
+        'city','Address',
+        'pending','paid','processing','QA','complete',
+        'Jan','Feb','Mar', 'Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
+      ];
+      var lines = [];
+
+      var statusCount = { //订单状态
+        QA: 0,
+        complete: 0,
+        paid: 0,
+        pending: 0,
+        processing: 0,
+      }
+      var monthSumCount = [0,0,0,0,0,0,0,0,0,0,0,0]; //12个月
+      for(var i = 0; i < orders.length; i++) {
+        var line = [];
+        var order = orders[i];
+
+        line.push(order.id);
+        line.push(order.user_id);
+        let couponName = null;
+        if(order.nurse){
+          couponName = order.data.nurse.first_name + order.data.nurse.last_name; //护工名字
+        }  
+        line.push(couponName);
+        let couponDiscount = this.promotionDiscount(order.vendor_coupon_id);//优惠券数
+        line.push(couponDiscount);
+
+        line.push(this.orderUserName(order.user_id).toLocaleString());
+        line.push(this.orderUserName(+order.data.date).toLocaleString());
+
+        line.push(order.data.location.city);
+        line.push(order.data.location.address);
+
+        statusCount[order.status]++;
+        line.push(statusCount.pending);
+        line.push(statusCount.paid);
+        line.push(statusCount.processing);
+        line.push(statusCount.QA);
+        line.push(statusCount.complete);
+
+        var month = new Date(order.created_at).getMonth();
+        monthSumCount[month]++;
+        line.push(...monthSumCount);
+        
+        lines.push(line);
+      }    
+      var csvText =  head.join(',') + '\n'+
+      lines.map(line => line.join(',')).join('\n');
+
+      this.triggerDownload(name, csvText)
+    },
+    triggerDownload(name, text) {
+      const BOM = "\uFEFF";
+      const fileName = `${name}.csv`;debugger;
+      const downloadLink = document.createElement("a");
+      downloadLink.href = `data:attachment/csv;charset=utf-8,${BOM}${encodeURIComponent(
+        text
+      )}`;
+      downloadLink.target = "_blank";
+      downloadLink.download = fileName;
+      downloadLink.click();
+    }, 
+    //old 
     downloadCSV(orders, name) {
+      //orders：所有订单状态，为一个数组，每项是一个订单数据
+      //this.csvKeys: 为一个数组，表头  
+      //this.csvValues: 为一个数组，所有订单信息
+      //text: 拼接的表格全部内容 this.csvKeys + this.csvValues以字符串形式拼接
       orders.forEach((order, index) => {
-        this.traversalObject(order, index, true);
+        this.traversalObject(order, index, true); //遍历orders对象
         this.csvValues[this.csvValues.length - 1] += "\n";
       });
       const text = `${this.csvKeys.join(",")}\n${this.csvValues
         .join(",")
         .replace(/\n,/g, "\n")}`;
       const BOM = "\uFEFF";
-      const fileName = `${name}.csv`;
-
+      const fileName = `${name}.csv`; 
       const downloadLink = document.createElement("a");
       downloadLink.href = `data:attachment/csv;charset=utf-8,${BOM}${encodeURIComponent(
         text
