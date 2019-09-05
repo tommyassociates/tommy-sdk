@@ -200,21 +200,24 @@ export default {
         var line = [];
         var order = orders[i];
 
-        line.push(order.id);
-        line.push(order.user_id);
+        line.push(order.id);//1
+        line.push(order.user_id);//2
+
         let couponName = null;
         if(order.nurse){
           couponName = order.data.nurse.first_name + order.data.nurse.last_name; //护工名字
-        }  
-        line.push(couponName);
+        }
+
+        line.push(couponName);//3
+
         let couponDiscount = this.promotionDiscount(order.vendor_coupon_id);//优惠券数
-        line.push(couponDiscount);
+        line.push(couponDiscount);//4
 
-        line.push(this.orderUserName(order.user_id).toLocaleString());
-        line.push(this.orderUserName(+order.data.date).toLocaleString());
+        line.push(this.orderUserName(order.user_id).toLocaleString());//5
+        line.push(this.orderUserName(+order.data.date).toLocaleString());//6
 
-        line.push(order.data.location.city);
-        line.push(order.data.location.address);
+        line.push('"' + order.data.location.city + '"');//7
+        line.push('"' + order.data.location.address + '"');//8
 
         statusCount[order.status]++;
         line.push(statusCount.pending);
