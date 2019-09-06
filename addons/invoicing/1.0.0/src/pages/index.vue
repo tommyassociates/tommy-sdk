@@ -180,14 +180,13 @@ export default {
   methods: {
     makeCSV(orders, name) {
       var head = [
-        'id', 'user_id','couponName','couponDiscount',
-        'Create Time','Booking Time',
-        'city','Address',
-        'pending','paid','processing','QA','complete',
+        'Id', 'User_id', 
+        'CouponName','CouponDiscount','Create Time',
+        'City','Address','mobile',
+        'Pending','Paid','Processing','QA','Complete',
         'Jan','Feb','Mar', 'Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
       ];
       var lines = [];
-
       var statusCount = { //订单状态
         QA: 0,
         complete: 0,
@@ -199,27 +198,32 @@ export default {
       for(var i = 0; i < orders.length; i++) {
         var line = [];
         var order = orders[i];
-
         line.push(order.id);//1
-        line.push(order.user_id);//2
-
-        let couponName = null;
-        if(order.nurse){
-          couponName = order.data.nurse.first_name + order.data.nurse.last_name; //护工名字
-        }
-
+        line.push(this.orderUserName(order.user_id));//2
+        
+        let discount = order.vendor_coupon_id
+        let couponName = discount ? 
+                         this.promotionName(discount) : 
+                         null;
+        // if(order.data.nurse){
+        //   couponName = order.data.nurse.first_name +
+        //                order.data.nurse.last_name; //护工名字
+        // }
         line.push(couponName);//3
+        let couponDiscount = discount ?  
+                             this.promotionDiscount(discount):
+                             0;//优惠券数 调用函数需要处理一下NaN
+        line.push(couponDiscount);//4 
 
-        let couponDiscount = this.promotionDiscount(order.vendor_coupon_id);//优惠券数
-        line.push(couponDiscount);//4
-
-        line.push(this.orderUserName(order.user_id).toLocaleString());//5
-        line.push(this.orderUserName(+order.data.date).toLocaleString());//6
-
-        line.push('"' + order.data.location.city + '"');//7
-        line.push('"' + order.data.location.address + '"');//8
-
-        statusCount[order.status]++;
+        line.push(this.orderDate(+order.data.date).toLocaleString());//5
+        line.push('"' + order.data.location.city + '"');//6
+        line.push('"' + order.data.location.address + '"');//7
+        let phone = null
+        if(order.data.nurse){
+          phone = order.data.nurse.mobile
+        }
+        line.push(phone) //8
+        statusCount[order.status]++; //五种状态
         line.push(statusCount.pending);
         line.push(statusCount.paid);
         line.push(statusCount.processing);
@@ -228,13 +232,13 @@ export default {
 
         var month = new Date(order.created_at).getMonth();
         monthSumCount[month]++;
-        line.push(...monthSumCount);
-        
-        lines.push(line);
-      }    
-      var csvText =  head.join(',') + '\n'+
-      lines.map(line => line.join(',')).join('\n');
+        line.push(...monthSumCount);  
 
+        lines.push(line); //得到所有的行
+      }    
+      var csvText = head.join(',') + 
+                    '\n'+
+                    lines.map(line => line.join(',')).join('\n');
       this.triggerDownload(name, csvText)
     },
     triggerDownload(name, text) {
@@ -248,7 +252,7 @@ export default {
       downloadLink.download = fileName;
       downloadLink.click();
     }, 
-    //old 
+    //The old use function: downloadCSV,traversalObject
     downloadCSV(orders, name) {
       //orders：所有订单状态，为一个数组，每项是一个订单数据
       //this.csvKeys: 为一个数组，表头  
@@ -457,7 +461,8 @@ export default {
       const promo = self.promotions.filter(el => el.id === parseInt(id, 10))[0];
       if (!promo) return 0;
       if (promo.kind !== "percentage") return promo.amount;
-      return self.orderItemsTotal * promo.amount;
+      let result = self.orderItemsTotal * promo.amount;
+      return result || 0
     }
   },
   beforeDestroy() {
