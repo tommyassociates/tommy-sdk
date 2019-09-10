@@ -63,7 +63,15 @@
     "tags": "Tags",
     "activities": "Activities",
     "activity_dashboard": "Activity Dashboard",
-    "subscriptions": "Subscriptions"
+    "subscriptions": "Subscriptions",
+    "date_format_format": "Format",
+    "date_format_demo": "Demo",
+    "date_format_values": "Values",
+    "date_format_examples": "Examples",
+    "time_format_format": "Format",
+    "time_format_demo": "Demo",
+    "time_format_values": "Values",
+    "time_format_examples": "Examples"
   },
   "views": {
     "index": {
