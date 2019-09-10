@@ -71,7 +71,20 @@
     "time_format_format": "Format",
     "time_format_demo": "Demo",
     "time_format_values": "Values",
-    "time_format_examples": "Examples"
+    "time_format_examples": "Examples",
+    "view_settings": "View Settings",
+    "view_settings_main_menu": "Main Menu",
+    "view_settings_summary": "Summary",
+    "view_settings_locations": "Locations",
+    "view_settings_tags": "Tags",
+    "view_settings_activities": "Activities"
+  },
+  "settings_items": {
+    "title": "Items",
+    "header_bg_color": "Header Background Color",
+    "header_font_color": "Highlighted Font Color",
+    "standard_font_color": "Standard Font Color",
+    "fields": "Fields"
   },
   "views": {
     "index": {

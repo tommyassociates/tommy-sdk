@@ -4,6 +4,7 @@ $orange: #FF5413;
   background-image: url("data:image/svg+xml;charset=utf-8,#{$svg}");
 }
 @import "./scss/icons.scss";
+@import "./utils/color-picker/color-picker.scss";
 
 .whs-navbar-links {
   .link + .link {
@@ -178,6 +179,20 @@ $orange: #FF5413;
   .item-title {
     font-size: 18px;
   }
+}
+
+.popover.whs-color-picker-popover {
+  width: 250px;
+  &, .popover-angle:after {
+    background-color: rgba(30, 30, 30, 0.95) !important;
+  }
+}
+.list-color-picker-target {
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  border: 1px solid #D8D8D8;
+  box-sizing: border-box;
 }
 
 @import "./scss/searchbar.scss";
