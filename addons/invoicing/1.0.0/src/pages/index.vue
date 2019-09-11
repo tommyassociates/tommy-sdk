@@ -180,71 +180,100 @@ export default {
   },
   methods: {
     makeCSV(orders, name) {
-      var head = [
-        'Id', 'User_id', 
-        'CouponName','CouponDiscount','Create Time',
-        'City','Address','mobile',
+      let self = this 
+      const head = [
+        'OrderId', 'Status', 'NurseName','CreateTime', 'BookingTime',
+         'Amount', 'Hours', 'City','Address','CustomerName', 
+        'PaymentMethod','CouponName', 'CouponDiscount',
+        'Clock In Time','Clock Out Time','Question 1','Question 2','Question 3',
         'Pending','Paid','Processing','QA','Complete',
         'Jan','Feb','Mar', 'Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
       ];
-      var lines = [];
-      var statusCount = { //订单状态
-        QA: 0,
-        complete: 0,
-        paid: 0,
-        pending: 0,
-        processing: 0,
-      }
-      var monthSumCount = [0,0,0,0,0,0,0,0,0,0,0,0]; //12个月
-      for(var i = 0; i < orders.length; i++) {
-        var line = [];
-        var order = orders[i];
-        line.push(order.id);//1
-        line.push(this.orderUserName(order.user_id));//2
+      Promise.all(orders.map(order => {
+          return API.loadOrder(order.id)
+        })).then(detailedOrders => {
+          console.log('-----', detailedOrders[0], JSON.parse(JSON.stringify(orders))[0])
         
-        let discount = order.vendor_coupon_id
-        let couponName = discount ? 
-                         this.promotionName(discount) : 
-                         null;
-        // if(order.data.nurse){
-        //   couponName = order.data.nurse.first_name +
-        //                order.data.nurse.last_name; //护工名字
-        // }
-        line.push(couponName);//3
-        let couponDiscount = discount ?  
-                             this.promotionDiscount(discount):
-                             0;//优惠券数 调用函数需要处理一下NaN
-        line.push(couponDiscount);//4 
-
-        line.push(this.orderDate(+order.data.date).toLocaleString());//5
-        line.push('"' + order.data.location.city + '"');//6
-        line.push('"' + order.data.location.address + '"');//7
-        let phone = null
-        if(order.data.nurse){
-          phone = order.data.nurse.mobile
-        }
-        line.push(phone) //8
-        statusCount[order.status]++; //五种状态
-        line.push(statusCount.pending);
-        line.push(statusCount.paid);
-        line.push(statusCount.processing);
-        line.push(statusCount.QA);
-        line.push(statusCount.complete);
-
-        var month = new Date(order.created_at).getMonth();
-        monthSumCount[month]++;
-        line.push(...monthSumCount);  
-
-        lines.push(line); //得到所有的行
-      }    
-      var csvText = head.join(',') + 
-                    '\n'+
-                    lines.map(line => line.join(',')).join('\n');
-      this.triggerDownload(name, csvText)
+          let lines = [];
+          let statusCount = { //订单状态
+            QA: 0,
+            complete: 0,
+            paid: 0,
+            pending: 0,
+            processing: 0
+          };
+          let monthSumCount = [0,0,0,0,0,0,0,0,0,0,0,0]; //12个月
+          for(let i = 0; i < orders.length; i++) {
+            let line = [];
+            let order = orders[i];
+            line.push(order.id);//1 订单id
+            line.push(order.status); //2 状态
+            let nurseName = 'null'
+            if(order.data.nurse){
+              nurseName = order.data.nurse.last_name +
+                          order.data.nurse.first_name; 
+            }
+            // const nurseName = order[assignee_id] ? 
+            //                   this.getAssigneeName(order[assignee_id]) : 
+            //                   "null";
+            line.push(nurseName);//3 护工名字
+            let createTime = self.$moment(order.created_at).format("YYYY/MM/DD HH:mm");
+            line.push(createTime); //4 订单创建时间,格式修改一致 
+            line.push(this.orderDate(+order.data.date).toLocaleString());//5 下单时间
+            line.push(detailedOrders[i].total);//6 订单总价
+            line.push((detailedOrders[i].data.duration / 60)|| 0);//7 预定时长
+            line.push('"' + order.data.location.city + '"');//8 城市
+            line.push('"' + order.data.location.address + '"');//9 地址
+            line.push(this.orderUserName(order.user_id));//10 客户名字
+            line.push('pay method') //11 支付方式
+            let discount = order.vendor_coupon_id;
+            let couponName = discount ? 
+                            this.promotionName(discount) : 
+                            'null';
+            line.push(couponName);//12 优惠券名字 
+            let couponDiscount = discount ?  
+                                this.promotionDiscount(discount):
+                                0;//优惠券数 调用函数需要处理一下NaN
+            line.push(couponDiscount);//13 优惠券折扣 
+            line.push(self.$moment(parseInt(order.data.date, 10)).format("YYYY/MM/DD HH:mm")); //护工上门时间
+            if(detailedOrders[i].data.duration) {
+              let timeLength = parseInt(order.data.date, 10) + parseInt(detailedOrders[i].data.duration, 10) * 60 * 1000
+               
+              line.push(self.$moment(timeLength).format("YYYY/MM/DD HH:mm"));//护工离开时间
+            } else {
+              line.push(' ')
+            }
+            let q = detailedOrders[i].data.feedback
+            if(q){
+              line.push(q.question1 || " ");
+              line.push(q.question2 || " ");
+              line.push(q.question3 || " ");
+            }else{
+              line.push(" ");
+              line.push(" ");
+              line.push(" ");
+            }
+            statusCount[order.status]++; //五种状态
+            line.push(statusCount.pending);
+            line.push(statusCount.paid);
+            line.push(statusCount.processing);
+            line.push('statusCount.QA');
+            line.push(statusCount.complete);
+            var month = new Date(order.created_at).getMonth();
+            monthSumCount[month]++;
+            line.push(...monthSumCount);  
+    
+            lines.push(line); //得到所有的行
+          }    
+          var csvText = head.join(',') + 
+                        '\n'+
+                        lines.map(line => line.join(',')).join('\n');
+          this.triggerDownload(name, csvText)
+      })
     },
-    triggerDownload(name, text) {
+    triggerDownload(name, text) { 
       const BOM = "\uFEFF";
-      const fileName = `${name}.csv`;debugger;
+      const fileName = `${name}.csv`;
       const downloadLink = document.createElement("a");
       downloadLink.href = `data:attachment/csv;charset=utf-8,${BOM}${encodeURIComponent(
         text
