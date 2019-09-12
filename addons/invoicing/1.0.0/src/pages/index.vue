@@ -183,16 +183,16 @@ export default {
       let self = this 
       const head = [
         'OrderId', 'Status', 'NurseName','CreateTime', 'BookingTime',
-         'Amount', 'Hours', 'City','Address','CustomerName', 
-        'PaymentMethod','CouponName', 'CouponDiscount',
-        'Clock In Time','Clock Out Time','Question 1','Question 2','Question 3',
-        'Pending','Paid','Processing','QA','Complete',
+        'Amount', 'Hours', 'City','Address','CustomerName', 
+        'CouponName', 'CouponDiscount',
+        'Question 1','Question 2','Question 3',
+        'Pending','Paid','Processing','Complete',
         'Jan','Feb','Mar', 'Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
       ];
       Promise.all(orders.map(order => {
           return API.loadOrder(order.id)
         })).then(detailedOrders => {
-          console.log('-----', detailedOrders[0], JSON.parse(JSON.stringify(orders))[0])
+          console.log('-----', detailedOrders[0], JSON.parse(JSON.stringify(orders))[0],'---------')
         
           let lines = [];
           let statusCount = { //订单状态
@@ -208,24 +208,24 @@ export default {
             let order = orders[i];
             line.push(order.id);//1 订单id
             line.push(order.status); //2 状态
-            let nurseName = 'null'
-            if(order.data.nurse){
-              nurseName = order.data.nurse.last_name +
-                          order.data.nurse.first_name; 
-            }
-            // const nurseName = order[assignee_id] ? 
-            //                   this.getAssigneeName(order[assignee_id]) : 
-            //                   "null";
+            // let nurseName = 'null'
+            // if(order.data.nurse){
+            //   nurseName = order.data.nurse.last_name +
+            //               order.data.nurse.first_name; 
+            // }
+            const nurseName = order.assignee_id ? 
+                              this.getAssigneeName(order.assignee_id) : 
+                              "null";
             line.push(nurseName);//3 护工名字
             let createTime = self.$moment(order.created_at).format("YYYY/MM/DD HH:mm");
             line.push(createTime); //4 订单创建时间,格式修改一致 
             line.push(this.orderDate(+order.data.date).toLocaleString());//5 下单时间
             line.push(detailedOrders[i].total);//6 订单总价
-            line.push((detailedOrders[i].data.duration / 60)|| 0);//7 预定时长
+            line.push((detailedOrders[i].data.duration / 60) || 0);//7 预定时长
             line.push('"' + order.data.location.city + '"');//8 城市
             line.push('"' + order.data.location.address + '"');//9 地址
             line.push(this.orderUserName(order.user_id));//10 客户名字
-            line.push('pay method') //11 支付方式
+            // line.push('pay method') //11 支付方式
             let discount = order.vendor_coupon_id;
             let couponName = discount ? 
                             this.promotionName(discount) : 
@@ -235,34 +235,32 @@ export default {
                                 this.promotionDiscount(discount):
                                 0;//优惠券数 调用函数需要处理一下NaN
             line.push(couponDiscount);//13 优惠券折扣 
-            line.push(self.$moment(parseInt(order.data.date, 10)).format("YYYY/MM/DD HH:mm")); //护工上门时间
-            if(detailedOrders[i].data.duration) {
-              let timeLength = parseInt(order.data.date, 10) + parseInt(detailedOrders[i].data.duration, 10) * 60 * 1000
-               
-              line.push(self.$moment(timeLength).format("YYYY/MM/DD HH:mm"));//护工离开时间
-            } else {
-              line.push(' ')
-            }
+            // line.push(self.$moment(parseInt(detailedOrders[i].data.date, 10)).format("YYYY/MM/DD HH:mm")); //'Clock In Time'：护工上门时间?
+            // if(detailedOrders[i].data.duration) {
+            //   let timeLength = parseInt(order.data.date, 10) + parseInt(detailedOrders[i].data.duration, 10) * 60 * 1000 ;
+            //   line.push(self.$moment(timeLength).format("YYYY/MM/DD HH:mm")); //'Clock Out Time'：护工离开时间
+            // } else {
+            //   line.push(' ')
+            // }
             let q = detailedOrders[i].data.feedback
             if(q){
               line.push(q.question1 || " ");
               line.push(q.question2 || " ");
               line.push(q.question3 || " ");
             }else{
-              line.push(" ");
-              line.push(" ");
-              line.push(" ");
+              line.push(" "); //question1
+              line.push(" "); //question2
+              line.push(" "); //question3
             }
             statusCount[order.status]++; //五种状态
             line.push(statusCount.pending);
             line.push(statusCount.paid);
             line.push(statusCount.processing);
-            line.push('statusCount.QA');
+            // line.push(statusCount.QA || ' ');//'QA'
             line.push(statusCount.complete);
             var month = new Date(order.created_at).getMonth();
             monthSumCount[month]++;
-            line.push(...monthSumCount);  
-    
+            line.push(...monthSumCount);
             lines.push(line); //得到所有的行
           }    
           var csvText = head.join(',') + 
@@ -360,7 +358,11 @@ export default {
       const name = this.$root.teamMembers.filter(
         m => m.user_id === parseInt(id, 10)
       )[0];
-      return name.last_name + name.first_name;
+      if(name) {
+        return name.last_name + name.first_name
+      }else {
+        return 'null'
+      }
     },
     onSlideClick(e) {
       const self = this;
