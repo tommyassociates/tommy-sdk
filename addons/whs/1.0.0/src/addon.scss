@@ -178,6 +178,31 @@ $orange: #FF5413;
   }
   .item-title {
     font-size: 18px;
+    white-space: normal;
+  }
+}
+.list.whs-fields-list {
+  .item-media {
+    align-self: flex-start;
+  }
+  .sortable-handler {
+    left: 0;
+    right: auto;
+    background-image: url(../assets/sortable-handler.svg);
+    background-size: 22px auto;
+    height: 27px;
+    bottom: auto;
+    top: 7px;
+  }
+
+  &.sortable-enabled {
+    > ul > li .item-content {
+      padding-left: 35px;
+    }
+    .item-link .item-inner {
+      background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg%20width%3D'8px'%20height%3D'13px'%20viewBox%3D'0%200%208%2013'%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%3E%3Cpolygon%20fill%3D'%23c7c7cc'%20transform%3D'translate(1.500000%2C%206.500000)%20rotate(-45.000000)%20translate(-1.500000%2C%20-6.500000)%20'%20points%3D'6%2011%206%202%204%202%204%209%20-3%209%20-3%2011%205%2011'%3E%3C%2Fpolygon%3E%3C%2Fsvg%3E") !important;
+      padding-right: 35px;
+    }
   }
 }
 
@@ -193,6 +218,26 @@ $orange: #FF5413;
   cursor: pointer;
   border: 1px solid #D8D8D8;
   box-sizing: border-box;
+}
+
+.whs-field-delete-button {
+  position: absolute;
+  font-size: 20px;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60px;
+  z-index: 500;
+  a {
+    color: $red;
+    padding: 5px;
+    &.active-state {
+      opacity: 0.5;
+    }
+  }
 }
 
 @import "./scss/searchbar.scss";

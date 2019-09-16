@@ -60,6 +60,9 @@
   background-size: contain;
   display: block;
   margin-right: 5px;
+  .item-media & {
+    margin-right: 0;
+  }
 }
 .whs-form-icon-aa {
   background-image: url(../assets/form-icon-aa.svg);
@@ -91,7 +94,27 @@
 .whs-form-icon-toggle {
   background-image: url(../assets/form-icon-toggle.svg);
 }
-
+.whs-form-icon-photo {
+  background-image: url(../assets/form-icon-photo.svg);
+}
+.whs-form-icon-calendar {
+  background-image: url(../assets/form-icon-calendar.svg);
+}
+.whs-form-icon-percentage {
+  background-image: url(../assets/form-icon-percentage.svg);
+}
+.whs-form-icon-text-multiline {
+  background-image: url(../assets/form-icon-text-multiline.svg);
+}
+.whs-form-icon-int {
+  background-image: url(../assets/form-icon-int.svg);
+}
+.whs-form-icon-link {
+  background-image: url(../assets/form-icon-link.svg);
+}
+.whs-form-icon-dot {
+  background-image: url(../assets/form-icon-dot.svg);
+}
 .whs-icon-empty {
   background: url(../assets/empty-icon.svg) no-repeat center;
   background-size: contain;

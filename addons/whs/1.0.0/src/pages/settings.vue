@@ -100,7 +100,7 @@
       <f7-page>
         <f7-navbar>
           <f7-nav-left>
-            <f7-link popup-close><i class="icon icon-back"></i></f7-link>
+            <f7-link popup-close class="icon-only"><i class="icon icon-back"></i></f7-link>
           </f7-nav-left>
           <f7-nav-title>{{$t('whs.settings.date')}}</f7-nav-title>
           <f7-nav-right>
@@ -150,7 +150,7 @@
       <f7-page>
         <f7-navbar>
           <f7-nav-left>
-            <f7-link popup-close><i class="icon icon-back"></i></f7-link>
+            <f7-link popup-close class="icon-only"><i class="icon icon-back"></i></f7-link>
           </f7-nav-left>
           <f7-nav-title>{{$t('whs.settings.time')}}</f7-nav-title>
           <f7-nav-right>
