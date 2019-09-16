@@ -5,6 +5,8 @@ import TagAdd from './pages/tag-add.vue';
 import LocationAdd from './pages/location-add.vue';
 import Settings from './pages/settings.vue';
 import SettingsItems from './pages/settings-items.vue';
+import SettingsItemsFields from './pages/settings-items-fields.vue';
+import SettingsItemsFieldDetails from './pages/settings-items-field-details.vue';
 
 const routes = [
   {
@@ -34,6 +36,14 @@ const routes = [
   {
     path: '/whs/settings/items/',
     component: SettingsItems,
+  },
+  {
+    path: '/whs/settings/items/fields/',
+    component: SettingsItemsFields,
+  },
+  {
+    path: '/whs/settings/items/field/',
+    component: SettingsItemsFieldDetails,
   },
 ];
 

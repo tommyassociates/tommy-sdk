@@ -30,7 +30,7 @@
         />
         <f7-list-item
           :title="$t('whs.settings_items.fields')"
-          link
+          link="/whs/settings/items/fields/"
         />
         <f7-list-item
           :title="$t('whs.settings.view_settings')"

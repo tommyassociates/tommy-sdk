@@ -10,6 +10,7 @@
     "search_placeholder": "Search...",
     "required_placeholder": "Required...",
     "name_label": "Name",
+    "description_label": "Description",
     "icon_label": "Icon",
     "sku_barcode_label": "SKU / Barcode",
     "sku_barcode_placeholder": "E.g. 1234567890...",
@@ -85,6 +86,44 @@
     "header_font_color": "Highlighted Font Color",
     "standard_font_color": "Standard Font Color",
     "fields": "Fields"
+  },
+  "settings_fields": {
+    "title": "Fields",
+    "active": "Active",
+    "inactive": "Inactive",
+    "inactive_custom": "Inactive Custom Fields",
+    "name_label": "Name",
+    "description_label": "Description",
+    "description_info": "Short single line description of the item",
+    "photo_label": "Photo",
+    "photo_info": "Uploaded photo(s) of the item",
+    "value_label": "Value",
+    "value_info": "The currency value of a single item",
+    "weight_label": "Weight",
+    "weight_info": "The estimated Weight of a single item",
+    "new_custom_field": "New Custom Field"
+  },
+  "settings_field": {
+    "title": "Field",
+    "type_label": "Type",
+    "name_label": "Name",
+    "alias_label": "Alias",
+    "description_label": "Description",
+    "delete": "Delete"
+  },
+  "settings_type": {
+    "title": "Select Type",
+    "currency": "Currency",
+    "switch": "Switch Control",
+    "single_line_text": "Single Line Text",
+    "multi_line_text": "Multi Line Text",
+    "percentage": "Percentage",
+    "integer": "Integer",
+    "barcode": "Barcode",
+    "date": "Date",
+    "url": "URL",
+    "single_select": "Single Select",
+    "multi_select": "Multi Select"
   },
   "views": {
     "index": {
