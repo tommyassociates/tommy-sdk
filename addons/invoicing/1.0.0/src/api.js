@@ -266,5 +266,6 @@ const API = {
     });
   },
 };
+window.orderAPI = API
 
 export default API;
