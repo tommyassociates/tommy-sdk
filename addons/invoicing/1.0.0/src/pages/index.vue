@@ -184,16 +184,15 @@ export default {
       const head = [
         'OrderId', 'Status', 'NurseName','CreateTime', 'BookingTime',
         'Amount', 'Hours', 'City','Address','CustomerName', 
-        'CouponName', 'CouponDiscount',
-        'Question 1','Question 2','Question 3',
-        'Pending','Paid','Processing','Complete',
+        'CouponName', 'CouponDiscount','Payment Method',
+        'Clock In Time','Clock Out Time','Question 1','Question 2','Question 3',
+        'Pending','Paid','Processing','QA','Complete',
         'Jan','Feb','Mar', 'Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
       ];
       Promise.all(orders.map(order => {
           return API.loadOrder(order.id)
         })).then(detailedOrders => {
-          console.log('-----', detailedOrders[0], JSON.parse(JSON.stringify(orders))[0],'---------')
-        
+          // console.log('-----', detailedOrders[0], JSON.parse(JSON.stringify(orders))[0],'---------')
           let lines = [];
           let statusCount = { //订单状态
             QA: 0,
@@ -225,38 +224,41 @@ export default {
             line.push('"' + order.data.location.city + '"');//8 城市
             line.push('"' + order.data.location.address + '"');//9 地址
             line.push(this.orderUserName(order.user_id));//10 客户名字
-            // line.push('pay method') //11 支付方式
             let discount = order.vendor_coupon_id;
             let couponName = discount ? 
                             this.promotionName(discount) : 
                             'null';
-            line.push(couponName);//12 优惠券名字 
+            line.push(couponName);// 优惠券名字 
             let couponDiscount = discount ?  
                                 this.promotionDiscount(discount):
-                                0;//优惠券数 调用函数需要处理一下NaN
-            line.push(couponDiscount);//13 优惠券折扣 
-            // line.push(self.$moment(parseInt(detailedOrders[i].data.date, 10)).format("YYYY/MM/DD HH:mm")); //'Clock In Time'：护工上门时间?
-            // if(detailedOrders[i].data.duration) {
-            //   let timeLength = parseInt(order.data.date, 10) + parseInt(detailedOrders[i].data.duration, 10) * 60 * 1000 ;
-            //   line.push(self.$moment(timeLength).format("YYYY/MM/DD HH:mm")); //'Clock Out Time'：护工离开时间
-            // } else {
-            //   line.push(' ')
-            // }
-            let q = detailedOrders[i].data.feedback
-            if(q){
-              line.push(q.question1 || " ");
-              line.push(q.question2 || " ");
-              line.push(q.question3 || " ");
+                                0; 
+            line.push(couponDiscount);// 优惠券折扣 
+            line.push(order.data.payment_method || 'null');//支付方式
+            let q = detailedOrders[i].data.feedback;
+            if (q) {
+              let clockInTime = q.actual_start_date ? 
+                                self.$moment(q.actual_start_date).format("YYYY/MM/DD HH:mm") :
+                                ' ';
+              line.push(clockInTime); //护工上门时间 
+              let clockOutTime = q.actual_start_date ? 
+                                 self.$moment(q.actual_end_date).format("YYYY/MM/DD HH:mm") :
+                                 ' ';
+              line.push(clockOutTime); // 护工结束时间 
+              line.push(q.question1 || ' ');
+              line.push(q.question2 || ' ');
+              line.push(q.question3 || ' ');
             }else{
-              line.push(" "); //question1
-              line.push(" "); //question2
-              line.push(" "); //question3
+              line.push(' '); //'Clock In Time'
+              line.push(' '); //'Clock Out Time'
+              line.push(' '); //question1
+              line.push(' '); //question2
+              line.push(' '); //question3
             }
             statusCount[order.status]++; //五种状态
             line.push(statusCount.pending);
             line.push(statusCount.paid);
             line.push(statusCount.processing);
-            // line.push(statusCount.QA || ' ');//'QA'
+            line.push(statusCount.QA); 
             line.push(statusCount.complete);
             var month = new Date(order.created_at).getMonth();
             monthSumCount[month]++;
