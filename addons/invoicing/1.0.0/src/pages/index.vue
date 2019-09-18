@@ -180,10 +180,10 @@ export default {
   },
   methods: {
     makeCSV(orders, name) {
-      let self = this 
+      let self = this
       const head = [
         'OrderId', 'Status', 'NurseName','CreateTime', 'BookingTime',
-        'Amount', 'Hours', 'City','Address','CustomerName', 
+        'Amount', 'Hours', 'City','Address','CustomerName',
         'CouponName', 'CouponDiscount','Payment Method',
         'Clock In Time','Clock Out Time','Question 1','Question 2','Question 3',
         'Pending','Paid','Processing','QA','Complete',
@@ -210,14 +210,14 @@ export default {
             // let nurseName = 'null'
             // if(order.data.nurse){
             //   nurseName = order.data.nurse.last_name +
-            //               order.data.nurse.first_name; 
+            //               order.data.nurse.first_name;
             // }
-            const nurseName = order.assignee_id ? 
-                              this.getAssigneeName(order.assignee_id) : 
+            const nurseName = order.assignee_id ?
+                              this.getAssigneeName(order.assignee_id) :
                               "null";
             line.push(nurseName);//3 护工名字
             let createTime = self.$moment(order.created_at).format("YYYY/MM/DD HH:mm");
-            line.push(createTime); //4 订单创建时间,格式修改一致 
+            line.push(createTime); //4 订单创建时间,格式修改一致
             line.push(this.orderDate(+order.data.date).toLocaleString());//5 下单时间
             line.push(detailedOrders[i].total);//6 订单总价
             line.push((detailedOrders[i].data.duration / 60) || 0);//7 预定时长
@@ -225,25 +225,25 @@ export default {
             line.push('"' + order.data.location.address + '"');//9 地址
             line.push(this.orderUserName(order.user_id));//10 客户名字
             let discount = order.vendor_coupon_id;
-            let couponName = discount ? 
-                            this.promotionName(discount) : 
+            let couponName = discount ?
+                            this.promotionName(discount) :
                             'null';
-            line.push(couponName);// 优惠券名字 
-            let couponDiscount = discount ?  
+            line.push(couponName);// 优惠券名字
+            let couponDiscount = discount ?
                                 this.promotionDiscount(discount):
-                                0; 
-            line.push(couponDiscount);// 优惠券折扣 
+                                0;
+            line.push(couponDiscount);// 优惠券折扣
             line.push(order.data.payment_method || 'null');//支付方式
             let q = detailedOrders[i].data.feedback;
             if (q) {
-              let clockInTime = q.actual_start_date ? 
+              let clockInTime = q.actual_start_date ?
                                 self.$moment(q.actual_start_date).format("YYYY/MM/DD HH:mm") :
                                 ' ';
-              line.push(clockInTime); //护工上门时间 
-              let clockOutTime = q.actual_start_date ? 
+              line.push(clockInTime); //护工上门时间
+              let clockOutTime = q.actual_start_date ?
                                  self.$moment(q.actual_end_date).format("YYYY/MM/DD HH:mm") :
                                  ' ';
-              line.push(clockOutTime); // 护工结束时间 
+              line.push(clockOutTime); // 护工结束时间
               line.push(q.question1 || ' ');
               line.push(q.question2 || ' ');
               line.push(q.question3 || ' ');
@@ -258,20 +258,20 @@ export default {
             line.push(statusCount.pending);
             line.push(statusCount.paid);
             line.push(statusCount.processing);
-            line.push(statusCount.QA); 
+            line.push(statusCount.QA);
             line.push(statusCount.complete);
             var month = new Date(order.created_at).getMonth();
             monthSumCount[month]++;
             line.push(...monthSumCount);
             lines.push(line); //得到所有的行
-          }    
-          var csvText = head.join(',') + 
+          }
+          var csvText = head.join(',') +
                         '\n'+
                         lines.map(line => line.join(',')).join('\n');
           this.triggerDownload(name, csvText)
       })
     },
-    triggerDownload(name, text) { 
+    triggerDownload(name, text) {
       const BOM = "\uFEFF";
       const fileName = `${name}.csv`;
       const downloadLink = document.createElement("a");
@@ -281,11 +281,11 @@ export default {
       downloadLink.target = "_blank";
       downloadLink.download = fileName;
       downloadLink.click();
-    }, 
+    },
     //The old use function: downloadCSV,traversalObject
     downloadCSV(orders, name) {
       //orders：所有订单状态，为一个数组，每项是一个订单数据
-      //this.csvKeys: 为一个数组，表头  
+      //this.csvKeys: 为一个数组，表头
       //this.csvValues: 为一个数组，所有订单信息
       //text: 拼接的表格全部内容 this.csvKeys + this.csvValues以字符串形式拼接
       orders.forEach((order, index) => {
@@ -296,7 +296,7 @@ export default {
         .join(",")
         .replace(/\n,/g, "\n")}`;
       const BOM = "\uFEFF";
-      const fileName = `${name}.csv`; 
+      const fileName = `${name}.csv`;
       const downloadLink = document.createElement("a");
       downloadLink.href = `data:attachment/csv;charset=utf-8,${BOM}${encodeURIComponent(
         text
