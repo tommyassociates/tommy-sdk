@@ -207,11 +207,6 @@ export default {
             let order = orders[i];
             line.push(order.id);//1 订单id
             line.push(order.status); //2 状态
-            // let nurseName = 'null'
-            // if(order.data.nurse){
-            //   nurseName = order.data.nurse.last_name +
-            //               order.data.nurse.first_name; 
-            // }
             const nurseName = order.assignee_id ? 
                               this.getAssigneeName(order.assignee_id) : 
                               "null";
@@ -236,14 +231,14 @@ export default {
             line.push(order.data.payment_method || 'null');//支付方式
             let q = detailedOrders[i].data.feedback;
             if (q) {
-              let clockInTime = q.actual_start_date ? 
+              let clockInTime = q.actual_start_date ?
                                 self.$moment(q.actual_start_date).format("YYYY/MM/DD HH:mm") :
                                 ' ';
-              line.push(clockInTime); //护工上门时间 
-              let clockOutTime = q.actual_start_date ? 
+              line.push(clockInTime); //护工上门时间
+              let clockOutTime = q.actual_start_date ?
                                  self.$moment(q.actual_end_date).format("YYYY/MM/DD HH:mm") :
                                  ' ';
-              line.push(clockOutTime); // 护工结束时间 
+              line.push(clockOutTime); // 护工结束时间
               line.push(q.question1 || ' ');
               line.push(q.question2 || ' ');
               line.push(q.question3 || ' ');
@@ -260,18 +255,18 @@ export default {
             line.push(statusCount.processing);
             line.push(statusCount.QA); 
             line.push(statusCount.complete);
-            var month = new Date(order.created_at).getMonth();
+            let month = new Date(order.created_at).getMonth();
             monthSumCount[month]++;
             line.push(...monthSumCount);
             lines.push(line); //得到所有的行
           }    
-          var csvText = head.join(',') + 
+          let csvText = head.join(',') +
                         '\n'+
                         lines.map(line => line.join(',')).join('\n');
           this.triggerDownload(name, csvText)
       })
     },
-    triggerDownload(name, text) { 
+    triggerDownload(name, text) {
       const BOM = "\uFEFF";
       const fileName = `${name}.csv`;
       const downloadLink = document.createElement("a");
@@ -281,11 +276,11 @@ export default {
       downloadLink.target = "_blank";
       downloadLink.download = fileName;
       downloadLink.click();
-    }, 
+    },
     //The old use function: downloadCSV,traversalObject
     downloadCSV(orders, name) {
       //orders：所有订单状态，为一个数组，每项是一个订单数据
-      //this.csvKeys: 为一个数组，表头  
+      //this.csvKeys: 为一个数组，表头
       //this.csvValues: 为一个数组，所有订单信息
       //text: 拼接的表格全部内容 this.csvKeys + this.csvValues以字符串形式拼接
       orders.forEach((order, index) => {
@@ -522,3 +517,4 @@ export default {
   }
 };
 </script>
+
