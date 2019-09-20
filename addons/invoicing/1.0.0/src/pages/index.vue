@@ -249,7 +249,13 @@ export default {
               line.push(' '); //question2
               line.push(' '); //question3
             }
-            statusCount[order.status]++; //五种状态
+            if(Array.isArray(order.status)) {
+              for(let i=0;i<order.status.length;i++) {
+                statusCount[order.status[i]]++;
+              }
+            }else {
+              statusCount[order.status]++; //五种状态
+            }
             line.push(statusCount.pending);
             line.push(statusCount.paid);
             line.push(statusCount.processing);
