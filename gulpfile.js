@@ -22,16 +22,17 @@ gulp.task('fonts', (cb) => {
   buildFonts(cb);
 });
 
-gulp.task('build', ['images', 'fonts', 'js', 'scss']);
+gulp.task('build', gulp.series(['images', 'fonts', 'js', 'scss']));
+
 
 gulp.task('watch', () => {
-  gulp.watch('./src/**/**/*.js', ['js']);
-  gulp.watch('./src/**/**/*.vue', ['js']);
-  gulp.watch('./src/**/**/*.scss', ['scss']);
-  gulp.watch('./src/i/*.*', ['images']);
-  gulp.watch(['./addons/**/*.*'], (data) => {
-    const addon = data.path.split(`${__dirname}/addons/`)[1].split('/')[0];
-    if (data.path.indexOf('/build/') >= 0) return;
+  gulp.watch('./src/**/**/*.js', gulp.series(['js']));
+  gulp.watch('./src/**/**/*.vue', gulp.series(['js']));
+  gulp.watch('./src/**/**/*.scss', gulp.series(['scss']));
+  gulp.watch('./src/i/*.*', gulp.series(['images']));
+  gulp.watch(['./addons/**/*.*'], { events: ['change'] }).on('change', (changedPath) => {
+    if (changedPath.indexOf('/build/') >= 0) return;
+    const addon = changedPath.split('addons/')[1].split('/')[0];
     buildAddon(addon);
   });
 });
@@ -40,4 +41,4 @@ gulp.task('open', () => {
   gulp.src('/').pipe(gopen({ uri: 'http://localhost:4002/' }));
 });
 
-gulp.task('server', ['build', 'watch', 'open']);
+gulp.task('server', gulp.parallel(['build', 'watch', 'open']));
