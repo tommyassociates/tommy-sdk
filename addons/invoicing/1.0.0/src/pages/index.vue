@@ -49,10 +49,10 @@
             </div>
           </div>
           <div class="orders-list-content">
+            <!-- 展示所有订单 -->
             <template v-if="list.orders && list.orders.length">
-              <!-- 护工页面展示未取消的订单 -->
               <a
-                v-for="(order, index) in list.orders.filter(it => !it.canceled)"
+                v-for="(order, index) in list.orders"
                 :key="index"
                 :data-url="`/invoicing/order-details/${order.id}/`"
                 class="card invoicing-order-card"
