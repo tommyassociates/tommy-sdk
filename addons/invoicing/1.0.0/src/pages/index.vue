@@ -199,14 +199,19 @@ export default {
             complete: 0,
             paid: 0,
             pending: 0,
-            processing: 0
+            processing: 0,
+            canceled:0
           };
           let monthSumCount = [0,0,0,0,0,0,0,0,0,0,0,0]; //12个月
           for(let i = 0; i < orders.length; i++) {
             let line = [];
             let order = orders[i];
             line.push(order.id);//1 订单id
+            // if(order.canceled){
+            //   line.push('canceled '+ order.status)
+            // }else{
             line.push(order.status); //2 状态
+            // }
             const nurseName = order.assignee_id ? 
                               this.getAssigneeName(order.assignee_id) : 
                               "null";
@@ -223,12 +228,12 @@ export default {
             let couponName = discount ? 
                             this.promotionName(discount) : 
                             'null';
-            line.push(couponName);// 优惠券名字 
+            line.push('"' + couponName + '"');// 优惠券名字 
             let couponDiscount = discount ?  
                                 this.promotionDiscount(discount):
                                 0; 
-            line.push(couponDiscount);// 优惠券折扣 
-            line.push(order.data.payment_method || 'null');//支付方式
+            line.push('"' + couponDiscount + '"');// 优惠券折扣 
+            line.push(('"' + order.data.payment_method + '"') || 'null');//支付方式
             let q = detailedOrders[i].data.feedback;
             if (q) {
               let clockInTime = q.actual_start_date ?
@@ -256,11 +261,15 @@ export default {
             }else {
               statusCount[order.status]++; //五种状态
             }
+            if(order.canceled){
+              statusCount.canceled++;
+            }
             line.push(statusCount.pending);
             line.push(statusCount.paid);
             line.push(statusCount.processing);
             line.push(statusCount.QA); 
             line.push(statusCount.complete);
+            // line.push(statusCount.canceled);
             let month = new Date(order.created_at).getMonth();
             monthSumCount[month]++;
             line.push(...monthSumCount);
