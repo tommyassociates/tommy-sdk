@@ -180,13 +180,12 @@ export default {
   },
   methods: {
     makeCSV(orders, name) {
-      let self = this 
+      let self = this
       const head = [
         'OrderId', 'Status', 'NurseName','CreateTime', 'BookingTime',
-        'Amount', 'Hours', 'City','Address','CustomerName', 
+        'Amount', 'Hours', 'City','Address','CustomerName',
         'CouponName', 'CouponDiscount','Payment Method',
         'Clock In Time','Clock Out Time','Question 1','Question 2','Question 3',
-        'Pending','Paid','Processing','QA','Complete',
         'Pending','Paid','Processing','QA','Complete','Canceled'
         'Jan','Feb','Mar', 'Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
       ];
@@ -226,14 +225,14 @@ export default {
             line.push('"' + order.data.location.address + '"');//9 地址
             line.push(this.orderUserName(order.user_id));//10 客户名字
             let discount = order.vendor_coupon_id;
-            let couponName = discount ? 
-                            this.promotionName(discount) : 
+            let couponName = discount ?
+                            this.promotionName(discount) :
                             'null';
-            line.push('"' + couponName + '"');// 优惠券名字 
-            let couponDiscount = discount ?  
+            line.push('"' + couponName + '"');// 优惠券名字
+            let couponDiscount = discount ?
                                 this.promotionDiscount(discount):
-                                0; 
-            line.push('"' + couponDiscount + '"');// 优惠券折扣 
+                                0;
+            line.push('"' + couponDiscount + '"');// 优惠券折扣
             line.push(('"' + order.data.payment_method + '"') || 'null');//支付方式
             let q = detailedOrders[i].data.feedback;
             if (q) {
@@ -307,7 +306,7 @@ export default {
         .join(",")
         .replace(/\n,/g, "\n")}`;
       const BOM = "\uFEFF";
-      const fileName = `${name}.csv`; 
+      const fileName = `${name}.csv`;
       const downloadLink = document.createElement("a");
       downloadLink.href = `data:attachment/csv;charset=utf-8,${BOM}${encodeURIComponent(
         text
@@ -533,4 +532,3 @@ export default {
   }
 };
 </script>
-
