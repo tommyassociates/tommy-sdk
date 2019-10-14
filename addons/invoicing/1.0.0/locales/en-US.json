@@ -51,7 +51,8 @@
     "sort_price_low": "Price low",
     "sort_newest": "Newest",
     "payment_range": "Payment Range",
-    "balance_range": "Balance Range"
+    "balance_range": "Balance Range",
+    "include_canceled": "Include cancelled orders"
   },
   "list_add": {
     "title": "Add List",

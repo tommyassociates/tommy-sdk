@@ -186,12 +186,14 @@ export default {
         'Amount', 'Hours', 'City','Address','CustomerName',
         'CouponName', 'CouponDiscount','Payment Method',
         'Clock In Time','Clock Out Time','Question 1','Question 2','Question 3',
-        'Pending','Paid','Processing','QA','Complete','Canceled'
+        'Pending','Paid','Processing','QA','Complete','Canceled',
         'Jan','Feb','Mar', 'Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'
       ];
-      Promise.all(orders.map(order => {
+      Promise
+        .all(orders.map(order => {
           return API.loadOrder(order.id)
-        })).then(detailedOrders => {
+        }))
+        .then(detailedOrders => {
           // console.log('-----', detailedOrders[0], JSON.parse(JSON.stringify(orders))[0],'---------')
           let lines = [];
           let statusCount = { //订单状态
@@ -211,7 +213,7 @@ export default {
               line.push('canceled '+ order.status)
             }else{
             line.push(order.status); //2 状态
-            // }
+            }
             const nurseName = order.assignee_id ?
                               this.getAssigneeName(order.assignee_id) :
                               "null";
@@ -279,7 +281,7 @@ export default {
                         '\n'+
                         lines.map(line => line.join(',')).join('\n');
           this.triggerDownload(name, csvText)
-      })
+        });
     },
     triggerDownload(name, text) {
       const BOM = "\uFEFF";
