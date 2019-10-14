@@ -122,6 +122,7 @@
       <!-- Show canceled -->
       <f7-list-item
         :title="$t('invoicing.list_edit.include_canceled', 'Include cancelled orders')"
+      >
         <f7-toggle
           slot="after"
           :checked="!!list.data.canceled"
