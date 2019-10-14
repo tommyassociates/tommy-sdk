@@ -119,6 +119,16 @@
         />
       </f7-list-item>
 
+      <!-- Show canceled -->
+      <f7-list-item
+        :title="$t('invoicing.list_edit.include_canceled', 'Include cancelled orders')"
+        <f7-toggle
+          slot="after"
+          :checked="!!list.data.canceled"
+          @change="setCanceled($event.target.checked)"
+        />
+      </f7-list-item>
+
 
       <tag-select
         v-for="(permission, index) in permissions"
@@ -175,6 +185,7 @@
         if (!list.data.status) list.data.status = [];
         if (!list.data.customer) list.data.customer = [];
         if (!list.data.assignee) list.data.assignee = [];
+        if (typeof list.data.canceled === 'undefined') list.data.canceled = true;
         self.list = list;
         self.$api.getInstalledAddonPermission('invoicing', 'order_list_read_access', {
           taggable_id: list.id,
@@ -250,6 +261,11 @@
         if (checked) {
           self.list.data.assignee = [];
         }
+      },
+      setCanceled(checked) {
+        const self = this;
+        self.list.data.canceled = checked;
+        self.showSave = true;
       },
       showDateRange() {
         const self = this;

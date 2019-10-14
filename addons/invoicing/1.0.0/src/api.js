@@ -86,6 +86,10 @@ const API = {
       params.assignee_id = list.data.assignee;
     }
 
+    if (typeof list.data.canceled !== 'undefined') {
+      params.canceled = list.data.canceled;
+    }
+
     /*
     sort: [price_high, price_low, newest]
     # status: [quote, paid, processing, complete]
