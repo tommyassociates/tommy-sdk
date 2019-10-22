@@ -5,6 +5,7 @@ const buildSass = require('./build/build-sass.js');
 const buildImages = require('./build/build-images.js');
 const buildFonts = require('./build/build-fonts.js');
 const buildAddon = require('./build/build-addon');
+const path = require('path');
 
 gulp.task('js', (cb) => {
   buildJs(cb);
@@ -31,8 +32,9 @@ gulp.task('watch', () => {
   gulp.watch('./src/**/**/*.scss', gulp.series(['scss']));
   gulp.watch('./src/i/*.*', gulp.series(['images']));
   gulp.watch(['./addons/**/*.*'], { events: ['change'] }).on('change', (changedPath) => {
-    if (changedPath.indexOf('/build/') >= 0) return;
-    const addon = changedPath.split('addons/')[1].split('/')[0];
+    const patchSeparator = path.sep;
+    if (changedPath.indexOf(`${patchSeparator}build${patchSeparator}`) >= 0) return;    
+    const addon = changedPath.split(`addons${patchSeparator}`)[1].split(patchSeparator)[0];
     buildAddon(addon);
   });
 });
