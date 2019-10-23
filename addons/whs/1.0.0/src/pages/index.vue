@@ -97,13 +97,14 @@
     <template v-if="activeTab === 'items' && !searchEnabled">
       <f7-list class="whs-list" media-list>
         <f7-list-item
-          v-for="n in 10"
+          v-for="item in items"
           chevron-center
           link="/whs/item/"
-          title="Field001"
+          :title="item.name"
+          :key="item.Id"
         >
           <div slot="media" class="whs-item-image"></div>
-          <div class="whs-item-row">QUANTITY: 9000</div>
+          <div class="whs-item-row">QUANTITY: {{item.quantity}}</div>
           <div class="whs-item-row">LOCATIONS: 10</div>
         </f7-list-item>
       </f7-list>
@@ -115,6 +116,7 @@
           chevron-center
           link
           title="Blacktown"
+          :key="n"
         >
           <div slot="media" class="whs-item-image"></div>
           <div class="whs-item-row">LOCATIONS: 2000</div>
@@ -129,6 +131,7 @@
           chevron-center
           link
           title="Color"
+          :key="n"
         >
           <div slot="media" class="whs-item-image"></div>
           <div class="whs-item-row">LOCATIONS: 2000</div>
@@ -149,13 +152,14 @@ export default {
       activeSearchFilter: 'all',
       search: '',
       searchEnabled: false,
+      items: null,
     };
   },
   created() {
 
   },
   computed: {
-
+    
   },
   methods: {
     onSearchbarSearch(query) {
@@ -172,6 +176,8 @@ export default {
   },
   mounted() {
     const self = this;
+    API.getMainListItem().then((data)=>{self.items = data});
+    
   }
 };
 </script>
