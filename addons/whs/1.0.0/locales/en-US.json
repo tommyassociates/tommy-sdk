@@ -15,7 +15,7 @@
     "sku_barcode_label": "SKU / Barcode",
     "sku_barcode_placeholder": "E.g. 1234567890...",
     "price_label": "Price",
-    "price_placeholder": "",
+    "price_placeholder": "E.g. 123.456...",
     "tags_label": "Tags",
     "tags_search_placeholder": "Search Tags...",
     "minimum_stock_level_label": "Minimum Stock Level",
@@ -32,7 +32,15 @@
     "pallet_capacity_label": "Pallet Capacity",
     "active_location_label": "Active Location",
     "location_category_label": "Location Category",
-    "location_category_placeholder": "Select Category"
+    "location_category_placeholder": "Select Category",
+    "required_name_error": "Please enter a name"
+  },
+  "alert_form":{
+    "text": "Fill the form",
+    "title": "Form error"
+  },
+  "toast":{
+    "text": "Item added"
   },
   "pagination": {
     "rows": "Rows",

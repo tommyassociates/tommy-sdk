@@ -4,19 +4,18 @@
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('whs.item_add.title')}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
-        <f7-link icon-only>
+        <f7-link icon-only @click="addItem">
           <f7-icon f7="check" />
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
 
-    <a class="whs-toolbar-button" slot="fixed">{{$t('whs.item_add.add_more_button')}}</a>
-
+    <a class="whs-toolbar-button" slot="fixed" @click="()=>{addItem(true)}">{{$t('whs.item_add.add_more_button')}}</a>
+    <form class="list" id="add-item" action="javascript:void(0)" enctype="multipart/form-data">  
     <f7-list class="whs-form">
       <ul>
         <form-images-picker
           :lineWithActions="false"
-          multiple
         />
         <f7-list-item divider>
           <i class="whs-form-icon whs-form-icon-aa"></i>
@@ -24,6 +23,12 @@
         </f7-list-item>
         <f7-list-input
           type="text"
+          name="name"
+          required
+          validate
+          :error-message="$t('whs.common.required_name_error')"
+          :value="item.name"
+          @input="item.name = $event.target.value"
           :placeholder="$t('whs.common.required_placeholder')"
         />
 
@@ -33,6 +38,9 @@
         </f7-list-item>
         <f7-list-input
           type="text"
+          name="code"
+          :value="item.code"
+          @input="item.code = $event.target.value"
           :placeholder="$t('whs.common.sku_barcode_placeholder')"
         >
           <a class="link whs-form-barcode-link" slot="input">
@@ -46,12 +54,15 @@
         </f7-list-item>
         <f7-list-input
           type="number"
+          name="price"
+          :value="item.price"
+          @input="item.price = $event.target.value"
           :placeholder="$t('whs.common.price_placeholder')"
         />
 
         <f7-list-item divider>
           <i class="whs-form-icon whs-form-icon-hash"></i>
-          {{$t('whs.common.tags_label')}}
+          {{$t('whs.common.tags_label')}} Not work
         </f7-list-item>
         <tags-picker />
         <f7-list-item divider>
@@ -59,17 +70,23 @@
           {{$t('whs.common.minimum_stock_level_label')}}
         </f7-list-item>
         <f7-list-input
-          type="text"
+          type="number"
+          name="min_stock_level"
+          :value="item.min_stock_level"
+          @input="item.min_stock_level = $event.target.value"
           :placeholder="$t('whs.common.minimum_stock_level_placeholder')"
         />
 
         <f7-list-item divider>
           <i class="whs-form-icon whs-form-icon-location"></i>
           {{$t('whs.common.location_quantity_label')}}
-        </f7-list-item>
-        <f7-list-item
-          link
-          :title="$t('whs.common.location_quantity_placeholder')"
+        </f7-list-item>        
+        <f7-list-input
+          type="number"
+          name="quantity"
+          :value="item.quantity"
+          @input="item.quantity = $event.target.value"
+          :placeholder="$t('whs.common.location_quantity_placeholder')"
         />
 
         <f7-list-item divider>
@@ -79,12 +96,14 @@
         <f7-list-input
           type="textarea"
           resizable
+          name="notes"
+          :value="item.notes"
+          @input="item.notes = $event.target.value"
           :placeholder="$t('whs.common.notes_placeholder')"
-        />
-
+        />        
         <f7-list-item divider>
           <i class="whs-form-icon whs-form-icon-check"></i>
-          {{$t('whs.common.storage_label')}}
+          {{$t('whs.common.storage_label')}} Not work
         </f7-list-item>
         <f7-list-item
           link
@@ -96,7 +115,7 @@
       </ul>
 
     </f7-list>
-
+    </form>
 
   </f7-page>
 </template>
@@ -112,6 +131,21 @@ export default {
   },
   data() {
     return {
+      item:{
+        name: null,
+        code: null,
+        //description: null,
+        price: null,
+       // height: null,
+       // width: null,
+       // depth: null,
+       // weight: null,
+        quantity: null,
+        min_stock_level: null,
+        notes: null,
+        //storage_type: null,
+        image: null,
+      }
     };
   },
   created() {
@@ -121,7 +155,28 @@ export default {
 
   },
   methods: {
-
+    addItem(more){
+      self = this;      
+      if (this.$f7.$('#add-item')[0].checkValidity()) {
+        API.createItem(API.removeEmpty(this.item))
+          .then(()=>{
+            if (more === true) {
+              self.item = API.clearObject(self.item);
+            }else {
+              self.$f7router.back();
+            }
+            const finishToast = self.$f7.toast.create({
+              text: self.$t('whs.toast.text'),
+              position: 'center',
+              closeTimeout: 2000,
+            });
+            finishToast.open();
+          });
+      } else {
+        this.$f7.dialog.alert(this.$t('whs.alert_form.text'), this.$t('whs.alert_form.title'), false);
+        return false;
+      }
+    },
   },
   beforeDestroy() {
     const self = this;
