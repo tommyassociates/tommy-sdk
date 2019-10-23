@@ -20,7 +20,7 @@
           <i class="f7-icons">close</i>
         </a>
       </div>
-      <label v-if="!lineWithActions" class="whs-form-images-add-button">
+      <label v-if="!lineWithActions && (!multiple && previews.length < 1)" class="whs-form-images-add-button">
         <input type="file" :multiple="multiple" @change="onFilesChange" accept="image/*">
         <i class="f7-icons">camera</i>
         <span>{{$t('whs.common.add_photo_label')}}</span>
@@ -35,7 +35,10 @@
         type: Boolean,
         default: true,
       },
-      multiple: Boolean,
+      multiple: {
+        type: Boolean,
+        default: false,
+      },
     },
     data() {
       return {
