@@ -147,13 +147,7 @@ export default {
       if (this.$f7.$("#add-location")[0].checkValidity()) {
         API.createLocation(API.removeEmpty(this.location)).then(() => {
           self.$f7router.back();
-
-          const finishToast = self.$f7.toast.create({
-            text: self.$t("whs.toast.text"),
-            position: "center",
-            closeTimeout: 2000
-          });
-          finishToast.open();
+          API.toast(self.$t('whs.toast.add_location'));
         });
       } else {
         this.$f7.dialog.alert(

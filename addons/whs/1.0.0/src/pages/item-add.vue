@@ -165,12 +165,7 @@ export default {
             }else {
               self.$f7router.back();
             }
-            const finishToast = self.$f7.toast.create({
-              text: self.$t('whs.toast.text'),
-              position: 'center',
-              closeTimeout: 2000,
-            });
-            finishToast.open();
+            API.toast(self.$t('whs.toast.add_item'));
           });
       } else {
         this.$f7.dialog.alert(this.$t('whs.alert_form.text'), this.$t('whs.alert_form.title'), false);

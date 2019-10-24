@@ -56,6 +56,14 @@ const API = {
           cache: false,
         });
       },
+    toast(text){
+      const finishToast = self.$f7.toast.create({
+        text: text,
+        position: 'center',
+        closeTimeout: 2000,
+      });
+      finishToast.open();
+    },
     removeEmpty(obj){
       Object.keys(obj).forEach((key) =>{
         (obj[key] && typeof obj[key] === 'object') && removeEmpty(obj[key]) ||
