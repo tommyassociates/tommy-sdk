@@ -105,7 +105,8 @@
         >
           <div slot="media" class="whs-item-image"></div>
           <div class="whs-item-row">QUANTITY: {{item.quantity}}</div>
-          <div class="whs-item-row">LOCATIONS: 10</div>
+          <!--<div class="whs-item-row">LOCATIONS: 10</div>-->
+          <div class="whs-item-row description" v-if="item.description">{{item.description}}</div>
         </f7-list-item>
       </f7-list>
       <empty-block v-else :text="$t('whs.common.no_items')" />
