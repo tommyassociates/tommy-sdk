@@ -50,15 +50,15 @@
           :title="$t('whs.common.parent_location_placeholder')"
         />
 
-        <!-- Notes -->
+        <!-- description -->
         <f7-list-item divider>
           <i class="whs-form-icon whs-form-icon-text"></i>
-          {{$t('whs.common.notes_label')}}
+          {{$t('whs.common.description_label')}}
         </f7-list-item>
         <f7-list-input
           type="textarea"
           resizable
-          :placeholder="$t('whs.common.notes_placeholder')"
+          :placeholder="$t('whs.common.description_placeholder')"
         />
 
         <!-- Capacity -->
