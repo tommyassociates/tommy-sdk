@@ -36,6 +36,11 @@ $orange: #FF5413;
     font-size: 16px;
     color: #999;
   }
+  .description{
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
 }
 .popover.whs-popover {
   background: #fff;
