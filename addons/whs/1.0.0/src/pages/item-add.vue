@@ -91,15 +91,15 @@
 
         <f7-list-item divider>
           <i class="whs-form-icon whs-form-icon-text"></i>
-          {{$t('whs.common.notes_label')}}
+          {{$t('whs.common.description_label')}}
         </f7-list-item>
         <f7-list-input
           type="textarea"
           resizable
-          name="notes"
-          :value="item.notes"
-          @input="item.notes = $event.target.value"
-          :placeholder="$t('whs.common.notes_placeholder')"
+          name="description"
+          :value="item.description"
+          @input="item.description = $event.target.value"
+          :placeholder="$t('whs.common.description_placeholder')"
         />        
         <f7-list-item divider>
           <i class="whs-form-icon whs-form-icon-check"></i>
@@ -142,7 +142,7 @@ export default {
        // weight: null,
         quantity: null,
         min_stock_level: null,
-        notes: null,
+        description: null,
         //storage_type: null,
         image: null,
       }
