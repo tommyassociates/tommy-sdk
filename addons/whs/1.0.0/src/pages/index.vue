@@ -95,65 +95,63 @@
     </div>
 
     <template v-if="activeTab === 'items' && !searchEnabled">
-      <f7-list class="whs-list" media-list>
+      <f7-list class="whs-list" media-list v-if="items.length >0">
         <f7-list-item
-          v-for="item in items"
+          v-for="(item, index) in items"
           chevron-center
           link="/whs/item/"
           :title="item.name"
-          :key="item.Id"
+          :key="index"
         >
           <div slot="media" class="whs-item-image"></div>
           <div class="whs-item-row">QUANTITY: {{item.quantity}}</div>
           <div class="whs-item-row">LOCATIONS: 10</div>
         </f7-list-item>
       </f7-list>
+      <empty-block v-else :text="$t('whs.common.no_items')" />
     </template>
     <template v-if="activeTab === 'locations' && !searchEnabled">
-      <f7-list class="whs-list" media-list>
+      <f7-list class="whs-list" media-list v-if="locations.length > 0">
         <f7-list-item
-          v-for="n in 10"
+          v-for="(location, index) in locations"
           chevron-center
           link
-          title="Blacktown"
-          :key="n"
+          :title="location.name"
+          :key="index"
         >
           <div slot="media" class="whs-item-image"></div>
           <div class="whs-item-row">LOCATIONS: 2000</div>
           <div class="whs-item-row">Test description of the location</div>
         </f7-list-item>
       </f7-list>
+      <empty-block v-else :text="$t('whs.common.no_locations')" />
     </template>
     <template v-if="activeTab === 'tags' && !searchEnabled">
-      <f7-list class="whs-list" media-list>
+      <f7-list class="whs-list" media-list v-if="tags.length > 0">
         <f7-list-item
-          v-for="n in 10"
+          v-for="(tag, index) in tags"
           chevron-center
           link
-          title="Color"
-          :key="n"
+          :title="tag.name"
+          :key="index"
         >
           <div slot="media" class="whs-item-image"></div>
           <div class="whs-item-row">LOCATIONS: 2000</div>
           <div class="whs-item-row">Items: 500</div>
         </f7-list-item>
       </f7-list>
+      <empty-block v-else :text="$t('whs.common.no_tags')" />
     </template>
 
   </f7-page>
 </template>
 <script>
 import API from "../api";
+import EmptyBlock from '../components/empty-block.vue';
 
 export default {
-  data() {
-    return {
-      activeTab: 'items',
-      activeSearchFilter: 'all',
-      search: '',
-      searchEnabled: false,
-      items: null,
-    };
+  components: {
+    EmptyBlock,
   },
   created() {
 
@@ -177,7 +175,22 @@ export default {
   mounted() {
     const self = this;
     API.getMainListItem().then((data)=>{self.items = data});
+    API.getMainListLocations().then((data)=>{self.locations = data});
+    //API.getMainListTags().then((data)=>{self.tags = data});
+    API.getMainListActivities().then((data)=>{self.activites = data});
     
+  },
+    data() {
+    return {
+      activeTab: 'items',
+      activeSearchFilter: 'all',
+      search: '',
+      searchEnabled: false,
+      items: [],
+      locations: [],
+      tags: [],
+      activites: [],
+    };
   }
 };
 </script>
