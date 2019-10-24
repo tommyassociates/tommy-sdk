@@ -48,6 +48,14 @@ const API = {
           cache: false,
         });
       },
+    createLocation(data) {
+        return api.call({
+          endpoint: `inventory/locations`,
+          method: 'POST',
+          data,
+          cache: false,
+        });
+      },
     removeEmpty(obj){
       Object.keys(obj).forEach((key) =>{
         (obj[key] && typeof obj[key] === 'object') && removeEmpty(obj[key]) ||
