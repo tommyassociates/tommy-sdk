@@ -39,7 +39,8 @@
     "title": "Form error"
   },
   "toast":{
-    "text": "Item added"
+    "add_item": "Item added",
+    "add_location": "Location added"
   },
   "pagination": {
     "rows": "Rows",
