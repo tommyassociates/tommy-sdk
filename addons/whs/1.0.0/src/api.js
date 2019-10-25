@@ -9,7 +9,6 @@ const API = {
         return api.call({
             endpoint: 'inventory/items',
             method: 'GET',
-            cache: false,
           }).then((data) => {
             return data;
           });
