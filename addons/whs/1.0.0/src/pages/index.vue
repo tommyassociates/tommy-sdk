@@ -158,13 +158,17 @@
             <i slot="media" class="whs-icon whs-icon-drawer-black"></i>
             <span slot="title">{{$t('whs.popover.activity.location')}}</span>
           </f7-list-item>
-          <f7-list-item @click='activityPopoverClick("tag")'>
-            <i slot="media" class="whs-icon whs-icon-tag-black"></i>
-            <span slot="title">{{$t('whs.popover.activity.tag')}}</span>
+          <f7-list-item @click='activityPopoverClick("tags")'>
+            <i slot="media" class="whs-icon whs-icon-drawer-black"></i>
+            <span slot="title">{{$t('whs.popover.activity.tags')}}</span>
           </f7-list-item>
-          <f7-list-item @click='activityPopoverClick("activity")'>
-            <i slot="media" class="whs-icon whs-icon-clock-black"></i>
-            <span slot="title">{{$t('whs.popover.activity.activity')}}</span>
+          <f7-list-item @click='activityPopoverClick("role")'>
+            <i slot="media" class="whs-icon whs-icon-roles"></i>
+            <span slot="title">{{$t('whs.popover.activity.role')}}</span>
+          </f7-list-item>
+          <f7-list-item @click='activityPopoverClick("team")'>
+            <i slot="media" class="whs-icon whs-icon-team"></i>
+            <span slot="title">{{$t('whs.popover.activity.team')}}</span>
           </f7-list-item>
         </f7-list>
       </f7-popover>
@@ -179,6 +183,119 @@
           </f7-button>        
         </f7-list-item>
       </f7-list>
+      <f7-list class="whs-list whs-main-activity all" media-list v-if='activity_filter === "all"'>
+          <f7-list-item divider class="more">
+            <f7-link @click="">
+              {{$t('whs.common.more')}}
+            </f7-link>
+          </f7-list-item>
+          <f7-list-item divider class="divider-title">
+            {{$t('whs.popover.activity.item')}}
+          </f7-list-item>
+          <f7-list-item
+            v-for="(index) in 2"
+            chevron-center
+            link
+            title="Item"
+            :key='"activity_item_"+index'
+          >
+            <div slot="media" class="whs-item-image"></div>
+            <div class="whs-item-row">LOCATIONS: 2000</div>
+            <div class="whs-item-row">Items: 500</div>
+          </f7-list-item>
+          <f7-list-item divider class="more">
+            <f7-link @click="">
+              {{$t('whs.common.more')}}
+            </f7-link>
+          </f7-list-item>
+          <f7-list-item divider class="divider-title">
+            {{$t('whs.popover.activity.location')}}
+          </f7-list-item>
+          <f7-list-item
+            v-for="(index) in 2"
+            chevron-center
+            link
+            title="Location"
+            :key='"activity_location_"+index'
+          >
+            <div slot="media" class="whs-item-image"></div>
+            <div class="whs-item-row">LOCATIONS: 2000</div>
+            <div class="whs-item-row">Items: 500</div>
+          </f7-list-item>
+
+          <f7-list-item divider class="more">
+            <f7-link @click="">
+              {{$t('whs.common.more')}}
+            </f7-link>
+          </f7-list-item>
+          <f7-list-item divider class="divider-title">
+            {{$t('whs.popover.activity.tag')}}
+          </f7-list-item>
+          <f7-list-item
+            v-for="(index) in 2"
+            chevron-center
+            link
+            title="Tag"
+            :key='"activity_tag_"+index'
+          >
+            <div slot="media" class="whs-item-image"></div>
+            <div class="whs-item-row">LOCATIONS: 2000</div>
+            <div class="whs-item-row">Items: 500</div>
+          </f7-list-item>
+
+          <f7-list-item divider class="more">
+            <f7-link @click="">
+              {{$t('whs.common.more')}}
+            </f7-link>
+          </f7-list-item>
+          <f7-list-item divider class="divider-title">
+            {{$t('whs.popover.activity.role')}}
+          </f7-list-item>
+          <f7-list-item
+            v-for="(index) in 2"
+            chevron-center
+            link
+            title="Roles"
+            :key='"activity_role_"+index'
+          >
+            <div slot="media" class="whs-item-image"></div>
+            <div class="whs-item-row">LOCATIONS: 2000</div>
+            <div class="whs-item-row">Items: 500</div>
+          </f7-list-item>
+
+          <f7-list-item divider class="more">
+            <f7-link @click="">
+              {{$t('whs.common.more')}}
+            </f7-link>
+          </f7-list-item>
+          <f7-list-item divider class="divider-title">
+            {{$t('whs.popover.activity.team')}}
+          </f7-list-item>
+          <f7-list-item
+            v-for="(index) in 2"
+            chevron-center
+            link
+            title="Team"
+            :key='"activity_team_"+index'
+          >
+            <div slot="media" class="whs-item-image"></div>
+            <div class="whs-item-row">LOCATIONS: 2000</div>
+            <div class="whs-item-row">Items: 500</div>
+          </f7-list-item>
+        </f7-list>
+        <f7-list v-else class="selected whs-list whs-main-activity" media-list>
+          <f7-list-item
+            v-for="(index) in 10"
+            chevron-center
+            link
+            title="Test"
+            :key='"activity_selected_"+index'
+          >
+            <div slot="media" class="whs-item-image"></div>
+            <div class="whs-item-row">LOCATIONS: 2000</div>
+            <div class="whs-item-row">Items: 500</div>
+          </f7-list-item>
+        </f7-list>
       <empty-block v-else :text="$t('whs.common.no_activity')" />
     </template>
 
