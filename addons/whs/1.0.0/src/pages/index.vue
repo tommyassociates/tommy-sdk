@@ -143,6 +143,15 @@
       </f7-list>
       <empty-block v-else :text="$t('whs.common.no_tags')" />
     </template>
+    <template v-if="activeTab === 'activity' && !searchEnabled">
+      <f7-list class="whs-list" media-list v-if="activity.length > 0">
+        <f7-list-item divider>
+        
+          <i class="whs-form-icon whs-form-icon-aa"></i>          
+        </f7-list-item>
+      </f7-list>
+      <empty-block v-else :text="$t('whs.common.no_activity')" />
+    </template>
 
   </f7-page>
 </template>
@@ -178,7 +187,7 @@ export default {
     API.getMainListItem().then((data)=>{self.items = data});
     API.getMainListLocations().then((data)=>{self.locations = data});
     //API.getMainListTags().then((data)=>{self.tags = data});
-    API.getMainListActivities().then((data)=>{self.activites = data});
+    API.getMainListActivities().then((data)=>{self.activity = data});
     
   },
     data() {
@@ -190,7 +199,8 @@ export default {
       items: [],
       locations: [],
       tags: [],
-      activites: [],
+      activity: [],
+      activity_filter: "Item",
     };
   }
 };
