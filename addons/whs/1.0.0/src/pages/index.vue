@@ -144,10 +144,39 @@
       <empty-block v-else :text="$t('whs.common.no_tags')" />
     </template>
     <template v-if="activeTab === 'activity' && !searchEnabled">
-      <f7-list class="whs-list" media-list v-if="activity.length > 0">
-        <f7-list-item divider>
-        
-          <i class="whs-form-icon whs-form-icon-aa"></i>          
+      <f7-popover class="whs-popover whs-popover-activity" :backdrop="false">
+        <f7-list no-chevron>
+          <f7-list-item @click='activityPopoverClick("all")'>
+            <i slot="media" class="whs-icon whs-icon-box-black"></i>
+            <span slot="title">{{$t('whs.popover.activity.all')}}</span>
+          </f7-list-item>
+          <f7-list-item @click='activityPopoverClick("item")'>
+            <i slot="media" class="whs-icon whs-icon-box-black"></i>
+            <span slot="title">{{$t('whs.popover.activity.item')}}</span>
+          </f7-list-item>
+          <f7-list-item @click='activityPopoverClick("location")'>
+            <i slot="media" class="whs-icon whs-icon-drawer-black"></i>
+            <span slot="title">{{$t('whs.popover.activity.location')}}</span>
+          </f7-list-item>
+          <f7-list-item @click='activityPopoverClick("tag")'>
+            <i slot="media" class="whs-icon whs-icon-tag-black"></i>
+            <span slot="title">{{$t('whs.popover.activity.tag')}}</span>
+          </f7-list-item>
+          <f7-list-item @click='activityPopoverClick("activity")'>
+            <i slot="media" class="whs-icon whs-icon-clock-black"></i>
+            <span slot="title">{{$t('whs.popover.activity.activity')}}</span>
+          </f7-list-item>
+        </f7-list>
+      </f7-popover>
+      <f7-list class="whs-list whs-main-activity" media-list v-if="activity.length > 0">
+        <f7-list-item divider class="filter">
+          <f7-link popover-open=".whs-popover-activity">
+            {{$t(`whs.popover.activity.${activity_filter}`)}}
+            <i class="whs-main-icon whs-icon-triangle"></i>        
+          </f7-link>
+          <f7-button fill>
+            {{$t('whs.common.dashboard')}}
+          </f7-button>        
         </f7-list-item>
       </f7-list>
       <empty-block v-else :text="$t('whs.common.no_activity')" />
@@ -178,6 +207,10 @@ export default {
       const self = this;
       self.$f7.searchbar.disable();
     },
+    activityPopoverClick(filter){
+      this.activity_filter = filter;
+      this.$f7.popover.close(".whs-popover-activity");
+    }
   },
   beforeDestroy() {
     const self = this;
@@ -200,7 +233,7 @@ export default {
       locations: [],
       tags: [],
       activity: [],
-      activity_filter: "Item",
+      activity_filter: "all",
     };
   }
 };

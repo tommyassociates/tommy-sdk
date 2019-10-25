@@ -32,7 +32,8 @@
     "active_location_label": "Active Location",
     "location_category_label": "Location Category",
     "location_category_placeholder": "Select Category",
-    "required_name_error": "Please enter a name"
+    "required_name_error": "Please enter a name",
+    "dashboard": "Dashboard"
   },
   "alert_form":{
     "text": "Fill the form",
@@ -52,6 +53,7 @@
       "activity": "New Activity"
     },
     "activity":{
+      "all": "All",
       "item": "Item",
       "location": "Location",
       "tag": "Tag",
