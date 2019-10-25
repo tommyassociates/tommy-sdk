@@ -33,7 +33,8 @@
     "location_category_label": "Location Category",
     "location_category_placeholder": "Select Category",
     "required_name_error": "Please enter a name",
-    "dashboard": "Dashboard"
+    "dashboard": "Dashboard",
+    "more": "More"
   },
   "alert_form":{
     "text": "Fill the form",
@@ -54,10 +55,11 @@
     },
     "activity":{
       "all": "All",
-      "item": "Item",
-      "location": "Location",
-      "tag": "Tag",
-      "activity": "Activity"
+      "item": "Items",
+      "tag": "Tags",
+      "location": "Locations",
+      "role": "Roles",
+      "team": "Team members"
     }
   },
   "pagination": {
