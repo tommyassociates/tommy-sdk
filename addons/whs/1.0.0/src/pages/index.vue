@@ -19,19 +19,19 @@
       <f7-list no-chevron>
         <f7-list-item link="/whs/item-add/" popover-close>
           <i slot="media" class="whs-icon whs-icon-box-black"></i>
-          <span slot="title">New Item</span>
+          <span slot="title">{{$t('whs.popover.new.item')}}</span>
         </f7-list-item>
         <f7-list-item link="/whs/location-add/" popover-close>
           <i slot="media" class="whs-icon whs-icon-drawer-black"></i>
-          <span slot="title">New Location</span>
+          <span slot="title">{{$t('whs.popover.new.location')}}</span>
         </f7-list-item>
         <f7-list-item link="/whs/tag-add/" popover-close>
           <i slot="media" class="whs-icon whs-icon-tag-black"></i>
-          <span slot="title">New Tag</span>
+          <span slot="title">{{$t('whs.popover.new.tag')}}</span>
         </f7-list-item>
         <f7-list-item link="/whs/activity-add/" popover-close>
           <i slot="media" class="whs-icon whs-icon-clock-black"></i>
-          <span slot="title">New Activity</span>
+          <span slot="title">{{$t('whs.popover.new.activity')}}</span>
         </f7-list-item>
       </f7-list>
     </f7-popover>
