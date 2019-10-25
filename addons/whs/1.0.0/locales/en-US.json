@@ -40,7 +40,9 @@
   },
   "toast":{
     "add_item": "Item added",
-    "add_location": "Location added"
+    "add_location": "Location added",
+    "add_tag": "Tag added",
+    "add_activity": "Activity added"
   },
   "pagination": {
     "rows": "Rows",
