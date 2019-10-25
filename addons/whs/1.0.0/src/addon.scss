@@ -244,7 +244,27 @@ $orange: #FF5413;
     }
   }
 }
-
+.whs-main-activity{
+  .filter{
+    height: 50px;
+    text-transform: uppercase;
+    line-height: 50px;    
+  }
+  .button{
+    background-color: #FF4500 !important;
+    float: right;
+    margin-top: 7px;
+    text-transform: uppercase;
+  }
+  .link{
+    color: #333333;
+  }
+}
+.whs-popover-activity{
+  .item-title{
+    text-transform: uppercase;
+  }
+}
 @import "./scss/searchbar.scss";
 @import "./scss/menubar.scss";
 @import "./scss/table.scss";

@@ -50,8 +50,18 @@
 .whs-icon-clock-black {
   background-image: url(../assets/icon-clock-black.svg);
 }
-
-
+.whs-icon-triangle{
+  background-image: url(../assets/icon-triangle.svg);
+}
+.whs-main-icon {
+  width: 14px;
+  height: 14px;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  display: block;
+  margin: 0 10px;
+}
 .whs-form-icon {
   width: 30px;
   height: 30px;
