@@ -44,6 +44,20 @@
     "add_tag": "Tag added",
     "add_activity": "Activity added"
   },
+  "popover":{
+    "new":{
+      "item": "New Item",
+      "location": "New Location",
+      "tag": "New Tag",
+      "activity": "New Activity"
+    },
+    "activity":{
+      "item": "Item",
+      "location": "Location",
+      "tag": "Tag",
+      "activity": "Activity"
+    }
+  },
   "pagination": {
     "rows": "Rows",
     "page": "Page {{current}} of {{total}}"
