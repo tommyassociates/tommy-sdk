@@ -3,8 +3,8 @@ const api = tommy.api;
 
 const mainListLimit = 12;
 
-const API = {
-    
+
+const API = {    
     getMainListItem(){
         return api.call({
             endpoint: 'inventory/items',
@@ -56,6 +56,20 @@ const API = {
           cache: false,
         });
       },
+    createTag(data) {
+        return api.call({
+          endpoint: `tags`,
+          method: 'POST',
+          data,
+          cache: false,
+        });
+      },
+    deleteTag(id){
+      return api.call({
+        endpoint: `tags/${id}`,
+        method: 'DELETE',
+      })
+    },
     toast(text){
       const finishToast = self.$f7.toast.create({
         text: text,
@@ -79,5 +93,7 @@ const API = {
       return obj;
     }
 };
+///test
+window.deleteTag = API.deleteTag;
 
 export default API;
