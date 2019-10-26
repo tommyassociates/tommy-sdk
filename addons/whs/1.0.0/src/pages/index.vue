@@ -159,8 +159,8 @@
             <span slot="title">{{$t('whs.popover.activity.location')}}</span>
           </f7-list-item>
           <f7-list-item @click='activityPopoverClick("tags")'>
-            <i slot="media" class="whs-icon whs-icon-drawer-black"></i>
-            <span slot="title">{{$t('whs.popover.activity.tags')}}</span>
+            <i slot="media" class="whs-icon whs-icon-tag-black"></i>
+            <span slot="title">{{$t('whs.popover.activity.tag')}}</span>
           </f7-list-item>
           <f7-list-item @click='activityPopoverClick("role")'>
             <i slot="media" class="whs-icon whs-icon-roles"></i>
