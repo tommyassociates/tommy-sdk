@@ -248,7 +248,8 @@ $orange: #FF5413;
   .filter{
     height: 50px;
     text-transform: uppercase;
-    line-height: 50px;    
+    line-height: 50px;
+    margin-top: 1px;
   }
   .button{
     background-color: #FF4500 !important;
@@ -265,6 +266,9 @@ $orange: #FF5413;
   }
   .divider-title{
     text-transform: uppercase;
+    &:before{
+      display: none;
+    }
   }
 }
 .whs-popover-activity{
