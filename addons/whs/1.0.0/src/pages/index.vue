@@ -185,7 +185,7 @@
       </f7-list>
       <f7-list class="whs-list whs-main-activity all" media-list v-if='activity_filter === "all"'>
           <f7-list-item divider class="more">
-            <f7-link @click="">
+            <f7-link @click="actionMoreClick('item')">
               {{$t('whs.common.more')}}
             </f7-link>
           </f7-list-item>
@@ -204,7 +204,7 @@
             <div class="whs-item-row">Items: 500</div>
           </f7-list-item>
           <f7-list-item divider class="more">
-            <f7-link @click="">
+            <f7-link @click="actionMoreClick('location')">
               {{$t('whs.common.more')}}
             </f7-link>
           </f7-list-item>
@@ -224,7 +224,7 @@
           </f7-list-item>
 
           <f7-list-item divider class="more">
-            <f7-link @click="">
+            <f7-link @click="actionMoreClick('tag')">
               {{$t('whs.common.more')}}
             </f7-link>
           </f7-list-item>
@@ -244,7 +244,7 @@
           </f7-list-item>
 
           <f7-list-item divider class="more">
-            <f7-link @click="">
+            <f7-link @click="actionMoreClick('role')">
               {{$t('whs.common.more')}}
             </f7-link>
           </f7-list-item>
@@ -264,7 +264,7 @@
           </f7-list-item>
 
           <f7-list-item divider class="more">
-            <f7-link @click="">
+            <f7-link @click="actionMoreClick('team')">
               {{$t('whs.common.more')}}
             </f7-link>
           </f7-list-item>
@@ -283,6 +283,8 @@
             <div class="whs-item-row">Items: 500</div>
           </f7-list-item>
         </f7-list>
+
+
         <f7-list v-else class="selected whs-list whs-main-activity" media-list>
           <f7-list-item
             v-for="(index) in 10"
@@ -296,7 +298,7 @@
             <div class="whs-item-row">Items: 500</div>
           </f7-list-item>
         </f7-list>
-      <empty-block v-else :text="$t('whs.common.no_activity')" />
+      <empty-block v-if="activity.length === 0" :text="$t('whs.common.no_activity')" />
     </template>
 
   </f7-page>
@@ -327,6 +329,9 @@ export default {
     activityPopoverClick(filter){
       this.activity_filter = filter;
       this.$f7.popover.close(".whs-popover-activity");
+    },
+    actionMoreClick(filter){
+      this.activity_filter = filter;
     }
   },
   beforeDestroy() {
@@ -354,4 +359,4 @@ export default {
     };
   }
 };
-</script>
+</script> 
