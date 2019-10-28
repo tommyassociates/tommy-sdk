@@ -99,9 +99,9 @@
         <f7-list-item
           v-for="(item, index) in items"
           chevron-center
-          link="/whs/item/"
+          :link="`/whs/item/?id=${item.id}&index=${index}`"
           :title="item.name"
-          :key="index"
+          :key="'item_'+index"
         >
           <div slot="media" class="whs-item-image"></div>
           <div class="whs-item-row">QUANTITY: {{item.quantity}}</div>
@@ -312,7 +312,7 @@ export default {
     EmptyBlock,
   },
   created() {
-
+     API.main_page = this;
   },
   computed: {
     

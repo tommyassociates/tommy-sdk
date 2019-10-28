@@ -4,7 +4,11 @@ const api = tommy.api;
 const mainListLimit = 12;
 
 
-const API = {    
+const API = {
+    main_page: undefined,
+    settings: {
+      currency: "$"
+    }, 
     getMainListItem(){
         return api.call({
             endpoint: 'inventory/items',
@@ -12,6 +16,17 @@ const API = {
           }).then((data) => {
             return data;
           });
+    },
+    getItemDetail(id){
+      return api.call({
+          endpoint: `inventory/items/${id}`,
+          method: 'GET',
+          data:{
+            with_summary: true,
+          },          
+        }).then((data) => {
+          return data;
+        });
     },
     getMainListLocations(){
       return api.call({
@@ -93,6 +108,6 @@ const API = {
     }
 };
 ///test
-window.deleteTag = API.deleteTag;
+//window.deleteTag = API.deleteTag;
 
 export default API;
