@@ -17,7 +17,10 @@ function buildAddonJs(addonFolder) {
       input: `${path}/src/addon.js`,
       plugins: [
         vue(),
-        rollupResolve({ jsnext: true, browser: true }),
+        //rollupResolve({ jsnext: true, browser: true }),
+        rollupResolve({ 
+          mainFields: ['module', 'main', 'jsnext', 'browser']
+        }),
         commonjs(),
         buble({
           objectAssign: 'Object.assign',
