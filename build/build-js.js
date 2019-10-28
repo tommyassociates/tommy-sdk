@@ -46,7 +46,10 @@ function build(cb) {
           'process.env.NODE_ENV': JSON.stringify(env), // or 'production'
           'process.env.TARGET': JSON.stringify(target), // or 'production'
         }),
-        resolve({ jsnext: true, browser: true }),
+        //resolve({ jsnext: true, browser: true }),
+        resolve({ 
+          mainFields: ['module', 'main', 'jsnext', 'browser']
+        }),
         commonjs(),
         buble({
           objectAssign: 'Object.assign',
