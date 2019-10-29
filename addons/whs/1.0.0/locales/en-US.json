@@ -42,6 +42,7 @@
   },
   "toast":{
     "add_item": "Item added",
+    "edit_item": "Item edited",
     "add_location": "Location added",
     "add_tag": "Tag added",
     "add_activity": "Activity added"
@@ -71,6 +72,7 @@
   },
   "item_add": {
     "title": "Add Item",
+    "title_edit": "Edit Item",
     "add_more_button": "Add Another Item"
   },
   "location_add": {
