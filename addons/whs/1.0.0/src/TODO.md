@@ -9,13 +9,15 @@
 - [ ] Add image to main form
 - [X] Detail when choosing
     - add strings vue filter
+    - add translation summary
 
 ## Locations
 
 - [ ] Add image to create
 - [ ] Add image to main form
-- [ ] Detail when choosing
-- [ ] Edit location
+- [x] Detail when choosing
+    - add strings vue filter
+    - add translation summary
 - [ ] Check capacity when @kam finished 
 
 ## Activity

@@ -123,11 +123,11 @@
         </div>
         <div class="whs-summary-card">
           <div class="whs-summary-card-left">
-            <div class="whs-summary-card-title">Pending out</div>
+            <div class="whs-summary-card-title">Low stock</div>
           </div>
           <div class="whs-summary-card-right">
             <div class="whs-summary-card-value">{{location.low_stock_count}}</div>
-            <div class="whs-summary-card-label">Low stock</div>
+            <div class="whs-summary-card-label">Items</div>
           </div>
         </div>
       </div>
