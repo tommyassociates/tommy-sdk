@@ -133,8 +133,8 @@ export default {
     if(this.$f7route.query.edit_id !== null && this.$f7route.query.edit_id !== undefined){
       this.editId = this.$f7route.query.edit_id;
       this.indexEdit = this.$f7route.query.index
-      ///load item from maim items
-      this.item = API.main_page.$data.items[this.indexEdit];
+      ///load item from maim items and clone
+      this.item = Object.assign({}, API.main_page.$data.items[this.indexEdit]);
     }
 
   },
