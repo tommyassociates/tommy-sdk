@@ -36,6 +36,18 @@ const API = {
           return data;
         });
     },
+    getLocationDetail(id){
+      return api.call({
+          endpoint: `inventory/locations/${id}`,
+          method: 'GET',
+          data:{
+            with_summary: true,
+          },          
+        }).then((data) => {
+          console.log("TCL: getLocationDetail -> data", data)
+          return data;
+        });
+    },
     getMainListActivities(){
       return api.call({
           endpoint: 'inventory/activities',
@@ -74,6 +86,14 @@ const API = {
         return api.call({
           endpoint: `inventory/locations`,
           method: 'POST',
+          data,
+          cache: false,
+        });
+      },
+    editLocation(data, id) {
+        return api.call({
+          endpoint: `inventory/locations/${id}`,
+          method: 'PUT',
           data,
           cache: false,
         });

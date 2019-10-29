@@ -16,6 +16,7 @@
 - [ ] Add image to main form
 - [ ] Detail when choosing
 - [ ] Edit location
+- [ ] Check capacity when @kam finished 
 
 ## Activity
 
