@@ -149,11 +149,12 @@ export default {
   },
   methods: {
     addItem(more){
-      self = this;      
+      const self = this;      
       if (this.$f7.$('#add-item')[0].checkValidity()) {
         if(this.editId){
           API.editItem(this.setDefaults(this.item), this.editId)
-            .then(()=>{     
+            .then(()=>{
+              self.$events.$emit('item:updated',this.item);     
               self.$f7router.back();
               API.toast(self.$t('whs.toast.edit_item'));
             });

@@ -205,12 +205,21 @@ export default {
         console.log("TCL: loadItemDetail -> self.item", self.item)
       });
     },
+    itemUpdated(item){
+      self = this;
+      self.itemTitle = item.name;
+      self.itemDesc = item.description;
+      API.resetCache(`inventory/items/${self.itemId}`);
+      self.loadItemDetail();
+    }
   },
   beforeDestroy() {
     const self = this;
+    self.$events.$off('item:updated', self.itemUpdated);
   },
   mounted() {
     const self = this;
+    self.$events.$on('item:updated', self.itemUpdated);
   },
   data() {
     return {
