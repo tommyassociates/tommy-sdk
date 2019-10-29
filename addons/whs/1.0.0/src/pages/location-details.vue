@@ -33,6 +33,12 @@
         <span>Tags</span>
       </a>
       <a
+        :class="`link ${activeTab === 'locations' ? 'whs-menubar-active' : ''}`"
+        @click="activeTab = 'locations'"
+      >
+        <span>Locations</span>
+      </a>
+      <a
         :class="`link ${activeTab === 'activity' ? 'whs-menubar-active' : ''}`"
         @click="activeTab = 'activity'"
       >
@@ -132,7 +138,72 @@
         </div>
       </div>
     </template>
+
     <template v-if="activeTab === 'items'">
+      <div class="whs-table">
+        <table>
+          <thead>
+            <tr>
+              <th class="sort-cell">
+                <a class="link">
+                  <i class="whs-icon whs-icon-sort-black"></i>
+                </a>
+              </th>
+              <th>Items</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="media-cell"></td>
+              <td>P00639</td>
+              <td>Apple Juice Pallet Cons</td>
+            </tr>
+            <tr>
+              <td class="media-cell"></td>
+              <td>P023639</td>
+              <td>Pachasing- Wicked Sister Chocolate</td>
+            </tr>
+            <tr>
+              <td class="media-cell"></td>
+              <td>WW00639</td>
+              <td>Apple Juice Pallet Cons</td>
+            </tr>
+            <tr>
+              <td class="media-cell"></td>
+              <td>GT00639</td>
+              <td>Pachasing- Wicked Sister Chocolate</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="whs-pagination" slot="fixed">
+        <div class="whs-pagination-rows">4 {{$t('whs.pagination.rows')}}</div>
+        <div class="whs-pagination-nav">
+          <a class="link">
+            <i class="f7-icons">chevron_left</i>
+          </a>
+          <span>{{$t('whs.pagination.page', { current: 1, total: 4 })}}</span>
+          <a class="link">
+            <i class="f7-icons">chevron_right</i>
+          </a>
+        </div>
+        <div class="whs-pagination-actions">
+          <a class="link">
+            <i class="icon f7-icons">share</i>
+          </a>
+          <a class="link">
+            <i class="icon f7-icons">gear</i>
+          </a>
+        </div>
+      </div>
+    </template>
+
+    <template v-if="activeTab === 'tags'">
+      <empty-block :text="$t('whs.common.no_tags')" />
+    </template>
+
+    <template v-if="activeTab === 'locations'">
       <div class="whs-table">
         <table>
           <thead>
@@ -196,9 +267,7 @@
         </div>
       </div>
     </template>
-    <template v-if="activeTab === 'tags'">
-      <empty-block :text="$t('whs.common.no_tags')" />
-    </template>
+
     <template v-if="activeTab === 'activity'">
       <empty-block :text="$t('whs.common.no_activity')" />
     </template>
