@@ -2,7 +2,7 @@
   <f7-page>
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{$t('whs.location_add.title')}}</f7-nav-title>
+      <f7-nav-title>{{title}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
         <f7-link icon-only @click="addLocation">
           <f7-icon f7="check" />
@@ -139,16 +139,43 @@ export default {
     FormImagesPicker,
     TagsPicker
   },
-  created() {},
-  computed: {},
+  created() {
+    if(this.$f7route.query.edit_id !== null && this.$f7route.query.edit_id !== undefined){
+      this.editId = this.$f7route.query.edit_id;
+      this.indexEdit = this.$f7route.query.index;
+      ///load location from maim locations and clone
+      this.location = Object.assign({}, API.main_page.$data.locations[this.indexEdit]);
+    }
+  },
+  computed: {
+    title(){
+      if(this.editId){
+        return this.$t('whs.location_add.title_edit')
+      }else{
+        return this.$t('whs.location_add.title')
+      }
+    }
+  },
   methods: {
     addLocation() {
       self = this;
       if (this.$f7.$("#add-location")[0].checkValidity()) {
-        API.createLocation(API.removeEmpty(this.location)).then(() => {
-          self.$f7router.back();
-          API.toast(self.$t('whs.toast.add_location'));
-        });
+        if(this.editId){
+          this.location = this.setDefaults(this.location);
+          API.editLocation(this.location, this.editId)
+            .then(()=>{
+              self.$events.$emit('location:updated',this.location);     
+              self.$f7router.back();
+              API.toast(self.$t('whs.toast.edit_location'));
+            });
+        }else{
+          this.location = API.removeEmpty(this.location);
+          API.createLocation(this.location).then(() => {
+            self.$events.$emit('location:aded',this.location);
+            self.$f7router.back();
+            API.toast(self.$t('whs.toast.add_location'));
+          });
+        }
       } else {
         this.$f7.dialog.alert(
           this.$t("whs.alert_form.text"),
@@ -156,6 +183,13 @@ export default {
           false
         );
       }
+    },
+    setDefaults(item){
+      self = this;
+      for(key in self.default_item){
+        if(item[key] === null || item[key] ==="") item[key] = self.default_item[key];
+      }
+      return item;
     }
   },
   beforeDestroy() {
@@ -174,6 +208,10 @@ export default {
         pallet_capacity: 0,
         active: true,
         category: null
+      },
+      editId: null,
+      indexEdit: null,
+      default_location:{
       }
     };
   }
