@@ -16,7 +16,7 @@ const API = {
           }).then((data) => {
             return data;
           });
-    },
+    },    
     getItemDetail(id){
       return api.call({
           endpoint: `inventory/items/${id}`,
@@ -99,6 +99,9 @@ const API = {
         closeTimeout: 2000,
       });
       finishToast.open();
+    },
+    resetCache(key){
+      api.resetCache(key);
     },
     removeEmpty(obj){
       Object.keys(obj).forEach((key) =>{
