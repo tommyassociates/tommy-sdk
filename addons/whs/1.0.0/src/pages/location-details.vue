@@ -21,10 +21,10 @@
         <span>Summary</span>
       </a>
       <a
-        :class="`link ${activeTab === 'locations' ? 'whs-menubar-active' : ''}`"
-        @click="activeTab = 'locations'"
+        :class="`link ${activeTab === 'items' ? 'whs-menubar-active' : ''}`"
+        @click="activeTab = 'items'"
       >
-        <span>Locations</span>
+        <span>Items</span>
       </a>
       <a
         :class="`link ${activeTab === 'tags' ? 'whs-menubar-active' : ''}`"
@@ -132,7 +132,7 @@
         </div>
       </div>
     </template>
-    <template v-if="activeTab === 'locations'">
+    <template v-if="activeTab === 'items'">
       <div class="whs-table">
         <table>
           <thead>
