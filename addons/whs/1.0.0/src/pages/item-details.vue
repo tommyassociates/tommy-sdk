@@ -4,10 +4,10 @@
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{itemTitle}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
-        <f7-link icon-only>
+        <f7-link icon-only href="/whs/item-add/">
           <f7-icon f7="add" />
         </f7-link>
-        <f7-link icon-only>
+        <f7-link icon-only :href="`/whs/item-add/?edit_id=${itemId}&index=${itemIndex}`">
           <f7-icon f7="gear" />
         </f7-link>
       </f7-nav-right>

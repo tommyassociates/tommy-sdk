@@ -62,6 +62,14 @@ const API = {
           cache: false,
         });
       },
+    editItem(data, id) {
+        return api.call({
+          endpoint: `inventory/items/${id}`,
+          method: 'PUT',
+          data,
+          cache: false,
+        });
+      },
     createLocation(data) {
         return api.call({
           endpoint: `inventory/locations`,
@@ -94,7 +102,7 @@ const API = {
     },
     removeEmpty(obj){
       Object.keys(obj).forEach((key) =>{
-        (obj[key] && typeof obj[key] === 'object') && removeEmpty(obj[key]) ||
+        (obj[key] && typeof obj[key] === 'object') && API.removeEmpty(obj[key]) ||
         (obj[key] === '' || obj[key] === null) && delete obj[key]
       });
       return obj;

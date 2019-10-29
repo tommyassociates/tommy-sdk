@@ -2,7 +2,7 @@
   <f7-page>
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{$t('whs.item_add.title')}}</f7-nav-title>
+      <f7-nav-title>{{title}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
         <f7-link icon-only @click="addItem">
           <f7-icon f7="check" />
@@ -10,7 +10,7 @@
       </f7-nav-right>
     </f7-navbar>
 
-    <a class="whs-toolbar-button" slot="fixed" @click="()=>{addItem(true)}">{{$t('whs.item_add.add_more_button')}}</a>
+    <a class="whs-toolbar-button" slot="fixed" v-if="!editId" @click="()=>{addItem(true)}">{{$t('whs.item_add.add_more_button')}}</a>
     <form class="list" id="add-item" action="javascript:void(0)" enctype="multipart/form-data">  
     <f7-list class="whs-form">
       <ul>
@@ -38,9 +38,9 @@
         </f7-list-item>
         <f7-list-input
           type="text"
-          name="code"
-          :value="item.code"
-          @input="item.code = $event.target.value"
+          name="sku"
+          :value="item.sku"
+          @input="item.sku = $event.target.value"
           :placeholder="$t('whs.common.sku_barcode_placeholder')"
         >
           <a class="link whs-form-barcode-link" slot="input">
@@ -129,55 +129,87 @@ export default {
     FormImagesPicker,
     TagsPicker,
   },
-  data() {
-    return {
-      item:{
-        name: null,
-        code: null,
-        //description: null,
-        price: null,
-       // height: null,
-       // width: null,
-       // depth: null,
-       // weight: null,
-        quantity: null,
-        min_stock_level: null,
-        description: null,
-        //storage_type: null,
-        image: null,
-      }
-    };
-  },
   created() {
+    if(this.$f7route.query.edit_id !== null && this.$f7route.query.edit_id !== undefined){
+      this.editId = this.$f7route.query.edit_id;
+      this.indexEdit = this.$f7route.query.index
+      ///load item from maim items
+      this.item = API.main_page.$data.items[this.indexEdit];
+    }
 
   },
   computed: {
-
+    title(){
+      if(this.editId){
+        return this.$t('whs.item_add.title_edit')
+      }else{
+        return this.$t('whs.item_add.title')
+      }
+    }
   },
   methods: {
     addItem(more){
       self = this;      
       if (this.$f7.$('#add-item')[0].checkValidity()) {
-        API.createItem(API.removeEmpty(this.item))
-          .then(()=>{
-            if (more === true) {
-              self.item = API.clearObject(self.item);
-            }else {
+        if(this.editId){
+          API.editItem(this.setDefaults(this.item), this.editId)
+            .then(()=>{     
               self.$f7router.back();
-            }
-            API.toast(self.$t('whs.toast.add_item'));
-          });
+              API.toast(self.$t('whs.toast.edit_item'));
+            });
+        }else{
+          API.createItem(API.removeEmpty(this.item))
+            .then(()=>{
+              if (more === true) {
+                self.item = API.clearObject(self.item);
+              }else {
+                self.$f7router.back();
+              }
+              API.toast(self.$t('whs.toast.add_item'));
+            });
+        }
       } else {
         this.$f7.dialog.alert(this.$t('whs.alert_form.text'), this.$t('whs.alert_form.title'), false);
         return false;
       }
     },
+    setDefaults(item){
+      self = this;
+      for(key in self.default_item){
+        if(item[key] === null || item[key] ==="") item[key] = self.default_item[key];
+      }
+      return item;
+    }
   },
   beforeDestroy() {
     const self = this;
   },
   mounted() {
     const self = this;
-  }
+  },
+  data() {
+    return {
+      item:{
+        name: null,
+        sku: null,
+        price: null,
+        quantity: null,
+        min_stock_level: null,
+        description: null,
+        storage_type: null,
+        image: null,
+      },
+      editId: null,
+      indexEdit: null,
+      default_item:{
+        price: 0.0,
+        width: 0,
+        depth: 0,
+        weight: 0,
+        quantity: 0,
+        min_stock_level: 0,
+      }
+    };
+  },
 };
 </script>
