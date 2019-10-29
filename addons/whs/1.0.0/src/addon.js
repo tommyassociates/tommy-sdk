@@ -12,6 +12,7 @@ const routes = [
   {
     path: '/whs/',
     component: Index,
+    keepAlive: true,
   },
   {
     path: '/whs/item/',

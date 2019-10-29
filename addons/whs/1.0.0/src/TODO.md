@@ -7,10 +7,8 @@
 
 - [ ] Add image to create
 - [ ] Add image to main form
-- [ ] Detail when choosing
-- [ ] Edit
-- [ ] Add special charset filter to text strings
-    - check filter, may be already released
+- [X] Detail when choosing
+    - add strings vue filter
 
 ## Locations
 
@@ -18,8 +16,6 @@
 - [ ] Add image to main form
 - [ ] Detail when choosing
 - [ ] Edit location
-- [ ] Add special charset filter to text strings
-    - check filter, may be already released
 
 ## Activity
 
