@@ -44,8 +44,11 @@
     "add_item": "Item added",
     "edit_item": "Item edited",
     "add_location": "Location added",
+    "edit_location": "Location edited",
     "add_tag": "Tag added",
-    "add_activity": "Activity added"
+    "edit_tag": "Tag edited",
+    "add_activity": "Activity added",
+    "edit_activity": "Activity edited"
   },
   "popover":{
     "new":{
@@ -68,7 +71,8 @@
     "page": "Page {{current}} of {{total}}"
   },
   "tag_add": {
-    "title": "Add Tag"
+    "title": "Add Tag",
+    "title_edit": "Edit Tag"
   },
   "item_add": {
     "title": "Add Item",
@@ -76,7 +80,8 @@
     "add_more_button": "Add Another Item"
   },
   "location_add": {
-    "title": "Add Location"
+    "title": "Add Location",
+    "title_edit": "Edit Location"
   },
   "settings": {
     "title": "Settings",
