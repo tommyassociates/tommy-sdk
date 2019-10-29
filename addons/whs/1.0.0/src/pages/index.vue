@@ -116,9 +116,9 @@
         <f7-list-item
           v-for="(location, index) in locations"
           chevron-center
-          link
+          :link="`/whs/location/?id=${location.id}&index=${index}`"
           :title="location.name"
-          :key="index"
+          :key="'location_'+index"
         >
           <div slot="media" class="whs-item-image"></div>
           <div class="whs-item-row">LOCATIONS: 2000</div>
