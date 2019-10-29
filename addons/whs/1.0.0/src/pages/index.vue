@@ -355,6 +355,7 @@ export default {
     const self = this;
 
     self.$events.$off('item:updated', self.itemUpdated);
+    self.$events.$off('item:aded', self.itemUpdated);
   },
   mounted() {
     const self = this;
@@ -365,6 +366,7 @@ export default {
     
 
     self.$events.$on('item:updated', self.itemUpdated);
+    self.$events.$on('item:aded', self.itemUpdated);
     
   },
     data() {

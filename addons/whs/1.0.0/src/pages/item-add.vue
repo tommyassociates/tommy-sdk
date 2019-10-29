@@ -152,15 +152,18 @@ export default {
       const self = this;      
       if (this.$f7.$('#add-item')[0].checkValidity()) {
         if(this.editId){
-          API.editItem(this.setDefaults(this.item), this.editId)
+          this.item = this.setDefaults(this.item);
+          API.editItem(this.item, this.editId)
             .then(()=>{
               self.$events.$emit('item:updated',this.item);     
               self.$f7router.back();
               API.toast(self.$t('whs.toast.edit_item'));
             });
         }else{
-          API.createItem(API.removeEmpty(this.item))
+          this.item = API.removeEmpty(this.item);
+          API.createItem(this.item)
             .then(()=>{
+              self.$events.$emit('item:aded',this.item); 
               if (more === true) {
                 self.item = API.clearObject(self.item);
               }else {
