@@ -109,14 +109,14 @@
           link
           :title="$t('whs.common.storage_placeholder')"
         />
-
-
-
       </ul>
-
     </f7-list>
     </form>
 
+    <div class="whs-form-delete" v-if="editId">
+      <f7-link class="delete" @click="deleteDialog()">{{$t('whs.common.delete')}}</f7-link>
+    </div>
+    
   </f7-page>
 </template>
 <script>
@@ -176,6 +176,17 @@ export default {
         this.$f7.dialog.alert(this.$t('whs.alert_form.text'), this.$t('whs.alert_form.title'), false);
         return false;
       }
+    },
+    deleteItem(){
+      API.deleteItem(this.editId)
+        .then(()=>{
+          self.$events.$emit('item:deleted',this.item);    
+          self.$f7router.back('/whs/', {force: true}); 
+          API.toast(self.$t('whs.toast.delete_item'));
+        });
+    },
+    deleteDialog(){
+      this.$f7.dialog.confirm(this.$t('whs.alert_form.delete_text'), this.$t('whs.alert_form.delete_title'), this.deleteItem);
     },
     setDefaults(item){
       self = this;
