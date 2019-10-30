@@ -127,6 +127,11 @@
         </ul>
       </f7-list>
     </form>
+    
+    <div class="whs-form-delete" v-if="editId">
+      <f7-link class="delete" @click="deleteDialog()">{{$t('whs.common.delete')}}</f7-link>
+    </div>
+    
   </f7-page>
 </template>
 <script>
@@ -183,6 +188,17 @@ export default {
           false
         );
       }
+    },
+    deleteLocation(){
+      API.deleteLocation(this.editId)
+        .then(()=>{
+          self.$events.$emit('location:deleted',this.item);    
+          self.$f7router.back('/whs/', {force: true}); 
+          API.toast(self.$t('whs.toast.delete_location'));
+        });
+    },
+    deleteDialog(){
+      this.$f7.dialog.confirm(this.$t('whs.alert_form.delete_text'), this.$t('whs.alert_form.delete_title'), this.deleteLocation);
     },
     setDefaults(item){
       self = this;

@@ -361,8 +361,10 @@ export default {
 
     self.$events.$off('item:updated', self.itemUpdated);
     self.$events.$off('item:aded', self.itemUpdated);
+    self.$events.$off('item:deleted', self.itemUpdated);
     self.$events.$off('location:updated', self.locationUpdated);
     self.$events.$off('location:aded', self.locationUpdated);
+    self.$events.$off('location:deleted', self.locationUpdated);
   },
   mounted() {
     const self = this;
@@ -374,8 +376,10 @@ export default {
 
     self.$events.$on('item:updated', self.itemUpdated);
     self.$events.$on('item:aded', self.itemUpdated);
+    self.$events.$on('item:deleted', self.itemUpdated);
     self.$events.$on('location:updated', self.locationUpdated);
     self.$events.$on('location:aded', self.locationUpdated);
+    self.$events.$on('location:deleted', self.locationUpdated);
     
   },
     data() {

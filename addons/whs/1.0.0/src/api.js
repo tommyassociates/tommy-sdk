@@ -82,6 +82,13 @@ const API = {
           cache: false,
         });
       },
+    deleteItem(id) {
+        return api.call({
+          endpoint: `inventory/items/${id}`,
+          method: 'DELETE',
+          cache: false,
+        });
+      },
     createLocation(data) {
         return api.call({
           endpoint: `inventory/locations`,
@@ -95,6 +102,13 @@ const API = {
           endpoint: `inventory/locations/${id}`,
           method: 'PUT',
           data,
+          cache: false,
+        });
+      },
+    deleteLocation(id) {
+        return api.call({
+          endpoint: `inventory/locations/${id}`,
+          method: 'DELETE',
           cache: false,
         });
       },

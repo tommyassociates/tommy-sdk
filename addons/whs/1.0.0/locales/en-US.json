@@ -34,21 +34,28 @@
     "location_category_placeholder": "Select Category",
     "required_name_error": "Please enter a name",
     "dashboard": "Dashboard",
-    "more": "More"
+    "more": "More",
+    "delete": "Delete"
   },
   "alert_form":{
     "text": "Fill the form",
-    "title": "Form error"
+    "title": "Form error",
+    "delete_text": "Record will be deleted permanently",
+    "delete_title": "Are you sure?"
   },
   "toast":{
     "add_item": "Item added",
     "edit_item": "Item edited",
+    "delete_item": "Item deleted",
     "add_location": "Location added",
     "edit_location": "Location edited",
+    "delete_location": "Location deleted",
     "add_tag": "Tag added",
     "edit_tag": "Tag edited",
+    "delete_tag": "Tag deleted",
     "add_activity": "Activity added",
-    "edit_activity": "Activity edited"
+    "edit_activity": "Activity edited",
+    "delete_activity": "Activity deleted"
   },
   "popover":{
     "new":{
