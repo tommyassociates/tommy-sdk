@@ -116,19 +116,21 @@
     <div class="whs-form-delete" v-if="editId">
       <f7-link class="delete" @click="deleteDialog()">{{$t('whs.common.delete')}}</f7-link>
     </div>
-    
+
   </f7-page>
 </template>
 <script>
 import API from "../api";
 import FormImagesPicker from '../components/form-images-picker.vue';
 import TagsPicker from '../components/tags-picker.vue';
+import Dialog from '../components/dialog-mixin.vue';
 
 export default {
   components: {
     FormImagesPicker,
     TagsPicker,
   },
+  mixins: [Dialog],
   created() {
     if(this.$f7route.query.edit_id !== null && this.$f7route.query.edit_id !== undefined){
       this.editId = this.$f7route.query.edit_id;
@@ -173,7 +175,7 @@ export default {
             });
         }
       } else {
-        this.$f7.dialog.alert(this.$t('whs.alert_form.text'), this.$t('whs.alert_form.title'), false);
+        this.alertDialog(this.$t('whs.alert_form.title'), this.$t('whs.alert_form.text'), this.$t('whs.alert_form.ok'));
         return false;
       }
     },
@@ -186,7 +188,7 @@ export default {
         });
     },
     deleteDialog(){
-      this.$f7.dialog.confirm(this.$t('whs.alert_form.delete_text'), this.$t('whs.alert_form.delete_title'), this.deleteItem);
+      this.confirmDialog(this.$t('whs.alert_form.delete_title'), this.$t('whs.alert_form.delete_text'), this.$t('whs.alert_form.confirm'),this.$t('whs.alert_form.cancel'), this.deleteItem);
     },
     setDefaults(item){
       self = this;
