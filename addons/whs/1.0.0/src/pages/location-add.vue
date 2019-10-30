@@ -138,12 +138,14 @@
 import API from "../api";
 import FormImagesPicker from "../components/form-images-picker.vue";
 import TagsPicker from "../components/tags-picker.vue";
+import Dialog from '../components/dialog-mixin.vue';
 
 export default {
   components: {
     FormImagesPicker,
     TagsPicker
   },
+  mixins: [Dialog],
   created() {
     if(this.$f7route.query.edit_id !== null && this.$f7route.query.edit_id !== undefined){
       this.editId = this.$f7route.query.edit_id;
@@ -182,11 +184,7 @@ export default {
           });
         }
       } else {
-        this.$f7.dialog.alert(
-          this.$t("whs.alert_form.text"),
-          this.$t("whs.alert_form.title"),
-          false
-        );
+        this.alertDialog(this.$t('whs.alert_form.title'), this.$t('whs.alert_form.text'), this.$t('whs.alert_form.ok'));
       }
     },
     deleteLocation(){
@@ -198,7 +196,7 @@ export default {
         });
     },
     deleteDialog(){
-      this.$f7.dialog.confirm(this.$t('whs.alert_form.delete_text'), this.$t('whs.alert_form.delete_title'), this.deleteLocation);
+      this.confirmDialog(this.$t('whs.alert_form.delete_title'), this.$t('whs.alert_form.delete_text'), this.$t('whs.alert_form.confirm'),this.$t('whs.alert_form.cancel'), this.deleteLocation);
     },
     setDefaults(item){
       self = this;

@@ -38,6 +38,9 @@
     "delete": "Delete"
   },
   "alert_form":{
+    "ok": "Ok",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
     "text": "Fill the form",
     "title": "Form error",
     "delete_text": "Record will be deleted permanently",
