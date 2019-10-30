@@ -121,8 +121,8 @@
           :key="'location_'+index"
         >
           <div slot="media" class="whs-item-image"></div>
-          <div class="whs-item-row">LOCATIONS: 2000</div>
-          <div class="whs-item-row">Test description of the location</div>
+          <div class="whs-item-row">CAPACITY: {{location.pallet_capacity}}</div>
+          <div class="whs-item-row">{{location.description}}</div>
         </f7-list-item>
       </f7-list>
       <empty-block v-else :text="$t('whs.common.no_locations')" />
