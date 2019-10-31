@@ -9,11 +9,14 @@ const API = {
     settings: {
       currency: "$"
     }, 
-    getItem(options = null){
+    getItem(data = null){
+      let cache = true;
+      if (data) cache = false;
         return api.call({
             endpoint: 'inventory/items',
             method: 'GET',
-            options
+            cache: cache,
+            data
           }).then((data) => {
             return data;
           });
@@ -49,24 +52,29 @@ const API = {
             with_summary: true,
           },          
         }).then((data) => {
-          console.log("TCL: getLocationDetail -> data", data)
           return data;
         });
     },
-    getActivities(options = null){
+    getActivities(data = null){
+      let cache = true;
+      if (data) cache = false;
       return api.call({
           endpoint: 'inventory/activities',
           method: 'GET',
-          options
+          cache: cache,
+          data
         }).then((data) => {
           return data;
         });
     },
-    getTags(options = null){
+    getTags(data = null){
+      let cache = true;
+      if (data) cache = false;
       return api.call({
           endpoint: 'inventory/tags',
           method: 'GET',
-          options
+          cache: cache,
+          data
         }).then((data) => {
           return data;
         });
