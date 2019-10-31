@@ -120,32 +120,24 @@
               <th>Location</th>
               <th>Parent</th>
               <th>Items</th>
+              <th>Lock</th>
+              <th>Lot code</th>
+              <th>Expiry</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
+            <tr 
+              v-for="(location, index) in locations"
+              :key="'loc_'+index"
+            >
               <td class="media-cell"></td>
-              <td>1000348671</td>
-              <td>BF-02-01</td>
+              <td>{{location.name}}</td>
+              <td>{{location.parent_location_id}}</td>
               <td>500</td>
-            </tr>
-            <tr>
-              <td class="media-cell"></td>
-              <td>1000348671</td>
-              <td>BF-02-01</td>
-              <td>500</td>
-            </tr>
-            <tr>
-              <td class="media-cell"></td>
-              <td>1000348671</td>
-              <td>BF-02-01</td>
-              <td>500</td>
-            </tr>
-            <tr>
-              <td class="media-cell"></td>
-              <td>1000348671</td>
-              <td>BF-02-01</td>
-              <td>500</td>
+              <td v-if="location.active"></td>
+              <td v-else><i class="whs-summary-icon whs-icon-lock"></i></td>
+              <td>{{location.sku}}</td>
+              <td>22 October 2019</td>
             </tr>
           </tbody>
         </table>
@@ -195,6 +187,7 @@ export default {
     this.itemDesc = API.main_page.$data.items[this.itemIndex].description;
 
     this.loadItemDetail();
+    this.getLocations();
   },
   computed: {},
   methods: {
@@ -211,7 +204,12 @@ export default {
       self.itemDesc = item.description;
       API.resetCache(`inventory/items/${self.itemId}`);
       self.loadItemDetail();
-    }
+    },
+    getLocations(){
+      const self = this;
+      API.getLocations({'inventory_item_id': Number(self.itemId)}).then((data)=>{self.locations = data;});
+      
+    },
   },
   beforeDestroy() {
     const self = this;
@@ -227,6 +225,7 @@ export default {
       itemDesc: null,
       itemId: null,
       itemIndex: null,
+      locations: [],
       activeTab: "summary",
       item:{},
     };

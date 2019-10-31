@@ -29,11 +29,14 @@ const API = {
           return data;
         });
     },
-    getLocations(options = null){
+    getLocations(data = null){
+      let cache = true;
+      if (data) cache = false;
       return api.call({
           endpoint: 'inventory/locations',
           method: 'GET',
-          options
+          cache: cache,
+          data
         }).then((data) => {
           return data;
         });
