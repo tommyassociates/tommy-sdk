@@ -151,28 +151,24 @@
               </th>
               <th>Items</th>
               <th>Description</th>
+              <th>Current</th>
+              <th>P.in</th>
+              <th>P.out</th>
+              <th>Location</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
+            <tr 
+              v-for="(item, index) in items"
+              :key="'item_'+index"
+            >
               <td class="media-cell"></td>
-              <td>P00639</td>
-              <td>Apple Juice Pallet Cons</td>
-            </tr>
-            <tr>
-              <td class="media-cell"></td>
-              <td>P023639</td>
-              <td>Pachasing- Wicked Sister Chocolate</td>
-            </tr>
-            <tr>
-              <td class="media-cell"></td>
-              <td>WW00639</td>
-              <td>Apple Juice Pallet Cons</td>
-            </tr>
-            <tr>
-              <td class="media-cell"></td>
-              <td>GT00639</td>
-              <td>Pachasing- Wicked Sister Chocolate</td>
+              <td>{{item.name}}</td>
+              <td>{{item.description}}</td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
             </tr>
           </tbody>
         </table>
@@ -289,6 +285,7 @@ export default {
     this.locationDesc = API.main_page.$data.locations[this.locationIndex].description;
 
     this.loadLocationDetail();
+    this.getItems();
   },
   computed: {},
   methods: {
@@ -304,6 +301,10 @@ export default {
       self.locationDesc = location.description;
       API.resetCache(`inventory/locations/${self.locationId}`);
       self.loadLocationDetail();
+    },
+    getItems(){
+      const self = this;
+      API.getItem({'location_id': Number(self.locationId)}).then((data)=>{self.items = data;});
     }
   },
   beforeDestroy() {
@@ -320,6 +321,7 @@ export default {
       locationDesc: null,
       locationId: null,
       locationIndex: null,
+      items:[],
       activeTab: "summary",
       location:{},
     };
