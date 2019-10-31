@@ -133,11 +133,11 @@
               <td class="media-cell"></td>
               <td>{{location.name}}</td>
               <td>{{location.parent_location_id}}</td>
-              <td>500</td>
+              <td></td>
               <td v-if="location.active"></td>
               <td v-else><i class="whs-summary-icon whs-icon-lock"></i></td>
               <td>{{location.sku}}</td>
-              <td>22 October 2019</td>
+              <td></td>
             </tr>
           </tbody>
         </table>
