@@ -318,17 +318,17 @@ export default {
     
   },
   methods: {
-    getMainListItem(){
+    getItem(){
       const self = this;
-      API.getMainListItem().then((data)=>{self.items = data});
+      API.getItem().then((data)=>{self.items = data});
     },
-    getMainListLocations(){
+    getLocations(){
       const self = this;
-      API.getMainListLocations().then((data)=>{self.locations = data});
+      API.getLocations().then((data)=>{self.locations = data});
     },
-    getMainListActivities(){
+    getActivities(){
       self = this;
-      self.getMainListItem();
+      self.getItem();
     },
     onSearchbarSearch(query) {
       const self = this;
@@ -348,12 +348,12 @@ export default {
     itemUpdated(){ 
       self = this;
       API.resetCache('inventory/items');
-      self.getMainListItem();
+      self.getItem();
     },
     locationUpdated(){
       self = this;
       API.resetCache('inventory/locations');
-      self.getMainListLocations();
+      self.getLocations();
     }
   },
   beforeDestroy() {
@@ -368,10 +368,10 @@ export default {
   },
   mounted() {
     const self = this;
-    self.getMainListItem();
-    self.getMainListLocations();
-    self.getMainListActivities();
-    //API.getMainListTags().then((data)=>{self.tags = data});
+    self.getItem();
+    self.getLocations();
+    self.getActivities();
+    //API.getTags().then((data)=>{self.tags = data});
     
 
     self.$events.$on('item:updated', self.itemUpdated);

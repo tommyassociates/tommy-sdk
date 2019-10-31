@@ -9,10 +9,11 @@ const API = {
     settings: {
       currency: "$"
     }, 
-    getMainListItem(){
+    getItem(options = null){
         return api.call({
             endpoint: 'inventory/items',
             method: 'GET',
+            options
           }).then((data) => {
             return data;
           });
@@ -28,10 +29,11 @@ const API = {
           return data;
         });
     },
-    getMainListLocations(){
+    getLocations(options = null){
       return api.call({
           endpoint: 'inventory/locations',
           method: 'GET',
+          options
         }).then((data) => {
           return data;
         });
@@ -48,20 +50,20 @@ const API = {
           return data;
         });
     },
-    getMainListActivities(){
+    getActivities(options = null){
       return api.call({
           endpoint: 'inventory/activities',
           method: 'GET',
+          options
         }).then((data) => {
           return data;
         });
     },
-    getMainListTags(){
+    getTags(options = null){
       return api.call({
           endpoint: 'inventory/tags',
           method: 'GET',
-          //per: mainListLimit,
-         // page: 1,
+          options
         }).then((data) => {
           return data;
         });
