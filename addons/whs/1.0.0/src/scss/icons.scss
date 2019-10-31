@@ -59,9 +59,21 @@
 .whs-icon-team{
   background-image: url(../assets/icon-team.svg);
 }
+.whs-icon-lock{
+  background-image: url(../assets/icon-lock.svg);
+}
 .whs-main-icon {
   width: 14px;
   height: 14px;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  display: block;
+  margin: 0 10px;
+}
+.whs-summary-icon {
+  width: 18px;
+  height: 18px;
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
