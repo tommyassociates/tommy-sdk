@@ -6,9 +6,6 @@ const mainListLimit = 12;
 
 const API = {
     main_page: undefined,
-    settings: {
-      currency: "$"
-    }, 
     getItem(data = null){
       let cache = true;
       if (data) cache = false;
@@ -138,6 +135,24 @@ const API = {
         endpoint: `tags/${id}`,
         method: 'DELETE',
       })
+    },
+    getSettings() {
+      return api.call({
+        endpoint: `addons/whs/install/settings/mainSettings`,
+        method: 'GET',
+        cache: false,
+      }).then((res) => {
+        if (!res) return res;
+        if (!res.data) return null;
+        return res.data;
+      });
+    },
+    saveSettings(settings = {}) {
+      return api.call({
+        endpoint: `addons/whs/install/settings/mainSettings`,
+        method: 'PUT',
+        data: { data: JSON.stringify(settings) },
+      });
     },
     toast(text){
       const finishToast = self.$f7.toast.create({

@@ -2,7 +2,7 @@
   <f7-page>
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
-      <f7-nav-title>{{$t('whs.index.title')}}</f7-nav-title>
+      <f7-nav-title>{{settings.name}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
         <f7-link icon-only popover-open=".whs-popover-add">
           <f7-icon f7="add" />
@@ -354,6 +354,21 @@ export default {
       self = this;
       API.resetCache('inventory/locations');
       self.getLocations();
+    },
+    getSettings(){
+      const self = this;
+      API.getSettings().catch((data)=>{console.log("TCL: getSettings -> data", data); });
+    },
+    setDefaultSettings(settings){
+      self = this;
+      if(settings !== null){
+        for(key in self.settings){
+          if(settings[key] === null || settings[key] ==="" || settings[key] === undefined) settings[key] = self.settings[key];
+        }
+        return settings;
+      }else{
+        return self.settings;
+      }
     }
   },
   beforeDestroy() {
@@ -368,10 +383,12 @@ export default {
   },
   mounted() {
     const self = this;
-    self.getItem();
-    self.getLocations();
-    self.getActivities();
-    //API.getTags().then((data)=>{self.tags = data});
+    API.getSettings().then((res) => {
+      self.settings = self.setDefaultSettings(res);
+      self.getItem();
+      self.getLocations();
+      self.getActivities();
+    }); 
     
 
     self.$events.$on('item:updated', self.itemUpdated);
@@ -382,7 +399,8 @@ export default {
     self.$events.$on('location:deleted', self.locationUpdated);
     
   },
-    data() {
+  data() {
+    self = this;
     return {
       activeTab: 'items',
       activeSearchFilter: 'all',
@@ -393,6 +411,12 @@ export default {
       tags: [],
       activity: [],
       activity_filter: "all",
+      settings:{
+        name: self.$t('whs.index.title'),
+        currency: "USD",
+        date: "YYYY/MM/DD",
+        time: "HH:mm"
+      }
     };
   }
 };

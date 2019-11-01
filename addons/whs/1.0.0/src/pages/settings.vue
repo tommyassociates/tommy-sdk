@@ -10,8 +10,13 @@
         type="text"
         :label="$t('whs.common.name_label')"
         inline-label
-        value="Inventory"
-      />
+        :value="new_name || settings.name"
+        @input="new_name = $event.target.value"        
+      >  
+        <f7-link slot="inner-end" v-if="new_name != settings.name && new_name !== null" @click="updateSettings('name', new_name)">   
+          <f7-icon f7="check"  />
+        </f7-link>
+      </f7-list-input>
       <f7-list-item
         :title="$t('whs.settings.currency')"
         smart-select
@@ -23,11 +28,12 @@
           closeOnSelect: true,
         }"
       >
-        <select name="currency">
+        <select name="currency" @change="updateSettings('currency',$event.target.value)">
           <option
             v-for="(label, code) in currencyList"
             :key="code"
             :value="code"
+            :selected="code === settings.currency"
           >{{code}}</option>
         </select>
 
@@ -35,13 +41,13 @@
       <f7-list-item
         link
         :title="$t('whs.settings.date')"
-        after="2019-03-16"
+        :after="demoDate"
         popup-open=".whs-date-format-popup"
       />
       <f7-list-item
         link
         :title="$t('whs.settings.time')"
-        after="5:58 PM"
+        :after="demoTime"
         popup-open=".whs-time-format-popup"
       />
       <f7-list-item
@@ -96,7 +102,10 @@
       />
     </f7-list>
 
-    <f7-popup class="whs-date-format-popup">
+    <f7-popup 
+      class="whs-date-format-popup"
+      @popup:open="editParam = settings.date"
+    >
       <f7-page>
         <f7-navbar>
           <f7-nav-left>
@@ -104,7 +113,7 @@
           </f7-nav-left>
           <f7-nav-title>{{$t('whs.settings.date')}}</f7-nav-title>
           <f7-nav-right>
-            <f7-link icon-only>
+            <f7-link icon-only popup-close @click="updateSettings('date', editParam)">
               <f7-icon f7="check" />
             </f7-link>
           </f7-nav-right>
@@ -115,11 +124,12 @@
             type="text"
             :label="$t('whs.settings.date_format_format')"
             inline-label
-            value="YYYY/MM/DD"
+            :value="editParam"
+            @input="editParam = $event.target.value"
           />
           <f7-list-item
             :title="$t('whs.settings.date_format_demo')"
-            :after="$moment().format('YYYY/MM/DD')"
+            :after="$moment().format(editParam)"
           />
           <f7-list-item
             divider
@@ -141,12 +151,16 @@
             :key="token"
             :title="token"
             :after="$moment().format(token)"
+            @click="editParam = token"
           ></f7-list-item>
         </f7-list>
       </f7-page>
     </f7-popup>
 
-    <f7-popup class="whs-time-format-popup">
+    <f7-popup 
+      class="whs-time-format-popup"
+      @popup:open="editParam = settings.time"
+    >
       <f7-page>
         <f7-navbar>
           <f7-nav-left>
@@ -154,7 +168,7 @@
           </f7-nav-left>
           <f7-nav-title>{{$t('whs.settings.time')}}</f7-nav-title>
           <f7-nav-right>
-            <f7-link icon-only>
+            <f7-link icon-only popup-close @click="updateSettings('time', editParam)">
               <f7-icon f7="check" />
             </f7-link>
           </f7-nav-right>
@@ -164,11 +178,12 @@
             type="text"
             :label="$t('whs.settings.time_format_format')"
             inline-label
-            value="HH:mm"
+            :value="editParam"
+            @input="editParam = $event.target.value"
           />
           <f7-list-item
             :title="$t('whs.settings.time_format_demo')"
-            :after="$moment().format('HH:mm')"
+            :after="$moment().format(editParam)"
           />
           <f7-list-item
             divider
@@ -190,6 +205,7 @@
             :key="token"
             :title="token"
             :after="$moment().format(token)"
+            @click="editParam = token"
           ></f7-list-item>
         </f7-list>
       </f7-page>
@@ -210,13 +226,23 @@ export default {
       momentDateExamples: ['ddd, DD MMMM YYYY', 'DD-MMM-YYYY', 'DD-MM-YYYY', 'M/D/YYYY', 'YYYY-MM-DD'],
       momentTimeTokens: ['HH', 'H', 'h', 'hh', 'a', 'A', 'm', 'mm', 's', 'ss', 'Z', 'ZZ'],
       momentTimeExamples: ['h:mm A', 'HH:mm', 'h:mm:ss A','h:mm:s A', 'HH-mm'],
+      settings: API.main_page.$data.settings,
+      editParam: null,
+      new_name: null,
     };
   },
   created() {
 
   },
   computed: {
-
+    demoDate(){
+      self = this;      
+      return self.$moment(new Date()).format(self.settings.date)
+    },
+    demoTime(){
+      self = this;      
+      return self.$moment(new Date()).format(self.settings.time)
+    }
   },
   methods: {
     renderCurrencyItem(ss, item) {
@@ -233,6 +259,12 @@ export default {
           </label>
         </li>
       `;
+    },
+    updateSettings(target, val){
+      self = this;
+      self.editParam = null;
+      self.settings[target] = val;
+      API.saveSettings(self.settings);
     }
   },
   beforeDestroy() {
