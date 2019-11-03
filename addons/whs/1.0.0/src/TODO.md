@@ -23,10 +23,12 @@
 ## Activity
 
 - [ ] Add create form
+- [ ] no activity when length = 0
 
 ## Settings
 
-- [ ] Use Fragments
+- [ ] do defragment settings (main,items, locations...)
+- [ ] add items settings
 
 
 
