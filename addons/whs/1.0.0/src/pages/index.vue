@@ -172,7 +172,7 @@
           </f7-list-item>
         </f7-list>
       </f7-popover>
-      <f7-list class="whs-list whs-main-activity" media-list v-if="activity.length > 0">
+      <f7-list class="whs-list whs-main-activity" media-list>
         <f7-list-item divider class="filter">
           <f7-link popover-open=".whs-popover-activity">
             {{$t(`whs.popover.activity.${activity_filter}`)}}
@@ -298,7 +298,7 @@
             <div class="whs-item-row">Items: 500</div>
           </f7-list-item>
         </f7-list>
-      <empty-block v-if="activity.length === 0" :text="$t('whs.common.no_activity')" />
+      <!--<empty-block v-if="activity.length === 0" :text="$t('whs.common.no_activity')" />-->
     </template>
 
   </f7-page>
