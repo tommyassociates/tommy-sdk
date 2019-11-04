@@ -2,7 +2,7 @@
   <f7-page>
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
-      <f7-nav-title>{{settings.name}}</f7-nav-title>
+      <f7-nav-title>{{settings.main.name}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
         <f7-link icon-only popover-open=".whs-popover-add">
           <f7-icon f7="add" />
@@ -362,10 +362,36 @@ export default {
     setDefaultSettings(settings){
       self = this;
       if(settings !== null){
-        for(key in self.settings){
-          if(settings[key] === null || settings[key] ==="" || settings[key] === undefined) settings[key] = self.settings[key];
+        for(item in self.settings){
+          if(settings[item] !== null && settings[item] !== undefined){
+            for(key in self.settings[item]){
+              if(settings[item][key] === null || settings[item][key] ==="" || settings[item][key] === undefined) settings[item][key] = self.settings[item][key];
+            }
+          }else{
+            settings[item] = self.settings[item];
+          }
         }
         return settings;
+      }else{
+        return self.settings;
+      }
+    },
+    parseSettings(settings){
+      const new_settings = new Object();
+      self = this;
+      if(settings !== null){
+        settings.forEach((item)=>{
+          new_settings[item.name] = new Object();
+          for(itemDef in self.settings[item.name]){
+            if(item.data[itemDef] === null || item.data[itemDef] ==="" || item.data[itemDef] === undefined) {
+              new_settings[item.name][itemDef] = self.settings[item.name][itemDef];
+            }else{
+              new_settings[item.name][itemDef] = item.data[itemDef];
+            }
+          }          
+        });
+        console.log("TCL: parseSettings -> new_settings", new_settings);
+        return new_settings;
       }else{
         return self.settings;
       }
@@ -383,8 +409,10 @@ export default {
   },
   mounted() {
     const self = this;
+    //API.deleteSettings('main');
     API.getSettings().then((res) => {
-      self.settings = self.setDefaultSettings(res);
+      console.log("TCL: mounted -> res", res)      
+      self.settings = self.parseSettings(res);
       self.getItem();
       self.getLocations();
       self.getActivities();
@@ -412,10 +440,12 @@ export default {
       activity: [],
       activity_filter: "all",
       settings:{
-        name: self.$t('whs.index.title'),
-        currency: "USD",
-        date: "YYYY/MM/DD",
-        time: "HH:mm"
+        main: {
+          name: self.$t('whs.index.title'),
+          currency: "USD",
+          date: "YYYY/MM/DD",
+          time: "HH:mm"
+        }
       }
     };
   }

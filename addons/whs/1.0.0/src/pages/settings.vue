@@ -10,10 +10,10 @@
         type="text"
         :label="$t('whs.common.name_label')"
         inline-label
-        :value="new_name || settings.name"
+        :value="new_name || settings.main.name"
         @input="new_name = $event.target.value"        
       >  
-        <f7-link slot="inner-end" v-if="new_name != settings.name && new_name !== null" @click="updateSettings('name', new_name)">   
+        <f7-link slot="inner-end" v-if="new_name != settings.main.name && new_name !== null" @click="updateMainSettings('name', new_name)">   
           <f7-icon f7="check"  />
         </f7-link>
       </f7-list-input>
@@ -28,12 +28,12 @@
           closeOnSelect: true,
         }"
       >
-        <select name="currency" @change="updateSettings('currency',$event.target.value)">
+        <select name="currency" @change="updateMainSettings('currency',$event.target.value)">
           <option
             v-for="(label, code) in currencyList"
             :key="code"
             :value="code"
-            :selected="code === settings.currency"
+            :selected="code === settings.main.currency"
           >{{code}}</option>
         </select>
 
@@ -113,7 +113,7 @@
           </f7-nav-left>
           <f7-nav-title>{{$t('whs.settings.date')}}</f7-nav-title>
           <f7-nav-right>
-            <f7-link icon-only popup-close @click="updateSettings('date', editParam)">
+            <f7-link icon-only popup-close @click="updateMainSettings('date', editParam)">
               <f7-icon f7="check" />
             </f7-link>
           </f7-nav-right>
@@ -168,7 +168,7 @@
           </f7-nav-left>
           <f7-nav-title>{{$t('whs.settings.time')}}</f7-nav-title>
           <f7-nav-right>
-            <f7-link icon-only popup-close @click="updateSettings('time', editParam)">
+            <f7-link icon-only popup-close @click="updateMainSettings('time', editParam)">
               <f7-icon f7="check" />
             </f7-link>
           </f7-nav-right>
@@ -237,11 +237,11 @@ export default {
   computed: {
     demoDate(){
       self = this;      
-      return self.$moment(new Date()).format(self.settings.date)
+      return self.$moment(new Date()).format(self.settings.main.date)
     },
     demoTime(){
       self = this;      
-      return self.$moment(new Date()).format(self.settings.time)
+      return self.$moment(new Date()).format(self.settings.main.time)
     }
   },
   methods: {
@@ -260,11 +260,11 @@ export default {
         </li>
       `;
     },
-    updateSettings(target, val){
+    updateMainSettings(target, val){
       self = this;
       self.editParam = null;
-      self.settings[target] = val;
-      API.saveSettings(self.settings);
+      self.settings.main[target] = val;
+      API.saveSettings('main',self.settings.main);
     }
   },
   beforeDestroy() {

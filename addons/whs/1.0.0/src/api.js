@@ -136,22 +136,36 @@ const API = {
         method: 'DELETE',
       })
     },
-    getSettings() {
+    getSettings(name) {
+      if(name) name = '/'+name; else name = '';
       return api.call({
-        endpoint: `addons/whs/install/settings/mainSettings`,
+        endpoint: `addons/whs/install/settings${name}`,
         method: 'GET',
         cache: false,
       }).then((res) => {
         if (!res) return res;
-        if (!res.data) return null;
-        return res.data;
+        if(name){
+          if (!res.data) return null;
+          return res.data;
+        }else{
+          if (res.length === 0) return null;
+          return res;
+        }
       });
     },
-    saveSettings(settings = {}) {
+    saveSettings(key, settings = {}) {
+      if(key) key = "/"+key; else key = ""
       return api.call({
-        endpoint: `addons/whs/install/settings/mainSettings`,
+        endpoint: `addons/whs/install/settings${key}`,
         method: 'PUT',
         data: { data: JSON.stringify(settings) },
+      });
+    },
+    deleteSettings(key) {
+      if(key) key = "/"+key; else key = ""
+      return api.call({
+        endpoint: `addons/whs/install/settings${key}`,
+        method: 'DELETE',
       });
     },
     toast(text){
