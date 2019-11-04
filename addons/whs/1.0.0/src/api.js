@@ -3,9 +3,9 @@ const api = tommy.api;
 
 const mainListLimit = 12;
 
-
 const API = {
     main_page: undefined,
+    team_id: null,
     getItem(data = null){
       let cache = true;
       if (data) cache = false;
@@ -159,6 +159,8 @@ const API = {
         endpoint: `addons/whs/install/settings${key}`,
         method: 'PUT',
         data: { data: JSON.stringify(settings) },
+        user_id: null,
+        team_id: API.team_id,
       });
     },
     deleteSettings(key) {

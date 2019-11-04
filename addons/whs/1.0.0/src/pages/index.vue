@@ -305,6 +305,7 @@
 </template>
 <script>
 import API from "../api";
+import Settings from "../settings";
 import EmptyBlock from '../components/empty-block.vue';
 
 export default {
@@ -312,7 +313,8 @@ export default {
     EmptyBlock,
   },
   created() {
-    API.main_page = this;    
+    API.main_page = this;
+    API.team_id = this.$root.team.id;   
   },
   computed: {
     
@@ -409,9 +411,8 @@ export default {
   },
   mounted() {
     const self = this;
-    //API.deleteSettings('main');
+    //API.deleteSettings('mainSettings');
     API.getSettings().then((res) => {
-      console.log("TCL: mounted -> res", res)      
       self.settings = self.parseSettings(res);
       self.getItem();
       self.getLocations();
@@ -439,15 +440,8 @@ export default {
       tags: [],
       activity: [],
       activity_filter: "all",
-      settings:{
-        main: {
-          name: self.$t('whs.index.title'),
-          currency: "USD",
-          date: "YYYY/MM/DD",
-          time: "HH:mm"
-        }
-      }
+      settings: Settings,      
     };
   }
-};
+}; 
 </script> 
