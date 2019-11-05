@@ -53,7 +53,7 @@
             <i class="icon whs-icon-box-black"></i>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">$ {{location.items_count}}</div>
+            <div class="whs-summary-card-value">$ {{formatCurrency(location.items_count)}}</div>
             <div class="whs-summary-card-label">TOTAL</div>
           </div>
         </div>
@@ -62,7 +62,7 @@
             <i class="icon whs-icon-tag-black"></i>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{location.tags_count}}</div>
+            <div class="whs-summary-card-value">{{formatNumber(location.tags_count)}}</div>
             <div class="whs-summary-card-label">TAGS</div>
           </div>
         </div>
@@ -71,7 +71,7 @@
             <i class="icon whs-icon-drawer-black"></i>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{location.sub_locations_count}}</div>
+            <div class="whs-summary-card-value">{{formatNumber(location.sub_locations_count)}}</div>
             <div class="whs-summary-card-label">LOCATIONS</div>
           </div>
         </div>
@@ -96,7 +96,7 @@
             <div class="whs-summary-card-title">Value</div>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">$ {{location.estimated_value}}</div>
+            <div class="whs-summary-card-value">{{formatCurrency(location.estimated_value)}}</div>
             <div class="whs-summary-card-label">Est. Total</div>
           </div>
         </div>
@@ -105,7 +105,7 @@
             <div class="whs-summary-card-title">Expiring</div>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{location.expiring_count}}</div>
+            <div class="whs-summary-card-value">{{formatNumber(location.expiring_count)}}</div>
             <div class="whs-summary-card-label">Items</div>
           </div>
         </div>
@@ -114,7 +114,7 @@
             <div class="whs-summary-card-title">Pending in</div>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{location.pending_in_count}}</div> 
+            <div class="whs-summary-card-value">{{formatNumber(location.pending_in_count)}}</div> 
             <div class="whs-summary-card-label">Items</div>
           </div>
         </div>
@@ -123,7 +123,7 @@
             <div class="whs-summary-card-title">Pending out</div>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{location.pending_out_count}}</div>
+            <div class="whs-summary-card-value">{{formatNumber(location.pending_out_count)}}</div>
             <div class="whs-summary-card-label">Items</div>
           </div>
         </div>
@@ -132,7 +132,7 @@
             <div class="whs-summary-card-title">Low stock</div>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{location.low_stock_count}}</div>
+            <div class="whs-summary-card-value">{{formatNumber(location.low_stock_count)}}</div>
             <div class="whs-summary-card-label">Items</div>
           </div>
         </div>
@@ -272,11 +272,13 @@
 <script>
 import API from "../api";
 import EmptyBlock from "../components/empty-block.vue";
+import CurMexin from "../utils/cur-num-mixin.vue";
 
 export default {
   components: {
     EmptyBlock
   },
+  mixins:[CurMexin],
   created() {
     this.locationId = this.$f7route.query.id;
     this.locationIndex = this.$f7route.query.index;
