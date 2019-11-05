@@ -26,6 +26,25 @@
   background-repeat: no-repeat;
   background-position: center;
 }
+.whs-icon-mask,
+.whs-icon-box-orange,
+.whs-icon-box-black,
+.whs-icon-drawer-orange,
+.whs-icon-drawer-black,
+.whs-icon-tag-orange,
+.whs-icon-tag-black,
+.whs-icon-clock-orange,
+.whs-icon-clock-black
+{
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
 .whs-icon-box-orange {
   background-color: #FF4500;
   -webkit-mask-image: url(../assets/icon-box-black.svg);
