@@ -1,3 +1,6 @@
+## Main
+-   Dynamic program name
+
 ## Items
 
 -	Add 
@@ -5,6 +8,7 @@
 -	Delete (in summary click gear)
 -	Summary
 -	Summary --> locations/items
+-   Summary, format values
 
 ## locations
 
@@ -13,6 +17,7 @@
 -	Delete (in summary click gear)
 -	Summary
 -	Summary --> locations/items
+-   Summary, format values
 
 ## Settings
 
@@ -22,7 +27,12 @@
 -	Time (dynamic preview and example click)
 -   Smart settings parser witch defaults values
 -   Item settings (name, header_color, highlight_color, font_color)
+-   Dynamic currency symbol
 
 ## Activity
 
 -	UI
+
+## Others
+
+- Number & currency format functions
