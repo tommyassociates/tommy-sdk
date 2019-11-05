@@ -27,28 +27,44 @@
   background-position: center;
 }
 .whs-icon-box-orange {
-  background-image: url(../assets/icon-box-orange.svg);
+  background-color: #FF4500;
+  -webkit-mask-image: url(../assets/icon-box-black.svg);
+  mask-image: url(../assets/icon-box-black.svg);
 }
 .whs-icon-box-black {
-  background-image: url(../assets/icon-box-black.svg);
+  background-color: #333333;
+  -webkit-mask-image: url(../assets/icon-box-black.svg);
+  mask-image: url(../assets/icon-box-black.svg);
 }
 .whs-icon-drawer-orange {
-  background-image: url(../assets/icon-drawer-orange.svg);
+  background-color: #FF4500;
+  -webkit-mask-image: url(../assets/icon-drawer-black.svg);
+  mask-image: url(../assets/icon-drawer-black.svg);
 }
 .whs-icon-drawer-black {
-  background-image: url(../assets/icon-drawer-black.svg);
+  background-color: #333333;
+  -webkit-mask-image: url(../assets/icon-drawer-black.svg);
+  mask-image: url(../assets/icon-drawer-black.svg);
 }
 .whs-icon-tag-orange {
-  background-image: url(../assets/icon-tag-orange.svg);
+  background-color: #FF4500;
+  -webkit-mask-image: url(../assets/icon-tag-black.svg);
+  mask-image: url(../assets/icon-tag-black.svg);
 }
 .whs-icon-tag-black {
-  background-image: url(../assets/icon-tag-black.svg);
+  background-color: #333333;
+  -webkit-mask-image: url(../assets/icon-tag-black.svg);
+  mask-image: url(../assets/icon-tag-black.svg);
 }
 .whs-icon-clock-orange {
-  background-image: url(../assets/icon-clock-orange.svg);
+  background-color: #FF4500;
+  -webkit-mask-image: url(../assets/icon-clock-black.svg);
+  mask-image: url(../assets/icon-clock-black.svg);
 }
 .whs-icon-clock-black {
-  background-image: url(../assets/icon-clock-black.svg);
+  background-color: #333333;
+  -webkit-mask-image: url(../assets/icon-clock-black.svg);
+  mask-image: url(../assets/icon-clock-black.svg);
 }
 .whs-icon-triangle{
   background-image: url(../assets/icon-triangle.svg);
