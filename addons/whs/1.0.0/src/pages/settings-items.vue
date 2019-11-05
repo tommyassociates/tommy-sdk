@@ -3,6 +3,11 @@
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('whs.settings_items.title')}}</f7-nav-title>
+      <f7-nav-right v-if="edited">
+        <f7-link @click="updateSettings()">   
+          <f7-icon f7="check"  />
+        </f7-link>
+      </f7-nav-right>
     </f7-navbar>
 
     <f7-list class="no-margin no-hairlines whs-settings-list">
@@ -11,22 +16,24 @@
           type="text"
           :label="$t('whs.common.name_label')"
           inline-label
-          value="Items"
-        />
+          :value="settings.name"
+          @input="updateValue('name', $event.target.value)"        
+      />  
+
         <list-color-picker
           :title="$t('whs.settings_items.header_bg_color')"
-          :value="headerBgColor"
-          @change="(v) => headerBgColor = v"
+          :value="settings.header_color"
+          @change="(v) => updateValue('header_color', v)"
         />
         <list-color-picker
           :title="$t('whs.settings_items.header_font_color')"
-          :value="headerFontColor"
-          @change="(v) => headerFontColor = v"
+          :value="settings.highlight_color"
+          @change="(v) => updateValue('highlight_color', v)"
         />
         <list-color-picker
           :title="$t('whs.settings_items.standard_font_color')"
-          :value="standardFontColor"
-          @change="(v) => standardFontColor = v"
+          :value="settings.font_color"
+          @change="(v) => updateValue('font_color', v)"
         />
         <f7-list-item
           :title="$t('whs.settings_items.fields')"
@@ -71,9 +78,8 @@
     },
     data() {
       return {
-        headerBgColor: '#fff',
-        headerFontColor: '#ff4500',
-        standardFontColor: '#333',
+        edited: false,
+        settings: Object.assign({}, API.main_page.$data.settings.item),
       };
     },
     created() {
@@ -83,7 +89,18 @@
 
     },
     methods: {
-
+      updateValue(target, val){
+        self = this;
+        self.editParam = null;
+        self.edited = true;
+        self.settings[target] = val;
+      },
+      updateSettings(){
+        self = this;
+        self.edited = false;
+        API.main_page.$data.settings.item = self.settings;
+        API.saveSettings('item',self.settings)
+      }
     },
     beforeDestroy() {
       const self = this;

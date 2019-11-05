@@ -29,6 +29,6 @@
 
 - [ ] do defragment settings (main,items, locations...)
 - [ ] add items settings
-
+- [ ] toast when settings saved
 
 

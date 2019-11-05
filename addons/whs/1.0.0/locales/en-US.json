@@ -3,6 +3,7 @@
     "title" : "Inventory"
   },
   "common": {
+    "items": "Items",
     "no_items": "No Items",
     "no_locations": "No Locations",
     "no_tags": "No Tags",
