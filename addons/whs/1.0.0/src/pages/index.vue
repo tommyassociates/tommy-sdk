@@ -382,17 +382,18 @@ export default {
       const new_settings = new Object();
       self = this;
       if(settings !== null){
-        settings.forEach((item)=>{
-          new_settings[item.name] = new Object();
-          for(itemDef in self.settings[item.name]){
-            if(item.data[itemDef] === null || item.data[itemDef] ==="" || item.data[itemDef] === undefined) {
-              new_settings[item.name][itemDef] = self.settings[item.name][itemDef];
-            }else{
-              new_settings[item.name][itemDef] = item.data[itemDef];
-            }
-          }          
-        });
-        console.log("TCL: parseSettings -> new_settings", new_settings);
+        const new_settings = settings.reduce((obj, item) => { obj[item["name"]] = item.data; return obj}, {})
+        for(def in self.settings){
+          if (new_settings[def] === undefined) {
+            new_settings[def] = self.settings[def];
+          }else{
+            for(itemDef in self.settings[def]){
+              if(new_settings[def][itemDef] === undefined) {
+                new_settings[def][itemDef] = self.settings[def][itemDef];
+              }
+            } 
+          }
+        }
         return new_settings;
       }else{
         return self.settings;

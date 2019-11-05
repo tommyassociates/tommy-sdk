@@ -6,8 +6,11 @@ export default {
         currency: "USD",
         date: "YYYY/MM/DD",
         time: "HH:mm"
-      },
-      items:{
-        name: window.tommy.i18n.t('whs.index.title')
-      }
+    },
+    item:{
+        name: window.tommy.i18n.t('whs.common.items'),
+        header_color: "#ffffff",
+        highlight_color: "#ff4500",
+        font_color: "#333333"
+    }
 }
