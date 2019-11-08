@@ -24,7 +24,7 @@
         :class="`link ${activeTab === 'items' ? 'whs-menubar-active' : ''}`"
         @click="activeTab = 'items'"
       >
-        <span>Items</span>
+        <span>{{settings.item.plural_name}}</span>
       </a>
       <a
         :class="`link ${activeTab === 'tags' ? 'whs-menubar-active' : ''}`"
@@ -326,6 +326,7 @@ export default {
       items:[],
       activeTab: "summary",
       location:{},
+      settings: API.main_page.$data.settings,
     };
   }
 };

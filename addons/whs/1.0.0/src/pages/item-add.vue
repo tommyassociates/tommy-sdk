@@ -10,7 +10,7 @@
       </f7-nav-right>
     </f7-navbar>
 
-    <a class="whs-toolbar-button" slot="fixed" v-if="!editId" @click="()=>{addItem(true)}">{{$t('whs.item_add.add_more_button')}}</a>
+    <a class="whs-toolbar-button" slot="fixed" v-if="!editId" @click="()=>{addItem(true)}">{{$t('whs.item_add.add_more_button', { text: settings.item.name})}}</a>
     <form class="list" id="add-item" action="javascript:void(0)" enctype="multipart/form-data">  
     <f7-list class="whs-form">
       <ul>
@@ -143,9 +143,9 @@ export default {
   computed: {
     title(){
       if(this.editId){
-        return this.$t('whs.item_add.title_edit')
+        return this.$t('whs.item_add.title_edit', { text: this.settings.item.name})
       }else{
-        return this.$t('whs.item_add.title')
+        return this.$t('whs.item_add.title', { text: this.settings.item.name})
       }
     }
   },
@@ -159,7 +159,7 @@ export default {
             .then(()=>{
               self.$events.$emit('item:updated',this.item);     
               self.$f7router.back();
-              API.toast(self.$t('whs.toast.edit_item'));
+              API.toast(self.$t('whs.toast.edit', { text: this.settings.item.name}));
             });
         }else{
           this.item = API.removeEmpty(this.item);
@@ -171,7 +171,7 @@ export default {
               }else {
                 self.$f7router.back();
               }
-              API.toast(self.$t('whs.toast.add_item'));
+              API.toast(self.$t('whs.toast.add', { text: this.settings.item.name}));
             });
         }
       } else {
@@ -184,7 +184,7 @@ export default {
         .then(()=>{
           self.$events.$emit('item:deleted',this.item);    
           self.$f7router.back('/whs/', {force: true}); 
-          API.toast(self.$t('whs.toast.delete_item'));
+          API.toast(self.$t('whs.toast.delete', { text: this.settings.item.name}));
         });
     },
     deleteDialog(){
@@ -225,7 +225,8 @@ export default {
         weight: 0,
         quantity: 0,
         min_stock_level: 0,
-      }
+      },
+      settings: API.main_page.$data.settings,
     };
   },
 };

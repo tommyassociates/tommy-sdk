@@ -32,6 +32,7 @@
     white-space: nowrap;
     text-overflow: ellipsis;
     overflow: hidden;
+    max-width: 100%;
   }
   &.whs-menubar-labels {
     overflow: auto;
@@ -64,8 +65,21 @@
     span:after {
       content: '';
       height: 2px;
-      background: $orange;
       left: 0;
+      background-color: $orange;
+      right: 0;
+      pointer-events: none;
+      bottom: 0;
+      position: absolute;
+    }
+  }
+  a.whs-menubar-dynamic-active {
+    color: $orange;
+    .after-line {
+      content: '';
+      height: 2px;
+      left: 0;
+      background-color: $orange;
       right: 0;
       pointer-events: none;
       bottom: 0;

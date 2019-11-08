@@ -1,8 +1,8 @@
 <template>
-  <f7-page class="whs-details-page">
+  <f7-page class="whs-details-page" @page:beforein="colorizeHeader" @page:beforeout="colorizeHeaderOut">
     <f7-navbar innerClass="whs-details-navbar-inner">
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{itemTitle}}</f7-nav-title>
+      <f7-nav-title :style="fontColor">{{itemTitle}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
         <f7-link icon-only href="/whs/item-add/">
           <f7-icon f7="add" />
@@ -12,31 +12,39 @@
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
-    <f7-subnavbar class="no-hairline">{{itemDesc}}</f7-subnavbar>
+    <f7-subnavbar class="no-hairline" :style="subnavbarStyle">{{itemDesc}}</f7-subnavbar>
     <div class="whs-menubar whs-menubar-labels no-swipe-panel">
       <a
-        :class="`link ${activeTab === 'summary' ? 'whs-menubar-active' : ''}`"
+        :class="`link ${activeTab === 'summary' ? 'whs-menubar-dynamic-active' : ''}`"
+        :style="activeTab === 'summary' ? highlightedColor : {}"
         @click="activeTab = 'summary'"
       >
         <span>Summary</span>
+        <div class="after-line" v-if="activeTab === 'summary'" :style="highlightedBgColor"></div>
       </a>
       <a
-        :class="`link ${activeTab === 'locations' ? 'whs-menubar-active' : ''}`"
+        :class="`link ${activeTab === 'locations' ? 'whs-menubar-dynamic-active' : ''}`"
+        :style="activeTab === 'locations' ? highlightedColor : {}"
         @click="activeTab = 'locations'"
       >
         <span>Locations</span>
+        <div class="after-line" v-if="activeTab === 'locations'" :style="highlightedBgColor"></div>
       </a>
       <a
-        :class="`link ${activeTab === 'tags' ? 'whs-menubar-active' : ''}`"
+        :class="`link ${activeTab === 'tags' ? 'whs-menubar-dynamic-active' : ''}`"
+        :style="activeTab === 'tags' ? highlightedColor : {}"
         @click="activeTab = 'tags'"
       >
         <span>Tags</span>
+        <div class="after-line" v-if="activeTab === 'tags'" :style="highlightedBgColor"></div>
       </a>
       <a
-        :class="`link ${activeTab === 'activity' ? 'whs-menubar-active' : ''}`"
+        :class="`link ${activeTab === 'activity' ? 'whs-menubar-dynamic-active' : ''}`"
+        :style="activeTab === 'activity' ? highlightedColor : {}"
         @click="activeTab = 'activity'"
       >
         <span>Activity</span>
+        <div class="after-line" v-if="activeTab === 'activity'" :style="highlightedBgColor"></div>
       </a>
     </div>
 
@@ -47,8 +55,8 @@
             <i class="icon whs-icon-box-black"></i>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{formatNumber(item.items_count)}}</div>
-            <div class="whs-summary-card-label">TOTAL</div>
+            <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(item.items_count)}}</div>
+            <div class="whs-summary-card-label" :style="fontColor">TOTAL</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -56,8 +64,8 @@
             <i class="icon whs-icon-tag-black"></i>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{formatNumber(item.tags_count)}}</div>
-            <div class="whs-summary-card-label">TAGS</div>
+            <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(item.tags_count)}}</div>
+            <div class="whs-summary-card-label" :style="fontColor">TAGS</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -65,8 +73,8 @@
             <i class="icon whs-icon-drawer-black"></i>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{formatNumber(item.locations_count)}}</div>
-            <div class="whs-summary-card-label">LOCATIONS</div>
+            <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(item.locations_count)}}</div>
+            <div class="whs-summary-card-label" :style="fontColor">LOCATIONS</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -74,8 +82,8 @@
             <div class="whs-summary-card-title">Value</div>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{formatCurrency(item.estimated_value)}}</div>
-            <div class="whs-summary-card-label">Est. Total</div>
+            <div class="whs-summary-card-value" :style="fontColor">{{formatCurrency(item.estimated_value)}}</div>
+            <div class="whs-summary-card-label" :style="fontColor">Est. Total</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -83,8 +91,8 @@
             <div class="whs-summary-card-title">Expiring</div>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{formatNumber(item.expiring_count)}}</div>
-            <div class="whs-summary-card-label">Items</div>
+            <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(item.expiring_count)}}</div>
+            <div class="whs-summary-card-label" :style="fontColor">Items</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -92,8 +100,8 @@
             <div class="whs-summary-card-title">Pending in</div>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{formatNumber(item.pending_in_count)}}</div> 
-            <div class="whs-summary-card-label">Items</div>
+            <div class="whs-summary-card-value" :style="fontColor">{{formatNumber(item.pending_in_count)}}</div> 
+            <div class="whs-summary-card-label" :style="fontColor">Items</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -101,8 +109,8 @@
             <div class="whs-summary-card-title">Pending out</div>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{formatNumber(item.pending_out_count)}}</div>
-            <div class="whs-summary-card-label">Items</div>
+            <div class="whs-summary-card-value" :style="fontColor">{{formatNumber(item.pending_out_count)}}</div>
+            <div class="whs-summary-card-label" :style="fontColor">Items</div>
           </div>
         </div>
       </div>
@@ -192,13 +200,36 @@ export default {
     this.loadItemDetail();
     this.getLocations();
   },
-  computed: {},
+  computed: {
+    headerBgColor(){
+      return{
+        "background-color": this.settings.item.header_color,
+      }
+    },
+    highlightedColor(){
+      return{
+        "color": this.settings.item.highlight_color,
+      }
+    },
+    highlightedBgColor(){
+      return{
+        "background-color": this.settings.item.highlight_color,
+      }
+    },
+    fontColor(){
+      return{
+        "color": this.settings.item.font_color,
+      }
+    },
+    subnavbarStyle(){
+      return Object.assign(this.headerBgColor, this.fontColor);
+    }
+  },
   methods: {
     loadItemDetail() {
       self = this;
       API.getItemDetail(this.itemId).then(data => {
         self.item = data;
-        console.log("TCL: loadItemDetail -> self.item", self.item)
       });
     },
     itemUpdated(item){
@@ -213,6 +244,12 @@ export default {
       API.getLocations({'inventory_item_id': Number(self.itemId)}).then((data)=>{self.locations = data;});
       
     },
+    colorizeHeader(){
+      this.$f7.$('.whs-details-navbar-inner').css(this.headerBgColor);      
+    },
+    colorizeHeaderOut(){
+      this.$f7.$('.whs-details-navbar-inner').css("background-color", "#F5F5F5");
+    }
   },
   beforeDestroy() {
     const self = this;
@@ -221,6 +258,7 @@ export default {
   mounted() {
     const self = this;
     self.$events.$on('item:updated', self.itemUpdated);
+
   },
   data() {
     return {
@@ -231,7 +269,11 @@ export default {
       locations: [],
       activeTab: "summary",
       item:{},
+      settings: API.main_page.$data.settings,
     };
   }
 };
 </script>
+<style>
+
+</style> 

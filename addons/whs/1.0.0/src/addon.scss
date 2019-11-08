@@ -49,10 +49,14 @@ $orange: #FF5413;
   }
 }
 .whs-details-navbar-inner {
-  background: #fff;
+  background-color: #fff;
+  transition: background-color .3s ease-out;
   .title {
     position: absolute !important;
     left: 51px !important;
+  }
+  i.icon, i.material-icons{
+    color: #333333;
   }
 }
 .whs-details-page {
