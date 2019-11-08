@@ -24,6 +24,7 @@
 -	Summary --> locations/items
 -   Summary, format values
 -   Dynamic item name (plural name)
+-   No items dynamic label in Locations --> items
 
 ## Settings
 
