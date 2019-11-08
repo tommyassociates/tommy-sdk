@@ -3,7 +3,10 @@
     "title" : "Inventory"
   },
   "common": {
+    "item": "Item",
     "items": "Items",
+    "no": "No {{text}}",
+    "new": "New {{text}}",
     "no_items": "No Items",
     "no_locations": "No Locations",
     "no_tags": "No Tags",
@@ -11,6 +14,7 @@
     "search_placeholder": "Search...",
     "required_placeholder": "Required...",
     "name_label": "Name",
+    "plural_name_label": "Plural name",
     "icon_label": "Icon",
     "sku_barcode_label": "SKU / Barcode",
     "sku_barcode_placeholder": "E.g. 1234567890...",
@@ -48,6 +52,9 @@
     "delete_title": "Are you sure?"
   },
   "toast":{
+    "add": "{{text}} added",
+    "edit": "{{text}} edited",
+    "delete": "{{text}} deleted",
     "add_item": "Item added",
     "edit_item": "Item edited",
     "delete_item": "Item deleted",
@@ -86,9 +93,9 @@
     "title_edit": "Edit Tag"
   },
   "item_add": {
-    "title": "Add Item",
-    "title_edit": "Edit Item",
-    "add_more_button": "Add Another Item"
+    "title": "Add {{text}}",
+    "title_edit": "Edit {{text}}",
+    "add_more_button": "Add Another {{text}}"
   },
   "location_add": {
     "title": "Add Location",

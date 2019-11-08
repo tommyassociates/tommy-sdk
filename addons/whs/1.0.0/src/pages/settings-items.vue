@@ -18,7 +18,14 @@
           inline-label
           :value="settings.name"
           @input="updateValue('name', $event.target.value)"        
-      />  
+      />
+      <f7-list-input
+          type="text"
+          :label="$t('whs.common.plural_name_label')"
+          inline-label
+          :value="settings.plural_name"
+          @input="updateValue('plural_name', $event.target.value)"        
+      />    
 
         <list-color-picker
           :title="$t('whs.settings_items.header_bg_color')"

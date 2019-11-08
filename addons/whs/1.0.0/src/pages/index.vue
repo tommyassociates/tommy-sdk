@@ -19,7 +19,7 @@
       <f7-list no-chevron>
         <f7-list-item link="/whs/item-add/" popover-close>
           <i slot="media" class="whs-icon whs-icon-box-black"></i>
-          <span slot="title">{{$t('whs.popover.new.item')}}</span>
+          <span slot="title">{{$t('whs.common.new', { text: settings.item.name})}}</span>
         </f7-list-item>
         <f7-list-item link="/whs/location-add/" popover-close>
           <i slot="media" class="whs-icon whs-icon-drawer-black"></i>
@@ -59,7 +59,7 @@
     <div class="whs-menubar" v-if="!searchEnabled">
       <a :class="`link ${activeTab === 'items' ? 'whs-menubar-active' : ''}`" @click="activeTab = 'items'">
         <i :class="`icon whs-icon whs-icon-box-${activeTab === 'items' ? 'orange' : 'black'}`"></i>
-        <span>Items</span>
+        <span>{{settings.item.plural_name}}</span>
       </a>
       <a :class="`link ${activeTab === 'locations' ? 'whs-menubar-active' : ''}`" @click="activeTab = 'locations'">
         <i :class="`icon whs-icon whs-icon-drawer-${activeTab === 'locations' ? 'orange' : 'black'}`"></i>
@@ -82,7 +82,7 @@
       </a>
       <a :class="`link ${activeSearchFilter === 'items' ? 'whs-menubar-active' : ''}`" @click="activeSearchFilter = 'items'">
         <i :class="`icon whs-icon whs-icon-box-${activeSearchFilter === 'items' ? 'orange' : 'black'}`"></i>
-        <span>Items</span>
+        <span>{{settings.item.plural_name}}</span>
       </a>
       <a :class="`link ${activeSearchFilter === 'locations' ? 'whs-menubar-active' : ''}`" @click="activeSearchFilter = 'locations'">
         <i :class="`icon whs-icon whs-icon-drawer-${activeSearchFilter === 'locations' ? 'orange' : 'black'}`"></i>
@@ -109,7 +109,7 @@
           <div class="whs-item-row description" v-if="item.description">{{item.description}}</div>
         </f7-list-item>
       </f7-list>
-      <empty-block v-else :text="$t('whs.common.no_items')" />
+      <empty-block v-else :text="$t('whs.common.no', { text: settings.item.plural_name})" />
     </template>
     <template v-if="activeTab === 'locations' && !searchEnabled">
       <f7-list class="whs-list" media-list v-if="locations.length > 0">
@@ -152,7 +152,7 @@
           </f7-list-item>
           <f7-list-item @click='activityPopoverClick("item")'>
             <i slot="media" class="whs-icon whs-icon-box-black"></i>
-            <span slot="title">{{$t('whs.popover.activity.item')}}</span>
+            <span slot="title">{{settings.item.plural_name}}</span>
           </f7-list-item>
           <f7-list-item @click='activityPopoverClick("location")'>
             <i slot="media" class="whs-icon whs-icon-drawer-black"></i>
@@ -190,7 +190,7 @@
             </f7-link>
           </f7-list-item>
           <f7-list-item divider class="divider-title">
-            {{$t('whs.popover.activity.item')}}
+            {{settings.item.plural_name}}
           </f7-list-item>
           <f7-list-item
             v-for="(index) in 2"
