@@ -139,7 +139,7 @@
       </div>
     </template>
 
-    <template v-if="activeTab === 'items'">
+    <template v-if="activeTab === 'items' && items.length > 0">
       <div class="whs-table">
         <table>
           <thead>
@@ -193,6 +193,9 @@
           </a>
         </div>
       </div>
+    </template>
+    <template v-if="activeTab === 'items' && items.length === 0">
+      <empty-block :text="$t('whs.common.no', {text: settings.item.plural_name})" />
     </template>
 
     <template v-if="activeTab === 'tags'">
