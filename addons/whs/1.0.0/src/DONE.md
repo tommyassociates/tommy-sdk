@@ -40,6 +40,7 @@
 -   Dynamic currency symbol
 -   Aded Plural name value in item/location settings
 -   Aded locations settings
+-   Toast when settings saved
 
 ## Activity
 

@@ -53,6 +53,7 @@
     "add": "{{text}} added",
     "edit": "{{text}} edited",
     "delete": "{{text}} deleted",
+    "settings": "{{text}} settings saved",
     "add_tag": "Tag added",
     "edit_tag": "Tag edited",
     "delete_tag": "Tag deleted",
