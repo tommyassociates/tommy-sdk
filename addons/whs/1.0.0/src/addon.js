@@ -8,6 +8,7 @@ import Settings from './pages/settings.vue';
 import SettingsItems from './pages/settings-items.vue';
 import SettingsItemsFields from './pages/settings-items-fields.vue';
 import SettingsItemsFieldDetails from './pages/settings-items-field-details.vue';
+import SettingsLocations from './pages/settings-locations.vue';
 
 const routes = [
   {
@@ -50,6 +51,10 @@ const routes = [
   {
     path: '/whs/settings/items/field/',
     component: SettingsItemsFieldDetails,
+  },
+  {
+    path: '/whs/settings/locations/',
+    component: SettingsLocations,
   },
 ];
 
