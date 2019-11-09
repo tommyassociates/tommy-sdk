@@ -27,7 +27,7 @@
         :style="activeTab === 'locations' ? highlightedColor : {}"
         @click="activeTab = 'locations'"
       >
-        <span>Locations</span>
+        <span>{{settings.location.plural_name}}</span>
         <div class="after-line" v-if="activeTab === 'locations'" :style="highlightedBgColor"></div>
       </a>
       <a
@@ -56,7 +56,7 @@
           </div>
           <div class="whs-summary-card-right">
             <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(item.items_count)}}</div>
-            <div class="whs-summary-card-label" :style="fontColor">TOTAL</div>
+            <div class="whs-summary-card-label uppercase" :style="fontColor">TOTAL</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -65,7 +65,7 @@
           </div>
           <div class="whs-summary-card-right">
             <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(item.tags_count)}}</div>
-            <div class="whs-summary-card-label" :style="fontColor">TAGS</div>
+            <div class="whs-summary-card-label uppercase" :style="fontColor">TAGS</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -74,7 +74,7 @@
           </div>
           <div class="whs-summary-card-right">
             <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(item.locations_count)}}</div>
-            <div class="whs-summary-card-label" :style="fontColor">LOCATIONS</div>
+            <div class="whs-summary-card-label uppercase" :style="fontColor">{{settings.location.plural_name}}</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -115,7 +115,7 @@
         </div>
       </div>
     </template>
-    <template v-if="activeTab === 'locations'">
+    <template v-if="activeTab === 'locations' && locations.length > 0">
       <div class="whs-table">
         <table>
           <thead>
@@ -171,6 +171,10 @@
         </div>
       </div>
     </template>
+    <template v-if="activeTab === 'locations' && locations.length === 0">
+      <empty-block :text="$t('whs.common.no', {text: settings.location.plural_name})" />
+    </template>
+
     <template v-if="activeTab === 'tags'">
       <empty-block :text="$t('whs.common.no_tags')" />
     </template>

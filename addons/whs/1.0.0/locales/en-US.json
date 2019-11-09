@@ -9,6 +9,7 @@
     "locations": "Locations",
     "no": "No {{text}}",
     "new": "New {{text}}",
+    "name_label": "Name",
     "no_tags": "No Tags",
     "no_activity": "No Activity",
     "search_placeholder": "Search...",
@@ -61,14 +62,12 @@
   },
   "popover":{
     "new":{
-      "location": "New Location",
       "tag": "New Tag",
       "activity": "New Activity"
     },
     "activity":{
       "all": "All",
       "tag": "Tags",
-      "location": "Locations",
       "role": "Roles",
       "team": "Team members"
     }
@@ -77,18 +76,10 @@
     "rows": "Rows",
     "page": "Page {{current}} of {{total}}"
   },
-  "tag_add": {
-    "title": "Add Tag",
-    "title_edit": "Edit Tag"
-  },
-  "item_add": {
+  "form_add": {
     "title": "Add {{text}}",
     "title_edit": "Edit {{text}}",
     "add_more_button": "Add Another {{text}}"
-  },
-  "location_add": {
-    "title": "Add Location",
-    "title_edit": "Edit Location"
   },
   "settings": {
     "name_label": "Name",

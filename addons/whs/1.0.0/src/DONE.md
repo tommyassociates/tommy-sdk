@@ -1,7 +1,7 @@
 ## Main
 -   Dynamic program name
 -   Dynamic item settings (name ,plural name) in main, popups
--   Dynamic text string "No items" image
+-   Dynamic empty images for items, locations
 
 ## Items
 
@@ -25,6 +25,9 @@
 -   Summary, format values
 -   Dynamic item name (plural name)
 -   No items dynamic label in Locations --> items
+-   Dynamic item settings (name ,plural name, header_color, highlight_color, font_color)
+-   Header bg color transistion animation
+-   Dynamic add form(title, toast)
 
 ## Settings
 
@@ -35,13 +38,13 @@
 -   Smart settings parser witch defaults values
 -   Item settings (name, header_color, highlight_color, font_color)
 -   Dynamic currency symbol
--   Aded Plural name value in item settings
+-   Aded Plural name value in item/location settings
 -   Aded locations settings
 
 ## Activity
 
 -	UI
--   Dynamic items name from settings
+-   Dynamic items/location name from settings
 
 ## Others
 

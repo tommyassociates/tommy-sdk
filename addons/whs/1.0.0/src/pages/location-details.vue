@@ -1,8 +1,8 @@
 <template>
-  <f7-page class="whs-details-page">
+  <f7-page class="whs-details-page" @page:beforein="colorizeHeader" @page:beforeout="colorizeHeaderOut">
     <f7-navbar innerClass="whs-details-navbar-inner">
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{locationTitle}}</f7-nav-title>
+      <f7-nav-title :style="fontColor">{{locationTitle}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
         <f7-link icon-only href="/whs/location-add/">
           <f7-icon f7="add" />
@@ -12,37 +12,47 @@
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
-    <f7-subnavbar class="no-hairline">{{locationDesc}}</f7-subnavbar>
+    <f7-subnavbar class="no-hairline" :style="subnavbarStyle">{{locationDesc}}</f7-subnavbar>
     <div class="whs-menubar whs-menubar-labels no-swipe-panel">
       <a
-        :class="`link ${activeTab === 'summary' ? 'whs-menubar-active' : ''}`"
+        :class="`link ${activeTab === 'summary' ? 'whs-menubar-dynamic-active' : ''}`"
         @click="activeTab = 'summary'"
+        :style="activeTab === 'summary' ? highlightedColor : {}"
       >
         <span>Summary</span>
+        <div class="after-line" v-if="activeTab === 'summary'" :style="highlightedBgColor"></div>
       </a>
       <a
-        :class="`link ${activeTab === 'items' ? 'whs-menubar-active' : ''}`"
+        :class="`link ${activeTab === 'items' ? 'whs-menubar-dynamic-active' : ''}`"
         @click="activeTab = 'items'"
+        :style="activeTab === 'items' ? highlightedColor : {}"
       >
         <span>{{settings.item.plural_name}}</span>
+        <div class="after-line" v-if="activeTab === 'items'" :style="highlightedBgColor"></div>
       </a>
       <a
-        :class="`link ${activeTab === 'tags' ? 'whs-menubar-active' : ''}`"
+        :class="`link ${activeTab === 'tags' ? 'whs-menubar-dynamic-active' : ''}`"
         @click="activeTab = 'tags'"
+        :style="activeTab === 'tags' ? highlightedColor : {}"
       >
         <span>Tags</span>
+        <div class="after-line" v-if="activeTab === 'tags'" :style="highlightedBgColor"></div>
       </a>
       <a
-        :class="`link ${activeTab === 'locations' ? 'whs-menubar-active' : ''}`"
+        :class="`link ${activeTab === 'locations' ? 'whs-menubar-dynamic-active' : ''}`"
         @click="activeTab = 'locations'"
+        :style="activeTab === 'locations' ? highlightedColor : {}"
       >
-        <span>Locations</span>
+        <span>{{settings.location.plural_name}}</span>
+        <div class="after-line" v-if="activeTab === 'locations'" :style="highlightedBgColor"></div>
       </a>
       <a
-        :class="`link ${activeTab === 'activity' ? 'whs-menubar-active' : ''}`"
+        :class="`link ${activeTab === 'activity' ? 'whs-menubar-dynamic-active' : ''}`"
         @click="activeTab = 'activity'"
+        :style="activeTab === 'activity' ? highlightedColor : {}"
       >
         <span>Activity</span>
+        <div class="after-line" v-if="activeTab === 'activity'" :style="highlightedBgColor"></div>
       </a>
     </div>
 
@@ -53,8 +63,8 @@
             <i class="icon whs-icon-box-black"></i>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">$ {{formatCurrency(location.items_count)}}</div>
-            <div class="whs-summary-card-label">TOTAL</div>
+            <div class="whs-summary-card-value" :style="highlightedColor">{{formatCurrency(location.items_count)}}</div>
+            <div class="whs-summary-card-label uppercase" :style="fontColor">TOTAL</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -62,8 +72,8 @@
             <i class="icon whs-icon-tag-black"></i>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{formatNumber(location.tags_count)}}</div>
-            <div class="whs-summary-card-label">TAGS</div>
+            <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(location.tags_count)}}</div>
+            <div class="whs-summary-card-label uppercase" :style="fontColor">TAGS</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -71,8 +81,8 @@
             <i class="icon whs-icon-drawer-black"></i>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{formatNumber(location.sub_locations_count)}}</div>
-            <div class="whs-summary-card-label">LOCATIONS</div>
+            <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(location.sub_locations_count)}}</div>
+            <div class="whs-summary-card-label uppercase" :style="fontColor">{{settings.location.plural_name}}</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -85,9 +95,10 @@
               size="100"
               value-font-size="18"
               value-font-weight="medium"
+              :value-text-color="settings.location.font_color"
               :value="location.capacity"
               value-text="0%"
-              border-color="#FF7B00"
+              :border-color="settings.location.highlight_color"
             ></f7-gauge>
           </div>
         </div>
@@ -97,7 +108,7 @@
           </div>
           <div class="whs-summary-card-right">
             <div class="whs-summary-card-value">{{formatCurrency(location.estimated_value)}}</div>
-            <div class="whs-summary-card-label">Est. Total</div>
+            <div class="whs-summary-card-label" :style="fontColor">Est. Total</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -105,8 +116,8 @@
             <div class="whs-summary-card-title">Expiring</div>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{formatNumber(location.expiring_count)}}</div>
-            <div class="whs-summary-card-label">Items</div>
+            <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(location.expiring_count)}}</div>
+            <div class="whs-summary-card-label" :style="fontColor">Items</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -115,7 +126,7 @@
           </div>
           <div class="whs-summary-card-right">
             <div class="whs-summary-card-value">{{formatNumber(location.pending_in_count)}}</div> 
-            <div class="whs-summary-card-label">Items</div>
+            <div class="whs-summary-card-label" :style="fontColor">Items</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -124,7 +135,7 @@
           </div>
           <div class="whs-summary-card-right">
             <div class="whs-summary-card-value">{{formatNumber(location.pending_out_count)}}</div>
-            <div class="whs-summary-card-label">Items</div>
+            <div class="whs-summary-card-label" :style="fontColor">Items</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -132,8 +143,8 @@
             <div class="whs-summary-card-title">Low stock</div>
           </div>
           <div class="whs-summary-card-right">
-            <div class="whs-summary-card-value">{{formatNumber(location.low_stock_count)}}</div>
-            <div class="whs-summary-card-label">Items</div>
+            <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(location.low_stock_count)}}</div>
+            <div class="whs-summary-card-label" :style="fontColor">Items</div>
           </div>
         </div>
       </div>
@@ -202,6 +213,7 @@
       <empty-block :text="$t('whs.common.no_tags')" />
     </template>
 
+    <!--<template v-if="activeTab === 'locations' && location.length >0">-->
     <template v-if="activeTab === 'locations'">
       <div class="whs-table">
         <table>
@@ -266,6 +278,10 @@
         </div>
       </div>
     </template>
+    <!--
+    <template v-if="activeTab === 'locations' && location.length === 0">
+      <empty-block :text="$t('whs.common.no', {text: settings.location.plural_name})" />
+    </template> -->
 
     <template v-if="activeTab === 'activity'">
       <empty-block :text="$t('whs.common.no_activity')" />
@@ -292,7 +308,31 @@ export default {
     this.loadLocationDetail();
     this.getItems();
   },
-  computed: {},
+  computed: {
+    headerBgColor(){
+      return{
+        "background-color": this.settings.location.header_color,
+      }
+    },
+    highlightedColor(){
+      return{
+        "color": this.settings.location.highlight_color,
+      }
+    },
+    highlightedBgColor(){
+      return{
+        "background-color": this.settings.location.highlight_color,
+      }
+    },
+    fontColor(){
+      return{
+        "color": this.settings.location.font_color,
+      }
+    },
+    subnavbarStyle(){
+      return Object.assign(this.headerBgColor, this.fontColor);
+    }
+  },
   methods: {
     loadLocationDetail() {
       self = this;
@@ -310,6 +350,12 @@ export default {
     getItems(){
       const self = this;
       API.getItem({'location_id': Number(self.locationId)}).then((data)=>{self.items = data;});
+    },
+    colorizeHeader(){
+      this.$f7.$('.whs-details-navbar-inner').css(this.headerBgColor);      
+    },
+    colorizeHeaderOut(){
+      this.$f7.$('.whs-details-navbar-inner').css("background-color", "#F5F5F5");
     }
   },
   beforeDestroy() {

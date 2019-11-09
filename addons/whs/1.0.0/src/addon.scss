@@ -115,6 +115,8 @@ $orange: #FF5413;
     line-height: 1.2;
     + .whs-summary-card-label {
       margin-top: 4px;
+    }+ .uppercase{
+      text-transform: uppercase;
     }
   }
   .whs-summary-card-title {

@@ -157,9 +157,9 @@ export default {
   computed: {
     title(){
       if(this.editId){
-        return this.$t('whs.location_add.title_edit')
+        return this.$t('whs.form_add.title_edit', { text: this.settings.location.name})
       }else{
-        return this.$t('whs.location_add.title')
+        return this.$t('whs.form_add.title', { text: this.settings.location.name})
       }
     }
   },
@@ -173,14 +173,14 @@ export default {
             .then(()=>{
               self.$events.$emit('location:updated',this.location);     
               self.$f7router.back();
-              API.toast(self.$t('whs.toast.edit_location'));
+              API.toast(self.$t('whs.toast.edit', { text: this.settings.location.name}));
             });
         }else{
           this.location = API.removeEmpty(this.location);
           API.createLocation(this.location).then(() => {
             self.$events.$emit('location:aded',this.location);
             self.$f7router.back();
-            API.toast(self.$t('whs.toast.add_location'));
+            API.toast(self.$t('whs.toast.add', { text: this.settings.location.name}));
           });
         }
       } else {
@@ -192,7 +192,7 @@ export default {
         .then(()=>{
           self.$events.$emit('location:deleted',this.item);    
           self.$f7router.back('/whs/', {force: true}); 
-          API.toast(self.$t('whs.toast.delete_location'));
+          API.toast(self.$t('whs.toast.delete', { text: this.settings.location.name}));
         });
     },
     deleteDialog(){
@@ -226,7 +226,8 @@ export default {
       editId: null,
       indexEdit: null,
       default_location:{
-      }
+      },
+      settings: API.main_page.$data.settings,
     };
   }
 };
