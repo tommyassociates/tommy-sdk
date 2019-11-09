@@ -13,5 +13,12 @@ export default {
         header_color: "#ffffff",
         highlight_color: "#ff4500",
         font_color: "#333333"
+    },
+    location:{
+        name: window.tommy.i18n.t('whs.common.location'),
+        plural_name: window.tommy.i18n.t('whs.common.locations'),
+        header_color: "#ffffff",
+        highlight_color: "#ff4500",
+        font_color: "#333333"
     }
 }

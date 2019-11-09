@@ -36,6 +36,7 @@
 -   Item settings (name, header_color, highlight_color, font_color)
 -   Dynamic currency symbol
 -   Aded Plural name value in item settings
+-   Aded locations settings
 
 ## Activity
 

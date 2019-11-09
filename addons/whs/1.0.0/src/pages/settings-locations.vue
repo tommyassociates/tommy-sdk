@@ -2,7 +2,7 @@
   <f7-page>
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{$t('whs.settings_edit.title_item')}}</f7-nav-title>
+      <f7-nav-title>{{$t('whs.settings_edit.title_location')}}</f7-nav-title>
       <f7-nav-right v-if="edited">
         <f7-link @click="updateSettings()">   
           <f7-icon f7="check"  />
@@ -44,7 +44,7 @@
         />
         <f7-list-item
           :title="$t('whs.settings_edit.fields')"
-          link="/whs/settings/items/fields/"
+          link="/whs/settings/locations/fields/"
         />
         <f7-list-item
           :title="$t('whs.settings.view_settings')"
@@ -59,7 +59,7 @@
           link
         />
         <f7-list-item
-          :title="$t('whs.settings.view_settings_locations')"
+          :title="$t('whs.settings.view_settings_items')"
           link
         />
         <f7-list-item
@@ -86,7 +86,7 @@
     data() {
       return {
         edited: false,
-        settings: Object.assign({}, API.main_page.$data.settings.item),
+        settings: Object.assign({}, API.main_page.$data.settings.location),
       };
     },
     created() {
@@ -105,7 +105,7 @@
       updateSettings(){
         self = this;
         self.edited = false;
-        API.main_page.$data.settings.item = self.settings;
+        API.main_page.$data.settings.location = self.settings;
         API.saveSettings('item',self.settings)
       }
     },

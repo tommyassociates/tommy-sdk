@@ -13,7 +13,7 @@
     <f7-list class="no-margin no-hairlines whs-settings-list">
       <f7-list-input
         type="text"
-        :label="$t('whs.common.name_label')"
+        :label="$t('whs.settings.name_label')"
         inline-label
         :value="settings.name"
         @input="updateValue('name', $event.target.value)"        
