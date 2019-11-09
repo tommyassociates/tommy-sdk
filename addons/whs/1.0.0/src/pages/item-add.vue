@@ -10,7 +10,7 @@
       </f7-nav-right>
     </f7-navbar>
 
-    <a class="whs-toolbar-button" slot="fixed" v-if="!editId" @click="()=>{addItem(true)}">{{$t('whs.item_add.add_more_button', { text: settings.item.name})}}</a>
+    <a class="whs-toolbar-button" slot="fixed" v-if="!editId" @click="()=>{addItem(true)}">{{$t('whs.form_add.add_more_button', { text: settings.item.name})}}</a>
     <form class="list" id="add-item" action="javascript:void(0)" enctype="multipart/form-data">  
     <f7-list class="whs-form">
       <ul>
@@ -143,9 +143,9 @@ export default {
   computed: {
     title(){
       if(this.editId){
-        return this.$t('whs.item_add.title_edit', { text: this.settings.item.name})
+        return this.$t('whs.form_add.title_edit', { text: this.settings.item.name})
       }else{
-        return this.$t('whs.item_add.title', { text: this.settings.item.name})
+        return this.$t('whs.form_add.title', { text: this.settings.item.name})
       }
     }
   },

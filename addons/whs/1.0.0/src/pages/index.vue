@@ -23,7 +23,7 @@
         </f7-list-item>
         <f7-list-item link="/whs/location-add/" popover-close>
           <i slot="media" class="whs-icon whs-icon-drawer-black"></i>
-          <span slot="title">{{$t('whs.popover.new.location')}}</span>
+          <span slot="title">{{$t('whs.common.new', { text: settings.location.name})}}</span>
         </f7-list-item>
         <f7-list-item link="/whs/tag-add/" popover-close>
           <i slot="media" class="whs-icon whs-icon-tag-black"></i>
@@ -63,7 +63,7 @@
       </a>
       <a :class="`link ${activeTab === 'locations' ? 'whs-menubar-active' : ''}`" @click="activeTab = 'locations'">
         <i :class="`icon whs-icon whs-icon-drawer-${activeTab === 'locations' ? 'orange' : 'black'}`"></i>
-        <span>Locations</span>
+        <span>{{settings.location.plural_name}}</span>
       </a>
       <a :class="`link ${activeTab === 'tags' ? 'whs-menubar-active' : ''}`" @click="activeTab = 'tags'">
         <i :class="`icon whs-icon whs-icon-tag-${activeTab === 'tags' ? 'orange' : 'black'}`"></i>
@@ -86,7 +86,7 @@
       </a>
       <a :class="`link ${activeSearchFilter === 'locations' ? 'whs-menubar-active' : ''}`" @click="activeSearchFilter = 'locations'">
         <i :class="`icon whs-icon whs-icon-drawer-${activeSearchFilter === 'locations' ? 'orange' : 'black'}`"></i>
-        <span>Locations</span>
+        <span>{{settings.location.plural_name}}</span>
       </a>
       <a :class="`link ${activeSearchFilter === 'tags' ? 'whs-menubar-active' : ''}`" @click="activeSearchFilter = 'tags'">
         <i :class="`icon whs-icon whs-icon-tag-${activeSearchFilter === 'tags' ? 'orange' : 'black'}`"></i>
@@ -125,7 +125,7 @@
           <div class="whs-item-row">{{location.description}}</div>
         </f7-list-item>
       </f7-list>
-      <empty-block v-else :text="$t('whs.common.no_locations')" />
+      <empty-block v-else :text="$t('whs.common.no', { text: settings.location.plural_name})" />
     </template>
     <template v-if="activeTab === 'tags' && !searchEnabled">
       <f7-list class="whs-list" media-list v-if="tags.length > 0">
@@ -156,7 +156,7 @@
           </f7-list-item>
           <f7-list-item @click='activityPopoverClick("location")'>
             <i slot="media" class="whs-icon whs-icon-drawer-black"></i>
-            <span slot="title">{{$t('whs.popover.activity.location')}}</span>
+            <span slot="title">{{settings.location.plural_name}}</span>
           </f7-list-item>
           <f7-list-item @click='activityPopoverClick("tag")'>
             <i slot="media" class="whs-icon whs-icon-tag-black"></i>
@@ -175,7 +175,7 @@
       <f7-list class="whs-list whs-main-activity" media-list>
         <f7-list-item divider class="filter">
           <f7-link popover-open=".whs-popover-activity">
-            {{$t(`whs.popover.activity.${activity_filter}`)}}
+            {{activityFilterTitle}}
             <i class="whs-main-icon whs-icon-triangle"></i>        
           </f7-link>
           <f7-button fill>
@@ -209,7 +209,7 @@
             </f7-link>
           </f7-list-item>
           <f7-list-item divider class="divider-title">
-            {{$t('whs.popover.activity.location')}}
+            {{settings.location.plural_name}}
           </f7-list-item>
           <f7-list-item
             v-for="(index) in 2"
@@ -317,7 +317,25 @@ export default {
     API.team_id = this.$root.team.id;   
   },
   computed: {
-    
+    activityFilterTitle(){
+      switch(this.activity_filter){
+        case "all":
+          return this.$t('whs.popover.activity.all')
+          break;
+        case "tag":
+          return this.$t('whs.popover.activity.tag')
+          break;
+        case "role":
+          return this.$t('whs.popover.activity.role')
+          break;
+        case "team":
+          return this.$t('whs.popover.activity.team')
+          break;
+        default:
+          return this.settings[this.activity_filter].plural_name;
+          break;
+      }
+    }
   },
   methods: {
     getItem(){
