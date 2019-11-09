@@ -106,7 +106,9 @@
         self = this;
         self.edited = false;
         API.main_page.$data.settings.location = self.settings;
-        API.saveSettings('location',self.settings)
+        API.saveSettings('location',self.settings).then(()=>{
+          API.toast(self.$t('whs.toast.settings', { text: this.settings.plural_name}));
+        });
       }
     },
     beforeDestroy() {

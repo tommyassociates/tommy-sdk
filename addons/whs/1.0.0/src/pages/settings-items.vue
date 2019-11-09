@@ -106,7 +106,9 @@
         self = this;
         self.edited = false;
         API.main_page.$data.settings.item = self.settings;
-        API.saveSettings('item',self.settings)
+        API.saveSettings('item',self.settings).then(()=>{
+          API.toast(self.$t('whs.toast.settings', { text: this.settings.plural_name}));
+        });
       }
     },
     beforeDestroy() {
