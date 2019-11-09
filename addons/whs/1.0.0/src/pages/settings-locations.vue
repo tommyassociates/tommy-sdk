@@ -106,7 +106,7 @@
         self = this;
         self.edited = false;
         API.main_page.$data.settings.location = self.settings;
-        API.saveSettings('item',self.settings)
+        API.saveSettings('location',self.settings)
       }
     },
     beforeDestroy() {
