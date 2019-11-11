@@ -90,7 +90,7 @@
       </a>
       <a :class="`link ${activeSearchFilter === 'tags' ? 'whs-menubar-active' : ''}`" @click="activeSearchFilter = 'tags'">
         <i :class="`icon whs-icon whs-icon-tag-${activeSearchFilter === 'tags' ? 'orange' : 'black'}`"></i>
-        <span>{{settings.location.plural_name}}</span>
+        <span>{{settings.tag.plural_name}}</span>
       </a>
     </div>
 
