@@ -20,5 +20,12 @@ export default {
         header_color: "#ffffff",
         highlight_color: "#ff4500",
         font_color: "#333333"
+    },
+    tag:{
+        name: window.tommy.i18n.t('whs.common.tag'),
+        plural_name: window.tommy.i18n.t('whs.common.tags'),
+        header_color: "#ffffff",
+        highlight_color: "#ff4500",
+        font_color: "#333333"
     }
 }
