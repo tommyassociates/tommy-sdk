@@ -2,7 +2,7 @@
   <f7-page>
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{$t('whs.tag_add.title')}}</f7-nav-title>
+      <f7-nav-title>{{title}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
         <f7-link icon-only @click="addTag">
           <f7-icon f7="check" />
@@ -26,11 +26,13 @@
             @input="tag.name = $event.target.value"
             :placeholder="$t('whs.common.required_placeholder')"
           />
+          <!--
           <f7-list-item divider>
             <i class="whs-form-icon whs-form-icon-image"></i>
             {{$t('whs.common.icon_label')}}
           </f7-list-item>
           <form-images-picker />
+          -->
         </ul>
       </f7-list>
     </form>
@@ -39,29 +41,53 @@
 <script>
 import API from "../api";
 import FormImagesPicker from "../components/form-images-picker.vue";
+import Dialog from '../components/dialog-mixin.vue';
 
 export default {
   components: {
     FormImagesPicker
   },
-  created() {},
-  computed: {},
+  mixins: [Dialog],
+  created() {
+    if(this.$f7route.query.edit_id !== null && this.$f7route.query.edit_id !== undefined){
+      this.editId = this.$f7route.query.edit_id;
+      this.indexEdit = this.$f7route.query.index;
+      ///load tag from maim tags and clone
+      this.tag = Object.assign({}, API.main_page.$data.tags[this.indexEdit]);
+    }
+  },
+  computed: {
+    title(){
+      if(this.editId){
+        return this.$t('whs.form_add.title_edit', { text: this.settings.tag.name})
+      }else{
+        return this.$t('whs.form_add.title', { text: this.settings.tag.name})
+      }
+    }
+  },
   methods: {
     addTag() {
       self = this;
       if (this.$f7.$("#add-tag")[0].checkValidity()) {
-        API.createLocation(API.removeEmpty(this.tag)).then(() => {
-          self.$f7router.back();
-          API.toast(self.$t("whs.toast.add_tag"));
-        });
+        if(this.editId){
+          API.editTag(this.tag, this.editId)
+            .then(()=>{
+              self.$events.$emit('tag:updated',this.tag);     
+              self.$f7router.back();
+              API.toast(self.$t('whs.toast.edit', { text: this.settings.tag.name}));
+            });
+        }else{
+          this.tag = API.removeEmpty(this.tag);
+          API.createTag(this.tag).then(() => {
+            self.$events.$emit('tag:aded',this.tag);
+            self.$f7router.back();
+            API.toast(self.$t('whs.toast.add', { text: this.settings.tag.name}));
+          });
+        }
       } else {
-        this.$f7.dialog.alert(
-          this.$t("whs.alert_form.text"),
-          this.$t("whs.alert_form.title"),
-          false
-        );
+        this.alertDialog(this.$t('whs.alert_form.title'), this.$t('whs.alert_form.text'), this.$t('whs.alert_form.ok'));
       }
-    }
+    },
   },
   beforeDestroy() {
     const self = this;
@@ -72,9 +98,11 @@ export default {
   data() {
     return {
       tag: {
-        name: null,
-        image: null
-      }
+        name: null, 
+      },
+      editId: null,
+      indexEdit: null,
+      settings: API.main_page.$data.settings,
     };
   }
 };

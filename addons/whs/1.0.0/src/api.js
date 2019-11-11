@@ -123,6 +123,7 @@ const API = {
         });
       },
     createTag(data) {
+        data.context = 'tags';
         return api.call({
           endpoint: `tags`,
           method: 'POST',
@@ -130,12 +131,21 @@ const API = {
           cache: false,
         });
       },
-    deleteTag(id){
-      return api.call({
-        endpoint: `tags/${id}`,
-        method: 'DELETE',
-      })
-    },
+    editTag(data, id) {
+        return api.call({
+          endpoint: `inventory/tags/${id}`,
+          method: 'PUT',
+          data,
+          cache: false,
+        });
+      },
+    deleteTag(id) {
+        return api.call({
+          endpoint: `inventory/tags/${id}`,
+          method: 'DELETE',
+          cache: false,
+        });
+      },
     getSettings(name) {
       if(name) name = '/'+name; else name = '';
       return api.call({
