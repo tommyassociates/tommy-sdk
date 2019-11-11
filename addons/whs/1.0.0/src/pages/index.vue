@@ -67,7 +67,7 @@
       </a>
       <a :class="`link ${activeTab === 'tags' ? 'whs-menubar-active' : ''}`" @click="activeTab = 'tags'">
         <i :class="`icon whs-icon whs-icon-tag-${activeTab === 'tags' ? 'orange' : 'black'}`"></i>
-        <span>Tags</span>
+        <span>{{settings.tag.plural_name}}</span>
       </a>
       <a :class="`link ${activeTab === 'activity' ? 'whs-menubar-active' : ''}`" @click="activeTab = 'activity'">
         <i :class="`icon whs-icon whs-icon-clock-${activeTab === 'activity' ? 'orange' : 'black'}`"></i>
@@ -90,7 +90,7 @@
       </a>
       <a :class="`link ${activeSearchFilter === 'tags' ? 'whs-menubar-active' : ''}`" @click="activeSearchFilter = 'tags'">
         <i :class="`icon whs-icon whs-icon-tag-${activeSearchFilter === 'tags' ? 'orange' : 'black'}`"></i>
-        <span>Tags</span>
+        <span>{{settings.location.plural_name}}</span>
       </a>
     </div>
 
@@ -137,8 +137,9 @@
           :key="index"
         >
           <div slot="media" class="whs-item-image"></div>
+          <!--
           <div class="whs-item-row">LOCATIONS: 2000</div>
-          <div class="whs-item-row">Items: 500</div>
+          <div class="whs-item-row">Items: 500</div>-->
         </f7-list-item>
       </f7-list>
       <empty-block v-else :text="$t('whs.common.no_tags')" />
@@ -160,7 +161,7 @@
           </f7-list-item>
           <f7-list-item @click='activityPopoverClick("tag")'>
             <i slot="media" class="whs-icon whs-icon-tag-black"></i>
-            <span slot="title">{{$t('whs.popover.activity.tag')}}</span>
+            <span slot="title">{{settings.tag.plural_name}}</span>
           </f7-list-item>
           <f7-list-item @click='activityPopoverClick("role")'>
             <i slot="media" class="whs-icon whs-icon-roles"></i>
@@ -229,7 +230,7 @@
             </f7-link>
           </f7-list-item>
           <f7-list-item divider class="divider-title">
-            {{$t('whs.popover.activity.tag')}}
+            {{settings.tag.plural_name}}
           </f7-list-item>
           <f7-list-item
             v-for="(index) in 2"
@@ -321,9 +322,6 @@ export default {
       switch(this.activity_filter){
         case "all":
           return this.$t('whs.popover.activity.all')
-          break;
-        case "tag":
-          return this.$t('whs.popover.activity.tag')
           break;
         case "role":
           return this.$t('whs.popover.activity.role')

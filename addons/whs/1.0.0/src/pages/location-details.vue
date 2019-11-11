@@ -35,7 +35,7 @@
         @click="activeTab = 'tags'"
         :style="activeTab === 'tags' ? highlightedColor : {}"
       >
-        <span>Tags</span>
+        <span>{{settings.tag.plural_name}}</span>
         <div class="after-line" v-if="activeTab === 'tags'" :style="highlightedBgColor"></div>
       </a>
       <a
@@ -73,7 +73,7 @@
           </div>
           <div class="whs-summary-card-right">
             <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(location.tags_count)}}</div>
-            <div class="whs-summary-card-label uppercase" :style="fontColor">TAGS</div>
+            <div class="whs-summary-card-label uppercase" :style="fontColor">{{settings.tag.plural_name}}</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -210,7 +210,7 @@
     </template>
 
     <template v-if="activeTab === 'tags'">
-      <empty-block :text="$t('whs.common.no_tags')" />
+      <empty-block :text="$t('whs.common.no', {text: settings.tag.plural_name})" />
     </template>
 
     <!--<template v-if="activeTab === 'locations' && location.length >0">-->
