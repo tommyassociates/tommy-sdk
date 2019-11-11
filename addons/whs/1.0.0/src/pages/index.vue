@@ -350,6 +350,10 @@ export default {
       self = this;
       self.getItem();
     },
+    getTags(){
+      const self = this;
+      API.getTags().then((data)=>{self.tags = data});
+    },
     onSearchbarSearch(query) {
       const self = this;
       self.search = query;
@@ -436,6 +440,7 @@ export default {
       self.getItem();
       self.getLocations();
       self.getActivities();
+      self.getTags();
     }); 
     
 
