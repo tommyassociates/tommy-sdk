@@ -27,7 +27,7 @@
         </f7-list-item>
         <f7-list-item link="/whs/tag-add/" popover-close>
           <i slot="media" class="whs-icon whs-icon-tag-black"></i>
-          <span slot="title">{{$t('whs.popover.new.tag')}}</span>
+          <span slot="title">{{$t('whs.common.new', { text: settings.tag.name})}}</span>
         </f7-list-item>
         <f7-list-item link="/whs/activity-add/" popover-close>
           <i slot="media" class="whs-icon whs-icon-clock-black"></i>
