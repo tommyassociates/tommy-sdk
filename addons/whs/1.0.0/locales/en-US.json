@@ -12,7 +12,6 @@
     "no": "No {{text}}",
     "new": "New {{text}}",
     "name_label": "Name",
-    "no_tags": "No Tags",
     "no_activity": "No Activity",
     "search_placeholder": "Search...",
     "required_placeholder": "Required...",
@@ -56,21 +55,13 @@
     "edit": "{{text}} edited",
     "delete": "{{text}} deleted",
     "settings": "{{text}} settings saved",
-    "add_tag": "Tag added",
-    "edit_tag": "Tag edited",
-    "delete_tag": "Tag deleted",
-    "add_activity": "Activity added",
-    "edit_activity": "Activity edited",
-    "delete_activity": "Activity deleted"
   },
   "popover":{
     "new":{
-      "tag": "New Tag",
       "activity": "New Activity"
     },
     "activity":{
       "all": "All",
-      "tag": "Tags",
       "role": "Roles",
       "team": "Team members"
     }
