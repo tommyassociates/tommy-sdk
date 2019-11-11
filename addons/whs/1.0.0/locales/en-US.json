@@ -54,7 +54,7 @@
     "add": "{{text}} added",
     "edit": "{{text}} edited",
     "delete": "{{text}} deleted",
-    "settings": "{{text}} settings saved",
+    "settings": "{{text}} settings saved"
   },
   "popover":{
     "new":{
@@ -62,6 +62,7 @@
     },
     "activity":{
       "all": "All",
+      "tag": "Tags",
       "role": "Roles",
       "team": "Team members"
     }

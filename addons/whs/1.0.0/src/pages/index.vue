@@ -377,6 +377,11 @@ export default {
       API.resetCache('inventory/locations');
       self.getLocations();
     },
+    tagUpdated(){
+      self = this;
+      API.resetCache('inventory/tags');
+      self.getTags();
+    },
     getSettings(){
       const self = this;
       API.getSettings().catch((data)=>{console.log("TCL: getSettings -> data", data); });
@@ -429,6 +434,9 @@ export default {
     self.$events.$off('location:updated', self.locationUpdated);
     self.$events.$off('location:aded', self.locationUpdated);
     self.$events.$off('location:deleted', self.locationUpdated);
+    self.$events.$off('tag:updated', self.tagUpdated);
+    self.$events.$off('tag:aded', self.tagUpdated);
+    self.$events.$off('tag:deleted', self.tagnUpdated);
   },
   mounted() {
     const self = this;
@@ -448,6 +456,9 @@ export default {
     self.$events.$on('location:updated', self.locationUpdated);
     self.$events.$on('location:aded', self.locationUpdated);
     self.$events.$on('location:deleted', self.locationUpdated);
+    self.$events.$on('tag:updated', self.tagUpdated);
+    self.$events.$on('tag:aded', self.tagUpdated);
+    self.$events.$on('tag:deleted', self.tagnUpdated);
     
   },
   data() {
