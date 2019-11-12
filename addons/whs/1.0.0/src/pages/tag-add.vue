@@ -33,9 +33,13 @@
           </f7-list-item>
           <form-images-picker />
           -->
-        </ul>
+        </ul>        
       </f7-list>
     </form>
+
+    <div class="whs-form-delete" v-if="editId" style="position:absolute; bottom:0; left: 50%">
+      <f7-link class="delete" @click="deleteDialog()" style="left: -50%;">{{$t('whs.common.delete')}}</f7-link>
+    </div>
   </f7-page>
 </template>
 <script>
@@ -87,6 +91,17 @@ export default {
       } else {
         this.alertDialog(this.$t('whs.alert_form.title'), this.$t('whs.alert_form.text'), this.$t('whs.alert_form.ok'));
       }
+    },
+    deleteTag(){
+      API.deleteTag(this.editId)
+        .then(()=>{
+          self.$events.$emit('tag:deleted',this.item);    
+          self.$f7router.back('/whs/', {force: true}); 
+          API.toast(self.$t('whs.toast.delete', { text: this.settings.tag.name}));
+        });
+    },
+    deleteDialog(){
+      this.confirmDialog(this.$t('whs.alert_form.delete_title'), this.$t('whs.alert_form.delete_text'), this.$t('whs.alert_form.confirm'),this.$t('whs.alert_form.cancel'), this.deleteTag);
     },
   },
   beforeDestroy() {
