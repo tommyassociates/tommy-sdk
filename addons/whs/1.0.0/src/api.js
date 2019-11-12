@@ -76,6 +76,17 @@ const API = {
           return data;
         });
     },
+    getTagDetail(id){
+      return api.call({
+          endpoint: `inventory/tags/${id}`,
+          method: 'GET',
+          data:{
+            with_summary: true,
+          },          
+        }).then((data) => {
+          return data;
+        });
+    },
     createItem(data) {
         return api.call({
           endpoint: `inventory/items`,
@@ -132,8 +143,9 @@ const API = {
         });
       },
     editTag(data, id) {
+        data.context = 'tags';
         return api.call({
-          endpoint: `inventory/tags/${id}`,
+          endpoint: `tags/${id}`,
           method: 'PUT',
           data,
           cache: false,
@@ -141,7 +153,7 @@ const API = {
       },
     deleteTag(id) {
         return api.call({
-          endpoint: `inventory/tags/${id}`,
+          endpoint: `tags/${id}`,
           method: 'DELETE',
           cache: false,
         });

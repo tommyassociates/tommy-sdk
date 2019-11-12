@@ -132,7 +132,7 @@
         <f7-list-item
           v-for="(tag, index) in tags"
           chevron-center
-          link
+          :link="`/whs/tag/?id=${tag.id}&index=${index}`"
           :title="tag.name"
           :key="index"
         >
