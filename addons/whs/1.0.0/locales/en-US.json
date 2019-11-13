@@ -74,6 +74,7 @@
   "form_add": {
     "title": "Add {{text}}",
     "title_edit": "Edit {{text}}",
+    "title_delete": "Delete {{text}}",
     "add_more_button": "Add Another {{text}}"
   },
   "settings": {

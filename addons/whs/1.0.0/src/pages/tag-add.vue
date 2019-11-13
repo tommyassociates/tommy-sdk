@@ -4,7 +4,7 @@
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{title}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
-        <f7-link icon-only @click="addTag">
+        <f7-link icon-only @click="addTag" v-if="!editId">
           <f7-icon f7="check" />
         </f7-link>
       </f7-nav-right>
@@ -62,8 +62,11 @@ export default {
   },
   computed: {
     title(){
+      
       if(this.editId){
-        return this.$t('whs.form_add.title_edit', { text: this.settings.tag.name})
+        //fix for v1 withot edit function
+        //return this.$t('whs.form_add.title_edit', { text: this.settings.tag.name})
+        return this.$t('whs.form_add.title_delete', { text: this.settings.tag.name})
       }else{
         return this.$t('whs.form_add.title', { text: this.settings.tag.name})
       }
@@ -95,7 +98,7 @@ export default {
     deleteTag(){
       API.deleteTag(this.editId)
         .then(()=>{
-          self.$events.$emit('tag:deleted',this.item);    
+          self.$events.$emit('tag:deleted',this.tag);    
           self.$f7router.back('/whs/', {force: true}); 
           API.toast(self.$t('whs.toast.delete', { text: this.settings.tag.name}));
         });
