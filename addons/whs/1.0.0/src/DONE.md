@@ -3,7 +3,7 @@
 -   Dynamic item settings (name ,plural name) in main, popups
 -   Dynamic empty images for items, locations, tags
 -   Dynamic names for items, tags, locations
-
+-   Fixed subnavbar menu
 
 ## Items
 
@@ -16,6 +16,8 @@
 -   Dynamic item settings (name ,plural name, header_color, highlight_color, font_color)
 -   Header bg color transistion animation
 -   Dynamic add form(title, add another, toast)
+-   Fixed subnavbar menu
+-   Dynamic styles witch description or not
 
 ## locations
 
@@ -30,6 +32,8 @@
 -   Dynamic item settings (name ,plural name, header_color, highlight_color, font_color)
 -   Header bg color transistion animation
 -   Dynamic add form(title, toast)
+-   Fixed subnavbar menu
+-   Dynamic styles witch description or not
 
 ## Settings
 
@@ -57,6 +61,7 @@
 -   Dynamic tag settings (name ,plural name, header_color, highlight_color, font_color)
 -   Header bg color transistion animation
 -   Dynamic add form(title, toast)
+-   Fixed subnavbar menu
 
 ## Others
 
