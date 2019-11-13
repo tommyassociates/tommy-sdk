@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="whs-details-page" @page:beforein="colorizeHeader" @page:beforeout="colorizeHeaderOut">
+  <f7-page :class="[locationDesc ? 'whs-details-page-description' : '', 'whs-details-page']" @page:beforein="colorizeHeader" @page:beforeout="colorizeHeaderOut">
     <f7-navbar innerClass="whs-details-navbar-inner">
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title :style="fontColor">{{locationTitle}}</f7-nav-title>
@@ -12,49 +12,53 @@
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
-    <f7-subnavbar class="no-hairline" :style="subnavbarStyle">{{locationDesc}}</f7-subnavbar>
-    <div class="whs-menubar whs-menubar-labels no-swipe-panel">
-      <a
-        :class="`link ${activeTab === 'summary' ? 'whs-menubar-dynamic-active' : ''}`"
-        @click="activeTab = 'summary'"
-        :style="activeTab === 'summary' ? highlightedColor : {}"
-      >
-        <span>Summary</span>
-        <div class="after-line" v-if="activeTab === 'summary'" :style="highlightedBgColor"></div>
-      </a>
-      <a
-        :class="`link ${activeTab === 'items' ? 'whs-menubar-dynamic-active' : ''}`"
-        @click="activeTab = 'items'"
-        :style="activeTab === 'items' ? highlightedColor : {}"
-      >
-        <span>{{settings.item.plural_name}}</span>
-        <div class="after-line" v-if="activeTab === 'items'" :style="highlightedBgColor"></div>
-      </a>
-      <a
-        :class="`link ${activeTab === 'tags' ? 'whs-menubar-dynamic-active' : ''}`"
-        @click="activeTab = 'tags'"
-        :style="activeTab === 'tags' ? highlightedColor : {}"
-      >
-        <span>{{settings.tag.plural_name}}</span>
-        <div class="after-line" v-if="activeTab === 'tags'" :style="highlightedBgColor"></div>
-      </a>
-      <a
-        :class="`link ${activeTab === 'locations' ? 'whs-menubar-dynamic-active' : ''}`"
-        @click="activeTab = 'locations'"
-        :style="activeTab === 'locations' ? highlightedColor : {}"
-      >
-        <span>{{settings.location.plural_name}}</span>
-        <div class="after-line" v-if="activeTab === 'locations'" :style="highlightedBgColor"></div>
-      </a>
-      <a
-        :class="`link ${activeTab === 'activity' ? 'whs-menubar-dynamic-active' : ''}`"
-        @click="activeTab = 'activity'"
-        :style="activeTab === 'activity' ? highlightedColor : {}"
-      >
-        <span>Activity</span>
-        <div class="after-line" v-if="activeTab === 'activity'" :style="highlightedBgColor"></div>
-      </a>
-    </div>
+    <f7-subnavbar class="no-hairline" :style="subnavbarStyle">
+      <div class="description" v-if="locationDesc">
+      {{locationDesc}}
+      </div>
+      <div class="whs-menubar whs-menubar-labels no-swipe-panel">
+        <a
+          :class="`link ${activeTab === 'summary' ? 'whs-menubar-dynamic-active' : ''}`"
+          @click="activeTab = 'summary'"
+          :style="activeTab === 'summary' ? highlightedColor : {}"
+        >
+          <span>Summary</span>
+          <div class="after-line" v-if="activeTab === 'summary'" :style="highlightedBgColor"></div>
+        </a>
+        <a
+          :class="`link ${activeTab === 'items' ? 'whs-menubar-dynamic-active' : ''}`"
+          @click="activeTab = 'items'"
+          :style="activeTab === 'items' ? highlightedColor : {}"
+        >
+          <span>{{settings.item.plural_name}}</span>
+          <div class="after-line" v-if="activeTab === 'items'" :style="highlightedBgColor"></div>
+        </a>
+        <a
+          :class="`link ${activeTab === 'tags' ? 'whs-menubar-dynamic-active' : ''}`"
+          @click="activeTab = 'tags'"
+          :style="activeTab === 'tags' ? highlightedColor : {}"
+        >
+          <span>{{settings.tag.plural_name}}</span>
+          <div class="after-line" v-if="activeTab === 'tags'" :style="highlightedBgColor"></div>
+        </a>
+        <a
+          :class="`link ${activeTab === 'locations' ? 'whs-menubar-dynamic-active' : ''}`"
+          @click="activeTab = 'locations'"
+          :style="activeTab === 'locations' ? highlightedColor : {}"
+        >
+          <span>{{settings.location.plural_name}}</span>
+          <div class="after-line" v-if="activeTab === 'locations'" :style="highlightedBgColor"></div>
+        </a>
+        <a
+          :class="`link ${activeTab === 'activity' ? 'whs-menubar-dynamic-active' : ''}`"
+          @click="activeTab = 'activity'"
+          :style="activeTab === 'activity' ? highlightedColor : {}"
+        >
+          <span>Activity</span>
+          <div class="after-line" v-if="activeTab === 'activity'" :style="highlightedBgColor"></div>
+        </a>
+      </div>
+      </f7-subnavbar>
 
     <template v-if="activeTab === 'summary'">
       <div class="whs-summary-cards">
