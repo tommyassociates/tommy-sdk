@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="whs-details-page" @page:beforein="colorizeHeader" @page:beforeout="colorizeHeaderOut">
+  <f7-page :class="[itemDesc ? 'whs-details-page-description' : '', 'whs-details-page']" @page:beforein="colorizeHeader" @page:beforeout="colorizeHeaderOut">
     <f7-navbar innerClass="whs-details-navbar-inner">
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title :style="fontColor">{{itemTitle}}</f7-nav-title>
@@ -12,42 +12,45 @@
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
-    <f7-subnavbar class="no-hairline" :style="subnavbarStyle">{{itemDesc}}</f7-subnavbar>
-    <div class="whs-menubar whs-menubar-labels no-swipe-panel">
-      <a
-        :class="`link ${activeTab === 'summary' ? 'whs-menubar-dynamic-active' : ''}`"
-        :style="activeTab === 'summary' ? highlightedColor : {}"
-        @click="activeTab = 'summary'"
-      >
-        <span>Summary</span>
-        <div class="after-line" v-if="activeTab === 'summary'" :style="highlightedBgColor"></div>
-      </a>
-      <a
-        :class="`link ${activeTab === 'locations' ? 'whs-menubar-dynamic-active' : ''}`"
-        :style="activeTab === 'locations' ? highlightedColor : {}"
-        @click="activeTab = 'locations'"
-      >
-        <span>{{settings.location.plural_name}}</span>
-        <div class="after-line" v-if="activeTab === 'locations'" :style="highlightedBgColor"></div>
-      </a>
-      <a
-        :class="`link ${activeTab === 'tags' ? 'whs-menubar-dynamic-active' : ''}`"
-        :style="activeTab === 'tags' ? highlightedColor : {}"
-        @click="activeTab = 'tags'"
-      >
-        <span>{{settings.tag.plural_name}}</span>
-        <div class="after-line" v-if="activeTab === 'tags'" :style="highlightedBgColor"></div>
-      </a>
-      <a
-        :class="`link ${activeTab === 'activity' ? 'whs-menubar-dynamic-active' : ''}`"
-        :style="activeTab === 'activity' ? highlightedColor : {}"
-        @click="activeTab = 'activity'"
-      >
-        <span>Activity</span>
-        <div class="after-line" v-if="activeTab === 'activity'" :style="highlightedBgColor"></div>
-      </a>
-    </div>
-
+    <f7-subnavbar class="no-hairline" :style="subnavbarStyle">
+      <div class="description" v-if="itemDesc">
+        {{itemDesc}}
+      </div>
+      <div class="whs-menubar whs-menubar-labels no-swipe-panel">
+        <a
+          :class="`link ${activeTab === 'summary' ? 'whs-menubar-dynamic-active' : ''}`"
+          :style="activeTab === 'summary' ? highlightedColor : {}"
+          @click="activeTab = 'summary'"
+        >
+          <span>Summary</span>
+          <div class="after-line" v-if="activeTab === 'summary'" :style="highlightedBgColor"></div>
+        </a>
+        <a
+          :class="`link ${activeTab === 'locations' ? 'whs-menubar-dynamic-active' : ''}`"
+          :style="activeTab === 'locations' ? highlightedColor : {}"
+          @click="activeTab = 'locations'"
+        >
+          <span>{{settings.location.plural_name}}</span>
+          <div class="after-line" v-if="activeTab === 'locations'" :style="highlightedBgColor"></div>
+        </a>
+        <a
+          :class="`link ${activeTab === 'tags' ? 'whs-menubar-dynamic-active' : ''}`"
+          :style="activeTab === 'tags' ? highlightedColor : {}"
+          @click="activeTab = 'tags'"
+        >
+          <span>{{settings.tag.plural_name}}</span>
+          <div class="after-line" v-if="activeTab === 'tags'" :style="highlightedBgColor"></div>
+        </a>
+        <a
+          :class="`link ${activeTab === 'activity' ? 'whs-menubar-dynamic-active' : ''}`"
+          :style="activeTab === 'activity' ? highlightedColor : {}"
+          @click="activeTab = 'activity'"
+        >
+          <span>Activity</span>
+          <div class="after-line" v-if="activeTab === 'activity'" :style="highlightedBgColor"></div>
+        </a>
+      </div>
+      </f7-subnavbar>
     <template v-if="activeTab === 'summary'">
       <div class="whs-summary-cards">
         <div class="whs-summary-card">
@@ -226,7 +229,11 @@ export default {
       }
     },
     subnavbarStyle(){
-      return Object.assign(this.headerBgColor, this.fontColor);
+      const style = {
+        "background-color": this.settings.item.header_color,
+        "color": this.settings.item.font_color,
+      }
+      return style;
     }
   },
   methods: {

@@ -62,12 +62,21 @@ $orange: #FF5413;
 .whs-details-page {
   .subnavbar {
     background: #fff;
-    height: 60px;
-    .subnavbar-inner {
+    height: 36px;
+    a.link{
+      line-height: 35px;
+      height: 35px;
+    }
+    .subnavbar-inner{
+      padding: 0;
+      display: block;
+    }
+    .description {
       padding-left: 51px;
+      margin-bottom: 10px;
       font-size: 20px;
       line-height: 1.25;
-      max-height: 50px;
+      height: 50px;
       overflow: hidden;
       position: relative;
       text-overflow: ellipsis;
@@ -79,8 +88,19 @@ $orange: #FF5413;
       display: -webkit-box;
     }
   }
-  &.page-with-subnavbar .page-content {
-    padding-top: 44px + 60px !important;
+  &.page-with-subnavbar{
+    padding-bottom: 80px;
+  }.page-content {
+    margin-top: 80px;
+    padding-top: 0 !important;
+  }&.whs-details-page-description{
+    padding-bottom: 140px;
+      .subnavbar{
+        height: 96px;
+      }
+      .page-content{
+        margin-top: 140px;
+      }
   }
 }
 
@@ -280,6 +300,22 @@ $orange: #FF5413;
 .whs-popover-activity{
   .item-title{
     text-transform: uppercase;
+  }
+}
+.main-subnavbar.subnavbar{  
+  background-color: #fff;
+  height: 126px;
+  .subnavbar-inner{
+    display: block;
+    padding: 0;
+  }
+}
+
+.whs-main-page {
+  padding-bottom: 167px;
+  .page-content {
+    margin-top: 167px !important;
+    padding-top: 0px !important;
   }
 }
 @import "./scss/searchbar.scss";

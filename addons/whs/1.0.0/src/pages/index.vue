@@ -1,5 +1,5 @@
 <template>
-  <f7-page>
+  <f7-page class="whs-main-page">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{settings.main.name}}</f7-nav-title>
@@ -14,6 +14,67 @@
           <f7-icon f7="gear" />
         </f7-link>
       </f7-nav-right>
+
+      <f7-subnavbar class="main-subnavbar">
+        <f7-searchbar
+          class="whs-searchbar"
+          :placeholder="$t('whs.common.search_placeholder')"
+          customSearch
+          :backdrop="false"
+          :disableButton="false"
+          :value="search"
+          @input="onSearchbarSearch($event.target.value)"
+          @searchbar:clear="onSearchbarClear"
+          @searchbar:enable="searchEnabled = true"
+          @searchbar:disable="searchEnabled = false"
+        >
+          <f7-link icon-only>
+            <i class="icon whs-icon-barcode"></i>
+          </f7-link>
+          <f7-link icon-only>
+            <i class="icon whs-icon-sort-black"></i>
+          </f7-link>
+        </f7-searchbar>
+
+        <div class="whs-menubar" v-if="!searchEnabled">
+          <a :class="`link ${activeTab === 'items' ? 'whs-menubar-active' : ''}`" @click="activeTab = 'items'">
+            <i :class="`icon whs-icon whs-icon-box-${activeTab === 'items' ? 'orange' : 'black'}`"></i>
+            <span>{{settings.item.plural_name}}</span>
+          </a>
+          <a :class="`link ${activeTab === 'locations' ? 'whs-menubar-active' : ''}`" @click="activeTab = 'locations'">
+            <i :class="`icon whs-icon whs-icon-drawer-${activeTab === 'locations' ? 'orange' : 'black'}`"></i>
+            <span>{{settings.location.plural_name}}</span>
+          </a>
+          <a :class="`link ${activeTab === 'tags' ? 'whs-menubar-active' : ''}`" @click="activeTab = 'tags'">
+            <i :class="`icon whs-icon whs-icon-tag-${activeTab === 'tags' ? 'orange' : 'black'}`"></i>
+            <span>{{settings.tag.plural_name}}</span>
+          </a>
+          <a :class="`link ${activeTab === 'activity' ? 'whs-menubar-active' : ''}`" @click="activeTab = 'activity'">
+            <i :class="`icon whs-icon whs-icon-clock-${activeTab === 'activity' ? 'orange' : 'black'}`"></i>
+            <span>Activity</span>
+          </a>
+        </div>
+
+        <div class="whs-menubar" v-if="searchEnabled">
+          <a :class="`link ${activeSearchFilter === 'all' ? 'whs-menubar-active' : ''}`" @click="activeSearchFilter = 'all'">
+            <i class="icon f7-icons">data</i>
+            <span>All</span>
+          </a>
+          <a :class="`link ${activeSearchFilter === 'items' ? 'whs-menubar-active' : ''}`" @click="activeSearchFilter = 'items'">
+            <i :class="`icon whs-icon whs-icon-box-${activeSearchFilter === 'items' ? 'orange' : 'black'}`"></i>
+            <span>{{settings.item.plural_name}}</span>
+          </a>
+          <a :class="`link ${activeSearchFilter === 'locations' ? 'whs-menubar-active' : ''}`" @click="activeSearchFilter = 'locations'">
+            <i :class="`icon whs-icon whs-icon-drawer-${activeSearchFilter === 'locations' ? 'orange' : 'black'}`"></i>
+            <span>{{settings.location.plural_name}}</span>
+          </a>
+          <a :class="`link ${activeSearchFilter === 'tags' ? 'whs-menubar-active' : ''}`" @click="activeSearchFilter = 'tags'">
+            <i :class="`icon whs-icon whs-icon-tag-${activeSearchFilter === 'tags' ? 'orange' : 'black'}`"></i>
+            <span>{{settings.tag.plural_name}}</span>
+          </a>
+        </div>
+      </f7-subnavbar>
+
     </f7-navbar>
     <f7-popover class="whs-popover whs-popover-add" :backdrop="false">
       <f7-list no-chevron>
@@ -35,64 +96,6 @@
         </f7-list-item>
       </f7-list>
     </f7-popover>
-    <f7-searchbar
-      slot="static"
-      class="whs-searchbar"
-      :placeholder="$t('whs.common.search_placeholder')"
-      customSearch
-      :backdrop="false"
-      :disableButton="false"
-      :value="search"
-      @input="onSearchbarSearch($event.target.value)"
-      @searchbar:clear="onSearchbarClear"
-      @searchbar:enable="searchEnabled = true"
-      @searchbar:disable="searchEnabled = false"
-    >
-      <f7-link icon-only>
-        <i class="icon whs-icon-barcode"></i>
-      </f7-link>
-      <f7-link icon-only>
-        <i class="icon whs-icon-sort-black"></i>
-      </f7-link>
-    </f7-searchbar>
-
-    <div class="whs-menubar" v-if="!searchEnabled">
-      <a :class="`link ${activeTab === 'items' ? 'whs-menubar-active' : ''}`" @click="activeTab = 'items'">
-        <i :class="`icon whs-icon whs-icon-box-${activeTab === 'items' ? 'orange' : 'black'}`"></i>
-        <span>{{settings.item.plural_name}}</span>
-      </a>
-      <a :class="`link ${activeTab === 'locations' ? 'whs-menubar-active' : ''}`" @click="activeTab = 'locations'">
-        <i :class="`icon whs-icon whs-icon-drawer-${activeTab === 'locations' ? 'orange' : 'black'}`"></i>
-        <span>{{settings.location.plural_name}}</span>
-      </a>
-      <a :class="`link ${activeTab === 'tags' ? 'whs-menubar-active' : ''}`" @click="activeTab = 'tags'">
-        <i :class="`icon whs-icon whs-icon-tag-${activeTab === 'tags' ? 'orange' : 'black'}`"></i>
-        <span>{{settings.tag.plural_name}}</span>
-      </a>
-      <a :class="`link ${activeTab === 'activity' ? 'whs-menubar-active' : ''}`" @click="activeTab = 'activity'">
-        <i :class="`icon whs-icon whs-icon-clock-${activeTab === 'activity' ? 'orange' : 'black'}`"></i>
-        <span>Activity</span>
-      </a>
-    </div>
-
-    <div class="whs-menubar" v-if="searchEnabled">
-      <a :class="`link ${activeSearchFilter === 'all' ? 'whs-menubar-active' : ''}`" @click="activeSearchFilter = 'all'">
-        <i class="icon f7-icons">data</i>
-        <span>All</span>
-      </a>
-      <a :class="`link ${activeSearchFilter === 'items' ? 'whs-menubar-active' : ''}`" @click="activeSearchFilter = 'items'">
-        <i :class="`icon whs-icon whs-icon-box-${activeSearchFilter === 'items' ? 'orange' : 'black'}`"></i>
-        <span>{{settings.item.plural_name}}</span>
-      </a>
-      <a :class="`link ${activeSearchFilter === 'locations' ? 'whs-menubar-active' : ''}`" @click="activeSearchFilter = 'locations'">
-        <i :class="`icon whs-icon whs-icon-drawer-${activeSearchFilter === 'locations' ? 'orange' : 'black'}`"></i>
-        <span>{{settings.location.plural_name}}</span>
-      </a>
-      <a :class="`link ${activeSearchFilter === 'tags' ? 'whs-menubar-active' : ''}`" @click="activeSearchFilter = 'tags'">
-        <i :class="`icon whs-icon whs-icon-tag-${activeSearchFilter === 'tags' ? 'orange' : 'black'}`"></i>
-        <span>{{settings.tag.plural_name}}</span>
-      </a>
-    </div>
 
     <template v-if="activeTab === 'items' && !searchEnabled">
       <f7-list class="whs-list" media-list v-if="items.length >0">
