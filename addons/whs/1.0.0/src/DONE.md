@@ -54,6 +54,7 @@
 -	UI
 -   Dynamic items/location/activity name from settings
 -   Dynamic activity settings (name ,plural name, header_color, highlight_color, font_color)
+-   API roles, team
 
 
 ## Tags

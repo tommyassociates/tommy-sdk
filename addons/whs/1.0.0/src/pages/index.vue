@@ -347,9 +347,20 @@ export default {
       const self = this;
       API.getLocations().then((data)=>{self.locations = data});
     },
-    getActivities(){
+    getActivities(target = false){
       self = this;
-      API.getActivities().then((data)=>{self.activities = data});
+      const options ={
+        'with_activity_counts': true,
+        'page_limit': 2,
+      }
+      if(target === false){
+        API.getItem(options).then((data)=>{self.activities_main.items = data});
+        API.getLocations(options).then((data)=>{self.activities_main.locations = data});
+        API.getTags(options).then((data)=>{self.activities_main.tags = data});
+        API.getRoles(options).then((data)=>{self.activities_main.roles = data});
+        API.getTeam(options).then((data)=>{self.activities_main.team = data});
+      }
+      //API.getActivities().then((data)=>{self.activities = data});
     },
     getTags(){
       const self = this;
@@ -475,6 +486,13 @@ export default {
       locations: [],
       tags: [],
       activities: [],
+      activities_main: {
+        items:[],
+        locations:[],
+        tags:[],
+        roles:[],
+        team:[],
+      },
       activity_filter: "all",
       settings: Settings,      
     };
