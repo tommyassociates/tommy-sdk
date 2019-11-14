@@ -11,6 +11,7 @@ import SettingsItemsFields from './pages/settings-items-fields.vue';
 import SettingsItemsFieldDetails from './pages/settings-items-field-details.vue';
 import SettingsLocations from './pages/settings-locations.vue';
 import SettingsTags from './pages/settings-tags.vue';
+import SettingsActivities from './pages/settings-activities.vue';
 
 const routes = [
   {
@@ -65,6 +66,10 @@ const routes = [
   {
     path: '/whs/settings/tags/',
     component: SettingsTags,
+  },
+  {
+    path: '/whs/settings/activities/',
+    component: SettingsActivities,
   },
 ];
 

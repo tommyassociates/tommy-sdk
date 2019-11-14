@@ -27,5 +27,12 @@ export default {
         header_color: "#ffffff",
         highlight_color: "#ff4500",
         font_color: "#333333"
+    },
+    activity:{
+        name: window.tommy.i18n.t('whs.common.activity'),
+        plural_name: window.tommy.i18n.t('whs.common.activities'),
+        header_color: "#ffffff",
+        highlight_color: "#ff4500",
+        font_color: "#333333"
     }
 }

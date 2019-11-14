@@ -52,7 +52,9 @@
 ## Activity
 
 -	UI
--   Dynamic items/location name from settings
+-   Dynamic items/location/activity name from settings
+-   Dynamic activity settings (name ,plural name, header_color, highlight_color, font_color)
+
 
 ## Tags
 -	Add 
