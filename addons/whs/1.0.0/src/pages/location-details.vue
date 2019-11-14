@@ -54,7 +54,7 @@
           @click="activeTab = 'activity'"
           :style="activeTab === 'activity' ? highlightedColor : {}"
         >
-          <span>Activity</span>
+          <span>{{settings.activity.plural_name}}</span>
           <div class="after-line" v-if="activeTab === 'activity'" :style="highlightedBgColor"></div>
         </a>
       </div>
@@ -288,7 +288,7 @@
     </template> -->
 
     <template v-if="activeTab === 'activity'">
-      <empty-block :text="$t('whs.common.no_activity')" />
+      <empty-block :text="$t('whs.common.no', { text: settings.activity.plural_name})" />
     </template>
   </f7-page>
 </template>

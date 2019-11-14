@@ -9,6 +9,8 @@
     "locations": "Locations",
     "tag": "Tag",
     "tags": "Tags",
+    "activity": "Activity",
+    "activities": "Activities",
     "no": "No {{text}}",
     "new": "New {{text}}",
     "name_label": "Name",
@@ -57,9 +59,6 @@
     "settings": "{{text}} settings saved"
   },
   "popover":{
-    "new":{
-      "activity": "New Activity"
-    },
     "activity":{
       "all": "All",
       "tag": "Tags",
@@ -118,6 +117,7 @@
     "title_item": "Items",
     "title_location": "Locations",
     "title_tag": "Tags",
+    "title_activities": "Activities",
     "header_bg_color": "Header Background Color",
     "header_font_color": "Highlighted Font Color",
     "standard_font_color": "Standard Font Color",

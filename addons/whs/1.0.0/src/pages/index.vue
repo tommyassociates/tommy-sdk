@@ -51,7 +51,7 @@
           </a>
           <a :class="`link ${activeTab === 'activity' ? 'whs-menubar-active' : ''}`" @click="activeTab = 'activity'">
             <i :class="`icon whs-icon whs-icon-clock-${activeTab === 'activity' ? 'orange' : 'black'}`"></i>
-            <span>Activity</span>
+            <span>{{settings.activity.plural_name}}</span>
           </a>
         </div>
 
@@ -92,7 +92,7 @@
         </f7-list-item>
         <f7-list-item link="/whs/activity-add/" popover-close>
           <i slot="media" class="whs-icon whs-icon-clock-black"></i>
-          <span slot="title">{{$t('whs.popover.new.activity')}}</span>
+          <span slot="title">{{$t('whs.common.new', { text: settings.activity.name})}}</span>
         </f7-list-item>
       </f7-list>
     </f7-popover>
@@ -302,7 +302,7 @@
             <div class="whs-item-row">Items: 500</div>
           </f7-list-item>
         </f7-list>
-      <!--<empty-block v-if="activity.length === 0" :text="$t('whs.common.no_activity')" />-->
+      <!--<empty-block v-if="activity.length === 0" :text="$t('whs.common.no', { text: settings.activity.plural_name})" />--> 
     </template>
 
   </f7-page>
