@@ -349,7 +349,7 @@ export default {
     },
     getActivities(){
       self = this;
-      self.getItem();
+      API.getActivities().then((data)=>{self.activities = data});
     },
     getTags(){
       const self = this;
@@ -474,7 +474,7 @@ export default {
       items: [],
       locations: [],
       tags: [],
-      activity: [],
+      activities: [],
       activity_filter: "all",
       settings: Settings,      
     };

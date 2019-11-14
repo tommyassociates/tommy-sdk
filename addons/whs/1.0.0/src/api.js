@@ -64,6 +64,40 @@ const API = {
           return data;
         });
     },
+    getActivityDetail(id){
+      return api.call({
+          endpoint: `inventory/activities/${id}`,
+          method: 'GET',
+          data:{
+            with_summary: true,
+          },          
+        }).then((data) => {
+          return data;
+        });
+    },
+    createActivity(data) {
+      return api.call({
+        endpoint: `inventory/activities`,
+        method: 'POST',
+        data,
+        cache: false,
+      });
+    },
+    editActivity(data, id) {
+        return api.call({
+          endpoint: `inventory/activities/${id}`,
+          method: 'PUT',
+          data,
+          cache: false,
+        });
+      },
+    deleteActivity(id) {
+        return api.call({
+          endpoint: `inventory/activities/${id}`,
+          method: 'DELETE',
+          cache: false,
+        });
+      },
     getTags(data = null){
       let cache = true;
       if (data) cache = false;
