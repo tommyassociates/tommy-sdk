@@ -192,6 +192,68 @@ const API = {
           cache: false,
         });
       },
+    getRoles(data = null){
+      let cache = true;
+      if (data) cache = false;
+        return api.call({
+            endpoint: 'inventory/roles',
+            method: 'GET',
+            cache: cache,
+            data
+          }).then((data) => {
+            return data;
+          });
+      },
+      getRoleDetail(id){
+        return api.call({
+            endpoint: `inventory/roles/${id}`,
+            method: 'GET',
+            data:{
+              with_summary: true,
+            },          
+          }).then((data) => {
+            return data;
+          });
+      },
+      createRole(data) {
+        data.context = 'roles';
+        return api.call({
+          endpoint: `tags`,
+          method: 'POST',
+          data,
+          cache: false,
+        });
+      },
+    deleteRole(id) {
+        return api.call({
+          endpoint: `tags/${id}`,
+          method: 'DELETE',
+          cache: false,
+        });
+      },
+    getTeam(data = null){
+      let cache = true;
+      if (data) cache = false;
+        return api.call({
+            endpoint: 'inventory/team_members',
+            method: 'GET',
+            cache: cache,
+            data
+          }).then((data) => {
+            return data;
+          });
+      },
+    getTeamDetail(id){
+        return api.call({
+            endpoint: `inventory/team_members/${id}`,
+            method: 'GET',
+            data:{
+              with_summary: true,
+            },          
+          }).then((data) => {
+            return data;
+          });
+      }, 
     getSettings(name) {
       if(name) name = '/'+name; else name = '';
       return api.call({
