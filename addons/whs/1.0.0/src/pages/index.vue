@@ -294,15 +294,16 @@
 
         <f7-list v-else class="selected whs-list whs-main-activity" media-list>
           <f7-list-item
-            v-for="(index) in 10"
+            v-for="(target, index) in activities_more.data"
             chevron-center
             link
-            title="Test"
+            :title="target.name || target.first_name+' '+target.last_name"
             :key='"activity_selected_"+index'
           >
-            <div slot="media" class="whs-item-image"></div>
-            <div class="whs-item-row">LOCATIONS: 2000</div>
-            <div class="whs-item-row">Items: 500</div>
+            <div slot="media" class="whs-item-image" :style="[target.image ? {'background-image': `url(${target.image})`}: moreActivitiesStyle]"></div>
+            <div class="whs-item-row">OPEN: {{target.open_count}}</div>
+            <div class="whs-item-row">DUE: {{target.due_count}}</div>
+            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>   
           </f7-list-item>
         </f7-list>
       <!--<empty-block v-if="activity.length === 0" :text="$t('whs.common.no', { text: settings.activity.plural_name})" />--> 
@@ -409,6 +410,26 @@ export default {
           "background-image": `url(${this.settings.team.image})`,          
         }
       }      
+    },
+    moreActivitiesStyle(){
+      self = this;
+      switch (self.activities_more.target){
+        case "item":
+          return self.itemStyle;
+          break;
+        case "location":
+          return self.locationStyle;
+          break;
+        case "tag":
+          return self.tagStyle;
+          break;
+        case "role":
+          return self.roleStyle;
+          break;
+        case "team":
+          return self.teamStyle;
+          break;
+      }
     }
   },
   methods: {
@@ -448,6 +469,7 @@ export default {
       //reset data
       self.activities_more = {
         data: [],
+        target: target,
         detail_link: "",
       }
       switch (target){
@@ -488,9 +510,11 @@ export default {
     activityPopoverClick(filter){
       this.activity_filter = filter;
       this.$f7.popover.close(".whs-popover-activity");
+      this.getActivitiesMore(filter);
     },
     actionMoreClick(filter){
       this.activity_filter = filter;
+      this.getActivitiesMore(filter);
     },
     itemUpdated(){ 
       self = this;
@@ -607,7 +631,8 @@ export default {
       },
       activities_more: {
         data: [],
-        detail_link: "",
+        target: "",
+        detail_link: "",        
       },
       activity_filter: "all",
       settings: Settings,      
