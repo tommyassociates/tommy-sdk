@@ -12,7 +12,7 @@ export default {
     header_color: "#ffffff",
     highlight_color: "#ff4500",
     font_color: "#333333",
-    image: "assets/icon-box-black.svg"
+    image: "assets/default/item.svg"
   },
   location: {
     name: window.tommy.i18n.t("whs.common.location"),
@@ -20,7 +20,7 @@ export default {
     header_color: "#ffffff",
     highlight_color: "#ff4500",
     font_color: "#333333",
-    image: "assets/icon-drawer-black.svg"
+    image: "assets/default/location.svg"
   },
   tag: {
     name: window.tommy.i18n.t("whs.common.tag"),
@@ -28,7 +28,7 @@ export default {
     header_color: "#ffffff",
     highlight_color: "#ff4500",
     font_color: "#333333",
-    image: "assets/icon-tag-black.svg"
+    image: "assets/default/tag.svg"
   },
   activity: {
     name: window.tommy.i18n.t("whs.common.activity"),
@@ -37,5 +37,11 @@ export default {
     highlight_color: "#ff4500",
     font_color: "#333333",
     image: "assets/icon-clock-black.svg"
+  },
+  role: {
+    image: "assets/default/team.svg"
+  },
+  team: {
+    image: "assets/default/team.svg"
   }
 };
