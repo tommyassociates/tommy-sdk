@@ -5,6 +5,7 @@ const mainListLimit = 12;
 
 const API = {
   main_page: undefined,
+  file_base_url: null,
   team_id: null,
   getItem(data = null) {
     let cache = true;

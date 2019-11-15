@@ -106,7 +106,7 @@
           :title="item.name"
           :key="'item_'+index"
         >
-          <div slot="media" class="whs-item-image"></div>
+          <div slot="media" class="whs-item-image" :style="[item.image ? {'background-image': `url(${item.image})`}: itemStyle]"></div>
           <div class="whs-item-row">QUANTITY: {{item.quantity}}</div>
           <!--<div class="whs-item-row">LOCATIONS: 10</div>-->
           <div class="whs-item-row description" v-if="item.description">{{item.description}}</div>
@@ -123,7 +123,7 @@
           :title="location.name"
           :key="'location_'+index"
         >
-          <div slot="media" class="whs-item-image"></div>
+          <div slot="media" class="whs-item-image" :style="[location.image ? {'background-image': `url(${location.image})`}: locationStyle]"></div>
           <div class="whs-item-row">CAPACITY: {{location.pallet_capacity}}</div>
           <div class="whs-item-row">{{location.description}}</div>
         </f7-list-item>
@@ -139,7 +139,7 @@
           :title="tag.name"
           :key="index"
         >
-          <div slot="media" class="whs-item-image"></div>
+          <div slot="media" class="whs-item-image" :style="[tag.image ? {'background-image': `url(${tag.image})`}: tagStyle]"></div>
           <!--
           <div class="whs-item-row">LOCATIONS: 2000</div>
           <div class="whs-item-row">Items: 500</div>-->
@@ -317,8 +317,12 @@ export default {
     EmptyBlock,
   },
   created() {
+    const self = this;
     API.main_page = this;
-    API.team_id = this.$root.team.id;   
+    API.team_id = this.$root.team.id;
+    //set patch for styles 
+    const addon = self.$root.addons.filter(a => a.package === 'whs')[0];
+    API.file_base_url = addon.file_base_url;
   },
   computed: {
     activityFilterTitle(){
@@ -336,6 +340,30 @@ export default {
           return this.settings[this.activity_filter].plural_name;
           break;
       }
+    },
+    itemStyle(){
+      return {
+        "background-image": `url(${API.file_base_url+this.settings.item.image})`,
+        'opacity': 0.3
+      }
+    },
+    locationStyle(){
+      return {
+        "background-image": `url(${API.file_base_url+this.settings.location.image})`,
+        'opacity': 0.3
+      }
+    },
+    tagStyle(){
+      return {
+        "background-image": `url(${API.file_base_url+this.settings.tag.image})`,
+        'opacity': 0.3
+      }      
+    },
+    activityStyle(){
+      return {
+        "background-image": `url(${API.file_base_url+this.settings.activity.image})`,
+        'opacity': 0.3
+      }      
     }
   },
   methods: {
@@ -477,6 +505,7 @@ export default {
   },
   data() {
     self = this;
+    console.log("TCL: data -> self", self)
     return {
       activeTab: 'items',
       activeSearchFilter: 'all',
