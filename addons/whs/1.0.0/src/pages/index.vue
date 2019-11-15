@@ -535,43 +535,35 @@ export default {
       const self = this;
       API.getSettings().catch((data)=>{console.log("TCL: getSettings -> data", data); });
     },
-    setDefaultSettings(settings){
+    parseSettings(settings) {
+      console.log("TCL: parseSettings -> settings", settings)
       self = this;
-      if(settings !== null){
-        for(item in self.settings){
-          if(settings[item] !== null && settings[item] !== undefined){
-            for(key in self.settings[item]){
-              if(settings[item][key] === null || settings[item][key] ==="" || settings[item][key] === undefined) settings[item][key] = self.settings[item][key];
-            }
-          }else{
-            settings[item] = self.settings[item];
-          }
-        }
-        return settings;
-      }else{
-        return self.settings;
-      }
+      if (settings === null) return self.settings;
+      //array -> object
+      const new_settings = settings.reduce((obj, item) => {
+        obj[item["name"]] = item.data;
+        return obj;
+      }, {});
+      /// 
+      return self.compareDefSettings(self.settings, new_settings);
     },
-    parseSettings(settings){
-      const new_settings = new Object();
-      self = this;
-      if(settings !== null){
-        const new_settings = settings.reduce((obj, item) => { obj[item["name"]] = item.data; return obj}, {})
-        for(def in self.settings){
-          if (new_settings[def] === undefined) {
-            new_settings[def] = self.settings[def];
-          }else{
-            for(itemDef in self.settings[def]){
-              if(new_settings[def][itemDef] === undefined) {
-                new_settings[def][itemDef] = self.settings[def][itemDef];
-              }
-            } 
+    compareDefSettings(def_settings, new_settings){
+      self = this; 
+      for (def in def_settings) {
+        if (new_settings[def] === undefined) {
+          new_settings[def] = def_settings[def];
+        } else {
+          for (itemDef in def_settings[def]) {
+            if (new_settings[def][itemDef] === undefined) {
+              new_settings[def][itemDef] = def_settings[def][itemDef];
+            }else if(typeof new_settings[def][itemDef] === "object") {
+              //deper check
+              new_settings[def][itemDef] = self.compareDefSettings(def_settings[def][itemDef], new_settings[def][itemDef]);
+            }
           }
         }
-        return new_settings;
-      }else{
-        return self.settings;
       }
+      return new_settings;
     }
   },
   beforeDestroy() {
