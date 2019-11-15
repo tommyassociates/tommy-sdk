@@ -139,10 +139,8 @@
           :title="tag.name"
           :key="index"
         >
-          <div slot="media" class="whs-item-image" :style="[tag.image ? {'background-image': `url(${tag.image})`}: tagStyle]"></div>
-          <!--
-          <div class="whs-item-row">LOCATIONS: 2000</div>
-          <div class="whs-item-row">Items: 500</div>-->
+          <div slot="media" class="whs-item-image" :style="[tag.image ? {'background-image': `url(${tag.image})`}: tagStyle]"></div>          
+          <div class="whs-item-row">COUNT: {{tag.taggings_count}}</div>
         </f7-list-item>
       </f7-list>
       <empty-block v-else :text="$t('whs.common.no_tags')" />
@@ -342,27 +340,55 @@ export default {
       }
     },
     itemStyle(){
-      return {
-        "background-image": `url(${API.file_base_url+this.settings.item.image})`,
-        'opacity': 0.3
+      if (this.settings.location.image.indexOf("base64") === -1){
+        return {
+          "background-image": `url(${API.file_base_url+this.settings.item.image})`,
+          'opacity': 0.3
+        }
+      }else{
+        return {
+          "background-image": `url(${this.settings.item.image})`,
+          'opacity': 0.3
+        }
       }
     },
     locationStyle(){
-      return {
-        "background-image": `url(${API.file_base_url+this.settings.location.image})`,
-        'opacity': 0.3
+      if (this.settings.location.image.indexOf("base64") === -1){
+        return {
+          "background-image": `url(${API.file_base_url+this.settings.location.image})`,
+          'opacity': 0.3
+        }
+      }else{
+        return {
+          "background-image": `url(${this.settings.location.image})`,
+          'opacity': 0.3
+        }
       }
     },
     tagStyle(){
-      return {
-        "background-image": `url(${API.file_base_url+this.settings.tag.image})`,
-        'opacity': 0.3
+      if (this.settings.location.image.indexOf("base64") === -1){
+        return {
+          "background-image": `url(${API.file_base_url+this.settings.tag.image})`,
+          'opacity': 0.3
+        }
+      }else{
+        return {
+          "background-image": `url(${this.settings.tag.image})`,
+          'opacity': 0.3
+        }
       }      
     },
     activityStyle(){
-      return {
-        "background-image": `url(${API.file_base_url+this.settings.activity.image})`,
-        'opacity': 0.3
+      if (this.settings.location.image.indexOf("base64") === -1){
+        return {
+          "background-image": `url(${API.file_base_url+this.settings.activity.image})`,
+          'opacity': 0.3
+        }
+      }else{
+        return {
+          "background-image": `url(${this.settings.activity.image})`,
+          'opacity': 0.3
+        }
       }      
     }
   },
