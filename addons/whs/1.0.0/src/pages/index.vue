@@ -204,8 +204,7 @@
             <div slot="media" class="whs-item-image" :style="[target.image ? {'background-image': `url(${target.image})`}: itemStyle]"></div>
             <div class="whs-item-row">OPEN: {{target.open_count}}</div>
             <div class="whs-item-row">DUE: {{target.due_count}}</div>
-            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>
-            <div class="whs-item-row">DONE: {{target.done_count}}</div>
+            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>            
           </f7-list-item>
           <f7-list-item divider class="more">
             <f7-link @click="actionMoreClick('location')">
@@ -225,8 +224,7 @@
             <div slot="media" class="whs-item-image" :style="[target.image ? {'background-image': `url(${target.image})`}: locationStyle]"></div>
             <div class="whs-item-row">OPEN: {{target.open_count}}</div>
             <div class="whs-item-row">DUE: {{target.due_count}}</div>
-            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>
-            <div class="whs-item-row">DONE: {{target.done_count}}</div>
+            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>            
           </f7-list-item>
 
           <f7-list-item divider class="more">
@@ -247,8 +245,7 @@
             <div slot="media" class="whs-item-image" :style="[target.image ? {'background-image': `url(${target.image})`}: tagStyle]"></div>
             <div class="whs-item-row">OPEN: {{target.open_count}}</div>
             <div class="whs-item-row">DUE: {{target.due_count}}</div>
-            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>
-            <div class="whs-item-row">DONE: {{target.done_count}}</div>
+            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>            
           </f7-list-item>
 
           <f7-list-item divider class="more">
@@ -269,8 +266,7 @@
             <div slot="media" class="whs-item-image" :style="[target.image ? {'background-image': `url(${target.image})`}: roleStyle]"></div>
             <div class="whs-item-row">OPEN: {{target.open_count}}</div>
             <div class="whs-item-row">DUE: {{target.due_count}}</div>
-            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>
-            <div class="whs-item-row">DONE: {{target.done_count}}</div>
+            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>            
           </f7-list-item>
 
           <f7-list-item divider class="more">
@@ -291,8 +287,7 @@
             <div slot="media" class="whs-item-image" :style="[target.image_url ? {'background-image': `url(${target.image_url})`}: teamStyle]"></div>
             <div class="whs-item-row">OPEN: {{target.open_count}}</div>
             <div class="whs-item-row">DUE: {{target.due_count}}</div>
-            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>
-            <div class="whs-item-row">DONE: {{target.done_count}}</div>
+            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>            
           </f7-list-item>
         </f7-list>
 
