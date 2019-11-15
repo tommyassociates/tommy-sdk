@@ -195,15 +195,17 @@
             {{settings.item.plural_name}}
           </f7-list-item>
           <f7-list-item
-            v-for="(index) in 2"
+            v-for="(target, index) in activities_main.items"
             chevron-center
             link
-            title="Item"
+            :title="target.name"
             :key='"activity_item_"+index'
           >
-            <div slot="media" class="whs-item-image"></div>
-            <div class="whs-item-row">LOCATIONS: 2000</div>
-            <div class="whs-item-row">Items: 500</div>
+            <div slot="media" class="whs-item-image" :style="[target.image ? {'background-image': `url(${target.image})`}: itemStyle]"></div>
+            <div class="whs-item-row">OPEN: {{target.open_count}}</div>
+            <div class="whs-item-row">DUE: {{target.due_count}}</div>
+            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>
+            <div class="whs-item-row">DONE: {{target.done_count}}</div>
           </f7-list-item>
           <f7-list-item divider class="more">
             <f7-link @click="actionMoreClick('location')">
@@ -214,15 +216,17 @@
             {{settings.location.plural_name}}
           </f7-list-item>
           <f7-list-item
-            v-for="(index) in 2"
+            v-for="(target, index) in activities_main.locations"
             chevron-center
             link
-            title="Location"
+            :title="target.name"
             :key='"activity_location_"+index'
           >
-            <div slot="media" class="whs-item-image"></div>
-            <div class="whs-item-row">LOCATIONS: 2000</div>
-            <div class="whs-item-row">Items: 500</div>
+            <div slot="media" class="whs-item-image" :style="[target.image ? {'background-image': `url(${target.image})`}: locationStyle]"></div>
+            <div class="whs-item-row">OPEN: {{target.open_count}}</div>
+            <div class="whs-item-row">DUE: {{target.due_count}}</div>
+            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>
+            <div class="whs-item-row">DONE: {{target.done_count}}</div>
           </f7-list-item>
 
           <f7-list-item divider class="more">
@@ -234,15 +238,17 @@
             {{settings.tag.plural_name}}
           </f7-list-item>
           <f7-list-item
-            v-for="(index) in 2"
+            v-for="(target, index) in activities_main.tags"
             chevron-center
             link
-            title="Tag"
+            :title="target.name"
             :key='"activity_tag_"+index'
           >
-            <div slot="media" class="whs-item-image"></div>
-            <div class="whs-item-row">LOCATIONS: 2000</div>
-            <div class="whs-item-row">Items: 500</div>
+            <div slot="media" class="whs-item-image" :style="[target.image ? {'background-image': `url(${target.image})`}: tagStyle]"></div>
+            <div class="whs-item-row">OPEN: {{target.open_count}}</div>
+            <div class="whs-item-row">DUE: {{target.due_count}}</div>
+            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>
+            <div class="whs-item-row">DONE: {{target.done_count}}</div>
           </f7-list-item>
 
           <f7-list-item divider class="more">
@@ -254,15 +260,17 @@
             {{$t('whs.popover.activity.role')}}
           </f7-list-item>
           <f7-list-item
-            v-for="(index) in 2"
+            v-for="(target, index) in activities_main.roles"
             chevron-center
             link
-            title="Roles"
+            :title="target.name"
             :key='"activity_role_"+index'
           >
-            <div slot="media" class="whs-item-image"></div>
-            <div class="whs-item-row">LOCATIONS: 2000</div>
-            <div class="whs-item-row">Items: 500</div>
+            <div slot="media" class="whs-item-image" :style="[target.image ? {'background-image': `url(${target.image})`}: roleStyle]"></div>
+            <div class="whs-item-row">OPEN: {{target.open_count}}</div>
+            <div class="whs-item-row">DUE: {{target.due_count}}</div>
+            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>
+            <div class="whs-item-row">DONE: {{target.done_count}}</div>
           </f7-list-item>
 
           <f7-list-item divider class="more">
@@ -274,15 +282,17 @@
             {{$t('whs.popover.activity.team')}}
           </f7-list-item>
           <f7-list-item
-            v-for="(index) in 2"
+            v-for="(target, index) in activities_main.team"
             chevron-center
             link
-            title="Team"
+            :title="target.first_name+' '+target.last_name"
             :key='"activity_team_"+index'
           >
-            <div slot="media" class="whs-item-image"></div>
-            <div class="whs-item-row">LOCATIONS: 2000</div>
-            <div class="whs-item-row">Items: 500</div>
+            <div slot="media" class="whs-item-image" :style="[target.image_url ? {'background-image': `url(${target.image_url})`}: teamStyle]"></div>
+            <div class="whs-item-row">OPEN: {{target.open_count}}</div>
+            <div class="whs-item-row">DUE: {{target.due_count}}</div>
+            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>
+            <div class="whs-item-row">DONE: {{target.done_count}}</div>
           </f7-list-item>
         </f7-list>
 
@@ -342,52 +352,66 @@ export default {
     itemStyle(){
       if (this.settings.location.image.indexOf("base64") === -1){
         return {
-          "background-image": `url(${API.file_base_url+this.settings.item.image})`,
-          'opacity': 0.3
+          "background-image": `url(${API.file_base_url+this.settings.item.image})`,          
         }
       }else{
         return {
-          "background-image": `url(${this.settings.item.image})`,
-          'opacity': 0.3
+          "background-image": `url(${this.settings.item.image})`,          
         }
       }
     },
     locationStyle(){
       if (this.settings.location.image.indexOf("base64") === -1){
         return {
-          "background-image": `url(${API.file_base_url+this.settings.location.image})`,
-          'opacity': 0.3
+          "background-image": `url(${API.file_base_url+this.settings.location.image})`,          
         }
       }else{
         return {
-          "background-image": `url(${this.settings.location.image})`,
-          'opacity': 0.3
+          "background-image": `url(${this.settings.location.image})`,          
         }
       }
     },
     tagStyle(){
       if (this.settings.location.image.indexOf("base64") === -1){
         return {
-          "background-image": `url(${API.file_base_url+this.settings.tag.image})`,
-          'opacity': 0.3
+          "background-image": `url(${API.file_base_url+this.settings.tag.image})`,          
         }
       }else{
         return {
-          "background-image": `url(${this.settings.tag.image})`,
-          'opacity': 0.3
+          "background-image": `url(${this.settings.tag.image})`,          
         }
       }      
     },
     activityStyle(){
       if (this.settings.location.image.indexOf("base64") === -1){
         return {
-          "background-image": `url(${API.file_base_url+this.settings.activity.image})`,
-          'opacity': 0.3
+          "background-image": `url(${API.file_base_url+this.settings.activity.image})`,          
         }
       }else{
         return {
-          "background-image": `url(${this.settings.activity.image})`,
-          'opacity': 0.3
+          "background-image": `url(${this.settings.activity.image})`,          
+        }
+      }      
+    },
+    roleStyle(){
+      if (this.settings.location.image.indexOf("base64") === -1){
+        return {
+          "background-image": `url(${API.file_base_url+this.settings.role.image})`,          
+        }
+      }else{
+        return {
+          "background-image": `url(${this.settings.role.image})`,          
+        }
+      }      
+    },
+    teamStyle(){
+      if (this.settings.location.image.indexOf("base64") === -1){
+        return {
+          "background-image": `url(${API.file_base_url+this.settings.team.image})`,          
+        }
+      }else{
+        return {
+          "background-image": `url(${this.settings.team.image})`,          
         }
       }      
     }
@@ -401,20 +425,58 @@ export default {
       const self = this;
       API.getLocations().then((data)=>{self.locations = data});
     },
-    getActivities(target = false){
+    getActivities(){
       self = this;
-      const options ={
+      const options = {
         'with_activity_counts': true,
         'page_limit': 2,
       }
-      if(target === false){
+        /*
         API.getItem(options).then((data)=>{self.activities_main.items = data});
         API.getLocations(options).then((data)=>{self.activities_main.locations = data});
         API.getTags(options).then((data)=>{self.activities_main.tags = data});
         API.getRoles(options).then((data)=>{self.activities_main.roles = data});
         API.getTeam(options).then((data)=>{self.activities_main.team = data});
+*/
+        //witot limit page
+        API.getItem(options).then((data)=>{self.activities_main.items = [data[0],data[1]]});
+        API.getLocations(options).then((data)=>{self.activities_main.locations = [data[0],data[1]]});
+        API.getTags(options).then((data)=>{self.activities_main.tags = [data[0],data[1]]});
+        API.getRoles(options).then((data)=>{self.activities_main.roles = [data[0],data[1]]});
+        API.getTeam(options).then((data)=>{self.activities_main.team = [data[0],data[1]]});
+    },
+    getActivitiesMore(target){
+      self = this;
+      const options = {
+        'with_activity_counts': true,
       }
-      //API.getActivities().then((data)=>{self.activities = data});
+      //reset data
+      self.activities_more = {
+        data: [],
+        detail_link: "",
+      }
+      switch (target){
+        case "item":
+          API.getItem(options).then((data)=>{self.activities_more.data = data});
+          self.activities_more.detail_link = ""
+          break;
+        case "location":
+          API.getLocations(options).then((data)=>{self.activities_more.data = data});
+          self.activities_more.detail_link = ""
+          break;
+        case "tag":
+          API.getTags(options).then((data)=>{self.activities_more.data = data});
+          self.activities_more.detail_link = ""
+          break;
+        case "role":
+          API.getRoles(options).then((data)=>{self.activities_more.data = data});
+          self.activities_more.detail_link = ""
+          break;
+        case "team":
+          API.getTeam(options).then((data)=>{self.activities_more.data = data});
+          self.activities_more.detail_link = ""
+          break;
+      }
     },
     getTags(){
       const self = this;
@@ -547,6 +609,10 @@ export default {
         tags:[],
         roles:[],
         team:[],
+      },
+      activities_more: {
+        data: [],
+        detail_link: "",
       },
       activity_filter: "all",
       settings: Settings,      
