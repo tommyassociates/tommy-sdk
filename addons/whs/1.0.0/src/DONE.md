@@ -4,6 +4,7 @@
 -   Dynamic empty images for items, locations, tags
 -   Dynamic names for items, tags, locations
 -   Fixed subnavbar menu
+-   Skeleton loading animation
 
 ## Items
 
@@ -73,3 +74,4 @@
 ## Others
 
 -   Number & currency format functions
+-   Refactoring lists on main page

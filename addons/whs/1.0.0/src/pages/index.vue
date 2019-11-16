@@ -97,54 +97,51 @@
       </f7-list>
     </f7-popover>
 
-    <template v-if="activeTab === 'items' && !searchEnabled">
-      <f7-list class="whs-list" media-list v-if="items.length >0">
-        <f7-list-item
-          v-for="(item, index) in items"
-          chevron-center
-          :link="`/whs/item/?id=${item.id}&index=${index}`"
-          :title="item.name"
-          :key="'item_'+index"
-        >
-          <div slot="media" class="whs-item-image" :style="[item.image ? {'background-image': `url(${item.image})`}: itemStyle]"></div>
-          <div class="whs-item-row">QUANTITY: {{item.quantity}}</div>
-          <!--<div class="whs-item-row">LOCATIONS: 10</div>-->
-          <div class="whs-item-row description" v-if="item.description">{{item.description}}</div>
-        </f7-list-item>
-      </f7-list>
-      <empty-block v-else :text="$t('whs.common.no', { text: settings.item.plural_name})" />
-    </template>
-    <template v-if="activeTab === 'locations' && !searchEnabled">
-      <f7-list class="whs-list" media-list v-if="locations.length > 0">
-        <f7-list-item
-          v-for="(location, index) in locations"
-          chevron-center
-          :link="`/whs/location/?id=${location.id}&index=${index}`"
-          :title="location.name"
-          :key="'location_'+index"
-        >
-          <div slot="media" class="whs-item-image" :style="[location.image ? {'background-image': `url(${location.image})`}: locationStyle]"></div>
-          <div class="whs-item-row">CAPACITY: {{location.pallet_capacity}}</div>
-          <div class="whs-item-row">{{location.description}}</div>
-        </f7-list-item>
-      </f7-list>
-      <empty-block v-else :text="$t('whs.common.no', { text: settings.location.plural_name})" />
-    </template>
-    <template v-if="activeTab === 'tags' && !searchEnabled">
-      <f7-list class="whs-list" media-list v-if="tags.length > 0">
-        <f7-list-item
-          v-for="(tag, index) in tags"
-          chevron-center
-          :link="`/whs/tag/?id=${tag.id}&index=${index}`"
-          :title="tag.name"
-          :key="index"
-        >
-          <div slot="media" class="whs-item-image" :style="[tag.image ? {'background-image': `url(${tag.image})`}: tagStyle]"></div>          
-          <div class="whs-item-row">COUNT: {{tag.taggings_count}}</div>
-        </f7-list-item>
-      </f7-list>
-      <empty-block v-else :text="$t('whs.common.no_tags')" />
-    </template>
+    <main-list
+      v-if="activeTab === 'items' && !searchEnabled" 
+      type="item" 
+      :data="items" 
+      detailUrl="/whs/item/" 
+      :styleImage="itemStyle"
+      :loaded="loaded.item"
+      :rows="
+        [
+          { 
+            name: 'Quantity',
+            link: 'quantity'
+          }
+        ]"
+    />
+    <main-list
+      v-if="activeTab === 'locations' && !searchEnabled"
+      type="location" 
+      :data="locations" 
+      detailUrl="/whs/location/" 
+      :styleImage="locationStyle"
+      :loaded="loaded.location"
+      :rows="
+        [
+          { 
+            name: 'Capacity',
+            link: 'pallet_capacity'
+          }
+        ]"
+    />
+    <main-list
+      v-if="activeTab === 'tags' && !searchEnabled"
+      type="tag" 
+      :data="tags" 
+      detailUrl="/whs/tag/" 
+      :styleImage="tagStyle"
+      :loaded="loaded.tag"
+      :rows="
+        [
+          { 
+            name: 'Count',
+            link: 'taggings_count'
+          }
+        ]"
+    />
     <template v-if="activeTab === 'activity' && !searchEnabled">
       <f7-popover class="whs-popover whs-popover-activity" :backdrop="false">
         <f7-list no-chevron>
@@ -194,18 +191,23 @@
           <f7-list-item divider class="divider-title">
             {{settings.item.plural_name}}
           </f7-list-item>
-          <f7-list-item
-            v-for="(target, index) in activities_main.items"
-            chevron-center
-            link
-            :title="target.name"
-            :key='"activity_item_"+index'
-          >
-            <div slot="media" class="whs-item-image" :style="[target.image ? {'background-image': `url(${target.image})`}: itemStyle]"></div>
-            <div class="whs-item-row">OPEN: {{target.open_count}}</div>
-            <div class="whs-item-row">DUE: {{target.due_count}}</div>
-            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>            
-          </f7-list-item>
+          <f7-list-item-row>
+            <main-list
+              type="item" 
+              :data="activities_main.items" 
+              detailUrl="/whs/item/" 
+              :styleImage="itemStyle"
+              :loaded="loaded.activity.item"
+              :skeleton_count=2
+              :rows="
+                [
+                  {name: 'Open', link: 'open_count'},
+                  {name: 'Due', link: 'due_count'},
+                  {name: 'Overdue', link: 'overdue_count'}
+                ]"
+            />
+          </f7-list-item-row>
+
           <f7-list-item divider class="more">
             <f7-link @click="actionMoreClick('location')">
               {{$t('whs.common.more')}}
@@ -214,18 +216,22 @@
           <f7-list-item divider class="divider-title">
             {{settings.location.plural_name}}
           </f7-list-item>
-          <f7-list-item
-            v-for="(target, index) in activities_main.locations"
-            chevron-center
-            link
-            :title="target.name"
-            :key='"activity_location_"+index'
-          >
-            <div slot="media" class="whs-item-image" :style="[target.image ? {'background-image': `url(${target.image})`}: locationStyle]"></div>
-            <div class="whs-item-row">OPEN: {{target.open_count}}</div>
-            <div class="whs-item-row">DUE: {{target.due_count}}</div>
-            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>            
-          </f7-list-item>
+          <f7-list-item-row>
+            <main-list
+              type="location" 
+              :data="activities_main.locations" 
+              detailUrl="/whs/location/" 
+              :styleImage="locationStyle"
+              :loaded="loaded.activity.location"
+              :skeleton_count=2
+              :rows="
+                [
+                  {name: 'Open', link: 'open_count'},
+                  {name: 'Due', link: 'due_count'},
+                  {name: 'Overdue', link: 'overdue_count'}
+                ]"
+            />
+          </f7-list-item-row>
 
           <f7-list-item divider class="more">
             <f7-link @click="actionMoreClick('tag')">
@@ -235,18 +241,22 @@
           <f7-list-item divider class="divider-title">
             {{settings.tag.plural_name}}
           </f7-list-item>
-          <f7-list-item
-            v-for="(target, index) in activities_main.tags"
-            chevron-center
-            link
-            :title="target.name"
-            :key='"activity_tag_"+index'
-          >
-            <div slot="media" class="whs-item-image" :style="[target.image ? {'background-image': `url(${target.image})`}: tagStyle]"></div>
-            <div class="whs-item-row">OPEN: {{target.open_count}}</div>
-            <div class="whs-item-row">DUE: {{target.due_count}}</div>
-            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>            
-          </f7-list-item>
+          <f7-list-item-row>
+            <main-list
+              type="tag" 
+              :data="activities_main.tags" 
+              detailUrl="/whs/tag/" 
+              :styleImage="tagStyle"
+              :loaded="loaded.activity.tag"
+              :skeleton_count=2
+              :rows="
+                [
+                  {name: 'Open', link: 'open_count'},
+                  {name: 'Due', link: 'due_count'},
+                  {name: 'Overdue', link: 'overdue_count'}
+                ]"
+            />
+          </f7-list-item-row>
 
           <f7-list-item divider class="more">
             <f7-link @click="actionMoreClick('role')">
@@ -256,18 +266,22 @@
           <f7-list-item divider class="divider-title">
             {{$t('whs.popover.activity.role')}}
           </f7-list-item>
-          <f7-list-item
-            v-for="(target, index) in activities_main.roles"
-            chevron-center
-            link
-            :title="target.name"
-            :key='"activity_role_"+index'
-          >
-            <div slot="media" class="whs-item-image" :style="[target.image ? {'background-image': `url(${target.image})`}: roleStyle]"></div>
-            <div class="whs-item-row">OPEN: {{target.open_count}}</div>
-            <div class="whs-item-row">DUE: {{target.due_count}}</div>
-            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>            
-          </f7-list-item>
+          <f7-list-item-row>
+            <main-list
+              type="role" 
+              :data="activities_main.roles" 
+              detailUrl="/whs/role/" 
+              :styleImage="roleStyle"
+              :loaded="loaded.activity.role"
+              :skeleton_count=2
+              :rows="
+                [
+                  {name: 'Open', link: 'open_count'},
+                  {name: 'Due', link: 'due_count'},
+                  {name: 'Overdue', link: 'overdue_count'}
+                ]"
+            />
+          </f7-list-item-row>
 
           <f7-list-item divider class="more">
             <f7-link @click="actionMoreClick('team')">
@@ -277,20 +291,24 @@
           <f7-list-item divider class="divider-title">
             {{$t('whs.popover.activity.team')}}
           </f7-list-item>
-          <f7-list-item
-            v-for="(target, index) in activities_main.team"
-            chevron-center
-            link
-            :title="target.first_name+' '+target.last_name"
-            :key='"activity_team_"+index'
-          >
-            <div slot="media" class="whs-item-image" :style="[target.image_url ? {'background-image': `url(${target.image_url})`}: teamStyle]"></div>
-            <div class="whs-item-row">OPEN: {{target.open_count}}</div>
-            <div class="whs-item-row">DUE: {{target.due_count}}</div>
-            <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>            
-          </f7-list-item>
+          <f7-list-item-row>
+            <main-list
+              type="team" 
+              :data="activities_main.team" 
+              detailUrl="/whs/team/" 
+              :styleImage="teamStyle"
+              :loaded="loaded.activity.team"
+              :skeleton_count=2
+              image_link="image_url"
+              :rows="
+                [
+                  {name: 'Open', link: 'open_count'},
+                  {name: 'Due', link: 'due_count'},
+                  {name: 'Overdue', link: 'overdue_count'}
+                ]"
+            />
+          </f7-list-item-row>
         </f7-list>
-
 
         <f7-list v-else class="selected whs-list whs-main-activity" media-list>
           <f7-list-item
@@ -305,6 +323,24 @@
             <div class="whs-item-row">DUE: {{target.due_count}}</div>
             <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>   
           </f7-list-item>
+
+          <f7-list-item-row>
+            <main-list
+              :type="activities_more.target" 
+              :data="activities_more.data" 
+              :detailUrl="'/whs/'+activities_more.target+'/'" 
+              :styleImage="moreActivitiesStyle"
+              :loaded="loaded.activity_more"
+              :image_link="activities_more.target === 'team' ? 'image_url' : 'image'"
+              :rows="
+                [
+                  {name: 'Open', link: 'open_count'},
+                  {name: 'Due', link: 'due_count'},
+                  {name: 'Overdue', link: 'overdue_count'}
+                ]"
+            />
+          </f7-list-item-row>
+
         </f7-list>
       <!--<empty-block v-if="activity.length === 0" :text="$t('whs.common.no', { text: settings.activity.plural_name})" />--> 
     </template>
@@ -315,10 +351,12 @@
 import API from "../api";
 import Settings from "../settings";
 import EmptyBlock from '../components/empty-block.vue';
+import MainList from '../components/main-list.vue';
 
 export default {
   components: {
     EmptyBlock,
+    'main-list': MainList,
   },
   created() {
     const self = this;
@@ -435,11 +473,11 @@ export default {
   methods: {
     getItem(){
       const self = this;
-      API.getItem().then((data)=>{self.items = data});
+      API.getItem().then((data)=>{self.items = data; self.loaded.item = true;});
     },
     getLocations(){
       const self = this;
-      API.getLocations().then((data)=>{self.locations = data});
+      API.getLocations().then((data)=>{self.locations = data; self.loaded.location = true;});
     },
     getActivities(){
       self = this;
@@ -448,18 +486,18 @@ export default {
         'page_limit': 2,
       }
         /*
-        API.getItem(options).then((data)=>{self.activities_main.items = data});
-        API.getLocations(options).then((data)=>{self.activities_main.locations = data});
-        API.getTags(options).then((data)=>{self.activities_main.tags = data});
-        API.getRoles(options).then((data)=>{self.activities_main.roles = data});
-        API.getTeam(options).then((data)=>{self.activities_main.team = data});
+        API.getItem(options).then((data)=>{self.activities_main.items = data; self.loaded.activity.item = true;});
+        API.getLocations(options).then((data)=>{self.activities_main.locations = data; self.loaded.activity.location = true;});
+        API.getTags(options).then((data)=>{self.activities_main.tags = data; self.loaded.activity.tag = true;});
+        API.getRoles(options).then((data)=>{self.activities_main.roles = data; self.loaded.activity.role = true;});
+        API.getTeam(options).then((data)=>{self.activities_main.team = data; self.loaded.activity.team = true;});
 */
         //witot limit page
-        API.getItem(options).then((data)=>{self.activities_main.items = [data[0],data[1]]});
-        API.getLocations(options).then((data)=>{self.activities_main.locations = [data[0],data[1]]});
-        API.getTags(options).then((data)=>{self.activities_main.tags = [data[0],data[1]]});
-        API.getRoles(options).then((data)=>{self.activities_main.roles = [data[0],data[1]]});
-        API.getTeam(options).then((data)=>{self.activities_main.team = [data[0],data[1]]});
+        API.getItem(options).then((data)=>{self.activities_main.items = [data[0],data[1]]; self.loaded.activity.item = true;});
+        API.getLocations(options).then((data)=>{self.activities_main.locations = [data[0],data[1]]; self.loaded.activity.location = true;});
+        API.getTags(options).then((data)=>{self.activities_main.tags = [data[0],data[1]]; self.loaded.activity.tag = true;});
+        API.getRoles(options).then((data)=>{self.activities_main.roles = [data[0],data[1]]; self.loaded.activity.role = true;});
+        API.getTeam(options).then((data)=>{self.activities_main.team = [data[0],data[1]]; self.loaded.activity.team = true;});
     },
     getActivitiesMore(target){
       self = this;
@@ -472,32 +510,29 @@ export default {
         target: target,
         detail_link: "",
       }
+      //reset loader
+      self.loaded.activity_more = false;
       switch (target){
         case "item":
-          API.getItem(options).then((data)=>{self.activities_more.data = data});
-          self.activities_more.detail_link = ""
+          API.getItem(options).then((data)=>{self.activities_more.data = data; self.loaded.activity_more = true;});
           break;
         case "location":
-          API.getLocations(options).then((data)=>{self.activities_more.data = data});
-          self.activities_more.detail_link = ""
+          API.getLocations(options).then((data)=>{self.activities_more.data = data; self.loaded.activity_more = true;});
           break;
         case "tag":
-          API.getTags(options).then((data)=>{self.activities_more.data = data});
-          self.activities_more.detail_link = ""
+          API.getTags(options).then((data)=>{self.activities_more.data = data; self.loaded.activity_more = true;});
           break;
         case "role":
-          API.getRoles(options).then((data)=>{self.activities_more.data = data});
-          self.activities_more.detail_link = ""
+          API.getRoles(options).then((data)=>{self.activities_more.data = data; self.loaded.activity_more = true;});
           break;
         case "team":
-          API.getTeam(options).then((data)=>{self.activities_more.data = data});
-          self.activities_more.detail_link = ""
+          API.getTeam(options).then((data)=>{self.activities_more.data = data; self.loaded.activity_more = true;});
           break;
       }
     },
     getTags(){
       const self = this;
-      API.getTags().then((data)=>{self.tags = data});
+      API.getTags().then((data)=>{self.tags = data; self.loaded.tag = true;});
     },
     onSearchbarSearch(query) {
       const self = this;
@@ -518,22 +553,21 @@ export default {
     },
     itemUpdated(){ 
       self = this;
+      self.loaded.item = false;
       API.resetCache('inventory/items');
       self.getItem();
     },
     locationUpdated(){
       self = this;
+      self.loaded.location = false;
       API.resetCache('inventory/locations');
       self.getLocations();
     },
     tagUpdated(){
       self = this;
+      self.loaded.tag = false;
       API.resetCache('inventory/tags');
       self.getTags();
-    },
-    getSettings(){
-      const self = this;
-      API.getSettings().catch((data)=>{console.log("TCL: getSettings -> data", data); });
     },
     parseSettings(settings) {
       console.log("TCL: parseSettings -> settings", settings)
@@ -584,6 +618,7 @@ export default {
     //API.deleteSettings('mainSettings');
     API.getSettings().then((res) => {
       self.settings = self.parseSettings(res);
+      self.loaded.settings = true;
       self.getItem();
       self.getLocations();
       self.getActivities();
@@ -599,7 +634,7 @@ export default {
     self.$events.$on('location:deleted', self.locationUpdated);
     self.$events.$on('tag:updated', self.tagUpdated);
     self.$events.$on('tag:aded', self.tagUpdated);
-    self.$events.$on('tag:deleted', self.tagnUpdated);
+    self.$events.$on('tag:deleted', self.tagUpdated);
     
   },
   data() {
@@ -624,10 +659,23 @@ export default {
       activities_more: {
         data: [],
         target: "",
-        detail_link: "",        
       },
       activity_filter: "all",
-      settings: Settings,      
+      settings: Settings,
+      loaded:{
+        settings: false,
+        item: false,
+        location: false,
+        tag: false,
+        activity: {
+          item: false,
+          location: false,
+          tag: false,
+          role: false,
+          team: false,
+        },
+        activity_more: false
+      }      
     };
   }
 }; 

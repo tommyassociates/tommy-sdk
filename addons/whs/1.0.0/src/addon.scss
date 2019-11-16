@@ -4,6 +4,7 @@ $orange: #FF5413;
   background-image: url("data:image/svg+xml;charset=utf-8,#{$svg}");
 }
 @import "./scss/icons.scss";
+@import "./scss/skeleton.scss";
 @import "./utils/color-picker/color-picker.scss";
 
 .whs-navbar-links {
@@ -38,6 +39,9 @@ $orange: #FF5413;
   .whs-item-row {
     font-size: 16px;
     color: #999;
+    span{
+      text-transform: uppercase;
+    }
   }
   .description{
     overflow: hidden;
@@ -298,6 +302,9 @@ $orange: #FF5413;
     &:before{
       display: none;
     }
+  }
+  .item-row ul{
+    padding: 0 !important;;
   }
 }
 .whs-popover-activity{
