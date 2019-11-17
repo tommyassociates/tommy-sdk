@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="main-list-container">
     <template v-if="loaded">
       <f7-list class="whs-list" media-list v-if="data.length >0 ">
         <f7-list-item
