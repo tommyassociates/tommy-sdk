@@ -23,6 +23,7 @@
     "price_placeholder": "E.g. 123.456...",
     "tags_label": "Tags",
     "tags_search_placeholder": "Search Tags...",
+    "select_tags_title": "Select Tags",
     "minimum_stock_level_label": "Minimum Stock Level",
     "minimum_stock_level_placeholder": "E.g. 12345...",
     "location_quantity_label": "Quantity",
@@ -38,6 +39,10 @@
     "active_location_label": "Active Location",
     "location_category_label": "Location Category",
     "location_category_placeholder": "Select Category",
+    "date_label": "Date",
+    "type_label": "Type",
+    "assets_label": "Assets",
+    "options_title": "Options",
     "required_name_error": "Please enter a name",
     "dashboard": "Dashboard",
     "more": "More",
@@ -74,7 +79,14 @@
     "title": "Add {{text}}",
     "title_edit": "Edit {{text}}",
     "title_delete": "Delete {{text}}",
-    "add_more_button": "Add Another {{text}}"
+    "add_more_button": "Add Another {{text}}",
+    "type_options":{      
+      "unspecified": "Please select...",
+      "pending_out": "Pending Out",
+      "pending_in": "Pending In",
+      "movement": "Movement",
+      "stocktake": "Stocktake"
+    }
   },
   "settings": {
     "name_label": "Name",

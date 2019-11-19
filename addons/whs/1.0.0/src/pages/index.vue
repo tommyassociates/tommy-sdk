@@ -318,7 +318,7 @@
             :title="target.name || target.first_name+' '+target.last_name"
             :key='"activity_selected_"+index'
           >
-            <div slot="media" class="whs-item-image" :style="[target.image ? {'background-image': `url(${target.image})`}: moreActivitiesStyle]"></div>
+            <div slot="media" class="whs-item-image" :style="[target.image ? {'background-image': `url(${target.image})`}: dynamicStyle]"></div>
             <div class="whs-item-row">OPEN: {{target.open_count}}</div>
             <div class="whs-item-row">DUE: {{target.due_count}}</div>
             <div class="whs-item-row">OVERDUE: {{target.overdue_count}}</div>   
@@ -329,7 +329,7 @@
               :type="activities_more.target" 
               :data="activities_more.data" 
               :detailUrl="'/whs/'+activities_more.target+'/'" 
-              :styleImage="moreActivitiesStyle"
+              :styleImage="dynamicStyle"
               :loaded="loaded.activity_more"
               :image_link="activities_more.target === 'team' ? 'image_url' : 'image'"
               :rows="
@@ -352,12 +352,14 @@ import API from "../api";
 import Settings from "../settings";
 import EmptyBlock from '../components/empty-block.vue';
 import MainList from '../components/main-list.vue';
+import ListStyles from '../mixins/list-styles.vue';
 
 export default {
   components: {
     EmptyBlock,
     'main-list': MainList,
   },
+  mixins: [ListStyles],
   created() {
     const self = this;
     API.main_page = this;
@@ -380,92 +382,6 @@ export default {
           break;
         default:
           return this.settings[this.activity_filter].plural_name;
-          break;
-      }
-    },
-    itemStyle(){
-      if (this.settings.location.image.indexOf("base64") === -1){
-        return {
-          "background-image": `url(${API.file_base_url+this.settings.item.image})`,          
-        }
-      }else{
-        return {
-          "background-image": `url(${this.settings.item.image})`,          
-        }
-      }
-    },
-    locationStyle(){
-      if (this.settings.location.image.indexOf("base64") === -1){
-        return {
-          "background-image": `url(${API.file_base_url+this.settings.location.image})`,          
-        }
-      }else{
-        return {
-          "background-image": `url(${this.settings.location.image})`,          
-        }
-      }
-    },
-    tagStyle(){
-      if (this.settings.location.image.indexOf("base64") === -1){
-        return {
-          "background-image": `url(${API.file_base_url+this.settings.tag.image})`,          
-        }
-      }else{
-        return {
-          "background-image": `url(${this.settings.tag.image})`,          
-        }
-      }      
-    },
-    activityStyle(){
-      if (this.settings.location.image.indexOf("base64") === -1){
-        return {
-          "background-image": `url(${API.file_base_url+this.settings.activity.image})`,          
-        }
-      }else{
-        return {
-          "background-image": `url(${this.settings.activity.image})`,          
-        }
-      }      
-    },
-    roleStyle(){
-      if (this.settings.location.image.indexOf("base64") === -1){
-        return {
-          "background-image": `url(${API.file_base_url+this.settings.role.image})`,          
-        }
-      }else{
-        return {
-          "background-image": `url(${this.settings.role.image})`,          
-        }
-      }      
-    },
-    teamStyle(){
-      if (this.settings.location.image.indexOf("base64") === -1){
-        return {
-          "background-image": `url(${API.file_base_url+this.settings.team.image})`,          
-        }
-      }else{
-        return {
-          "background-image": `url(${this.settings.team.image})`,          
-        }
-      }      
-    },
-    moreActivitiesStyle(){
-      self = this;
-      switch (self.activities_more.target){
-        case "item":
-          return self.itemStyle;
-          break;
-        case "location":
-          return self.locationStyle;
-          break;
-        case "tag":
-          return self.tagStyle;
-          break;
-        case "role":
-          return self.roleStyle;
-          break;
-        case "team":
-          return self.teamStyle;
           break;
       }
     }
@@ -492,6 +408,10 @@ export default {
         API.getRoles(options).then((data)=>{self.activities_main.roles = data; self.loaded.activity.role = true;});
         API.getTeam(options).then((data)=>{self.activities_main.team = data; self.loaded.activity.team = true;});
 */
+
+        //for test activity
+        API.getActivities().then((data)=>{console.log("TCL: getActivities -> data", data)});
+        
         //witot limit page
         API.getItem(options).then((data)=>{self.activities_main.items = [data[0],data[1]]; self.loaded.activity.item = true;});
         API.getLocations(options).then((data)=>{self.activities_main.locations = [data[0],data[1]]; self.loaded.activity.location = true;});
@@ -508,8 +428,9 @@ export default {
       self.activities_more = {
         data: [],
         target: target,
-        detail_link: "",
       }
+      //link to more styles list
+      self.dynamicStyleTarget = self.activities_more.target,  
       //reset loader
       self.loaded.activity_more = false;
       switch (target){
@@ -675,7 +596,7 @@ export default {
           team: false,
         },
         activity_more: false
-      }      
+      },       
     };
   }
 }; 

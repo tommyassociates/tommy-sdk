@@ -62,7 +62,7 @@
 
         <f7-list-item divider>
           <i class="whs-form-icon whs-form-icon-hash"></i>
-          {{$t('whs.common.tags_label')}} Not work
+          {{$t('whs.common.tags_label')}}
         </f7-list-item>
         <tags-picker />
         <f7-list-item divider>
@@ -123,7 +123,7 @@
 import API from "../api";
 import FormImagesPicker from '../components/form-images-picker.vue';
 import TagsPicker from '../components/tags-picker.vue';
-import Dialog from '../components/dialog-mixin.vue';
+import Dialog from '../mixins/dialog.vue';
 
 export default {
   components: {

@@ -138,7 +138,7 @@
 import API from "../api";
 import FormImagesPicker from "../components/form-images-picker.vue";
 import TagsPicker from "../components/tags-picker.vue";
-import Dialog from '../components/dialog-mixin.vue';
+import Dialog from '../mixins/dialog.vue';
 
 export default {
   components: {

@@ -52,6 +52,22 @@ $orange: #FF5413;
     width: 100%;
   }
 }
+.list.whs-select-list{
+  .whs-item-image {
+    width: 70px;
+  }
+  .item-media {
+    min-height: 70px;
+    align-self: stretch !important;
+  }
+  .item-inner{
+    padding-right: 50px;
+  }
+  .icon-checkbox{
+    position: absolute;
+    right: 0;
+  }
+}
 .popover.whs-popover {
   background: #fff;
   .popover-angle:after {
@@ -329,6 +345,29 @@ $orange: #FF5413;
   .page-content {
     margin-top: 167px !important;
     padding-top: 0px !important;
+  }
+}
+.whs-type-options{
+  li:first-of-type {
+    display: none;
+  }
+}
+.whs-picker-selected-list{
+  padding: 0 !important;
+  .item-media{
+    width: 40px;
+    height: 100%;
+    background: #eee;
+    background-size: 100% auto;
+    background-position: center;
+    background-repeat: no-repeat;
+    margin-right: 10px;
+  }
+  .item-content{
+    padding: 0 !important;
+  }
+  .item-inner{
+    padding: 0 !important;
   }
 }
 @import "./scss/searchbar.scss";

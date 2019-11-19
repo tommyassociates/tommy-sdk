@@ -5,6 +5,7 @@ import TagDetails from "./pages/tag-details.vue";
 import ItemAdd from "./pages/item-add.vue";
 import TagAdd from "./pages/tag-add.vue";
 import LocationAdd from "./pages/location-add.vue";
+import ActivityAdd from "./pages/activity-add.vue";
 import Settings from "./pages/settings.vue";
 import SettingsItems from "./pages/settings-items.vue";
 import SettingsItemsFields from "./pages/settings-items-fields.vue";
@@ -12,6 +13,7 @@ import SettingsItemsFieldDetails from "./pages/settings-items-field-details.vue"
 import SettingsLocations from "./pages/settings-locations.vue";
 import SettingsTags from "./pages/settings-tags.vue";
 import SettingsActivities from "./pages/settings-activities.vue";
+import SelectTag from "./pages/select-tag.vue";
 
 const routes = [
   {
@@ -44,6 +46,10 @@ const routes = [
     component: LocationAdd
   },
   {
+    path: "/whs/activity-add/",
+    component: ActivityAdd
+  },
+  {
     path: "/whs/settings/",
     component: Settings
   },
@@ -70,6 +76,10 @@ const routes = [
   {
     path: "/whs/settings/activities/",
     component: SettingsActivities
+  },
+  {
+    path: "/whs/select-tag/",
+    component: SelectTag
   }
 ];
 
