@@ -118,12 +118,26 @@
             {{$t('whs.common.location_category_label')}}
           </f7-list-item>
           <f7-list-item
-            link
-            name="category"
-            :value="location.category"
-            @input="location.category = $event.target.value"
-            :title="$t('whs.common.location_category_placeholder')"
-          />
+            class="whs-type-selector"
+            smart-select
+            title= " "
+            :smart-select-params="{
+              openIn: 'popup',
+              pageBackLinkText: '',
+              popupCloseLinkText: '',
+              closeOnSelect: true,
+              pageTitle: $t('whs.common.options_title'),
+              valueEl: '.whs-type-selector .item-title',
+              cssClass: 'whs-type-options'            
+            }"
+          >
+            <select name="category" @change="location.category = $event.target.value">
+              <option value="unspecified" :selected="location.category === 'unspecified' || location.category === ''">{{$t('whs.form_add.location_options.unspecified')}}</option>
+              <option value="frozen" :selected="location.category === 'frozen'">{{$t('whs.form_add.location_options.frozen')}}</option>
+              <option value="ambient" :selected="location.category === 'ambient'">{{$t('whs.form_add.location_options.ambient')}}</option>
+            </select>
+          </f7-list-item>
+
         </ul>
       </f7-list>
     </form>

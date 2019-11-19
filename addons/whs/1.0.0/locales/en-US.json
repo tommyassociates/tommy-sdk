@@ -86,6 +86,16 @@
       "pending_in": "Pending In",
       "movement": "Movement",
       "stocktake": "Stocktake"
+    },
+    "location_options":{      
+      "unspecified": "Select (optional)",
+      "frozen": "Frozen",
+      "ambient": "Ambient"
+    },
+    "item_options":{      
+      "unspecified": "Select (optional)",
+      "freezer": "Freezer",
+      "ambient": "Ambient"
     }
   },
   "settings": {

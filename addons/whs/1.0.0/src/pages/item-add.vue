@@ -103,12 +103,28 @@
         />        
         <f7-list-item divider>
           <i class="whs-form-icon whs-form-icon-check"></i>
-          {{$t('whs.common.storage_label')}} Not work
+          {{$t('whs.common.storage_label')}}
         </f7-list-item>
-        <f7-list-item
-          link
-          :title="$t('whs.common.storage_placeholder')"
-        />
+          <f7-list-item
+            class="whs-type-selector"
+            smart-select
+            title= " "
+            :smart-select-params="{
+              openIn: 'popup',
+              pageBackLinkText: '',
+              popupCloseLinkText: '',
+              closeOnSelect: true,
+              pageTitle: $t('whs.common.options_title'),
+              valueEl: '.whs-type-selector .item-title',
+              cssClass: 'whs-type-options'            
+            }"
+          >
+            <select name="storage_type" @change="item.storage_type = $event.target.value">
+              <option value="unspecified" :selected="item.storage_type === 'unspecified' || item.storage_type === ''">{{$t('whs.form_add.item_options.unspecified')}}</option>
+              <option value="freezer" :selected="item.storage_type === 'freezer'">{{$t('whs.form_add.item_options.freezer')}}</option>
+              <option value="ambient" :selected="item.storage_type === 'ambient'">{{$t('whs.form_add.item_options.ambient')}}</option>
+            </select>
+          </f7-list-item>        
       </ul>
     </f7-list>
     </form>
