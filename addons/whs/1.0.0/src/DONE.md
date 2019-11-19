@@ -20,6 +20,7 @@
 -   Fixed subnavbar menu
 -   Dynamic styles witch description or not
 -   Dynamic image
+-   Storage popup for add form
 
 ## locations
 
@@ -37,6 +38,7 @@
 -   Fixed subnavbar menu
 -   Dynamic styles witch description or not
 -   Dynamic image
+-   Category popup for add form
 
 ## Settings
 
