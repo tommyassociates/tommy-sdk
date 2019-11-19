@@ -59,6 +59,7 @@
 -   Dynamic activity settings (name ,plural name, header_color, highlight_color, font_color)
 -   API roles, team, locations, items
 -   Dynamic image
+-   Add form
 
 
 ## Tags
@@ -75,3 +76,4 @@
 
 -   Number & currency format functions
 -   Refactoring lists on main page
+-   Tag selector
