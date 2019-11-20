@@ -62,7 +62,7 @@
 
         <f7-list-item divider>
           <i class="whs-form-icon whs-form-icon-hash"></i>
-          {{$t('whs.common.tags_label')}}
+          {{settings.tag.name}}
         </f7-list-item>
         <tags-picker />
         <f7-list-item divider>

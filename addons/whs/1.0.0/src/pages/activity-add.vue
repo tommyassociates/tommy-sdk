@@ -67,6 +67,13 @@
               >{{$t('whs.form_add.type_options.stocktake')}}</option>
             </select>
           </f7-list-item>
+          <template v-if="activity.activity_type === 'pending_out' || activity.activity_type === 'pending_in' || activity.activity_type === 'movement'">
+            <f7-list-item divider>
+              <i class="whs-form-icon whs-form-icon-item"></i>
+              {{settings.item.name}}
+            </f7-list-item>
+            <item-picker :multiply="false"/>
+          </template>          
           <!--Assets-->
           <f7-list-item divider>
             <i class="whs-form-icon whs-form-icon-person"></i>
@@ -76,7 +83,7 @@
           <!--Tags-->
           <f7-list-item divider>
             <i class="whs-form-icon whs-form-icon-hash"></i>
-            {{$t('whs.common.tags_label')}}
+            {{settings.tag.name}}
           </f7-list-item>
           <tags-picker />
           <!-- Executed? -->
@@ -125,6 +132,7 @@ import API from "../api";
 import TagsPicker from "../components/tags-picker.vue";
 import AssetsPicker from "../components/assets-picker.vue";
 import TeamPicker from "../components/team-picker.vue";
+import ItemPicker from "../components/item-picker.vue";
 import Dialog from "../mixins/dialog.vue";
 
 export default {
@@ -132,6 +140,7 @@ export default {
     TagsPicker,
     AssetsPicker,
     TeamPicker,
+    ItemPicker,
   },
   mixins: [Dialog],
   created() {

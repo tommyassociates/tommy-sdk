@@ -95,14 +95,14 @@
           <!-- Tags -->
           <f7-list-item divider>
             <i class="whs-form-icon whs-form-icon-hash"></i>
-            {{$t('whs.common.tags_label')}}
+            {{settings.tag.name}}
           </f7-list-item>
           <tags-picker />
 
           <!-- Active Location -->
           <f7-list-item divider>
             <i class="whs-form-icon whs-form-icon-toggle"></i>
-            {{$t('whs.common.active_location_label')}}
+            {{$t('whs.common.active_location_label', {text: settings.location.name})}}
           </f7-list-item>
           <f7-list-item>
             <f7-toggle
@@ -115,7 +115,7 @@
           <!-- Category -->
           <f7-list-item divider>
             <i class="whs-form-icon whs-form-icon-check"></i>
-            {{$t('whs.common.location_category_label')}}
+            {{$t('whs.common.location_category_label', {text: settings.location.name})}}
           </f7-list-item>
           <f7-list-item
             class="whs-type-selector"
