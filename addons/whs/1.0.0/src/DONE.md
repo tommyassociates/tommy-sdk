@@ -79,3 +79,4 @@
 -   Number & currency format functions
 -   Refactoring lists on main page
 -   Tag selector
+-   Assets selector

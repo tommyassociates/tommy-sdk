@@ -1,7 +1,7 @@
 <template>
   <div class="main-list-container">
     <template v-if="loaded">
-      <f7-list class="whs-list whs-select-list searchbar-found" media-list v-if="data.length >0 " :id="'whs-select-'+type">
+      <f7-list class="whs-list whs-select-list searchbar-found" media-list v-if="Object.keys(data).length > 0 " :id="'whs-select-'+type">
         <f7-list-item
           v-for="(item, index) in data"
           checkbox
@@ -48,7 +48,7 @@ export default {
   },
   props: {
     type: String,
-    data: Array,
+    data: Object,
     selected: Array,
     styleImage: Object,
     image_link: {
@@ -73,7 +73,7 @@ export default {
       const self = this;
       if (typeof self.selected === 'undefined') return false;
       return (
-        self.selected.filter(t => t.id === target.id).length > 0
+        self.selected.filter(t => t.id === target.id && t.pseudo_type === target.pseudo_type).length > 0
       );
     },
   },

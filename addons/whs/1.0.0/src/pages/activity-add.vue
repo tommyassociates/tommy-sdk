@@ -57,7 +57,7 @@
           <i class="whs-form-icon whs-form-icon-person"></i>
           {{$t('whs.common.assets_label')}}
         </f7-list-item>
-        <tags-picker />
+        <assets-picker />
         <!--Tags-->
         <f7-list-item divider>
           <i class="whs-form-icon whs-form-icon-hash"></i>
@@ -79,11 +79,13 @@
 <script>
 import API from "../api";
 import TagsPicker from "../components/tags-picker.vue";
+import AssetsPicker from "../components/assets-picker.vue";
 import Dialog from "../mixins/dialog.vue";
 
 export default {
   components: {
-    TagsPicker
+    TagsPicker,
+    AssetsPicker
   },
   mixins: [Dialog],
   created() {
