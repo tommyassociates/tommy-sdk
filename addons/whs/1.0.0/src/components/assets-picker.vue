@@ -5,17 +5,16 @@
         <i class="icon whs-list-search-icon"></i>
       </div>
       <div class="item-inner">
-        <div class="item-title">{{$t('whs.common.tags_search_placeholder')}}</div>
+        <div class="item-title">{{$t('whs.common.assets_search_placeholder')}}</div>
       </div>
     </a>
-    <ul class="tag-items whs-picker-selected-list">
-      <li class="tag-item" v-for="(tag, index) in selected" :key="index">
+    <ul class="asset-items whs-picker-selected-list">
+      <li class="asset-item" v-for="(asset, index) in selected" :key="index">
         <div class="item-content">
           <div class="item-inner">
-            <div class="item-media" :style="[tag.image ? {'background-image': `url(${tag.image})`}: tagStyle]"></div>
-
-            <div class="item-title">{{tag.name}}</div>
-            <div class="item-after"><a style="height: 24px" @click="removeItem(tag.id, tag.pseudo_type)" href="#" class="item-link"><i class="material-icons">close</i></a></div>
+            <div class="item-media" :style="[asset.image ? {'background-image': `url(${asset.image})`}: teamStyle]"></div>
+            <div class="item-title">{{asset.name || asset.first_name+' '+ asset.last_name}}</div>
+            <div class="item-after"><a style="height: 24px" @click="removeItem(asset.id, asset.pseudo_type)" href="#" class="item-link"><i class="material-icons">close</i></a></div>
           </div>
         </div>
       </li>
@@ -48,27 +47,28 @@ import ListStyles from "../mixins/list-styles.vue";
         self.$f7router.navigate('/whs/select-picker/', {
           props: {
             selected: self.selected,
-            pageTitle: self.$t(`whs.common.select_tags_title`),
+            pageTitle: self.$t(`whs.common.select_assets_title`),
             multiply: self.multiply,
             getData: self.getData,
-            type: "tag",
-            onChange(tag, selected) {                            
+            type: "asset",
+            onChange(asset, selected) {                            
               if (selected) {
-                self.$emit('itemAdd', tag);
-                self.addItem(tag);
+                self.$emit('itemAdd', asset);
+                self.addItem(asset);
               } else {
-                self.$emit('itemRemove', tag); 
-                self.deleteItem(tag);
+                self.$emit('itemRemove', asset); 
+                self.deleteItem(asset);
               }
             },
           },
         });
       },
       getData(self){
-        API.getTags().then(data => {
-          data.forEach((item, index)=>{item.pseudo_type = "tag"});
-          Object.assign(self.targets, data);
-          console.log("TCL: getData -> self.targets", self.targets)
+        Promise.all([API.getTeam(), API.getRoles()]).then(data => { 
+        console.log("TCL: getData -> data", data)
+          data[0].forEach((item, index)=>{item.pseudo_type = "team"});
+          data[1].forEach((item, index)=>{item.pseudo_type = "role"});
+          Object.assign(self.targets, data[0].concat(data[1]));          
           self.loaded = true;
           self.createSearchbar();
         });
@@ -79,12 +79,12 @@ import ListStyles from "../mixins/list-styles.vue";
       },
       deleteItem(target){
         self = this;
-        const index = self.selected.findIndex(tag => tag.id === target.id && tag.pseudo_type === target.pseudo_type);
+        const index = self.selected.findIndex(asset => asset.id === target.id && asset.pseudo_type === target.pseudo_type);
         self.selected.splice(index, 1);
       },
       removeItem(itemId, pseudo_type) {
         const self = this;
-        const index = self.selected.findIndex(tag => tag.id === itemId && tag.pseudo_type === pseudo_type);
+        const index = self.selected.findIndex(asset => asset.id === itemId && asset.pseudo_type === pseudo_type);
         self.selected.splice(index, 1);
       },
     },

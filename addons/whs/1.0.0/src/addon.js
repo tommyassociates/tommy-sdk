@@ -13,7 +13,7 @@ import SettingsItemsFieldDetails from "./pages/settings-items-field-details.vue"
 import SettingsLocations from "./pages/settings-locations.vue";
 import SettingsTags from "./pages/settings-tags.vue";
 import SettingsActivities from "./pages/settings-activities.vue";
-import SelectTag from "./pages/select-tag.vue";
+import SelectPicker from "./pages/select-picker.vue";
 
 const routes = [
   {
@@ -78,8 +78,8 @@ const routes = [
     component: SettingsActivities
   },
   {
-    path: "/whs/select-tag/",
-    component: SelectTag
+    path: "/whs/select-picker/",
+    component: SelectPicker
   }
 ];
 
