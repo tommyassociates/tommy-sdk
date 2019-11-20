@@ -299,7 +299,7 @@
               :styleImage="teamStyle"
               :loaded="loaded.activity.team"
               :skeleton_count=2
-              image_link="image_url"
+              image_link="icon_url"
               :rows="
                 [
                   {name: 'Open', link: 'open_count'},
