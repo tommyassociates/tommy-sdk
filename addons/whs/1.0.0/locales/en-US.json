@@ -24,6 +24,8 @@
     "tags_label": "Tags",
     "tags_search_placeholder": "Search Tags...",
     "assets_search_placeholder": "Search Team, Roles...",
+    "executed_label": "Already Executed?",
+    "executed_by_label": "Executed By",
     "select_tags_title": "Select Tags",
     "select_assets_title": "Select Assets",
     "minimum_stock_level_label": "Minimum Stock Level",
