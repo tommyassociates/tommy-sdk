@@ -82,16 +82,19 @@ import ListStyles from "../mixins/list-styles.vue";
           self.selected.splice(0, 99);
           self.selected.push(target)
         }
+        self.$emit("selected:change", self.selected);
       },
       deleteItem(target){
         self = this;
         const index = self.selected.findIndex(asset => asset.id === target.id && asset.pseudo_type === target.pseudo_type);
         self.selected.splice(index, 1);
+        self.$emit("selected:change", self.selected);
       },
       removeItem(itemId, pseudo_type) {
         const self = this;
         const index = self.selected.findIndex(asset => asset.id === itemId && asset.pseudo_type === pseudo_type);
         self.selected.splice(index, 1);
+        self.$emit("selected:change", self.selected);
       },
     },
   }
