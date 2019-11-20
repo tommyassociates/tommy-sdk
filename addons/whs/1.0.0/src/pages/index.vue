@@ -331,7 +331,7 @@
               :detailUrl="'/whs/'+activities_more.target+'/'" 
               :styleImage="dynamicStyle"
               :loaded="loaded.activity_more"
-              :image_link="activities_more.target === 'team' ? 'image_url' : 'image'"
+              :image_link="activities_more.target === 'team' ? 'icon_url' : 'image'"
               :rows="
                 [
                   {name: 'Open', link: 'open_count'},
