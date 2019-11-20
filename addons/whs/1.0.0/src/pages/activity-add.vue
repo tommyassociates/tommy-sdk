@@ -12,7 +12,7 @@
     <form class="list" id="add-activity" action="javascript:void(0)" enctype="multipart/form-data">
       <f7-list class="whs-form">
         <ul>
-          <!-- Name -->
+          <!-- Scheduled -->
           <f7-list-item divider>
             <i class="whs-form-icon whs-form-icon-calendar"></i>
             {{$t('whs.common.date_label')}}
@@ -21,7 +21,7 @@
             readonly
             type="text"
             name="scheduled"
-            :value="activity.scheduled_at !== null ? $moment(activity.scheduled_at).format(settings.main.date) : null"
+            :value="activity.scheduled_at !== null ? $moment(activity.scheduled_at).format(settings.main.date) : $t('whs.common.date_placeholder')"
             @click.native="openScheduledCalendar()"
           />
           <!-- Type -->
@@ -88,7 +88,7 @@
             <f7-toggle
               slot="after"
               :checked="executed"
-              @toggle:change="(value)=>{executed = value}"
+              @toggle:change="executedChange"
             />
           </f7-list-item>
           <template v-if="executed">
@@ -98,6 +98,18 @@
               {{$t('whs.common.executed_by_label')}}
             </f7-list-item>
             <team-picker :multiply="false"/>
+            <!-- Executed -->
+            <f7-list-item divider>
+              <i class="whs-form-icon whs-form-icon-calendar"></i>
+              {{$t('whs.common.date_executed_label')}}
+            </f7-list-item>
+            <f7-list-input
+              readonly
+              type="text"
+              name="executed"
+              :value="activity.executed_at !== null ? $moment(activity.executed_at).format(settings.main.date+' '+settings.main.time) : $t('whs.common.date_placeholder')"
+              @click.native="openExecutedCalendar()"
+            />
           </template>
         </ul>
       </f7-list>
@@ -207,26 +219,67 @@ export default {
     openScheduledCalendar() {
       const self = this;
       self.calendarScheduled.open();
-    }
+    },
+    createScheduledCalendar() {
+      const self = this;
+      let date = new Date();
+      if (self.activity.scheduled_at) date = new Date(self.activity.scheduled_at);
+      self.calendarScheduled = self.$f7.calendar.create({
+        value: [date],
+        openIn: "customModal",
+        backdrop: true,
+        closeOnSelect: true,
+        on: {
+          change(cal, val) {            
+            if(self.calendar_first_change.scheduled){
+              self.activity.scheduled_at = val[0];
+            }else{
+              self.calendar_first_change.scheduled = true;
+            }
+          }
+        }
+      });
+    },
+    openExecutedCalendar() {
+      const self = this;
+      self.calendarExecuted.open();
+    },
+    createExecutedCalendar() {
+      const self = this;
+      let date = new Date();
+      if (self.activity.executed_at) date = new Date(self.activity.executed_at);
+      self.calendarExecuted = self.$f7.calendar.create({
+        value: [date],
+        openIn: "customModal",
+        backdrop: true,
+        closeOnSelect: true,
+        on: {
+          change(cal, val) {
+            if(self.calendar_first_change.executed){
+              self.activity.executed_at = val[0];
+            }else{
+              self.calendar_first_change.executed = true;
+            }
+          }
+        }
+      });
+    },
+    executedChange(value){
+      self = this;
+      self.executed = value;
+      if(!value){
+        self.activity.executed_at = null;
+        self.activity.executed_by_id = null;
+      }
+    },
   },
   beforeDestroy() {
     const self = this;
   },
   mounted() {
     const self = this;
-    let date = new Date();
-    if (self.activity.scheduled_at) date = new Date(self.activity.scheduled_at);
-    self.calendarScheduled = self.$f7.calendar.create({
-      value: [date],
-      openIn: "customModal",
-      backdrop: true,
-      closeOnSelect: true,
-      on: {
-        change(cal, val) {
-          self.activity.scheduled_at = val[0];
-        }
-      }
-    });
+    self.createScheduledCalendar();
+    self.createExecutedCalendar();
   },
   data() {
     self = this;
@@ -234,13 +287,19 @@ export default {
       activity: {
         scheduled_at: null,
         executed_at: new Date(),
-        activity_type: null
+        activity_type: null,
+        executed_at: null,
+        executed_by_id: null,
       },
       editId: null,
       indexEdit: null,
       executed: false,
       default_activity: {},
-      settings: API.main_page.$data.settings
+      settings: API.main_page.$data.settings,
+      calendar_first_change:{
+        executed: false,
+        scheduled: false,
+      }
     };
   }
 };
