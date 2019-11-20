@@ -33,7 +33,7 @@
           <f7-list-item
             class="whs-type-selector"
             smart-select
-            title= " "
+            title=" "
             :smart-select-params="{
               openIn: 'popup',
               pageBackLinkText: '',
@@ -45,28 +45,60 @@
             }"
           >
             <select name="type" @change="activity.activity_type = $event.target.value">
-              <option value="unspecified" :selected="activity.activity_type === 'unspecified'">{{$t('whs.form_add.type_options.unspecified')}}</option>
-              <option value="pending_out" :selected="activity.activity_type === 'pending_out'">{{$t('whs.form_add.type_options.pending_out')}}</option>
-              <option value="pending_in" :selected="activity.activity_type === 'pending_in'">{{$t('whs.form_add.type_options.pending_in')}}</option>
-              <option value="movement" :selected="activity.activity_type === 'movement'">{{$t('whs.form_add.type_options.movement')}}</option>
-              <option value="stocktake" :selected="activity.activity_type === 'stocktake'">{{$t('whs.form_add.type_options.stocktake')}}</option>
+              <option
+                value="unspecified"
+                :selected="activity.activity_type === 'unspecified'"
+              >{{$t('whs.form_add.type_options.unspecified')}}</option>
+              <option
+                value="pending_out"
+                :selected="activity.activity_type === 'pending_out'"
+              >{{$t('whs.form_add.type_options.pending_out')}}</option>
+              <option
+                value="pending_in"
+                :selected="activity.activity_type === 'pending_in'"
+              >{{$t('whs.form_add.type_options.pending_in')}}</option>
+              <option
+                value="movement"
+                :selected="activity.activity_type === 'movement'"
+              >{{$t('whs.form_add.type_options.movement')}}</option>
+              <option
+                value="stocktake"
+                :selected="activity.activity_type === 'stocktake'"
+              >{{$t('whs.form_add.type_options.stocktake')}}</option>
             </select>
           </f7-list-item>
-        <!--Assets-->
-        <f7-list-item divider>
-          <i class="whs-form-icon whs-form-icon-person"></i>
-          {{$t('whs.common.assets_label')}}
-        </f7-list-item>
-        <assets-picker />
-        <!--Tags-->
-        <f7-list-item divider>
-          <i class="whs-form-icon whs-form-icon-hash"></i>
-          {{$t('whs.common.tags_label')}}
-        </f7-list-item>
-        <tags-picker />
-
-
-
+          <!--Assets-->
+          <f7-list-item divider>
+            <i class="whs-form-icon whs-form-icon-person"></i>
+            {{$t('whs.common.assets_label')}}
+          </f7-list-item>
+          <assets-picker :multiply="false"/>
+          <!--Tags-->
+          <f7-list-item divider>
+            <i class="whs-form-icon whs-form-icon-hash"></i>
+            {{$t('whs.common.tags_label')}}
+          </f7-list-item>
+          <tags-picker />
+          <!-- Executed? -->
+          <f7-list-item divider>
+            <i class="whs-form-icon whs-form-icon-toggle"></i>
+            {{$t('whs.common.executed_label')}}
+          </f7-list-item>
+          <f7-list-item>
+            <f7-toggle
+              slot="after"
+              :checked="executed"
+              @toggle:change="(value)=>{executed = value}"
+            />
+          </f7-list-item>
+          <template v-if="executed">
+            <!--Assets-->
+            <f7-list-item divider>
+              <i class="whs-form-icon whs-form-icon-person"></i>
+              {{$t('whs.common.executed_by_label')}}
+            </f7-list-item>
+            <team-picker :multiply="false"/>
+          </template>
         </ul>
       </f7-list>
     </form>
@@ -80,12 +112,14 @@
 import API from "../api";
 import TagsPicker from "../components/tags-picker.vue";
 import AssetsPicker from "../components/assets-picker.vue";
+import TeamPicker from "../components/team-picker.vue";
 import Dialog from "../mixins/dialog.vue";
 
 export default {
   components: {
     TagsPicker,
-    AssetsPicker
+    AssetsPicker,
+    TeamPicker,
   },
   mixins: [Dialog],
   created() {
@@ -97,6 +131,7 @@ export default {
       this.indexEdit = this.$f7route.query.index;
       ///load activity from maim activitys and clone
       //this.activity = Object.assign({}, API.main_page.$data.activitys[this.indexEdit]);
+      //this.executed = this.activity.executed_by_id !=== null
     }
   },
   computed: {
@@ -110,7 +145,7 @@ export default {
           text: this.settings.activity.name
         });
       }
-    }
+    },
   },
   methods: {
     addActivity() {
@@ -169,9 +204,9 @@ export default {
       }
       return item;
     },
-    openScheduledCalendar(){
-        const self = this;
-        self.calendarScheduled.open();
+    openScheduledCalendar() {
+      const self = this;
+      self.calendarScheduled.open();
     }
   },
   beforeDestroy() {
@@ -180,8 +215,8 @@ export default {
   mounted() {
     const self = this;
     let date = new Date();
-    if(self.activity.scheduled_at) date = new Date(self.activity.scheduled_at);
-    self.calendarScheduled = self.$f7.calendar.create({      
+    if (self.activity.scheduled_at) date = new Date(self.activity.scheduled_at);
+    self.calendarScheduled = self.$f7.calendar.create({
       value: [date],
       openIn: "customModal",
       backdrop: true,
@@ -199,12 +234,13 @@ export default {
       activity: {
         scheduled_at: null,
         executed_at: new Date(),
-        activity_type: null,
+        activity_type: null
       },
       editId: null,
       indexEdit: null,
+      executed: false,
       default_activity: {},
-      settings: API.main_page.$data.settings,
+      settings: API.main_page.$data.settings
     };
   }
 };
