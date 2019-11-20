@@ -4,7 +4,9 @@
       <f7-list class="whs-list whs-select-list searchbar-found" media-list v-if="Object.keys(data).length > 0 " :id="'whs-select-'+type">
         <f7-list-item
           v-for="(item, index) in data"
-          checkbox
+          :checkbox="multiply"
+          :radio="!multiply"
+          name="whs-select-list-item"
           :checked ="checkId(item)"
           :title="item.name || item.first_name+' '+ item.last_name"
           :key="type+'_'+index"
@@ -51,6 +53,7 @@ export default {
     data: Object,
     selected: Array,
     styleImage: Object,
+    multiply: Boolean,
     image_link: {
       type: String,
       default: "image"
