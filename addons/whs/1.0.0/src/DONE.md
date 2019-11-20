@@ -21,6 +21,7 @@
 -   Dynamic styles witch description or not
 -   Dynamic image
 -   Storage popup for add form
+-   Dynamic name and placeholder
 
 ## locations
 
@@ -39,6 +40,7 @@
 -   Dynamic styles witch description or not
 -   Dynamic image
 -   Category popup for add form
+-   Dynamic name and placeholder
 
 ## Settings
 
@@ -73,6 +75,7 @@
 -   Dynamic add form(title, toast)
 -   Fixed subnavbar menu
 -   Dynamic image
+-   Dynamic name and placeholder
 
 ## Others
 
@@ -81,3 +84,4 @@
 -   Tag picker
 -   Assets picker
 -   Team picker
+-   Item picker
