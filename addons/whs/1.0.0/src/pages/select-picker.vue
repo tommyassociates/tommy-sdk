@@ -7,7 +7,7 @@
         <f7-searchbar :init="false"></f7-searchbar>
       </f7-subnavbar>
     </f7-navbar>
-    <select-list :type="type" :data="targets" :styleImage="tagStyle" :loaded="loaded" @change="selectChanget" :selected="selected"/>
+    <select-list :type="type" :data="targets" :styleImage="tagStyle" :loaded="loaded" @change="selectChanget" :selected="selected" :multiply="multiply" />
   </f7-page>
 </template>
 <script>
@@ -19,10 +19,10 @@ export default {
   props: {
     selected: Array,
     onChange: Function,
-    multiply: Boolean,
     getData: Function,
     pageTitle: String,
     type: String,
+    multiply: Boolean,
   },
   components: {
     "select-list": SelectList

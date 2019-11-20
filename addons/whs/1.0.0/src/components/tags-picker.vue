@@ -1,6 +1,6 @@
 <template>
   <li>
-    <a class="item-content no-chevron item-link whs-list-search-item" @click="openSelector">
+    <a class="item-content no-chevron item-link whs-list-search-item" @click="openSelector" v-if="selected.length == 0 || multiply">
       <div class="item-media">
         <i class="icon whs-list-search-icon"></i>
       </div>
@@ -52,6 +52,7 @@ import ListStyles from "../mixins/list-styles.vue";
             multiply: self.multiply,
             getData: self.getData,
             type: "tag",
+            multiply: self.multiply,
             onChange(tag, selected) {                            
               if (selected) {
                 self.$emit('itemAdd', tag);
@@ -75,7 +76,12 @@ import ListStyles from "../mixins/list-styles.vue";
       },
       addItem(target){
         self = this;
-        self.selected.push(target)
+        if(self.multiply){          
+          self.selected.push(target)
+        }else{
+          self.selected.splice(0, 99);
+          self.selected.push(target)
+        }
       },
       deleteItem(target){
         self = this;
