@@ -7,7 +7,7 @@
         <f7-searchbar :init="false"></f7-searchbar>
       </f7-subnavbar>
     </f7-navbar>
-    <select-list :type="type" :data="targets" :styleImage="tagStyle" :loaded="loaded" @change="selectChanget" :selected="selected" :multiply="multiply" />
+    <select-list :type="type" :data="targets" :styleImage="tagStyle" :loaded="loaded" @change="selectChanget" :selected="selected" :multiply="multiply" :image_link="image_link"/>
   </f7-page>
 </template>
 <script>
@@ -23,6 +23,7 @@ export default {
     pageTitle: String,
     type: String,
     multiply: Boolean,
+    image_link: String,
   },
   components: {
     "select-list": SelectList

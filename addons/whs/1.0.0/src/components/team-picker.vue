@@ -53,6 +53,7 @@ import ListStyles from "../mixins/list-styles.vue";
             getData: self.getData,
             type: "team",
             multiply: self.multiply,
+            image_link: "icon_url",
             onChange(team, selected) {                            
               if (selected) {
                 self.$emit('itemAdd', team);

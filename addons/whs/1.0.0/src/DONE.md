@@ -78,5 +78,6 @@
 
 -   Number & currency format functions
 -   Refactoring lists on main page
--   Tag selector
--   Assets selector
+-   Tag picker
+-   Assets picker
+-   Team picker
