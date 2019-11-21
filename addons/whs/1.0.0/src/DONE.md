@@ -86,3 +86,4 @@
 -   Team picker
 -   Item picker
 -   Location picker
+-   Pagination bar
