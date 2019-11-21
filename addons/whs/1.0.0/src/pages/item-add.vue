@@ -79,14 +79,14 @@
 
         <f7-list-item divider>
           <i class="whs-form-icon whs-form-icon-location"></i>
-          {{$t('whs.common.location_quantity_label')}}
+          {{$t('whs.common.quantity_label')}}
         </f7-list-item>        
         <f7-list-input
           type="number"
           name="quantity"
           :value="item.quantity"
           @input="item.quantity = $event.target.value"
-          :placeholder="$t('whs.common.location_quantity_placeholder')"
+          :placeholder="$t('whs.common.quantity_placeholder')"
         />
 
         <f7-list-item divider>
