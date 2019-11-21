@@ -28,8 +28,8 @@ import ListStyles from "../mixins/list-styles.vue";
 
   export default {
     props:{
-      selected:{
-        default: Array
+      loadSelect:{
+        type: Array
       },
       multiply:{
         type: Boolean,
@@ -39,6 +39,7 @@ import ListStyles from "../mixins/list-styles.vue";
     mixins: [ListStyles],
     data(){
       return{
+        selected: [],
         settings: API.main_page.$data.settings     
       }
     },
@@ -96,6 +97,21 @@ import ListStyles from "../mixins/list-styles.vue";
         self.selected.splice(index, 1);
         self.$emit("selected:change", self.selected);
       },
+      locationLoadSelect(){
+        self = this;      
+        self.loadSelect.forEach(target_id => {
+          if(target_id !== null){
+            API.getLocationDetail(target_id, false).then(data => {
+              data.pseudo_type = 'location';
+              self.selected.push(data);
+            });
+          }   
+        });       
+      }
     },
+    mounted(){
+      self = this;
+      self.locationLoadSelect();
+    }
   }
 </script>
