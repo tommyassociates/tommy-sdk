@@ -21,13 +21,13 @@ const API = {
         return data;
       });
   },
-  getItemDetail(id) {
+  getItemDetail(id, summary = true) {
     return api
       .call({
         endpoint: `inventory/items/${id}`,
         method: "GET",
         data: {
-          with_summary: true
+          with_summary: summary
         }
       })
       .then(data => {
@@ -48,13 +48,13 @@ const API = {
         return data;
       });
   },
-  getLocationDetail(id) {
+  getLocationDetail(id, summary = true) {
     return api
       .call({
         endpoint: `inventory/locations/${id}`,
         method: "GET",
         data: {
-          with_summary: true
+          with_summary: summary
         }
       })
       .then(data => {
@@ -75,13 +75,13 @@ const API = {
         return data;
       });
   },
-  getActivityDetail(id) {
+  getActivityDetail(id, summary = true) {
     return api
       .call({
         endpoint: `inventory/activities/${id}`,
         method: "GET",
         data: {
-          with_summary: true
+          with_summary: summary
         }
       })
       .then(data => {
@@ -125,13 +125,13 @@ const API = {
         return data;
       });
   },
-  getTagDetail(id) {
+  getTagDetail(id, summary = true) {
     return api
       .call({
         endpoint: `inventory/tags/${id}`,
         method: "GET",
         data: {
-          with_summary: true
+          with_summary: summary
         }
       })
       .then(data => {
@@ -223,13 +223,13 @@ const API = {
         return data;
       });
   },
-  getRoleDetail(id) {
+  getRoleDetail(id, summary = true) {
     return api
       .call({
         endpoint: `inventory/roles/${id}`,
         method: "GET",
         data: {
-          with_summary: true
+          with_summary: summary
         }
       })
       .then(data => {
@@ -266,13 +266,13 @@ const API = {
         return data;
       });
   },
-  getTeamDetail(id) {
+  getTeamDetail(id, summary = true) {
     return api
       .call({
         endpoint: `inventory/team_members/${id}`,
         method: "GET",
         data: {
-          with_summary: true
+          with_summary: summary
         }
       })
       .then(data => {

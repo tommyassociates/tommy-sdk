@@ -51,13 +51,7 @@
             <i class="whs-form-icon whs-form-icon-location"></i>
             {{$t('whs.common.parent_location_label')}}
           </f7-list-item>
-          <f7-list-item
-            link
-            name="parent_location_id"
-            :value="location.parent_location_id"
-            @input="location.parent_location_id = $event.target.value"
-            :title="$t('whs.common.parent_location_placeholder')"
-          />
+          <location-picker :multiply="false" @selected:change="parentLocationChange" :loadSelect="[location.parent_location_id]"/>  
 
           <!-- description -->
           <f7-list-item divider>
@@ -152,12 +146,14 @@
 import API from "../api";
 import FormImagesPicker from "../components/form-images-picker.vue";
 import TagsPicker from "../components/tags-picker.vue";
+import LocationPicker from "../components/location-picker.vue";
 import Dialog from '../mixins/dialog.vue';
 
 export default {
   components: {
     FormImagesPicker,
-    TagsPicker
+    TagsPicker,
+    LocationPicker
   },
   mixins: [Dialog],
   created() {
@@ -218,6 +214,14 @@ export default {
         if(item[key] === null || item[key] ==="") item[key] = self.default_item[key];
       }
       return item;
+    },
+    parentLocationChange(target){
+      self = this;
+      if(target.length > 0 ){
+        self.location.parent_location_id = target[0].id        
+      }else{
+        self.location.parent_location_id = null;
+      }
     }
   },
   beforeDestroy() {
