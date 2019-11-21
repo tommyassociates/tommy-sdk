@@ -10,9 +10,9 @@
                   <i class="whs-icon whs-icon-sort-black"></i>
                 </a>
               </th>
-              <th>Location</th>
+              <th>{{settings.location.plural_name}}</th>
               <th>Parent</th>
-              <th>Items</th>
+              <th>{{settings.item.plural_name}}</th>
               <th>Lock</th>
               <th>Lot code</th>
               <th>Expiry</th>
