@@ -85,3 +85,4 @@
 -   Assets picker
 -   Team picker
 -   Item picker
+-   Location picker
