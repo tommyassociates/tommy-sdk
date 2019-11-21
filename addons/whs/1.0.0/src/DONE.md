@@ -87,3 +87,4 @@
 -   Item picker
 -   Location picker
 -   Pagination bar
+-   Location table in summary pages
