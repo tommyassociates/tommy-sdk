@@ -348,6 +348,14 @@
   </f7-page>
 </template>
 <script>
+/*
+Починить изображения в ассетах так как там и роли и люди
+Дождаться когда решится вопрос с stocktake типом в добавлении активности
+Переделать под дизайн ошибки в формах добавления
+
+
+*/
+
 import API from "../api";
 import Settings from "../settings";
 import EmptyBlock from '../components/empty-block.vue';

@@ -5,16 +5,17 @@
         <i class="icon whs-list-search-icon"></i>
       </div>
       <div class="item-inner">
-        <div class="item-title">{{$t('whs.common.assets_search_placeholder')}}</div>
+        <div class="item-title">{{$t(`whs.common.dynamic_search_placeholder`,{text: settings.location.name})}}</div>
       </div>
     </a>
-    <ul class="asset-items whs-picker-selected-list">
-      <li class="asset-item" v-for="(asset, index) in selected" :key="index">
+    <ul class="location-items whs-picker-selected-list">
+      <li class="location-item" v-for="(location, index) in selected" :key="index">
         <div class="item-content">
           <div class="item-inner">
-            <div class="item-media" :style="imageStyle(asset)"></div>
-            <div class="item-title">{{asset.name || asset.first_name+' '+ asset.last_name}}</div>
-            <div class="item-after"><a style="height: 24px" @click="removeItem(asset.id, asset.pseudo_type)" href="#" class="item-link"><i class="material-icons">close</i></a></div>
+            <div class="item-media" :style="[location.image ? {'background-image': `url(${location.image})`}: locationStyle]"></div>
+
+            <div class="item-title">{{location.name}}</div>
+            <div class="item-after"><a style="height: 24px" @click="removeItem(location.id, location.pseudo_type)" href="#" class="item-link"><i class="material-icons">close</i></a></div>
           </div>
         </div>
       </li>
@@ -47,34 +48,28 @@ import ListStyles from "../mixins/list-styles.vue";
         self.$f7router.navigate('/whs/select-picker/', {
           props: {
             selected: self.selected,
-            pageTitle: self.$t(`whs.common.select_assets_title`),
+            pageTitle: self.$t(`whs.common.dynamic_select_title`,{text: self.settings.location.name}),
             multiply: self.multiply,
             getData: self.getData,
-            type: "asset",
+            type: "location",
             multiply: self.multiply,
-            onChange(asset, selected) {                            
+            onChange(location, selected) {                            
               if (selected) {
-                self.$emit('itemAdd', asset);
-                self.addItem(asset);
+                self.$emit('itemAdd', location);
+                self.addItem(location);
               } else {
-                self.$emit('itemRemove', asset); 
-                self.deleteItem(asset);
+                self.$emit('itemRemove', location); 
+                self.deleteItem(location);
               }
             },
           },
         });
       },
-      imageStyle(asset){
-        if (asset.image) return {'background-image': `url(${asset.image})`}
-        if (asset.icon_url) return {'background-image': `url(${asset.icon_url})`}
-        return this.teamStyle;
-      },
       getData(self){
-        Promise.all([API.getTeam(), API.getRoles()]).then(data => { 
-        console.log("TCL: getData -> data", data)
-          data[0].forEach((item, index)=>{item.pseudo_type = "team"});
-          data[1].forEach((item, index)=>{item.pseudo_type = "role"});
-          Object.assign(self.targets, data[0].concat(data[1]));          
+        API.getLocations().then(data => {
+          data.forEach((item, index)=>{item.pseudo_type = "location"});
+          Object.assign(self.targets, data);
+          console.log("TCL: getData -> self.targets", self.targets)
           self.loaded = true;
           self.createSearchbar();
         });
@@ -91,13 +86,13 @@ import ListStyles from "../mixins/list-styles.vue";
       },
       deleteItem(target){
         self = this;
-        const index = self.selected.findIndex(asset => asset.id === target.id && asset.pseudo_type === target.pseudo_type);
+        const index = self.selected.findIndex(location => location.id === target.id && location.pseudo_type === target.pseudo_type);
         self.selected.splice(index, 1);
         self.$emit("selected:change", self.selected);
       },
       removeItem(itemId, pseudo_type) {
         const self = this;
-        const index = self.selected.findIndex(asset => asset.id === itemId && asset.pseudo_type === pseudo_type);
+        const index = self.selected.findIndex(location => location.id === itemId && location.pseudo_type === pseudo_type);
         self.selected.splice(index, 1);
         self.$emit("selected:change", self.selected);
       },

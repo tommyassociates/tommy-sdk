@@ -67,17 +67,51 @@
               >{{$t('whs.form_add.type_options.stocktake')}}</option>
             </select>
           </f7-list-item>
-          <template v-if="activity.activity_type === 'pending_out' || activity.activity_type === 'pending_in' || activity.activity_type === 'movement'">
+          <template v-if="activity.activity_type === 'pending_out' || activity.activity_type === 'pending_in' || activity.activity_type === 'movement' || activity.activity_type === 'stocktake'" >
+             <!-- Item -->
             <f7-list-item divider>
               <i class="whs-form-icon whs-form-icon-item"></i>
               {{settings.item.name}}
             </f7-list-item>
-            <item-picker :multiply="false"/>
+            <item-picker :multiply="false" @selected:change="itemChange"/>
+
+            <template v-if="activity.inventory_item_id !== null">
+              <!-- Capacity -->
+              <f7-list-item divider>
+                <i class="whs-form-icon whs-form-icon-1"></i>
+                {{$t('whs.common.quantity_label')}}
+              </f7-list-item>
+              <f7-list-item :title="String(activity.count)">
+                <f7-stepper
+                  :value="activity.count"
+                  :step="1"
+                  :autorepeat="true"
+                  :autorepeat-dynamic="true"
+                  :min="0"
+                  :max="999999999999999999"
+                  @stepper:change="(value)=>{activity.count = value}"
+                  buttons-only
+                  color="gray"
+                />
+              </f7-list-item>
+              <!-- Source -->
+              <f7-list-item divider>
+                <i class="whs-form-icon whs-form-icon-location"></i>
+                {{$t('whs.common.source_label')}}
+              </f7-list-item>
+              <location-picker :multiply="false" @selected:change="sourceChange"/>              
+              <!-- Destination -->
+              <f7-list-item divider>
+                <i class="whs-form-icon whs-form-icon-location"></i>
+                {{$t('whs.common.destination_label')}}
+              </f7-list-item>
+              <location-picker :multiply="false" @selected:change="destinationChange"/>
+            </template>
           </template>          
           <!--Assets-->
           <f7-list-item divider>
             <i class="whs-form-icon whs-form-icon-person"></i>
-            {{$t('whs.common.assets_label')}}
+            {{$t('whs.common.assignet_label')}}
           </f7-list-item>
           <assets-picker :multiply="false"/>
           <!--Tags-->
@@ -104,7 +138,7 @@
               <i class="whs-form-icon whs-form-icon-person"></i>
               {{$t('whs.common.executed_by_label')}}
             </f7-list-item>
-            <team-picker :multiply="false"/>
+            <team-picker :multiply="false" @selected:change="executedTeamChange"/>
             <!-- Executed -->
             <f7-list-item divider>
               <i class="whs-form-icon whs-form-icon-calendar"></i>
@@ -133,14 +167,17 @@ import TagsPicker from "../components/tags-picker.vue";
 import AssetsPicker from "../components/assets-picker.vue";
 import TeamPicker from "../components/team-picker.vue";
 import ItemPicker from "../components/item-picker.vue";
+import LocationPicker from "../components/location-picker.vue";
 import Dialog from "../mixins/dialog.vue";
 
+///Inventory item can't be blank. Source location can't be blank. Destination location can't be blank
 export default {
   components: {
     TagsPicker,
     AssetsPicker,
     TeamPicker,
     ItemPicker,
+    LocationPicker,
   },
   mixins: [Dialog],
   created() {
@@ -171,7 +208,7 @@ export default {
   methods: {
     addActivity() {
       self = this;
-      if (this.$f7.$("#add-activity")[0].checkValidity()) {
+      if (this.$f7.$("#add-activity")[0].checkValidity() && self.checkValidity()) {
         if (this.editId) {
           this.activity = this.setDefaults(this.activity);
           API.editActivity(this.activity, this.editId).then(() => {
@@ -194,10 +231,17 @@ export default {
       } else {
         this.alertDialog(
           this.$t("whs.alert_form.title"),
-          this.$t("whs.alert_form.text"),
+          this.$t("whs.alert_form.text")+". Inventory item can't be blank. Source location can't be blank. Destination location can't be blank",
           this.$t("whs.alert_form.ok")
         );
       }
+    },
+    checkValidity(){
+      self = this;
+      if(self.activity.inventory_item_id === null) return false;
+      if(self.activity.source_location_id === null) return false;
+      if(self.activity.destination_location_id === null) return false;
+      return true;      
     },
     deleteActivity() {
       API.deleteActivity(this.editId).then(() => {
@@ -281,6 +325,38 @@ export default {
         self.activity.executed_by_id = null;
       }
     },
+    itemChange(target){
+      self = this;
+      if(target.length > 0 ){
+        self.activity.inventory_item_id = target[0].id        
+      }else{
+        self.activity.inventory_item_id = null;
+      }
+    },
+    executedTeamChange(target){
+      self = this;
+      if(target.length > 0 ){
+        self.activity.executed_by_id = target[0].id        
+      }else{
+        self.activity.executed_by_id = null;
+      }
+    },     
+    sourceChange(target){
+      self = this;
+      if(target.length > 0 ){
+        self.activity.source_location_id = target[0].id        
+      }else{
+        self.activity.source_location_id = null;
+      }
+    },
+    destinationChange(target){
+      self = this;
+      if(target.length > 0 ){
+        self.activity.destination_location_id = target[0].id        
+      }else{
+        self.activity.destination_location_id = null;
+      }
+    },
   },
   beforeDestroy() {
     const self = this;
@@ -299,6 +375,10 @@ export default {
         activity_type: null,
         executed_at: null,
         executed_by_id: null,
+        count: 0,
+        inventory_item_id: null,
+        destination_location_id: null,
+
       },
       editId: null,
       indexEdit: null,
