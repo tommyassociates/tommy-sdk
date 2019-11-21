@@ -7,9 +7,7 @@ const API = {
   main_page: undefined,
   file_base_url: null,
   team_id: null,
-  getItem(data = null) {
-    let cache = true;
-    if (data) cache = false;
+  getItem(data = null, cache = true) { 
     return api
       .call({
         endpoint: "inventory/items",
@@ -34,9 +32,7 @@ const API = {
         return data;
       });
   },
-  getLocations(data = null) {
-    let cache = true;
-    if (data) cache = false;
+  getLocations(data = null, cache = true) {
     return api
       .call({
         endpoint: "inventory/locations",
@@ -61,9 +57,7 @@ const API = {
         return data;
       });
   },
-  getActivities(data = null) {
-    let cache = true;
-    if (data) cache = false;
+  getActivities(data = null, cache = true) {
     return api
       .call({
         endpoint: "inventory/activities",
@@ -111,9 +105,7 @@ const API = {
       cache: false
     });
   },
-  getTags(data = null) {
-    let cache = true;
-    if (data) cache = false;
+  getTags(data = null, cache = true) {
     return api
       .call({
         endpoint: "inventory/tags",
@@ -209,9 +201,7 @@ const API = {
       cache: false
     });
   },
-  getRoles(data = null) {
-    let cache = true;
-    if (data) cache = false;
+  getRoles(data = null, cache = true) {
     return api
       .call({
         endpoint: "inventory/roles",
@@ -252,9 +242,9 @@ const API = {
       cache: false
     });
   },
-  getTeam(data = null) {
-    let cache = true;
-    if (data) cache = false;
+  getTeam(data = null, cache = true) {
+    
+    
     return api
       .call({
         endpoint: "inventory/team_members",
