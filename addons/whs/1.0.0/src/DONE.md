@@ -89,3 +89,4 @@
 -   Pagination bar
 -   Location table in summary pages
 -   Tag table in summary pages
+-   Activity table in summary pages
