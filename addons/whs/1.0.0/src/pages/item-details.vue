@@ -134,7 +134,6 @@
 </template>
 <script>
 import API from "../api";
-import EmptyBlock from "../components/empty-block.vue";
 import LocationTable from "../components/location-table.vue";
 import TagTable from "../components/tag-table.vue";
 import ActivityTable from "../components/activity-table.vue";
@@ -144,7 +143,6 @@ import CurMexin from "../utils/cur-num-mixin.vue";
 
 export default {
   components: {
-    EmptyBlock,
     LocationTable,
     PaginationTable,
     TagTable,
