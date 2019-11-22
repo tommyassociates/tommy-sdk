@@ -118,68 +118,14 @@
         </div>
       </div>
     </template>
-    <template v-if="activeTab === 'locations' && locations.length > 0">
-      <div class="whs-table">
-        <table>
-          <thead>
-            <tr>
-              <th class="sort-cell">
-                <a class="link">
-                  <i class="whs-icon whs-icon-sort-black"></i>
-                </a>
-              </th>
-              <th>Location</th>
-              <th>Parent</th>
-              <th>Items</th>
-              <th>Lock</th>
-              <th>Lot code</th>
-              <th>Expiry</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr 
-              v-for="(location, index) in locations"
-              :key="'loc_'+index"
-            >
-              <td class="media-cell"></td>
-              <td>{{location.name}}</td>
-              <td>{{location.parent_location_id}}</td>
-              <td></td>
-              <td v-if="location.active"></td>
-              <td v-else><i class="whs-summary-icon whs-icon-lock"></i></td>
-              <td>{{location.sku}}</td>
-              <td></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="whs-pagination" slot="fixed">
-        <div class="whs-pagination-rows">4 {{$t('whs.pagination.rows')}}</div>
-        <div class="whs-pagination-nav">
-          <a class="link">
-            <i class="f7-icons">chevron_left</i>
-          </a>
-          <span>{{$t('whs.pagination.page', { current: 1, total: 4 })}}</span>
-          <a class="link">
-            <i class="f7-icons">chevron_right</i>
-          </a>
-        </div>
-        <div class="whs-pagination-actions">
-          <a class="link">
-            <i class="icon f7-icons">share</i>
-          </a>
-          <a class="link">
-            <i class="icon f7-icons">gear</i>
-          </a>
-        </div>
-      </div>
-    </template>
-    <template v-if="activeTab === 'locations' && locations.length === 0">
-      <empty-block :text="$t('whs.common.no', {text: settings.location.plural_name})" />
+    <template v-if="activeTab === 'locations'">
+      <location-table :loadId="itemId" loadIdName="inventory_item_id" parent="item"/>
+      <pagination-table slot="fixed" link="location" parent="item" />
     </template>
 
     <template v-if="activeTab === 'tags'">
-      <empty-block :text="$t('whs.common.no', {text: settings.tag.plural_name})" />
+      <tag-table :loadId="itemId" loadIdName="inventory_item_id" parent="item"/>
+      <pagination-table slot="fixed" link="tag" parent="item" />
     </template>
     <template v-if="activeTab === 'activity'">
       <empty-block :text="$t('whs.common.no', {text: settings.activity.plural_name})" />
@@ -189,23 +135,26 @@
 <script>
 import API from "../api";
 import EmptyBlock from "../components/empty-block.vue";
+import LocationTable from "../components/location-table.vue";
+import TagTable from "../components/tag-table.vue";
+import PaginationTable from "../components/pagination-table.vue";
 import CurMexin from "../utils/cur-num-mixin.vue";
 
 
 export default {
   components: {
-    EmptyBlock
+    EmptyBlock,
+    LocationTable,
+    PaginationTable,
+    TagTable,
   },
   mixins:[CurMexin],
   created() {
-    this.itemId = this.$f7route.query.id;
+    this.itemId = Number(this.$f7route.query.id);
     this.itemIndex = this.$f7route.query.index;
     ///get title and description from main items
     this.itemTitle = API.main_page.$data.items[this.itemIndex].name;
     this.itemDesc = API.main_page.$data.items[this.itemIndex].description;
-
-    this.loadItemDetail();
-    this.getLocations();
   },
   computed: {
     headerBgColor(){
@@ -250,11 +199,6 @@ export default {
       API.resetCache(`inventory/items/${self.itemId}`);
       self.loadItemDetail();
     },
-    getLocations(){
-      const self = this;
-      API.getLocations({'inventory_item_id': Number(self.itemId)}).then((data)=>{self.locations = data;});
-      
-    },
     colorizeHeader(){
       this.$f7.$('.whs-details-navbar-inner').css(this.headerBgColor);      
     },
@@ -269,7 +213,7 @@ export default {
   mounted() {
     const self = this;
     self.$events.$on('item:updated', self.itemUpdated);
-
+    self.loadItemDetail();
   },
   data() {
     return {

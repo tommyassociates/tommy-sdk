@@ -88,3 +88,4 @@
 -   Location picker
 -   Pagination bar
 -   Location table in summary pages
+-   Tag table in summary pages
