@@ -370,6 +370,7 @@ export default {
     self = this;
     return {
       activity: {
+        user_id: self.$root.user.id,
         scheduled_at: null,
         executed_at: new Date(),
         activity_type: null,
