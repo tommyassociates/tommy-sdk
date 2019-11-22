@@ -98,15 +98,17 @@ import ListStyles from "../mixins/list-styles.vue";
         self.$emit("selected:change", self.selected);
       },
       locationLoadSelect(){
-        self = this;      
-        self.loadSelect.forEach(target_id => {
-          if(target_id !== null){
-            API.getLocationDetail(target_id, false).then(data => {
-              data.pseudo_type = 'location';
-              self.selected.push(data);
-            });
-          }   
-        });       
+        self = this;
+        if(self.loadSelect){      
+          self.loadSelect.forEach(target_id => {
+            if(target_id !== null){
+              API.getLocationDetail(target_id, false).then(data => {
+                data.pseudo_type = 'location';
+                self.selected.push(data);
+              });
+            }   
+          });
+        }       
       }
     },
     mounted(){
