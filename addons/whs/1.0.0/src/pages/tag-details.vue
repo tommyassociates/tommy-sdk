@@ -116,144 +116,40 @@
         </div>
       </div>
     </template>
-
-    <template v-if="activeTab === 'items' && items.length > 0">
-      <div class="whs-table">
-        <table>
-          <thead>
-            <tr>
-              <th class="sort-cell">
-                <a class="link">
-                  <i class="whs-icon whs-icon-sort-black"></i>
-                </a>
-              </th>
-              <th>Items</th>
-              <th>Description</th>
-              <th>Current</th>
-              <th>P.in</th>
-              <th>P.out</th>
-              <th>Location</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr 
-              v-for="(item, index) in items"
-              :key="'item_'+index"
-            >
-              <td class="media-cell"></td>
-              <td>{{item.name}}</td>
-              <td>{{item.description}}</td>
-              <td></td>
-              <td></td>
-              <td></td>
-              <td></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="whs-pagination" slot="fixed">
-        <div class="whs-pagination-rows">4 {{$t('whs.pagination.rows')}}</div>
-        <div class="whs-pagination-nav">
-          <a class="link">
-            <i class="f7-icons">chevron_left</i>
-          </a>
-          <span>{{$t('whs.pagination.page', { current: 1, total: 4 })}}</span>
-          <a class="link">
-            <i class="f7-icons">chevron_right</i>
-          </a>
-        </div>
-        <div class="whs-pagination-actions">
-          <a class="link">
-            <i class="icon f7-icons">share</i>
-          </a>
-          <a class="link">
-            <i class="icon f7-icons">gear</i>
-          </a>
-        </div>
-      </div>
+    
+    <template v-if="activeTab === 'items'">
+      <item-table :loadId="tagId" loadIdName="inventory_tag_id" parent="tag"/>
+      <pagination-table slot="fixed" link="item" parent="tag" />
     </template>
-    <template v-if="activeTab === 'items' && items.length === 0">
-      <empty-block :text="$t('whs.common.no', {text: settings.item.plural_name})" />
+    <template v-if="activeTab === 'locations'">
+      <location-table :loadId="tagId" loadIdName="inventory_tag_id" parent="tag"/>
+      <pagination-table slot="fixed" link="location" parent="tag" />
     </template>
-
-    <template v-if="activeTab === 'locations' && locations.length > 0">
-      <div class="whs-table">
-        <table>
-          <thead>
-            <tr>
-              <th class="sort-cell">
-                <a class="link">
-                  <i class="whs-icon whs-icon-sort-black"></i>
-                </a>
-              </th>
-              <th>Location</th>
-              <th>Parent</th>
-              <th>Items</th>
-              <th>Lock</th>
-              <th>Lot code</th>
-              <th>Expiry</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr 
-              v-for="(location, index) in locations"
-              :key="'loc_'+index"
-            >
-              <td class="media-cell"></td>
-              <td>{{location.name}}</td>
-              <td>{{location.parent_location_id}}</td>
-              <td></td>
-              <td v-if="location.active"></td>
-              <td v-else><i class="whs-summary-icon whs-icon-lock"></i></td>
-              <td>{{location.sku}}</td>
-              <td></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="whs-pagination" slot="fixed">
-        <div class="whs-pagination-rows">4 {{$t('whs.pagination.rows')}}</div>
-        <div class="whs-pagination-nav">
-          <a class="link">
-            <i class="f7-icons">chevron_left</i>
-          </a>
-          <span>{{$t('whs.pagination.page', { current: 1, total: 4 })}}</span>
-          <a class="link">
-            <i class="f7-icons">chevron_right</i>
-          </a>
-        </div>
-        <div class="whs-pagination-actions">
-          <a class="link">
-            <i class="icon f7-icons">share</i>
-          </a>
-          <a class="link">
-            <i class="icon f7-icons">gear</i>
-          </a>
-        </div>
-      </div>
-    </template>
-    <template v-if="activeTab === 'locations' && locations.length === 0">
-      <empty-block :text="$t('whs.common.no', {text: settings.location.plural_name})" />
-    </template>
-
     <template v-if="activeTab === 'activity'">
-      <empty-block  :text="$t('whs.common.no', {text: settings.activity.plural_name})" />
+      <activity-table :loadId="tagId" loadIdName="inventory_tag_id" parent="tag"/>
+      <pagination-table slot="fixed" link="activity" parent="tag" />
     </template>
   </f7-page>
 </template>
 <script>
 import API from "../api";
-import EmptyBlock from "../components/empty-block.vue";
+import LocationTable from "../components/location-table.vue";
+import ActivityTable from "../components/activity-table.vue";
+import ItemTable from "../components/item-table.vue";
+import PaginationTable from "../components/pagination-table.vue";
 import CurMexin from "../utils/cur-num-mixin.vue";
 
 
 export default {
   components: {
-    EmptyBlock
+    LocationTable,
+    PaginationTable,
+    ActivityTable,
+    ItemTable,
   },
   mixins:[CurMexin],
   created() {
-    this.tagId = this.$f7route.query.id;
+    this.tagId = Number(this.$f7route.query.id);
     this.tagIndex = this.$f7route.query.index;
     ///get title and description from main tags
     this.tagTitle = API.main_page.$data.tags[this.tagIndex].name;
