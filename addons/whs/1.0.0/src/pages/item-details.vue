@@ -122,13 +122,13 @@
       <location-table :loadId="itemId" loadIdName="inventory_item_id" parent="item"/>
       <pagination-table slot="fixed" link="location" parent="item" />
     </template>
-
     <template v-if="activeTab === 'tags'">
       <tag-table :loadId="itemId" loadIdName="inventory_item_id" parent="item"/>
       <pagination-table slot="fixed" link="tag" parent="item" />
     </template>
     <template v-if="activeTab === 'activity'">
-      <empty-block :text="$t('whs.common.no', {text: settings.activity.plural_name})" />
+      <activity-table :loadId="itemId" loadIdName="inventory_item_id" parent="item"/>
+      <pagination-table slot="fixed" link="activity" parent="item" />
     </template>
   </f7-page>
 </template>
@@ -137,6 +137,7 @@ import API from "../api";
 import EmptyBlock from "../components/empty-block.vue";
 import LocationTable from "../components/location-table.vue";
 import TagTable from "../components/tag-table.vue";
+import ActivityTable from "../components/activity-table.vue";
 import PaginationTable from "../components/pagination-table.vue";
 import CurMexin from "../utils/cur-num-mixin.vue";
 
@@ -147,6 +148,7 @@ export default {
     LocationTable,
     PaginationTable,
     TagTable,
+    ActivityTable,
   },
   mixins:[CurMexin],
   created() {
