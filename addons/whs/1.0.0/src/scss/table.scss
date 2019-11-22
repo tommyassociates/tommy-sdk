@@ -39,6 +39,12 @@
     vertical-align: middle;
     font-size: 0;
   }
+  .media-cell-image{
+    background-color: #eee !important;
+    background-size: 100% auto !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+  }
   tbody tr:nth-child(2n) td {
     background: #fafafa;
   }
