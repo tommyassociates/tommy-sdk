@@ -67,13 +67,15 @@
               >{{$t('whs.form_add.type_options.stocktake')}}</option>
             </select>
           </f7-list-item>
-          <template v-if="activity.activity_type === 'pending_out' || activity.activity_type === 'pending_in' || activity.activity_type === 'movement' || activity.activity_type === 'stocktake'" >
-             <!-- Item -->
+          <template
+            v-if="activity.activity_type === 'pending_out' || activity.activity_type === 'pending_in' || activity.activity_type === 'movement' || activity.activity_type === 'stocktake'"
+          >
+            <!-- Item -->
             <f7-list-item divider>
               <i class="whs-form-icon whs-form-icon-item"></i>
               {{settings.item.name}}
             </f7-list-item>
-            <item-picker :multiply="false" @selected:change="itemChange"/>
+            <item-picker :multiply="false" @selected:change="itemChange" />
 
             <template v-if="activity.inventory_item_id !== null">
               <!-- Capacity -->
@@ -99,21 +101,21 @@
                 <i class="whs-form-icon whs-form-icon-location"></i>
                 {{$t('whs.common.source_label')}}
               </f7-list-item>
-              <location-picker :multiply="false" @selected:change="sourceChange"/>              
+              <location-picker :multiply="false" @selected:change="sourceChange" />
               <!-- Destination -->
               <f7-list-item divider>
                 <i class="whs-form-icon whs-form-icon-location"></i>
                 {{$t('whs.common.destination_label')}}
               </f7-list-item>
-              <location-picker :multiply="false" @selected:change="destinationChange"/>
+              <location-picker :multiply="false" @selected:change="destinationChange" />
             </template>
-          </template>          
+          </template>
           <!--Assets-->
           <f7-list-item divider>
             <i class="whs-form-icon whs-form-icon-person"></i>
             {{$t('whs.common.assignet_label')}}
           </f7-list-item>
-          <assets-picker :multiply="false"/>
+          <assets-picker :multiply="false" />
           <!--Tags-->
           <f7-list-item divider>
             <i class="whs-form-icon whs-form-icon-hash"></i>
@@ -126,11 +128,7 @@
             {{$t('whs.common.executed_label')}}
           </f7-list-item>
           <f7-list-item>
-            <f7-toggle
-              slot="after"
-              :checked="executed"
-              @toggle:change="executedChange"
-            />
+            <f7-toggle slot="after" :checked="executed" @toggle:change="executedChange" />
           </f7-list-item>
           <template v-if="executed">
             <!--Assets-->
@@ -138,7 +136,7 @@
               <i class="whs-form-icon whs-form-icon-person"></i>
               {{$t('whs.common.executed_by_label')}}
             </f7-list-item>
-            <team-picker :multiply="false" @selected:change="executedTeamChange"/>
+            <team-picker :multiply="false" @selected:change="executedTeamChange" />
             <!-- Executed -->
             <f7-list-item divider>
               <i class="whs-form-icon whs-form-icon-calendar"></i>
@@ -162,13 +160,13 @@
   </f7-page>
 </template>
 <script>
-import API from "../api";
-import TagsPicker from "../components/tags-picker.vue";
-import AssetsPicker from "../components/assets-picker.vue";
-import TeamPicker from "../components/team-picker.vue";
-import ItemPicker from "../components/item-picker.vue";
-import LocationPicker from "../components/location-picker.vue";
-import Dialog from "../mixins/dialog.vue";
+import API from "../../api";
+import TagsPicker from "../../components/tags-picker.vue";
+import AssetsPicker from "../../components/assets-picker.vue";
+import TeamPicker from "../../components/team-picker.vue";
+import ItemPicker from "../../components/item-picker.vue";
+import LocationPicker from "../../components/location-picker.vue";
+import Dialog from "../../mixins/dialog.vue";
 
 ///Inventory item can't be blank. Source location can't be blank. Destination location can't be blank
 export default {
@@ -177,7 +175,7 @@ export default {
     AssetsPicker,
     TeamPicker,
     ItemPicker,
-    LocationPicker,
+    LocationPicker
   },
   mixins: [Dialog],
   created() {
@@ -203,12 +201,15 @@ export default {
           text: this.settings.activity.name
         });
       }
-    },
+    }
   },
   methods: {
     addActivity() {
       self = this;
-      if (this.$f7.$("#add-activity")[0].checkValidity() && self.checkValidity()) {
+      if (
+        this.$f7.$("#add-activity")[0].checkValidity() &&
+        self.checkValidity()
+      ) {
         if (this.editId) {
           this.activity = this.setDefaults(this.activity);
           API.editActivity(this.activity, this.editId).then(() => {
@@ -231,17 +232,18 @@ export default {
       } else {
         this.alertDialog(
           this.$t("whs.alert_form.title"),
-          this.$t("whs.alert_form.text")+". Inventory item can't be blank. Source location can't be blank. Destination location can't be blank",
+          this.$t("whs.alert_form.text") +
+            ". Inventory item can't be blank. Source location can't be blank. Destination location can't be blank",
           this.$t("whs.alert_form.ok")
         );
       }
     },
-    checkValidity(){
+    checkValidity() {
       self = this;
-      if(self.activity.inventory_item_id === null) return false;
-      if(self.activity.source_location_id === null) return false;
-      if(self.activity.destination_location_id === null) return false;
-      return true;      
+      if (self.activity.inventory_item_id === null) return false;
+      if (self.activity.source_location_id === null) return false;
+      if (self.activity.destination_location_id === null) return false;
+      return true;
     },
     deleteActivity() {
       API.deleteActivity(this.editId).then(() => {
@@ -276,17 +278,18 @@ export default {
     createScheduledCalendar() {
       const self = this;
       let date = new Date();
-      if (self.activity.scheduled_at) date = new Date(self.activity.scheduled_at);
+      if (self.activity.scheduled_at)
+        date = new Date(self.activity.scheduled_at);
       self.calendarScheduled = self.$f7.calendar.create({
         value: [date],
         openIn: "customModal",
         backdrop: true,
         closeOnSelect: true,
         on: {
-          change(cal, val) {            
-            if(self.calendar_first_change.scheduled){
+          change(cal, val) {
+            if (self.calendar_first_change.scheduled) {
               self.activity.scheduled_at = val[0];
-            }else{
+            } else {
               self.calendar_first_change.scheduled = true;
             }
           }
@@ -308,55 +311,55 @@ export default {
         closeOnSelect: true,
         on: {
           change(cal, val) {
-            if(self.calendar_first_change.executed){
+            if (self.calendar_first_change.executed) {
               self.activity.executed_at = val[0];
-            }else{
+            } else {
               self.calendar_first_change.executed = true;
             }
           }
         }
       });
     },
-    executedChange(value){
+    executedChange(value) {
       self = this;
       self.executed = value;
-      if(!value){
+      if (!value) {
         self.activity.executed_at = null;
         self.activity.executed_by_id = null;
       }
     },
-    itemChange(target){
+    itemChange(target) {
       self = this;
-      if(target.length > 0 ){
-        self.activity.inventory_item_id = target[0].id        
-      }else{
+      if (target.length > 0) {
+        self.activity.inventory_item_id = target[0].id;
+      } else {
         self.activity.inventory_item_id = null;
       }
     },
-    executedTeamChange(target){
+    executedTeamChange(target) {
       self = this;
-      if(target.length > 0 ){
-        self.activity.executed_by_id = target[0].id        
-      }else{
+      if (target.length > 0) {
+        self.activity.executed_by_id = target[0].id;
+      } else {
         self.activity.executed_by_id = null;
       }
-    },     
-    sourceChange(target){
+    },
+    sourceChange(target) {
       self = this;
-      if(target.length > 0 ){
-        self.activity.source_location_id = target[0].id        
-      }else{
+      if (target.length > 0) {
+        self.activity.source_location_id = target[0].id;
+      } else {
         self.activity.source_location_id = null;
       }
     },
-    destinationChange(target){
+    destinationChange(target) {
       self = this;
-      if(target.length > 0 ){
-        self.activity.destination_location_id = target[0].id        
-      }else{
+      if (target.length > 0) {
+        self.activity.destination_location_id = target[0].id;
+      } else {
         self.activity.destination_location_id = null;
       }
-    },
+    }
   },
   beforeDestroy() {
     const self = this;
@@ -378,17 +381,16 @@ export default {
         executed_by_id: null,
         count: 0,
         inventory_item_id: null,
-        destination_location_id: null,
-
+        destination_location_id: null
       },
       editId: null,
       indexEdit: null,
       executed: false,
       default_activity: {},
       settings: API.main_page.$data.settings,
-      calendar_first_change:{
+      calendar_first_change: {
         executed: false,
-        scheduled: false,
+        scheduled: false
       }
     };
   }

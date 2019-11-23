@@ -51,7 +51,11 @@
             <i class="whs-form-icon whs-form-icon-location"></i>
             {{$t('whs.common.parent_location_label')}}
           </f7-list-item>
-          <location-picker :multiply="false" @selected:change="parentLocationChange" :loadSelect="[location.parent_location_id]"/>  
+          <location-picker
+            :multiply="false"
+            @selected:change="parentLocationChange"
+            :loadSelect="[location.parent_location_id]"
+          />
 
           <!-- description -->
           <f7-list-item divider>
@@ -114,7 +118,7 @@
           <f7-list-item
             class="whs-type-selector"
             smart-select
-            title= " "
+            title=" "
             :smart-select-params="{
               openIn: 'popup',
               pageBackLinkText: '',
@@ -126,28 +130,35 @@
             }"
           >
             <select name="category" @change="location.category = $event.target.value">
-              <option value="unspecified" :selected="location.category === 'unspecified' || location.category === ''">{{$t('whs.form_add.location_options.unspecified')}}</option>
-              <option value="frozen" :selected="location.category === 'frozen'">{{$t('whs.form_add.location_options.frozen')}}</option>
-              <option value="ambient" :selected="location.category === 'ambient'">{{$t('whs.form_add.location_options.ambient')}}</option>
+              <option
+                value="unspecified"
+                :selected="location.category === 'unspecified' || location.category === ''"
+              >{{$t('whs.form_add.location_options.unspecified')}}</option>
+              <option
+                value="frozen"
+                :selected="location.category === 'frozen'"
+              >{{$t('whs.form_add.location_options.frozen')}}</option>
+              <option
+                value="ambient"
+                :selected="location.category === 'ambient'"
+              >{{$t('whs.form_add.location_options.ambient')}}</option>
             </select>
           </f7-list-item>
-
         </ul>
       </f7-list>
     </form>
-    
+
     <div class="whs-form-delete" v-if="editId">
       <f7-link class="delete" @click="deleteDialog()">{{$t('whs.common.delete')}}</f7-link>
     </div>
-    
   </f7-page>
 </template>
 <script>
-import API from "../api";
-import FormImagesPicker from "../components/form-images-picker.vue";
-import TagsPicker from "../components/tags-picker.vue";
-import LocationPicker from "../components/location-picker.vue";
-import Dialog from '../mixins/dialog.vue';
+import API from "../../api";
+import FormImagesPicker from "../../components/form-images-picker.vue";
+import TagsPicker from "../../components/tags-picker.vue";
+import LocationPicker from "../../components/location-picker.vue";
+import Dialog from "../../mixins/dialog.vue";
 
 export default {
   components: {
@@ -157,19 +168,29 @@ export default {
   },
   mixins: [Dialog],
   created() {
-    if(this.$f7route.query.edit_id !== null && this.$f7route.query.edit_id !== undefined){
+    if (
+      this.$f7route.query.edit_id !== null &&
+      this.$f7route.query.edit_id !== undefined
+    ) {
       this.editId = this.$f7route.query.edit_id;
       this.indexEdit = this.$f7route.query.index;
       ///load location from maim locations and clone
-      this.location = Object.assign({}, API.main_page.$data.locations[this.indexEdit]);
+      this.location = Object.assign(
+        {},
+        API.main_page.$data.locations[this.indexEdit]
+      );
     }
   },
   computed: {
-    title(){
-      if(this.editId){
-        return this.$t('whs.form_add.title_edit', { text: this.settings.location.name})
-      }else{
-        return this.$t('whs.form_add.title', { text: this.settings.location.name})
+    title() {
+      if (this.editId) {
+        return this.$t("whs.form_add.title_edit", {
+          text: this.settings.location.name
+        });
+      } else {
+        return this.$t("whs.form_add.title", {
+          text: this.settings.location.name
+        });
       }
     }
   },
@@ -177,49 +198,64 @@ export default {
     addLocation() {
       self = this;
       if (this.$f7.$("#add-location")[0].checkValidity()) {
-        if(this.editId){
+        if (this.editId) {
           this.location = this.setDefaults(this.location);
-          API.editLocation(this.location, this.editId)
-            .then(()=>{
-              self.$events.$emit('location:updated',this.location);     
-              self.$f7router.back();
-              API.toast(self.$t('whs.toast.edit', { text: this.settings.location.name}));
-            });
-        }else{
+          API.editLocation(this.location, this.editId).then(() => {
+            self.$events.$emit("location:updated", this.location);
+            self.$f7router.back();
+            API.toast(
+              self.$t("whs.toast.edit", { text: this.settings.location.name })
+            );
+          });
+        } else {
           this.location = API.removeEmpty(this.location);
           API.createLocation(this.location).then(() => {
-            self.$events.$emit('location:aded',this.location);
+            self.$events.$emit("location:aded", this.location);
             self.$f7router.back();
-            API.toast(self.$t('whs.toast.add', { text: this.settings.location.name}));
+            API.toast(
+              self.$t("whs.toast.add", { text: this.settings.location.name })
+            );
           });
         }
       } else {
-        this.alertDialog(this.$t('whs.alert_form.title'), this.$t('whs.alert_form.text'), this.$t('whs.alert_form.ok'));
+        this.alertDialog(
+          this.$t("whs.alert_form.title"),
+          this.$t("whs.alert_form.text"),
+          this.$t("whs.alert_form.ok")
+        );
       }
     },
-    deleteLocation(){
-      API.deleteLocation(this.editId)
-        .then(()=>{
-          self.$events.$emit('location:deleted',this.item);    
-          self.$f7router.back('/whs/', {force: true}); 
-          API.toast(self.$t('whs.toast.delete', { text: this.settings.location.name}));
-        });
+    deleteLocation() {
+      API.deleteLocation(this.editId).then(() => {
+        self.$events.$emit("location:deleted", this.item);
+        self.$f7router.back("/whs/", { force: true });
+        API.toast(
+          self.$t("whs.toast.delete", { text: this.settings.location.name })
+        );
+      });
     },
-    deleteDialog(){
-      this.confirmDialog(this.$t('whs.alert_form.delete_title'), this.$t('whs.alert_form.delete_text'), this.$t('whs.alert_form.confirm'),this.$t('whs.alert_form.cancel'), this.deleteLocation);
+    deleteDialog() {
+      this.confirmDialog(
+        this.$t("whs.alert_form.delete_title"),
+        this.$t("whs.alert_form.delete_text"),
+        this.$t("whs.alert_form.confirm"),
+        this.$t("whs.alert_form.cancel"),
+        this.deleteLocation
+      );
     },
-    setDefaults(item){
+    setDefaults(item) {
       self = this;
-      for(key in self.default_item){
-        if(item[key] === null || item[key] ==="") item[key] = self.default_item[key];
+      for (key in self.default_item) {
+        if (item[key] === null || item[key] === "")
+          item[key] = self.default_item[key];
       }
       return item;
     },
-    parentLocationChange(target){
+    parentLocationChange(target) {
       self = this;
-      if(target.length > 0 ){
-        self.location.parent_location_id = target[0].id        
-      }else{
+      if (target.length > 0) {
+        self.location.parent_location_id = target[0].id;
+      } else {
         self.location.parent_location_id = null;
       }
     }
@@ -243,9 +279,8 @@ export default {
       },
       editId: null,
       indexEdit: null,
-      default_location:{
-      },
-      settings: API.main_page.$data.settings,
+      default_location: {},
+      settings: API.main_page.$data.settings
     };
   }
 };
