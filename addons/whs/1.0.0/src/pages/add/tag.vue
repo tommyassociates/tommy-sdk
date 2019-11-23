@@ -33,19 +33,23 @@
           </f7-list-item>
           <form-images-picker />
           -->
-        </ul>        
+        </ul>
       </f7-list>
     </form>
 
     <div class="whs-form-delete" v-if="editId" style="position:absolute; bottom:0; left: 50%">
-      <f7-link class="delete" @click="deleteDialog()" style="left: -50%;">{{$t('whs.common.delete')}}</f7-link>
+      <f7-link
+        class="delete"
+        @click="deleteDialog()"
+        style="left: -50%;"
+      >{{$t('whs.common.delete')}}</f7-link>
     </div>
   </f7-page>
 </template>
 <script>
-import API from "../api";
-import FormImagesPicker from "../components/form-images-picker.vue";
-import Dialog from '../mixins/dialog.vue';
+import API from "../../api";
+import FormImagesPicker from "../../components/form-images-picker.vue";
+import Dialog from "../../mixins/dialog.vue";
 
 export default {
   components: {
@@ -53,7 +57,10 @@ export default {
   },
   mixins: [Dialog],
   created() {
-    if(this.$f7route.query.edit_id !== null && this.$f7route.query.edit_id !== undefined){
+    if (
+      this.$f7route.query.edit_id !== null &&
+      this.$f7route.query.edit_id !== undefined
+    ) {
       this.editId = this.$f7route.query.edit_id;
       this.indexEdit = this.$f7route.query.index;
       ///load tag from maim tags and clone
@@ -61,14 +68,15 @@ export default {
     }
   },
   computed: {
-    title(){
-      
-      if(this.editId){
+    title() {
+      if (this.editId) {
         //fix for v1 withot edit function
         //return this.$t('whs.form_add.title_edit', { text: this.settings.tag.name})
-        return this.$t('whs.form_add.title_delete', { text: this.settings.tag.name})
-      }else{
-        return this.$t('whs.form_add.title', { text: this.settings.tag.name})
+        return this.$t("whs.form_add.title_delete", {
+          text: this.settings.tag.name
+        });
+      } else {
+        return this.$t("whs.form_add.title", { text: this.settings.tag.name });
       }
     }
   },
@@ -76,36 +84,50 @@ export default {
     addTag() {
       self = this;
       if (this.$f7.$("#add-tag")[0].checkValidity()) {
-        if(this.editId){
-          API.editTag(this.tag, this.editId)
-            .then(()=>{
-              self.$events.$emit('tag:updated',this.tag);     
-              self.$f7router.back();
-              API.toast(self.$t('whs.toast.edit', { text: this.settings.tag.name}));
-            });
-        }else{
+        if (this.editId) {
+          API.editTag(this.tag, this.editId).then(() => {
+            self.$events.$emit("tag:updated", this.tag);
+            self.$f7router.back();
+            API.toast(
+              self.$t("whs.toast.edit", { text: this.settings.tag.name })
+            );
+          });
+        } else {
           this.tag = API.removeEmpty(this.tag);
           API.createTag(this.tag).then(() => {
-            self.$events.$emit('tag:aded',this.tag);
+            self.$events.$emit("tag:aded", this.tag);
             self.$f7router.back();
-            API.toast(self.$t('whs.toast.add', { text: this.settings.tag.name}));
+            API.toast(
+              self.$t("whs.toast.add", { text: this.settings.tag.name })
+            );
           });
         }
       } else {
-        this.alertDialog(this.$t('whs.alert_form.title'), this.$t('whs.alert_form.text'), this.$t('whs.alert_form.ok'));
+        this.alertDialog(
+          this.$t("whs.alert_form.title"),
+          this.$t("whs.alert_form.text"),
+          this.$t("whs.alert_form.ok")
+        );
       }
     },
-    deleteTag(){
-      API.deleteTag(this.editId)
-        .then(()=>{
-          self.$events.$emit('tag:deleted',this.tag);    
-          self.$f7router.back('/whs/', {force: true}); 
-          API.toast(self.$t('whs.toast.delete', { text: this.settings.tag.name}));
-        });
+    deleteTag() {
+      API.deleteTag(this.editId).then(() => {
+        self.$events.$emit("tag:deleted", this.tag);
+        self.$f7router.back("/whs/", { force: true });
+        API.toast(
+          self.$t("whs.toast.delete", { text: this.settings.tag.name })
+        );
+      });
     },
-    deleteDialog(){
-      this.confirmDialog(this.$t('whs.alert_form.delete_title'), this.$t('whs.alert_form.delete_text'), this.$t('whs.alert_form.confirm'),this.$t('whs.alert_form.cancel'), this.deleteTag);
-    },
+    deleteDialog() {
+      this.confirmDialog(
+        this.$t("whs.alert_form.delete_title"),
+        this.$t("whs.alert_form.delete_text"),
+        this.$t("whs.alert_form.confirm"),
+        this.$t("whs.alert_form.cancel"),
+        this.deleteTag
+      );
+    }
   },
   beforeDestroy() {
     const self = this;
@@ -116,11 +138,11 @@ export default {
   data() {
     return {
       tag: {
-        name: null, 
+        name: null
       },
       editId: null,
       indexEdit: null,
-      settings: API.main_page.$data.settings,
+      settings: API.main_page.$data.settings
     };
   }
 };

@@ -50,48 +50,34 @@
           <i class="whs-form-icon whs-form-icon-dot"></i>
           {{$t('whs.settings_field.type_label')}}
         </f7-list-item>
-        <f7-list-item
-          link
-          popup-open=".whs-field-type-popup"
-          title="Single line text"
-        />
+        <f7-list-item link popup-open=".whs-field-type-popup" title="Single line text" />
       </ul>
     </f7-list>
 
-    <field-type-picker
-      :type="type"
-      @change="(v) => type = v"
-    />
-
+    <field-type-picker :type="type" @change="(v) => type = v" />
   </f7-page>
 </template>
 <script>
-  import API from "../api";
-  import FieldTypePicker from '../components/field-type-picker.vue';
+import API from "../../api";
+import FieldTypePicker from "../../components/field-type-picker.vue";
 
-  export default {
-    components: {
-      FieldTypePicker,
-    },
-    data() {
-      return {
-        type: 'single_line_text',
-      };
-    },
-    created() {
-
-    },
-    computed: {
-
-    },
-    methods: {
-
-    },
-    beforeDestroy() {
-      const self = this;
-    },
-    mounted() {
-      const self = this;
-    }
+export default {
+  components: {
+    FieldTypePicker
+  },
+  data() {
+    return {
+      type: "single_line_text"
+    };
+  },
+  created() {},
+  computed: {},
+  methods: {},
+  beforeDestroy() {
+    const self = this;
+  },
+  mounted() {
+    const self = this;
+  }
 };
 </script>

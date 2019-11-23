@@ -133,12 +133,12 @@
   </f7-page>
 </template>
 <script>
-import API from "../api";
-import LocationTable from "../components/location-table.vue";
-import TagTable from "../components/tag-table.vue";
-import ActivityTable from "../components/activity-table.vue";
-import PaginationTable from "../components/pagination-table.vue";
-import CurMexin from "../utils/cur-num-mixin.vue";
+import API from "../../api";
+import LocationTable from "../../components/location-table.vue";
+import TagTable from "../../components/tag-table.vue";
+import ActivityTable from "../../components/activity-table.vue";
+import PaginationTable from "../../components/pagination-table.vue";
+import CurMexin from "../../utils/cur-num-mixin.vue";
 
 
 export default {

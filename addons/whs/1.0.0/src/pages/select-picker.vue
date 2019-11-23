@@ -7,7 +7,16 @@
         <f7-searchbar :init="false"></f7-searchbar>
       </f7-subnavbar>
     </f7-navbar>
-    <select-list :type="type" :data="targets" :styleImage="tagStyle" :loaded="loaded" @change="selectChanget" :selected="selected" :multiply="multiply" :image_link="image_link"/>
+    <select-list
+      :type="type"
+      :data="targets"
+      :styleImage="tagStyle"
+      :loaded="loaded"
+      @change="selectChanget"
+      :selected="selected"
+      :multiply="multiply"
+      :image_link="image_link"
+    />
   </f7-page>
 </template>
 <script>
@@ -23,7 +32,7 @@ export default {
     pageTitle: String,
     type: String,
     multiply: Boolean,
-    image_link: String,
+    image_link: String
   },
   components: {
     "select-list": SelectList
@@ -39,15 +48,15 @@ export default {
       self.$nextTick(() => {
         const searchbar = self.$f7.searchbar.create({
           el: ".searchbar",
-          searchContainer: "#whs-select-"+self.type,
-          searchIn: ".item-title",
+          searchContainer: "#whs-select-" + self.type,
+          searchIn: ".item-title"
         });
       });
     },
-    selectChanget(e){
+    selectChanget(e) {
       self = this;
-      self.onChange(e.target, e.checked);      
-    },
+      self.onChange(e.target, e.checked);
+    }
   },
   data() {
     return {
