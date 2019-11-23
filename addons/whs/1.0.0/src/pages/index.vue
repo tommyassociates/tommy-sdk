@@ -174,7 +174,7 @@
             link: 'taggings_count'
           }
         ]"
-    />
+    /> 
     <template v-if="activeTab === 'activity' && !searchEnabled">
       <f7-popover class="whs-popover whs-popover-activity" :backdrop="false">
         <f7-list no-chevron>
@@ -422,7 +422,7 @@ export default {
       });
     },
     getActivities() {
-      self = this;
+      const self = this;
       const options = {
         with_activity_counts: true,
         page_limit: 2
@@ -463,7 +463,7 @@ export default {
       });
     },
     getActivitiesMore(target) {
-      self = this;
+      const self = this;
       const options = {
         with_activity_counts: true
       };
@@ -473,9 +473,9 @@ export default {
         target: target
       };
       //link to more styles list
-      (self.dynamicStyleTarget = self.activities_more.target),
-        //reset loader
-        (self.loaded.activity_more = false);
+      self.dynamicStyleTarget = self.activities_more.target;
+      //reset loader
+      self.loaded.activity_more = false;
       switch (target) {
         case "item":
           API.getItem(options).then(data => {
@@ -534,26 +534,26 @@ export default {
       this.getActivitiesMore(filter);
     },
     itemUpdated() {
-      self = this;
+      const self = this;
       self.loaded.item = false;
       API.resetCache("inventory/items");
       self.getItem();
     },
     locationUpdated() {
-      self = this;
+      const self = this;
       self.loaded.location = false;
       API.resetCache("inventory/locations");
       self.getLocations();
     },
     tagUpdated() {
-      self = this;
+      const self = this;
       self.loaded.tag = false;
       API.resetCache("inventory/tags");
       self.getTags();
     },
     parseSettings(settings) {
       console.log("TCL: parseSettings -> settings", settings);
-      self = this;
+      const self = this;
       if (settings === null) return self.settings;
       //array -> object
       const new_settings = settings.reduce((obj, item) => {
@@ -564,7 +564,7 @@ export default {
       return self.compareDefSettings(self.settings, new_settings);
     },
     compareDefSettings(def_settings, new_settings) {
-      self = this;
+      const self = this;
       for (def in def_settings) {
         if (new_settings[def] === undefined) {
           new_settings[def] = def_settings[def];
@@ -621,8 +621,7 @@ export default {
     self.$events.$on("tag:deleted", self.tagUpdated);
   },
   data() {
-    self = this;
-    console.log("TCL: data -> self", self);
+    const self = this;
     return {
       activeTab: "items",
       activeSearchFilter: "all",
