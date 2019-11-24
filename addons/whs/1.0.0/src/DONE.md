@@ -91,3 +91,4 @@
 -   Tag table in summary pages
 -   Activity table in summary pages
 -   Item table in summary pages
+-   Role table in summary pages
