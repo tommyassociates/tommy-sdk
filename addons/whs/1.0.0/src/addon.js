@@ -3,6 +3,7 @@ import ItemDetails from "./pages/details/item.vue";
 import LocationDetails from "./pages/details/location.vue";
 import TagDetails from "./pages/details/tag.vue";
 import TeamDetails from "./pages/details/team.vue";
+import RoleDetails from "./pages/details/role.vue";
 import ItemAdd from "./pages/add/item.vue";
 import TagAdd from "./pages/add/tag.vue";
 import LocationAdd from "./pages/add/location.vue";
@@ -37,6 +38,10 @@ const routes = [
   {
     path: "/whs/team/",
     component: TeamDetails
+  },
+  {
+    path: "/whs/role/",
+    component: RoleDetails
   },
   {
     path: "/whs/item-add/",

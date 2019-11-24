@@ -65,6 +65,7 @@
 -   Dynamic image
 -   Add form
 -   Team summary page
+-   Role summary page
 
 
 ## Tags
@@ -93,3 +94,4 @@
 -   Activity table in summary pages
 -   Item table in summary pages
 -   Role table in summary pages
+-   Team table in summary pages
