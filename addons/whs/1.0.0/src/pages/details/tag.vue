@@ -7,7 +7,7 @@
         <f7-link icon-only href="/whs/tag-add/">
           <f7-icon f7="add" />
         </f7-link>
-        <f7-link icon-only :href="`/whs/tag-add/?edit_id=${tagId}&index=${tagIndex}`">
+        <f7-link icon-only @click="clickEdit()">
           <f7-icon f7="gear" />
         </f7-link>
       </f7-nav-right>
@@ -141,6 +141,9 @@ import CurMexin from "../../utils/cur-num-mixin.vue";
 
 
 export default {
+  props:{
+    item_link: Object
+  },
   components: {
     LocationTable,
     PaginationTable,
@@ -149,11 +152,9 @@ export default {
   },
   mixins:[CurMexin],
   created() {
-    this.tagId = Number(this.$f7route.query.id);
-    this.tagIndex = this.$f7route.query.index;
-    ///get title and description from main tags
-    this.tagTitle = API.main_page.$data.tags[this.tagIndex].name;
-    this.tagDesc = API.main_page.$data.tags[this.tagIndex].description;
+    this.tagId = this.item_link.id;
+    this.tagTitle = this.item_link.name;
+    this.tagDesc = this.item_link.description;
 
     this.loadTagDetail();
   },
@@ -201,6 +202,13 @@ export default {
     },
     colorizeHeaderOut(){
       this.$f7.$('.whs-details-navbar-inner').css("background-color", "#F5F5F5");
+    },
+    clickEdit(){
+      const self = this;
+      self.$f7router.navigate('/whs/tag-add/', {
+        props: {
+          item_link: self.item_link
+      }});
     }
   },
   beforeDestroy() {

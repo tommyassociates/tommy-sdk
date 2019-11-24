@@ -4,8 +4,8 @@
       <f7-list class="whs-list" media-list v-if="data.length >0 ">
         <f7-list-item
           v-for="(item, index) in data"
-          chevron-center
-          :link="`${detailUrl}?id=${item.id}&index=${index}`"
+          chevron-center          
+          @click="goToDetails(item)"
           :title="item.name || item.first_name+' '+ item.last_name"
           :key="type+'_'+index"
         >
@@ -74,10 +74,20 @@ export default {
       default: 5
     },
   },
+  computed: {},
+  methods:{
+    goToDetails(item){
+      const self = this;
+      self.$f7router.navigate(self.detailUrl, {
+        props: {
+          item_link: item
+      }});
+    }
+  },
   data() {
     return {
       settings: API.main_page.$data.settings
     };
-  }
+  },
 };
 </script>

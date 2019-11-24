@@ -375,6 +375,7 @@ import MainList from "../components/main-list.vue";
 import ListStyles from "../mixins/list-styles.vue";
 
 export default {
+  name: "Inventory",
   components: {
     EmptyBlock,
     "main-list": MainList

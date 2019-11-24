@@ -161,6 +161,9 @@ import LocationPicker from "../../components/location-picker.vue";
 import Dialog from "../../mixins/dialog.vue";
 
 export default {
+  props:{
+    item_link: Object
+  },
   components: {
     FormImagesPicker,
     TagsPicker,
@@ -168,17 +171,9 @@ export default {
   },
   mixins: [Dialog],
   created() {
-    if (
-      this.$f7route.query.edit_id !== null &&
-      this.$f7route.query.edit_id !== undefined
-    ) {
-      this.editId = this.$f7route.query.edit_id;
-      this.indexEdit = this.$f7route.query.index;
-      ///load location from maim locations and clone
-      this.location = Object.assign(
-        {},
-        API.main_page.$data.locations[this.indexEdit]
-      );
+    if (this.item_link) {
+      this.editId = this.item_link.id;
+      this.location = Object.assign({}, this.item_link);
     }
   },
   computed: {

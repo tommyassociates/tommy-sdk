@@ -2,6 +2,7 @@ import Index from "./pages/index.vue";
 import ItemDetails from "./pages/details/item.vue";
 import LocationDetails from "./pages/details/location.vue";
 import TagDetails from "./pages/details/tag.vue";
+import TeamDetails from "./pages/details/team.vue";
 import ItemAdd from "./pages/add/item.vue";
 import TagAdd from "./pages/add/tag.vue";
 import LocationAdd from "./pages/add/location.vue";
@@ -32,6 +33,10 @@ const routes = [
   {
     path: "/whs/tag/",
     component: TagDetails
+  },
+  {
+    path: "/whs/team/",
+    component: TeamDetails
   },
   {
     path: "/whs/item-add/",

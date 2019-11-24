@@ -170,6 +170,9 @@ import Dialog from "../../mixins/dialog.vue";
 
 ///Inventory item can't be blank. Source location can't be blank. Destination location can't be blank
 export default {
+  props:{
+    item_link: Object
+  },
   components: {
     TagsPicker,
     AssetsPicker,
@@ -179,15 +182,11 @@ export default {
   },
   mixins: [Dialog],
   created() {
-    if (
-      this.$f7route.query.edit_id !== null &&
-      this.$f7route.query.edit_id !== undefined
-    ) {
-      this.editId = this.$f7route.query.edit_id;
-      this.indexEdit = this.$f7route.query.index;
-      ///load activity from maim activitys and clone
-      //this.activity = Object.assign({}, API.main_page.$data.activitys[this.indexEdit]);
-      //this.executed = this.activity.executed_by_id !=== null
+    if (this.item_link) {
+      this.editId = this.item_link.id;
+      this.activity = Object.assign({}, this.item_link);
+      this.activity.user_id = this.$root.user.id;
+      
     }
   },
   computed: {
