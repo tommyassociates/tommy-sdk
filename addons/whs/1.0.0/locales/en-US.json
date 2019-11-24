@@ -206,7 +206,16 @@
     "value": "Value",
     "expiring": "Expiring",
     "pending_in": "Pending in",
-    "pending_out": "Pending out"
+    "pending_out": "Pending out",
+    "open": "Open",
+    "due": "Due",
+    "overdue": "Overdue",
+    "activities": "Activities",
+    "relocations": "Relocations",
+    "locations": "Locations",
+    "movements": "Movements",
+    "stocktakes": "Stocktakes"
+
   },
   "title": "Inventory",
   "summary": "Manage your inventory.",
