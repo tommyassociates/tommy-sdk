@@ -64,6 +64,7 @@
 -   API roles, team, locations, items
 -   Dynamic image
 -   Add form
+-   Team summary page
 
 
 ## Tags
