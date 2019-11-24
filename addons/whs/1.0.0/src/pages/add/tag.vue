@@ -52,19 +52,17 @@ import FormImagesPicker from "../../components/form-images-picker.vue";
 import Dialog from "../../mixins/dialog.vue";
 
 export default {
+  props:{
+    item_link: Object
+  },
   components: {
     FormImagesPicker
   },
   mixins: [Dialog],
   created() {
-    if (
-      this.$f7route.query.edit_id !== null &&
-      this.$f7route.query.edit_id !== undefined
-    ) {
-      this.editId = this.$f7route.query.edit_id;
-      this.indexEdit = this.$f7route.query.index;
-      ///load tag from maim tags and clone
-      this.tag = Object.assign({}, API.main_page.$data.tags[this.indexEdit]);
+    if (this.item_link) {
+      this.editId = this.item_link.id;
+      this.tag = Object.assign({}, this.item_link);
     }
   },
   computed: {

@@ -7,7 +7,7 @@
         <f7-link icon-only href="/whs/location-add/">
           <f7-icon f7="add" />
         </f7-link>
-        <f7-link icon-only :href="`/whs/location-add/?edit_id=${locationId}&index=${locationIndex}`">
+        <f7-link icon-only @click="clickEdit()">
           <f7-icon f7="gear" />
         </f7-link>
       </f7-nav-right>
@@ -182,6 +182,9 @@ import PaginationTable from "../../components/pagination-table.vue";
 import CurMexin from "../../utils/cur-num-mixin.vue";
 
 export default {
+  props:{
+    item_link: Object
+  },
   components: {
     LocationTable,
     PaginationTable,
@@ -191,11 +194,9 @@ export default {
   },
   mixins:[CurMexin],
   created() {
-    this.locationId = Number(this.$f7route.query.id);
-    this.locationIndex = this.$f7route.query.index;
-    ///get title and description from main items
-    this.locationTitle = API.main_page.$data.locations[this.locationIndex].name;
-    this.locationDesc = API.main_page.$data.locations[this.locationIndex].description;
+    this.locationId = this.item_link.id;
+    this.locationTitle = this.item_link.name;
+    this.locationDesc = this.item_link.description;
 
     this.loadLocationDetail();
   },
@@ -243,6 +244,13 @@ export default {
     },
     colorizeHeaderOut(){
       this.$f7.$('.whs-details-navbar-inner').css("background-color", "#F5F5F5");
+    },
+    clickEdit(){
+      const self = this;
+      self.$f7router.navigate('/whs/location-add/', {
+        props: {
+          item_link: self.item_link
+      }});
     }
   },
   beforeDestroy() {
