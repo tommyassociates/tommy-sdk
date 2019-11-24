@@ -155,9 +155,9 @@
 </template>
 <script>
 import API from "../../api";
-import FormImagesPicker from "../../components/form-images-picker.vue";
-import TagsPicker from "../../components/tags-picker.vue";
-import LocationPicker from "../../components/location-picker.vue";
+import FormImagesPicker from "../../components/picker/form-images.vue";
+import TagsPicker from "../../components/picker/tags.vue";
+import LocationPicker from "../../components/picker/location.vue";
 import Dialog from "../../mixins/dialog.vue";
 
 export default {

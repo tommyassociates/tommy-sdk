@@ -58,7 +58,7 @@
 </template>
 <script>
 import API from "../../api";
-import ListColorPicker from "../../components/list-color-picker.vue";
+import ListColorPicker from "../../components/picker/list-color.vue";
 
 export default {
   components: {

@@ -5,17 +5,17 @@
         <i class="icon whs-list-search-icon"></i>
       </div>
       <div class="item-inner">
-        <div class="item-title">{{$t(`whs.common.dynamic_search_placeholder`,{text: settings.item.name})}}</div>
+        <div class="item-title">{{$t(`whs.common.dynamic_search_placeholder`,{text: settings.tag.name})}}</div>
       </div>
     </a>
-    <ul class="item-items whs-picker-selected-list">
-      <li class="item-item" v-for="(item, index) in selected" :key="index">
+    <ul class="tag-items whs-picker-selected-list">
+      <li class="tag-item" v-for="(tag, index) in selected" :key="index">
         <div class="item-content">
           <div class="item-inner">
-            <div class="item-media" :style="[item.image ? {'background-image': `url(${item.image})`}: itemStyle]"></div>
+            <div class="item-media" :style="[tag.image ? {'background-image': `url(${tag.image})`}: tagStyle]"></div>
 
-            <div class="item-title">{{item.name}}</div>
-            <div class="item-after"><a style="height: 24px" @click="removeItem(item.id, item.pseudo_type)" href="#" class="item-link"><i class="material-icons">close</i></a></div>
+            <div class="item-title">{{tag.name}}</div>
+            <div class="item-after"><a style="height: 24px" @click="removeItem(tag.id, tag.pseudo_type)" href="#" class="item-link"><i class="material-icons">close</i></a></div>
           </div>
         </div>
       </li>
@@ -23,8 +23,8 @@
   </li>
 </template>
 <script>
-import API from "../api";
-import ListStyles from "../mixins/list-styles.vue";
+import API from "../../api";
+import ListStyles from "../../mixins/list-styles.vue";
 
   export default {
     props:{
@@ -48,27 +48,28 @@ import ListStyles from "../mixins/list-styles.vue";
         self.$f7router.navigate('/whs/select-picker/', {
           props: {
             selected: self.selected,
-            pageTitle: self.$t(`whs.common.dynamic_select_title`,{text: self.settings.item.name}),
+            pageTitle: self.$t(`whs.common.dynamic_select_title`,{text: self.settings.tag.name}),
             multiply: self.multiply,
             getData: self.getData,
-            type: "item",
+            type: "tag",
             multiply: self.multiply,
-            onChange(item, selected) {                            
+            onChange(tag, selected) {                            
               if (selected) {
-                self.$emit('itemAdd', item);
-                self.addItem(item);
+                self.$emit('itemAdd', tag);
+                self.addItem(tag);
               } else {
-                self.$emit('itemRemove', item); 
-                self.deleteItem(item);
+                self.$emit('itemRemove', tag); 
+                self.deleteItem(tag);
               }
             },
           },
         });
       },
       getData(self){
-        API.getItem().then(data => {
-          data.forEach((item, index)=>{item.pseudo_type = "item"});
+        API.getTags().then(data => {
+          data.forEach((item, index)=>{item.pseudo_type = "tag"});
           Object.assign(self.targets, data);
+          console.log("TCL: getData -> self.targets", self.targets)
           self.loaded = true;
           self.createSearchbar();
         });
@@ -85,13 +86,13 @@ import ListStyles from "../mixins/list-styles.vue";
       },
       deleteItem(target){
         self = this;
-        const index = self.selected.findIndex(item => item.id === target.id && item.pseudo_type === target.pseudo_type);
+        const index = self.selected.findIndex(tag => tag.id === target.id && tag.pseudo_type === target.pseudo_type);
         self.selected.splice(index, 1);
         self.$emit("selected:change", self.selected);
       },
       removeItem(itemId, pseudo_type) {
         const self = this;
-        const index = self.selected.findIndex(item => item.id === itemId && item.pseudo_type === pseudo_type);
+        const index = self.selected.findIndex(tag => tag.id === itemId && tag.pseudo_type === pseudo_type);
         self.selected.splice(index, 1);
         self.$emit("selected:change", self.selected);
       },

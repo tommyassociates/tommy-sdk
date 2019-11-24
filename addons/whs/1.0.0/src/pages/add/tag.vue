@@ -48,7 +48,7 @@
 </template>
 <script>
 import API from "../../api";
-import FormImagesPicker from "../../components/form-images-picker.vue";
+import FormImagesPicker from "../../components/picker/form-images.vue";
 import Dialog from "../../mixins/dialog.vue";
 
 export default {

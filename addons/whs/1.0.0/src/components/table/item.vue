@@ -10,31 +10,28 @@
                   <i class="whs-icon whs-icon-sort-black"></i>
                 </a>
               </th>
-              <th>{{settings.location.plural_name}}</th>
-              <th>Parent</th>
               <th>{{settings.item.plural_name}}</th>
-              <th>Lock</th>
-              <th>Lot code</th>
-              <th>Expiry</th>
+              <th>Description</th>
+              <th>Current</th>
+              <th>P.in</th>
+              <th>P.out</th>
+              <th>{{settings.location.plural_name}}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(item, index) in data" :key="'item_'+index">
               <td class="media-cell"></td>
               <td>{{item.name}}</td>
-              <td>{{item.parent_location_id}}</td>
+              <td>{{item.description}}</td>
               <td></td>
-              <td v-if="item.active"></td>
-              <td v-else>
-                <i class="whs-summary-icon whs-icon-lock"></i>
-              </td>
-              <td>{{item.sku}}</td>
+              <td></td>
+              <td></td>
               <td></td>
             </tr>
           </tbody>
         </table>
       </div>
-      <empty-block v-if="data.length === 0" :text="$t('whs.common.no', {text: settings.location.plural_name})" />
+      <empty-block v-if="data.length === 0" :text="$t('whs.common.no', {text: settings.item.plural_name})" />
     </template>
     <template v-if="!loaded">
       <div style="background: #fff;">
@@ -70,8 +67,8 @@
 </template>
 
 <script>
-import API from "../api";
-import EmptyBlock from "../components/empty-block.vue";
+import API from "../../api";
+import EmptyBlock from "../../components/empty-block.vue";
 
 export default {
   components:{
@@ -95,13 +92,13 @@ export default {
       const self = this;
       const options = {};
       options[self.loadIdName] = self.loadId;
-      API.getLocations(options).then(data => {
+      API.getItem(options).then(data => {
         self.data = data;
         self.loaded = true;
       });
 
       ///test pagination
-      self.$events.$emit("pagination:" + self.parent + ":location:set", {
+      self.$events.$emit("pagination:" + self.parent + ":item:set", {
         total: 12,
         rows: 39
       });
@@ -115,14 +112,14 @@ export default {
   created() {
     const self = this;
     self.$events.$on(
-      "pagination:" + self.parent + ":location:change",
+      "pagination:" + self.parent + ":item:change",
       self.changePagination
     );
   },
   beforeDestroy() {
     const self = this;
     self.$events.$off(
-      "pagination:" + self.parent + ":location:change",
+      "pagination:" + self.parent + ":item:change",
       self.changePagination
     );
   },

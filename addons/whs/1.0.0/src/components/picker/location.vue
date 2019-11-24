@@ -23,8 +23,8 @@
   </li>
 </template>
 <script>
-import API from "../api";
-import ListStyles from "../mixins/list-styles.vue";
+import API from "../../api";
+import ListStyles from "../../mixins/list-styles.vue";
 
   export default {
     props:{

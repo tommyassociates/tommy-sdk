@@ -148,8 +148,8 @@
 </template>
 <script>
 import API from "../../api";
-import FormImagesPicker from "../../components/form-images-picker.vue";
-import TagsPicker from "../../components/tags-picker.vue";
+import FormImagesPicker from "../../components/picker/form-images.vue";
+import TagsPicker from "../../components/picker/tags.vue";
 import Dialog from "../../mixins/dialog.vue";
 
 export default {

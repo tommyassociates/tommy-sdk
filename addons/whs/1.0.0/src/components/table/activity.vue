@@ -10,22 +10,38 @@
                   <i class="whs-icon whs-icon-sort-black"></i>
                 </a>
               </th>
-              <th>{{settings.tag.plural_name}}</th>
-              <th>{{settings.item.plural_name}}</th>
-              <th>{{settings.location.plural_name}}</th>
+              <th>Generated</th>
+              <th>Type</th>
+              <th>Scheduled</th>
+              <th>Item</th>
+              <th>Assignet</th>
+              <th>Executed By</th>
+              <th>Executed</th>
+              <th>Source</th>
+              <th>Destination</th>
+              <th>Value</th>
+              <th>Count</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(item, index) in data" :key="'item_'+index">
-              <td class="media-cell media-cell-image" :style="[item.image ? {'background-image': `url(${item.image})`}: tagStyle]" ></td>
-              <td>{{item.name}}</td>
-              <td></td>
-              <td></td>              
+              <td class="media-cell"></td>
+              <td>{{item.generated_id}}</td>
+              <td>{{item.activity_type}}</td>
+              <td>{{item.scheduled_at !== null ? $moment(item.scheduled_at).format(settings.main.date) : ''}}</td>
+              <td>{{item.inventory_item_id}}</td>
+              <td>{{/*Assignet*/}}</td>
+              <td>{{item.executed_by_id}}</td>
+              <td>{{item.executed_at !== null ? $moment(item.executed_at).format(settings.main.date+' '+settings.main.time) : ''}}</td>
+              <td>{{item.source_location_id}}</td>
+              <td>{{item.destination_location_id}}</td>
+              <td>{{item.value}}</td>
+              <td>{{item.count}}</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <empty-block v-if="data.length === 0" :text="$t('whs.common.no', {text: settings.tag.plural_name})" />
+      <empty-block v-if="data.length === 0" :text="$t('whs.common.no', {text: settings.activity.plural_name})" />
     </template>
     <template v-if="!loaded">
       <div style="background: #fff;">
@@ -41,13 +57,15 @@
                 <th>________</th>
                 <th>______</th>
                 <th>____</th>
+                <th>____</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(index) in 12" :key="'skeleton_item_'+index">
-                <td class="media-cell media-cell-image"></td>
+                <td class="media-cell">_</td>
                 <td>___________</td>
                 <td>_____</td>
+                <td>____</td>
                 <td>____</td>
               </tr>
             </tbody>
@@ -59,16 +77,13 @@
 </template>
 
 <script>
-import API from "../api";
-import EmptyBlock from "../components/empty-block.vue";
-import ListStyles from "../mixins/list-styles.vue";
-
+import API from "../../api";
+import EmptyBlock from "../../components/empty-block.vue";
 
 export default {
   components:{
     EmptyBlock
   },
-  mixins: [ListStyles],
   props: {
     loadId: Number,
     loadIdName: String,
@@ -87,13 +102,13 @@ export default {
       const self = this;
       const options = {};
       options[self.loadIdName] = self.loadId;
-      API.getTags(options).then(data => {
+      API.getActivities(options).then(data => {
         self.data = data;
         self.loaded = true;
       });
 
       ///test pagination
-      self.$events.$emit("pagination:" + self.parent + ":tag:set", {
+      self.$events.$emit("pagination:" + self.parent + ":activity:set", {
         total: 12,
         rows: 39
       });
@@ -107,14 +122,14 @@ export default {
   created() {
     const self = this;
     self.$events.$on(
-      "pagination:" + self.parent + ":tag:change",
+      "pagination:" + self.parent + ":activity:change",
       self.changePagination
     );
   },
   beforeDestroy() {
     const self = this;
     self.$events.$off(
-      "pagination:" + self.parent + ":tag:change",
+      "pagination:" + self.parent + ":activity:change",
       self.changePagination
     );
   },

@@ -4,7 +4,7 @@
   </f7-list-item>
 </template>
 <script>
-  import createColorPicker from '../utils/color-picker/color-picker-class';
+  import createColorPicker from '../../utils/color-picker/color-picker-class';
 
   export default {
     props: {
