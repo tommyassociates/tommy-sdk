@@ -200,6 +200,7 @@
   "summary_page":{
     "summary": "Summary",
     "roles": "Roles",
+    "team": "Team",
     "total": "Total",
     "est_total": "Est. total",
     "items": "Items",
