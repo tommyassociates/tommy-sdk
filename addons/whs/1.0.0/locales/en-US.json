@@ -197,6 +197,17 @@
       "title": "Inventory"
     }
   },
+  "summary_page":{
+    "summary": "Summary",
+    "roles": "Roles",
+    "total": "Total",
+    "est_total": "Est. total",
+    "items": "Items",
+    "value": "Value",
+    "expiring": "Expiring",
+    "pending_in": "Pending in",
+    "pending_out": "Pending out"
+  },
   "title": "Inventory",
   "summary": "Manage your inventory.",
   "description": "Manage your inventory.",

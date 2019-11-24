@@ -19,7 +19,7 @@
           :style="activeTab === 'summary' ? highlightedColor : {}"
           @click="activeTab = 'summary'"
         >
-          <span>Summary</span>
+          <span>{{$t('whs.summary_page.summary')}}</span>
           <div class="after-line" v-if="activeTab === 'summary'" :style="highlightedBgColor"></div>
         </a>
         <a
@@ -57,7 +57,7 @@
           </div>
           <div class="whs-summary-card-right">
             <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(tag.tags_count)}}</div>
-            <div class="whs-summary-card-label uppercase" :style="fontColor">TOTAL</div>
+            <div class="whs-summary-card-label uppercase" :style="fontColor">{{$t('whs.summary_page.total')}}</div>
           </div>
         </div>
         <div class="whs-summary-card">
@@ -80,38 +80,38 @@
         </div>
         <div class="whs-summary-card">
           <div class="whs-summary-card-left">
-            <div class="whs-summary-card-title">Value</div>
+            <div class="whs-summary-card-title">{{$t('whs.summary_page.value')}}</div>
           </div>
           <div class="whs-summary-card-right">
             <div class="whs-summary-card-value" :style="fontColor">{{formatCurrency(tag.estimated_value)}}</div>
-            <div class="whs-summary-card-label" :style="fontColor">Est. Total</div>
+            <div class="whs-summary-card-label" :style="fontColor">{{$t('whs.summary_page.est_total')}}</div>
           </div>
         </div>
         <div class="whs-summary-card">
           <div class="whs-summary-card-left">
-            <div class="whs-summary-card-title">Expiring</div>
+            <div class="whs-summary-card-title">{{$t('whs.summary_page.expiring')}}</div>
           </div>
           <div class="whs-summary-card-right">
             <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(tag.expiring_count)}}</div>
-            <div class="whs-summary-card-label" :style="fontColor">Items</div>
+            <div class="whs-summary-card-label" :style="fontColor">{{$t('whs.summary_page.items')}}</div>
           </div>
         </div>
         <div class="whs-summary-card">
           <div class="whs-summary-card-left">
-            <div class="whs-summary-card-title">Pending in</div>
+            <div class="whs-summary-card-title">{{$t('whs.summary_page.pending_in')}}</div>
           </div>
           <div class="whs-summary-card-right">
             <div class="whs-summary-card-value" :style="fontColor">{{formatNumber(tag.pending_in_count)}}</div> 
-            <div class="whs-summary-card-label" :style="fontColor">Items</div>
+            <div class="whs-summary-card-label" :style="fontColor">{{$t('whs.summary_page.items')}}</div>
           </div>
         </div>
         <div class="whs-summary-card">
           <div class="whs-summary-card-left">
-            <div class="whs-summary-card-title">Pending out</div>
+            <div class="whs-summary-card-title">{{$t('whs.summary_page.pending_out')}}</div>
           </div>
           <div class="whs-summary-card-right">
             <div class="whs-summary-card-value" :style="fontColor">{{formatNumber(tag.pending_out_count)}}</div>
-            <div class="whs-summary-card-label" :style="fontColor">Items</div>
+            <div class="whs-summary-card-label" :style="fontColor">{{$t('whs.summary_page.items')}}</div>
           </div>
         </div>
       </div>
