@@ -134,10 +134,10 @@
 </template>
 <script>
 import API from "../../api";
-import LocationTable from "../../components/location-table.vue";
-import TagTable from "../../components/tag-table.vue";
-import ActivityTable from "../../components/activity-table.vue";
-import PaginationTable from "../../components/pagination-table.vue";
+import LocationTable from "../../components/table/location.vue";
+import TagTable from "../../components/table/tag.vue";
+import ActivityTable from "../../components/table/activity.vue";
+import PaginationTable from "../../components/table/pagination.vue";
 import CurMexin from "../../utils/cur-num-mixin.vue";
 
 

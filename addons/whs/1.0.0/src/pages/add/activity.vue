@@ -161,11 +161,11 @@
 </template>
 <script>
 import API from "../../api";
-import TagsPicker from "../../components/tags-picker.vue";
-import AssetsPicker from "../../components/assets-picker.vue";
-import TeamPicker from "../../components/team-picker.vue";
-import ItemPicker from "../../components/item-picker.vue";
-import LocationPicker from "../../components/location-picker.vue";
+import TagsPicker from "../../components/picker/tags.vue";
+import AssetsPicker from "../../components/picker/assets.vue";
+import TeamPicker from "../../components/picker/team.vue";
+import ItemPicker from "../../components/picker/item.vue";
+import LocationPicker from "../../components/picker/location.vue";
 import Dialog from "../../mixins/dialog.vue";
 
 ///Inventory item can't be blank. Source location can't be blank. Destination location can't be blank

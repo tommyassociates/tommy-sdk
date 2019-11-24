@@ -59,7 +59,7 @@
 </template>
 <script>
 import API from "../../api";
-import FieldTypePicker from "../../components/field-type-picker.vue";
+import FieldTypePicker from "../../components/picker/field-type.vue";
 
 export default {
   components: {
