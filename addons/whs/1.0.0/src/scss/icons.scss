@@ -26,16 +26,11 @@
   background-repeat: no-repeat;
   background-position: center;
 }
-.whs-icon-mask,
-.whs-icon-box-orange,
-.whs-icon-box-black,
-.whs-icon-drawer-orange,
-.whs-icon-drawer-black,
-.whs-icon-tag-orange,
-.whs-icon-tag-black,
-.whs-icon-clock-orange,
-.whs-icon-clock-black
-{
+.whs-icon-mask
+.whs-icon-box,
+.whs-icon-drawer,
+.whs-icon-tag,
+.whs-icon-clock {
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-size: contain;
@@ -45,46 +40,32 @@
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
 }
-.whs-icon-box-orange {
-  background-color: #FF4500;
-  -webkit-mask-image: url(../assets/icon-box-black.svg);
-  mask-image: url(../assets/icon-box-black.svg);
+.whs-icon-all {
+  background-color: #333333;
+  -webkit-mask-image: url(../assets/icon-all-black.svg);  
+  mask-image: url(../assets/icon-all-black.svg);
 }
-.whs-icon-box-black {
+.whs-icon-box {
   background-color: #333333;
   -webkit-mask-image: url(../assets/icon-box-black.svg);
   mask-image: url(../assets/icon-box-black.svg);
 }
-.whs-icon-drawer-orange {
-  background-color: #FF4500;
-  -webkit-mask-image: url(../assets/icon-drawer-black.svg);
-  mask-image: url(../assets/icon-drawer-black.svg);
-}
-.whs-icon-drawer-black {
+.whs-icon-drawer {
   background-color: #333333;
   -webkit-mask-image: url(../assets/icon-drawer-black.svg);
   mask-image: url(../assets/icon-drawer-black.svg);
 }
-.whs-icon-tag-orange {
-  background-color: #FF4500;
-  -webkit-mask-image: url(../assets/icon-tag-black.svg);
-  mask-image: url(../assets/icon-tag-black.svg);
-}
-.whs-icon-tag-black {
+.whs-icon-tag {
   background-color: #333333;
   -webkit-mask-image: url(../assets/icon-tag-black.svg);
   mask-image: url(../assets/icon-tag-black.svg);
 }
-.whs-icon-clock-orange {
-  background-color: #FF4500;
-  -webkit-mask-image: url(../assets/icon-clock-black.svg);
-  mask-image: url(../assets/icon-clock-black.svg);
-}
-.whs-icon-clock-black {
+.whs-icon-clock {
   background-color: #333333;
   -webkit-mask-image: url(../assets/icon-clock-black.svg);
   mask-image: url(../assets/icon-clock-black.svg);
 }
+
 .whs-icon-triangle{
   background-image: url(../assets/icon-triangle.svg);
 }

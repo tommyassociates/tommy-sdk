@@ -19,6 +19,13 @@ $blink: #000;
   }
 }
 
+.skeleton-icon {
+  & .icon{
+    background: $bg !important;
+    -webkit-mask-image: none !important;
+    mask-image: none !important;
+  }
+}
 .skeleton-block {
   height: 1em;
   background: $bg !important;

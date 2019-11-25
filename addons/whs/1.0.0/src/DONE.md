@@ -95,3 +95,4 @@
 -   Item table in summary pages
 -   Role table in summary pages
 -   Team table in summary pages
+-   main preloader animation
