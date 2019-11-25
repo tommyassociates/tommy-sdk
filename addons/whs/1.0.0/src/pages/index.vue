@@ -2,7 +2,7 @@
   <f7-page class="whs-main-page">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
-      <f7-nav-title>{{settings.main.name}}</f7-nav-title>
+      <f7-nav-title :class="`${loaded.settings === true ? '' : 'skeleton-effect-blink skeleton-text '}`">{{settings.main.name}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
         <f7-link icon-only popover-open=".whs-popover-add">
           <f7-icon f7="add" />
@@ -36,12 +36,12 @@
           </f7-link>
         </f7-searchbar>
 
-        <div class="whs-menubar" v-if="!searchEnabled">
+        <div :class="`whs-menubar ${loaded.settings === true ? '' : 'skeleton-effect-blink skeleton-text skeleton-icon'}`" v-if="!searchEnabled" >
           <a
             :class="`link ${activeTab === 'items' ? 'whs-menubar-active' : ''}`"
             @click="activeTab = 'items'"
           >
-            <i :class="`icon whs-icon whs-icon-box-${activeTab === 'items' ? 'orange' : 'black'}`"></i>
+            <i class="icon whs-icon whs-icon-box"></i>
             <span>{{settings.item.plural_name}}</span>
           </a>
           <a
@@ -49,7 +49,7 @@
             @click="activeTab = 'locations'"
           >
             <i
-              :class="`icon whs-icon whs-icon-drawer-${activeTab === 'locations' ? 'orange' : 'black'}`"
+              class="icon whs-icon whs-icon-drawer"
             ></i>
             <span>{{settings.location.plural_name}}</span>
           </a>
@@ -57,7 +57,7 @@
             :class="`link ${activeTab === 'tags' ? 'whs-menubar-active' : ''}`"
             @click="activeTab = 'tags'"
           >
-            <i :class="`icon whs-icon whs-icon-tag-${activeTab === 'tags' ? 'orange' : 'black'}`"></i>
+            <i class="icon whs-icon whs-icon-tag"></i>
             <span>{{settings.tag.plural_name}}</span>
           </a>
           <a
@@ -65,7 +65,7 @@
             @click="activeTab = 'activity'"
           >
             <i
-              :class="`icon whs-icon whs-icon-clock-${activeTab === 'activity' ? 'orange' : 'black'}`"
+              class="icon whs-icon whs-icon-clock"
             ></i>
             <span>{{settings.activity.plural_name}}</span>
           </a>
@@ -76,7 +76,9 @@
             :class="`link ${activeSearchFilter === 'all' ? 'whs-menubar-active' : ''}`"
             @click="activeSearchFilter = 'all'"
           >
-            <i class="icon f7-icons">data</i>
+            <i
+              class="icon whs-icon whs-icon-all"
+            ></i>
             <span>All</span>
           </a>
           <a
@@ -84,7 +86,7 @@
             @click="activeSearchFilter = 'items'"
           >
             <i
-              :class="`icon whs-icon whs-icon-box-${activeSearchFilter === 'items' ? 'orange' : 'black'}`"
+              class="icon whs-icon whs-icon-box"
             ></i>
             <span>{{settings.item.plural_name}}</span>
           </a>
@@ -93,7 +95,7 @@
             @click="activeSearchFilter = 'locations'"
           >
             <i
-              :class="`icon whs-icon whs-icon-drawer-${activeSearchFilter === 'locations' ? 'orange' : 'black'}`"
+              class="icon whs-icon whs-icon-drawer"
             ></i>
             <span>{{settings.location.plural_name}}</span>
           </a>
@@ -102,7 +104,7 @@
             @click="activeSearchFilter = 'tags'"
           >
             <i
-              :class="`icon whs-icon whs-icon-tag-${activeSearchFilter === 'tags' ? 'orange' : 'black'}`"
+              class="icon whs-icon whs-icon-tag"
             ></i>
             <span>{{settings.tag.plural_name}}</span>
           </a>
@@ -112,19 +114,19 @@
     <f7-popover class="whs-popover whs-popover-add" :backdrop="false">
       <f7-list no-chevron>
         <f7-list-item link="/whs/item-add/" popover-close>
-          <i slot="media" class="whs-icon whs-icon-box-black"></i>
+          <i slot="media" class="whs-icon whs-icon-box"></i>
           <span slot="title">{{$t('whs.common.new', { text: settings.item.name})}}</span>
         </f7-list-item>
         <f7-list-item link="/whs/location-add/" popover-close>
-          <i slot="media" class="whs-icon whs-icon-drawer-black"></i>
+          <i slot="media" class="whs-icon whs-icon-drawer"></i>
           <span slot="title">{{$t('whs.common.new', { text: settings.location.name})}}</span>
         </f7-list-item>
         <f7-list-item link="/whs/tag-add/" popover-close>
-          <i slot="media" class="whs-icon whs-icon-tag-black"></i>
+          <i slot="media" class="whs-icon whs-icon-tag"></i>
           <span slot="title">{{$t('whs.common.new', { text: settings.tag.name})}}</span>
         </f7-list-item>
         <f7-list-item link="/whs/activity-add/" popover-close>
-          <i slot="media" class="whs-icon whs-icon-clock-black"></i>
+          <i slot="media" class="whs-icon whs-icon-clock"></i>
           <span slot="title">{{$t('whs.common.new', { text: settings.activity.name})}}</span>
         </f7-list-item>
       </f7-list>
@@ -179,19 +181,19 @@
       <f7-popover class="whs-popover whs-popover-activity" :backdrop="false">
         <f7-list no-chevron>
           <f7-list-item @click="activityPopoverClick('all')">
-            <i slot="media" class="whs-icon whs-icon-box-black"></i>
+            <i slot="media" class="whs-icon whs-icon-box"></i>
             <span slot="title">{{$t('whs.popover.activity.all')}}</span>
           </f7-list-item>
           <f7-list-item @click="activityPopoverClick('item')">
-            <i slot="media" class="whs-icon whs-icon-box-black"></i>
+            <i slot="media" class="whs-icon whs-icon-box"></i>
             <span slot="title">{{settings.item.plural_name}}</span>
           </f7-list-item>
           <f7-list-item @click="activityPopoverClick('location')">
-            <i slot="media" class="whs-icon whs-icon-drawer-black"></i>
+            <i slot="media" class="whs-icon whs-icon-drawer"></i>
             <span slot="title">{{settings.location.plural_name}}</span>
           </f7-list-item>
           <f7-list-item @click="activityPopoverClick('tag')">
-            <i slot="media" class="whs-icon whs-icon-tag-black"></i>
+            <i slot="media" class="whs-icon whs-icon-tag"></i>
             <span slot="title">{{settings.tag.plural_name}}</span>
           </f7-list-item>
           <f7-list-item @click="activityPopoverClick('role')">

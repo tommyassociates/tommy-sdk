@@ -53,7 +53,7 @@
       <div class="whs-summary-cards">
         <div class="whs-summary-card">
           <div class="whs-summary-card-left">
-            <i class="icon whs-icon-box-black"></i>
+            <i class="icon whs-icon-box"></i>
           </div>
           <div class="whs-summary-card-right">
             <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(tag.tags_count)}}</div>
@@ -62,7 +62,7 @@
         </div>
         <div class="whs-summary-card">
           <div class="whs-summary-card-left">
-            <i class="icon whs-icon-tag-black"></i>
+            <i class="icon whs-icon-tag"></i>
           </div>
           <div class="whs-summary-card-right">
             <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(tag.tags_count)}}</div>
@@ -71,7 +71,7 @@
         </div>
         <div class="whs-summary-card">
           <div class="whs-summary-card-left">
-            <i class="icon whs-icon-drawer-black"></i>
+            <i class="icon whs-icon-drawer"></i>
           </div>
           <div class="whs-summary-card-right">
             <div class="whs-summary-card-value" :style="highlightedColor">{{formatNumber(tag.locations_count)}}</div>

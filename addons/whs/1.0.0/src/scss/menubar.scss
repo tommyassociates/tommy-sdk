@@ -2,15 +2,17 @@
   display: flex;
   background: #fff;
   margin-top: 1px;
-  a {
+  color: #333333;
+  a { 
     width: 25%;
+    height: 100% !important;    
     flex-shrink: 10;
     display: flex;
     justify-content: flex-start;
     align-items: center;
     flex-direction: column;
-    color: #000;
-  }
+    color: #333333;
+  } 
   i {
     width: 50px;
     height: 50px;
@@ -62,6 +64,9 @@
   }
   a.whs-menubar-active {
     color: $orange;
+    .icon{
+      background-color: $orange;
+    }
     span:after {
       content: '';
       height: 2px;
