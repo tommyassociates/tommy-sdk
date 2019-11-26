@@ -9,6 +9,7 @@ const autoprefixer = require('gulp-autoprefixer');
 const rename = require('gulp-rename');
 const cleanCSS = require('gulp-clean-css');
 const clean = require('gulp-clean');
+const inlineImage = require("gulp-inline-image");
 
 function build(cb) {
   const env = process.env.NODE_ENV || 'development';
@@ -27,8 +28,10 @@ function build(cb) {
         if (cb) cb();
         console.log(err.toString());
       })
+      .pipe(inlineImage())
       .pipe(autoprefixer({
         cascade: false,
+        browsers: ['Android >= 4.1', 'iOS >= 8']
       }))
       .on('error', (err) => {
         if (cb) cb();
