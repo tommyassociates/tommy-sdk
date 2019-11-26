@@ -1,5 +1,5 @@
 module.exports = {
-  extends: "airbnb-base",
+  extends: ["airbnb-base", 'plugin:vue/recommended', 'plugin:promise/recommended'],
   env: {
     browser: true,
     node: true,
@@ -7,6 +7,7 @@ module.exports = {
   plugins: [
     "import",
     "html",
+    "promise"
   ],
   globals: {
     "window": true,
@@ -39,6 +40,6 @@ module.exports = {
       ObjectExpression: { minProperties: 9, multiline: true, consistent: true },
       ObjectPattern: { minProperties: 9, multiline: true, consistent: true }
     }],
-    "linebreak-style": 0
+    "linebreak-style": 0,
   },
 };
