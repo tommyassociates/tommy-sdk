@@ -69,7 +69,8 @@ function buildAddonScss(addonFolder) {
       .pipe(inlineImage())
       .pipe(
         autoprefixer({
-          cascade: false
+          cascade: false,
+          browsers: ['Android >= 4.1', 'iOS >= 8']
         })
       )
       .on("error", err => {
