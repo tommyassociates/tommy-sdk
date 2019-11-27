@@ -30,8 +30,7 @@ function build(cb) {
       })
       .pipe(inlineImage())
       .pipe(autoprefixer({
-        cascade: false,
-        browsers: ['Android >= 4.1', 'iOS >= 8']
+        cascade: false
       }))
       .on('error', (err) => {
         if (cb) cb();
