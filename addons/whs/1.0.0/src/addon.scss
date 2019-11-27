@@ -3,9 +3,12 @@ $orange: #FF5413;
 @mixin encoded-svg-background($svg) {
   background-image: url("data:image/svg+xml;charset=utf-8,#{$svg}");
 }
+
+//@import "./scss/_svg.scss";
 @import "./scss/icons.scss";
 @import "./scss/skeleton.scss";
 @import "./utils/color-picker/color-picker.scss";
+
 
 .whs-navbar-links {
   .link + .link {

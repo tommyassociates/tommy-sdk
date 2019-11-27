@@ -26,7 +26,6 @@
   background-repeat: no-repeat;
   background-position: center;
 }
-.whs-icon-mask,
 .whs-icon-box,
 .whs-icon-drawer,
 .whs-icon-tag,
@@ -42,38 +41,33 @@
 }
 .whs-icon-all {
   background-color: #333333;
-  -webkit-mask-image: url(../assets/icon-all-black.svg);  
-  mask-image: url(../assets/icon-all-black.svg);
+  mask-image: inline-image('../assets/icon-all-black.svg');
 }
 .whs-icon-box {
   background-color: #333333;
-  -webkit-mask-image: url(../assets/icon-box-black.svg);
-  mask-image: url(../assets/icon-box-black.svg);
+  mask-image: inline-image('../assets/icon-box-black.svg');
 }
 .whs-icon-drawer {
   background-color: #333333;
-  -webkit-mask-image: url(../assets/icon-drawer-black.svg);
-  mask-image: url(../assets/icon-drawer-black.svg);
+  mask-image: inline-image('../assets/icon-drawer-black.svg');
 }
 .whs-icon-tag {
   background-color: #333333;
-  -webkit-mask-image: url(../assets/icon-tag-black.svg);
-  mask-image: url(../assets/icon-tag-black.svg);
+  mask-image: inline-image('../assets/icon-tag-black.svg');
 }
 .whs-icon-clock {
   background-color: #333333;
-  -webkit-mask-image: url(../assets/icon-clock-black.svg);
-  mask-image: url(../assets/icon-clock-black.svg);
+  mask-image: inline-image('../assets/icon-clock-black.svg');
 }
 
 .whs-icon-triangle{
-  background-image: url(../assets/icon-triangle.svg);
+  background-image: inline-image('../assets/icon-triangle.svg');
 }
 .whs-icon-roles{
-  background-image: url(../assets/icon-roles.svg);
+  background-image: inline-image('../assets/icon-roles.svg');
 }
 .whs-icon-team{
-  background-image: url(../assets/icon-team.svg);
+  background-image: inline-image('../assets/icon-team.svg');
 }
 .whs-icon-lock{
   background-image: url(../assets/icon-lock.svg);

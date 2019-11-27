@@ -4,7 +4,8 @@
       <f7-list class="whs-list" media-list v-if="data.length >0 ">
         <f7-list-item
           v-for="(item, index) in data"
-          chevron-center          
+          chevron-center
+          link          
           @click="goToDetails(item)"
           :title="item.name || item.first_name+' '+ item.last_name"
           :key="type+'_'+index"
