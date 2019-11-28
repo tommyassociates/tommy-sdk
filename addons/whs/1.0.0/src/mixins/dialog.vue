@@ -1,11 +1,12 @@
 <script>
 export default {
   methods: {
-    alertDialog(title, text, okButton) {
+    alertDialog(title, text, okButton, cssClass = null) {
       this.$f7.dialog
         .create({
           title: title,
           text: text,
+          cssClass: cssClass,
           buttons: [
             {
               text: okButton,
@@ -16,11 +17,12 @@ export default {
         })
         .open();
     },
-    confirmDialog(title, text, okButton, cancelButton, okCallback, cancelCallback) {
+    confirmDialog(title, text, okButton, cancelButton, okCallback, cancelCallback, cssClass = null) {
       this.$f7.dialog
         .create({
           title: title,
           text: text,
+          cssClass: cssClass,
           buttons: [
             {
               text: cancelButton,

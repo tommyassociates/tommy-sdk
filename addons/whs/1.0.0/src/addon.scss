@@ -375,6 +375,11 @@ $orange: #FF5413;
     padding: 0 !important;
   }
 }
+.whs-alert{
+  .dialog-text{
+    white-space: pre-line;
+  }
+}
 @import "./scss/searchbar.scss";
 @import "./scss/menubar.scss";
 @import "./scss/table.scss";
