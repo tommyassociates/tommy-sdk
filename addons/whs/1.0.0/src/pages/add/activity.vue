@@ -44,31 +44,34 @@
               cssClass: 'whs-type-options'            
             }"
           >
-            <select name="type" @change="activity.activity_type = $event.target.value">
+            <select name="type" @change="activity.kind = $event.target.value; validate_errors.kind = true;">
               <option
                 value="unspecified"
-                :selected="activity.activity_type === 'unspecified'"
+                :selected="activity.kind === 'unspecified'"
               >{{$t('whs.form_add.type_options.unspecified')}}</option>
               <option
                 value="pending_out"
-                :selected="activity.activity_type === 'pending_out'"
+                :selected="activity.kind === 'pending_out'"
               >{{$t('whs.form_add.type_options.pending_out')}}</option>
               <option
                 value="pending_in"
-                :selected="activity.activity_type === 'pending_in'"
+                :selected="activity.kind === 'pending_in'"
               >{{$t('whs.form_add.type_options.pending_in')}}</option>
               <option
                 value="movement"
-                :selected="activity.activity_type === 'movement'"
+                :selected="activity.kind === 'movement'"
               >{{$t('whs.form_add.type_options.movement')}}</option>
               <option
                 value="stocktake"
-                :selected="activity.activity_type === 'stocktake'"
+                :selected="activity.kind === 'stocktake'"
               >{{$t('whs.form_add.type_options.stocktake')}}</option>
             </select>
           </f7-list-item>
+          <f7-list-item divider class="whs-validate error" v-if="!validate_errors.kind">
+            {{$t('whs.form_add.validate.required')}}
+          </f7-list-item>
           <template
-            v-if="activity.activity_type === 'pending_out' || activity.activity_type === 'pending_in' || activity.activity_type === 'movement' || activity.activity_type === 'stocktake'"
+            v-if="activity.kind === 'pending_out' || activity.kind === 'pending_in' || activity.kind === 'movement'"
           >
             <!-- Item -->
             <f7-list-item divider>
@@ -110,6 +113,25 @@
               <location-picker :multiply="false" @selected:change="destinationChange" />
             </template>
           </template>
+          <!--Stocktake template -->
+          <template
+            v-if="activity.kind === 'stocktake'"
+          >
+            <!-- Item -->
+            <f7-list-item divider>
+              <i class="whs-form-icon whs-form-icon-item"></i>
+              {{settings.item.name}}
+            </f7-list-item>
+            <item-picker :multiply="false" @selected:change="itemChange" />
+            <template v-if="activity.inventory_item_id !== null">
+              <!-- Destination -->
+              <f7-list-item divider>
+                <i class="whs-form-icon whs-form-icon-location"></i>
+                {{$t('whs.common.destination_label')}}
+              </f7-list-item>
+              <location-picker :multiply="false" @selected:change="currentLocationChange" />
+            </template>
+          </template>
           <!--Assets-->
           <f7-list-item divider>
             <i class="whs-form-icon whs-form-icon-person"></i>
@@ -131,12 +153,15 @@
             <f7-toggle slot="after" :checked="executed" @toggle:change="executedChange" />
           </f7-list-item>
           <template v-if="executed">
-            <!--Assets-->
+            <!--Executed by-->
             <f7-list-item divider>
               <i class="whs-form-icon whs-form-icon-person"></i>
               {{$t('whs.common.executed_by_label')}}
             </f7-list-item>
             <team-picker :multiply="false" @selected:change="executedTeamChange" />
+            <f7-list-item divider class="whs-validate error" v-if="!validate_errors.executed_by_id">
+              {{$t('whs.form_add.validate.required')}}
+            </f7-list-item>
             <!-- Executed -->
             <f7-list-item divider>
               <i class="whs-form-icon whs-form-icon-calendar"></i>
@@ -149,6 +174,12 @@
               :value="activity.executed_at !== null ? $moment(activity.executed_at).format(settings.main.date+' '+settings.main.time) : $t('whs.common.date_placeholder')"
               @click.native="openExecutedCalendar()"
             />
+            <f7-list-item divider class="whs-validate error" v-if="!validate_errors.executed_at">
+              {{$t('whs.form_add.validate.required')}}
+            </f7-list-item>
+            <f7-list-item divider class="whs-validate error" v-if="!validate_errors.executed_at_time">
+              {{$t('whs.form_add.validate.scheduled')}}
+            </f7-list-item>
           </template>
         </ul>
       </f7-list>
@@ -231,18 +262,65 @@ export default {
       } else {
         this.alertDialog(
           this.$t("whs.alert_form.title"),
-          this.$t("whs.alert_form.text") +
-            ". Inventory item can't be blank. Source location can't be blank. Destination location can't be blank",
-          this.$t("whs.alert_form.ok")
+          this.$t("whs.alert_form.text") + self.validate_message,
+          this.$t("whs.alert_form.ok"),
+          "whs-alert"
         );
       }
     },
     checkValidity() {
       self = this;
-      if (self.activity.inventory_item_id === null) return false;
-      if (self.activity.source_location_id === null) return false;
-      if (self.activity.destination_location_id === null) return false;
-      return true;
+      self.validate_message = "";
+      let validate = true;
+      if(self.executed){
+        if(self.activity.executed_by_id === null){
+          validate = false;
+          self.validate_message += "\nPlease select executed.";
+          self.validate_errors.executed_by_id = false;
+        }
+        if(self.activity.executed_at === null){
+          validate = false;
+          self.validate_message += "\nPlease select executed time.";
+          self.validate_errors.executed_at = false;
+        }
+      }
+      if(self.activity.scheduled_at !== null && self.activity.executed_at !== null){
+        if(self.activity.executed_at  < self.activity.scheduled_at){
+          validate = false;
+          self.validate_message += "\n"+self.$t("whs.form_add.validate.scheduled_full")+".";
+          self.validate_errors.executed_at_time = false;
+        }
+      }
+      if(self.activity.kind === null || self.activity.kind === 'unspecified'){
+        validate = false;
+        self.validate_message += "\nPlease select activity type.";
+        self.validate_errors.kind = false;
+      }
+      if(self.activity.kind === 'pending_out' || self.activity.kind === 'pending_in' || self.activity.kind === 'movement'){
+        if (self.activity.inventory_item_id === null) {
+          validate = false;
+          self.validate_message += "\nInventory item can't be blank.";
+          self.validate_errors.inventory_item_id = false;
+        }
+        if (self.activity.source_location_id === null) {
+          validate = false;
+          self.validate_message += "\nSource location can't be blank.";
+          self.validate_errors.source_location_id = false;
+        }
+        if (self.activity.destination_location_id === null) {
+          validate = false;
+          self.validate_message += "\nDestination location can't be blank.";
+          self.validate_errors.destination_location_id  = false;
+        }
+      }
+      if(self.activity.kind === 'stocktake'){
+        if (self.activity.current_location_id === null) {
+          validate = false;
+          self.validate_message += "\nCurrent location can't be blank.";
+          self.validate_errors.current_location_id = false;
+        }
+      }
+      return validate;
     },
     deleteActivity() {
       API.deleteActivity(this.editId).then(() => {
@@ -310,11 +388,22 @@ export default {
         closeOnSelect: true,
         on: {
           change(cal, val) {
+            self.validate_errors.executed_at = true;
             if (self.calendar_first_change.executed) {
               self.activity.executed_at = val[0];
             } else {
               self.calendar_first_change.executed = true;
             }
+            //check time
+            if(self.activity.scheduled_at !== null && self.activity.executed_at !== null && self.calendar_first_change.executed){
+              console.log("TCL: change -> self.activity.scheduled_at", self.activity.scheduled_at)
+              if(self.activity.executed_at >= self.activity.scheduled_at){
+                self.validate_errors.executed_at_time = true;
+              }else{
+                self.validate_errors.executed_at_time = false;
+              }
+            }
+
           }
         }
       });
@@ -322,6 +411,8 @@ export default {
     executedChange(value) {
       self = this;
       self.executed = value;
+      self.validate_errors.executed_at = true;
+      self.validate_errors.executed_by_id = true;      
       if (!value) {
         self.activity.executed_at = null;
         self.activity.executed_by_id = null;
@@ -337,6 +428,7 @@ export default {
     },
     executedTeamChange(target) {
       self = this;
+      self.validate_errors.executed_by_id = true;    
       if (target.length > 0) {
         self.activity.executed_by_id = target[0].id;
       } else {
@@ -358,6 +450,14 @@ export default {
       } else {
         self.activity.destination_location_id = null;
       }
+    },
+    currentLocationChange(target) {
+      self = this;
+      if (target.length > 0) {
+        self.activity.current_location_id = target[0].id;
+      } else {
+        self.activity.current_location_id = null;
+      }
     }
   },
   beforeDestroy() {
@@ -375,12 +475,14 @@ export default {
         user_id: self.$root.user.id,
         scheduled_at: null,
         executed_at: new Date(),
-        activity_type: null,
+        kind: null,
         executed_at: null,
         executed_by_id: null,
         count: 0,
         inventory_item_id: null,
-        destination_location_id: null
+        destination_location_id: null,
+        source_location_id: null,
+        current_location_id: null,
       },
       editId: null,
       indexEdit: null,
@@ -390,6 +492,16 @@ export default {
       calendar_first_change: {
         executed: false,
         scheduled: false
+      },
+      validate_errors:{
+        kind: true,
+        inventory_item_id: true, 
+        source_location_id: true,
+        destination_location_id: true,
+        current_location_id: true,
+        executed_at: true,
+        executed_at_time: true,
+        executed_by_id: true,
       }
     };
   }

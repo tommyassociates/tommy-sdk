@@ -27,7 +27,7 @@
             <tr v-for="(item, index) in data" :key="'item_'+index">
               <td class="media-cell"></td>
               <td>{{item.generated_id}}</td>
-              <td>{{item.activity_type}}</td>
+              <td>{{item.kind}}</td>
               <td>{{item.scheduled_at !== null ? $moment(item.scheduled_at).format(settings.main.date) : ''}}</td>
               <td>{{item.inventory_item_id}}</td>
               <td>{{/*Assignet*/}}</td>
