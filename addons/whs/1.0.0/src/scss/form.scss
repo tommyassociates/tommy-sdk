@@ -23,6 +23,10 @@
       text-transform: uppercase;
       color: #fff;
       background: #00CE7D;
+      .link{
+        color: #fff;
+        margin-left: auto;        
+      }
     }
     &.error{
       background: #ff4500;
