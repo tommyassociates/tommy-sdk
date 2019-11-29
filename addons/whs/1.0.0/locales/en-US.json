@@ -96,6 +96,13 @@
       "movement": "Movement",
       "stocktake": "Stocktake"
     },
+    "validate":{
+      "required": "Required",
+      "scheduled": "Cannot be before scheduled date",
+      "scheduled_full": "Executed time cannot be before scheduled date",
+      "available": "{{count}} of {{total}} available",
+      "selected": "{{count}} of {{total}} selected"
+    },
     "location_options":{      
       "unspecified": "Select (optional)",
       "frozen": "Frozen",

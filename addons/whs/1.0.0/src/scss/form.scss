@@ -17,6 +17,16 @@
       display: flex;
       align-items: center;
     }
+    &.whs-validate{
+      height: 30px;
+      font-size: 14px;
+      text-transform: uppercase;
+      color: #fff;
+      background: #00CE7D;
+    }
+    &.error{
+      background: #ff4500;
+    }
   }
   input[type=time],
   input[type=number],
