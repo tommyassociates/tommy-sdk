@@ -67,6 +67,7 @@
 -   Team summary page
 -   Role summary page
 -   Validate check
+-   Quantity smart divider
 
 ## Tags
 -	Add 

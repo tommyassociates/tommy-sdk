@@ -93,11 +93,16 @@
                   :autorepeat="true"
                   :autorepeat-dynamic="true"
                   :min="0"
-                  :max="999999999999999999"
+                  :max="total.available"
                   @stepper:change="(value)=>{activity.count = value}"
                   buttons-only
                   color="gray"
+                  ref="stepper_qauntity"
                 />
+              </f7-list-item>
+              <f7-list-item divider :class="[activity.count == 0 ? 'error':'', 'whs-validate']">
+                {{$t('whs.form_add.validate.available',{ count: activity.count, total:total.available})}}
+                <f7-link @click="clickAvailableAll()">{{$t('whs.form_add.validate.available_all')}}</f7-link>       
               </f7-list-item>
               <!-- Source -->
               <f7-list-item divider>
@@ -422,7 +427,10 @@ export default {
       self = this;
       if (target.length > 0) {
         self.activity.inventory_item_id = target[0].id;
+        self.total.available = target[0].quantity;
       } else {
+        self.activity.count = 0;
+        self.total.available = 0;        
         self.activity.inventory_item_id = null;
       }
     },
@@ -458,7 +466,12 @@ export default {
       } else {
         self.activity.current_location_id = null;
       }
-    }
+    },
+    clickAvailableAll(){
+      self = this;
+      self.activity.count = self.total.available;
+      self.$refs.stepper_qauntity.setValue(self.total.available);
+    }    
   },
   beforeDestroy() {
     const self = this;
@@ -474,7 +487,7 @@ export default {
       activity: {
         user_id: self.$root.user.id,
         scheduled_at: null,
-        executed_at: new Date(),
+        executed_at: null,
         kind: null,
         executed_at: null,
         executed_by_id: null,
@@ -502,6 +515,10 @@ export default {
         executed_at: true,
         executed_at_time: true,
         executed_by_id: true,
+      },
+      total:{
+        available: 0,
+        selected: 0,
       }
     };
   }

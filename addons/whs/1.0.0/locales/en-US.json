@@ -101,6 +101,7 @@
       "scheduled": "Cannot be before scheduled date",
       "scheduled_full": "Executed time cannot be before scheduled date",
       "available": "{{count}} of {{total}} available",
+      "available_all": "All",
       "selected": "{{count}} of {{total}} selected"
     },
     "location_options":{      
