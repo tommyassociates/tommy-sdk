@@ -243,8 +243,6 @@ const API = {
     });
   },
   getTeam(data = null, cache = true) {
-    
-    
     return api
       .call({
         endpoint: "inventory/team_members",
