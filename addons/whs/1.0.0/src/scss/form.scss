@@ -6,6 +6,16 @@
       display: none;
     }
   }
+  .item-input-error-message{
+    height: 30px;
+    font-size: 14px;
+    text-transform: uppercase;
+    color: #fff;
+    box-sizing: border-box;
+    padding: 8px 12px 2px;
+    margin: -4px -16px 0 -16px;
+    background: #ff4500;
+  }
   .item-divider {
     background: #E7E6E6;
     font-size: 18px;
