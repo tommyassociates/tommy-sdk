@@ -67,7 +67,7 @@
             <i class="whs-form-icon whs-form-icon-hash"></i>
             {{settings.tag.name}}
           </f7-list-item>
-          <tags-picker />
+          <tags-picker @selected:change="tagsChange"/>
           <f7-list-item divider>
             <i class="whs-form-icon whs-form-icon-1"></i>
             {{$t('whs.common.minimum_stock_level_label')}}
@@ -178,6 +178,18 @@ export default {
       }
     }
   },
+  watch:{
+    filters(newFilter) { 
+      const self = this;
+      if(newFilter.length > 0){
+        self.item.filters = JSON.stringify(newFilter);
+        self.item.with_filters = true;
+      }else{
+        self.$delete(self.item, 'filters');
+        self.$delete(self.item, 'with_filters');
+      }
+    }
+  },
   methods: {
     addItem(more) {
       const self = this;
@@ -239,7 +251,14 @@ export default {
           item[key] = self.default_item[key];
       }
       return item;
-    }
+    },
+    tagsChange(target){
+      self = this;
+      self.filters = self.filters.filter(e => e.context!= "tags");
+      if (target.length > 0) {
+        self.filters = self.filters.concat(target);
+      } 
+    },
   },
   beforeDestroy() {
     const self = this;
@@ -269,7 +288,8 @@ export default {
         quantity: 0,
         min_stock_level: 0
       },
-      settings: API.main_page.$data.settings
+      settings: API.main_page.$data.settings,
+      filters: [],
     };
   }
 };
