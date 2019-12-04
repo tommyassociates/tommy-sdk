@@ -151,7 +151,7 @@
             <i class="whs-form-icon whs-form-icon-hash"></i>
             {{settings.tag.name}}
           </f7-list-item>
-          <tags-picker />
+          <tags-picker @selected:change="tagsChange"/>
           <!-- Executed? -->
           <f7-list-item divider>
             <i class="whs-form-icon whs-form-icon-toggle"></i>
@@ -207,7 +207,6 @@ import ItemPicker from "../../components/picker/item.vue";
 import LocationPicker from "../../components/picker/location.vue";
 import Dialog from "../../mixins/dialog.vue";
 
-///Inventory item can't be blank. Source location can't be blank. Destination location can't be blank
 export default {
   props:{
     item_link: Object
@@ -467,11 +466,14 @@ export default {
       self = this;
       self.validate_errors.assign = true;
       //clean old assign
-      self.filters.forEach(function(item, index, object) {
-        if (item.context === "members" || item.context === "roles") {
-          object.splice(index, 1);
-        }
-      });
+      self.filters = self.filters.filter(e => e.context!= "members" && e.context != "roles");
+      if (target.length > 0) {
+        self.filters = self.filters.concat(target);
+      } 
+    },
+    tagsChange(target){
+      self = this;
+      self.filters = self.filters.filter(e => e.context!= "tags");
       if (target.length > 0) {
         self.filters = self.filters.concat(target);
       } 

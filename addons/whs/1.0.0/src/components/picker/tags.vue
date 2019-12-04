@@ -15,7 +15,7 @@
             <div class="item-media" :style="[tag.image ? {'background-image': `url(${tag.image})`}: tagStyle]"></div>
 
             <div class="item-title">{{tag.name}}</div>
-            <div class="item-after"><a style="height: 24px" @click="removeItem(tag.id, tag.pseudo_type)" href="#" class="item-link"><i class="material-icons">close</i></a></div>
+            <div class="item-after"><a style="height: 24px" @click="removeItem(tag.id, tag.context)" href="#" class="item-link"><i class="material-icons">close</i></a></div>
           </div>
         </div>
       </li>
@@ -67,7 +67,7 @@ import ListStyles from "../../mixins/list-styles.vue";
       },
       getData(self){
         API.getTags().then(data => {
-          data.forEach((item, index)=>{item.pseudo_type = "tag"});
+          data.forEach((item, index)=>{item.context = "tags"});
           Object.assign(self.targets, data);
           console.log("TCL: getData -> self.targets", self.targets)
           self.loaded = true;
@@ -86,13 +86,13 @@ import ListStyles from "../../mixins/list-styles.vue";
       },
       deleteItem(target){
         self = this;
-        const index = self.selected.findIndex(tag => tag.id === target.id && tag.pseudo_type === target.pseudo_type);
+        const index = self.selected.findIndex(tag => tag.id === target.id && tag.context === target.context);
         self.selected.splice(index, 1);
         self.$emit("selected:change", self.selected);
       },
-      removeItem(itemId, pseudo_type) {
+      removeItem(itemId, context) {
         const self = this;
-        const index = self.selected.findIndex(tag => tag.id === itemId && tag.pseudo_type === pseudo_type);
+        const index = self.selected.findIndex(tag => tag.id === itemId && tag.context === context);
         self.selected.splice(index, 1);
         self.$emit("selected:change", self.selected);
       },
