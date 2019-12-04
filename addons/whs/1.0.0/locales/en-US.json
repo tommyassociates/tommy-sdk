@@ -98,11 +98,18 @@
     },
     "validate":{
       "required": "Required",
-      "scheduled": "Cannot be before scheduled date",
-      "scheduled_full": "Executed time cannot be before scheduled date",
+      "scheduled": "Cannot be before scheduled date",      
       "available": "{{count}} of {{total}} available",
       "available_all": "All",
-      "selected": "{{count}} of {{total}} selected"
+      "selected": "{{count}} of {{total}} selected",
+      "executed_by_message": "Please select executed.",
+      "kind_message": "Please select activity type.",
+      "inventory_item_id_message": "Inventory item can't be blank.",
+      "executed_at_time_message": "Executed time cannot be before scheduled date.",
+      "source_location_id_message": "Source location can't be blank.",
+      "destination_location_id_message": "Destination location can't be blank.",
+      "current_location_id_message": "Current location can't be blank.",
+      "assign_message": "Assign can't be blank."
     },
     "location_options":{      
       "unspecified": "Select (optional)",

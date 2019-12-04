@@ -295,54 +295,54 @@ export default {
       if(self.executed){
         if(self.activity.executed_by_id === null){
           validate = false;
-          self.validate_message += "\nPlease select executed.";
+          self.validate_message += "\n"+self.$t("whs.form_add.validate.executed_by_message");
           self.validate_errors.executed_by_id = false;
         }
         if(self.activity.executed_at === null){
           validate = false;
-          self.validate_message += "\nPlease select executed time.";
+          self.validate_message += "\n"+self.$t("whs.form_add.validate.executed_at_message");
           self.validate_errors.executed_at = false;
         }
       }
       if(self.activity.scheduled_at !== null && self.activity.executed_at !== null){
         if(self.activity.executed_at  < self.activity.scheduled_at){
           validate = false;
-          self.validate_message += "\n"+self.$t("whs.form_add.validate.scheduled_full")+".";
+          self.validate_message += "\n"+self.$t("whs.form_add.validate.executed_at_time_message");
           self.validate_errors.executed_at_time = false;
         }
       }
       if(self.activity.kind === null || self.activity.kind === 'unspecified'){
         validate = false;
-        self.validate_message += "\nPlease select activity type.";
+        self.validate_message += "\n"+self.$t("whs.form_add.validate.kind_message");
         self.validate_errors.kind = false;
       }
       if(self.activity.kind === 'pending_out' || self.activity.kind === 'pending_in' || self.activity.kind === 'movement'){
         if (self.activity.inventory_item_id === null) {
           validate = false;
-          self.validate_message += "\nInventory item can't be blank.";
+          self.validate_message += "\n"+self.$t("whs.form_add.validate.inventory_item_id_message");
           self.validate_errors.inventory_item_id = false;
         }
         if (self.activity.source_location_id === null) {
           validate = false;
-          self.validate_message += "\nSource location can't be blank.";
+          self.validate_message += "\n"+self.$t("whs.form_add.validate.source_location_id_message");
           self.validate_errors.source_location_id = false;
         }
         if (self.activity.destination_location_id === null) {
           validate = false;
-          self.validate_message += "\nDestination location can't be blank.";
+          self.validate_message += "\n"+self.$t("whs.form_add.validate.destination_location_id_message");
           self.validate_errors.destination_location_id  = false;
         }
       }
       if(self.activity.kind === 'stocktake'){
         if (self.activity.current_location_id === null) {
           validate = false;
-          self.validate_message += "\nCurrent location can't be blank.";
+          self.validate_message += "\n"+self.$t("whs.form_add.validate.current_location_id_message");
           self.validate_errors.current_location_id = false;
         }
       }
       if(self.filters.findIndex(e => e.context === 'members' || e.context === 'roles') < 0){
         validate = false;
-        self.validate_message += "\nAssignet can't be blank.";
+        self.validate_message += "\n"+self.$t("whs.form_add.validate.assign_message");
         self.validate_errors.assign = false;
       }
       return validate;
