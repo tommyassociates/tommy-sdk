@@ -143,6 +143,9 @@
             {{$t('whs.common.assignet_label')}}
           </f7-list-item>
           <assets-picker :multiply="false" @selected:change="assetChange"/>
+          <f7-list-item divider class="whs-validate error" v-if="!validate_errors.assign">
+            {{$t('whs.form_add.validate.required')}}
+          </f7-list-item>
           <!--Tags-->
           <f7-list-item divider>
             <i class="whs-form-icon whs-form-icon-hash"></i>
@@ -337,6 +340,11 @@ export default {
           self.validate_errors.current_location_id = false;
         }
       }
+      if(self.filters.findIndex(e => e.context === 'members' || e.context === 'roles') < 0){
+        validate = false;
+        self.validate_message += "\nAssignet can't be blank.";
+        self.validate_errors.assign = false;
+      }
       return validate;
     },
     deleteActivity() {
@@ -457,6 +465,7 @@ export default {
     },
     assetChange(target){
       self = this;
+      self.validate_errors.assign = true;
       //clean old assign
       self.filters.forEach(function(item, index, object) {
         if (item.context === "members" || item.context === "roles") {
@@ -539,6 +548,7 @@ export default {
         executed_at: true,
         executed_at_time: true,
         executed_by_id: true,
+        assign: true,
       },
       total:{
         available: 0,
