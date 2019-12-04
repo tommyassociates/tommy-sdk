@@ -142,7 +142,7 @@
             <i class="whs-form-icon whs-form-icon-person"></i>
             {{$t('whs.common.assignet_label')}}
           </f7-list-item>
-          <assets-picker :multiply="false" />
+          <assets-picker :multiply="false" @selected:change="assetChange"/>
           <!--Tags-->
           <f7-list-item divider>
             <i class="whs-form-icon whs-form-icon-hash"></i>
@@ -235,6 +235,18 @@ export default {
         return this.$t("whs.form_add.title", {
           text: this.settings.activity.name
         });
+      }
+    }
+  },
+  watch:{
+    filters(newFilter) { 
+      const self = this;
+      if(newFilter.length > 0){
+        self.activity.filters = JSON.stringify(newFilter);
+        self.activity.with_filters = true;
+      }else{
+        self.$delete(self.activity, 'filters');
+        self.$delete(self.activity, 'with_filters');
       }
     }
   },
@@ -443,6 +455,18 @@ export default {
         self.activity.executed_by_id = null;
       }
     },
+    assetChange(target){
+      self = this;
+      //clean old assign
+      self.filters.forEach(function(item, index, object) {
+        if (item.context === "members" || item.context === "roles") {
+          object.splice(index, 1);
+        }
+      });
+      if (target.length > 0) {
+        self.filters = self.filters.concat(target);
+      } 
+    },
     sourceChange(target) {
       self = this;
       if (target.length > 0) {
@@ -519,7 +543,8 @@ export default {
       total:{
         available: 0,
         selected: 0,
-      }
+      },
+      filters:[],
     };
   }
 };

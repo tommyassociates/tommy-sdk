@@ -14,7 +14,7 @@
           <div class="item-inner">
             <div class="item-media" :style="imageStyle(asset)"></div>
             <div class="item-title">{{asset.name || asset.first_name+' '+ asset.last_name}}</div>
-            <div class="item-after"><a style="height: 24px" @click="removeItem(asset.id, asset.pseudo_type)" href="#" class="item-link"><i class="material-icons">close</i></a></div>
+            <div class="item-after"><a style="height: 24px" @click="removeItem(asset.id, asset.context)" href="#" class="item-link"><i class="material-icons">close</i></a></div>
           </div>
         </div>
       </li>
@@ -72,8 +72,8 @@ import ListStyles from "../../mixins/list-styles.vue";
       getData(self){
         Promise.all([API.getTeam(), API.getRoles()]).then(data => { 
         console.log("TCL: getData -> data", data)
-          data[0].forEach((item, index)=>{item.pseudo_type = "team"});
-          data[1].forEach((item, index)=>{item.pseudo_type = "role"});
+          data[0].forEach((item, index)=>{item.context = "members"});
+          data[1].forEach((item, index)=>{item.context = "roles"});
           Object.assign(self.targets, data[0].concat(data[1]));          
           self.loaded = true;
           self.createSearchbar();
@@ -91,13 +91,13 @@ import ListStyles from "../../mixins/list-styles.vue";
       },
       deleteItem(target){
         self = this;
-        const index = self.selected.findIndex(asset => asset.id === target.id && asset.pseudo_type === target.pseudo_type);
+        const index = self.selected.findIndex(asset => asset.id === target.id && asset.context === target.context);
         self.selected.splice(index, 1);
         self.$emit("selected:change", self.selected);
       },
-      removeItem(itemId, pseudo_type) {
+      removeItem(itemId, context) {
         const self = this;
-        const index = self.selected.findIndex(asset => asset.id === itemId && asset.pseudo_type === pseudo_type);
+        const index = self.selected.findIndex(asset => asset.id === itemId && asset.context === context);
         self.selected.splice(index, 1);
         self.$emit("selected:change", self.selected);
       },
