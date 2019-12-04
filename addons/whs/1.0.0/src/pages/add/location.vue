@@ -95,7 +95,7 @@
             <i class="whs-form-icon whs-form-icon-hash"></i>
             {{settings.tag.name}}
           </f7-list-item>
-          <tags-picker />
+          <tags-picker  @selected:change="tagsChange"/>
 
           <!-- Active Location -->
           <f7-list-item divider>
@@ -189,6 +189,18 @@ export default {
       }
     }
   },
+  watch:{
+    filters(newFilter) { 
+      const self = this;
+      if(newFilter.length > 0){
+        self.location.filters = JSON.stringify(newFilter);
+        self.location.with_filters = true;
+      }else{
+        self.$delete(self.location, 'filters');
+        self.$delete(self.location, 'with_filters');
+      }
+    }
+  },
   methods: {
     addLocation() {
       self = this;
@@ -253,7 +265,14 @@ export default {
       } else {
         self.location.parent_location_id = null;
       }
-    }
+    },
+    tagsChange(target){
+      self = this;
+      self.filters = self.filters.filter(e => e.context!= "tags");
+      if (target.length > 0) {
+        self.filters = self.filters.concat(target);
+      } 
+    },
   },
   beforeDestroy() {
     const self = this;
@@ -275,7 +294,8 @@ export default {
       editId: null,
       indexEdit: null,
       default_location: {},
-      settings: API.main_page.$data.settings
+      settings: API.main_page.$data.settings,
+      filters: [],
     };
   }
 };
