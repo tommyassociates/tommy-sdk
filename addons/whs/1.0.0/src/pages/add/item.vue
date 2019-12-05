@@ -67,7 +67,7 @@
             <i class="whs-form-icon whs-form-icon-hash"></i>
             {{settings.tag.name}}
           </f7-list-item>
-          <tags-picker @selected:change="tagsChange"/>
+          <tags-picker @selected:change="tagsChange" ref="tags_picker"/>
           <f7-list-item divider>
             <i class="whs-form-icon whs-form-icon-1"></i>
             {{$t('whs.common.minimum_stock_level_label')}}
@@ -165,6 +165,7 @@ export default {
     if (this.item_link) {
       this.editId = this.item_link.id;
       this.item = Object.assign({}, this.item_link);
+      this.loadFilters();
     }
   },
   computed: {
@@ -258,6 +259,21 @@ export default {
       if (target.length > 0) {
         self.filters = self.filters.concat(target);
       } 
+    },
+    prepareFilters(tags){
+      self = this;
+      tags.forEach(e =>{
+        e.id = e.tag_id;
+        delete e.tag_id;
+        self.filters.push(e);
+      })
+      self.$refs.tags_picker.setValue(self.filters);
+    },
+    loadFilters() {
+      self = this;
+      API.getItemDetail(self.editId, false, true).then(data => {
+        self.prepareFilters(data.filters);
+      });
     },
   },
   beforeDestroy() {

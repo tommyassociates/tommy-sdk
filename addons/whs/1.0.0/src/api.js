@@ -19,13 +19,14 @@ const API = {
         return data;
       });
   },
-  getItemDetail(id, summary = true) {
+  getItemDetail(id, summary = true, with_filters = false) {
     return api
       .call({
         endpoint: `inventory/items/${id}`,
         method: "GET",
         data: {
-          with_summary: summary
+          with_summary: summary,
+          with_filters: with_filters
         }
       })
       .then(data => {
@@ -44,13 +45,14 @@ const API = {
         return data;
       });
   },
-  getLocationDetail(id, summary = true) {
+  getLocationDetail(id, summary = true, with_filters = false) {
     return api
       .call({
         endpoint: `inventory/locations/${id}`,
         method: "GET",
         data: {
-          with_summary: summary
+          with_summary: summary,
+          with_filters: with_filters
         }
       })
       .then(data => {
