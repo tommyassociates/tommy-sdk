@@ -21,7 +21,14 @@ const routes = [
   {
     path: "/whs/",
     component: Index,
-    keepAlive: true
+    on:{
+      pageInit(e,page){
+        page.view.router.params.stackPages=true;
+      },
+      pageBeforeRemove(e,page){
+        page.view.router.params.stackPages=false;
+      }
+    } 			
   },
   {
     path: "/whs/item/",
