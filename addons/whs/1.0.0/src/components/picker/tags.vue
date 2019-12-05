@@ -96,6 +96,14 @@ import ListStyles from "../../mixins/list-styles.vue";
         self.selected.splice(index, 1);
         self.$emit("selected:change", self.selected);
       },
+      setValue(target){
+        const self = this;
+        console.log("TCL: setValue -> self.selected", self.selected)
+        target.forEach(e =>{
+          self.selected.push(e);
+        })
+        console.log("TCL: setValue -> self.selected", self.selected)
+      }
     },
   }
 </script>

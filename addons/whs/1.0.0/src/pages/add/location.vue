@@ -95,7 +95,7 @@
             <i class="whs-form-icon whs-form-icon-hash"></i>
             {{settings.tag.name}}
           </f7-list-item>
-          <tags-picker  @selected:change="tagsChange"/>
+          <tags-picker  @selected:change="tagsChange" ref="tags_picker"/>
 
           <!-- Active Location -->
           <f7-list-item divider>
@@ -174,6 +174,7 @@ export default {
     if (this.item_link) {
       this.editId = this.item_link.id;
       this.location = Object.assign({}, this.item_link);
+      this.loadFilters();
     }
   },
   computed: {
@@ -203,7 +204,7 @@ export default {
   },
   methods: {
     addLocation() {
-      self = this;
+      const self = this;
       if (this.$f7.$("#add-location")[0].checkValidity()) {
         if (this.editId) {
           this.location = this.setDefaults(this.location);
@@ -251,7 +252,7 @@ export default {
       );
     },
     setDefaults(item) {
-      self = this;
+      const self = this;
       for (key in self.default_item) {
         if (item[key] === null || item[key] === "")
           item[key] = self.default_item[key];
@@ -259,7 +260,7 @@ export default {
       return item;
     },
     parentLocationChange(target) {
-      self = this;
+      const self = this;
       if (target.length > 0) {
         self.location.parent_location_id = target[0].id;
       } else {
@@ -267,11 +268,26 @@ export default {
       }
     },
     tagsChange(target){
-      self = this;
+      const self = this;
       self.filters = self.filters.filter(e => e.context!= "tags");
       if (target.length > 0) {
         self.filters = self.filters.concat(target);
       } 
+    },
+    prepareFilters(tags){
+      const self = this;
+      tags.forEach(e =>{
+        e.id = e.tag_id;
+        delete e.tag_id;
+        self.filters.push(e);
+      })
+      self.$refs.tags_picker.setValue(self.filters);
+    },
+    loadFilters() {
+      const self = this;
+      API.getLocationDetail(self.editId, false, true).then(data => {
+        self.prepareFilters(data.filters);
+      });
     },
   },
   beforeDestroy() {
