@@ -22,6 +22,7 @@
 -   Dynamic image
 -   Storage popup for add form
 -   Dynamic name and placeholder
+-   Save/load tags
 
 ## locations
 
@@ -41,6 +42,7 @@
 -   Dynamic image
 -   Category popup for add form
 -   Dynamic name and placeholder
+-   Save/load tags
 
 ## Settings
 
@@ -68,6 +70,8 @@
 -   Role summary page
 -   Validate check
 -   Quantity smart divider
+-   Save assign
+-   Save/load tags
 
 ## Tags
 -	Add 

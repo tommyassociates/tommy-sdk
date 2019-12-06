@@ -19,7 +19,6 @@
 ## Activity
 
 - [ ] no activity when length = 0
-- [ ] Assigned (Fragment save?)
 
 ## Settings
 
