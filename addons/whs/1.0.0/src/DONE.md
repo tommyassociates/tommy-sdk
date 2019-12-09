@@ -24,6 +24,7 @@
 -   Dynamic name and placeholder
 -   Save/load tags
 -   Dynamic fields
+-   Localize dynamic fields
 
 ## locations
 
