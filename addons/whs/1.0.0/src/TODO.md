@@ -2,23 +2,21 @@
 
 - [ ] Add image to create
 - [ ] Add image to main form
-- [ ] Redo required style 
 
 ## Items
 
 - [ ] Add image to create
 - [ ] Add image to main form
-- [ ] Redo required style 
 
 ## Locations
 
 - [ ] Add image to create
 - [ ] Add image to main form
-- [ ] Redo required style 
 
 ## Activity
 
 - [ ] no activity when length = 0
+- [ ] fix data values to ISO format
 
 ## Settings
 
@@ -26,7 +24,6 @@
     - [ ] Settings for all team(Core)
 - [ ] Dynamic fields
     - [ ] Locations
-    - [ ] Items
     - [ ] Tags
 - [ ] View settings
     - [ ] Main

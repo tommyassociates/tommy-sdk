@@ -43,5 +43,103 @@ export default {
   },
   team: {
     image: "assets/default/team.svg"
-  }
+  },
+  item_fields: [    
+    {
+      name: "Photo",
+      description: "Uploaded photo(s) of the item",
+      alias: "image",
+      type: "photo",
+      active: true,
+      order: 0
+    },   
+    {
+      name: "Name",
+      alias: "name",
+      type: "single_line_text",
+      description: "Product name field",
+      placeholder: "Required...",
+      required: true,
+      validate: true,
+      active: true,
+      order: 1
+    },
+    {
+      name: "SKU / Barcode",
+      alias: "sku",
+      type: "barcode",
+      description: "Barcode item line",
+      placeholder: "E.g. 1234567890...",
+      active: true,
+      order: 2
+    },
+    {
+      name: "Price",
+      alias: "price",
+      type: "currency",
+      description: "Price item",
+      placeholder: "E.g. 123.456...",
+      active: true,
+      order: 3
+    },
+    {
+      name: "Tag",
+      alias: "tag",
+      type: "tag",
+      description: "Tag item",
+      placeholder: "Search tags...",
+      active: true,
+      order: 4
+    },
+    {
+      name: "Minimum Stock Level",
+      alias: "min_stock_level",
+      type: "integer",
+      description: "Minimum Stock Level description",
+      placeholder: "E.g. 123456...",
+      active: true,
+      order: 5
+    },
+    {
+      name: "Quantity",
+      alias: "quantity",
+      type: "integer",
+      description: "Quantity description",
+      placeholder: "E.g. 123456...",
+      active: true,
+      order: 6
+    },
+    {
+      name: "Description",
+      alias: "description",
+      type: "multi_line_text",
+      description: "Short multi line description of the item",
+      placeholder: "Optional",
+      active: true,
+      order: 7
+    },
+    {
+      name: "Storage",
+      alias: "storage_type",
+      type: "single_select",
+      description: "Storage type selection",
+      placeholder: "Select (optional)",
+      active: true,
+      order: 1,
+      options: [
+        {
+          name: "Unspecified",
+          value: "unspecified"
+        }, 
+        {
+          name: "Freezer",
+          value: "freezer"
+        },
+        {
+          name: "Ambient",
+          value: "ambient"
+        }
+      ]
+    },
+  ]
 };
