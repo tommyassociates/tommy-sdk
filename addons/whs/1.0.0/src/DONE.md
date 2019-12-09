@@ -112,3 +112,4 @@
     -   single line text
     -   single select
     -   tag
+    -   location
