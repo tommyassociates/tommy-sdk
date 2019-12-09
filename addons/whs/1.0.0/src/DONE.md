@@ -24,7 +24,7 @@
 -   Dynamic name and placeholder
 -   Save/load tags
 -   Dynamic fields
--   Localize dynamic fields
+-   Localization dynamic fields
 
 ## locations
 
@@ -45,6 +45,8 @@
 -   Category popup for add form
 -   Dynamic name and placeholder
 -   Save/load tags
+-   Dynamic fields
+-   Localization dynamic fields
 
 ## Settings
 

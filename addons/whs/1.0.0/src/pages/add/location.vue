@@ -12,138 +12,16 @@
     <form class="list" id="add-location" action="javascript:void(0)" enctype="multipart/form-data">
       <f7-list class="whs-form">
         <ul>
-          <form-images-picker :lineWithActions="false" />
-          <!-- Name -->
-          <f7-list-item divider>
-            <i class="whs-form-icon whs-form-icon-aa"></i>
-            {{$t('whs.common.name_label')}}
-          </f7-list-item>
-          <f7-list-input
-            type="text"
-            name="name"
-            required
-            validate
-            :error-message="$t('whs.common.required_name_error')"
-            :value="location.name"
-            @input="location.name = $event.target.value"
-            :placeholder="$t('whs.common.required_placeholder')"
-          />
-
-          <!-- Barcode -->
-          <f7-list-item divider>
-            <i class="whs-form-icon whs-form-icon-barcode"></i>
-            {{$t('whs.common.sku_barcode_label')}}
-          </f7-list-item>
-          <f7-list-input
-            type="text"
-            name="sku"
-            :value="location.sku"
-            @input="location.sku = $event.target.value"
-            :placeholder="$t('whs.common.sku_barcode_placeholder')"
-          >
-            <a class="link whs-form-barcode-link" slot="input">
-              <i class="whs-icon whs-icon-barcode"></i>
-            </a>
-          </f7-list-input>
-
-          <!-- Parent Location -->
-          <f7-list-item divider>
-            <i class="whs-form-icon whs-form-icon-location"></i>
-            {{$t('whs.common.parent_location_label')}}
-          </f7-list-item>
-          <location-picker
-            :multiply="false"
-            @selected:change="parentLocationChange"
-            :loadSelect="[location.parent_location_id]"
-          />
-
-          <!-- description -->
-          <f7-list-item divider>
-            <i class="whs-form-icon whs-form-icon-text"></i>
-            {{$t('whs.common.description_label')}}
-          </f7-list-item>
-          <f7-list-input
-            type="textarea"
-            resizable
-            name="description"
-            :value="location.description"
-            @input="location.description = $event.target.value"
-            :placeholder="$t('whs.common.description_placeholder')"
-          />
-
-          <!-- Capacity -->
-          <f7-list-item divider>
-            <i class="whs-form-icon whs-form-icon-1"></i>
-            {{$t('whs.common.pallet_capacity_label')}}
-          </f7-list-item>
-          <f7-list-item :title="String(location.pallet_capacity)">
-            <f7-stepper
-              :value="location.pallet_capacity"
-              :step="1"
-              :autorepeat="true"
-              :autorepeat-dynamic="true"
-              :min="0"
-              :max="999999999999999999"
-              @stepper:change="(value)=>{location.pallet_capacity = value}"
-              buttons-only
-              color="gray"
-            />
-          </f7-list-item>
-
-          <!-- Tags -->
-          <f7-list-item divider>
-            <i class="whs-form-icon whs-form-icon-hash"></i>
-            {{settings.tag.name}}
-          </f7-list-item>
-          <tags-picker  @selected:change="tagsChange" ref="tags_picker"/>
-
-          <!-- Active Location -->
-          <f7-list-item divider>
-            <i class="whs-form-icon whs-form-icon-toggle"></i>
-            {{$t('whs.common.active_location_label', {text: settings.location.name})}}
-          </f7-list-item>
-          <f7-list-item>
-            <f7-toggle
-              slot="after"
-              :checked="location.active"
-              @toggle:change="(value)=>{location.active = value}"
-            />
-          </f7-list-item>
-
-          <!-- Category -->
-          <f7-list-item divider>
-            <i class="whs-form-icon whs-form-icon-check"></i>
-            {{$t('whs.common.location_category_label', {text: settings.location.name})}}
-          </f7-list-item>
-          <f7-list-item
-            class="whs-type-selector"
-            smart-select
-            title=" "
-            :smart-select-params="{
-              openIn: 'popup',
-              pageBackLinkText: '',
-              popupCloseLinkText: '',
-              closeOnSelect: true,
-              pageTitle: $t('whs.common.options_title'),
-              valueEl: '.whs-type-selector .item-title',
-              cssClass: 'whs-type-options'            
-            }"
-          >
-            <select name="category" @change="location.category = $event.target.value">
-              <option
-                value="unspecified"
-                :selected="location.category === 'unspecified' || location.category === ''"
-              >{{$t('whs.form_add.location_options.unspecified')}}</option>
-              <option
-                value="frozen"
-                :selected="location.category === 'frozen'"
-              >{{$t('whs.form_add.location_options.frozen')}}</option>
-              <option
-                value="ambient"
-                :selected="location.category === 'ambient'"
-              >{{$t('whs.form_add.location_options.ambient')}}</option>
-            </select>
-          </f7-list-item>
+          <template v-for="(field, index) in prepareFields(settings.location_fields)">
+              <component 
+                :is="field.type"
+                :key="'field_'+index"
+                :params="field"
+                :value="location[field.alias]"
+                @value:update="valueUpdate"
+                :ref="'field_'+field.alias"
+              ></component>
+          </template>
         </ul>
       </f7-list>
     </form>
@@ -155,19 +33,35 @@
 </template>
 <script>
 import API from "../../api";
-import FormImagesPicker from "../../components/picker/form-images.vue";
-import TagsPicker from "../../components/picker/tags.vue";
-import LocationPicker from "../../components/picker/location.vue";
 import Dialog from "../../mixins/dialog.vue";
+
+//fields
+import SingleLineField from "../../components/fields/single_line_text.vue";
+import MultiLineField from "../../components/fields/multi_line_text.vue";
+import PhotoField from "../../components/fields/photo.vue";
+import BarcodeField from "../../components/fields/barcode.vue";
+import CurrencyField from "../../components/fields/currency.vue";
+import TagField from "../../components/fields/tag.vue";
+import IntegerField from "../../components/fields/integer.vue";
+import SingleSelectField from "../../components/fields/single_select.vue";
+import LocationField from "../../components/fields/location.vue";
+import ToggleField from "../../components/fields/toggle.vue";
 
 export default {
   props:{
     item_link: Object
   },
   components: {
-    FormImagesPicker,
-    TagsPicker,
-    LocationPicker
+    single_line_text: SingleLineField,
+    multi_line_text: MultiLineField,
+    photo: PhotoField,
+    barcode: BarcodeField,
+    currency: CurrencyField,
+    tag: TagField,
+    integer: IntegerField,
+    single_select: SingleSelectField,
+    location: LocationField,
+    toggle: ToggleField,
   },
   mixins: [Dialog],
   created() {
@@ -203,6 +97,26 @@ export default {
     }
   },
   methods: {
+    prepareFields(fields){
+      fields = fields.filter(e => e.active === true);
+      fields.sort((a, b) => (a.order > b.order) ? 1 : -1)
+      return fields;
+    },
+    valueUpdate(e){
+      console.log("TCL: valueUpdate -> e", e)
+      const self = this;
+      switch(e.alias){
+        case 'tag':
+          self.tagsChange(e.value);
+          break;
+        case 'parent_location_id':
+          self.parentLocationChange(e.value);
+          break;
+        default:
+          self.location[e.alias] = e.value;
+          break;
+      }      
+    },
     addLocation() {
       const self = this;
       if (this.$f7.$("#add-location")[0].checkValidity()) {
@@ -281,7 +195,7 @@ export default {
         delete e.tag_id;
         self.filters.push(e);
       })
-      self.$refs.tags_picker.setValue(self.filters);
+      self.$refs.field_tag[0].$refs.tags_picker.setValue(self.filters);
     },
     loadFilters() {
       const self = this;
@@ -303,9 +217,10 @@ export default {
         sku: null,
         parent_location_id: null,
         description: null,
-        pallet_capacity: 0,
+        pallet_capacity: null,
         active: true,
-        category: null
+        category: null,
+        image: null,
       },
       editId: null,
       indexEdit: null,

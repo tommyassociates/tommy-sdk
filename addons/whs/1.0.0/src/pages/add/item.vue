@@ -40,8 +40,6 @@
 </template>
 <script>
 import API from "../../api";
-import FormImagesPicker from "../../components/picker/form-images.vue";
-import TagsPicker from "../../components/picker/tags.vue";
 import Dialog from "../../mixins/dialog.vue";
 
 //fields
