@@ -19,124 +19,16 @@
     <form class="list" id="add-item" action="javascript:void(0)" enctype="multipart/form-data">
       <f7-list class="whs-form">
         <ul>
-          <form-images-picker :lineWithActions="false" />
-          <f7-list-item divider>
-            <i class="whs-form-icon whs-form-icon-aa"></i>
-            {{$t('whs.common.name_label')}}
-          </f7-list-item>
-          <f7-list-input
-            type="text"
-            name="name"
-            required
-            validate
-            :error-message="$t('whs.common.required_name_error')"
-            :value="item.name"
-            @input="item.name = $event.target.value"
-            :placeholder="$t('whs.common.required_placeholder')"
-          />
-
-          <f7-list-item divider>
-            <i class="whs-form-icon whs-form-icon-barcode"></i>
-            {{$t('whs.common.sku_barcode_label')}}
-          </f7-list-item>
-          <f7-list-input
-            type="text"
-            name="sku"
-            :value="item.sku"
-            @input="item.sku = $event.target.value"
-            :placeholder="$t('whs.common.sku_barcode_placeholder')"
-          >
-            <a class="link whs-form-barcode-link" slot="input">
-              <i class="whs-icon whs-icon-barcode"></i>
-            </a>
-          </f7-list-input>
-
-          <f7-list-item divider>
-            <i class="whs-form-icon whs-form-icon-dollar"></i>
-            {{$t('whs.common.price_label')}}
-          </f7-list-item>
-          <f7-list-input
-            type="number"
-            name="price"
-            :value="item.price"
-            @input="item.price = $event.target.value"
-            :placeholder="$t('whs.common.price_placeholder')"
-          />
-
-          <f7-list-item divider>
-            <i class="whs-form-icon whs-form-icon-hash"></i>
-            {{settings.tag.name}}
-          </f7-list-item>
-          <tags-picker @selected:change="tagsChange" ref="tags_picker"/>
-          <f7-list-item divider>
-            <i class="whs-form-icon whs-form-icon-1"></i>
-            {{$t('whs.common.minimum_stock_level_label')}}
-          </f7-list-item>
-          <f7-list-input
-            type="number"
-            name="min_stock_level"
-            :value="item.min_stock_level"
-            @input="item.min_stock_level = $event.target.value"
-            :placeholder="$t('whs.common.minimum_stock_level_placeholder')"
-          />
-
-          <f7-list-item divider>
-            <i class="whs-form-icon whs-form-icon-location"></i>
-            {{$t('whs.common.quantity_label')}}
-          </f7-list-item>
-          <f7-list-input
-            type="number"
-            name="quantity"
-            :value="item.quantity"
-            @input="item.quantity = $event.target.value"
-            :placeholder="$t('whs.common.quantity_placeholder')"
-          />
-
-          <f7-list-item divider>
-            <i class="whs-form-icon whs-form-icon-text"></i>
-            {{$t('whs.common.description_label')}}
-          </f7-list-item>
-          <f7-list-input
-            type="textarea"
-            resizable
-            name="description"
-            :value="item.description"
-            @input="item.description = $event.target.value"
-            :placeholder="$t('whs.common.description_placeholder')"
-          />
-          <f7-list-item divider>
-            <i class="whs-form-icon whs-form-icon-check"></i>
-            {{$t('whs.common.storage_label')}}
-          </f7-list-item>
-          <f7-list-item
-            class="whs-type-selector"
-            smart-select
-            title=" "
-            :smart-select-params="{
-              openIn: 'popup',
-              pageBackLinkText: '',
-              popupCloseLinkText: '',
-              closeOnSelect: true,
-              pageTitle: $t('whs.common.options_title'),
-              valueEl: '.whs-type-selector .item-title',
-              cssClass: 'whs-type-options'            
-            }"
-          >
-            <select name="storage_type" @change="item.storage_type = $event.target.value">
-              <option
-                value="unspecified"
-                :selected="item.storage_type === 'unspecified' || item.storage_type === ''"
-              >{{$t('whs.form_add.item_options.unspecified')}}</option>
-              <option
-                value="freezer"
-                :selected="item.storage_type === 'freezer'"
-              >{{$t('whs.form_add.item_options.freezer')}}</option>
-              <option
-                value="ambient"
-                :selected="item.storage_type === 'ambient'"
-              >{{$t('whs.form_add.item_options.ambient')}}</option>
-            </select>
-          </f7-list-item>
+          <template v-for="(field, index) in prepareFields(settings.item_fields)">
+              <component 
+                :is="field.type"
+                :key="'field_'+index"
+                :params="field"
+                :value="item[field.alias]"
+                @value:update="valueUpdate"
+                :ref="'field_'+field.alias"
+              ></component>
+          </template>
         </ul>
       </f7-list>
     </form>
@@ -152,13 +44,30 @@ import FormImagesPicker from "../../components/picker/form-images.vue";
 import TagsPicker from "../../components/picker/tags.vue";
 import Dialog from "../../mixins/dialog.vue";
 
+//fields
+import SingleLineField from "../../components/fields/single_line_text.vue";
+import MultiLineField from "../../components/fields/multi_line_text.vue";
+import PhotoField from "../../components/fields/photo.vue";
+import BarcodeField from "../../components/fields/barcode.vue";
+import CurrencyField from "../../components/fields/currency.vue";
+import TagField from "../../components/fields/tag.vue";
+import IntegerField from "../../components/fields/integer.vue";
+import SingleSelectField from "../../components/fields/single_select.vue";
+
 export default {
+  name: "AddItem",
   props:{
     item_link: Object
   },
   components: {
-    FormImagesPicker,
-    TagsPicker
+    single_line_text: SingleLineField,
+    multi_line_text: MultiLineField,
+    photo: PhotoField,
+    barcode: BarcodeField,
+    currency: CurrencyField,
+    tag: TagField,
+    integer: IntegerField,
+    single_select: SingleSelectField,
   },
   mixins: [Dialog],
   created() {
@@ -192,6 +101,23 @@ export default {
     }
   },
   methods: {
+    prepareFields(fields){
+      fields = fields.filter(e => e.active === true);
+      fields.sort((a, b) => (a.order > b.order) ? 1 : -1)
+      return fields;
+    },
+    valueUpdate(e){
+      console.log("TCL: valueUpdate -> e", e)
+      const self = this;
+      switch(e.alias){
+        case 'tag':
+          self.tagsChange(e.value);
+          break;
+        default:
+          self.item[e.alias] = e.value;
+          break;
+      }      
+    },
     addItem(more) {
       const self = this;
       if (this.$f7.$("#add-item")[0].checkValidity()) {
@@ -267,7 +193,7 @@ export default {
         delete e.tag_id;
         self.filters.push(e);
       })
-      self.$refs.tags_picker.setValue(self.filters);
+      self.$refs.field_tag[0].$refs.tags_picker.setValue(self.filters);
     },
     loadFilters() {
       self = this;

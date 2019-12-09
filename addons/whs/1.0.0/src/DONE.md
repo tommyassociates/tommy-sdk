@@ -23,6 +23,7 @@
 -   Storage popup for add form
 -   Dynamic name and placeholder
 -   Save/load tags
+-   Dynamic fields
 
 ## locations
 
@@ -101,3 +102,12 @@
 -   Role table in summary pages
 -   Team table in summary pages
 -   main preloader animation
+-   dynamic fields components
+    -   barcode
+    -   currency
+    -   integer
+    -   multi line text
+    -   photo
+    -   single line text
+    -   single select
+    -   tag
