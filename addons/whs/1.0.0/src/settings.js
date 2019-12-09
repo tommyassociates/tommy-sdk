@@ -142,5 +142,104 @@ export default {
         }
       ]
     },
+  ],
+  location_fields: [    
+    {
+      name: window.tommy.i18n.t("whs.fields.image.name"),
+      description: window.tommy.i18n.t("whs.fields.image.description"),
+      placeholder: window.tommy.i18n.t("whs.fields.image.placeholder"),
+      alias: "image",
+      type: "photo",
+      active: true,
+      order: 0
+    },   
+    {
+      name: window.tommy.i18n.t("whs.fields.name.name"),
+      description: window.tommy.i18n.t("whs.fields.name.description"),
+      placeholder: window.tommy.i18n.t("whs.fields.name.placeholder"),
+      alias: "name",
+      type: "single_line_text",
+      required: true,
+      validate: true,
+      active: true,
+      order: 1
+    },
+    {
+      name: window.tommy.i18n.t("whs.fields.sku.name"),
+      description: window.tommy.i18n.t("whs.fields.sku.description"),
+      placeholder: window.tommy.i18n.t("whs.fields.sku.placeholder"),
+      alias: "sku",
+      type: "barcode",
+      active: true,
+      order: 2
+    },
+    {
+      name: window.tommy.i18n.t("whs.fields.parent_location.name"),
+      description: window.tommy.i18n.t("whs.fields.parent_location.description"),
+      placeholder: window.tommy.i18n.t("whs.fields.parent_location.placeholder"),
+      alias: "parent_location_id",
+      type: "location",
+      multiply: false,
+      active: true,
+      order: 3
+    },
+    {
+      name: window.tommy.i18n.t("whs.fields.description.name"),
+      description: window.tommy.i18n.t("whs.fields.description.description"),
+      placeholder: window.tommy.i18n.t("whs.fields.description.placeholder"),
+      alias: "description",
+      type: "multi_line_text",
+      active: true,
+      order: 4
+    },
+    {
+      name: window.tommy.i18n.t("whs.fields.pallet_capacity.name"),
+      description: window.tommy.i18n.t("whs.fields.pallet_capacity.description"),
+      placeholder: window.tommy.i18n.t("whs.fields.pallet_capacity.placeholder"),
+      alias: "pallet_capacity",
+      type: "integer",
+      active: true,
+      order: 5
+    },
+    {
+      name: window.tommy.i18n.t("whs.fields.tag.name"),
+      description: window.tommy.i18n.t("whs.fields.tag.description"),
+      placeholder: window.tommy.i18n.t("whs.fields.tag.placeholder"),
+      alias: "tag",
+      type: "tag",
+      active: true,
+      order: 6
+    },
+    {
+      name: window.tommy.i18n.t("whs.fields.active_location.name"),
+      description: window.tommy.i18n.t("whs.fields.active_location.description"),
+      alias: "active",
+      type: "toggle",
+      active: true,
+      order: 7
+    },
+    {
+      name: window.tommy.i18n.t("whs.fields.location_category.name"),
+      description: window.tommy.i18n.t("whs.fields.location_category.description"),
+      placeholder: window.tommy.i18n.t("whs.fields.location_category.placeholder"),
+      alias: "category",
+      type: "single_select",
+      active: true,
+      order: 8,
+      options: [
+        {
+          name: "Unspecified",
+          value: "unspecified"
+        }, 
+        {
+          name: "Frozen",
+          value: "frozen"
+        },
+        {
+          name: "Ambient",
+          value: "ambient"
+        }
+      ]
+    },
   ]
 };

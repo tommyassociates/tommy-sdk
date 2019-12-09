@@ -102,6 +102,25 @@
       "name": "Storage",
       "description": "Storage type selection",
       "placeholder": "Select (optional)"
+    },
+    "parent_location":{
+      "name": "Parent location",
+      "description": "Location selection",
+      "placeholder": "Select location..."
+    },
+    "pallet_capacity":{
+      "name": "Capacity",
+      "description": "Pallet capacity",
+      "placeholder": "Set pallet capacity"
+    },
+    "location_category":{
+      "name": "Location category",
+      "description": "Location category selector",
+      "placeholder": "Select location..."
+    },
+    "active_location":{
+      "name": "Active location",
+      "description": "Active location toggle selector"
     }
   },
   "alert_form":{
