@@ -113,3 +113,4 @@
     -   single select
     -   tag
     -   location
+    -   toggle
