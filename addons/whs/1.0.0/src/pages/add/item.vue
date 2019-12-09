@@ -107,7 +107,6 @@ export default {
       return fields;
     },
     valueUpdate(e){
-      console.log("TCL: valueUpdate -> e", e)
       const self = this;
       switch(e.alias){
         case 'tag':

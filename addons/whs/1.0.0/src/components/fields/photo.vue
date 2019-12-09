@@ -22,7 +22,7 @@
         >
           <input type="file" :multiple="params.multiple" @change="onFilesChange" accept="image/*" />
           <i class="f7-icons">camera</i>
-          <span>{{$t('whs.common.add_photo_label')}}</span>
+          <span>{{params.placeholder}}</span>
         </label>
       </div>
     </li>

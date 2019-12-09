@@ -16,11 +16,11 @@
     "name_label": "Name",
     "no_activity": "No Activity",
     "search_placeholder": "Search...",
-    "required_placeholder": "Required...",
-    "sku_barcode_label": "SKU / Barcode",
-    "sku_barcode_placeholder": "E.g. 1234567890...",
-    "price_label": "Price",
-    "price_placeholder": "E.g. 123.456...",
+    "required_placeholderDELETE_THIS": "Required...",
+    "sku_barcode_labelDELETE_THIS": "SKU / Barcode",
+    "sku_barcode_placeholderDELETE_THIS": "E.g. 1234567890...",
+    "price_labelDELETE_THIS": "Price",
+    "price_placeholderDELETE_THIS": "E.g. 123.456...",
     "assets_search_placeholder": "Search Team, Roles...",
     "teams_search_placeholder": "Search Team...",
     "executed_label": "Already Executed?",
@@ -28,15 +28,15 @@
     "date_executed_label": "Executed Time",    
     "select_assets_title": "Select Assets",
     "select_teams_title": "Select Team",
-    "minimum_stock_level_label": "Minimum Stock Level",
-    "minimum_stock_level_placeholder": "E.g. 12345...",
+    "minimum_stock_level_labelDELETE_THIS": "Minimum Stock Level",
+    "minimum_stock_level_placeholderDELETE_THIS": "E.g. 12345...",
     "quantity_label": "Quantity",
-    "quantity_placeholder": "Add to Location",
-    "description_label": "Description",
-    "description_placeholder": "Optional",
-    "storage_label": "Storage",
-    "storage_placeholder": "Select option",
-    "add_photo_label": "Add Photo",
+    "quantity_placeholderDELETE_THIS": "Add to Location",
+    "description_labelDELETE_THIS": "Description",
+    "description_placeholderDELETE_THIS": "Optional",
+    "storage_labelDELETE_THIS": "Storage",
+    "storage_placeholderDELETE_THIS": "Select option",
+    "add_photo_labelDELETE_THIS": "Add Photo",
     "parent_location_label": "Parent Location",
     "parent_location_placeholder": "Select Location",
     "pallet_capacity_label": "Pallet Capacity",
@@ -48,7 +48,7 @@
     "type_label": "Type",
     "assignet_label": "Assignet",
     "options_title": "Options",
-    "required_name_error": "Please enter a name",
+    "required_name_errorDELETE_THIS": "Please enter a name",
     "dashboard": "Dashboard",
     "more": "More",
     "delete": "Delete",
@@ -56,6 +56,53 @@
     "dynamic_search_placeholder": "Search {{text}}...",
     "source_label": "Source",
     "destination_label": "Destination"
+  },
+  "fields":{
+    "image":{
+      "name": "Photo",
+      "description": "Uploaded photo(s) of the item",
+      "placeholder": "Add photo"
+    },
+    "name":{
+      "name": "Name",
+      "description": "Product name field",
+      "placeholder": "Required..."
+    },
+    "sku": {
+      "name": "SKU / Barcode",
+      "description": "Barcode item line",
+      "placeholder": "E.g. 1234567890..."
+    },
+    "price":{
+      "name": "Price",
+      "description": "Price item",
+      "placeholder": "E.g. 123.456..."
+    },
+    "tag":{
+      "name": "Tag",
+      "description": "Tag item",
+      "placeholder": "Search tags..."
+    },
+    "min_stock_level":{
+      "name": "Minimum Stock Level",
+      "description": "Minimum Stock Level description",
+      "placeholder": "E.g. 123456..."
+    },
+    "quantity":{
+      "name": "Quantity",
+      "description": "Quantity description",
+      "placeholder": "E.g. 123456..."
+    },
+    "description":{
+      "name": "Description",
+      "description": "Short multi line description of the item",
+      "placeholder": "Optional"
+    },
+    "storage_type":{
+      "name": "Storage",
+      "description": "Storage type selection",
+      "placeholder": "Select (optional)"
+    }
   },
   "alert_form":{
     "ok": "Ok",
@@ -114,11 +161,6 @@
     "location_options":{      
       "unspecified": "Select (optional)",
       "frozen": "Frozen",
-      "ambient": "Ambient"
-    },
-    "item_options":{      
-      "unspecified": "Select (optional)",
-      "freezer": "Freezer",
       "ambient": "Ambient"
     }
   },
