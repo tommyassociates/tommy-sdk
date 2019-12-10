@@ -1,7 +1,7 @@
 <template>
   <div>
     <f7-list-item divider>
-      <i class="whs-form-icon whs-form-icon-check"></i>
+      <i class="whs-form-icon whs-form-icon-dot"></i>
       {{params.name}}
     </f7-list-item>
     <f7-list-item
