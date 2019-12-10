@@ -42,10 +42,7 @@
           :value="settings.font_color"
           @change="(v) => updateValue('font_color', v)"
         />
-        <f7-list-item
-          :title="$t('whs.settings_edit.fields')"
-          link="/whs/settings/locations/fields/"
-        />
+        <f7-list-item :title="$t('whs.settings_edit.fields')" link="/whs/settings/edit-fields/?type=location" />
         <f7-list-item :title="$t('whs.settings.view_settings')" divider />
         <f7-list-item :title="$t('whs.settings.view_settings_main_menu')" link />
         <f7-list-item :title="$t('whs.settings.view_settings_summary')" link />

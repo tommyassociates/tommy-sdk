@@ -10,7 +10,7 @@ import LocationAdd from "./pages/add/location.vue";
 import ActivityAdd from "./pages/add/activity.vue";
 import Settings from "./pages/settings/index.vue";
 import SettingsItems from "./pages/settings/items.vue";
-import SettingsItemsFields from "./pages/settings/items-fields.vue";
+import SettingsEditFields from "./pages/settings/edit-fields.vue";
 import SettingsItemsFieldDetails from "./pages/settings/items-field-details.vue";
 import SettingsLocations from "./pages/settings/locations.vue";
 import SettingsTags from "./pages/settings/tags.vue";
@@ -75,8 +75,8 @@ const routes = [
     component: SettingsItems
   },
   {
-    path: "/whs/settings/items/fields/",
-    component: SettingsItemsFields
+    path: "/whs/settings/edit-fields/",
+    component: SettingsEditFields
   },
   {
     path: "/whs/settings/items/field/",
