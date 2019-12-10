@@ -243,13 +243,8 @@ export default {
   watch:{
     filters(newFilter) { 
       const self = this;
-      if(newFilter.length > 0){
-        self.activity.filters = JSON.stringify(newFilter);
-        self.activity.with_filters = true;
-      }else{
-        self.$delete(self.activity, 'filters');
-        self.$delete(self.activity, 'with_filters');
-      }
+      self.activity.filters = JSON.stringify(newFilter);
+      self.activity.with_filters = true;
     }
   },
   methods: {

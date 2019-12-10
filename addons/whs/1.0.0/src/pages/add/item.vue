@@ -89,13 +89,8 @@ export default {
   watch:{
     filters(newFilter) { 
       const self = this;
-      if(newFilter.length > 0){
-        self.item.filters = JSON.stringify(newFilter);
-        self.item.with_filters = true;
-      }else{
-        self.$delete(self.item, 'filters');
-        self.$delete(self.item, 'with_filters');
-      }
+      self.item.filters = JSON.stringify(newFilter);
+      self.item.with_filters = true;
     }
   },
   methods: {
