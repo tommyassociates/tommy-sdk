@@ -102,13 +102,13 @@
     margin-right: 0;
   }
 }
-.whs-form-icon-aa {
+.whs-form-icon-aa, .whs-form-icon-single_line_text {
   background-image: url(../assets/form-icon-aa.svg);
 }
 .whs-form-icon-image {
   background-image: url(../assets/form-icon-image.svg);
 }
-.whs-form-icon-1 {
+.whs-form-icon-1, .whs-form-icon-integer {
   background-image: url(../assets/form-icon-1.svg);
 }
 .whs-form-icon-barcode {
@@ -117,10 +117,10 @@
 .whs-form-icon-check {
   background-image: url(../assets/form-icon-check.svg);
 }
-.whs-form-icon-dollar {
+.whs-form-icon-dollar, .whs-form-icon-currency {
   background-image: url(../assets/form-icon-dollar.svg);
 }
-.whs-form-icon-hash {
+.whs-form-icon-hash, .whs-form-icon-tag {
   background-image: url(../assets/form-icon-hash.svg);
 }
 .whs-form-icon-location {
@@ -141,7 +141,7 @@
 .whs-form-icon-percentage {
   background-image: url(../assets/form-icon-percentage.svg);
 }
-.whs-form-icon-text-multiline {
+.whs-form-icon-text-multiline, .whs-form-icon-multi_line_text {
   background-image: url(../assets/form-icon-text-multiline.svg);
 }
 .whs-form-icon-int {
@@ -150,7 +150,7 @@
 .whs-form-icon-link {
   background-image: url(../assets/form-icon-link.svg);
 }
-.whs-form-icon-dot {
+.whs-form-icon-dot, .whs-form-icon-single_select {
   background-image: url(../assets/form-icon-dot.svg);
 }
 .whs-form-icon-person {
