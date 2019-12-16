@@ -223,7 +223,12 @@ $orange: #FF5413;
     margin-bottom: 20px;
   }
 }
-
+.block-title.whs-list-divider{
+  font-size: 16px;
+  color: #999;
+  text-transform: uppercase;
+  margin-top: 15px;
+}
 .list.whs-settings-list {
   .item-divider {
     font-size: 16px;
