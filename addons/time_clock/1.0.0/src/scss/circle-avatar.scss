@@ -1,0 +1,39 @@
+.time-clock-avatars-container{
+    display: flex;
+    flex-direction: row;
+}
+
+.time-clock-circle-avatar{
+    width: 100px;
+    min-height: 100px;
+    flex:1 1 auto;
+    .image{
+        display: block;
+        width: 64px;
+        height: 64px;
+        border: 0.5px solid #999999;
+        background-color: #999999;
+        border-radius: 50%;
+        background-size: 100% auto;
+        background-position: center;
+        background-repeat: no-repeat;
+        margin: 12px auto;
+        &.more{
+            background-image: inline-image('../assets/3dot.svg');
+            background-size: auto;
+        }
+    }
+    .name{
+        display: block;
+        margin: 4px;
+        font-size: 16px;
+        text-align: center;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        max-width: 100%;
+        &.more{
+            color: #999999;
+        }
+    }
+}
