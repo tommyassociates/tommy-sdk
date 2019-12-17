@@ -1,0 +1,50 @@
+{
+  "index": {
+    "title": "Time Clock",
+    "active_title": "Active",
+    "today_title": "Today",
+    "more_button": "More",
+    "clock_event_options": ["Clock On","Clock Off", "Start Break", "End Break"],
+    "clock_on_button": "Clock On",
+    "clock_off_button": "Clock Off",
+    "break_on_button": "Start Break",
+    "break_off_button": "End Break"
+  },
+  "settings": {
+    "title": "Settings",
+    "required_title": "Required",
+    "gps_label": "GPS",
+    "photo_label": "Photo",
+    "who_can_edit_title": "Who Can Edit Time Clocking",
+    "who_can_clock_manually_title": "Who Can Manually Clock On/Off",
+    "who_can_clock_title": "Who Can Clock On/Off",
+    "who_can_break_title": "Who Can Start/Stop Breaks"
+  },
+  "search": {
+    "title": "Time Clock Search",
+    "date_label": "Date Range",
+    "notset_label": "Not Set",
+    "active_label": "Active",
+    "date_options": ["Today", "Yesterday"]
+  },
+  "date_range": {
+    "title": "Date Range",
+    "active_label": "Active",
+    "today_label": "Today",
+    "week_label": "This Week",
+    "month_label": "This Month",
+    "custom_label": "Custom",
+    "start_custom_label": "Start Date",
+    "end_custom_label": "End Date"
+  },
+  "event_details": {
+    "title": "Details",
+    "time_label": "Time",
+    "date_label": "Date",
+    "who_label": "Who",
+    "where_label": "Where",
+    "photo_label": "Photo",
+    "action_label": "Action",
+    "delete_button": "Delete"
+  }
+}
