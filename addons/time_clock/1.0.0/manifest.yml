@@ -1,0 +1,29 @@
+---
+  title: "Time Clock"
+  package: "time_clock"
+  summary: "Manage your time."
+  description: "Manage your time."
+  version: "1.0.0"
+  developer: "Tommy Labs GmbH"
+  homepage: "https://mytommy.com"
+  private: false
+  locales:
+    - en-US
+    - zh-CN
+  roles:
+    - Team Member
+    - Team Manager
+    - Team Admin
+  assets:
+    -
+      type: "stylesheet"
+      file: "build/addon.css"
+    -
+      type: "javascript"
+      file: "build/addon.js"
+  views:
+    index:
+      title: "Time Clock"
+      type: "page"
+      index: true
+      path: "/time-clock/"

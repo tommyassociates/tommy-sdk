@@ -1,0 +1,50 @@
+{
+  "index": {
+    "title": "时间表",
+    "active_title": "已经激活",
+    "today_title": "今天",
+    "more_button": "更多",
+    "clock_event_options": ["上班打卡","下班打卡", "开始休息", "结束休息"],
+    "clock_on_button": "上班打卡",
+    "clock_off_button": "下班打卡",
+    "break_on_button": "开始休息",
+    "break_off_button": "结束休息"
+  },
+  "settings": {
+    "title": "设置",
+    "required_title": "必填",
+    "gps_label": "GPS",
+    "photo_label": "照片",
+    "who_can_edit_title": "谁可以编辑时间表",
+    "who_can_clock_manually_title": "谁可以手动打卡",
+    "who_can_clock_title": "谁可以上下班打卡",
+    "who_can_break_title": "谁可以开始/结束休息"
+  },
+  "search": {
+    "title": "打卡搜索",
+    "date_label": "日期区间",
+    "notset_label": "未设置",
+    "active_label": "激活",
+    "date_options": ["今天", "昨天"]
+  },
+  "date_range": {
+    "title": "日期区间",
+    "active_label": "激活",
+    "today_label": "今天",
+    "week_label": "这个星期",
+    "month_label": "这个月",
+    "custom_label": "个性化",
+    "start_custom_label": "开始日期",
+    "end_custom_label": "结束日期"
+  },
+  "event_details": {
+    "title": "细节",
+    "time_label": "时间",
+    "date_label": "日期",
+    "who_label": "谁",
+    "where_label": "地点",
+    "photo_label": "照片",
+    "action_label": "行动",
+    "delete_button": "删除"
+  }
+}
