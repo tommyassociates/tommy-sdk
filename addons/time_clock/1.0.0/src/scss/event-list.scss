@@ -1,0 +1,63 @@
+.list.time-clock-list {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    .item-content {
+      padding: 12px;
+      height: 88px;
+      &:after{
+        content: '';
+        position: absolute;
+        background-color: #D8D8D8;
+        display: block;
+        z-index: 15;
+        top: auto;
+        right: 12px;
+        bottom: 0;
+        left: 12px;
+        height: 1px;
+        transform-origin: 50% 100%;
+      }
+    }
+    &.active{
+      .item-content:after{
+        content: none;
+      }
+    }
+    .item-media {
+      padding: 0 !important;
+      min-height: 64px;
+      align-self: stretch;
+    }
+    .time-clock-item-image {
+      width: 64px;
+      height: 64px;
+      background: #eee;
+      background-size: 100% auto;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+    .item-title {
+      font-size: 20px;
+      font-weight: normal !important;
+    }
+    .description{    
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      color: #666666;
+      font-size: 16px;
+    }
+    .item-inner{
+        margin-left: 12px !important;
+        padding: 0 !important;
+        line-height: normal;
+    }
+    .time{
+        font-size: 18px;
+        text-align: right;
+        margin-left: 12px;
+        white-space: nowrap;
+        line-height: normal;
+        height: 100%;
+    }
+  }
