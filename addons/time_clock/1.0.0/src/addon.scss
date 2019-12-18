@@ -9,7 +9,27 @@ $yellow: #FF7B00;
 
 .time-clock-main-page{
     color: $dark;
+    .toolbar-inner{
+        padding: 0 12px;
+        display: flex;
+        flex-flow: row wrap;
+
+    }
+    .toolbar{
+        &:after{
+            content: '';
+            position: absolute;
+            right: 0;
+            width: 100%;
+            top: auto;
+            bottom: 100%;
+            height: 10px;
+            pointer-events: none;
+            background: linear-gradient(to top,rgba(0,0,0,.3) 0%,rgba(0,0,0,.1) 40%,rgba(0,0,0,.05) 50%,rgba(0,0,0,0) 80%,rgba(0,0,0,0) 100%);
+        }
+    }
 }
+
 .time-clock-active{
     background: #fff;
 }
@@ -22,4 +42,26 @@ $yellow: #FF7B00;
     box-sizing: border-box;
     padding: 8px 12px 2px;
     margin: 0;
+}
+.time-clock-toolbar-button{
+    width: 100%;
+    height: 50px !important;
+    line-height: 50px !important;
+    font-size: 20px !important;
+    border-radius: 6px !important;
+    &:nth-child(2){
+        margin-top: 12px;
+    }
+    &.clock-on{
+        background-color: $green !important;
+    }
+    &.clock-off{
+        background-color: $orange !important;
+    }
+    &.break-on{
+        background-color: $yellow !important;
+    }
+    &.break-off{
+        background-color: $orange !important;
+    }
 }
