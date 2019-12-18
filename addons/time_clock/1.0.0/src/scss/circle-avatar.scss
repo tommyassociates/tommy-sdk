@@ -1,12 +1,11 @@
-.time-clock-avatars-container{
-    display: flex;
-    flex-direction: row;
-}
-
 .time-clock-circle-avatar{
-    width: 100px;
-    min-height: 100px;
-    flex:1 1 auto;
+    display:flex;
+    flex-direction:row;
+    .container{
+        width: 100px;
+        height: 118px;
+        flex:1 1 auto;
+    }
     .image{
         display: block;
         width: 64px;
