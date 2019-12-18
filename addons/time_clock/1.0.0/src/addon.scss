@@ -1,1 +1,25 @@
 @import "./scss/skeleton.scss";
+@import "./scss/circle-avatar.scss";
+@import "./scss/event-list.scss";
+
+$dark: #333333;
+$green: #2EC8A1;
+$orange: #FF4500;
+$yellow: #FF7B00;
+
+.time-clock-main-page{
+    color: $dark;
+}
+.time-clock-active{
+    background: #fff;
+}
+.block-title.time-clock-divider{
+    font-size: 14px;
+    font-weight: normal;
+    background: #e7e6e6;
+    color: #333;
+    height: 32px;
+    box-sizing: border-box;
+    padding: 8px 12px 2px;
+    margin: 0;
+}
