@@ -18,10 +18,8 @@
         transform-origin: 50% 100%;
       }
     }
-    &.active{
-      .item-content:after{
-        content: none;
-      }
+    li:last-child .item-content:after{
+      content: none;
     }
     .item-media {
       padding: 0 !important;
