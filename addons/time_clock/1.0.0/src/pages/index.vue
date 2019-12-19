@@ -12,7 +12,7 @@
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
-    <f7-toolbar :style="toolbarStyle">
+    <f7-toolbar :style="toolbarStyle" class="time-clock-main-toolbar">
       <f7-button raised fill v-if="!clock_on && !break_on" @click="clockOnClick" class="time-clock-toolbar-button clock-on">{{$t('time_clock.index.clock_on_button')}}</f7-button>
       <f7-button raised fill v-if="clock_on && !break_on" @click="clockOffClick" class="time-clock-toolbar-button clock-off">{{$t('time_clock.index.clock_off_button')}}</f7-button>
       <f7-button raised fill v-if="clock_on && !break_on" @click="breakOnClick" class="time-clock-toolbar-button break-on">{{$t('time_clock.index.break_on_button')}}</f7-button>
@@ -40,18 +40,21 @@
         :data="events_data"
       />
     </f7-page-content>
+    <CameraPopup ref="cameraPopup"/>
   </f7-page>
 </template>
 <script>
 import API from "../api";
 import ActiveAvatar from "../components/circle-avatar.vue";
 import Events from "../components/events.vue";
+import CameraPopup from "../components/take-photo.vue";
 
 export default {
   name: 'TimeClock',
   components:{
     ActiveAvatar,
     Events,
+    CameraPopup,
   },
   data() {
     const self = this;
@@ -95,19 +98,28 @@ export default {
   methods: {
     clockOnClick(){
       const self = this;
-      self.clock_on = true;
+      self.$refs.cameraPopup.open(()=>{
+        self.clock_on = true;
+      });
+      
     },
     clockOffClick(){
       const self = this;
-      self.clock_on = false;
+      self.$refs.cameraPopup.open(()=>{
+        self.clock_on = false;
+      });
     },
     breakOnClick(){
       const self = this;
-      self.break_on = true;
+      self.$refs.cameraPopup.open(()=>{
+        self.break_on = true;
+      });
     },
     breakOffClick(){
       const self = this;
-      self.break_on = false;
+      self.$refs.cameraPopup.open(()=>{
+        self.break_on = false;
+      });
     }
   },
   beforeDestroy() {
