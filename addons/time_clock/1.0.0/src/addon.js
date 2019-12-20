@@ -2,6 +2,7 @@ import Index from "./pages/index.vue";
 import Settings from "./pages/settings.vue";
 import Detail from "./pages/detail.vue";
 import Search from "./pages/search.vue";
+import SelectPicker from "./pages/select-picker.vue";
 
 const routes = [
   {
@@ -19,6 +20,10 @@ const routes = [
   {
     path: "/time-clock/search/",
     component: Search,		
+  },
+  {
+    path: "/time-clock/select-picker/",
+    component: SelectPicker,		
   }
 ];
 
