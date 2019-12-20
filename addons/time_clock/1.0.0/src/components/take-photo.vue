@@ -14,7 +14,7 @@
         </f7-nav-left>
       </f7-navbar>
       <f7-toolbar>
-        <f7-button class="back" @click="goBack"></f7-button>
+        <f7-button class="go-back" @click="goBack"></f7-button>
         <f7-button class="shoot" v-if="!photo_taken" @click="takePhoto"></f7-button>
         <f7-button class="send" v-if="photo_taken" @click="sendPhoto"></f7-button>
         <f7-button class="reshoot" v-if="photo_taken" @click="reShoot"></f7-button>
