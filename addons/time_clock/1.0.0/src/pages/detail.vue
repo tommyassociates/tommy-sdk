@@ -226,6 +226,7 @@ export default {
     onPageBeforeRemove() {
       const self = this;
       self.$refs.actionSheet.$destroy();
+      self.calendarInstance.destroy();
     }
   },
   computed: {
