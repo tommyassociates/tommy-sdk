@@ -40,7 +40,7 @@
         :data="events_data"
       />
     </f7-page-content>
-    <CameraPopup ref="cameraPopup" :geolocation="true" @camera:send="getPhotoCamera"/>
+    <CameraPopup ref="cameraPopup" :geolocation="true" @camera:send="getPhotoCamera" @popup:close="popupCameraClose"/>
   </f7-page>
 </template>
 <script>
@@ -118,6 +118,9 @@ export default {
       const self = this;
       self.$refs.cameraPopup.open();
       self.$refs.cameraPopup.$once('camera:send', ()=>{self.break_on = false;})
+    },
+    popupCameraClose(){
+      self.$refs.cameraPopup.$off('camera:send');
     }
   },
   beforeDestroy() {
