@@ -272,8 +272,10 @@ export default {
       self.detail_data = data[0];
       self.loaded = true;
       self.actionListCounter = 4;
-      self.createCalendar();
-      self.createTimePicker(self.detail_data.date);
+      this.$nextTick(()=>{
+        self.createCalendar();
+        self.createTimePicker(self.detail_data.date);
+      });
     });
   },
   created() {
