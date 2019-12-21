@@ -120,6 +120,7 @@ export default {
       self.$refs.cameraPopup.$once('camera:send', ()=>{self.break_on = false;})
     },
     popupCameraClose(){
+      const self = this;
       self.$refs.cameraPopup.$off('camera:send');
     }
   },
