@@ -2,15 +2,16 @@
   <f7-popup
     class="time-clock-camera-popup"
     @popup:opened="popupCameraOpened"
+    @popup:open="popupCameraOpen"
     @popup:close="popupCameraClose"
     @popup:closed="popupCameraClosed"
     ref="cameraPopup"
   >
     <f7-page :page-content="false">
       <f7-navbar>
-        <f7-nav-left>
+        <f7-nav-left v-if="geolocation">
           <div class="geo-icon"></div>
-          <div class="coords">{{geo}}</div>
+          <div class="coords">{{geoCoordinates}}</div>
         </f7-nav-left>
       </f7-navbar>
       <f7-toolbar>
@@ -43,10 +44,15 @@ import resizeImage from "../mixins/resize-image.vue";
 export default {
   name: "TakePhoto",
   mixins: [resizeImage],
+  props:{
+    geolocation:{
+      type: Boolean,
+      default: false
+    }
+  },
   methods: {
-    open(callback) {
+    open() {
       const self = this;
-      self.callback = callback;
       self.$refs.cameraPopup.open();
     },
     takePhoto() {
@@ -67,17 +73,24 @@ export default {
     },
     sendPhoto() {
       const self = this;
-      self.callback();
+      self.$emit('camera:send', self.photo);
       self.$refs.cameraPopup.close();
     },
-    popupCameraOpened() {
+    popupCameraOpened() {      
       const self = this;
+      self.$emit('popup:opened');
+    },
+    popupCameraOpen() {
+      const self = this;
+      self.$emit('popup:open');
     },
     popupCameraClose() {
       const self = this;
+      self.$emit('popup:close');
     },
     popupCameraClosed(){
       const self = this;
+      self.$emit('popup:closed');
       self.clean();
     },
     clean(){
@@ -109,6 +122,9 @@ export default {
       const self = this;
       if (!self.photo) return null;
       return { backgroundImage: 'url("' + self.photo + '")' };
+    },
+    geoCoordinates(){
+
     }
   },
   data() {

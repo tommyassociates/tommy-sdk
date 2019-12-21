@@ -40,7 +40,7 @@
         :data="events_data"
       />
     </f7-page-content>
-    <CameraPopup ref="cameraPopup"/>
+    <CameraPopup ref="cameraPopup" :geolocation="true" @camera:send="getPhotoCamera"/>
   </f7-page>
 </template>
 <script>
@@ -96,30 +96,28 @@ export default {
     }
   },
   methods: {
+    getPhotoCamera(photo){
+
+    },
     clockOnClick(){
       const self = this;
-      self.$refs.cameraPopup.open(()=>{
-        self.clock_on = true;
-      });
-      
+      self.$refs.cameraPopup.open();
+      self.$refs.cameraPopup.$once('camera:send', ()=>{self.clock_on = true;})
     },
     clockOffClick(){
       const self = this;
-      self.$refs.cameraPopup.open(()=>{
-        self.clock_on = false;
-      });
+      self.$refs.cameraPopup.open();
+      self.$refs.cameraPopup.$once('camera:send', ()=>{self.clock_on = false;})
     },
     breakOnClick(){
       const self = this;
-      self.$refs.cameraPopup.open(()=>{
-        self.break_on = true;
-      });
+      self.$refs.cameraPopup.open();
+      self.$refs.cameraPopup.$once('camera:send', ()=>{self.break_on = true;})
     },
     breakOffClick(){
       const self = this;
-      self.$refs.cameraPopup.open(()=>{
-        self.break_on = false;
-      });
+      self.$refs.cameraPopup.open();
+      self.$refs.cameraPopup.$once('camera:send', ()=>{self.break_on = false;})
     }
   },
   beforeDestroy() {
