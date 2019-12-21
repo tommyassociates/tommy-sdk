@@ -3,6 +3,7 @@ import Settings from "./pages/settings.vue";
 import Detail from "./pages/detail.vue";
 import Search from "./pages/search.vue";
 import SelectPicker from "./pages/select-picker.vue";
+import MapPage from "./pages/map.vue";
 
 const routes = [
   {
@@ -24,6 +25,10 @@ const routes = [
   {
     path: "/time-clock/select-picker/",
     component: SelectPicker,		
+  },
+  {
+    path: "/time-clock/map/",
+    component: MapPage,		
   }
 ];
 

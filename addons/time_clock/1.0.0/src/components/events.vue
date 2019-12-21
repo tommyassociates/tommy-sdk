@@ -6,6 +6,7 @@
       :title="item.name" 
       link 
       no-chevron
+      @click="goToDetails(item.id)"
     >
       <div
         slot="media"
@@ -33,6 +34,12 @@ export default {
     active:{
       type: Boolean,
       default: false
+    }
+  },
+  methods:{
+    goToDetails(id){
+      const self = this;
+      if(!self.active) self.$f7router.navigate('/time-clock/detail/'+id);
     }
   }
 };
