@@ -15,7 +15,7 @@ const API = {
     return generateTest(3);
   },
   teamGet() {
-      return generateTest(3);
+      return generateTest(10);
   }
 };
 
