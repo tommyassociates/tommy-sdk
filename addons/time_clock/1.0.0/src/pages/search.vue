@@ -24,6 +24,7 @@
           @searchbar:clear="onSearchbarClear"
           @searchbar:enable="searchEnabled = true"
           @searchbar:disable="searchEnabled = false"
+          ref="searhbar"
         />
       </f7-list>
       <f7-block-title class="time-clock-divider">{{$t('time_clock.search.results_divider')}}</f7-block-title>
@@ -43,6 +44,9 @@ import Events from "../components/events.vue";
 
 export default {
   name: "TimeClockSearch",
+  props:{
+    start_search: String,
+  },
   components: {
     Events
   },
@@ -122,6 +126,11 @@ export default {
   },
   mounted() {
     const self = this;
+    if (self.start_search.length > 0){
+      self.search = self.start_search;
+      self.$refs.searhbar.enable();
+      self.getSearchData(self.start_search);
+    }
   }
 };
 </script>
