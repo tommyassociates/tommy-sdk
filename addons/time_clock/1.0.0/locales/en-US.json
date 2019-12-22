@@ -28,7 +28,8 @@
     "date_options": ["Today", "Yesterday"],
     "search_placeholder": "Search Member, Role, Location…",
     "search_disable_button": "Cancel",
-    "results_divider": "Search Result"
+    "results_divider": "Search Result",
+    "not_found": "Not found"
   },
   "date_range": {
     "title": "Date Range",

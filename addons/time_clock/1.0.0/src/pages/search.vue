@@ -28,7 +28,12 @@
       </f7-list>
       <f7-block-title class="time-clock-divider">{{$t('time_clock.search.results_divider')}}</f7-block-title>
       <!--Events -->
-      <Events :data="events_data" v-if="loaded"/>
+      <template v-if="loaded">
+        <Events :data="events_data" v-if="events_data.length > 0"/>
+        <div class="not-found" v-if="events_data.length === 0"><p>{{$t('time_clock.search.not_found')}}</p></div>
+      </template>
+      <template v-if="!loaded">
+      </template>
     </f7-page-content>
   </f7-page>
 </template>
