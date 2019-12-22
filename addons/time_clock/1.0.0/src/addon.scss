@@ -144,6 +144,15 @@ $yellow: #FF7B00;
         color: #999;
     }
 }
+.time-clock-search-page{
+    .not-found{
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #333;
+        font-size: 22px;
+    }
+}
 .time-clock-range-page{
     .list{
         margin: 0 !important;

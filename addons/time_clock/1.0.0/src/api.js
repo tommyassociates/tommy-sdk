@@ -12,7 +12,7 @@ const API = {
       return generateTest(25);
   },
   eventsSearch(val) {
-    return generateTest(25);
+    return generateTest(0);
   },
   teamGet() {
       return generateTest(3);

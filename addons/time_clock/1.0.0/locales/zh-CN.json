@@ -28,7 +28,8 @@
     "date_options": ["今天", "昨天"],
     "search_placeholder": "Search Member, Role, Location…",
     "search_disable_button": "取消",
-    "results_divider": "Search Result"
+    "results_divider": "Search Result",
+    "not_found": "Not found"
   },
   "date_range": {
     "title": "日期区间",
