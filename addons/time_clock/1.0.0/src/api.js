@@ -11,6 +11,9 @@ const API = {
   eventsGet() {
       return generateTest(25);
   },
+  eventsSearch(val) {
+    return generateTest(25);
+  },
   teamGet() {
       return generateTest(3);
   }
@@ -34,7 +37,9 @@ function generateTest(length) {
       obj.id = Math.floor(Math.random() * 1000);
       test_array.push(obj)
     }
-    resolve(test_array)
+    setTimeout(() => {
+      resolve(test_array)
+    }, 1000+Math.random()*1000)    
   })
   return promise;
 }
