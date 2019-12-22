@@ -27,7 +27,8 @@
     "active_label": "激活",
     "date_options": ["今天", "昨天"],
     "search_placeholder": "Search Member, Role, Location…",
-    "search_disable_button": "取消"
+    "search_disable_button": "取消",
+    "results_divider": "Search Result"
   },
   "date_range": {
     "title": "日期区间",

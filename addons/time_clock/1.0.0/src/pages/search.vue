@@ -26,7 +26,7 @@
           @searchbar:disable="searchEnabled = false"
         />
       </f7-list>
-      <f7-block-title class="time-clock-divider">Result</f7-block-title>
+      <f7-block-title class="time-clock-divider">{{$t('time_clock.search.results_divider')}}</f7-block-title>
       <!--Events -->
       <Events :data="events_data" v-if="loaded"/>
     </f7-page-content>
