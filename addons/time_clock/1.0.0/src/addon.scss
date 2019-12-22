@@ -143,9 +143,31 @@ $yellow: #FF7B00;
     .cancel{
         color: #999;
     }
+}
+.time-clock-range-page{
+    .list{
+        margin: 0 !important;
+    }
+    
+    .item-content{
+        height: 50px;
+    }
+    .item-title{
+        font-size: 18px;
+        color: #333333;
+    }
+    .item-after{
+        font-size: 16px !important;
+        color: #999 !important;
+    }
+    .custom{
+        margin-top: 12px !important;
+    }
 }   
 .form-radio input[type="radio"]:checked~i,
 label.label-radio input[type="checkbox"]:checked~.item-inner,
 label.label-radio input[type="radio"]:checked~.item-inner {
   @include encoded-svg-background("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 10'><polygon fill='${orange}' points='11.6,0 4.4,7.2 1.4,4.2 0,5.6 4.4,10 4.4,10 4.4,10 13,1.4 '/></svg>");
 }
+
+@import "./scss/searchbar.scss";

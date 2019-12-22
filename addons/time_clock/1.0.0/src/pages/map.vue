@@ -3,7 +3,7 @@
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('time_clock.event_details.where_label')}}</f7-nav-title>
-      <f7-nav-right class="whs-navbar-links">
+      <f7-nav-right>
         <f7-link icon-only @click="editGeo" v-if="edit || justAdd">
           <f7-icon f7="check" />
         </f7-link>

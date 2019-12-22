@@ -25,7 +25,9 @@
     "date_label": "Date Range",
     "notset_label": "Not Set",
     "active_label": "Active",
-    "date_options": ["Today", "Yesterday"]
+    "date_options": ["Today", "Yesterday"],
+    "search_placeholder": "Search Member, Role, Location…",
+    "search_disable_button": "Cancel"
   },
   "date_range": {
     "title": "Date Range",
@@ -34,6 +36,7 @@
     "week_label": "This Week",
     "month_label": "This Month",
     "custom_label": "Custom",
+    "notset_label": "Not Set",
     "start_custom_label": "Start Date",
     "end_custom_label": "End Date"
   },
