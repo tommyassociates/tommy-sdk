@@ -4,6 +4,7 @@ import Detail from "./pages/detail.vue";
 import Search from "./pages/search.vue";
 import SelectPicker from "./pages/select-picker.vue";
 import MapPage from "./pages/map.vue";
+import DateRange from "./pages/date-range.vue";
 
 const routes = [
   {
@@ -29,6 +30,10 @@ const routes = [
   {
     path: "/time-clock/map/",
     component: MapPage,		
+  },
+  {
+    path: "/time-clock/date-range/",
+    component: DateRange,		
   }
 ];
 
