@@ -1,6 +1,7 @@
 .time-clock-circle-avatar{
     display:flex;
     flex-direction:row;
+    overflow: scroll;
     .container{
         width: 100px;
         height: 118px;
