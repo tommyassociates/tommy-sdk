@@ -27,7 +27,8 @@
     "active_label": "Active",
     "date_options": ["Today", "Yesterday"],
     "search_placeholder": "Search Member, Role, Location…",
-    "search_disable_button": "Cancel"
+    "search_disable_button": "Cancel",
+    "results_divider": "Search Result"
   },
   "date_range": {
     "title": "Date Range",
