@@ -14,15 +14,8 @@
           <div class="coords">{{geoCoordinates}}</div>
         </f7-nav-left>
       </f7-navbar>
-      <f7-toolbar>
-        <f7-button class="go-back" @click="goBack"></f7-button>
-        <f7-button class="shoot" v-if="!photo_taken" @click="takePhoto"></f7-button>
-        <f7-button class="send" v-if="photo_taken" @click="sendPhoto"></f7-button>
-        <f7-button class="reshoot" v-if="photo_taken" @click="reShoot"></f7-button>
-        <div class="empty-button" v-if="!photo_taken"></div>
-      </f7-toolbar>
       <f7-page-content>
-        <div class="image-camera-container" :style="imageContainerStyle">
+        <div :class="['image-camera-container', portrait ? 'portrait':'landscape']" :style="imageContainerStyle">
           <input
             type="file"
             :multiple="false"
@@ -31,6 +24,13 @@
             v-if="!cordova && !photo_taken"
             ref="inputFile"
           />
+          <div class="control-buttons-container">
+            <f7-button class="go-back" @click="goBack"></f7-button>
+            <f7-button class="shoot" v-if="!photo_taken" @click="takePhoto"></f7-button>
+            <f7-button class="send" v-if="photo_taken" @click="sendPhoto"></f7-button>
+            <f7-button class="reshoot" v-if="photo_taken" @click="reShoot"></f7-button>
+            <div class="empty-button" v-if="!photo_taken"></div>
+          </div>
         </div>
       </f7-page-content>
     </f7-page>
@@ -79,10 +79,12 @@ export default {
     popupCameraOpened() {      
       const self = this;
       self.$emit('popup:opened');
+      window.addEventListener('resize', self.orientationChange);
     },
     popupCameraOpen() {
       const self = this;
       self.$emit('popup:open');
+      self.orientationChange();
     },
     popupCameraClose() {
       const self = this;
@@ -93,11 +95,12 @@ export default {
       self.$emit('popup:closed');
       self.clean();
     },
-    clean(){
+    clean(){      
       const self = this;
       self.photo_taken = false;
       self.photo = null;
       self.geo = null;
+      window.removeEventListener('resize', self.orientationChange);
     },
     onFilesChange(e) {
       const self = this;
@@ -115,6 +118,14 @@ export default {
         };
         reader.readAsDataURL(file);
       }
+    },
+    orientationChange() {
+      const self = this;
+      let new_portrait = true;
+      if(window.innerWidth > window.innerHeight) {
+        new_portrait = false;
+      }
+      if (new_portrait !== self.portrait) self.portrait = new_portrait;
     }
   },
   computed: {
@@ -125,11 +136,18 @@ export default {
     },
     geoCoordinates(){
 
-    }
+    },
+  },
+  created(){
+    const self = this;    
+  },
+  beforeDestroy(){
+    window.removeEventListener('resize', self.orientationChange);
   },
   data() {
     const self = this;
     return {
+      portrait: true,
       photo_taken: false,
       photo: null,
       geo: null,
