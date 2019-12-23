@@ -45,7 +45,10 @@ import Events from "../components/events.vue";
 export default {
   name: "TimeClockSearch",
   props:{
-    start_search: String,
+    start_search: {
+      type: String,
+      default: null,
+    }
   },
   components: {
     Events
@@ -126,7 +129,7 @@ export default {
   },
   mounted() {
     const self = this;
-    if (self.start_search.length > 0){
+    if (self.start_search){
       self.search = self.start_search;
       self.$refs.searhbar.enable();
       self.getSearchData(self.start_search);
