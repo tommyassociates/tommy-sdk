@@ -10,57 +10,12 @@
         background-repeat: no-repeat;
         background-position: center center;
     }
-    .toolbar{
-        background-color: #333;
-        height: 110px;
-        &:after{
-            content: '';
-            position: absolute;
-            right: 0;
-            width: 100%;
-            top: auto;
-            bottom: 100%;
-            height: 10px;
-            pointer-events: none;
-            background: linear-gradient(to top,rgba(0,0,0,.3) 0%,rgba(0,0,0,.1) 40%,rgba(0,0,0,.05) 50%,rgba(0,0,0,0) 80%,rgba(0,0,0,0) 100%);
-        }
-        .toolbar-inner{
-            padding: 0 40px;
-            .empty-button{
-                width: 50px;
-                height: 50px;
-            }
-        }
-        .button{
-            border: none;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            background-color: #fff;
-            background-position: center center;
-            background-repeat: no-repeat;
-            &.shoot{
-                width: 80px;
-                height: 80px;
-                background-color: #333;
-                background-image: inline-image('../assets/photo-shoot.svg');
-            }
-            &.send{
-                width: 80px;
-                height: 80px;
-                background-image: inline-image('../assets/photo-send.svg');
-            }
-            &.go-back{
-                background-image: inline-image('../assets/photo-back.svg');
-            }
-            &.reshoot{
-                background-image: inline-image('../assets/photo-reshoot.svg');
-            }
-        }
-    }
     .page-content{
-        padding-bottom: 110px !important;
-        padding-top: 0 !important;
+        padding: 0 !important;
+        background-color: #000;
+        input{
+            color: #fff;
+        }
         .image-camera-container{
             display: flex;
             justify-content: center;
@@ -68,9 +23,68 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-size: 100% auto;
+            background-size: auto auto;
             background-position: center;
             background-repeat: no-repeat;
+            .empty-button{
+                width: 50px;
+                height: 50px;
+            }
+            .control-buttons-container{
+                display: flex;
+                z-index: 15;
+                position: absolute;
+                align-items: center;
+                align-content: center;
+                justify-content: space-between;
+            }            
+            &.portrait{
+                .control-buttons-container{                    
+                    bottom: 0;
+                    left: 40px;
+                    right: 40px;
+                    height: 110px;                    
+                    width: auto;
+                    flex-direction: row;
+                }
+            }
+            &.landscape{
+                .control-buttons-container{
+                    position: absolute;
+                    right: 0;
+                    top: 40px;
+                    bottom: 40px;
+                    height: auto;
+                    width: 110px;
+                    flex-direction: column;
+                }
+            }
+            .button{
+                border: none;
+                border-radius: 50%;
+                width: 50px;
+                height: 50px;
+                background-color: #ffffffd9;
+                background-position: center center;
+                background-repeat: no-repeat;
+                &.shoot{
+                    width: 80px;
+                    height: 80px;
+                    background-color: #333;
+                    background-image: inline-image('../assets/photo-shoot.svg');
+                }
+                &.send{
+                    width: 80px;
+                    height: 80px;
+                    background-image: inline-image('../assets/photo-send.svg');
+                }
+                &.go-back{
+                    background-image: inline-image('../assets/photo-back.svg');
+                }
+                &.reshoot{
+                    background-image: inline-image('../assets/photo-reshoot.svg');
+                }
+            }
         }
     }
 }
