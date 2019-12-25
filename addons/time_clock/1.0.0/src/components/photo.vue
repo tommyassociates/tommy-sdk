@@ -1,7 +1,80 @@
+<template>
+  <div class="camera-input-file" style="display: none">
+    <input
+      type="file"
+      :multiple="false"
+      @change="onFileCameraChange"
+      accept="image/*"
+      v-if="!isCordova"
+      ref="inputFileCamera"
+    />
+  </div>
+</template>
+
 <script>
 export default {
+  props:{
+    direction:{
+      type: String,
+      default: 'BACK'
+    }
+  },
   methods: {
-    resizeImage(base64image, width = 1080, height = 1080) {
+    takePhoto() {
+      const self = this;
+      if (self.isCordova) {
+        self.openCamera();
+      } else {
+        self.$refs.inputFileCamera.click();
+      }
+    },
+    openCamera() {
+      const self = this;
+      var srcType = Camera.PictureSourceType.CAMERA;      
+      const options = {
+        quality: 85,
+        targetHeight: 1080,
+        targetWidth: 1080,
+        destinationType: Camera.DestinationType.DATA_URL,
+        sourceType: Camera.PictureSourceType.CAMERA,
+        encodingType: Camera.EncodingType.JPEG,
+        mediaType: Camera.MediaType.PICTURE,
+        allowEdit: false,
+        correctOrientation: true,
+        saveToPhotoAlbum: false,
+      }
+      options.cameraDirection = Camera.Direction[String(self.direction).toUpperCase()];
+      navigator.camera.getPicture(
+        //cameraSuccess
+        (image)=>{
+          self.$emit("photo:send", image);
+          navigator.camera.cleanup();
+        },
+        //cameraError
+        (error) => {
+          console.debug("Unable to obtain picture: " + error, "app");
+          navigator.camera.cleanup();
+        },
+        options
+      );
+    },
+    onFileCameraChange(e) {
+      const self = this;
+      const files = e.target.files;
+      if (!files.length) return;
+      for (let i = 0; i < files.length; i += 1) {
+        const file = files[i];
+        const reader = new FileReader();
+        reader.onload = () => {
+          self.photo_taken = true;
+          self.resizeImageCamera(reader.result).then(data => {
+            self.$emit("photo:send", data);
+          });
+        };
+        reader.readAsDataURL(file);
+      }
+    },
+    resizeImageCamera(base64image, width = 1080, height = 1080) {
       let img = new Image();
       img.src = base64image;
 
@@ -83,6 +156,12 @@ export default {
         };
       });
     }
-  }
+  },
+  data(){
+    const self = this;
+    return{
+      isCordova: self.$f7.device.cordova
+    }
+  },
 };
 </script>
