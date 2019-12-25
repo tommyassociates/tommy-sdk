@@ -2,8 +2,22 @@ const tommy = window.tommy;
 const api = tommy.api;
 
 const API = {
+  actor: undefined,
+  actorId: undefined,
   activeGet() {
       return generateTest(1);
+  },
+  getTest(data = null, cache = true) { 
+    return api
+      .call({
+        endpoint: "workforce",
+        method: "GET",
+        cache: cache,
+        data
+      })
+      .then(data => {
+        return data;
+      });
   },
   detailGet() {
       return generateTest(1);

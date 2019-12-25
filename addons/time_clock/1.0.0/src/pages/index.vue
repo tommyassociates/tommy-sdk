@@ -39,22 +39,22 @@
       <Events 
         :data="events_data"
       />
+      <Photo ref="photo" direction="front"/>
     </f7-page-content>
-    <CameraPopup ref="cameraPopup" :geolocation="true" @camera:send="getPhotoCamera" @popup:close="popupCameraClose"/>
   </f7-page>
 </template>
 <script>
 import API from "../api";
 import ActiveAvatar from "../components/circle-avatar.vue";
 import Events from "../components/events.vue";
-import CameraPopup from "../components/take-photo.vue";
+import Photo from "../components/photo.vue";
 
 export default {
   name: 'TimeClock',
   components:{
     ActiveAvatar,
     Events,
-    CameraPopup,
+    Photo
   },
   data() {
     const self = this;
@@ -64,10 +64,18 @@ export default {
       active_data: [],
       events_data: [],
       team_data: [],
+      actorId: self.$f7route.query.actor_id,
     };
   },
   created() {
     const self = this;
+    if (self.actorId) {
+      API.actorId = parseInt(self.actorId, 10);
+      API.actor = self.actor;
+    } else {
+      delete API.actorId;
+      delete API.actor;
+    }
   },
   computed: {
     pageContentStyle(){
@@ -96,39 +104,34 @@ export default {
     }
   },
   methods: {
-    getPhotoCamera(photo){
-
-    },
     clockOnClick(){
       const self = this;
-      self.$refs.cameraPopup.open();
-      self.$refs.cameraPopup.$once('camera:send', ()=>{self.clock_on = true;})
+      self.$refs.photo.takePhoto();
+      self.$refs.photo.$once('photo:send', (photo)=>{self.clock_on = true;})
     },
     clockOffClick(){
       const self = this;
-      self.$refs.cameraPopup.open();
-      self.$refs.cameraPopup.$once('camera:send', ()=>{self.clock_on = false;})
+      self.$refs.photo.takePhoto();
+      self.$refs.photo.$once('photo:send', (photo)=>{self.clock_on = false;})
     },
     breakOnClick(){
       const self = this;
-      self.$refs.cameraPopup.open();
-      self.$refs.cameraPopup.$once('camera:send', ()=>{self.break_on = true;})
+      //gps 
+      //self.$refs.photo.$once('photo:send', (photo)=>{self.break_on = true;})
     },
     breakOffClick(){
       const self = this;
-      self.$refs.cameraPopup.open();
-      self.$refs.cameraPopup.$once('camera:send', ()=>{self.break_on = false;})
+      //gps 
+      //self.$refs.photo.$once('photo:send', (photo)=>{self.break_on = false;})
     },
-    popupCameraClose(){
-      const self = this;
-      self.$refs.cameraPopup.$off('camera:send');
-    }
   },
   beforeDestroy() {
     const self = this;
+    self.$refs.photo.$off('camera:send');
   },
   mounted() {
     const self = this;
+   // API.getTest().then(data => console.log("TCL: mounted -> data", data));    
     API.activeGet().then(data => self.active_data = data);
     API.teamGet().then(data => self.team_data = data);
     API.eventsGet().then(data => self.events_data = data);

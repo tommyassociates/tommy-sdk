@@ -65,7 +65,6 @@
         @click="sheet_action_opened = true"
       ></f7-list-item>
     </f7-list>
-    <CameraPopup ref="cameraPopup" @camera:send="getPhotoCamera" />
     <f7-sheet class="time-clock-action-sheet" ref="actionSheet" >
       <f7-toolbar>
         <div class="left">
@@ -102,13 +101,11 @@
 import API from "../api";
 import dialog from "../mixins/dialog.vue";
 import timePicker from "../mixins/time-picker.vue";
-import CameraPopup from "../components/take-photo.vue";
 
 export default {
   name: "DetailActivity",
   mixins: [dialog, timePicker],
   components: {
-    CameraPopup
   },
   methods: {
     changeAction(val) {

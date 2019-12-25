@@ -1,7 +1,6 @@
 @import "./scss/skeleton.scss";
 @import "./scss/circle-avatar.scss";
 @import "./scss/event-list.scss";
-@import "./scss/camera-popup.scss";
 @import "./scss/select-list.scss";
 
 $dark: #333333;
@@ -177,6 +176,10 @@ $yellow: #FF7B00;
 label.label-radio input[type="checkbox"]:checked~.item-inner,
 label.label-radio input[type="radio"]:checked~.item-inner {
   @include encoded-svg-background("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 10'><polygon fill='${orange}' points='11.6,0 4.4,7.2 1.4,4.2 0,5.6 4.4,10 4.4,10 4.4,10 13,1.4 '/></svg>");
+}
+
+.time-clock-settings-page{
+    
 }
 
 @import "./scss/searchbar.scss";
