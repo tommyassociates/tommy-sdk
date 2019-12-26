@@ -52,6 +52,7 @@ export default {
         },
         //cameraError
         (error) => {
+          self.$app.notify("Unable to obtain picture: " + error, "app");
           console.debug("Unable to obtain picture: " + error, "app");
           navigator.camera.cleanup();
         },
