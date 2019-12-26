@@ -8,7 +8,11 @@
     "clock_on_button": "Clock On",
     "clock_off_button": "Clock Off",
     "break_on_button": "Start Break",
-    "break_off_button": "End Break"
+    "break_off_button": "End Break",
+    "geo_loading": "Geolocation loading",
+    "geo": "Geolocation",
+    "photo": "Photo",
+    "sending": "Sending"
   },
   "settings": {
     "title": "Settings",

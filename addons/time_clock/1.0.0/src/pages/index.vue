@@ -40,6 +40,7 @@
         :data="events_data"
       />
       <Photo ref="photo" direction="front"/>
+      <Geo ref="geo" />
     </f7-page-content>
   </f7-page>
 </template>
@@ -48,13 +49,15 @@ import API from "../api";
 import ActiveAvatar from "../components/circle-avatar.vue";
 import Events from "../components/events.vue";
 import Photo from "../components/photo.vue";
+import Geo from "../components/geo.vue";
 
 export default {
   name: 'TimeClock',
   components:{
     ActiveAvatar,
     Events,
-    Photo
+    Photo,
+    Geo
   },
   data() {
     const self = this;
@@ -107,11 +110,13 @@ export default {
     clockOnClick(){
       const self = this;
       self.$refs.photo.takePhoto();
+      self.$refs.geo.takeGeo();
       self.$refs.photo.$once('photo:send', (photo)=>{self.clock_on = true;})
     },
     clockOffClick(){
       const self = this;
       self.$refs.photo.takePhoto();
+      self.$refs.geo.takeGeo();
       self.$refs.photo.$once('photo:send', (photo)=>{self.clock_on = false;})
     },
     breakOnClick(){
