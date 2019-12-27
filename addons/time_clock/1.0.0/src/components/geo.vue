@@ -6,15 +6,20 @@ export default {
     dialog: {
       type: Boolean,
       default: true
+    },
+    getStret: {
+      type: Boolean,
+      default: true
     }
   },
   methods: {
     takeGeo() {
       const self = this;
 
-      if(self.dialog) self.dialogProgress = self.$f7.dialog.progress(
-        self.$t("time_clock.index.geo_loading")
-      );
+      if (self.dialog)
+        self.dialogProgress = self.$f7.dialog.progress(
+          self.$t("time_clock.index.geo_loading")
+        );
       navigator.geolocation.getCurrentPosition(self.onSuccess, self.onError, {
         maximumAge: 600000,
         timeout: 5000,
@@ -23,15 +28,53 @@ export default {
     },
     onSuccess(position) {
       const self = this;
-      if(self.dialog) self.dialogProgress.close();
-      self.$emit("geo:taken", position.coords);
+      if (self.dialog) self.dialogProgress.close();
+      if (self.getStret) {
+        position.coords.name = '';
+        self.getStreetName(position.coords);
+      } else {
+        self.$emit("geo:taken", position.coords);
+      }
     },
     onError(error) {
       const self = this;
-      if(self.dialog) self.dialogProgress.close();
+      if (self.dialog) self.dialogProgress.close();
       self.$emit("geo:error", error);
       self.$app.notify(error.message);
       console.debug("Take geocordinates error: " + error.message);
+    },
+    getStreetName(coords) {
+      const self = this;
+      self.$f7.request({
+        url: "https://nominatim.openstreetmap.org/reverse",
+        dataType: "json",
+        cache: false,
+        data: {
+          lat: coords.latitude,
+          lon: coords.longitude,
+          format: "json",
+          "accept-language": self.$tommy.config.locale
+        },
+        success: result => {
+          let name = [];
+          if (result.address.city) name.push(result.address.city);
+          if (result.address.village) name.push(result.address.village);
+          if (result.address.road) name.push(result.address.road);
+          if (result.address.house_number)
+            name.push(result.address.house_number);
+          if (name.length > 0) {
+            name = name.join(", ");
+          } else {
+            name = '';
+          }
+          coords.name = name;
+          self.$emit("geo:taken", coords);
+        },
+        error: error => {
+          coords.name = '';
+          self.$emit("geo:taken", coords);
+        }
+      });
     }
   },
   data() {
