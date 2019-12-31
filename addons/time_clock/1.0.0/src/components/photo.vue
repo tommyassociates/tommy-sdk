@@ -13,10 +13,10 @@
 
 <script>
 export default {
-  props:{
-    direction:{
+  props: {
+    direction: {
       type: String,
-      default: 'BACK'
+      default: "BACK"
     }
   },
   methods: {
@@ -24,13 +24,26 @@ export default {
       const self = this;
       if (self.isCordova) {
         self.openCamera();
+        window.addEventListener("focus", self.CordovaCameraCheck, false);        
+        
       } else {
+        //wath the file form
+        window.addEventListener("focus", self.FileCameraCheck, false);
         self.$refs.inputFileCamera.click();
       }
     },
+    takePhotoAsync() {
+      const self = this;
+      const photoPromise = new Promise((resolve, reject) => {
+        self.resolvePromise = resolve;
+        self.rejectPromise = reject;
+      });
+      self.takePhoto();
+      return photoPromise;
+    },
     openCamera() {
       const self = this;
-      var srcType = Camera.PictureSourceType.CAMERA;      
+      var srcType = Camera.PictureSourceType.CAMERA;
       const options = {
         quality: 85,
         targetHeight: 1080,
@@ -41,19 +54,23 @@ export default {
         mediaType: Camera.MediaType.PICTURE,
         allowEdit: false,
         correctOrientation: true,
-        saveToPhotoAlbum: false,
-      }
-      options.cameraDirection = Camera.Direction[String(self.direction).toUpperCase()];
+        saveToPhotoAlbum: false
+      };
+      options.cameraDirection =
+        Camera.Direction[String(self.direction).toUpperCase()];
       navigator.camera.getPicture(
         //cameraSuccess
-        (image)=>{
+        image => {
+          self.photo_taken = true;
           self.$emit("photo:send", image);
+          if (typeof self.resolvePromise === "function") self.resolvePromise(image);
           navigator.camera.cleanup();
         },
         //cameraError
-        (error) => {
+        error => {
           self.$app.notify("Unable to obtain picture: " + error, "app");
           console.debug("Unable to obtain picture: " + error, "app");
+          if (typeof self.rejectPromise === "function") self.rejectPromise(error);
           navigator.camera.cleanup();
         },
         options
@@ -70,10 +87,39 @@ export default {
           self.photo_taken = true;
           self.resizeImageCamera(reader.result).then(data => {
             self.$emit("photo:send", data);
+            if (typeof self.resolvePromise === "function")
+              self.resolvePromise(data);
           });
+        };
+        reader.error = error => {
+          self.$emit("photo:error", error);
+          if (typeof self.rejectPromise === "function")
+            self.rejectPromise(error);
         };
         reader.readAsDataURL(file);
       }
+    },
+    FileCameraCheck(e) {
+      const self = this;
+      setTimeout(() => {
+        if (self.$refs.inputFileCamera.value.length === 0) {
+          self.$emit("photo:error", "Photo not taken");
+           window.removeEventListener("focus", self.FileCameraCheck, false);
+          if (typeof self.rejectPromise === "function")
+            self.rejectPromise("Photo not taken");
+        }
+      }, 300);
+    },
+    CordovaCameraCheck(e) {
+      const self = this;
+      setTimeout(() => {
+        if (photo_taken === false) {
+          self.$emit("photo:error", "Photo not taken");
+           window.removeEventListener("focus", self.CordovaCameraCheck, false);
+          if (typeof self.rejectPromise === "function")
+            self.rejectPromise("Photo not taken");
+        }
+      }, 300);
     },
     resizeImageCamera(base64image, width = 1080, height = 1080) {
       let img = new Image();
@@ -158,11 +204,12 @@ export default {
       });
     }
   },
-  data(){
+  data() {
     const self = this;
-    return{
+    return {
+      photo_taken: false,
       isCordova: self.$f7.device.cordova
-    }
-  },
+    };
+  }
 };
 </script>
