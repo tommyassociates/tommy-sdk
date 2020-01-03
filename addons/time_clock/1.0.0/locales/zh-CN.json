@@ -4,7 +4,12 @@
     "active_title": "已经激活",
     "today_title": "今天",
     "more_button": "更多",
-    "clock_event_options": ["上班打卡","下班打卡", "开始休息", "结束休息"],
+    "clock_event_options":{
+      "start": "上班打卡",
+      "stop": "下班打卡",
+      "pause": "开始休息",
+      "resume": "结束休息"
+    },
     "clock_on_button": "上班打卡",
     "clock_off_button": "下班打卡",
     "break_on_button": "开始休息",

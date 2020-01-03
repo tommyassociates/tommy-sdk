@@ -4,7 +4,12 @@
     "active_title": "Active",
     "today_title": "Today",
     "more_button": "More",
-    "clock_event_options": ["Clock On","Clock Off", "Start Break", "End Break"],
+    "clock_event_options":{
+      "start": "Clock On",
+      "stop": "Clock Off",
+      "pause": "Start Break",
+      "resume": "End Break"
+    },
     "clock_on_button": "Clock On",
     "clock_off_button": "Clock Off",
     "break_on_button": "Start Break",
