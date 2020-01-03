@@ -2,18 +2,68 @@ const tommy = window.tommy;
 const api = tommy.api;
 
 const API = {
-  actor: undefined,
-  actorId: undefined,
-  activeGet() {
-      return generateTest(1);
-  },
+  user_id: undefined,
+  shifts_active_id: undefined,
   getTest(data = null, cache = true) { 
     return api
       .call({
-        endpoint: "workforce",
+        //endpoint: "workforce/timesheets",
+        //endpoint: "workforce/shifts/active",
+        //endpoint: "workforce/attendances/active",
+        endpoint: "workforce/attendances/active",
         method: "GET",
         cache: cache,
         data
+      })
+      .then(data => {
+        return data;
+      });
+  },/*
+  postTestEvent(data = null, cache = true) {
+    let date = new Date();
+    date.setHours(date.getHours() - 1);
+    let date7 = new Date();
+    date7.setDate(date7.getDate() + 7);
+
+    data = {
+      user_id: 3,
+      team_id: 1,
+      title: "Test event",
+      location: "Test location",
+      start_at: date.toISOString(),
+      end_at: date7.toISOString(),
+      reminder: null,
+      details: null,
+      color: null,
+      duration: 54000,
+      resource_id: 123,
+      resource_type: "VendorOrder",
+      assignee_id: 3,
+      assignee_team_id: null,
+      addon_install_id: null,
+      created_at: date.toISOString(),
+      updated_at: date.toISOString(),
+    } 
+    return api
+      .call({
+        //endpoint: "workforce/timesheets",
+        //endpoint: "workforce/shifts/active",
+        //endpoint: "workforce/attendances/active",
+        endpoint: "workforce/shifts",
+        method: "POST",
+        cache: false,
+        data
+      })
+      .then(data => {
+        return data;
+      });
+  },*/
+  getShiftActive(){
+    return api
+      .call({
+        endpoint: "workforce/shifts/active",
+        method: "GET",
+        cache: false,
       })
       .then(data => {
         return data;
@@ -22,14 +72,44 @@ const API = {
   detailGet() {
       return generateTest(1);
   },
-  eventsGet() {
-      return generateTest(25);
+  getAttendances(data = null, cache = true) {
+      return api
+      .call({
+        endpoint: "workforce/attendances",
+        method: "GET",
+        cache: cache,
+        data,
+      })
+      .then(data => {
+        return data;
+      });
+  },
+  getAttendancesActive(data = null, cache = true) {
+      return api
+      .call({
+        endpoint: "workforce/attendances/active",
+        method: "GET",
+        cache: cache,
+        data,
+      })
+      .then(data => {
+        return data;
+      });
+  },
+  setAttendances(data){
+    return api
+    .call({
+      endpoint: "workforce/attendances",
+      method: "POST",
+      cache: false,
+      data,
+    })
+    .then(data => {
+      return data;
+    });
   },
   eventsSearch(val) {
     return generateTest(3);
-  },
-  teamGet() {
-      return generateTest(10);
   }
 };
 
