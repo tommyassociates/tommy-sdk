@@ -20,7 +20,7 @@
       <f7-list-item
         :title="$t('time_clock.event_details.time_label')"
         :link="edit_acces"
-        @click="openTimePicker()"
+        @click.native="openTimePicker()"
       >
         <div slot="after">
           <input type="text" id="timePicker" readonly />
@@ -29,13 +29,13 @@
       <f7-list-item
         :title="$t('time_clock.event_details.date_label')"
         :link="edit_acces"
-        @click="openCalendar()"
+        @click.native="openCalendar()"
         :after="dateField"
       ></f7-list-item>
       <f7-list-item
         :title="$t('time_clock.event_details.who_label')"
         :link="edit_acces"
-        @click="openSelector()"
+        @click.native="openSelector()"
       >
         <div slot="after" class="after-container">
           <div class="name">{{detail_data.user_name}}</div>
@@ -46,16 +46,16 @@
         :title="$t('time_clock.event_details.where_label')"
         :link="edit_acces"
         :after="detail_data.address"
-        @click="openMapPage"
+        @click.native="openMapPage"
       ></f7-list-item>
       <f7-list-item
         :title="$t('time_clock.event_details.photo_label')"
         :link="edit_acces"
-        @click="openCamera()"
+        @click.native="openCamera()"
         v-if="detail_data.status === 'start' || detail_data.status === 'stop'"
       >
         <div slot="after" class="after-container">
-          <div class="image" :style></div>
+          <div class="image"></div>
         </div>
       </f7-list-item>
       <f7-list-item
@@ -247,6 +247,7 @@ export default {
     },
     openCalendar() {
       const self = this;
+      console.log("TCL: openCalendar -> self", self)
       self.calendarInstance.open();
     },
     createCalendar() {
@@ -301,11 +302,11 @@ export default {
   },
   mounted() {
     const self = this;
-    API.getAttendancesDetail(self.edit_id).then(data => {
-      console.log("TCL: getAttendancesDetail -> data", data);
+    API.getAttendancesDetail(self.edit_id).then(data => {      
       self.detail_data = self.prepareAttendance(data);
+      console.log("TCL: mounted -> self.detail_data", self.detail_data)
       self.loaded = true;
-      this.$nextTick(() => {
+      self.$nextTick(() => {
         self.createCalendar();
         self.createTimePicker(self.detail_data.created_at);
       });
