@@ -3,6 +3,11 @@
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{pageTitle}}</f7-nav-title>
+      <f7-nav-right>
+        <f7-link icon-only @click="saveSelected()" v-if="changet">
+          <f7-icon f7="check" />
+        </f7-link>
+      </f7-nav-right>
       <f7-subnavbar :inner="false">
         <f7-searchbar :init="false"></f7-searchbar>
       </f7-subnavbar>
@@ -24,8 +29,8 @@ import SelectList from "../components/select-list.vue";
 
 export default {
   props: {
-    selected: Array,
-    onChange: Function,
+    selected: Number,
+    saveChange: Function,
     getData: Function,
     pageTitle: String,
     type: String,
@@ -52,11 +57,20 @@ export default {
     },
     selectChanget(e) {
       const self = this;
-      self.onChange(e.target, e.checked);
+      self.changet = true;
+      self.changet_data = e;
+      //self.onChange(e.target, e.checked);
+    },
+    saveSelected(){
+      const self = this;
+      self.saveChange(self.changet_data.target);
+      self.$f7router.back();
     }
   },
   data() {
     return {
+      changet: false,
+      changet_data: null,
       targets: {},
       loaded: false,
     };

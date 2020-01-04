@@ -96,6 +96,40 @@ const API = {
         return data;
       });
   },
+  getAttendancesDetail(id) {
+    return api
+    .call({
+      endpoint: "workforce/attendances/"+id,
+      method: "GET",
+      cache: false,
+    })
+    .then(data => {
+      return data;
+    });
+  },
+  editAttendance(id, data){
+    return api
+    .call({
+      endpoint: "workforce/attendances/"+id,
+      method: "PUT",
+      cache: false,
+      data
+    })
+    .then(data => {
+      return data;
+    });
+  },
+  deleteAttendance(id){
+    return api
+    .call({
+      endpoint: "workforce/attendances/"+id,
+      method: "DELETE",
+      cache: false,
+    })
+    .then(data => {
+      return data;
+    });
+  },
   setAttendances(data){
     return api
     .call({
