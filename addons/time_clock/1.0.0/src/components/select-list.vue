@@ -7,7 +7,7 @@
           :checkbox="multiply"
           :radio="!multiply"
           name="time-clock-select-list-item"
-          :checked ="checkId(item)"
+          :checked ="selected == item.user_id"
           :title="item.name || item.first_name+' '+ item.last_name"
           :key="type+'_'+index"
           @change="toggleItem(item, $event.target.checked)"
@@ -45,7 +45,7 @@ export default {
   props: {
     type: String,
     data: Object,
-    selected: Array,
+    selected: Number,
     multiply: Boolean,
     loaded: {
       type: Boolean,
@@ -60,14 +60,7 @@ export default {
     toggleItem(item, checked){
       self = this;
       self.$emit('change', {target: item, checked: checked});
-    },
-    checkId(target) {
-      const self = this;
-      if (typeof self.selected === 'undefined') return false;
-      return (
-        self.selected.filter(t => t.id === target.id && t.pseudo_type === target.pseudo_type).length > 0
-      );
-    },
+    }
   },
   data() {
     return {
