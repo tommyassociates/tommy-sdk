@@ -30,6 +30,7 @@
     "gulp-uglify": "^3.0.2",
     "js-yaml": "^3.13.1",
     "junk": "^3.1.0",
+    "leaflet": "^1.6.0",
     "natives": "^1.1.6",
     "node-sass": "^4.13.0",
     "request": "^2.88.0",

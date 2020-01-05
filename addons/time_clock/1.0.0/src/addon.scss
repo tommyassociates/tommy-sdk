@@ -3,6 +3,7 @@
 @import "./scss/event-list.scss";
 @import "./scss/select-list.scss";
 
+
 $dark: #333333;
 $green: #2EC8A1;
 $orange: #FF4500;
@@ -184,3 +185,10 @@ label.label-radio input[type="radio"]:checked~.item-inner {
 }
 
 @import "./scss/searchbar.scss";
+
+#time-clock-map-conainer{
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+@import "../../../../node_modules/leaflet/dist/leaflet";
