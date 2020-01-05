@@ -170,13 +170,18 @@ export default {
           edit: self.edit_acces,
           latitude: self.detail_data.latitude,
           longitude: self.detail_data.longitude,
+          accuracy: self.detail_data.accuracy,
+          address: self.detail_data.address,
           callback: self.editCoordinates
         }
       });
     },
-    editCoordinates(latitude, longitude) {
-      console.log("TCL: editCoordinates -> longitude", longitude);
-      console.log("TCL: editCoordinates -> latitude", latitude);
+    editCoordinates(latitude, longitude, accuracy, address) {
+      const self = this;
+      self.detail_data.latitude = latitude;
+      self.detail_data.longitude = longitude;
+      self.detail_data.accuracy = accuracy;
+      self.detail_data.address = address;
     },
     openCamera() {
       const self = this;
@@ -221,14 +226,14 @@ export default {
       delete data.icon_url;
       delete data.id;
       API.editAttendance(self.detail_data.id, data).then(() => {
-        self.$f7route.back();
+        self.$f7router.back();
       });
     },
     deleteAttendance() {
       const self = this;
       if (!self.edit_acces) return;
       API.deleteAttendance(self.detail_data.id).then(() => {
-        self.$f7route.back();
+        self.$f7router.back();
       });
     },
     deleteClick() {
