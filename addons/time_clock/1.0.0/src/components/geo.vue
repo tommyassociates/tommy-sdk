@@ -44,7 +44,6 @@ export default {
 
     },
     onSuccess(position, resolve, reject) {
-      console.log('rwwwwwwwwwwwwwwwww', typeof resolve, typeof reject)
       const self = this;
       if (self.dialog) self.dialogProgress.close();
       if (self.getStret) {
