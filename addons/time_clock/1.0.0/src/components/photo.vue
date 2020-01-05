@@ -102,7 +102,7 @@ export default {
     FileCameraCheck(e) {
       const self = this;
       setTimeout(() => {
-        if (self.$refs.inputFileCamera.value.length === 0) {
+        if (self.$refs.inputFileCamera.files.length === 0) {
           self.$emit("photo:error", "Photo not taken");
            window.removeEventListener("focus", self.FileCameraCheck, false);
           if (typeof self.rejectPromise === "function")
