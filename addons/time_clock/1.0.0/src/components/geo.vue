@@ -22,7 +22,7 @@ export default {
         );
       navigator.geolocation.getCurrentPosition(self.onSuccess, self.onError, {
         maximumAge: 600000,
-        timeout: 5000,
+        timeout: 10000,
         enableHighAccuracy: true
       });
     },
