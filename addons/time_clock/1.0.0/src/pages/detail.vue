@@ -55,7 +55,7 @@
         v-if="detail_data.status === 'start' || detail_data.status === 'stop'"
       >
         <div slot="after" class="after-container">
-          <div class="image"></div>
+          <div class="image" :style="{backgroundImage : 'url('+detail_data.image+')'}"></div>
         </div>
       </f7-list-item>
       <f7-list-item
@@ -224,7 +224,7 @@ export default {
       ///detail_data.status === 'start' || detail_data.status === 'stop'
       const data = Object.assign({}, self.detail_data);
       if (data.status === "pause" || data.status === "resume")
-        delete data.image;
+      delete data.image;
       delete data.user_name;
       delete data.icon_url;
       delete data.id;
