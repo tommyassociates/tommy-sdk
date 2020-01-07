@@ -283,23 +283,31 @@ export default {
       const last_user_attedance = self.attendances_data.find(e=>{
         if (e.user_id = API.actorId) return true;
       });
-      switch(last_user_attedance.status) {
-        case 'start':
-          self.clock_on = true; 
-          self.break_on = false
-          break;
-        case 'stop':
-          self.clock_on = false;
-          self.break_on = false;
-          break;
-        case 'pause':
-          self.clock_on = true;
-          self.break_on = true; 
-          break;
-        case 'resume':
-          self.clock_on = true;
-          self.break_on = false;
-          break;
+      if(last_user_attedance){
+        switch(last_user_attedance.status) {
+          case 'start':
+            self.clock_on = true; 
+            self.break_on = false
+            break;
+          case 'stop':
+            self.clock_on = false;
+            self.break_on = false;
+            break;
+          case 'pause':
+            self.clock_on = true;
+            self.break_on = true; 
+            break;
+          case 'resume':
+            self.clock_on = true;
+            self.break_on = false;
+            break;
+          default:
+            self.clock_on = false;
+            self.break_on = false;
+        }
+      }else{
+            self.clock_on = false;
+            self.break_on = false;
       }
     }
   },
