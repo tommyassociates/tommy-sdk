@@ -2,7 +2,8 @@ const tommy = window.tommy;
 const api = tommy.api;
 
 const API = {
-  user_id: undefined,
+  actorId: undefined,
+  actor: undefined,
   shifts_active_id: undefined,
   getTest(data = null, cache = true) { 
     return api
@@ -26,7 +27,7 @@ const API = {
     date7.setDate(date7.getDate() + 7);
 
     data = {
-      user_id: 3,
+      actorId: 3,
       team_id: 1,
       title: "Test event",
       location: "Test location",
@@ -69,29 +70,33 @@ const API = {
         return data;
       });
   },
-  detailGet() {
-      return generateTest(1);
-  },
-  getAttendances(data = null, cache = true) {
-      return api
-      .call({
+  getAttendances(data = null, cache = false, others = false) {
+      let options = {
         endpoint: "workforce/attendances",
         method: "GET",
+        with_permission_to: true,
+        with_filters: true,
         cache: cache,
         data,
-      })
+      }
+      if (!others) options.endpoint = options.endpoint + '?user_id='+ API.actorId;
+      return api
+      .call(options)
       .then(data => {
         return data;
       });
   },
-  getAttendancesActive(data = null, cache = true) {
+  getAttendancesActive(data = null, cache = false, others = false) {
+    let options = {
+      endpoint: "workforce/attendances/active",
+      method: "GET",
+      cache: cache,
+      data,
+    }
+    
+    if (!others) options.endpoint = options.endpoint + '?user_id='+ API.actorId;
       return api
-      .call({
-        endpoint: "workforce/attendances/active",
-        method: "GET",
-        cache: cache,
-        data,
-      })
+      .call(options)
       .then(data => {
         return data;
       });
