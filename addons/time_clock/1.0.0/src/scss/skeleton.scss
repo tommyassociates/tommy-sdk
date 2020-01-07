@@ -26,6 +26,10 @@ $blink: #000;
     mask-image: none !important;
   }
 }
+.skeleton-element {
+  background: $bg !important;
+  border-color: $bg !important;
+}
 .skeleton-block {
   height: 1em;
   background: $bg !important;
