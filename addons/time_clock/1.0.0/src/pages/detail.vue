@@ -259,7 +259,7 @@ export default {
     },
     createCalendar() {
       const self = this;
-      let date = new Date(self.detail_data.created_at);
+      let date = new Date(self.detail_data.timestamp);
       self.calendarInstance = self.$f7.calendar.create({
         value: [date],
         openIn: "customModal",
@@ -267,7 +267,7 @@ export default {
         closeOnSelect: true,
         on: {
           change(cal, val) {
-            self.detail_data.created_at = new Date(val[0]).toISOString();
+            self.detail_data.timestamp = new Date(val[0]).toISOString();
           }
         }
       });
@@ -370,14 +370,14 @@ export default {
       const self = this;
       if (!self.detail_data) return null;
       return self
-        .$moment(new Date(self.detail_data.created_at))
+        .$moment(new Date(self.detail_data.timestamp))
         .format("DD MMM YYYY");
     },
     timeField() {
       const self = this;
       if (!self.detail_data) return null;
       return self
-        .$moment(new Date(self.detail_data.created_at))
+        .$moment(new Date(self.detail_data.timestamp))
         .format("HH:mm");
     }
   },
@@ -390,7 +390,7 @@ export default {
       self.loaded = true;
       self.$nextTick(() => {
         self.createCalendar();
-        self.createTimePicker(self.detail_data.created_at);
+        self.createTimePicker(self.detail_data.timestamp);
         self.createPhotoPreview();
       });
     });

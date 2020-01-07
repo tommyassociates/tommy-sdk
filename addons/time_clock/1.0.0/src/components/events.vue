@@ -16,7 +16,7 @@
         ></div>
         <div class="description">{{item.address}}</div>
         <div slot="content-end" class="time">
-          {{$moment(new Date(item.created_at)).format('HH:mm')}}
+          {{$moment(new Date(item.timestamp)).format('HH:mm')}}
           <br />
           {{$t('time_clock.index.clock_event_options.'+item.status)}}
         </div>
