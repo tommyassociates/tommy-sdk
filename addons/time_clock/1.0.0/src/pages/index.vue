@@ -12,7 +12,7 @@
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
-    <f7-toolbar :style="toolbarStyle" class="time-clock-main-toolbar" v-if="shifts_enable">
+    <f7-toolbar :style="toolbarStyle" class="time-clock-main-toolbar" v-if="shifts_enable && loaded.first">
       <f7-button
         raised
         fill
@@ -248,7 +248,7 @@ export default {
     updateAll() {
       const self = this;
       self.updateAttendances();
-      self.updateAttendancesActive();
+      self.updateAttendancesActive();      
     },
     updateAttendances() {
       const self = this;
@@ -256,6 +256,7 @@ export default {
       API.getAttendances(null, false, self.viewOthers).then(data => {
         self.attendances_data = self.prepareAttendances(data);
         self.loaded.attendance = true;
+        self.updateStatus();
       });
     },
     updateAttendancesActive() {
@@ -276,6 +277,30 @@ export default {
         }
       });
       return typeof view !== "undefined";
+    },
+    updateStatus(){
+      const self = this;
+      const last_user_attedance = self.attendances_data.find(e=>{
+        if (e.user_id = API.actorId) return true;
+      });
+      switch(last_user_attedance.status) {
+        case 'start':
+          self.clock_on = true; 
+          self.break_on = false
+          break;
+        case 'stop':
+          self.clock_on = false;
+          self.break_on = false;
+          break;
+        case 'pause':
+          self.clock_on = true;
+          self.break_on = true; 
+          break;
+        case 'resume':
+          self.clock_on = true;
+          self.break_on = false;
+          break;
+      }
     }
   },
   beforeDestroy() {
@@ -296,6 +321,8 @@ export default {
       API.getAttendances(null, false, self.viewOthers).then(data => {
         self.attendances_data = self.prepareAttendances(data);
         self.loaded.attendance = true;
+        self.loaded.first = true;
+        self.updateStatus();
       });
       API.getAttendancesActive(null, false, self.viewOthers).then(data => {
         self.active_data = self.prepareAttendances(data);
@@ -317,6 +344,7 @@ export default {
       team_data: [],
       shifts_enable: false,
       loaded: {
+        first: false,
         active: false,
         attendance: false
       }
