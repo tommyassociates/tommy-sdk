@@ -1,30 +1,32 @@
 ## Tags
 
-- [ ] Add image to create
-- [ ] Add image to main form
-
 ## Items
 
-- [ ] Add image to create
-- [ ] Add image to main form
-
 ## Locations
-
-- [ ] Add image to create
-- [ ] Add image to main form
 
 ## Activity
 
 - [ ] no activity when length = 0
-- [ ] fix data values to ISO format
+- [ ] fix data values to save ISO format
 
 ## Settings
 
 - [ ] Setting access
     - [ ] Settings for all team(Core)
-- [ ] Dynamic fields
+- [ ] Dynamic fields components
     - [ ] Locations
     - [ ] Tags
+    - [ ] Precentage
+    - [ ] Date
+    - [ ] URL
+    - [x] Photo
+        - [ ] get photo from Cordova camera
+    - [x] Barcode
+        - [ ] get code from Cordova qrcode scanner
+- [ ] Edit/delete dynamic field
+- [ ] Active/inactive dynamic field mode
+- [ ] Save dynamic fields to settings
+- [ ] Required dynamic field blocking
 - [ ] View settings
     - [ ] Main
     - [ ] Summary
@@ -43,9 +45,10 @@
 - [ ] Notifications
 - [ ] Search
     - [ ] Barcode
+        -[ ] Get code from barcode Cordova scanner
     - [ ] Filter
 - [ ] Activity view
-    - [x] Latest activities
+    - [x] Latest activities change request with names(after server side updating)
         - [ ] Locations (need request)
         - [ ] Items (need request)
         - [ ] Tags (need request)
@@ -56,7 +59,7 @@
 
 ## Summary pages
 
-- [x] Tables
+- [x] Tables change reqwests with names(after server side updating)
     - [ ] Locations (need request)
     - [ ] Items (need request)
     - [ ] Tags (need request)
@@ -70,3 +73,8 @@
 ## Other
 
 - [ ] Pad view
+
+## Tommy v2
+
+- [ ] Add image to create
+- [ ] Add image to main form
