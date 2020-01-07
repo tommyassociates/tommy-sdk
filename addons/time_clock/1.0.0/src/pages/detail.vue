@@ -229,6 +229,7 @@ export default {
       delete data.id;
       API.editAttendance(self.detail_data.id, data).then(() => {
         self.$f7router.back();
+        self.$events.$emit('time_clock:attedance_edit', self.detail_data);
       });
     },
     deleteAttendance() {
@@ -236,6 +237,7 @@ export default {
       if (!self.edit_acces) return;
       API.deleteAttendance(self.detail_data.id).then(() => {
         self.$f7router.back();
+        self.$events.$emit('time_clock:attedance_delete', self.detail_data);
       });
     },
     deleteClick() {
