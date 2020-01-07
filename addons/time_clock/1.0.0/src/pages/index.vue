@@ -97,7 +97,10 @@ export default {
   },
   created() {
     const self = this;
-    API.user_id = self.getUserId();
+    API.actorId = self.getUserId();
+    API.actor = self.getActor();    
+    self.$events.$on('time_clock:attedance_edit', self.updateAll);
+    self.$events.$on('time_clock:attedance_delete', self.updateAll);
   },
   computed: {
     pageContentStyle() {
@@ -209,6 +212,17 @@ export default {
         return Number(self.$root.account.user_id);
       }
     },
+    getActor() {
+      const self = this;
+      const userId = self.$f7route.query.actor_id;
+      if (userId) {
+        return self.$root.teamMembers.filter(
+          user => user.user_id === parseInt(self.userId, 10)
+        )[0];
+      } else {
+        return self.$root.account;
+      }
+    },
     getShiftActive() {
       const self = this;
       API.getShiftActive().then(data => {
@@ -231,7 +245,7 @@ export default {
       });
       return data;
     },
-    updateAll(){
+    updateAll() {
       const self = this;
       self.updateAttendances();
       self.updateAttendancesActive();
@@ -239,7 +253,7 @@ export default {
     updateAttendances() {
       const self = this;
       self.loaded.attendance = false;
-      API.getAttendances().then(data => {
+      API.getAttendances(null, false, self.viewOthers).then(data => {
         self.attendances_data = self.prepareAttendances(data);
         self.loaded.attendance = true;
       });
@@ -247,26 +261,46 @@ export default {
     updateAttendancesActive() {
       const self = this;
       self.loaded.active = false;
-      API.getAttendancesActive().then(data => {
+      API.getAttendancesActive(null, false, self.viewOthers).then(data => {
         self.active_data = self.prepareAttendances(data);
         self.loaded.active = true;
       });
+    },
+    checkPermision(p) {
+      const self = this;
+      let view = p.filters.find(e => {
+        if (e.context === "members") {
+          if (e.user_id === API.actorId) return true;
+        } else if (e.context === "roles") {
+          if (API.actor.roles.indexOf(e.name) > 0) return true;
+        }
+      });
+      return typeof view !== "undefined";
     }
   },
   beforeDestroy() {
     const self = this;
-    self.$refs.photo.$off("camera:send");
+    self.$events.$off('time_clock:attedance_edit', self.updateAll);
+    self.$events.$off('time_clock:attedance_delete', self.updateAll);
   },
   mounted() {
     const self = this;
     self.getShiftActive();
-    API.getAttendances().then(data => {
-      self.attendances_data = self.prepareAttendances(data);
-      self.loaded.attendance = true;
-    });
-    API.getAttendancesActive().then(data => {
-      self.active_data = self.prepareAttendances(data);
-      self.loaded.active = true;
+    return Promise.all([
+      self.$api.getInstalledAddonPermission(
+        "time_clock",
+        "attendance_other_access",
+        { with_filters: true }
+      )]).then(v => {
+      self.viewOthers = self.checkPermision(v[0]);
+      API.getAttendances(null, false, self.viewOthers).then(data => {
+        self.attendances_data = self.prepareAttendances(data);
+        self.loaded.attendance = true;
+      });
+      API.getAttendancesActive(null, false, self.viewOthers).then(data => {
+        self.active_data = self.prepareAttendances(data);
+        self.loaded.active = true;
+      });
     });
 
     API.getTest().then(data => console.log("TCL: mounted -> TEST", data));
@@ -274,6 +308,7 @@ export default {
   data() {
     const self = this;
     return {
+      viewOthers: false,
       clock_on: false,
       break_on: false,
       view_other_users: false,
