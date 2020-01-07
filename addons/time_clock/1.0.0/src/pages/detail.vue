@@ -269,7 +269,12 @@ export default {
         closeOnSelect: true,
         on: {
           change(cal, val) {
-            self.detail_data.timestamp = new Date(val[0]).toISOString();
+            const date = new Date(self.detail_data.timestamp);
+            const date_new = new Date(val[0]);
+            date.setFullYear(date_new.getFullYear());
+            date.setMonth(date_new.getMonth());
+            date.setDate(date_new.getDate());
+            self.detail_data.timestamp = date.toISOString();
           }
         }
       });
@@ -391,13 +396,13 @@ export default {
       const self = this;
       if (!self.detail_data) return null;
       return self
-        .$moment(new Date(self.detail_data.timestamp))
+        .$moment(self.detail_data.timestamp)
         .format("DD MMM YYYY");
     },
     timeField() {
       const self = this;
       if (!self.detail_data) return null;
-      return self.$moment(new Date(self.detail_data.timestamp)).format("HH:mm");
+      return self.$moment(self.detail_data.timestamp).format("H:mm");
     }
   },
   mounted() {

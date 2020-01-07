@@ -45,14 +45,13 @@ export default {
           }
         ]
       });
-
       self.timePickerInstance.on("close", () => {
         const self = this;
-        let date_new = new Date(self.detail_data.created_at);
-        date_new.setUTCHours(self.timePickerInstance.value[0]);
-        date_new.setUTCMinutes(self.timePickerInstance.value[1]);
+        let date_new = new Date(self.detail_data.timestamp);
+        date_new.setHours(Number(self.timePickerInstance.value[0]));
+        date_new.setMinutes(Number(self.timePickerInstance.value[1]));
         date_new = date_new.toISOString();
-        self.detail_data.created_at = date_new;
+        self.detail_data.timestamp = date_new;
       });
     }
   }
