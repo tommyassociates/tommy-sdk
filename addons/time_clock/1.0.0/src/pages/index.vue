@@ -44,7 +44,7 @@
     </f7-toolbar>
     <f7-page-content :style="pageContentStyle">
       <!--Active -->
-      <div class="time-clock-active" v-if="!view_other_users">
+      <div class="time-clock-active" v-if="!viewOthers">
         <f7-list media-list class="time-clock-list">
           <Events
             :data="active_data"
@@ -55,9 +55,9 @@
         </f7-list>
       </div>
 
-      <div class="time-clock-active" v-if="view_other_users">
+      <div class="time-clock-active" v-if="viewOthers">
         <div class="time-clock-avatars-container">
-          <Active-avatar :data="team_data" :loaded="loaded.active" />
+          <Active-avatar :data="active_data" :loaded="loaded.active" :devider="$t('time_clock.index.active_title')"/>
         </div>
       </div>
 
@@ -338,10 +338,8 @@ export default {
       viewOthers: false,
       clock_on: false,
       break_on: false,
-      view_other_users: false,
       active_data: [],
       attendances_data: [],
-      team_data: [],
       shifts_enable: false,
       loaded: {
         first: false,
