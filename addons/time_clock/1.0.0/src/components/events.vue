@@ -21,6 +21,7 @@
           {{$t('time_clock.index.clock_event_options.'+item.status)}}
         </div>
       </f7-list-item>
+      <div class="no-attendances" v-if="data.length === 0">{{$t('time_clock.index.no_attendances')}}</div>
     </f7-list>
     <f7-list media-list class="time-clock-list" v-if="!loaded">
       <f7-block-title class="time-clock-divider"></f7-block-title>

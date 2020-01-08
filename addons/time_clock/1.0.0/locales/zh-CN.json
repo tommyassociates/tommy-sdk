@@ -18,7 +18,8 @@
     "geo": "Geolocation",
     "photo": "Photo",
     "sending": "Sending",
-    "no_activity": "No Activity"
+    "no_activity": "No Activity",
+    "no_attendances": "No Attendances"
   },
   "settings": {
     "title": "设置",
