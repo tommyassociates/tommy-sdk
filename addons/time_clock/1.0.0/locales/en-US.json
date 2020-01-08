@@ -17,7 +17,8 @@
     "geo_loading": "Geolocation loading",
     "geo": "Geolocation",
     "photo": "Photo",
-    "sending": "Sending"
+    "sending": "Sending",
+    "no_activity": "No Activity"
   },
   "settings": {
     "title": "Settings",

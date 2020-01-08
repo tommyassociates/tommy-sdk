@@ -10,6 +10,9 @@
       <div class="image more"></div>
       <div class="name more">{{$t('time_clock.index.more_button')}}</div>
     </div>
+    <div class="container" v-if="data.length === 0">
+      <div class="no-activity">{{$t('time_clock.index.no_activity')}}</div>
+    </div>
   </div>
   <div class="time-clock-circle-avatar skeleton-text skeleton-effect-blink" v-if="!loaded">
     <div v-for="(index) in 4" :key="'avatar_skeleton_'+index" class="container">
