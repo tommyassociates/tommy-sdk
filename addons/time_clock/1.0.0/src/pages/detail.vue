@@ -23,7 +23,7 @@
         @click.native="openTimePickerDetail()"
       >
         <div slot="after">
-          <input type="text" id="timePicker" readonly :value="timeField"/>
+          <input type="text" id="timePicker" readonly :value="timeField" />
         </div>
       </f7-list-item>
       <f7-list-item
@@ -55,7 +55,7 @@
         v-if="detail_data.status === 'start' || detail_data.status === 'stop'"
       >
         <div slot="after" class="after-container">
-          <div class="image" :style="{backgroundImage : 'url('+detail_data.image+')'}"></div>
+          <div class="image" :style="{backgroundImage : 'url('+image_preview+')'}"></div>
         </div>
       </f7-list-item>
       <f7-list-item
@@ -142,11 +142,12 @@
 import API from "../api";
 import dialog from "../mixins/dialog.vue";
 import timePicker from "../mixins/time-picker.vue";
+import Blob from "../mixins/baseToBlob.vue";
 import Photo from "../components/photo.vue";
 
 export default {
   name: "DetailActivity",
-  mixins: [dialog, timePicker],
+  mixins: [dialog, timePicker, Blob],
   components: { Photo },
   methods: {
     changeAction(val) {
@@ -192,7 +193,7 @@ export default {
     },
     openSelector() {
       const self = this;
-      if(!self.edit_acces) return;
+      if (!self.edit_acces) return;
       self.$f7router.navigate("/time-clock/select-picker/", {
         props: {
           selected: self.detail_data.user_id,
@@ -221,14 +222,32 @@ export default {
     editAttendance() {
       const self = this;
       if (!self.edit_acces) return;
-      ///detail_data.status === 'start' || detail_data.status === 'stop'
-      const data = Object.assign({}, self.detail_data);
-      if (data.status === "pause" || data.status === "resume")
-      delete data.image;
-      delete data.user_name;
-      delete data.icon_url;
-      delete data.id;
-      API.editAttendance(self.detail_data.id, data).then(() => {
+      const form = new FormData();
+
+      if (
+        self.detail_data.status === "pause" ||
+        self.detail_data.status === "resume"
+      ) {
+        form.append("image", null);
+      } else {
+        form.append(
+          "image",
+          self.dataURLToBlob(self.image_preview),
+          `attendance_${self.detail_data.id}.jpg`
+        );
+      }
+
+      form.append("address", self.detail_data.address);
+      form.append("latitude", self.detail_data.latitude);
+      form.append("longitude", self.detail_data.longitude);
+      form.append("accuracy", self.detail_data.accuracy);
+      form.append("event_id", self.detail_data.event_id);
+      form.append("status", self.detail_data.status);
+      form.append("team_id", self.detail_data.team_id);
+      form.append("user_id", self.detail_data.user_id);
+      form.append("timestamp", self.detail_data.timestamp);
+
+      API.editAttendance(self.detail_data.id, form).then(() => {
         self.$f7router.back();
         self.$events.$emit("time_clock:attedance_edit", self.detail_data);
       });
@@ -257,7 +276,7 @@ export default {
     },
     openCalendar() {
       const self = this;
-      if(self.edit_acces) self.calendarInstance.open();
+      if (self.edit_acces) self.calendarInstance.open();
     },
     createCalendar() {
       const self = this;
@@ -302,7 +321,7 @@ export default {
       self.photoPreview = self.$f7.photoBrowser.create({
         photos: [
           {
-            url: self.detail_data.image
+            url: self.image_preview
           }
         ],
         theme: "dark",
@@ -363,7 +382,7 @@ export default {
     reloadPhoto() {
       const self = this;
       self.$refs.photo.takePhotoAsync().then(photo => {
-        self.detail_data.image = photo;
+        self.image_preview = photo;
         self.photoPreview.swiper.removeSlide(0);
         self.photoPreview.swiper.appendSlide(
           `<div class="photo-browser-slide swiper-slide swiper-slide-active" data-swiper-slide-index="0"><span class="swiper-zoom-container"><img src="${photo}" ></span></div>`
@@ -386,18 +405,16 @@ export default {
       });
       return typeof view !== "undefined";
     },
-    openTimePickerDetail(){
+    openTimePickerDetail() {
       const self = this;
-      if(self.edit_acces) self.openTimePicker();
+      if (self.edit_acces) self.openTimePicker();
     }
   },
   computed: {
     dateField() {
       const self = this;
       if (!self.detail_data) return null;
-      return self
-        .$moment(self.detail_data.timestamp)
-        .format("DD MMM YYYY");
+      return self.$moment(self.detail_data.timestamp).format("DD MMM YYYY");
     },
     timeField() {
       const self = this;
@@ -413,22 +430,23 @@ export default {
       })
       .then(v => {
         self.edit_acces = self.checkPermision(v);
-        
+
         API.getAttendancesDetail(self.edit_id).then(data => {
           self.detail_data = self.prepareAttendance(data);
+          if (typeof self.detail_data.image !== "undefined")
+            self.image_preview = self.detail_data.image.url;
           self.loaded = true;
-          if(self.edit_acces){
-          self.$nextTick(() => {
-            self.createCalendar();
-            self.createTimePicker(self.detail_data.timestamp);
-            self.createPhotoPreview();
-          });
-          }else{
-          self.$nextTick(() => {
-            self.createPhotoPreview();
-          });
+          if (self.edit_acces) {
+            self.$nextTick(() => {
+              self.createCalendar();
+              self.createTimePicker(self.detail_data.timestamp);
+              self.createPhotoPreview();
+            });
+          } else {
+            self.$nextTick(() => {
+              self.createPhotoPreview();
+            });
           }
-
         });
       });
   },
@@ -438,6 +456,7 @@ export default {
   data() {
     const self = this;
     return {
+      image_preview: null,
       sheet_action_opened: false,
       new_action: null,
       edit_id: self.$f7route.params.id,

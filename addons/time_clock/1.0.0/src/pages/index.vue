@@ -12,7 +12,11 @@
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
-    <f7-toolbar :style="toolbarStyle" class="time-clock-main-toolbar" v-if="shifts_enable && loaded.first">
+    <f7-toolbar
+      :style="toolbarStyle"
+      class="time-clock-main-toolbar"
+      v-if="shifts_enable && loaded.first"
+    >
       <f7-button
         raised
         fill
@@ -57,7 +61,11 @@
 
       <div class="time-clock-active" v-if="viewOthers">
         <div class="time-clock-avatars-container">
-          <Active-avatar :data="active_data" :loaded="loaded.active" :devider="$t('time_clock.index.active_title')"/>
+          <Active-avatar
+            :data="active_data"
+            :loaded="loaded.active"
+            :devider="$t('time_clock.index.active_title')"
+          />
         </div>
       </div>
 
@@ -82,6 +90,7 @@ import ActiveAvatar from "../components/circle-avatar.vue";
 import Events from "../components/events.vue";
 import Photo from "../components/photo.vue";
 import Geo from "../components/geo.vue";
+import Blob from "../mixins/baseToBlob.vue";
 
 /*
 TODO: add shift empty page
@@ -95,12 +104,13 @@ export default {
     Photo,
     Geo
   },
+  mixins: [Blob],
   created() {
     const self = this;
     API.actorId = self.getUserId();
-    API.actor = self.getActor();    
-    self.$events.$on('time_clock:attedance_edit', self.updateAll);
-    self.$events.$on('time_clock:attedance_delete', self.updateAll);
+    API.actor = self.getActor();
+    self.$events.$on("time_clock:attedance_edit", self.updateAll);
+    self.$events.$on("time_clock:attedance_delete", self.updateAll);
   },
   computed: {
     pageContentStyle() {
@@ -133,16 +143,20 @@ export default {
       const self = this;
       self.$refs.geo.takeGeoAsync().then(cords => {
         self.$refs.photo.takePhotoAsync().then(photo => {
-          const params = {
-            event_id: API.shifts_active_id,
-            latitude: cords.latitude,
-            longitude: cords.longitude,
-            accuracy: cords.accuracy,
-            status: "start",
-            address: cords.name,
-            image: photo
-          };
-          API.setAttendances(params).then(() => {
+          const form = new FormData();
+          form.append("event_id", API.shifts_active_id);
+          form.append("latitude", cords.latitude);
+          form.append("longitude", cords.longitude);
+          form.append("accuracy", cords.accuracy);
+          form.append("status", "start");
+          form.append("address", cords.name);
+          form.append(
+            "image",
+            self.dataURLToBlob(photo),
+            `attendance_start.jpg`
+          );
+
+          API.setAttendances(form).then(() => {
             self.updateAll();
             self.clock_on = true;
           });
@@ -153,16 +167,20 @@ export default {
       const self = this;
       self.$refs.geo.takeGeoAsync().then(cords => {
         self.$refs.photo.takePhotoAsync().then(photo => {
-          const params = {
-            event_id: API.shifts_active_id,
-            latitude: cords.latitude,
-            longitude: cords.longitude,
-            accuracy: cords.accuracy,
-            status: "stop",
-            address: cords.name,
-            image: photo
-          };
-          API.setAttendances(params).then(() => {
+          const form = new FormData();
+          form.append("event_id", API.shifts_active_id);
+          form.append("latitude", cords.latitude);
+          form.append("longitude", cords.longitude);
+          form.append("accuracy", cords.accuracy);
+          form.append("status", "stop");
+          form.append("address", cords.name);
+          form.append(
+            "image",
+            self.dataURLToBlob(photo),
+            `attendance_stop.jpg`
+          );
+
+          API.setAttendances(form).then(() => {
             self.updateAll();
             self.clock_on = false;
           });
@@ -248,7 +266,7 @@ export default {
     updateAll() {
       const self = this;
       self.updateAttendances();
-      self.updateAttendancesActive();      
+      self.updateAttendancesActive();
     },
     updateAttendances() {
       const self = this;
@@ -278,26 +296,26 @@ export default {
       });
       return typeof view !== "undefined";
     },
-    updateStatus(){
+    updateStatus() {
       const self = this;
-      const last_user_attedance = self.attendances_data.find(e=>{
-        if (e.user_id = API.actorId) return true;
+      const last_user_attedance = self.attendances_data.find(e => {
+        if ((e.user_id = API.actorId)) return true;
       });
-      if(last_user_attedance){
-        switch(last_user_attedance.status) {
-          case 'start':
-            self.clock_on = true; 
-            self.break_on = false
+      if (last_user_attedance) {
+        switch (last_user_attedance.status) {
+          case "start":
+            self.clock_on = true;
+            self.break_on = false;
             break;
-          case 'stop':
+          case "stop":
             self.clock_on = false;
             self.break_on = false;
             break;
-          case 'pause':
+          case "pause":
             self.clock_on = true;
-            self.break_on = true; 
+            self.break_on = true;
             break;
-          case 'resume':
+          case "resume":
             self.clock_on = true;
             self.break_on = false;
             break;
@@ -305,16 +323,16 @@ export default {
             self.clock_on = false;
             self.break_on = false;
         }
-      }else{
-            self.clock_on = false;
-            self.break_on = false;
+      } else {
+        self.clock_on = false;
+        self.break_on = false;
       }
     }
   },
   beforeDestroy() {
     const self = this;
-    self.$events.$off('time_clock:attedance_edit', self.updateAll);
-    self.$events.$off('time_clock:attedance_delete', self.updateAll);
+    self.$events.$off("time_clock:attedance_edit", self.updateAll);
+    self.$events.$off("time_clock:attedance_delete", self.updateAll);
   },
   mounted() {
     const self = this;
@@ -324,7 +342,8 @@ export default {
         "time_clock",
         "attendance_other_access",
         { with_filters: true }
-      )]).then(v => {
+      )
+    ]).then(v => {
       self.viewOthers = self.checkPermision(v[0]);
       API.getAttendances(null, false, self.viewOthers).then(data => {
         self.attendances_data = self.prepareAttendances(data);
@@ -358,4 +377,3 @@ export default {
   }
 };
 </script>
-
