@@ -10,8 +10,7 @@
         <f7-list-item v-for="(event, index) in currentEvents" :key="index" link="#" @click="loadEventDetails(event)"
           :title="eventTitle(event)" :text="eventText(event)">
           <div class="item-media text-icon align-self-center" slot="content-start">
-            <span>{{formatDate(event.start_at, 'D')}}</span>
-            <small>{{formatDate(event.start_at, 'MMM')}}</small>
+            <span>{{getDifferenceOfHours(event)}}</span>
           </div>
         </f7-list-item>
       </f7-list-group>
@@ -38,8 +37,17 @@ import formatDate from "../format-date";
 export default {
   data() {
     const self = this;
+
+    const start_at = self.$moment().startOf('day')
+    const end_at = self.$moment().endOf('day')
+    const fakeEvents = [
+      { start_at: start_at, end_at: end_at },
+      { start_at: start_at, end_at: end_at },
+      { start_at: start_at, end_at: end_at },
+    ]
+
     return {
-      events: null,
+      events: fakeEvents,
       today: self.$moment().startOf("day")
     };
   },
@@ -58,6 +66,14 @@ export default {
     }
   },
   methods: {
+    getDifferenceOfHours(event) {
+      const { start_at, end_at } = event
+
+      const diffHours = end_at.diff(start_at, 'hours', true)
+      const formatHours = diffHours.toFixed(1).replace(/\.0$/, '')
+
+      return formatHours
+    },
     eventTitle(event) {
       const self = this;
       let title = self.formatDate(event.start_at, "h:mm a");
@@ -100,7 +116,7 @@ export default {
         params.actor_id = actor_id;
       }
       return self.$api.getEvents(params, { cache: false }).then(events => {
-        self.events = events;
+        // self.events = events;
       });
     }
   }
