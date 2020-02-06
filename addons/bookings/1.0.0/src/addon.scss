@@ -1,0 +1,54 @@
+.bookings-wrapper {
+  &.page {
+    background: #fafafa;
+  }
+}
+
+.booking-events__wrapper {
+  background: #fff;
+}
+
+
+.booking-events__title {
+  text-transform: uppercase;
+  color: #666666;
+  background: #fafafa;
+  padding: 24px;
+  font-size: 20px;
+  line-height: 24px;
+}
+
+
+.booking-event {
+  border-bottom: 1px solid #fafafa;
+
+  .booking-event__description {
+    color: #666666;
+    font-size: 20px;
+    line-height: 36px;
+  }
+
+  .item-link {
+    padding: 20px 24px;
+
+    .item-title {
+      color: #000;
+      font-size: 24px;
+      line-height: 36px;
+    }
+
+    .item-media {
+      width: 100px !important;
+      height: 100px !important;
+      font-size: 30px;
+    }
+
+    .item-inner {
+      margin-left: 22px;
+
+      &:after {
+        display: none;
+      }
+    }
+  }
+}

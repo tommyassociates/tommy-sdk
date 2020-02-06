@@ -1,5 +1,5 @@
 <template>
-  <f7-page id="bookings__index" @page:afterin="loadEvents" ptr @ptr:refresh="onPtrRefresh">
+  <f7-page id="bookings__index" @page:afterin="loadEvents" ptr @ptr:refresh="onPtrRefresh" class="bookings-wrapper">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{$t('bookings.index.title', 'Bookings')}}</f7-nav-title>
@@ -9,26 +9,34 @@
       <div id="calendar-container"></div>
     </f7-block>
 
-    <f7-list media-list class="no-margin transparent no-chevron" no-hairlines v-if="events && events.length">
+    <f7-list media-list class="booking-events__wrapper" no-hairlines v-if="events && events.length">
+
       <f7-list-group media-list v-if="currentEvents.length">
-        <f7-list-item group-title>Current</f7-list-item>
+        <f7-list-item group-title class="booking-events__title">Current</f7-list-item>
         <f7-list-item v-for="(event, index) in currentEvents" :key="index" link="#" @click="loadEventDetails(event)"
-          :title="eventTitle(event)" :text="eventText(event)">
+          :title="eventTitle(event)" :text="eventText(event)"
+          class="booking-event"
+        >
+          <div class="item-media text-icon align-self-center" slot="content-start">
+            <span>{{getDifferenceOfHours(event)}}</span>
+          </div>
+          <div class="booking-event__description">Glod Coast University</div>
+          <div class="booking-event__description">Hospital</div>
+        </f7-list-item>
+      </f7-list-group>
+
+      <f7-list-group media-list v-if="previousEvents.length">
+        <f7-list-item group-title class="booking-events__title">Previous</f7-list-item>
+        <f7-list-item v-for="(event, index) in previousEvents" :key="index" link="#" @click="loadEventDetails(event)"
+          :title="eventTitle(event)" :text="eventText(event)"
+          class="booking-event"
+        >
           <div class="item-media text-icon align-self-center" slot="content-start">
             <span>{{getDifferenceOfHours(event)}}</span>
           </div>
         </f7-list-item>
       </f7-list-group>
-      <f7-list-group media-list v-if="previousEvents.length">
-        <f7-list-item group-title>Previous</f7-list-item>
-        <f7-list-item v-for="(event, index) in previousEvents" :key="index" link="#" @click="loadEventDetails(event)"
-          :title="eventTitle(event)" :text="eventText(event)">
-          <div class="item-media text-icon align-self-center" slot="content-start">
-            <span>{{formatDate(event.start_at, 'D')}}</span>
-            <small>{{formatDate(event.start_at, 'MMM')}}</small>
-          </div>
-        </f7-list-item>
-      </f7-list-group>
+
     </f7-list>
 
     <f7-block v-if="events && !events.length" class="no-data">
@@ -38,11 +46,13 @@
   </f7-page>
 </template>
 <script>
-import formatDate from "../format-date";
+
+import formatDate from '../format-date'
+import API from '../api'
 
 export default {
   data() {
-    const self = this;
+    const self = this
 
     const start_at = self.$moment().startOf('day')
     const end_at = self.$moment().endOf('day')
@@ -67,6 +77,7 @@ export default {
       toolbar: false,
       value: [now],
       events: self.events,
+      header: true,
       on: {
         init: calendar => {},
         change: calendar => {},
@@ -88,6 +99,11 @@ export default {
     }
   },
   methods: {
+    getEvents() {
+      const self = this
+
+      API.getEvents().then(data => self.events = data)
+    },
     getDifferenceOfHours(event) {
       const { start_at, end_at } = event
 
