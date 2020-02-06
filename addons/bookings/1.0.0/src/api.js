@@ -1,20 +1,20 @@
 const { api } = window.tommy
 
 const API = {
-  getEvents() {
+  getShifts() {
     return api
       .call({
-        endpoint: 'events',
+        endpoint: 'workforce/shifts',
         method: 'GET',
       })
       .then(data => {
         return data
       })
   },
-  getEvent(id) {
+  getShift(id) {
     return api
       .call({
-        endpoint: 'events'+id,
+        endpoint: 'workforce/shifts'+id,
         method: 'GET',
       })
       .then(data => {

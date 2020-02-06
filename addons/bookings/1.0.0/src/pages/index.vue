@@ -11,20 +11,6 @@
 
     <f7-list media-list class="booking-events__wrapper" no-hairlines v-if="events && events.length">
 
-      <f7-list-group media-list v-if="currentEvents.length">
-        <f7-list-item group-title class="booking-events__title">Current</f7-list-item>
-        <f7-list-item v-for="(event, index) in currentEvents" :key="index" link="#" @click="loadEventDetails(event)"
-          :title="eventTitle(event)" :text="eventText(event)"
-          class="booking-event"
-        >
-          <div class="item-media text-icon align-self-center" slot="content-start">
-            <span>{{getDifferenceOfHours(event)}}</span>
-          </div>
-          <div class="booking-event__description">Glod Coast University</div>
-          <div class="booking-event__description">Hospital</div>
-        </f7-list-item>
-      </f7-list-group>
-
       <f7-list-group media-list v-if="previousEvents.length">
         <f7-list-item group-title class="booking-events__title">Previous</f7-list-item>
         <f7-list-item v-for="(event, index) in previousEvents" :key="index" link="#" @click="loadEventDetails(event)"
@@ -34,6 +20,22 @@
           <div class="item-media text-icon align-self-center" slot="content-start">
             <span>{{getDifferenceOfHours(event)}}</span>
           </div>
+          <span class="booking-event__description">Glod Coast University</span>
+          <span class="booking-event__description">Hospital</span>
+        </f7-list-item>
+      </f7-list-group>
+
+      <f7-list-group media-list v-if="currentEvents.length">
+        <f7-list-item group-title class="booking-events__title">Current</f7-list-item>
+        <f7-list-item v-for="(event, index) in currentEvents" :key="index" link="#" @click="loadEventDetails(event)"
+          :title="eventTitle(event)" :text="eventText(event)"
+          class="booking-event -processing"
+        >
+          <div class="item-media text-icon align-self-center" slot="content-start">
+            <span>{{getDifferenceOfHours(event)}}</span>
+          </div>
+          <span class="booking-event__description">Glod Coast University</span>
+          <span class="booking-event__description">Hospital</span>
         </f7-list-item>
       </f7-list-group>
 
@@ -57,7 +59,6 @@ export default {
     const start_at = self.$moment().startOf('day')
     const end_at = self.$moment().endOf('day')
     const fakeEvents = [
-      { start_at: start_at, end_at: end_at },
       { start_at: start_at, end_at: end_at },
       { start_at: start_at, end_at: end_at },
     ]
@@ -94,7 +95,7 @@ export default {
     previousEvents() {
       const self = this;
       return self.events.filter(event => {
-        return self.$moment(event.start_at) < self.today;
+        return self.$moment(event.start_at) <= self.today;
       });
     }
   },
