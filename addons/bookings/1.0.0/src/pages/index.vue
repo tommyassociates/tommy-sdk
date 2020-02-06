@@ -6,6 +6,14 @@
     </f7-navbar>
 
     <f7-block>
+      <div class="calendar-toolbar">
+        <span class="calendar-toolbar__prev" @click="onPrevMonth()"><</span>
+        <div>
+          <span class="calendar-toolbar__date">{{toolbarDate}}</span>
+          <span class="calendar-toolbar__collapse" @click="onCollapse()">^</span>
+        </div>
+        <span class="calendar-toolbar__next" @click="onNextMonth()">></span>
+      </div>
       <div id="calendar-container"></div>
     </f7-block>
 
@@ -65,25 +73,43 @@ export default {
 
     return {
       events: fakeEvents,
-      today: self.$moment().startOf("day")
+      today: self.$moment().startOf("day"),
+      toolbarDate: '',
+      collapseCalendar: true,
     };
   },
   mounted() {
     const self = this
     const app = self.$app
+
     const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekLater = new Date().setDate(today.getDate() + 7);
 
     self.calendar = app.f7.calendar.create({
       containerEl: '#calendar-container',
       toolbar: false,
       value: [now],
-      events: self.events,
-      header: true,
-      on: {
-        init: calendar => {},
-        change: calendar => {},
-      }
+      firstDay: 0,
+      touchMove: false,
+      events: [
+        {
+          from: today,
+          to: weekLater,
+          color: 'pink'
+        },
+        {
+          date: today,
+          color: 'blue'
+        },
+        {
+          date: today,
+          color: 'red'
+        },
+      ],
     })
+
+    self.getToolbarDate()
   },
   computed: {
     currentEvents() {
@@ -97,9 +123,15 @@ export default {
       return self.events.filter(event => {
         return self.$moment(event.start_at) <= self.today;
       });
-    }
+    },
   },
   methods: {
+    getToolbarDate() {
+      const self = this
+      const { currentMonth, currentYear, params } = self.calendar
+
+      return self.toolbarDate = params.monthNames[currentMonth] + ' ' + currentYear
+    },
     getEvents() {
       const self = this
 
@@ -134,6 +166,30 @@ export default {
     loadEventDetails(event) {
       const self = this;
       self.$f7router.navigate("/bookings/details/", { props: { event } });
+    },
+    onCollapse() {
+      const self = this
+      const firstDayOfMonth = self.$moment().startOf('month').weekday()
+      const currentDay = self.$moment().weekday()
+      const weekOfMonth = Math.ceil((firstDayOfMonth + currentDay) / 7)
+      const rows = document.getElementsByClassName('calendar-month-current')[0].childNodes
+
+      Array.prototype.forEach.call(rows, (row, index) => {
+        if (index === weekOfMonth - 1) return
+        self.collapseCalendar ? row.classList.add('-hide') : row.classList.remove('-hide')
+      })
+
+      self.collapseCalendar = !self.collapseCalendar
+    },
+    onNextMonth() {
+      const { calendar } = this
+      calendar.nextMonth(500)
+      this.getToolbarDate()
+    },
+    onPrevMonth() {
+      const { calendar } = this
+      calendar.prevMonth(500)
+      this.getToolbarDate()
     },
     onPtrRefresh(event, done) {
       const self = this;
