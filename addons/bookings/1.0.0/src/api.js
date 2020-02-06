@@ -1,28 +1,25 @@
-const tommy = window.tommy
-const api = tommy.api
+const { api } = window.tommy
 
 const API = {
-  getShiftIndex() {
+  getEvents() {
     return api
       .call({
-        endpoint: "workforce/shifts",
-        method: "GET",
-        cache: false,
+        endpoint: 'events',
+        method: 'GET',
       })
       .then(data => {
-        return data;
-      });
+        return data
+      })
   },
-  gethiftDetail(id) {
+  getEvent(id) {
     return api
-    .call({
-      endpoint: "workforce/shifts/"+id,
-      method: "GET",
-      cache: false,
-    })
-    .then(data => {
-      return data;
-    });
+      .call({
+        endpoint: 'events'+id,
+        method: 'GET',
+      })
+      .then(data => {
+        return data
+      })
   },
 }
 
