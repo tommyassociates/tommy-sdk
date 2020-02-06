@@ -29,7 +29,7 @@
         <f7-list-item group-title class="booking-events__title">Current</f7-list-item>
         <f7-list-item v-for="(event, index) in currentEvents" :key="index" link="#" @click="loadEventDetails(event)"
           :title="eventTitle(event)" :text="eventText(event)"
-          class="booking-event -processing"
+          class="booking-event booking-label -processing"
         >
           <div class="item-media text-icon align-self-center" slot="content-start">
             <span>{{getDifferenceOfHours(event)}}</span>
