@@ -1,23 +1,19 @@
 <template>
   <f7-page id="bookings__index" @page:afterin="loadEvents" ptr @ptr:refresh="onPtrRefresh" class="bookings-wrapper">
-    <f7-navbar>
-      <tommy-nav-menu></tommy-nav-menu>
-      <f7-nav-title>{{$t('bookings.index.title', 'Bookings')}}</f7-nav-title>
-    </f7-navbar>
 
-    <f7-block>
+    <f7-block class="no-margin no-padding">
       <div class="calendar-toolbar">
-        <span class="calendar-toolbar__prev" @click="onPrevMonth()"><</span>
+        <span class="calendar-toolbar__prev" v-if="!collapsedCalendar" @click="onPrevMonth()"></span>
         <div>
           <span class="calendar-toolbar__date">{{toolbarDate}}</span>
-          <span class="calendar-toolbar__collapse" @click="onCollapse()">^</span>
+          <span class="calendar-toolbar__collapse" v-bind:class="{ '-rotate': collapsedCalendar }" @click="onCollapse()"></span>
         </div>
-        <span class="calendar-toolbar__next" @click="onNextMonth()">></span>
+        <span class="calendar-toolbar__next" v-if="!collapsedCalendar" @click="onNextMonth()"></span>
       </div>
       <div id="calendar-container"></div>
     </f7-block>
 
-    <f7-list media-list class="booking-events__wrapper" no-hairlines v-if="events && events.length">
+    <f7-list media-list class="booking-events__wrapper no-margin no-padding" no-hairlines v-if="events && events.length">
 
       <f7-list-group media-list v-if="previousEvents.length">
         <f7-list-item group-title class="booking-events__title">Previous</f7-list-item>
@@ -53,6 +49,7 @@
       <h2>{{$t('bookings.no_bookings', 'No bookings have been assigned')}}</h2>
       <p>{{$t('bookings.no_bookings_hint', 'Please check again later...')}}</p>
     </f7-block>
+
   </f7-page>
 </template>
 <script>
@@ -75,7 +72,7 @@ export default {
       events: fakeEvents,
       today: self.$moment().startOf("day"),
       toolbarDate: '',
-      collapseCalendar: true,
+      collapsedCalendar: false,
     };
   },
   mounted() {
@@ -84,7 +81,7 @@ export default {
 
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekLater = new Date().setDate(today.getDate() + 7);
+    const weekLater = new Date().setDate(today.getDate() + 3);
 
     self.calendar = app.f7.calendar.create({
       containerEl: '#calendar-container',
@@ -94,22 +91,23 @@ export default {
       touchMove: false,
       events: [
         {
+          date: today,
+          color: '#84c4f8'
+        },
+        {
+          date: today,
+          color: '#00ce7d'
+        },
+        {
           from: today,
           to: weekLater,
-          color: 'pink'
-        },
-        {
-          date: today,
-          color: 'blue'
-        },
-        {
-          date: today,
-          color: 'red'
+          color: '#ff4500'
         },
       ],
     })
 
     self.getToolbarDate()
+    self.onCollapse()
   },
   computed: {
     currentEvents() {
@@ -172,14 +170,16 @@ export default {
       const firstDayOfMonth = self.$moment().startOf('month').weekday()
       const currentDay = self.$moment().weekday()
       const weekOfMonth = Math.ceil((firstDayOfMonth + currentDay) / 7)
+      const calendar = document.getElementById('calendar-container')
       const rows = document.getElementsByClassName('calendar-month-current')[0].childNodes
 
       Array.prototype.forEach.call(rows, (row, index) => {
         if (index === weekOfMonth - 1) return
-        self.collapseCalendar ? row.classList.add('-hide') : row.classList.remove('-hide')
+        self.collapsedCalendar ? row.classList.remove('-hide') : row.classList.add('-hide')
       })
 
-      self.collapseCalendar = !self.collapseCalendar
+      self.collapsedCalendar ? calendar.classList.remove('collapsed') : calendar.classList.add('collapsed')
+      self.collapsedCalendar = !self.collapsedCalendar
     },
     onNextMonth() {
       const { calendar } = this
