@@ -1,20 +1,25 @@
+$mobile: 'max-width: 767px';
+
 .bookings-wrapper {
   &.page {
     background: #fafafa;
+  }
+
+  .booking-events__title {
+    text-transform: uppercase;
+    color: #666666;
+    background: #fafafa;
+    padding: 10px 20px;
+    font-size: 23px;
+    line-height: 1em;
+
+    @media screen and ($mobile) {
+    }
   }
 }
 
 .booking-events__wrapper {
   background: #fff;
-}
-
-.booking-events__title {
-  text-transform: uppercase;
-  color: #666666;
-  background: #fafafa;
-  padding: 15px 20px;
-  font-size: 16px;
-  line-height: 20px;
 }
 
 .booking-label {
@@ -25,14 +30,17 @@
     &:before {
       content: '';
       position: absolute;
-      font-size: 16px;
-      line-height: 20px;
-      padding: 4px;
+      font-size: 19px;
+      line-height: 1em;
+      padding: 3px;
       border-radius: 2px;
       text-transform: uppercase;
       left: 100%;
-      margin-left: 43px;
+      margin-left: 40px;
+      margin-top: 3px;
       color: #fff;
+      text-align: center;
+      min-width: 114px;
     }
   }
 
@@ -78,8 +86,8 @@
 
   .booking-event__description {
     color: #666666;
-    font-size: 16px;
-    line-height: 28px;
+    font-size: 23px;
+    line-height: 26px;
 
     &+.booking-event__description {
       margin-left: 35px;
@@ -87,12 +95,27 @@
   }
 
   .item-link {
-    padding: 15px 20px;
+    padding: 18px 20px;
+    position: relative;
+
+    &:before {
+      content: '';
+      position: absolute;
+      border: solid #cccccc;
+      border-width: 0 2px 2px 0;
+      width: 8px;
+      height: 8px;
+      top: 50%;
+      margin-top: -4px;
+      right: 29px;
+      transform: rotate(-45deg);
+    }
 
     .item-title {
       color: #000;
-      font-size: 20px;
-      line-height: 28px;
+      font-size: 30px;
+      line-height: 1em;
+      margin-bottom: 6px;
     }
 
     .item-media {
@@ -105,8 +128,12 @@
       padding: 0;
 
       .item-inner {
-        padding: 5px 0 0;
-        margin-left: 22px;
+        padding: 2px 0 0;
+        margin-left: 20px;
+
+        .item-title-row {
+          background: none;
+        }
 
         &:after {
           display: none;
