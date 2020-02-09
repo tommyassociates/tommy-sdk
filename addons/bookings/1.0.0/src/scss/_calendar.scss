@@ -3,7 +3,7 @@
   position: relative;
   max-width: 300px;
   margin: 0 auto;
-  padding: 10px 0;
+  padding: 10px 0 21px;
 }
 
 .calendar-toolbar__prev {
@@ -41,7 +41,7 @@
     border: solid #333333;
     border-width: 0 2px 2px 0;
     left: 100%;
-    margin-left: 15px;
+    margin-left: 17px;
     cursor: pointer;
     transform: rotate(-135deg);
     bottom: 0;
@@ -50,23 +50,23 @@
   &.-rotate {
     &:before {
       transform: rotate(45deg);
-      bottom: 5px;
+      bottom: 8px;
     }
   }
 }
 
 .calendar-toolbar__date {
-  font-size: 18px;
-  line-height: 22px;
+  font-size: 23px;
+  line-height: 1em;
   color: #333333;
 }
 
 #calendar-container {
   &.collapsed {
-    height: 72px;
+    height: 88px;
 
     .calendar-row {
-      height: 45px;
+      height: 51px;
 
       &.-hide {
         display: none;
@@ -80,19 +80,19 @@
     &:before {
       background: none;
     }
-    border-bottom: 1px solid #f1f1f1;
+    border-top: 1px solid #f1f1f1;
   }
 
   .calendar-week-header {
     background: none;
     height: auto;
-    padding: 5px 0;
-  }
+    padding: 2px 0 15px;
 
-  .calendar-week-day {
-    font-size: 16px;
-    line-height: 48px;
-    color: #333333;
+    .calendar-week-day {
+      font-size: 20px;
+      line-height: 1em;
+      color: #333333;
+    }
   }
 
   .calendar-day {
@@ -117,8 +117,8 @@
       left: 0;
       width: 100%;
       height: 100%;
-      font-size: 16px;
-      line-height: 48px;
+      font-size: 20px;
+      line-height: 51px;
     }
 
     &.calendar-day-today {
