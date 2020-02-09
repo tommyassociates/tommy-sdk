@@ -1,3 +1,5 @@
+$mobile: 'max-width: 767px';
+
 .calendar-toolbar {
   text-align: center;
   position: relative;
@@ -15,7 +17,12 @@
   left: 0;
   cursor: pointer;
   transform: rotate(45deg);
-  top: 14px;
+  top: 12px;
+
+  @media screen and ($mobile) {
+    width: 8px;
+    height: 8px;
+  }
 }
 
 .calendar-toolbar__next {
@@ -27,7 +34,12 @@
   right: 0;
   cursor: pointer;
   transform: rotate(-45deg);
-  top: 14px;
+  top: 12px;
+
+  @media screen and ($mobile) {
+    width: 8px;
+    height: 8px;
+  }
 }
 
 .calendar-toolbar__collapse {
@@ -45,12 +57,22 @@
     cursor: pointer;
     transform: rotate(-135deg);
     bottom: 0;
+
+    @media screen and ($mobile) {
+      width: 7px;
+      height: 7px;
+      bottom: 2px;
+    }
   }
 
   &.-rotate {
     &:before {
       transform: rotate(45deg);
       bottom: 8px;
+
+      @media screen and ($mobile) {
+        bottom: 7px;
+      }
     }
   }
 }
@@ -59,6 +81,10 @@
   font-size: 23px;
   line-height: 1em;
   color: #333333;
+
+  @media screen and ($mobile) {
+    font-size: 16px;
+  }
 }
 
 #calendar-container {
@@ -88,10 +114,18 @@
     height: auto;
     padding: 2px 0 15px;
 
+    @media screen and ($mobile) {
+      padding: 8px 0 15px;
+    }
+
     .calendar-week-day {
       font-size: 20px;
       line-height: 1em;
       color: #333333;
+
+      @media screen and ($mobile) {
+        font-size: 15px;
+      }
     }
   }
 

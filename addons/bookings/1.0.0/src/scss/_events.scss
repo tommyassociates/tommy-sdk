@@ -14,6 +14,8 @@ $mobile: 'max-width: 767px';
     line-height: 1em;
 
     @media screen and ($mobile) {
+      padding: 9px 10px;
+      font-size: 15px;
     }
   }
 }
@@ -41,6 +43,13 @@ $mobile: 'max-width: 767px';
       color: #fff;
       text-align: center;
       min-width: 114px;
+
+      @media screen and ($mobile) {
+        font-size: 14px;
+        margin-left: 20px;
+        margin-top: -2px;
+        min-width: 90px;
+      }
     }
   }
 
@@ -89,14 +98,28 @@ $mobile: 'max-width: 767px';
     font-size: 23px;
     line-height: 26px;
 
+    @media screen and ($mobile) {
+      font-size: 15px;
+      line-height: 19px;
+      display: block;
+    }
+
     &+.booking-event__description {
       margin-left: 35px;
+
+      @media screen and ($mobile) {
+        margin-left: 0;
+      }
     }
   }
 
   .item-link {
     padding: 18px 20px;
     position: relative;
+
+    @media screen and ($mobile) {
+      padding: 13px 10px;
+    }
 
     &:before {
       content: '';
@@ -109,6 +132,10 @@ $mobile: 'max-width: 767px';
       margin-top: -4px;
       right: 29px;
       transform: rotate(-45deg);
+
+      @media screen and ($mobile) {
+        right: 15px;
+      }
     }
 
     .item-title {
@@ -116,12 +143,22 @@ $mobile: 'max-width: 767px';
       font-size: 30px;
       line-height: 1em;
       margin-bottom: 6px;
+
+      @media screen and ($mobile) {
+        font-size: 18px;
+        margin-bottom: 4px;
+      }
     }
 
     .item-media {
       width: 64px !important;
       height: 64px !important;
       font-size: 21px;
+
+      @media screen and ($mobile) {
+        width: 50px !important;
+        height: 50px !important;
+      }
     }
 
     .item-content {
@@ -130,6 +167,11 @@ $mobile: 'max-width: 767px';
       .item-inner {
         padding: 2px 0 0;
         margin-left: 20px;
+
+        @media screen and ($mobile) {
+          padding: 2px 0 0;
+          margin-left: 10px;
+        }
 
         .item-title-row {
           background: none;
