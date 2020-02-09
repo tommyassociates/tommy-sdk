@@ -168,7 +168,7 @@ export default {
     onCollapse() {
       const self = this
       const firstDayOfMonth = self.$moment().startOf('month').weekday()
-      const currentDay = self.$moment().weekday()
+      const currentDay = new Date().getDate()
       const weekOfMonth = Math.ceil((firstDayOfMonth + currentDay) / 7)
       const calendar = document.getElementById('calendar-container')
       const rows = document.getElementsByClassName('calendar-month-current')[0].childNodes
