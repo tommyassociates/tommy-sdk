@@ -1,25 +1,11 @@
 const { api } = window.tommy
 
 const API = {
-  getShifts() {
-    return api
-      .call({
-        endpoint: 'workforce/shifts',
-        method: 'GET',
-      })
-      .then(data => {
-        return data
-      })
+  getWorkforceShifts(params = {}, options = {}) {
+    return api.getWorkforceShifts(Object.assign({}))
   },
-  getShift(id) {
-    return api
-      .call({
-        endpoint: 'workforce/shifts'+id,
-        method: 'GET',
-      })
-      .then(data => {
-        return data
-      })
+  getWorkforceShift(id = undefined, params = {}, options = {}) {
+    return api.getWorkforceShift(Object.assign({}, params), options)
   },
 }
 
