@@ -24,8 +24,8 @@
           <div class="item-media text-icon align-self-center" slot="content-start">
             <span>{{getDifferenceOfHours(event)}}</span>
           </div>
-          <span class="booking-event__description">Glod Coast University</span>
-          <span class="booking-event__description">Hospital</span>
+          <span class="booking-event__description">{{ event.title }}</span>
+          <span class="booking-event__description">{{ event.location }}</span>
         </f7-list-item>
       </f7-list-group>
 
@@ -38,8 +38,8 @@
           <div class="item-media text-icon align-self-center" slot="content-start">
             <span>{{getDifferenceOfHours(event)}}</span>
           </div>
-          <span class="booking-event__description">Glod Coast University</span>
-          <span class="booking-event__description">Hospital</span>
+          <span class="booking-event__description">{{ event.title }}</span>
+          <span class="booking-event__description">{{ event.location }}</span>
         </f7-list-item>
       </f7-list-group>
 
@@ -61,15 +61,8 @@ export default {
   data() {
     const self = this
 
-    const start_at = self.$moment().startOf('day')
-    const end_at = self.$moment().endOf('day')
-    const fakeEvents = [
-      { start_at: start_at, end_at: end_at },
-      { start_at: start_at, end_at: end_at },
-    ]
-
     return {
-      events: fakeEvents,
+      events: [],
       today: self.$moment().startOf("day"),
       toolbarDate: '',
       collapsedCalendar: false,
@@ -80,8 +73,8 @@ export default {
     const app = self.$app
 
     const now = new Date()
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekLater = new Date().setDate(today.getDate() + 3);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const weekLater = new Date().setDate(today.getDate() + 3)
 
     self.calendar = app.f7.calendar.create({
       containerEl: '#calendar-container',
@@ -108,6 +101,7 @@ export default {
 
     self.getToolbarDate()
     self.onCollapse()
+    // self.loadShifts()
   },
   computed: {
     currentEvents() {
@@ -119,7 +113,7 @@ export default {
     previousEvents() {
       const self = this;
       return self.events.filter(event => {
-        return self.$moment(event.start_at) <= self.today;
+        return self.$moment(event.start_at) < self.today;
       });
     },
   },
@@ -130,18 +124,18 @@ export default {
 
       return self.toolbarDate = params.monthNames[currentMonth] + ' ' + currentYear
     },
-    getEvents() {
-      const self = this
-
-      API.getEvents().then(data => self.events = data)
-    },
     getDifferenceOfHours(event) {
+      const self = this
       const { start_at, end_at } = event
 
-      const diffHours = end_at.diff(start_at, 'hours', true)
-      const formatHours = diffHours.toFixed(1).replace(/\.0$/, '')
+      if (end_at) {
+        const diffHours = self.$moment(end_at).diff(self.$moment(start_at), 'hours', true)
+        const formatHours = diffHours.toFixed(1).replace(/\.0$/, '')
+        return formatHours
+      } else {
+        return 5
+      }
 
-      return formatHours
     },
     eventTitle(event) {
       const self = this;
@@ -199,20 +193,27 @@ export default {
         }
       });
     },
+    // loadEvents() {
+    //   const self = this;
+    //   const actor_id = self.$f7route.query.actor_id;
+    //   const params = {
+    //     addon: "bookings",
+    //     kind: "Booking",
+    //     user_id: actor_id || self.$root.user.id
+    //   };
+    //   if (actor_id) {
+    //     params.actor_id = actor_id;
+    //   }
+    //   return self.$api.getEvents(params, { cache: false }).then(events => {
+    //     // self.events = events;
+    //   });
+    // },
     loadEvents() {
-      const self = this;
-      const actor_id = self.$f7route.query.actor_id;
-      const params = {
-        addon: "bookings",
-        kind: "Booking",
-        user_id: actor_id || self.$root.user.id
-      };
-      if (actor_id) {
-        params.actor_id = actor_id;
-      }
-      return self.$api.getEvents(params, { cache: false }).then(events => {
-        // self.events = events;
-      });
+      const self = this
+
+      return API.getWorkforceShifts().then(events => {
+        self.events = events
+      })
     }
   }
 };

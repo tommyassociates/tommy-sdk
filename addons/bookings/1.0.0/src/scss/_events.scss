@@ -177,6 +177,10 @@ $mobile: 'max-width: 767px';
           background: none;
         }
 
+        .item-text {
+          display: none;
+        }
+
         &:after {
           display: none;
         }
