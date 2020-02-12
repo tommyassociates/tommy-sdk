@@ -101,7 +101,6 @@ export default {
 
     self.getToolbarDate()
     self.onCollapse()
-    // self.loadShifts()
   },
   computed: {
     currentEvents() {
@@ -131,11 +130,11 @@ export default {
       if (end_at) {
         const diffHours = self.$moment(end_at).diff(self.$moment(start_at), 'hours', true)
         const formatHours = diffHours.toFixed(1).replace(/\.0$/, '')
+
         return formatHours
       } else {
-        return 5
+        return '-'
       }
-
     },
     eventTitle(event) {
       const self = this;
@@ -193,21 +192,6 @@ export default {
         }
       });
     },
-    // loadEvents() {
-    //   const self = this;
-    //   const actor_id = self.$f7route.query.actor_id;
-    //   const params = {
-    //     addon: "bookings",
-    //     kind: "Booking",
-    //     user_id: actor_id || self.$root.user.id
-    //   };
-    //   if (actor_id) {
-    //     params.actor_id = actor_id;
-    //   }
-    //   return self.$api.getEvents(params, { cache: false }).then(events => {
-    //     // self.events = events;
-    //   });
-    // },
     loadEvents() {
       const self = this
 

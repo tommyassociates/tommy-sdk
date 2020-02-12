@@ -5,7 +5,7 @@ const API = {
     return api.getWorkforceShifts(Object.assign({}))
   },
   getWorkforceShift(id = undefined, params = {}, options = {}) {
-    return api.getWorkforceShift(Object.assign({}, params), options)
+    return api.getWorkforceShift(Object.assign({}))
   },
 }
 
