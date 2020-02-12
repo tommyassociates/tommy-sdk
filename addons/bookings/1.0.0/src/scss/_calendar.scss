@@ -171,6 +171,10 @@ $mobile: 'max-width: 767px';
         bottom: 0;
         right: 0;
         z-index: 99;
+
+        @media screen and ($mobile) {
+          border-width: 0 0 18px 18px;
+        }
       }
     }
 
