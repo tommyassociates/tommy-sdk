@@ -1,4 +1,5 @@
-import tommy, { app, events, addons } from '../../tommy_app/src/tommy/tommy'; // eslint-disable-line
+// import tommy, { app, events, addons } from '../../tommy_app/src/tommy/tommy'; // eslint-disable-line
+import tommy, { app, events, addons } from 'tommy_core/src/tommy'; // eslint-disable-line
 import routes from './routes';
 import appComponent from './components/app.vue';
 import components from './components';
