@@ -19,7 +19,9 @@ let configCn = {};
 
 try {
   config = JSON.parse(fs.readFileSync('./config.json'), 'utf8');
-} catch (e) {}
+} catch (e) {
+  throw new Error('Cannot load config.json: ' + e)
+}
 
 try {
   configCn = JSON.parse(fs.readFileSync('./config-cn.json'), 'utf8');
@@ -72,7 +74,6 @@ function createAddon(host, action, pkg, version, archivePath, callback) {
     .catch((errs) => {
       callback('Upload failed', errs);
     });
-
 }
 
 function readLocalAddonVersions() {
@@ -90,7 +91,6 @@ function getLocalAddonFilePath(pkg, version, file) {
 
 function getSdkUrl() {
   return `http://localhost:${app.get('port')}`;
-  // url.resolve()
 }
 
 function readLocalAddon(pkg, version) {
@@ -168,6 +168,7 @@ app.use(express.static('www'));
 app.use(express.static('./'));
 
 app.get('/', (req, res) => {
+  // console.log('sdk config', config)
   res.render('index', {
     localAddons: readLocalAddons(),
     config,
@@ -200,8 +201,6 @@ app.post('/addon/archive/:package/:version', (req, res) => {
 
 app.post('/addon/sandbox/upload/:package/:version', (req, res) => {
   const pkg = req.params.package;
-
-
   const version = req.params.version;
   createAddonArchive(pkg, version, (err, archivePath) => {
     console.log('Created archive', archivePath);
@@ -218,8 +217,6 @@ app.post('/addon/sandbox/upload/:package/:version', (req, res) => {
 
 app.post('/addon/sandbox/update/:package/:version', (req, res) => {
   const pkg = req.params.package;
-
-
   const version = req.params.version;
   createAddonArchive(pkg, version, (err, archivePath) => {
     console.log('Created archive', archivePath);
@@ -236,8 +233,6 @@ app.post('/addon/sandbox/update/:package/:version', (req, res) => {
 
 app.post('/addon/store/submit/:package/:version', (req, res) => {
   const pkg = req.params.package;
-
-
   const version = req.params.version;
   createAddonArchive(pkg, version, (err, archivePath) => {
     console.log('Created archive', archivePath);
