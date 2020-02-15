@@ -1,0 +1,111 @@
+$mobile: 'max-width: 767px';
+$gray: #333;
+$light_gray: #999;
+$orange: #ff4500;
+$white: #fff;
+$background: #f1f1f1;
+
+.bookings-details {
+  background: $background;
+  color: $gray;
+  padding: 30px 0;
+
+  @media screen and ($mobile) {
+  }
+}
+
+.bookings-details__back {
+  .icon-only {
+    .material-icons {
+      color: $gray;
+      font-size: 40px;
+
+      @media screen and ($mobile) {
+      }
+    }
+  }
+}
+
+.navbar {
+  .bookings-details__title {
+    &.title {
+      color: $gray;
+      font-weight: 400;
+      font-size: 23px;
+      line-height: 1em;
+
+      @media screen and ($mobile) {
+        font-size: 20px;
+      }
+    }
+  }
+}
+
+.bookings-details__list {
+  &.list {
+    margin: 0;
+  }
+
+  .bookings-details__item {
+    .item-content {
+      border-bottom: 1px solid $background;
+      padding: 18px 20px;
+
+      @media screen and ($mobile) {
+        padding: 3px 13px;
+      }
+
+      .item-inner {
+        padding: 0;
+
+        &:after {
+          display: none;
+        }
+      }
+    }
+
+    .item-title {
+      color: $gray;
+      display: flex;
+      justify-content: space-between;
+      flex-direction: row;
+      flex-grow: 1;
+      font-size: 28px;
+      line-height: 1em;
+
+      @media screen and ($mobile) {
+        font-size: 18px;
+      }
+
+      .item-header {
+        color: $light_gray;
+        font-size: 28px;
+        line-height: 1em;
+
+        @media screen and ($mobile) {
+          font-size: 18px;
+        }
+      }
+    }
+  }
+}
+
+.bookings-details__button {
+  &.button {
+    color: $white;
+    background: $orange;
+    border: none;
+    border-radius: 5px;
+    height: auto;
+    padding: 20px;
+    margin: 29px 20px;
+    font-size: 29px;
+    line-height: 1em;
+
+    @media screen and ($mobile) {
+      border-radius: 5px;
+      margin: 18px 0;
+      font-size: 20px;
+    }
+  }
+}
