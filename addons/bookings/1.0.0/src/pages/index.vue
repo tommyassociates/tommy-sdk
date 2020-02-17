@@ -1,5 +1,9 @@
 <template>
-  <f7-page id="bookings__index" @page:afterin="loadEvents" ptr @ptr:refresh="onPtrRefresh" class="bookings-wrapper">
+  <f7-page id="bookings__index" @page:afterin="loadEvents" ptr @ptr:refresh="onPtrRefresh" class="bookings__wrapper">
+
+    <f7-navbar>
+      <tommy-nav-menu></tommy-nav-menu>
+    </f7-navbar>
 
     <f7-block class="no-margin no-padding">
       <div class="calendar-toolbar">
@@ -16,7 +20,7 @@
     <f7-list media-list class="booking-events__wrapper no-margin no-padding" no-hairlines v-if="events && events.length">
 
       <f7-list-group media-list v-if="previousEvents.length">
-        <f7-list-item group-title class="booking-events__title">Previous</f7-list-item>
+        <f7-list-item group-title class="booking-events__title">Open Shifts</f7-list-item>
         <f7-list-item v-for="(event, index) in previousEvents" :key="index" link="#" @click="loadEventDetails(event)"
           :title="eventTitle(event)" :text="eventText(event)"
           class="booking-event"
@@ -46,7 +50,7 @@
     </f7-list>
 
     <f7-block v-if="events && !events.length" class="no-data">
-      <h2>{{$t('bookings.no_bookings', 'No bookings have been assigned')}}</h2>
+      <h2>{{$t('bookings.no_bookings', 'No shifts found')}}</h2>
       <p>{{$t('bookings.no_bookings_hint', 'Please check again later...')}}</p>
     </f7-block>
 
@@ -60,43 +64,26 @@ import API from '../api'
 export default {
   data() {
     const self = this
+    const today = self.$moment().startOf('day')
 
     return {
       events: [],
-      today: self.$moment().startOf("day"),
+      selectedEvents: [],
+      today,
       toolbarDate: '',
       collapsedCalendar: false,
-    };
+    }
   },
   mounted() {
     const self = this
     const app = self.$app
 
-    const now = new Date()
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const weekLater = new Date().setDate(today.getDate() + 3)
-
     self.calendar = app.f7.calendar.create({
       containerEl: '#calendar-container',
-      toolbar: false,
-      value: [now],
+      events: self.selectedEvents,
       firstDay: 0,
+      toolbar: false,
       touchMove: false,
-      events: [
-        {
-          date: today,
-          color: '#84c4f8'
-        },
-        {
-          date: today,
-          color: '#00ce7d'
-        },
-        {
-          from: today,
-          to: weekLater,
-          color: '#ff4500'
-        },
-      ],
     })
 
     self.getToolbarDate()
@@ -117,6 +104,20 @@ export default {
     },
   },
   methods: {
+    getSelectedEvents(events) {
+      const selectedEvents = events.map(event => {
+        const { start_at, end_at } = event
+        const color = '#ff4500'
+
+        if (end_at) {
+          return { from: start_at, to: end_at, color }
+        } else {
+          return { date: start_at, color }
+        }
+      })
+
+      return selectedEvents
+    },
     getToolbarDate() {
       const self = this
       const { currentMonth, currentYear, params } = self.calendar
@@ -197,6 +198,11 @@ export default {
 
       return API.getWorkforceShifts().then(events => {
         self.events = events
+        self.selectedEvents = self.getSelectedEvents(events)
+        console.log(self.calendar.getValue())
+        self.calendar.setValue([new Date(2020, 2, 7)])
+        console.log(self.calendar.getValue())
+        self.calendar.update()
       })
     }
   }

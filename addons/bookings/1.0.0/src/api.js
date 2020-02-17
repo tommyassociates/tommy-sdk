@@ -2,10 +2,10 @@ const { api } = window.tommy
 
 const API = {
   getWorkforceShifts(params = {}, options = {}) {
-    return api.getWorkforceShifts(Object.assign({}))
+    return api.getEvents(Object.assign({}))
   },
   getWorkforceShift(id = undefined, params = {}, options = {}) {
-    return api.getWorkforceShift(Object.assign({}))
+    return api.getEvents(Object.assign({}))
   },
 }
 
