@@ -1,0 +1,13 @@
+<div class="navbar">
+  <div class="navbar-inner">
+    <div class="left sliding"><a href="#" class="back link"><i class="material-icons md-36">keyboard_arrow_left</i></a></div>
+    <div class="center sliding">{{t "event_details.title" ns="calendar" defaultValue="Details"}}</div>
+    <div class="right"><a href="{{addonAssetUrl "views/edit-event.html"}}&event_id={{url_query.event_id}}" class="link"><span>{{t "label.edit" ns="calendar" defaultValue="Edit"}}</span></a></div>
+  </div>
+</div>
+<div class="pages">
+  <div class="page navbar-through" id="calendar__event-details" data-page="calendar__event-details">
+    <div class="page-content">
+    </div>
+  </div>
+</div>
