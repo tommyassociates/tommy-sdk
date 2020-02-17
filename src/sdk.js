@@ -1,10 +1,16 @@
-// import tommy, { app, events, addons } from '../../tommy_app/src/tommy/tommy'; // eslint-disable-line
 import tommy, { app, events, addons } from 'tommy_core/src/tommy'; // eslint-disable-line
 import routes from './routes';
 import appComponent from './components/app.vue';
 import components from './components';
 
 const language = localStorage.language || 'en-US';
+
+import AppStyles from './scss/sdk.scss';
+// console.log('SDK_LOCAL_ADDONS', SDK_LOCAL_ADDONS)
+// console.log('SDK_CONFIG', SDK_CONFIG)
+// console.log('SANDBOX_URL', SANDBOX_URL)
+// console.log('API_URL', API_URL)
+// console.log('API_KEY', API_KEY)
 
 app.init({
   appEl: '#tommy-sdk',
@@ -78,14 +84,14 @@ app.init({
   methods: {
     mounted() {
       const self = this;
-      localStorage.setItem('serverUrl', window.SANDBOX_URL);
+      localStorage.setItem('serverUrl', SANDBOX_URL);
 
       // Auth
       self.$api
         .call({
           endpoint: 'sessions',
           method: 'POST',
-          data: { api_key: window.SDK_CONFIG.apiKey },
+          data: { api_key: API_KEY },
         })
         .then((response) => {
           self.setUser(response, response.token);
@@ -94,19 +100,42 @@ app.init({
           self.updateTeamMembers();
 
           events.$on('addonRoutesLoaded', (addon, addonRoutes) => {
-            self.$f7.routes.push(...addonRoutes);
-            self.$f7.views.main.routes.push(...addonRoutes);
+            // NOTE: Do not load routes here in order to support HMR
+            // self.$f7.routes.push(...addonRoutes);
+            // self.$f7.views.main.routes.push(...addonRoutes);
           });
           events.$on('addonLoaded', (addon) => {
             self.$root.addons.push(addon);
           });
-          window.SDK_LOCAL_ADDONS.forEach((addon) => {
+          SDK_LOCAL_ADDONS.forEach((addon) => {
             self.$addons.initAddon(addon).catch(() => {});
+
+            // Load the addon routes programatically for HMR
+            import(`../addons/${addon.package}/${addon.version}/src/addon.js`)
+              .then(m => {
+                const routes = m.default;
+                self.$f7.routes.push(...routes);
+                self.$f7.views.main.routes.push(...routes);
+
+                // Load the default addon if specified
+                if (SDK_CONFIG.autoloadAddonPath &&
+                    SDK_CONFIG.autoloadAddonPath === addon.entry_path) {
+                  const entryUrl = this.addonUrl(addon)
+                  console.log('loading initial addon', entryUrl)
+                  self.$f7.views.main.router.navigate(entryUrl)
+                }
+              })
           });
         })
         .catch((error) => {
-          self.$f7.dialog.alert(`Cannot connect to sandbox server: ${window.SANDBOX_ENDPOINT}: ${error}`);
+          self.$f7.dialog.alert(`Cannot connect to sandbox server: ${SANDBOX_ENDPOINT}: ${error}`);
         });
+    },
+    addonUrl(addon) {
+      const self = this;
+      let url = addon.entry_path;
+      if (self.$root.actorId) url += `?actor_id=${self.$root.actorId}`;
+      return url;
     },
   },
   f7ready(f7) { // eslint-disable-line
