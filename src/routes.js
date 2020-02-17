@@ -2,6 +2,8 @@ import Home from './pages/home.vue';
 import Settings from './pages/settings.vue';
 import AddonDetails from './pages/addon-details.vue';
 
+// FIXME
+
 const routes = [
   {
     path: '/',
