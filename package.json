@@ -6,7 +6,9 @@
   "license": "ISC",
   "description": "SDK for building Tommy addons.",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "repository": {
     "type": "git",

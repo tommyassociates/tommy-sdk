@@ -6,11 +6,15 @@ import components from './components';
 const language = localStorage.language || 'en-US';
 
 import AppStyles from './scss/sdk.scss';
+
 // console.log('SDK_LOCAL_ADDONS', SDK_LOCAL_ADDONS)
 // console.log('SDK_CONFIG', SDK_CONFIG)
 // console.log('SANDBOX_URL', SANDBOX_URL)
 // console.log('API_URL', API_URL)
 // console.log('API_KEY', API_KEY)
+
+if (!window.tommy)
+  window.tommy = tommy
 
 app.init({
   appEl: '#tommy-sdk',
