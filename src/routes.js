@@ -2,7 +2,7 @@ import Home from './pages/home.vue';
 import Settings from './pages/settings.vue';
 import AddonDetails from './pages/addon-details.vue';
 
-// FIXME
+import coreRoutes from 'tommy_core/src/routes';
 
 const routes = [
   {
@@ -17,6 +17,7 @@ const routes = [
     path: '/addon-details/:package/',
     component: AddonDetails,
   },
+  ...coreRoutes
 ];
 
 export default routes;

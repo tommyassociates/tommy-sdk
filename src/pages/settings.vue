@@ -11,12 +11,13 @@
         smart-select
         title="Current Account"
       >
-        <select :value="$root.account.id" @change="changeAccount">
+        <!-- {{ $root.account.id }} -->
+        <select :value="$root.account.id + ':' + $root.account.type" @change="changeAccount">
           <option
             v-for="(account, index) in $root.accounts"
             :key="index"
-            :value="account.id"
-          >{{account.name}} ({{account.kind}})</option>
+            :value="account.id + ':' + account.type"
+          >{{account.name}} ({{account.type}}: {{account.kind}})</option>
         </select>
       </f7-list-item>
     </f7-list>
@@ -49,22 +50,23 @@
     },
     methods: {
       changeActorId(e) {
-        const self = this;
         const actorId = parseInt(e.target.value, 10);
-        self.$root.setActorId(actorId);
+        this.$root.setActorId(actorId);
       },
       changeAccount(e) {
-        const self = this;
-        const accountId = parseInt(e.target.value, 10);
+        const data = e.target.value.split(':'),
+              accountId = parseInt(data[0], 10),
+              accountType = data[1];
         let newAccount;
-        self.$root.accounts.forEach((account) => {
-          if (account.id === accountId) newAccount = account;
+        this.$root.accounts.forEach(account => {
+          console.log(accountId, accountType, account)
+          if (account.id === accountId && account.type === accountType)
+            newAccount = account;
         });
         if (!newAccount) return;
         const { id, type, location_id } = newAccount; // eslint-disable-line
-        self.$root.changeAccount(id, type, location_id);
+        this.$root.changeAccount(id, type, location_id);
       },
     },
   };
 </script>
-
