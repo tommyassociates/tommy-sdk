@@ -149,7 +149,7 @@
 <script>
   import API from '../api';
   import taskStatus from '../utils/task-status';
-  import humanTime from '../utils/human-time';
+  import humanTime from 'tommy_core/src/utils/human-time';
   import taskStatuses from '../utils/task-statuses';
   import participantsSelect from '../components/participants-select.vue';
 

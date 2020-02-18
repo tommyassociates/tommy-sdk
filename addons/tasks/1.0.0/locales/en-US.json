@@ -32,18 +32,8 @@
   "board-setting": {
     "list-management": "List Management"
   },
-  "date_range": {
-    "none": "None",
-    "today": "Today",
-    "week": "This Week",
-    "month": "This Month"
-  },
   "common": {
     "search_members_tags": "Search Members, Tags",
-    "date_range": "Date Range",
-    "choose_range": "Choose Range",
-    "start_date": "Start Date",
-    "end_date": "End Date",
     "deadline": "Deadline"
   },
   "status": {

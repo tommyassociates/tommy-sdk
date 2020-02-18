@@ -1,12 +1,12 @@
-$color_custom: #ff4500;
-$svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$color_custom}'><path d='M0,2V0h22v2H0z'/><path d='M0,7V5h22v2H0z'/><path d='M0,12v-2h22v2H0z'/></svg>";
-@function url-friendly-colour($colour) {
-  @return '%23'+str-slice('#{$colour}', 2, -1)
-}
-
-@mixin encoded-svg-background($svg) {
-  background-image: url("data:image/svg+xml;charset=utf-8,#{$svg}");
-}
+// $tommy-red: #ff4500;
+// $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$tommy-red}'><path d='M0,2V0h22v2H0z'/><path d='M0,7V5h22v2H0z'/><path d='M0,12v-2h22v2H0z'/></svg>";
+// @function url-friendly-colour($colour) {
+//   @return '%23'+str-slice('#{$colour}', 2, -1)
+// }
+//
+// @mixin encoded-svg-background($svg) {
+//   background-image: url("data:image/svg+xml;charset=utf-8,#{$svg}");
+// }
 
 .page.tasks-page {
   .item-input-full-width {
@@ -21,7 +21,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
       padding: 0 12px 0 0;
       overflow: hidden;
       background: #FFF7F4;
-      border: solid 1px $color_custom;
+      border: solid 1px $tommy-red;
       border-radius: 8px;
       font-size: inherit;
       &:first-child {
@@ -34,7 +34,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
         font-weight: 300;
         line-height: normal;
         border-radius: 0;
-        background: $color_custom;
+        background: $tommy-red;
         i.icon {
           font-size: 23px;
           height: 23px;
@@ -250,65 +250,65 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
           &[type=checkbox]:checked {
             &+.item-media i.icon-form-checkbox,
             &+.checkbox {
-              background: $color_custom#{"!important"}
+              background: $tommy-red#{"!important"}
             }
           }
         }
       }
     }
-    .item-divider {
-      padding: 10px 16px;
-      font-size: 14px;
-      color: #666666;
-      background: #f7f7f7 !important;
-      &::before {
-        display: none
-      }
-    }
-    &.list-custom {
-      margin-top: 0;
-      margin-bottom: 0;
-      &.inset {
-        ul li {
-          margin: 12px 0 0;
-          border-radius: 4px;
-          .item-inner::after {
-            display: none
-          }
-        }
-      }
-      ul {
-        border-radius: 0;
-        background: none;
-        li {
-          margin: 0;
-          background: #fff;
-          &.sorting {
-            background: #FBFBFB;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.20);
-          }
-          input {
-            font-size: inherit
-          }
-          input:checked + .icon-checkbox {
-            background-color: $color_custom
-          }
-          input:checked:disabled + .icon-checkbox {
-            background-color: #ccc
-          }
-        }
-      }
-      .list-button {
-        color: #999;
-        background: none;
-        &::after {
-          display: none
-        }
-      }
-      .sortable-handler {
-        @include encoded-svg-background($svg);
-      }
-    }
+    // .item-divider {
+    //   padding: 10px 16px;
+    //   font-size: 14px;
+    //   color: #666666;
+    //   background: #f7f7f7 !important;
+    //   &::before {
+    //     display: none
+    //   }
+    // }
+    // &.list-custom {
+    //   margin-top: 0;
+    //   margin-bottom: 0;
+    //   &.inset {
+    //     ul li {
+    //       margin: 12px 0 0;
+    //       border-radius: 4px;
+    //       .item-inner::after {
+    //         display: none
+    //       }
+    //     }
+    //   }
+    //   ul {
+    //     border-radius: 0;
+    //     background: none;
+    //     li {
+    //       margin: 0;
+    //       background: #fff;
+    //       &.sorting {
+    //         background: #FBFBFB;
+    //         box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.20);
+    //       }
+    //       input {
+    //         font-size: inherit
+    //       }
+    //       input:checked + .icon-checkbox {
+    //         background-color: $tommy-red
+    //       }
+    //       input:checked:disabled + .icon-checkbox {
+    //         background-color: #ccc
+    //       }
+    //     }
+    //   }
+    //   .list-button {
+    //     color: #999;
+    //     background: none;
+    //     &::after {
+    //       display: none
+    //     }
+    //   }
+    //   .sortable-handler {
+    //     @include encoded-svg-background($svg);
+    //   }
+    // }
   }
   .media-list {
     &.media-list-custom {
@@ -375,7 +375,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
         }
         .close {
           margin: 0 16px;
-          color: $color_custom
+          color: $tommy-red
         }
       }
     }
@@ -418,7 +418,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
       }
       i {
         font-size: 25px;
-        color: $color_custom
+        color: $tommy-red
       }
     }
   }
@@ -474,10 +474,10 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
   }
   .color-custom,
   .list .list-button.color-custom {
-    color: $color_custom
+    color: $tommy-red
   }
   .bg-custom {
-    background-color: $color_custom
+    background-color: $tommy-red
   }
   .label-switch .checkbox:before {
     background-color: #fff#{"!important"}
@@ -722,36 +722,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
 .tasks-participats-select {
 
 }
-.tasks-list-tags-select {
-  .tag-item .item-content {
-    padding: 0;
-  }
-}
-.tasks-tag-select ul {
-  background: transparent;
-}
-.tasks-tag-select-tags-list {
-  .tag-select-list-avatar,
-  .tag-select-list-icon {
-    width: 28px;
-    height: 28px;
-    background: #eee no-repeat center;
-    background-size: cover;
-    border-radius: 50%;
-    display: block;
-    text-align: center;
-    line-height: 28px;
-  }
-  .tag-select-list-icon {
-    background-image: linear-gradient(-270deg, #FF4500 0%, #FF7B00 100%);
-    img {
-      width: auto;
-      height: auto;
-      max-width: 80%;
-      vertical-align: middle;
-    }
-  }
-}
+
 
 .sheet-modal#task-participants-sheet {
   background: #fff;

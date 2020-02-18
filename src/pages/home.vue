@@ -38,6 +38,7 @@
     </f7-list>
   </f7-page>
 </template>
+
 <script>
   export default {
     mounted() {
