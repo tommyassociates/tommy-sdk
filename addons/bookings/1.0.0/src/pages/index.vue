@@ -19,39 +19,39 @@
 
     <f7-list media-list class="booking-events__wrapper no-margin no-padding" no-hairlines v-if="events && events.length">
 
-      <f7-list-group media-list v-if="previousEvents.length">
+      <f7-list-group media-list v-if="openShifts.length">
         <f7-list-item group-title class="booking-events__title">Open Shifts</f7-list-item>
-        <f7-list-item v-for="(event, index) in previousEvents" :key="index" link="#" @click="loadEventDetails(event)"
-          :title="eventTitle(event)" :text="eventText(event)"
+        <f7-list-item v-for="(shift, index) in openShifts" :key="index" link="#" @click="loadEventDetails(shift)"
+          :title="eventTitle(shift)" :text="eventText(shift)"
           class="booking-event"
         >
           <div class="item-media text-icon align-self-center" slot="content-start">
-            <span>{{getDifferenceOfHours(event)}}</span>
+            <span>{{getDifferenceOfHours(shift)}}</span>
           </div>
-          <span class="booking-event__description">{{ event.title }}</span>
-          <span class="booking-event__description">{{ event.location }}</span>
+          <span class="booking-event__description">{{ shift.title }}</span>
+          <span class="booking-event__description">{{ shift.location }}</span>
         </f7-list-item>
       </f7-list-group>
 
-      <f7-list-group media-list v-if="currentEvents.length">
+      <f7-list-group media-list v-if="currentShifts.length">
         <f7-list-item group-title class="booking-events__title">Current</f7-list-item>
-        <f7-list-item v-for="(event, index) in currentEvents" :key="index" link="#" @click="loadEventDetails(event)"
-          :title="eventTitle(event)" :text="eventText(event)"
+        <f7-list-item v-for="(shift, index) in currentShifts" :key="index" link="#" @click="loadEventDetails(shift)"
+          :title="eventTitle(shift)" :text="eventText(shift)"
           class="booking-event booking-label -processing"
         >
           <div class="item-media text-icon align-self-center" slot="content-start">
-            <span>{{getDifferenceOfHours(event)}}</span>
+            <span>{{getDifferenceOfHours(shift)}}</span>
           </div>
-          <span class="booking-event__description">{{ event.title }}</span>
-          <span class="booking-event__description">{{ event.location }}</span>
+          <span class="booking-event__description">{{ shift.title }}</span>
+          <span class="booking-event__description">{{ shift.location }}</span>
         </f7-list-item>
       </f7-list-group>
 
     </f7-list>
 
-    <f7-block v-if="events && !events.length" class="no-data">
-      <h2>{{$t('bookings.no_bookings', 'No shifts found')}}</h2>
-      <p>{{$t('bookings.no_bookings_hint', 'Please check again later...')}}</p>
+    <f7-block v-if="!currentShifts.length" class="no-data">
+      <h2>{{$t('No shifts found')}}</h2>
+      <p>{{$t('Please check again later...')}}</p>
     </f7-block>
 
   </f7-page>
@@ -72,6 +72,7 @@ export default {
       today,
       toolbarDate: '',
       collapsedCalendar: false,
+      selectedDate: today,
     }
   },
   mounted() {
@@ -81,25 +82,33 @@ export default {
     self.calendar = app.f7.calendar.create({
       containerEl: '#calendar-container',
       events: self.selectedEvents,
+      value: [self.today],
       firstDay: 0,
       toolbar: false,
       touchMove: false,
+      on: {
+        dayClick: (calendar, dayEl, year, month, day) => {
+          self.selectedDate = new Date(year, month, day)
+        },
+      },
     })
 
     self.getToolbarDate()
     self.onCollapse()
   },
   computed: {
-    currentEvents() {
+    currentShifts() {
+      const self = this
+      const selectedDate = self.$moment(new Date(self.selectedDate)).format('YYYY-MM-DD')
+
+      return self.events.filter(event => {
+        return self.$moment(event.start_at).format('YYYY-MM-DD') == selectedDate
+      })
+    },
+    openShifts() {
       const self = this;
       return self.events.filter(event => {
         return self.$moment(event.start_at) >= self.today;
-      });
-    },
-    previousEvents() {
-      const self = this;
-      return self.events.filter(event => {
-        return self.$moment(event.start_at) < self.today;
       });
     },
   },
@@ -198,11 +207,6 @@ export default {
 
       return API.getWorkforceShifts().then(events => {
         self.events = events
-        self.selectedEvents = self.getSelectedEvents(events)
-        console.log(self.calendar.getValue())
-        self.calendar.setValue([new Date(2020, 2, 7)])
-        console.log(self.calendar.getValue())
-        self.calendar.update()
       })
     }
   }

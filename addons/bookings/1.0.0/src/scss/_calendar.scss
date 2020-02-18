@@ -176,6 +176,14 @@ $mobile: 'max-width: 767px';
       }
     }
 
+    &.calendar-day-next {
+      height: 0;
+
+      .calendar-day-number {
+        display: none;
+      }
+    }
+
     &.calendar-day-has-events {
       .calendar-day-number {
         color: #fff;
@@ -196,7 +204,6 @@ $mobile: 'max-width: 767px';
     &.calendar-day-today {
       .calendar-day-number {
         background: none;
-        color: #ff4500;
       }
 
       &:before {
@@ -220,6 +227,7 @@ $mobile: 'max-width: 767px';
     &.calendar-day-selected {
       .calendar-day-number {
         background: none;
+        color: #ff4500;
       }
     }
   }

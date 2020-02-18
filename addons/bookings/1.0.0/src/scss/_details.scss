@@ -8,9 +8,12 @@ $background: #f1f1f1;
 .bookings-details {
   background: $background;
   color: $gray;
-  padding: 30px 0;
 
-  @media screen and ($mobile) {
+  .page-content {
+    padding-top: 0 !important;
+    margin: 0 auto;
+    max-width: 1024px;
+    background: none;
   }
 }
 
@@ -19,25 +22,20 @@ $background: #f1f1f1;
     .material-icons {
       color: $gray;
       font-size: 40px;
-
-      @media screen and ($mobile) {
-      }
     }
   }
 }
 
-.navbar {
-  .bookings-details__title {
-    &.title {
-      color: $gray;
-      font-weight: 400;
-      font-size: 23px;
-      line-height: 1em;
+.bookings-details__title {
+  text-align: center;
+  padding: 10px 0;
+  color: $gray;
+  font-weight: 400;
+  font-size: 23px;
+  line-height: 1em;
 
-      @media screen and ($mobile) {
-        font-size: 20px;
-      }
-    }
+  @media screen and ($mobile) {
+    font-size: 20px;
   }
 }
 
