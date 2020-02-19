@@ -1,5 +1,5 @@
 {
-  "name": "tommy_addon_sdk",
+  "name": "tommy-sdk",
   "version": "0.5.0",
   "author": "Kam Low <support@mytommy.com> (https://mytommy.com)",
   "homepage": "https://mytommy.com",
@@ -7,13 +7,15 @@
   "description": "SDK for building Tommy addons.",
   "scripts": {
     "start": "node server.js",
-    "copy-fonts": "cpy node_modules/framework7-icons/fonts/*.* src/fonts && cpy node_modules/material-design-icons/iconfont/*.{eot,ttf,woff,woff2} src/fonts",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "update:packages": "node scripts/wipe-dependencies.js && rm -rf node_modules && npm update --save-dev && npm update --save",
+    "copy-fonts": "ncp node_modules/tommy-core/src/fonts src/fonts",
+    "postinstall": "npm run copy-fonts"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tommyassociates/tommy_addon_sdk.git"
+    "url": "git+https://github.com/tommyassociates/tommy-sdk.git"
   },
   "keywords": [
     "tommy",
@@ -21,21 +23,19 @@
     "api"
   ],
   "dependencies": {
-    "dom7": "^2.1.3",
     "archiver": "^3.1.1",
-    "extract-loader": "^4.0.3",
+    "dom7": "^2.1.3",
     "framework7": "^3.6.2",
     "framework7-icons": "^0.9.1",
     "framework7-vue": "^3.6.2",
     "js-yaml": "^3.13.1",
     "junk": "^3.1.0",
     "leaflet": "^1.6.0",
-    "material-design-icons": "^3.0.1",
     "postcss-loader": "^3.0.0",
     "request": "^2.88.2",
     "template7": "^1.4.2",
-    "tommy_core": "*",
-    "vue": "^2.6.10"
+    "tommy-core": "*",
+    "vue": "^2.6.11"
   },
   "devDependencies": {
     "@babel/core": "^7.2.2",
@@ -43,19 +43,19 @@
     "@babel/plugin-syntax-jsx": "^7.2.0",
     "@babel/plugin-transform-runtime": "^7.2.0",
     "@babel/preset-env": "^7.3.1",
-    "autoprefixer": "^9.4.7",
     "babel-helper-vue-jsx-merge-props": "^2.0.3",
-    "babel-loader": "^8.0.5",
-    "babel-plugin-transform-vue-jsx": "^4.0.1",
-    "babel-preset-es2015": "^6.24.1",
-    "chalk": "^2.4.2",
+    "babel-loader": "^8.0.6",
+    "babel-plugin-syntax-jsx": "^6.18.0",
+    "babel-plugin-transform-vue-jsx": "^3.7.0",
+    "babel-preset-env": "^1.7.0",
+    "chalk": "^3.0.0",
     "clean-webpack-plugin": "^3.0.0",
-    "copy-webpack-plugin": "^4.6.0",
-    "cpy-cli": "^2.0.0",
-    "css-loader": "^1.0.1",
+    "copy-webpack-plugin": "^5.1.1",
+    "css-loader": "^3.4.2",
     "file-loader": "^2.0.0",
     "html-webpack-plugin": "^3.2.0",
     "mini-css-extract-plugin": "^0.4.5",
+    "ncp": "^2.0.0",
     "node-sass": "^4.13.1",
     "optimize-css-assets-webpack-plugin": "^5.0.1",
     "ora": "^3.0.0",
@@ -66,11 +66,11 @@
     "url-loader": "^3.0.0",
     "vue-loader": "^15.9.0",
     "vue-style-loader": "^4.1.2",
-    "vue-template-compiler": "^2.6.10",
+    "vue-template-compiler": "^2.6.11",
     "webpack": "^4.41.6",
     "webpack-bundle-analyzer": "^3.0.3",
     "webpack-cli": "^3.3.11",
-    "webpack-dev-server": "^3.7.2",
+    "webpack-dev-server": "^3.10.3",
     "webpack-hot-middleware": "^2.25.0"
   },
   "engines": {
