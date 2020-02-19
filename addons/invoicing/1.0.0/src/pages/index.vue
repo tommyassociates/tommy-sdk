@@ -96,7 +96,7 @@
 </template>
 <script>
 import API from "../api";
-import humanTime from "tommy_core/src/utils/human-time";
+import humanTime from "tommy-core/src/utils/human-time";
 
 export default {
   data() {

@@ -155,7 +155,7 @@
 <script>
   import API from '../api';
   import orderStatuses from '../utils/order-statuses';
-  import formatDateRange from 'tommy_core/src/utils/format-date-range';
+  import formatDateRange from 'tommy-core/src/utils/format-date-range';
   import tagSelect from '../components/tag-select.vue';
 
   export default {

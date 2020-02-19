@@ -2,7 +2,7 @@ import Home from './pages/home.vue';
 import Settings from './pages/settings.vue';
 import AddonDetails from './pages/addon-details.vue';
 
-import coreRoutes from 'tommy_core/src/routes';
+import coreRoutes from 'tommy-core/src/routes';
 
 const routes = [
   {

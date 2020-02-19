@@ -69,7 +69,7 @@
 </template>
 <script>
   import API from '../api';
-  import formatDateRange from 'tommy_core/src/utils/format-date-range';
+  import formatDateRange from 'tommy-core/src/utils/format-date-range';
   import formatAmountRange from '../utils/format-amount-range';
   import tagSelect from '../components/tag-select.vue';
 

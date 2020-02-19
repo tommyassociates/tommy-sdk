@@ -40,9 +40,9 @@
   </f7-page>
 </template>
 <script>
-  import TagSelect from 'tommy_core/src/components/tag-select';
-  import PermissionSelect from 'tommy_core/src/components/permission-select';
-  import DateRangeSelect from 'tommy_core/src/components/date-range-select';
+  import TagSelect from 'tommy-core/src/components/tag-select';
+  import PermissionSelect from 'tommy-core/src/components/permission-select';
+  import DateRangeSelect from 'tommy-core/src/components/date-range-select';
 
   export default {
     components: {
