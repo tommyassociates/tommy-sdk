@@ -7,6 +7,7 @@
   "description": "SDK for building Tommy addons.",
   "scripts": {
     "start": "node server.js",
+    "copy-fonts": "cpy node_modules/framework7-icons/fonts/*.* src/fonts && cpy node_modules/material-design-icons/iconfont/*.{eot,ttf,woff,woff2} src/fonts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
