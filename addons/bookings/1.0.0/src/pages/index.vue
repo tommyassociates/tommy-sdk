@@ -47,12 +47,12 @@
         </f7-list-item>
       </f7-list-group>
 
-    </f7-list>
+      <f7-block v-if="!currentShifts.length && !openShifts.length" class="no-data">
+        <h2>{{$t('No shifts found')}}</h2>
+        <p>{{$t('Please check again later...')}}</p>
+      </f7-block>
 
-    <f7-block v-if="!currentShifts.length" class="no-data">
-      <h2>{{$t('No shifts found')}}</h2>
-      <p>{{$t('Please check again later...')}}</p>
-    </f7-block>
+    </f7-list>
 
   </f7-page>
 </template>
@@ -71,7 +71,7 @@ export default {
       selectedEvents: [],
       today,
       toolbarDate: '',
-      collapsedCalendar: false,
+      collapsedCalendar: true,
       selectedDate: today,
     }
   },
@@ -207,6 +207,7 @@ export default {
 
       return API.getWorkforceShifts().then(events => {
         self.events = events
+        self.selectedEvents = self.getSelectedEvents(events)
       })
     }
   }
