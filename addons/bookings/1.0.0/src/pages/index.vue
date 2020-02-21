@@ -1,5 +1,9 @@
 <template>
-  <f7-page id="bookings__index" @page:afterin="loadEvents" ptr @ptr:refresh="onPtrRefresh" class="bookings-wrapper">
+  <f7-page id="bookings__index" @page:afterin="loadEvents" ptr @ptr:refresh="onPtrRefresh" class="bookings__wrapper">
+
+    <f7-navbar>
+      <tommy-nav-menu></tommy-nav-menu>
+    </f7-navbar>
 
     <f7-block class="no-margin no-padding">
       <div class="calendar-toolbar">
@@ -15,39 +19,39 @@
 
     <f7-list media-list class="booking-events__wrapper no-margin no-padding" no-hairlines v-if="events && events.length">
 
-      <f7-list-group media-list v-if="previousEvents.length">
-        <f7-list-item group-title class="booking-events__title">Previous</f7-list-item>
-        <f7-list-item v-for="(event, index) in previousEvents" :key="index" link="#" @click="loadEventDetails(event)"
-          :title="eventTitle(event)" :text="eventText(event)"
+      <f7-list-group media-list v-if="openShifts.length">
+        <f7-list-item group-title class="booking-events__title">Open Shifts</f7-list-item>
+        <f7-list-item v-for="(shift, index) in openShifts" :key="index" link="#" @click="loadEventDetails(shift)"
+          :title="eventTitle(shift)" :text="eventText(shift)"
           class="booking-event"
         >
           <div class="item-media text-icon align-self-center" slot="content-start">
-            <span>{{getDifferenceOfHours(event)}}</span>
+            <span>{{getDifferenceOfHours(shift)}}</span>
           </div>
-          <span class="booking-event__description">{{ event.title }}</span>
-          <span class="booking-event__description">{{ event.location }}</span>
+          <span class="booking-event__description">{{ shift.title }}</span>
+          <span class="booking-event__description">{{ shift.location }}</span>
         </f7-list-item>
       </f7-list-group>
 
-      <f7-list-group media-list v-if="currentEvents.length">
+      <f7-list-group media-list v-if="currentShifts.length">
         <f7-list-item group-title class="booking-events__title">Current</f7-list-item>
-        <f7-list-item v-for="(event, index) in currentEvents" :key="index" link="#" @click="loadEventDetails(event)"
-          :title="eventTitle(event)" :text="eventText(event)"
+        <f7-list-item v-for="(shift, index) in currentShifts" :key="index" link="#" @click="loadEventDetails(shift)"
+          :title="eventTitle(shift)" :text="eventText(shift)"
           class="booking-event booking-label -processing"
         >
           <div class="item-media text-icon align-self-center" slot="content-start">
-            <span>{{getDifferenceOfHours(event)}}</span>
+            <span>{{getDifferenceOfHours(shift)}}</span>
           </div>
-          <span class="booking-event__description">{{ event.title }}</span>
-          <span class="booking-event__description">{{ event.location }}</span>
+          <span class="booking-event__description">{{ shift.title }}</span>
+          <span class="booking-event__description">{{ shift.location }}</span>
         </f7-list-item>
       </f7-list-group>
 
     </f7-list>
 
-    <f7-block v-if="events && !events.length" class="no-data">
-      <h2>{{$t('bookings.no_bookings', 'No bookings have been assigned')}}</h2>
-      <p>{{$t('bookings.no_bookings_hint', 'Please check again later...')}}</p>
+    <f7-block v-if="!currentShifts.length" class="no-data">
+      <h2>{{$t('No shifts found')}}</h2>
+      <p>{{$t('Please check again later...')}}</p>
     </f7-block>
 
   </f7-page>
@@ -60,63 +64,84 @@ import API from '../api'
 export default {
   data() {
     const self = this
+    const today = self.$moment().startOf('day')
 
     return {
       events: [],
-      today: self.$moment().startOf("day"),
+      selectedEvents: [],
+      today,
       toolbarDate: '',
       collapsedCalendar: false,
-    };
+      selectedDate: today,
+    }
   },
   mounted() {
-    const self = this
-    const app = self.$app
-
-    const now = new Date()
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const weekLater = new Date().setDate(today.getDate() + 3)
-
-    self.calendar = app.f7.calendar.create({
-      containerEl: '#calendar-container',
-      toolbar: false,
-      value: [now],
-      firstDay: 0,
-      touchMove: false,
-      events: [
-        {
-          date: today,
-          color: '#84c4f8'
-        },
-        {
-          date: today,
-          color: '#00ce7d'
-        },
-        {
-          from: today,
-          to: weekLater,
-          color: '#ff4500'
-        },
-      ],
-    })
-
-    self.getToolbarDate()
-    self.onCollapse()
+    this.createCalendar()
+    this.getToolbarDate()
+    this.onCollapse()
   },
   computed: {
-    currentEvents() {
+    currentShifts() {
+      const self = this
+      const selectedDate = self.$moment(new Date(self.selectedDate))
+
+      return self.events.filter(event => {
+        return self.$moment(event.start_at) <= selectedDate, self.$moment(event.end_at) >= selectedDate
+      })
+    },
+    openShifts() {
       const self = this;
       return self.events.filter(event => {
         return self.$moment(event.start_at) >= self.today;
       });
     },
-    previousEvents() {
-      const self = this;
-      return self.events.filter(event => {
-        return self.$moment(event.start_at) < self.today;
-      });
-    },
   },
   methods: {
+    createCalendar() {
+      const self = this
+      const app = self.$app
+
+      self.calendar = app.f7.calendar.create({
+        containerEl: '#calendar-container',
+        events: self.selectedEvents,
+        value: [self.today],
+        firstDay: 0,
+        toolbar: false,
+        touchMove: false,
+        on: {
+          dayClick: (calendar, dayEl, year, month, day) => {
+            self.selectedDate = new Date(year, month, day)
+          },
+        },
+      })
+    },
+    destroyCalendar() {
+      const containerEl = document.querySelector('#calendar-container')
+
+      this.calendar.app.calendar.destroy(this.calendar.$el)
+      containerEl.removeChild(containerEl.firstChild)
+    },
+    getSelectedEvents(events) {
+      const selectedEvents = events.map(event => {
+        const { start_at, end_at } = event
+        const color = '#ff4500'
+
+        if (end_at) {
+          return { from: this.getFormatedDate(start_at), to: end_at, color }
+        } else {
+          return { date: start_at, color }
+        }
+      })
+
+      return selectedEvents
+    },
+    getFormatedDate(date) {
+      const year = this.$moment(date).year()
+      const month = this.$moment(date).month()
+      const day = this.$moment(date).date()
+
+      return new Date(year, month, day)
+    },
     getToolbarDate() {
       const self = this
       const { currentMonth, currentYear, params } = self.calendar
@@ -197,6 +222,12 @@ export default {
 
       return API.getWorkforceShifts().then(events => {
         self.events = events
+        self.selectedEvents = self.getSelectedEvents(events)
+
+        self.destroyCalendar()
+        self.createCalendar()
+        self.onCollapse()
+        self.onCollapse()
       })
     }
   }

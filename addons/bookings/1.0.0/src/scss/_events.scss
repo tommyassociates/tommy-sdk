@@ -1,6 +1,7 @@
 $mobile: 'max-width: 767px';
+$background: #f1f1f1;
 
-.bookings-wrapper {
+.bookings__wrapper {
   &.page {
     background: #fafafa;
   }
@@ -22,7 +23,7 @@ $mobile: 'max-width: 767px';
 }
 
 .booking-events__wrapper {
-  background: #fff;
+  background: $background;
 }
 
 .booking-label {

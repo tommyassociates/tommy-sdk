@@ -3,8 +3,9 @@
 
     <f7-navbar class="bookings-details__nav">
       <tommy-nav-back class="bookings-details__back"></tommy-nav-back>
-      <f7-nav-title class="bookings-details__title">Shift Details</f7-nav-title>
     </f7-navbar>
+
+    <f7-nav-title class="bookings-details__title">Shift Details</f7-nav-title>
 
     <f7-list no-hairlines class="bookings-details__list">
       <f7-list-item
