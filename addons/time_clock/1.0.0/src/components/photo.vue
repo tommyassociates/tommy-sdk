@@ -24,8 +24,8 @@ export default {
       const self = this;
       if (self.isCordova) {
         self.openCamera();
-        window.addEventListener("focus", self.CordovaCameraCheck, false);        
-        
+        window.addEventListener("focus", self.CordovaCameraCheck, false);
+
       } else {
         //wath the file form
         window.addEventListener("focus", self.FileCameraCheck, false);
@@ -91,10 +91,11 @@ export default {
               self.resolvePromise(data);
           });
         };
-        reader.error = error => {
+
+        reader.onError = error => {
           self.$emit("photo:error", error);
-          if (typeof self.rejectPromise === "function")
-            self.rejectPromise(error);
+            if (typeof self.rejectPromise === "function")
+              self.rejectPromise(error);
         };
         reader.readAsDataURL(file);
       }
