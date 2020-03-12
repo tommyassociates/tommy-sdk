@@ -4,6 +4,9 @@
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{$t('time_clock.index.title')}}</f7-nav-title>
       <f7-nav-right class="time-clock-navbar-links">
+        <f7-link href="/time-clock/add/" icon-only>
+          <f7-icon f7="plus" />
+        </f7-link>
         <f7-link href="/time-clock/search/" icon-only>
           <f7-icon f7="search" />
         </f7-link>
@@ -15,7 +18,7 @@
     <f7-toolbar
       :style="toolbarStyle"
       class="time-clock-main-toolbar"
-      v-if="shifts_enable && loaded.first"
+      v-if="attendances_enable && loaded.first"
     >
       <f7-button
         raised
@@ -71,7 +74,7 @@
 
       <!--<f7-block-title class="time-clock-divider">{{$t('time_clock.index.today_title')}}</f7-block-title>
       ADD SPLIT DAYS
-      
+
       -->
       <!--Events -->
       <Events
@@ -252,6 +255,21 @@ export default {
         }
       });
     },
+    getAttendancesActive() {
+      console.log('getAttendancesActive 1');
+      const self = this;
+      API.getAttendancesActive().then(data => {
+        console.log('getAttendancesActive 2');
+        console.log(data);
+        if (data.length > 0) {
+          //API.shifts_active_id = data[0].id;
+          self.attendances_enable = true;
+        } else {
+          //self.shifts_enable = false;
+        }
+      });
+
+    },
     prepareAttendances(data) {
       const self = this;
       data.forEach(e => {
@@ -336,7 +354,8 @@ export default {
   },
   mounted() {
     const self = this;
-    self.getShiftActive();
+    self.getAttendancesActive();
+    //self.getShiftActive();
     return Promise.all([
       self.$api.getInstalledAddonPermission(
         "time_clock",
@@ -368,6 +387,7 @@ export default {
       active_data: [],
       attendances_data: [],
       shifts_enable: false,
+      attendances_enable: true,
       loaded: {
         first: false,
         active: false,
