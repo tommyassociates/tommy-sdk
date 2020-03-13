@@ -15,10 +15,11 @@
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
+
+    <!-- v-if="attendances_enable && loaded.first" -->
     <f7-toolbar
       :style="toolbarStyle"
       class="time-clock-main-toolbar"
-      v-if="attendances_enable && loaded.first"
     >
       <f7-button
         raised
@@ -33,7 +34,7 @@
         v-if="clock_on && !break_on"
         @click="clockOffClick"
         class="time-clock-toolbar-button clock-off"
-      >{{$t('time_clock.index.clock_off_button')}}</f7-button>
+      >{{$t('time_clock.index.clock_off_button')}} {{ formatDuration() }}</f7-button>
       <f7-button
         raised
         fill
@@ -47,7 +48,7 @@
         v-if="break_on"
         @click="breakOffClick"
         class="time-clock-toolbar-button break-off"
-      >{{$t('time_clock.index.break_off_button')}}</f7-button>
+      >{{$t('time_clock.index.break_off_button')}} {{ formatDuration() }}</f7-button>
     </f7-toolbar>
     <f7-page-content :style="pageContentStyle">
       <!--Active -->
@@ -139,7 +140,7 @@ export default {
           height: "74px"
         };
       }
-    }
+    },
   },
   methods: {
     clockOnClick() {
@@ -183,6 +184,8 @@ export default {
             `attendance_stop.jpg`
           );
 
+          self.loaded.duration = 0;
+
           API.setAttendances(form).then(() => {
             self.updateAll();
             self.clock_on = false;
@@ -201,6 +204,10 @@ export default {
           status: "pause",
           address: cords.name
         };
+
+        self.loaded.duration = 0;
+        self.loaded.timestamp = self.$moment(new Date()).format();
+
         API.setAttendances(params).then(() => {
           self.updateAttendances();
           self.break_on = true;
@@ -218,6 +225,11 @@ export default {
           status: "resume",
           address: cords.name
         };
+
+        self.loaded.duration = 0;
+        //set back to the attendance timestamp
+        self.loaded.timestamp = self.$moment(self.active_data[0].timestamp).format();
+
         API.setAttendances(params).then(() => {
           self.updateAttendances();
           self.break_on = false;
@@ -244,34 +256,36 @@ export default {
         return self.$root.account;
       }
     },
-    getShiftActive() {
-      const self = this;
-      API.getShiftActive().then(data => {
-        if (data.length > 0) {
-          API.shifts_active_id = data[0].id;
-          self.shifts_enable = true;
-        } else {
-          //self.shifts_enable = false;
-        }
-      });
-    },
-    getAttendancesActive() {
-      console.log('getAttendancesActive 1');
-      const self = this;
-      API.getAttendancesActive().then(data => {
-        console.log('getAttendancesActive 2');
-        console.log(data);
-        if (data.length > 0) {
-          //API.shifts_active_id = data[0].id;
-          self.attendances_enable = true;
-        } else {
-          //self.shifts_enable = false;
-        }
-      });
-
-    },
+    // getShiftActive() {
+    //   const self = this;
+    //   API.getShiftActive().then(data => {
+    //     if (data.length > 0) {
+    //       API.shifts_active_id = data[0].id;
+    //       self.shifts_enable = true;
+    //     } else {
+    //       //self.shifts_enable = false;
+    //     }
+    //   });
+    // },
+    // getAttendancesActive() {
+    //   console.log('getAttendancesActive 1');
+    //   const self = this;
+    //   API.getAttendancesActive().then(data => {
+    //     console.log('getAttendancesActive 2');
+    //     console.log(data);
+    //     if (data.id > 0) {
+    //       API.attendances_active_id = data.id;
+    //       self.attendances_enable = true;
+    //     } else {
+    //       //self.shifts_enable = false;
+    //     }
+    //   });
+    // },
     prepareAttendances(data) {
       const self = this;
+      console.log('prepareAttendances');
+      console.log(data);
+
       data.forEach(e => {
         const user = self.$root.teamMembers.filter(
           member => member.user_id === e.user_id
@@ -281,6 +295,21 @@ export default {
       });
       return data;
     },
+
+    prepareAttendance(data) {
+      const self = this;
+      console.log('prepareAttendance');
+      console.log(data);
+
+      const user = self.$root.teamMembers.filter(
+        member => member.user_id === data.user_id
+      );
+      data.user_name = user[0].first_name + " " + user[0].last_name;
+      data.icon_url = user[0].icon_url;
+      return [data];
+    },
+
+
     updateAll() {
       const self = this;
       self.updateAttendances();
@@ -299,8 +328,9 @@ export default {
       const self = this;
       self.loaded.active = false;
       API.getAttendancesActive(null, false, self.viewOthers).then(data => {
-        self.active_data = self.prepareAttendances(data);
+        self.active_data = self.prepareAttendance(data);
         self.loaded.active = true;
+        self.loaded.timestamp = self.active_data[0].timestamp;
       });
     },
     checkPermision(p) {
@@ -345,17 +375,35 @@ export default {
         self.clock_on = false;
         self.break_on = false;
       }
-    }
+    },
+    formatDuration() {
+      const self = this;
+      return self.$moment.utc(self.$moment.duration(self.loaded.duration, "hours").asMilliseconds()).format("H:mm");
+    },
+    calculateDuration() {
+      const self = this;
+      const startTime = self.$moment(self.loaded.timestamp);
+      const endTime = self.$moment(new Date());
+      const duration = self.$moment.duration(endTime.diff(startTime));
+      self.loaded.duration = duration.asHours();
+    },
   },
   beforeDestroy() {
     const self = this;
     self.$events.$off("time_clock:attedance_edit", self.updateAll);
     self.$events.$off("time_clock:attedance_delete", self.updateAll);
+    clearInterval(self.loaded.interval);
   },
   mounted() {
     const self = this;
-    self.getAttendancesActive();
+    //self.getAttendancesActive();
     //self.getShiftActive();
+
+    self.loaded.interval = setInterval(() => {
+      self.calculateDuration();
+    }, 60000); //1minute
+
+
     return Promise.all([
       self.$api.getInstalledAddonPermission(
         "time_clock",
@@ -371,12 +419,15 @@ export default {
         self.updateStatus();
       });
       API.getAttendancesActive(null, false, self.viewOthers).then(data => {
-        self.active_data = self.prepareAttendances(data);
+        self.active_data = self.prepareAttendance(data);
         self.loaded.active = true;
+        self.loaded.timestamp = self.active_data[0].timestamp;
       });
     });
 
     API.getTest().then(data => console.log("TCL: mounted -> TEST", data));
+
+
   },
   data() {
     const self = this;
@@ -386,12 +437,14 @@ export default {
       break_on: false,
       active_data: [],
       attendances_data: [],
-      shifts_enable: false,
       attendances_enable: true,
       loaded: {
         first: false,
         active: false,
-        attendance: false
+        attendance: false,
+        duration: 0,
+        timestamp: false,
+        interval: false
       }
     };
   }

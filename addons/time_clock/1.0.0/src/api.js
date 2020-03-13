@@ -5,6 +5,7 @@ const API = {
   actorId: undefined,
   actor: undefined,
   shifts_active_id: undefined,
+  attendances_active_id: undefined,
   getTest(data = null, cache = true) {
     return api
       .call({
