@@ -53,7 +53,7 @@
     <f7-page-content :style="pageContentStyle">
       <!--Active -->
       <div class="time-clock-active" v-if="!viewOthers">
-        <f7-list media-list class="time-clock-list">
+        <f7-list media-list class="time-clock-list" v-if="active_data.length">
           <Events
             :data="active_data"
             :devider="$t('time_clock.index.active_title')"
