@@ -92,7 +92,7 @@
 import API from "../api";
 import ActiveAvatar from "../components/circle-avatar.vue";
 import Events from "../components/events.vue";
-import Photo from "../components/photo.vue";
+import Photo from 'tommy_core/src/components/photo.vue';
 import Geo from "../components/geo.vue";
 import Blob from "../mixins/baseToBlob.vue";
 
