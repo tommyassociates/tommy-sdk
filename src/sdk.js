@@ -115,6 +115,7 @@ app.init({
             self.$addons.initAddon(addon).catch(() => {});
 
             // Load the addon routes programatically for HMR
+            import(`../addons/${addon.package}/${addon.version}/src/addon.scss`)
             import(`../addons/${addon.package}/${addon.version}/src/addon.js`)
               .then(m => {
                 const routes = m.default;
