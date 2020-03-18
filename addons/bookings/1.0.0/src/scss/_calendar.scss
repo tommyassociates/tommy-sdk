@@ -1,5 +1,41 @@
 $mobile: 'max-width: 767px';
 
+.bookings__wrapper {
+  .page-content {
+    overflow: hidden;
+    padding-top: 0 !important;
+  }
+}
+
+.navbar {
+  display: inline-block;
+  width: auto;
+}
+
+.booking-events__wrapper {
+  display: flex;
+  flex-grow: 1;
+  height: 100%;
+
+  > .media-list {
+    flex-grow: 1;
+    height: 100%;
+
+    > ul {
+      height: 100%;
+      overflow-y: auto;
+    }
+  }
+}
+
+.navbar {
+   .icon-only {
+    .material-icons {
+      color: #333;
+    }
+  }
+}
+
 .calendar-toolbar {
   text-align: center;
   position: relative;
@@ -133,6 +169,16 @@ $mobile: 'max-width: 767px';
     position: relative;
 
     &.calendar-day-prev {
+      height: 0;
+
+      .calendar-day-number {
+        display: none;
+      }
+    }
+
+    &.calendar-day-next {
+      height: 0;
+
       .calendar-day-number {
         display: none;
       }
@@ -181,12 +227,10 @@ $mobile: 'max-width: 767px';
     &.calendar-day-selected {
       .calendar-day-number {
         background: none;
+        color: #ff4500;
       }
     }
   }
-
-
-
 
   .calendar-day-events {
     display: block;
@@ -218,8 +262,3 @@ $mobile: 'max-width: 767px';
     }
   }
 }
-
-
-
-
-
