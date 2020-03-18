@@ -3,6 +3,7 @@
     "title": "Time Clock",
     "active_title": "Active",
     "today_title": "Today",
+    "yesterday_title": "Yesterday",
     "more_button": "More",
     "clock_event_options":{
       "start": "Clock On",

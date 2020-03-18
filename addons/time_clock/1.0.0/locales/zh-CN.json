@@ -3,6 +3,7 @@
     "title": "时间表",
     "active_title": "已经激活",
     "today_title": "今天",
+    "yesterday_title": "昨天",
     "more_button": "更多",
     "clock_event_options":{
       "start": "上班打卡",

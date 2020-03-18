@@ -71,7 +71,9 @@ const API = {
         return data;
       });
   },
-  getAttendances(data = null, cache = false, others = false) {
+  getAttendances(data = null, cache = false, others = false, otherOptions = {}) {
+    console.log("getAttendances");
+    console.log(otherOptions);
       let options = {
         endpoint: "workforce/attendances",
         method: "GET",
@@ -80,7 +82,20 @@ const API = {
         cache: cache,
         data,
       }
-      if (!others) options.endpoint = options.endpoint + '?user_id='+ API.actorId;
+      // if (!others) options.endpoint = options.endpoint + '&user_id='+ API.actorId;
+
+      if (!others) {
+        otherOptions.user_id = API.actorId;
+      }
+
+      const querystring = Object.keys(otherOptions).map((key) => {
+        return encodeURIComponent(key) + '=' + encodeURIComponent(otherOptions[key])
+      }).join('&');
+
+      if (querystring) options.endpoint = options.endpoint + '?' + querystring;
+
+      console.log(options.endpoint);
+
       return api
       .call(options)
       .then(data => {
@@ -151,10 +166,33 @@ const API = {
       return data;
     });
   },
-  eventsSearch(val) {
-    return generateTest(3);
-  }
+
+
+  // eventsSearch(data) {
+  //   //return generateTest(3);
+  //
+  //   let options = {
+  //     endpoint: "workforce/attendances",
+  //     method: "GET",
+  //     with_permission_to: true,
+  //     with_filters: true,
+  //     cache: cache,
+  //     data,
+  //   }
+  //   if (!others) options.endpoint = options.endpoint + '?user_id='+ API.actorId;
+  //   return api
+  //     .call(options)
+  //     .then(data => {
+  //       return data;
+  //     });
+  //
+  //
+  //
+  // }
 };
+
+
+
 
 function generateTest(length) {
   const obj = {

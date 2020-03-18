@@ -5,13 +5,13 @@
       <f7-nav-title>{{$t('time_clock.index.title')}}</f7-nav-title>
       <f7-nav-right class="time-clock-navbar-links">
         <f7-link href="/time-clock/add/" icon-only>
-          <f7-icon f7="plus" />
+          <f7-icon f7="plus"/>
         </f7-link>
         <f7-link href="/time-clock/search/" icon-only>
-          <f7-icon f7="search" />
+          <f7-icon f7="search"/>
         </f7-link>
         <f7-link href="/time-clock/settings/" icon-only>
-          <f7-icon f7="gear" />
+          <f7-icon f7="gear"/>
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
@@ -27,426 +27,433 @@
         v-if="!clock_on && !break_on"
         @click="clockOnClick"
         class="time-clock-toolbar-button clock-on"
-      >{{$t('time_clock.index.clock_on_button')}}</f7-button>
+      >{{$t('time_clock.index.clock_on_button')}}
+      </f7-button>
       <f7-button
         raised
         fill
         v-if="clock_on && !break_on"
         @click="clockOffClick"
         class="time-clock-toolbar-button clock-off"
-      >{{$t('time_clock.index.clock_off_button')}} {{ formatDuration() }}</f7-button>
+      >{{$t('time_clock.index.clock_off_button')}} {{ formatDuration() }}
+      </f7-button>
       <f7-button
         raised
         fill
         v-if="clock_on && !break_on"
         @click="breakOnClick"
         class="time-clock-toolbar-button break-on"
-      >{{$t('time_clock.index.break_on_button')}}</f7-button>
+      >{{$t('time_clock.index.break_on_button')}}
+      </f7-button>
       <f7-button
         raised
         fill
         v-if="break_on"
         @click="breakOffClick"
         class="time-clock-toolbar-button break-off"
-      >{{$t('time_clock.index.break_off_button')}} {{ formatDuration() }}</f7-button>
+      >{{$t('time_clock.index.break_off_button')}} {{ formatDuration() }}
+      </f7-button>
     </f7-toolbar>
     <f7-page-content :style="pageContentStyle">
+
       <!--Active -->
       <div class="time-clock-active" v-if="!viewOthers">
-        <f7-list media-list class="time-clock-list" v-if="active_data.length">
-          <Events
-            :data="active_data"
-            :devider="$t('time_clock.index.active_title')"
-            :skeleton="1"
-            :loaded="loaded.active"
-          />
-        </f7-list>
+        <!--<f7-list media-list class="time-clock-list" v-if="formattedActiveData">-->
+        <Events
+          :data="formattedActiveData"
+          :skeleton="1"
+          :loaded="loaded.active"
+        />
+        <!-- </f7-list>-->
       </div>
+
 
       <div class="time-clock-active" v-if="viewOthers">
         <div class="time-clock-avatars-container">
           <Active-avatar
-            :data="active_data"
+            :data="activeData"
             :loaded="loaded.active"
             :devider="$t('time_clock.index.active_title')"
           />
         </div>
       </div>
 
-      <!--<f7-block-title class="time-clock-divider">{{$t('time_clock.index.today_title')}}</f7-block-title>
-      ADD SPLIT DAYS
 
-      -->
       <!--Events -->
       <Events
-        :data="attendances_data"
-        :devider="$t('time_clock.index.today_title')"
+        :data="formattedAttendanceData"
         :loaded="loaded.attendance"
       />
-      <Photo ref="photo" direction="front" />
-      <Geo ref="geo" />
+      <Photo ref="photo" direction="front"/>
+      <Geo ref="geo"/>
     </f7-page-content>
   </f7-page>
 </template>
 <script>
-import API from "../api";
-import ActiveAvatar from "../components/circle-avatar.vue";
-import Events from "../components/events.vue";
-import Photo from 'tommy_core/src/components/photo.vue';
-import Geo from "../components/geo.vue";
-import Blob from "../mixins/baseToBlob.vue";
+  import API from "../api";
+  import AttendanceService from "../services/attendance-service";
 
-/*
-TODO: add shift empty page
+  import ActiveAvatar from "../components/circle-avatar.vue";
+  import Events from "../components/events.vue";
+  import Photo from 'tommy_core/src/components/photo.vue';
+  import Geo from "../components/geo.vue";
+  import Blob from "../mixins/baseToBlob.vue";
 
-*/
-export default {
-  name: "TimeClock",
-  components: {
-    ActiveAvatar,
-    Events,
-    Photo,
-    Geo
-  },
-  mixins: [Blob],
-  created() {
-    const self = this;
-    API.actorId = self.getUserId();
-    API.actor = self.getActor();
-    self.$events.$on("time_clock:attedance_edit", self.updateAll);
-    self.$events.$on("time_clock:attedance_delete", self.updateAll);
-  },
-  computed: {
-    pageContentStyle() {
+
+  /*
+  TODO: add shift empty page
+
+  */
+  export default {
+    name: "TimeClock",
+    data() {
       const self = this;
-      if (self.clock_on && !self.break_on) {
-        return {
-          paddingBottom: "136px"
-        };
-      } else {
-        return {
-          paddingBottom: "74px"
-        };
-      }
+      return {
+        viewOthers: false,
+        clock_on: false,
+        break_on: false,
+        activeData: [],
+        formattedActiveData: {},
+        attendanceData: [],
+        formattedAttendanceData: {},
+        loaded: {
+          first: false,
+          active: false,
+          attendance: false,
+          duration: 0,
+          timestamp: false,
+          interval: false
+        }
+      };
     },
-    toolbarStyle() {
-      const self = this;
-      if (self.clock_on && !self.break_on) {
-        return {
-          height: "136px"
-        };
-      } else {
-        return {
-          height: "74px"
-        };
-      }
+    components: {
+      ActiveAvatar,
+      Events,
+      Photo,
+      Geo
     },
-  },
-  methods: {
-    clockOnClick() {
+    mixins: [Blob],
+    created() {
       const self = this;
-      self.$refs.geo.takeGeoAsync().then(cords => {
-        self.$refs.photo.takePhotoAsync().then(photo => {
-          const form = new FormData();
-          form.append("event_id", API.shifts_active_id);
-          form.append("latitude", cords.latitude);
-          form.append("longitude", cords.longitude);
-          form.append("accuracy", cords.accuracy);
-          form.append("status", "start");
-          form.append("address", cords.name);
-          form.append(
-            "image",
-            self.dataURLToBlob(photo),
-            `attendance_start.jpg`
-          );
+      API.actorId = self.getUserId();
+      API.actor = self.getActor();
+      self.$events.$on("time_clock:attedance_edit", self.updateAll);
+      self.$events.$on("time_clock:attedance_delete", self.updateAll);
+    },
+    computed: {
+      pageContentStyle() {
+        const self = this;
+        if (self.clock_on && !self.break_on) {
+          return {
+            paddingBottom: "136px"
+          };
+        } else {
+          return {
+            paddingBottom: "74px"
+          };
+        }
+      },
+      toolbarStyle() {
+        const self = this;
+        if (self.clock_on && !self.break_on) {
+          return {
+            height: "136px"
+          };
+        } else {
+          return {
+            height: "74px"
+          };
+        }
+      },
+    },
+    methods: {
+      clockOnClick() {
+        const self = this;
+        self.$refs.geo.takeGeoAsync().then(cords => {
+          self.$refs.photo.takePhotoAsync().then(photo => {
+            const form = new FormData();
+            form.append("event_id", API.shifts_active_id);
+            form.append("latitude", cords.latitude);
+            form.append("longitude", cords.longitude);
+            form.append("accuracy", cords.accuracy);
+            form.append("status", "start");
+            form.append("address", cords.name);
+            form.append(
+              "image",
+              self.dataURLToBlob(photo),
+              `attendance_start.jpg`
+            );
 
-          API.setAttendances(form).then(() => {
-            self.updateAll();
-            self.clock_on = true;
+            API.setAttendances(form).then(() => {
+              self.updateAll();
+              self.clock_on = true;
+            });
           });
         });
-      });
-    },
-    clockOffClick() {
-      const self = this;
-      self.$refs.geo.takeGeoAsync().then(cords => {
-        self.$refs.photo.takePhotoAsync().then(photo => {
-          const form = new FormData();
-          form.append("event_id", API.shifts_active_id);
-          form.append("latitude", cords.latitude);
-          form.append("longitude", cords.longitude);
-          form.append("accuracy", cords.accuracy);
-          form.append("status", "stop");
-          form.append("address", cords.name);
-          form.append(
-            "image",
-            self.dataURLToBlob(photo),
-            `attendance_stop.jpg`
-          );
+      },
+      clockOffClick() {
+        const self = this;
+        self.$refs.geo.takeGeoAsync().then(cords => {
+          self.$refs.photo.takePhotoAsync().then(photo => {
+            const form = new FormData();
+            form.append("event_id", API.shifts_active_id);
+            form.append("latitude", cords.latitude);
+            form.append("longitude", cords.longitude);
+            form.append("accuracy", cords.accuracy);
+            form.append("status", "stop");
+            form.append("address", cords.name);
+            form.append(
+              "image",
+              self.dataURLToBlob(photo),
+              `attendance_stop.jpg`
+            );
+
+            self.loaded.duration = 0;
+
+            API.setAttendances(form).then(() => {
+              self.updateAll();
+              self.clock_on = false;
+            });
+          });
+        });
+      },
+      breakOnClick() {
+        const self = this;
+        self.$refs.geo.takeGeoAsync().then(cords => {
+          const params = {
+            event_id: API.shifts_active_id,
+            latitude: cords.latitude,
+            longitude: cords.longitude,
+            accuracy: cords.accuracy,
+            status: "pause",
+            address: cords.name
+          };
 
           self.loaded.duration = 0;
+          self.loaded.timestamp = self.$moment(new Date()).format();
 
-          API.setAttendances(form).then(() => {
-            self.updateAll();
-            self.clock_on = false;
+          API.setAttendances(params).then(() => {
+            self.updateAttendances();
+            self.break_on = true;
           });
         });
-      });
-    },
-    breakOnClick() {
-      const self = this;
-      self.$refs.geo.takeGeoAsync().then(cords => {
-        const params = {
-          event_id: API.shifts_active_id,
-          latitude: cords.latitude,
-          longitude: cords.longitude,
-          accuracy: cords.accuracy,
-          status: "pause",
-          address: cords.name
-        };
+      },
+      breakOffClick() {
+        const self = this;
+        self.$refs.geo.takeGeoAsync().then(cords => {
+          const params = {
+            event_id: API.shifts_active_id,
+            latitude: cords.latitude,
+            longitude: cords.longitude,
+            accuracy: cords.accuracy,
+            status: "resume",
+            address: cords.name
+          };
 
-        self.loaded.duration = 0;
-        self.loaded.timestamp = self.$moment(new Date()).format();
+          self.loaded.duration = 0;
+          //set back to the attendance timestamp
+          self.loaded.timestamp = self.$moment(self.activeData.timestamp).format();
 
-        API.setAttendances(params).then(() => {
-          self.updateAttendances();
-          self.break_on = true;
+          API.setAttendances(params).then(() => {
+            self.updateAttendances();
+            self.break_on = false;
+          });
         });
-      });
-    },
-    breakOffClick() {
-      const self = this;
-      self.$refs.geo.takeGeoAsync().then(cords => {
-        const params = {
-          event_id: API.shifts_active_id,
-          latitude: cords.latitude,
-          longitude: cords.longitude,
-          accuracy: cords.accuracy,
-          status: "resume",
-          address: cords.name
-        };
+      },
+      getUserId() {
+        const self = this;
+        const userId = self.$f7route.query.actor_id;
+        if (userId) {
+          return Number(userId);
+        } else {
+          return Number(self.$root.account.user_id);
+        }
+      },
+      getActor() {
+        const self = this;
+        const userId = self.$f7route.query.actor_id;
+        if (userId) {
+          return self.$root.teamMembers.filter(
+            user => user.user_id === parseInt(self.userId, 10)
+          )[0];
+        } else {
+          return self.$root.account;
+        }
+      },
+      // getShiftActive() {
+      //   const self = this;
+      //   API.getShiftActive().then(data => {
+      //     if (data.length > 0) {
+      //       API.shifts_active_id = data[0].id;
+      //       self.shifts_enable = true;
+      //     } else {
+      //       //self.shifts_enable = false;
+      //     }
+      //   });
+      // },
+      // getAttendancesActive() {
+      //   console.log('getAttendancesActive 1');
+      //   const self = this;
+      //   API.getAttendancesActive().then(data => {
+      //     console.log('getAttendancesActive 2');
+      //     console.log(data);
+      //     if (data.id > 0) {
+      //       API.attendances_active_id = data.id;
+      //       self.attendances_enable = true;
+      //     } else {
+      //       //self.shifts_enable = false;
+      //     }
+      //   });
+      // },
 
-        self.loaded.duration = 0;
-        //set back to the attendance timestamp
-        self.loaded.timestamp = self.$moment(self.active_data[0].timestamp).format();
 
-        API.setAttendances(params).then(() => {
-          self.updateAttendances();
+      updateAll() {
+        const self = this;
+        self.updateAttendances();
+        self.updateAttendancesActive();
+      },
+      updateAttendances() {
+        const self = this;
+        self.loaded.attendance = false;
+        API.getAttendances(null, false, self.viewOthers).then(data => {
+          self.attendanceData = AttendanceService.prepareAttendances(data, self);
+          self.loaded.attendance = true;
+          self.updateStatus();
+        });
+      },
+      updateAttendancesActive() {
+        const self = this;
+        self.loaded.active = false;
+        API.getAttendancesActive(null, false, self.viewOthers).then(data => {
+          self.activeData = AttendanceService.prepareAttendance(data, self);
+          self.loaded.active = true;
+          self.loaded.timestamp = self.activeData.timestamp;
+        });
+      },
+      checkPermision(p) {
+        const self = this;
+        let view = p.filters.find(e => {
+          if (e.context === "members") {
+            if (e.user_id === API.actorId) return true;
+          } else if (e.context === "roles") {
+            if (API.actor.roles.indexOf(e.name) > 0) return true;
+          }
+        });
+        return typeof view !== "undefined";
+      },
+      updateStatus() {
+        const self = this;
+        const last_user_attedance = self.attendanceData.find(e => {
+          if ((e.user_id = API.actorId)) return true;
+        });
+        if (last_user_attedance) {
+          switch (last_user_attedance.status) {
+            case "start":
+              self.clock_on = true;
+              self.break_on = false;
+              break;
+            case "stop":
+              self.clock_on = false;
+              self.break_on = false;
+              break;
+            case "pause":
+              self.clock_on = true;
+              self.break_on = true;
+              break;
+            case "resume":
+              self.clock_on = true;
+              self.break_on = false;
+              break;
+            default:
+              self.clock_on = false;
+              self.break_on = false;
+          }
+        } else {
+          self.clock_on = false;
           self.break_on = false;
+        }
+      },
+      formatDuration() {
+        const self = this;
+        return self.$moment.utc(self.$moment.duration(self.loaded.duration, "hours").asMilliseconds()).format("H:mm");
+      },
+      calculateDuration() {
+        const self = this;
+        const startTime = self.$moment(self.loaded.timestamp);
+        const endTime = self.$moment(new Date());
+        const duration = self.$moment.duration(endTime.diff(startTime));
+        self.loaded.duration = duration.asHours();
+      },
+    },
+    beforeDestroy() {
+      const self = this;
+      self.$events.$off("time_clock:attedance_edit", self.updateAll);
+      self.$events.$off("time_clock:attedance_delete", self.updateAll);
+      clearInterval(self.loaded.interval);
+    },
+    mounted() {
+      const self = this;
+
+
+      //self.getAttendancesActive();
+      //self.getShiftActive();
+
+      self.loaded.interval = setInterval(() => {
+        self.calculateDuration();
+      }, 60000); //1minute
+
+
+      return Promise.all([
+        self.$api.getInstalledAddonPermission(
+          "time_clock",
+          "attendance_other_access",
+          {with_filters: true}
+        )
+      ]).then(v => {
+        self.viewOthers = self.checkPermision(v[0]);
+        API.getAttendances(null, false, self.viewOthers).then(data => {
+          self.attendanceData = AttendanceService.prepareAttendances(data, self);
+          self.formattedAttendanceData = AttendanceService.splitAttendanceIntoDays(self.attendanceData, self);
+          self.loaded.attendance = true;
+          self.loaded.first = true;
+          self.updateStatus();
+          self.calculateDuration();
+        });
+        API.getAttendancesActive(null, false, self.viewOthers).then(data => {
+          console.log('getAttendancesActive FNNN');
+          console.log(data);
+          self.activeData = AttendanceService.prepareAttendance(data, self);
+          self.formattedActiveData = AttendanceService.formatAttendanceActive(self.activeData, self);
+          self.loaded.active = true;
+          self.loaded.timestamp = self.activeData.timestamp;
         });
       });
-    },
-    getUserId() {
-      const self = this;
-      const userId = self.$f7route.query.actor_id;
-      if (userId) {
-        return Number(userId);
-      } else {
-        return Number(self.$root.account.user_id);
-      }
-    },
-    getActor() {
-      const self = this;
-      const userId = self.$f7route.query.actor_id;
-      if (userId) {
-        return self.$root.teamMembers.filter(
-          user => user.user_id === parseInt(self.userId, 10)
-        )[0];
-      } else {
-        return self.$root.account;
-      }
-    },
-    // getShiftActive() {
-    //   const self = this;
-    //   API.getShiftActive().then(data => {
-    //     if (data.length > 0) {
-    //       API.shifts_active_id = data[0].id;
-    //       self.shifts_enable = true;
-    //     } else {
-    //       //self.shifts_enable = false;
-    //     }
-    //   });
-    // },
-    // getAttendancesActive() {
-    //   console.log('getAttendancesActive 1');
-    //   const self = this;
-    //   API.getAttendancesActive().then(data => {
-    //     console.log('getAttendancesActive 2');
-    //     console.log(data);
-    //     if (data.id > 0) {
-    //       API.attendances_active_id = data.id;
-    //       self.attendances_enable = true;
-    //     } else {
-    //       //self.shifts_enable = false;
-    //     }
-    //   });
-    // },
-    prepareAttendances(data) {
-      const self = this;
-      console.log('prepareAttendances');
-      console.log(data);
 
-      data.forEach(e => {
-        const user = self.$root.teamMembers.filter(
-          member => member.user_id === e.user_id
-        );
-        e.user_name = user[0].first_name + " " + user[0].last_name;
-        e.icon_url = user[0].icon_url;
-      });
-      return data;
-    },
-
-    prepareAttendance(data) {
-      const self = this;
-      console.log('prepareAttendance');
-      console.log(data);
-
-      const user = self.$root.teamMembers.filter(
-        member => member.user_id === data.user_id
-      );
-      data.user_name = user[0].first_name + " " + user[0].last_name;
-      data.icon_url = user[0].icon_url;
-      return [data];
-    },
+      API.getTest().then(data => console.log("TCL: mounted -> TEST", data));
 
 
-    updateAll() {
-      const self = this;
-      self.updateAttendances();
-      self.updateAttendancesActive();
     },
-    updateAttendances() {
-      const self = this;
-      self.loaded.attendance = false;
-      API.getAttendances(null, false, self.viewOthers).then(data => {
-        self.attendances_data = self.prepareAttendances(data);
-        self.loaded.attendance = true;
-        self.updateStatus();
-      });
-    },
-    updateAttendancesActive() {
-      const self = this;
-      self.loaded.active = false;
-      API.getAttendancesActive(null, false, self.viewOthers).then(data => {
-        self.active_data = self.prepareAttendance(data);
-        self.loaded.active = true;
-        self.loaded.timestamp = self.active_data[0].timestamp;
-      });
-    },
-    checkPermision(p) {
-      const self = this;
-      let view = p.filters.find(e => {
-        if (e.context === "members") {
-          if (e.user_id === API.actorId) return true;
-        } else if (e.context === "roles") {
-          if (API.actor.roles.indexOf(e.name) > 0) return true;
-        }
-      });
-      return typeof view !== "undefined";
-    },
-    updateStatus() {
-      const self = this;
-      const last_user_attedance = self.attendances_data.find(e => {
-        if ((e.user_id = API.actorId)) return true;
-      });
-      if (last_user_attedance) {
-        switch (last_user_attedance.status) {
-          case "start":
-            self.clock_on = true;
-            self.break_on = false;
-            break;
-          case "stop":
-            self.clock_on = false;
-            self.break_on = false;
-            break;
-          case "pause":
-            self.clock_on = true;
-            self.break_on = true;
-            break;
-          case "resume":
-            self.clock_on = true;
-            self.break_on = false;
-            break;
-          default:
-            self.clock_on = false;
-            self.break_on = false;
-        }
-      } else {
-        self.clock_on = false;
-        self.break_on = false;
-      }
-    },
-    formatDuration() {
-      const self = this;
-      return self.$moment.utc(self.$moment.duration(self.loaded.duration, "hours").asMilliseconds()).format("H:mm");
-    },
-    calculateDuration() {
-      const self = this;
-      const startTime = self.$moment(self.loaded.timestamp);
-      const endTime = self.$moment(new Date());
-      const duration = self.$moment.duration(endTime.diff(startTime));
-      self.loaded.duration = duration.asHours();
-    },
-  },
-  beforeDestroy() {
-    const self = this;
-    self.$events.$off("time_clock:attedance_edit", self.updateAll);
-    self.$events.$off("time_clock:attedance_delete", self.updateAll);
-    clearInterval(self.loaded.interval);
-  },
-  mounted() {
-    const self = this;
-    //self.getAttendancesActive();
-    //self.getShiftActive();
 
-    self.loaded.interval = setInterval(() => {
-      self.calculateDuration();
-    }, 60000); //1minute
-
-
-    return Promise.all([
-      self.$api.getInstalledAddonPermission(
-        "time_clock",
-        "attendance_other_access",
-        { with_filters: true }
-      )
-    ]).then(v => {
-      self.viewOthers = self.checkPermision(v[0]);
-      API.getAttendances(null, false, self.viewOthers).then(data => {
-        self.attendances_data = self.prepareAttendances(data);
-        self.loaded.attendance = true;
-        self.loaded.first = true;
-        self.updateStatus();
-      });
-      API.getAttendancesActive(null, false, self.viewOthers).then(data => {
-        self.active_data = self.prepareAttendance(data);
-        self.loaded.active = true;
-        self.loaded.timestamp = self.active_data[0].timestamp;
-      });
-    });
-
-    API.getTest().then(data => console.log("TCL: mounted -> TEST", data));
-
-
-  },
-  data() {
-    const self = this;
-    return {
-      viewOthers: false,
-      clock_on: false,
-      break_on: false,
-      active_data: [],
-      attendances_data: [],
-      attendances_enable: true,
-      loaded: {
-        first: false,
-        active: false,
-        attendance: false,
-        duration: 0,
-        timestamp: false,
-        interval: false
-      }
-    };
-  }
-};
+  };
 </script>
+
+<style lang="scss">
+  //@TODO Move to tommycore
+  .ios .navbar i {
+    color: #333333;
+  }
+
+  .ios .toolbar {
+    background: #fff;
+
+    .toolbar-inner {
+      &:after {
+        background: linear-gradient(to top, rgba(0, 0, 0, .3) 0, rgba(0, 0, 0, .1) 40%, rgba(0, 0, 0, .05) 50%, rgba(0, 0, 0, 0.5) 80%, rgba(0, 0, 0, 0.5) 100%) !important;
+      }
+    }
+  }
+
+  .block-title {
+    background: #f1f1f1 !important;
+  }
+</style>

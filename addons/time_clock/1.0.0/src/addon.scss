@@ -193,6 +193,12 @@ label.label-radio input[type="radio"]:checked~.item-inner {
 }
 @import "../../../../node_modules/leaflet/dist/leaflet";
 
+//TODO : Move to core
+.ios .navbar i {
+  color: red; //#979797;
+}
+
+
 
 
 
@@ -391,4 +397,9 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
 
 .popover#task-participants-popover .popover-inner {
   max-height: 300px;
+}
+
+
+.ios .navbar i {
+  color: green;
 }

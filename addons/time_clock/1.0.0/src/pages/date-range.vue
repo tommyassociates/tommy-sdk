@@ -16,43 +16,14 @@
         :title="$t('time_clock.date_range.notset_label')"
         @change="rangeChange('notset')"
         :checked="date_range === 'notset'"
-      />
-      <f7-list-item
-        radio
-        name="range"
-        :title="$t('time_clock.date_range.active_label')"
-        @change="rangeChange('active')"
-        :checked="date_range === 'active'"
-      />
-      <f7-list-item
-        radio
-        name="range"
-        :title="$t('time_clock.date_range.today_label')"
-        @change="rangeChange('today')"
-        :checked="date_range === 'today'"
-      />
-      <f7-list-item
-        radio
-        name="range"
-        :title="$t('time_clock.date_range.week_label')"
-        @change="rangeChange('week')"
-        :checked="date_range === 'week'"
-      />
-      <f7-list-item
-        radio
-        name="range"
-        :title="$t('time_clock.date_range.month_label')"
-        @change="rangeChange('month')"
-        :checked="date_range === 'month'"
-      />
-      <f7-list-item
-        radio
-        name="range"
-        :title="$t('time_clock.date_range.custom_label')"
-        @change="rangeChange('custom')"
-        :checked="date_range === 'custom'"
-      />
-      <f7-list media-list class="custom" v-show="new_date_range === 'custom'">
+      >
+
+      </f7-list-item>
+
+      <f7-list>
+        <date-range-select></date-range-select>
+
+        <!--
         <f7-list-item
           :title="$t('time_clock.date_range.start_custom_label')"
           @click="openCalendarBegin()"
@@ -63,12 +34,16 @@
           @click="openCalendarEnd()"
           :after="dateEndField"
         ></f7-list-item>
+        -->
       </f7-list>
     </f7-list>
   </f7-page>
 </template>
 
 <script>
+
+import dateRangeSelect from 'tommy_core/src/components/date-range-select.vue';
+
 export default {
   name: "DateRange",
   props: {
@@ -81,6 +56,9 @@ export default {
         }
     },
     editRange: Function
+  },
+  components: {
+    dateRangeSelect
   },
   methods: {
     openCalendarBegin(){
@@ -106,7 +84,7 @@ export default {
           date = new Date();
       }else{
           date = new Date(self.new_date_range_custom.begin);
-      }      
+      }
       self.calendarBeginInstance = self.$f7.calendar.create({
         value: [date],
         openIn: "customModal",
@@ -127,7 +105,7 @@ export default {
           date = new Date();
       }else{
           date = new Date(self.new_date_range_custom.end);
-      }   
+      }
       self.calendarEndInstance = self.$f7.calendar.create({
         value: [date],
         openIn: "customModal",
