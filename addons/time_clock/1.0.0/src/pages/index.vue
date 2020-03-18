@@ -438,22 +438,5 @@
 </script>
 
 <style lang="scss">
-  //@TODO Move to tommycore
-  .ios .navbar i {
-    color: #333333;
-  }
 
-  .ios .toolbar {
-    background: #fff;
-
-    .toolbar-inner {
-      &:after {
-        background: linear-gradient(to top, rgba(0, 0, 0, .3) 0, rgba(0, 0, 0, .1) 40%, rgba(0, 0, 0, .05) 50%, rgba(0, 0, 0, 0.5) 80%, rgba(0, 0, 0, 0.5) 100%) !important;
-      }
-    }
-  }
-
-  .block-title {
-    background: #f1f1f1 !important;
-  }
 </style>

@@ -24,55 +24,56 @@
 .time-clock-active{
     background: #fff;
 }
-.block-title.time-clock-divider{
-    font-size: 14px;
-    font-weight: normal;
-    background: #e7e6e6;
-    color: #333;
-    height: 32px;
-    box-sizing: border-box;
-    padding: 8px 12px 2px;
-    margin: 0;
-}
-.time-clock-main-toolbar{
-    .toolbar-inner{
-        padding: 0 12px;
-        display: flex;
-        flex-flow: row wrap;
+
+.ios {
+  .toolbar.time-clock-main-toolbar {
+    background: white;
+    .toolbar-inner {
+      padding: 0 12px;
+      display: flex;
+      flex-flow: row wrap;
     }
-    &:after{
-        content: '';
-        position: absolute;
-        right: 0;
-        width: 100%;
-        top: auto;
-        bottom: 100%;
-        height: 10px;
-        pointer-events: none;
-        background: linear-gradient(to top,rgba(0,0,0,.3) 0%,rgba(0,0,0,.1) 40%,rgba(0,0,0,.05) 50%,rgba(0,0,0,0) 80%,rgba(0,0,0,0) 100%);
+
+    &:after {
+      content: '';
+      position: absolute;
+      right: 0;
+      width: 100%;
+      top: auto;
+      bottom: 100%;
+      height: 10px;
+      pointer-events: none;
+      background: linear-gradient(to top, rgba(0, 0, 0, .3) 0%, rgba(0, 0, 0, .1) 40%, rgba(0, 0, 0, .05) 50%, rgba(0, 0, 0, 0) 80%, rgba(0, 0, 0, 0) 100%);
     }
-    .time-clock-toolbar-button{
-        width: 100%;
-        height: 50px !important;
-        line-height: 50px !important;
-        font-size: 20px !important;
-        border-radius: 6px !important;
-        &:nth-child(2){
-            margin-top: 12px;
-        }
-        &.clock-on{
-            background-color: $tommy-green !important;
-        }
-        &.clock-off{
-            background-color: $tommy-red !important;
-        }
-        &.break-on{
-            background-color: $tommy-yellow !important;
-        }
-        &.break-off{
-            background-color: $tommy-red !important;
-        }
+
+    .time-clock-toolbar-button {
+      width: 100%;
+      height: 50px !important;
+      line-height: 50px !important;
+      font-size: 20px !important;
+      border-radius: 6px !important;
+
+      &:nth-child(2) {
+        margin-top: 12px;
+      }
+
+      &.clock-on {
+        background-color: $tommy-green !important;
+      }
+
+      &.clock-off {
+        background-color: $tommy-red !important;
+      }
+
+      &.break-on {
+        background-color: $tommy-yellow !important;
+      }
+
+      &.break-off {
+        background-color: $tommy-red !important;
+      }
     }
+  }
 }
 .time-clock-detail-page,
 .time-clock-map-page{
@@ -195,13 +196,6 @@ label.label-radio input[type="radio"]:checked~.item-inner {
     height: 100%;
 }
 // @import "../../../../node_modules/leaflet/dist/leaflet";
-
-//TODO : Move to core
-.ios .navbar i {
-  color: red; //#979797;
-}
-
-
 
 
 
@@ -403,6 +397,21 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
 }
 
 
-.ios .navbar i {
-  color: green;
+
+//TODO move to core.
+.ios {
+  .page {
+    background: #f1f1f1;
+  }
+  .navbar {
+    width: 100%;
+  }
+  .block-title {
+    margin-top: 0px;
+    margin-bottom: 0px;
+    color: #666;
+    background: #f1f1f1;
+    border-top: 1px solid #f1f1f1;
+    border-bottom: 1px solid #f1f1f1;
+  }
 }
