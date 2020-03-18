@@ -29,6 +29,7 @@
     transition: 0ms;
   }
   &.searchbar-enabled {
+    background: $tommy-red;
     color: #fff;
     input[type="search"] {
       color: #fff;
@@ -67,4 +68,3 @@
         line-height: 44px;
     }
 }
-

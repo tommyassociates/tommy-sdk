@@ -1,21 +1,24 @@
+@import '~tommy-core/src/scss/variables';
+@import '~tommy-core/src/scss/mixins';
+
+// $tommy-dark: #333333;
+// $tommy-green: #2EC8A1;
+// $tommy-red: #FF4500;
+// $tommy-yellow: #FF7B00;
+
+// @mixin encoded-svg-background($svg) {
+//   background-image: url("data:image/svg+xml;charset=utf-8,#{$svg}");
+// }
+
 @import "./scss/skeleton.scss";
 @import "./scss/circle-avatar.scss";
 @import "./scss/event-list.scss";
 @import "./scss/select-list.scss";
+@import "./scss/searchbar.scss";
 
 
-$dark: #333333;
-$green: #2EC8A1;
-$orange: #FF4500;
-$yellow: #FF7B00;
-
-@mixin encoded-svg-background($svg) {
-    background-image: url("data:image/svg+xml;charset=utf-8,#{$svg}");
-  }
-
-
-.time-clock-main-page{
-    color: $dark;
+.time-clock-main-page {
+    color: $tommy-dark;
 }
 
 .time-clock-active{
@@ -58,16 +61,16 @@ $yellow: #FF7B00;
             margin-top: 12px;
         }
         &.clock-on{
-            background-color: $green !important;
+            background-color: $tommy-green !important;
         }
         &.clock-off{
-            background-color: $orange !important;
+            background-color: $tommy-red !important;
         }
         &.break-on{
-            background-color: $yellow !important;
+            background-color: $tommy-yellow !important;
         }
         &.break-off{
-            background-color: $orange !important;
+            background-color: $tommy-red !important;
         }
     }
 }
@@ -191,7 +194,7 @@ label.label-radio input[type="radio"]:checked~.item-inner {
     width: 100%;
     height: 100%;
 }
-@import "../../../../node_modules/leaflet/dist/leaflet";
+// @import "../../../../node_modules/leaflet/dist/leaflet";
 
 //TODO : Move to core
 .ios .navbar i {
