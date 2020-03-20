@@ -68,12 +68,11 @@
       </div>
 
 
-      <div class="time-clock-active" v-if="viewOthers">
+      <div class="time-clock-active" v-if="viewOthers && activeData !== null">
         <div class="time-clock-avatars-container">
           <Active-avatar
-            :data="activeData"
+            :data="formattedActiveData"
             :loaded="loaded.active"
-            :devider="$t('time_clock.index.active_title')"
           />
         </div>
       </div>
