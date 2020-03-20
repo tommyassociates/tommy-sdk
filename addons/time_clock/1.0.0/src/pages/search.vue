@@ -31,9 +31,8 @@
         />
       </f7-list>
 
-
       <template v-if="isSearch">
-        <div class="time-clock-active" v-if="!viewOthers && activeData !== null">
+        <div class="time-clock-active" v-if="viewOthers && activeData !== null">
           <Events
             :data="formattedActiveData"
             :skeleton="1"
