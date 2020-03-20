@@ -7,6 +7,7 @@
     </f7-navbar>
     <f7-page-content ref="pageContent">
       <f7-list class="time-clock-searchbar-list">
+
         <date-range-select
           v-model="dateRange"
           @change="onDateRangeChange"
@@ -29,33 +30,24 @@
           ref="searhbar"
         />
       </f7-list>
-      <!--
-      <f7-block-title class="time-clock-divider">{{$t('time_clock.search.results_divider')}}</f7-block-title>
-      -->
-      <!--Events -->
-      <template v-if="loaded">
-        <!--
+
+
+      <template v-if="isSearch">
+        <div class="time-clock-active" v-if="!viewOthers && activeData !== null">
+          <Events
+            :data="formattedActiveData"
+            :skeleton="1"
+            :loaded="loaded.active"
+          />
+          <!-- </f7-list>-->
+        </div>
+
+
         <Events
-          :data="events_data"
-          :devider="$t('time_clock.index.active_title')"
-          :loaded="loaded"
-          v-if="events_data.length > 0"
-        >
-        </Events>
-        -->
-
-
+          :data="formattedAttendanceData"
+          :loaded="loaded.attendance"
+        />
       </template>
-      <template v-if="!loaded">
-      </template>
-
-
-
-
-      <Events
-        :data="formattedAttendanceData"
-        :loaded="loaded.attendance"
-      />
       <div class="not-found" v-if="attendanceData.length === 0"><p>{{$t('time_clock.search.not_found')}}</p></div>
 
     </f7-page-content>
@@ -65,6 +57,7 @@
   import API from "../api";
   import Events from "../components/events.vue";
   import dateRangeSelect from 'tommy_core/src/components/date-range-select.vue';
+  import AttendanceService from "../services/attendance-service";
 
   export default {
     name: "TimeClockSearch",
@@ -81,7 +74,7 @@
     data() {
       const self = this;
       return {
-        dateRange: null,
+        dateRange: '',
         delayTimerSearch: null,
         search: null,
         searchEnabled: false,
@@ -101,8 +94,15 @@
     },
     created() {
       const self = this;
+      API.actorId = API.getUserId(self);
+      API.actor = API.getActor(self);
     },
-    computed: {},
+    computed: {
+      isSearch() {
+        const self = this;
+        return self.dateRange || self.search;
+      }
+    },
     methods: {
       pageBeforeIn() {
         const self = this;
@@ -112,22 +112,6 @@
         const self = this;
         self.scrollTop = self.$refs.pageContent.$el.scrollTop;
       },
-      // dateRangeClick() {
-      //   const self = this;
-      //   self.$f7router.navigate('/time-clock/date-range/', {
-      //     props: {
-      //       date_range: self.date_range,
-      //       date_range_custom: self.date_range_custom,
-      //       editRange: self.editRange,
-      //     }
-      //   })
-      // },
-      // editRange(date_range, date_range_custom) {
-      //   const self = this;
-      //   self.date_range = date_range;
-      //   if (date_range === 'custom') self.date_range_custom = date_range_custom;
-      //   self.getSearchData(self.search);
-      // },
       onSearchbarSearch(val) {
         const self = this;
         self.search = val;
@@ -137,94 +121,51 @@
         }, 1000);
       },
       getSearchData(searchText) {
-        console.log('getSearchData');
         const self = this;
-
-        const otherOptions = {};
-        if (self.dateRange) {
-          otherOptions.date_range = self.dateRange;
-        }
-        if (searchText) {
-          otherOptions.search = searchText;
-        }
-
-        // if (val.length === 0) return;
-
-        self.loaded = false;
-        // const searchParams = {};
-        // searchParams.range = self.date_range;
-
-        // if (self.date_range === 'custom') {
-        //   searchParams.date_range = [
-        //     self.date_range_custom.begin,
-        //     self.date_range_custom.end
-        //   ];
-        // } else {
-        //   searchParams.date_range = self.date_range;
-        // }
-
-        // API.eventsSearch(searchParams).then(data => {
-        // let eventsData = [];
-        // data.forEach((dataItem, index) => {
-        //   let eventData = {};
-        //   eventData.timestamp = dataItem.date;
-        //   eventData.event = dataItem.event;
-        //   eventData.id = dataItem.id;
-        //   eventData.icon_url = dataItem.image;
-        //   eventData.name = dataItem.name;
-        //
-        //   eventsData.push(eventData);
-        // })
-        //   self.events_data = data;
-        //   self.loaded = true;
-        // });
-
-
-        console.log('GET SEARCH DATA');
-
-        //copied from index.
-        return Promise.all([
-          self.$api.getInstalledAddonPermission(
-            "time_clock",
-            "attendance_other_access",
-            {with_filters: true}
-          )
-        ]).then(v => {
-          self.viewOthers = self.checkPermision(v[0]);
-
-
-          API.getAttendances(null, false, self.viewOthers, otherOptions).then(data => {
-            self.events_data = API.prepareAttendances(data, self);
-            self.loaded = true;
-            // self.updateStatus();
-          });
-        });
-
-
+        self.search = searchText;
+        this.refreshSearchResults();
       },
       onSearchbarClear() {
-      },
-
-      //copied from index.
-      checkPermision(p) {
         const self = this;
-        let view = p.filters.find(e => {
-          if (e.context === "members") {
-            if (e.user_id === API.actorId) return true;
-          } else if (e.context === "roles") {
-            if (API.actor.roles.indexOf(e.name) > 0) return true;
-          }
-        });
-        return typeof view !== "undefined";
+        self.search = '';
       },
 
       onDateRangeChange(value) {
+        const self = this;
         console.log('search - date range change: ' + value);
       },
 
       onDateRangeSave(value) {
+        const self = this;
         console.log('search - date range save: ' + value);
-        this.dateRange = value;
+
+        //self.dateRange = value;
+
+        self.refreshSearchResults();
+      },
+
+
+      refreshSearchResults() {
+        const self = this;
+        const otherOptions = {};
+        if (self.dateRange) {
+          otherOptions.date_range = self.dateRange;
+        }
+        if (self.search) {
+          otherOptions.search = encodeURIComponent(self.search);
+        }
+
+        API.getAttendances(null, false, self.viewOthers, otherOptions).then(data => {
+          self.attendanceData = AttendanceService.prepareAttendances(data, self);
+          self.formattedAttendanceData = AttendanceService.splitAttendanceIntoDays(self.attendanceData, self);
+          self.loaded.attendance = true;
+          self.loaded.first = true;
+        });
+        API.getAttendancesActive(null, false, self.viewOthers, otherOptions).then(data => {
+          self.activeData = AttendanceService.prepareAttendance(data, self);
+          self.formattedActiveData = AttendanceService.formatAttendanceActive(self.activeData, self);
+          self.loaded.active = true;
+        });
       },
 
 
@@ -234,11 +175,19 @@
     },
     mounted() {
       const self = this;
-      if (self.start_search) {
-        self.search = self.start_search;
-        self.$refs.searhbar.enable();
-        self.getSearchData(self.start_search);
-      }
+
+      return Promise.all([
+        self.$api.getInstalledAddonPermission(
+          "time_clock",
+          "attendance_other_access",
+          {with_filters: true}
+        )
+      ]).then(v => {
+        self.viewOthers = API.checkPermision(v[0], self);
+        self.refreshSearchResults();
+      });
+
+
     }
   };
 </script>

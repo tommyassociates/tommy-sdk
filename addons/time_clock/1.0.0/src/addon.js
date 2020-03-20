@@ -4,37 +4,32 @@ import Detail from "./pages/detail.vue";
 import Search from "./pages/search.vue";
 import SelectPicker from "./pages/select-picker.vue";
 import MapPage from "./pages/map.vue";
-import DateRange from "./pages/date-range.vue";
 
 const routes = [
   {
     path: "/time-clock/",
-    component: Index,		
+    component: Index,
   },
   {
     path: "/time-clock/settings/",
-    component: Settings,		
+    component: Settings,
   },
   {
     path: "/time-clock/detail/:id",
-    component: Detail,		
+    component: Detail,
   },
   {
     path: "/time-clock/search/",
-    component: Search,		
+    component: Search,
   },
   {
     path: "/time-clock/select-picker/",
-    component: SelectPicker,		
+    component: SelectPicker,
   },
   {
     path: "/time-clock/map/",
-    component: MapPage,		
+    component: MapPage,
   },
-  {
-    path: "/time-clock/date-range/",
-    component: DateRange,		
-  }
 ];
 
 export default routes;

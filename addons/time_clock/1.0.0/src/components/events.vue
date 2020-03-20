@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div v-if="data">
     <div v-for="(days, index) in data"
          :key="'days_'+index"
          :title="index">
@@ -69,9 +69,7 @@
     },
     data() {
       const self = this;
-      return {
-        formattedData: []
-      };
+      return {};
     },
     mounted() {
       const self = this;

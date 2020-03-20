@@ -8,9 +8,6 @@ const AttendanceService = {
    * @returns {*}
    */
   prepareAttendances(data, self) {
-    // const self = this;
-    console.log('prepareAttendances');
-    console.log(data);
 
     data.forEach(e => {
       const user = self.$root.teamMembers.find(
@@ -29,18 +26,16 @@ const AttendanceService = {
    * @returns {*[]}
    */
   prepareAttendance(data, self) {
-    // const self = this;
-    console.log('prepareAttendance');
-    console.log(data);
 
-    if (typeof data === 'object' && data !== null) {
-      const user = self.$root.teamMembers.find(
-        member => member.user_id === data.user_id
-      );
-      data.user_name = `${user.first_name} ${user.last_name}`;
-      data.icon_url = user.icon_url;
-      return data;
-    }
+    if (data === null) return null;
+
+    const user = self.$root.teamMembers.find(
+      member => member.user_id === data.user_id
+    );
+    data.user_name = `${user.first_name} ${user.last_name}`;
+    data.icon_url = user.icon_url;
+    return data;
+
 
   },
 
@@ -52,14 +47,12 @@ const AttendanceService = {
    * @returns {*}
    */
   splitAttendanceIntoDays(data = [], self) {
-    console.log('splitAttendanceIntoDays FN');
-    console.log(data);
 
     //format the data.
     const today = self.$moment(new Date());
     const yesterday = self.$moment(new Date()).subtract(1, 'day');
 
-    const days = data.length ? data.reduce((days, attendance) => {
+    const days = data.reduce((days, attendance) => {
       const date = attendance.timestamp.split('T')[0];
       if (!days[date]) {
 
@@ -80,7 +73,7 @@ const AttendanceService = {
       }
       days[date].attendances.push(attendance);
       return days;
-    }, {}) : {};
+    }, {});
 
     return days;
   },
@@ -91,12 +84,12 @@ const AttendanceService = {
    * @param self
    * @returns {{[p: string]: {title: *, attendances: [*]}, active: {title: *, attendances: [*]}}}
    */
-  formatAttendanceActive(data, self) {
+  formatAttendanceActive(data = [], self) {
     const title = self.$t('time_clock.index.active_title');
     return {
       ['active']: {
         title,
-        attendances: [data]
+        attendances: data ? [data] : null
       }
     };
   },

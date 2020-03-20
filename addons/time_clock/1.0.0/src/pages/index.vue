@@ -57,7 +57,7 @@
     <f7-page-content :style="pageContentStyle">
 
       <!--Active -->
-      <div class="time-clock-active" v-if="!viewOthers">
+      <div class="time-clock-active" v-if="!viewOthers && activeData !== null">
         <!--<f7-list media-list class="time-clock-list" v-if="formattedActiveData">-->
         <Events
           :data="formattedActiveData"
@@ -135,8 +135,8 @@
     mixins: [Blob],
     created() {
       const self = this;
-      API.actorId = self.getUserId();
-      API.actor = self.getActor();
+      API.actorId = API.getUserId(self);
+      API.actor = API.getActor(self);
       self.$events.$on("time_clock:attedance_edit", self.updateAll);
       self.$events.$on("time_clock:attedance_delete", self.updateAll);
     },
@@ -260,26 +260,7 @@
           });
         });
       },
-      getUserId() {
-        const self = this;
-        const userId = self.$f7route.query.actor_id;
-        if (userId) {
-          return Number(userId);
-        } else {
-          return Number(self.$root.account.user_id);
-        }
-      },
-      getActor() {
-        const self = this;
-        const userId = self.$f7route.query.actor_id;
-        if (userId) {
-          return self.$root.teamMembers.filter(
-            user => user.user_id === parseInt(self.userId, 10)
-          )[0];
-        } else {
-          return self.$root.account;
-        }
-      },
+
       // getShiftActive() {
       //   const self = this;
       //   API.getShiftActive().then(data => {
@@ -326,21 +307,14 @@
         self.loaded.active = false;
         API.getAttendancesActive(null, false, self.viewOthers).then(data => {
           self.activeData = AttendanceService.prepareAttendance(data, self);
-          self.loaded.active = true;
-          self.loaded.timestamp = self.activeData.timestamp;
-        });
-      },
-      checkPermision(p) {
-        const self = this;
-        let view = p.filters.find(e => {
-          if (e.context === "members") {
-            if (e.user_id === API.actorId) return true;
-          } else if (e.context === "roles") {
-            if (API.actor.roles.indexOf(e.name) > 0) return true;
+          if (self.activeData !== null) {
+            self.loaded.timestamp = self.activeData.timestamp;
           }
+          self.formattedActiveData = AttendanceService.formatAttendanceActive(self.activeData, self);
+          self.loaded.active = true;
         });
-        return typeof view !== "undefined";
       },
+
       updateStatus() {
         const self = this;
         const last_user_attedance = self.attendanceData.find(e => {
@@ -375,14 +349,18 @@
       },
       formatDuration() {
         const self = this;
-        return self.$moment.utc(self.$moment.duration(self.loaded.duration, "hours").asMilliseconds()).format("H:mm");
+        if (self.activeData !== null) {
+          return self.$moment.utc(self.$moment.duration(self.loaded.duration, "hours").asMilliseconds()).format("H:mm");
+        }
       },
       calculateDuration() {
         const self = this;
-        const startTime = self.$moment(self.loaded.timestamp);
-        const endTime = self.$moment(new Date());
-        const duration = self.$moment.duration(endTime.diff(startTime));
-        self.loaded.duration = duration.asHours();
+        if (self.activeData !== null) {
+          const startTime = self.$moment(self.loaded.timestamp);
+          const endTime = self.$moment(new Date());
+          const duration = self.$moment.duration(endTime.diff(startTime));
+          self.loaded.duration = duration.asHours();
+        }
       },
     },
     beforeDestroy() {
@@ -410,7 +388,7 @@
           {with_filters: true}
         )
       ]).then(v => {
-        self.viewOthers = self.checkPermision(v[0]);
+        self.viewOthers = API.checkPermision(v[0], self);
         API.getAttendances(null, false, self.viewOthers).then(data => {
           self.attendanceData = AttendanceService.prepareAttendances(data, self);
           self.formattedAttendanceData = AttendanceService.splitAttendanceIntoDays(self.attendanceData, self);
@@ -420,12 +398,12 @@
           self.calculateDuration();
         });
         API.getAttendancesActive(null, false, self.viewOthers).then(data => {
-          console.log('getAttendancesActive FNNN');
-          console.log(data);
           self.activeData = AttendanceService.prepareAttendance(data, self);
-          self.formattedActiveData = AttendanceService.formatAttendanceActive(self.activeData, self);
+          if (self.activeData !== null) {
+            self.formattedActiveData = AttendanceService.formatAttendanceActive(self.activeData, self);
+            self.loaded.timestamp = self.activeData.timestamp;
+          }
           self.loaded.active = true;
-          self.loaded.timestamp = self.activeData.timestamp;
         });
       });
 
