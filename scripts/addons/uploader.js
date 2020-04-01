@@ -1,26 +1,26 @@
-const fs = require('fs');
-const request = require('request');
-const url = require('url');
-const helpers = require('../helpers');
-const addonBuilder = require('./builder');
-const addonArchiver = require('./archiver');
+const fs = require('fs')
+const request = require('request')
+const url = require('url')
+const helpers = require('../helpers')
+const addonBuilder = require('./builder')
+const addonArchiver = require('./archiver')
 
 
 module.exports = async function(action, pkg, version, callback) {
   const urls = [];
   if (helpers.getConfig() && helpers.getConfig().apiEndpoint) {
-    urls.push(`${helpers.getConfig().apiEndpoint}/v1/addons/${action}?api_key=${helpers.getConfig().apiKey}`);
+    urls.push(`${helpers.getConfig().apiEndpoint}/v1/addons/${action}?api_key=${helpers.getConfig().apiKey}`)
   }
   if (helpers.getCnConfig() && helpers.getCnConfig().apiEndpoint) {
-    urls.push(`${helpers.getCnConfig().apiEndpoint}/v1/addons/${action}?api_key=${helpers.getCnConfig().apiKey}`);
+    urls.push(`${helpers.getCnConfig().apiEndpoint}/v1/addons/${action}?api_key=${helpers.getCnConfig().apiKey}`)
   }
 
   await addonBuilder(pkg, version)
   await addonArchiver(pkg, version)
 
-  const archivePath = helpers.archivePath(pkg, version);
+  const archivePath = helpers.archivePath(pkg, version)
   const promises = urls.map(url => new Promise((resolve, reject) => {
-    console.log('uploading to ', url, archivePath);
+    console.log('uploading to ', url, archivePath)
     request.post({
       url,
       formData: {
@@ -30,26 +30,26 @@ module.exports = async function(action, pkg, version, callback) {
       },
     }, (err, httpResponse, body) => {
       if (!err && httpResponse.statusCode === 201) {
-        console.log('addon uploaded to ', url);
-        resolve(JSON.parse(body));
+        console.log('addon uploaded to ', url)
+        resolve(JSON.parse(body))
       } else {
         let errMessage;
         try {
-          errMessage = JSON.parse(body);
+          errMessage = JSON.parse(body)
         } catch (e) {}
-        console.error('addon upload error', url, errMessage);
-        reject(errMessage || err);
+        console.error('addon upload error', url, errMessage)
+        reject(errMessage || err)
       }
-    });
-  }));
+    })
+  }))
 
   Promise.all(promises)
     .then((jsons) => {
-      callback(null, jsons);
+      callback(null, jsons)
     })
     .catch((errs) => {
-      callback('addon batch upload failed', errs);
-    });
+      callback('addon batch upload failed', errs)
+    })
 }
 
 
@@ -59,17 +59,17 @@ module.exports = async function(action, pkg, version, callback) {
 // let configCn;
 
 // function resolvePath() {
-//   let args = Array.prototype.slice.call(arguments);
-//   args = [__dirname, '..'].concat(args);
+//   let args = Array.prototype.slice.call(arguments)
+//   args = [__dirname, '..'].concat(args)
 //   // console.log('AAAA', args)
-//   // return path.join.apply(path.join, args);
-//   return path.join.apply(path.join, args);
-//   // return path.join(__dirname, '..', dir);
+//   // return path.join.apply(path.join, args)
+//   return path.join.apply(path.join, args)
+//   // return path.join(__dirname, '..', dir)
 // }
 //
 // function getFilteredFiles(dir, pkg) {
-//   let files = fs.readdirSync(dir, pkg);
-//   files = files.filter(junk.not);
+//   let files = fs.readdirSync(dir, pkg)
+//   files = files.filter(junk.not)
 //   return files;
 // }
 //
@@ -78,7 +78,7 @@ module.exports = async function(action, pkg, version, callback) {
 //     return config
 //
 //   try {
-//     config = JSON.parse(fs.readFileSync(resolvePath('config.json')), 'utf8');
+//     config = JSON.parse(fs.readFileSync(resolvePath('config.json')), 'utf8')
 //     return config
 //   } catch (e) {
 //     throw new Error('Cannot load config.json: ' + e)
@@ -90,7 +90,7 @@ module.exports = async function(action, pkg, version, callback) {
 //     return config
 //
 //   try {
-//     configCn = JSON.parse(fs.readFileSync(resolvePath('config-cn.json')), 'utf8');
+//     configCn = JSON.parse(fs.readFileSync(resolvePath('config-cn.json')), 'utf8')
 //     return configCn
 //   } catch (e) {}
 // }
@@ -123,9 +123,9 @@ module.exports = async function(action, pkg, version, callback) {
 // // function buildAddon(pkg, version) {
 // //   addonBuilder(pkg, version)
 // //     .then((jsons) => {
-// //       callback(null, jsons);
+// //       callback(null, jsons)
 // //     })
 // //     .catch((errs) => {
-// //       callback('Upload failed', errs);
-// //     });
+// //       callback('Upload failed', errs)
+// //     })
 // // }

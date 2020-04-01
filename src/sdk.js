@@ -111,14 +111,15 @@ app.init({
           events.$on('addonLoaded', (addon) => {
             self.$root.addons.push(addon);
           });
-          SDK_LOCAL_ADDONS.forEach((addon) => {
+
+          SDK_LOCAL_ADDONS.forEach(addon => {
             self.$addons.initAddon(addon).catch(() => {});
 
             // Load the addon routes programatically for HMR
             import(`../addons/${addon.package}/${addon.version}/src/addon.scss`)
             import(`../addons/${addon.package}/${addon.version}/src/addon.js`)
               .then(m => {
-                const routes = m.default;
+                const routes = m //.default;
                 self.$f7.routes.push(...routes);
                 self.$f7.views.main.routes.push(...routes);
 

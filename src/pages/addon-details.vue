@@ -79,6 +79,14 @@
             >{{addonData.uploading ? 'Uploading...' : 'Upload to Sandbox'}}</f7-button>
           </p>
         </template>
+        <p>
+          <f7-button
+            :disabled="addonData.uploading"
+            fill
+            big
+            @click="uploadAddon"
+          >{{addonData.uploading ? 'Uploading...' : 'Upload to Sandbox'}}</f7-button>
+        </p>
       </f7-block>
     </div>
   </f7-page>
@@ -108,7 +116,7 @@
         })
         .catch(() => {
           self.remoteFetched = true;
-        });
+        })
     },
     methods: {
       addonStatus() {
@@ -135,11 +143,11 @@
           success(data) {
             self.addonData = data;
             self.addonData.uploading = false;
-            self.$api.installAddon(pkg, {}, {});
+            self.$api.installAddon(pkg, {}, {})
             self.$app.notify(
               'Addon Uploaded',
               'Your addon uploaded successfully'
-            );
+            )
           },
           error(xhr) {
             self.addonData.status = null;
@@ -147,9 +155,9 @@
             self.$app.notify(
               'Addon Upload Failed',
               `Your addon uploaded failed: ${xhr.responseText}`
-            );
+            )
           },
-        });
+        })
       },
       updateAddon() {
         const self = this;
@@ -166,7 +174,7 @@
             self.$app.notify(
               'Addon Updated',
               'Your addon updated successfully'
-            );
+            )
           },
           error(xhr) {
             self.addonData.status = null;
@@ -174,9 +182,9 @@
             self.$app.notify(
               'Addon Update Failed',
               `Your addon update failed: ${xhr.responseText}`
-            );
+            )
           },
-        });
+        })
       },
       deleteAddon() {
         const self = this;
@@ -191,7 +199,7 @@
             self.$app.notify(
               'Addon Uninstalled',
               'Addon uninstalled successfully'
-            );
+            )
           })
           .catch((err) => {
             self.addonData.status = null;
@@ -199,10 +207,9 @@
             self.$app.notify(
               'Addon Error',
               `Addon uninstall failed: ${err}`
-            );
-          });
+            )
+          })
       },
     },
   };
 </script>
-
