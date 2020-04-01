@@ -9,16 +9,66 @@
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
+
+    <f7-page-content ref="pageContent">
+      <!--
+      <f7-block-title class="time-clock-divider">{{$t('time_clock.settings.required_title')}}</f7-block-title>
+      <f7-list>
+        <f7-list-item :title="$t('time_clock.settings.gps_label')" >
+          <f7-toggle slot="after"></f7-toggle>
+        </f7-list-item>
+        <f7-list-item :title="$t('time_clock.settings.photo_label')" >
+          <f7-toggle slot="after"></f7-toggle>
+        </f7-list-item>
+      </f7-list>
+
+      <f7-block-title class="time-clock-divider">{{$t('time_clock.settings.who_can_edit_title')}}</f7-block-title>
+      <f7-list class="message-list">
+        <f7-list-item >
+          <search-cmp @clickOpened="togglePopup(true)"></search-cmp>
+        </f7-list-item>
+        <f7-list-item >
+          <tag-cmp
+            :name="seeUser.name"
+            @clearName="clearUser(true)"
+          ></tag-cmp>
+        </f7-list-item>
+      </f7-list>
+
+      <f7-block-title class="time-clock-divider">{{$t('time_clock.settings.who_can_clock_manually_title')}}</f7-block-title>
+      <f7-block-title class="time-clock-divider">{{$t('time_clock.settings.who_can_clock_title')}}</f7-block-title>
+      <f7-block-title class="time-clock-divider">{{$t('time_clock.settings.who_can_break_title')}}</f7-block-title>
+-->
+
+    </f7-page-content>
+
+    <!-- Popup
+    <group-popup-cmp
+      :opened="customerPopupOpened"
+      @closed="customerPopupOpened = false"
+      :items="items"
+      @checkedGroup="checkedGroup"
+      :checkedId="checkedId"
+    ></group-popup-cmp>
+ -->
+
   </f7-page>
 </template>
 
 <script>
   import API from '../api';
+  // import GroupPopupCmp from '../components/group-popup.vue';
+  // import SearchCmp from '../components/search.vue';
+  // import TagCmp from '../components/tag.vue';
+
   //import tagSelect from '../components/tag-select.vue';
 
   export default {
     name: "TimeClockSettings",
     components: {
+      // GroupPopupCmp,
+      // SearchCmp,
+      // TagCmp,
     },
     mounted() {
       const self = this;
@@ -36,6 +86,19 @@
         permission.resource_id = undefined;
         self.permissions.push(permission);
       });
+
+      // self.items = [
+      //   {
+      //     id: 1215,
+      //     name: 'elder',
+      //   },
+      //   {
+      //     id: 155,
+      //     name: 'manager',
+      //   },
+      // ];
+
+
     },
     methods: {
       saveListPermission(permission) {
@@ -56,11 +119,54 @@
         permission.filters.splice(permission.filters.indexOf(tag), 1);
         self.saveListPermission(permission);
       },
+
+
+//copied from broadcast.
+//       clearUser(isSee) {
+//         const user = {
+//           id: null,
+//           name: null,
+//         };
+//         if (isSee) {
+//           this.seeUser = user;
+//         } else {
+//           this.sendUser = user;
+//         }
+//       },
+//       checkedGroup(id) {
+//         const item = this.items.filter(i => i.id === id)[0];
+//         if (this.isSee) {
+//           this.seeUser = item;
+//         } else {
+//           this.sendUser = item;
+//         }
+//         this.checkedId = this.isSee ? this.seeUser.id : this.sendUser.id;
+//       },
+//       togglePopup(isSee) {
+//         this.isSee = isSee;
+//         this.checkedId = isSee ? this.seeUser.id : this.sendUser.id;
+//         this.customerPopupOpened = true;
+//       },
     },
     data() {
       return {
         hasActorId: API.actorId,
         permissions: [],
+
+        //copied from broadcast.
+        // lists: null,
+        // customerPopupOpened: false,
+        // items: null,
+        // seeUser: {
+        //   id: null,
+        //   name: null,
+        // },
+        // sendUser: {
+        //   id: null,
+        //   name: null,
+        // },
+        // isSee: null,
+        // checkedId: null,
       };
     }
   };
