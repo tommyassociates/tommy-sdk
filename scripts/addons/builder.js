@@ -1,19 +1,20 @@
-const webpack = require('webpack');
-const VueLoaderPlugin = require('vue-loader/lib/plugin');
+const webpack = require('webpack')
+const VueLoaderPlugin = require('vue-loader/lib/plugin')
 const OptimizeCSSPlugin = require('optimize-css-assets-webpack-plugin')
-const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
-const { CleanWebpackPlugin } = require('clean-webpack-plugin');
-// const CopyWebpackPlugin = require('copy-webpack-plugin');
-// const HtmlWebpackPlugin = require('html-webpack-plugin');
+const UglifyJsPlugin = require('uglifyjs-webpack-plugin')
+const { CleanWebpackPlugin } = require('clean-webpack-plugin')
+// const CopyWebpackPlugin = require('copy-webpack-plugin')
+// const HtmlWebpackPlugin = require('html-webpack-plugin')
 // const MiniCssExtractPlugin = require('mini-css-extract-plugin')
-// const entryPlus = require('webpack-entry-plus');
+// const entryPlus = require('webpack-entry-plus')
 
-const glob = require('glob');
-const path = require('path');
-const helpers = require('../helpers');
+var fs = require('fs')
+const glob = require('glob')
+const path = require('path')
+const helpers = require('../helpers')
 
 function resolvePath(dir) {
-  return path.join(__dirname, '..', '..', dir);
+  return path.join(__dirname, '..', '..', dir)
 }
 
 function jsOutputPath(file) {
@@ -29,15 +30,11 @@ function cssOutputPath(file) {
 }
 
 function createConfig(pkg, version) {
-  // console.log('HELPPPPPPPPPPPPPPPPPPPPP', helpers)
-  // console.log('HELPPPPPPPPPPPPPPPPPPPPP', helpers.getSdkVariables)
-  // console.log('HELPPPPPPPPPPPPPPPPPPPPP', helpers.getSdkVariables())
   const jsEntry = `addons/${pkg}/${version}/build/addon`
   const cssEntry = `addons/${pkg}/${version}/build/addon.css`
 
   return {
-    // mode: 'development',
-    mode: 'production',
+    mode: 'production', // 'development'
     devtool: false,
     entry: {
       [jsEntry]: resolvePath(`addons/${pkg}/${version}/src/addon.js`),
@@ -66,37 +63,15 @@ function createConfig(pkg, version) {
         {
           test: /\.js$/,
           use: 'babel-loader',
-          // use: {
-          //   loader: 'babel-loader',
-          //   options: {
-          //     presets: [
-          //       ['es2015', {
-          //           'useBuiltIns': true,
-          //           'modules': "commonjs",
-          //       }],
-          //       'stage-1',
-          //       'react'
-          //       // [
-          //       //   '@babel/preset-env',
-          //       //   {
-          //       //     useBuiltIns: false,
-          //       //     loose: true,
-          //       //     modules: 'commonjs'
-          //       //   }
-          //       // ]
-          //     ]
-          //     // presets: ['@babel/preset-env'],
-          //     // plugins: ['@babel/plugin-transform-runtime']
-          //   }
-          // },
-          include: [
-            resolvePath('addons'),
-            resolvePath('node_modules/framework7'),
-            resolvePath('node_modules/framework7-vue'),
-            resolvePath('node_modules/template7'),
-            resolvePath('node_modules/dom7'),
-            resolvePath('node_modules/ssr-window'),
-          ],
+          // include: [
+          //   resolvePath('addons'),
+          //   resolvePath('node_modules/tommy-core'),
+          //   resolvePath('node_modules/framework7'),
+          //   resolvePath('node_modules/framework7-vue'),
+          //   resolvePath('node_modules/template7'),
+          //   resolvePath('node_modules/dom7'),
+          //   resolvePath('node_modules/ssr-window'),
+          // ],
         },
         {
           test: /\.vue$/,
@@ -180,33 +155,51 @@ function createConfig(pkg, version) {
 
 module.exports = function(pkg, version) {
   return new Promise((resolve, reject) => {
-    const config = createConfig(pkg, version);
-    const compiler = webpack(config);
+    console.error('addon building', pkg, version)
+    const config = createConfig(pkg, version)
+    const compiler = webpack(config)
     compiler.run((err, stats) => {
       if (err) {
-        console.error('addon compile failed', pkg, version);
-        console.error(err.stack || err);
+        console.error('addon compile failed', pkg, version)
+        console.error(err.stack || err)
         if (err.details) {
-          console.error(err.details);
+          console.error(err.details)
         }
         reject(err)
         return;
       }
 
-      const info = stats.toJson();
-
+      const info = stats.toJson()
       if (stats.hasErrors()) {
-        console.error(info.errors);
+        console.error('addon compile error:', info.errors)
+        reject(info.errors)
+        return;
       }
 
       if (stats.hasWarnings()) {
-        console.warn(info.warnings);
+        console.warn('addon compile warning:', info.warnings)
       }
 
-      console.log('addon compiled', pkg, version);
-      resolve(stats)
-    });
-  });
+      console.log('addon compiled', pkg, version)
+
+      // FIX: Addons need to be exported as a global variable to support old
+      // builds, so we need to ensure the default module is exposed directly.
+      const outputFile = resolvePath(`addons/${pkg}/${version}/build/addon.js`)
+      fs.readFile(outputFile, 'utf8', function (err, data) {
+        if (err) {
+          return console.log(err)
+        }
+
+        const result = data.slice(0, -1) + '.default;'
+        fs.writeFile(outputFile, result, 'utf8', function (err) {
+           if (err) return console.log(err)
+           resolve(stats) // success
+        })
+      })
+
+      // resolve(stats)
+    })
+  })
 }
 
 
@@ -221,11 +214,11 @@ module.exports = function(pkg, version) {
 // Object.keys(addonVersions).forEach((pkg) => {
 //   const versions = addonVersions[pkg];
 //   for (let i = 0; i < versions.length; i += 1) {
-//     configs.push(createConfig(pkg, versions[i]));
+//     configs.push(createConfig(pkg, versions[i]))
 //   }
-// });
+// })
 //
-// const compiler = webpack(configs);
+// const compiler = webpack(configs)
 // const watching = compiler.watch({
 //   aggregateTimeout: 300,
 //   poll: undefined
