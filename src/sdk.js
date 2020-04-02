@@ -119,7 +119,7 @@ app.init({
             import(`../addons/${addon.package}/${addon.version}/src/addon.scss`)
             import(`../addons/${addon.package}/${addon.version}/src/addon.js`)
               .then(m => {
-                const routes = m //.default;
+                const routes = m.default;
                 self.$f7.routes.push(...routes);
                 self.$f7.views.main.routes.push(...routes);
 
