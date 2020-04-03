@@ -143,7 +143,7 @@ import API from "../api";
 import dialog from "../mixins/dialog.vue";
 import timePicker from "../mixins/time-picker.vue";
 import Blob from "../mixins/baseToBlob.vue";
-import Photo from 'tommy_core/src/components/photo.vue';
+import Photo from '../components/photo.vue';
 export default {
   name: "DetailActivity",
   mixins: [dialog, timePicker, Blob],

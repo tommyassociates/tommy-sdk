@@ -94,9 +94,11 @@
 
   import ActiveAvatar from "../components/circle-avatar.vue";
   import Events from "../components/events.vue";
-  import Photo from 'tommy_core/src/components/photo.vue';
+  import Photo from '../components/photo.vue';
   import Geo from "../components/geo.vue";
   import Blob from "../mixins/baseToBlob.vue";
+
+  // import photoService from '../photo-service';
 
 
   /*
@@ -169,7 +171,40 @@
       clockOnClick() {
         const self = this;
         self.$refs.geo.takeGeoAsync().then(cords => {
+
+          // photoService.init({
+          //   f7: self.$f7,
+          //   success(response) {
+          //     // if (response.icon_url) {
+          //     //   self.$root.user.icon_url = response.icon_url;
+          //     //   self.$root.setUser(self.$root.user);
+          //     // }
+          //     // self.submit();
+          //
+          //     console.log('clockOnClick - photo');
+          //       const form = new FormData();
+          //       form.append("event_id", API.shifts_active_id);
+          //       form.append("latitude", cords.latitude);
+          //       form.append("longitude", cords.longitude);
+          //       form.append("accuracy", cords.accuracy);
+          //       form.append("status", "start");
+          //       form.append("address", cords.name);
+          //       form.append(
+          //         "image",
+          //         self.dataURLToBlob(photo),
+          //         `attendance_start.jpg`
+          //       );
+          //
+          //       API.setAttendances(form).then(() => {
+          //         self.updateAll();
+          //         self.clock_on = true;
+          //       });
+          //   },
+          // });
+          // photoService.capturePhotoEdit();
+
           self.$refs.photo.takePhotoAsync().then(photo => {
+            console.log('clockOnClick - photo');
             const form = new FormData();
             form.append("event_id", API.shifts_active_id);
             form.append("latitude", cords.latitude);
@@ -179,13 +214,16 @@
             form.append("address", cords.name);
             form.append(
               "image",
-              self.dataURLToBlob(photo),
+              // self.dataURLToBlob(photo),
+              photo,
               `attendance_start.jpg`
             );
 
             API.setAttendances(form).then(() => {
+              console.log('in set attendances');
               self.updateAll();
               self.clock_on = true;
+              console.log('done');
             });
           });
         });
@@ -194,6 +232,8 @@
         const self = this;
         self.$refs.geo.takeGeoAsync().then(cords => {
           self.$refs.photo.takePhotoAsync().then(photo => {
+            console.log('clockOffClick - photo');
+            console.log(photo);
             const form = new FormData();
             form.append("event_id", API.shifts_active_id);
             form.append("latitude", cords.latitude);
@@ -203,15 +243,18 @@
             form.append("address", cords.name);
             form.append(
               "image",
-              self.dataURLToBlob(photo),
+              //self.dataURLToBlob(photo),
+              photo,
               `attendance_stop.jpg`
             );
 
             self.loaded.duration = 0;
 
             API.setAttendances(form).then(() => {
+              console.log('in set attendances');
               self.updateAll();
               self.clock_on = false;
+              console.log('done');
             });
           });
         });
