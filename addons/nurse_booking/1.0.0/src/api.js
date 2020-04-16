@@ -29,7 +29,7 @@ const API = {
   },
   getServiceDetails(teamId, id, type) {
     return api.call({
-      endpoint: `vendors/${teamId}/${type === 'VendorProduct' ? 'products' : 'packages'}/${id}`,
+      endpoint: `vendors/${teamId}/${type === 'Vendor::Product' ? 'products' : 'packages'}/${id}`,
       method: 'GET',
     }).then((data) => {
       return data;

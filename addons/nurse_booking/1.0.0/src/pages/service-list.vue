@@ -57,7 +57,7 @@
         self.$f7router.navigate(url);
       },
       serviceType(service) {
-        return service.vendor_package_products ? 'package' : 'product';
+        return service.package_products ? 'package' : 'product';
       },
       serviceImage(service) {
         const self = this;

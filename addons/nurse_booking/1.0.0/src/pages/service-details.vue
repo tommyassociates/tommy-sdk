@@ -56,22 +56,22 @@
       let service = {};
       let products = null;
       (API.cache.services || []).forEach((serviceData) => {
-        const serviceType = serviceData.vendor_package_products ? 'package' : 'product';
+        const serviceType = serviceData.package_products ? 'package' : 'product';
         if (serviceData.id === parseInt(self.id, 10) && serviceType === type) {
           service = serviceData;
           service.coupons = couponsForService(service, API.cache.coupons, self.$root.user.id);
         }
       });
-      if (service.vendor_package_products && service.vendor_package_products.length) {
-        products = service.vendor_package_products.map((product) => {
+      if (service.package_products && service.package_products.length) {
+        products = service.package_products.map((product) => {
           return (API.cache.services || []).filter((s) => {
-            return s.id === product.vendor_product_id && !s.vendor_package_products;
+            return s.id === product.vendor_product_id && !s.package_products;
           })[0];
         });
       }
       return {
         service,
-        selectedCoupon: null,
+        selectedCoupons: [],
         type,
         products,
       };
@@ -93,37 +93,36 @@
         API.cache.booking.serviceType = self.type;
 
         if (service.coupons && service.coupons.length) {
-          couponPicker(service.coupons, (coupon) => {
-            self.selectedCoupon = coupon;
+          couponPicker(service.coupons, self.selectedCoupons, (coupons) => {
+            // self.selectedCoupons = coupons;
             API.cache.booking.services = [service];
-            API.cache.booking.coupon = self.selectedCoupon;
+            API.cache.booking.coupons = self.selectedCoupons;
             self.$f7router.navigate('/nurse_booking/order-select-location/');
           }, () => {
             API.cache.booking.coupon = null;
-            delete API.cache.booking.coupon;
-            self.selectedCoupon = null;
+            delete API.cache.booking.coupons;
+            self.selectedCoupons = [];
             self.$f7router.navigate('/nurse_booking/order-select-location/');
           });
         } else {
           API.cache.booking.coupon = null;
-          delete API.cache.booking.coupon;
-          self.selectedCoupon = null;
+          delete API.cache.booking.coupons;
+          self.selectedCoupons = [];
           self.$f7router.navigate('/nurse_booking/order-select-location/');
         }
       },
       chooseCoupon() {
         const self = this;
         const service = self.service;
-        couponPicker(service.coupons, (coupon) => {
-          self.selectedCoupon = coupon;
+        couponPicker(service.coupons, self.selectedCoupons, (coupons) => {
+          // self.selectedCoupons = coupons;
           API.cache.booking.services = [self.service];
-          API.cache.booking.coupon = self.selectedCoupon;
+          API.cache.booking.coupons = self.selectedCoupons;
           self.$f7router.navigate('/nurse_booking/order-select-location/');
         }, () => {
-          self.selectedCoupon = null;
+          self.selectedCoupons = [];
         });
       },
     },
   };
 </script>
-

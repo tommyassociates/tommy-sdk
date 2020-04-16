@@ -58,12 +58,15 @@
 
     <f7-list class="list-prices" no-hairlines>
       <f7-list-item
-        v-if="coupon"
+        v-if="coupons && coupons.length"
         link="#"
         :title="$t('nurse_booking.order_confirm.coupons_label')"
-        :after="`${coupon.kind !== 'percentage' ? `-¥${couponDiscount}` : `-${coupon.amount * 100}%`}`"
+        :after="`-¥ ${couponDiscount}`"
         @click="selectCoupon"
       ></f7-list-item>
+      <!-- v-for="coupon in coupons" -->
+      <!-- :after="`${coupon.kind !== 'percentage' ? `-¥${couponDiscount}` : `-${coupon.amount * 100}%`}`" -->
+
       <f7-list-item
         class="item-total-price"
         :title="$t('nurse_booking.order_confirm.total_label')"
@@ -75,6 +78,7 @@
 <script>
   import API from '../api';
   import couponPicker from '../coupon-picker';
+  import calculateOrder from '../calculate-order';
   import payOrder from '../pay-order';
   import formatDate from '../format-date';
 
@@ -84,7 +88,7 @@
 
       return {
         services: API.cache.booking.services,
-        coupon: API.cache.booking.coupon,
+        coupons: API.cache.booking.coupons,
         user: self.$root.user,
         location: API.cache.booking.location,
         date: API.cache.booking.date,
@@ -92,28 +96,40 @@
       };
     },
     computed: {
+      monies() {
+        return calculateOrder(this)
+      },
       couponDiscount() {
-        const self = this;
-        const { coupon } = self;
-        let discount = 0;
-        if (coupon) {
-          discount = coupon.kind !== 'percentage' ? coupon.amount : coupon.amount * self.servicePrice;
-        }
-        if (discount > self.servicePrice) discount = self.servicePrice;
-        return discount;
+        return this.monies.discount;
+        // const self = this;
+        // const { coupons, services } = self;
+        // let discount = 0;
+        // if (coupons) {
+        //   coupons.forEach((coupon) => {
+        //     discount += coupon.kind !== 'percentage' ? coupon.amount : coupon.amount * self.servicePrice;
+        //   });
+        // }
+        // // if (coupon) {
+        // //   discount = coupon.kind !== 'percentage' ? coupon.amount : coupon.amount * self.servicePrice;
+        // // }
+        // if (discount > self.servicePrice) discount = self.servicePrice;
+        // return discount;
       },
       total() {
-        const self = this;
-        return Math.max(self.servicePrice - self.couponDiscount, 0);
+        return this.monies.total;
+        // return calculateOrder(this)
+        // const self = this;
+        // return Math.max(self.servicePrice - self.couponDiscount, 0);
       },
       servicePrice() {
-        const self = this;
-        const { services } = self;
-        let price = 0;
-        services.forEach((service) => {
-          price += service.price;
-        });
-        return price;
+        return this.monies.subtotal;
+        // const self = this;
+        // const { services } = self;
+        // let price = 0;
+        // services.forEach((service) => {
+        //   price += service.price;
+        // });
+        // return price;
       },
       serviceImage() {
         const self = this;
@@ -132,10 +148,10 @@
       selectCoupon() {
         const self = this;
         const service = self.services[0];
-        couponPicker(service.coupons, (coupon) => {
-          API.cache.booking.coupon = coupon;
-          self.coupon = coupon;
-        }, () => {}, self.coupon);
+        couponPicker(service.coupons, self.coupons, (coupon) => {
+          // API.cache.booking.coupon = coupon;
+          // self.coupon = coupon;
+        }, () => {}); //, self.coupon
       },
       onPageBeforeIn(e, page) {
         const self = this;
@@ -147,11 +163,11 @@
       },
       payOrder() {
         const self = this;
-        const { services, coupon, location, date, total, nurse } = self;
+        const { services, coupons, location, date, total, nurse } = self;
         const vendor_order_items_attributes = self.services.map((el) => {
           return {
             orderable_id: el.id,
-            orderable_type: el.vendor_package_products ? 'VendorPackage' : 'VendorProduct',
+            orderable_type: el.package_products ? 'Vendor::Package' : 'Vendor::Product',
             quantity: el.quantity || 1,
           };
         });
@@ -164,7 +180,7 @@
         if (!duration) duration = 60;
 
         let discount = 0;
-        if (coupon) discount = self.couponDiscount;
+        // if (coupon) discount = self.couponDiscount;
 
         payOrder({
           vendor_order_items_attributes,
@@ -172,7 +188,7 @@
           productName: services.map(el => el.name).join(', '),
           productId: services[0].id,
           total,
-          couponId: coupon ? coupon.id : null,
+          couponIds: coupons ? coupons.map(x => x.id) : null,
           discount,
           location,
           date,
@@ -183,4 +199,3 @@
     },
   };
 </script>
-

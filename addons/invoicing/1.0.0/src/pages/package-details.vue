@@ -103,7 +103,7 @@
           <div class="invoicing-order-add-box-placeholder">{{$t('invoicing.package.add_item_label')}}</div>
         </div>
         <div class="invoicing-order-item"
-          v-for="(product, index) in item.vendor_package_products_attributes"
+          v-for="(product, index) in item.package_products_attributes"
           :key="index"
           v-if="!product._destroy"
         >
@@ -207,7 +207,7 @@
           description: '',
           name: '',
           price: 0,
-          vendor_package_products_attributes: [],
+          package_products_attributes: [],
           data: {
             availabile_in: [],
             duration: null,
@@ -216,9 +216,9 @@
         return;
       }
       API.loadPackage(self.id).then((item) => {
-        if (!item.vendor_package_products_attributes) item.vendor_package_products_attributes = [];
-        if (item.vendor_package_products) {
-          item.vendor_package_products_attributes = item.vendor_package_products.map((el) => {
+        if (!item.package_products_attributes) item.package_products_attributes = [];
+        if (item.package_products) {
+          item.package_products_attributes = item.package_products.map((el) => {
             return {
               id: el.id,
               vendor_product_id: el.vendor_product_id,
@@ -226,7 +226,7 @@
               vendor_package_id: el.vendor_package_id,
             };
           });
-          delete item.vendor_package_products;
+          delete item.package_products;
         }
         if (!item.data || typeof item.data === 'string') {
           item.data = {
@@ -253,17 +253,17 @@
       },
       increaseProduct(index) {
         const self = this;
-        self.item.vendor_package_products_attributes[index].quantity += 1;
+        self.item.package_products_attributes[index].quantity += 1;
         self.enableSave();
       },
       decreaseProduct(index) {
         const self = this;
-        self.item.vendor_package_products_attributes[index].quantity -= 1;
-        if (self.item.vendor_package_products_attributes[index].quantity === 0) {
-          if (self.item.vendor_package_products_attributes[index].id) {
-            self.item.vendor_package_products_attributes[index]._destroy = true;
+        self.item.package_products_attributes[index].quantity -= 1;
+        if (self.item.package_products_attributes[index].quantity === 0) {
+          if (self.item.package_products_attributes[index].id) {
+            self.item.package_products_attributes[index]._destroy = true;
           } else {
-            self.item.vendor_package_products_attributes.splice(index, 1);
+            self.item.package_products_attributes.splice(index, 1);
           }
         }
         self.enableSave();
@@ -272,12 +272,12 @@
         const self = this;
         self.productsOpened = false;
         let hasProduct;
-        self.item.vendor_package_products_attributes.forEach((el) => {
+        self.item.package_products_attributes.forEach((el) => {
           if (el.vendor_product_id === product.id) hasProduct = true;
         })
         if (hasProduct) return;
 
-        self.item.vendor_package_products_attributes.push({
+        self.item.package_products_attributes.push({
           vendor_product_id: product.id,
           quantity: 1,
         });

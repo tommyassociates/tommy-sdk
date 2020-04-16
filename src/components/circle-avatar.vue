@@ -16,8 +16,8 @@
       class="avatar-circle-image"
       v-if="icon_url"
       :style="`background-image: url(${icon_url})`"
-      :class="{ 'current-avatar' : current }"
     />
+    <!-- :class="{ 'current-avatar' : current }" -->
   </span>
 </template>
 <script>

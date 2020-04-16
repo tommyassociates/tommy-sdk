@@ -16,8 +16,10 @@
     </div>
 
     <div class="location-card location-add-form" v-if="addMode || locations && !locations.length">
-      <input type="text" :value="city" :domProps="{defaultValue: defaultCity}" @input="city = $event.target.value" :placeholder="$t('nurse_booking.location.city_placeholder')" />
-      <textarea type="text" :value="address || defaultAddress" @input="address = $event.target.value" :placeholder="$t('nurse_booking.location.address_placeholder')"></textarea>
+      <input type="text" :value="city"  @input="city = $event.target.value" :placeholder="$t('nurse_booking.location.city_placeholder')" />
+      <!-- :domProps="{defaultValue: defaultCity}" -->
+      <textarea type="text" :value="address" @input="address = $event.target.value" :placeholder="$t('nurse_booking.location.address_placeholder')"></textarea>
+      <!-- :value="address || defaultAddress" -->
       <label>
         <input type="checkbox" name="default" :checked="isDefault" @change="isDefault = $event.target.checked">
         <i class="framework7-icons">check</i>
@@ -113,4 +115,3 @@
     },
   };
 </script>
-

@@ -138,12 +138,13 @@
                 <div class="invoicing-order-add-box-placeholder">{{$t('invoicing.order_details.add_promotion_label')}}
                 </div>
               </div>
-              <div class="invoicing-order-item" v-if="order.vendor_coupon_id">
-                <div class="invoicing-order-item-name">{{promotionName(order.vendor_coupon_id)}}</div>
+              <!-- v-if="order.vendor_coupon_id" -->
+              <div class="invoicing-order-item" v-for="coupon_id in order.vendor_coupon_ids">
+                <div class="invoicing-order-item-name">{{promotionName(coupon_id)}}</div>
                 <div class="invoicing-order-item-details">
-                  <div class="invoicing-order-item-price">-{{promotionDiscount(order.vendor_coupon_id)}}</div>
+                  <div class="invoicing-order-item-price">-{{promotionDiscount(coupon_id)}}</div>
                   <div class="invoicing-order-item-selector">
-                    <f7-link icon-f7="delete_round" @click="deleteOrderPromotion()"></f7-link>
+                    <f7-link icon-f7="delete_round" @click="deleteOrderPromotion(coupon_id)"></f7-link>
                   </div>
                 </div>
               </div>
@@ -231,10 +232,10 @@
                 <f7-list class="list-custom invoicing-order-details-products invoicing-order-details-items">
                   <f7-list-item divider :title="$t('invoicing.order_details.packages')"></f7-list-item>
                   <f7-list-item v-for="pkg in packages" :key="`package-${pkg.id}`" link :title="pkg.name"
-                    :after="`¥${pkg.price}`" @click="addOrderItem(pkg, 'VendorPackage')"></f7-list-item>
+                    :after="`¥${pkg.price}`" @click="addOrderItem(pkg, 'Vendor::Package')"></f7-list-item>
                   <f7-list-item divider :title="$t('invoicing.order_details.items')"></f7-list-item>
                   <f7-list-item v-for="product in products" :key="`product-${product.id}`" link :title="product.name"
-                    :after="`¥${product.price}`" @click="addOrderItem(product, 'VendorProduct')"></f7-list-item>
+                    :after="`¥${product.price}`" @click="addOrderItem(product, 'Vendor::Product')"></f7-list-item>
                 </f7-list>
               </f7-page>
             </f7-view>
@@ -330,7 +331,7 @@ export default {
         discount: 0,
         total: 0,
         user_id: null,
-        vendor_coupon_id: null,
+        vendor_coupon_ids: [],
         vendor_order_items: [],
         wallet_transaction_id: null,
         status: 'pending',
@@ -398,25 +399,24 @@ export default {
       const self = this;
       let total = 0;
       self.order.vendor_order_items.forEach((el) => {
-        total
-          += self.productPrice(el.orderable_id, el.orderable_type) * el.quantity;
+        total += self.productPrice(el.orderable_id, el.orderable_type) * el.quantity;
       });
       return total;
     },
     orderDiscountTotal() {
       const self = this;
       let total = 0;
-      if (self.order.vendor_coupon_id) {
-        const coupon = self.promotions.filter(
-          el => el.id === self.order.vendor_coupon_id
-        )[0];
-        if (coupon) {
-          if (coupon.kind !== 'percentage') {
-            total = coupon.amount;
-          } else {
-            total = self.orderItemsTotal * coupon.amount;
+      if (self.order.vendor_coupon_ids) {
+        self.order.vendor_coupon_ids.forEach(coupon_id => {
+          const coupon = self.promotions.find(el => el.id === coupon_id);
+          if (coupon) {
+            if (coupon.kind !== 'percentage') {
+              total += coupon.amount;
+            } else {
+              total += self.orderItemsTotal * coupon.amount;
+            }
           }
-        }
+        })
       }
       return total;
     },
@@ -590,34 +590,38 @@ export default {
     },
     promotionName(id) {
       const self = this;
-      return self.promotions.filter(el => el.id === parseInt(id, 10))[0].name;
+      return self.promotions.find(el => el.id === parseInt(id, 10)).name;
     },
     promotionDiscount(id) {
       const self = this;
-      const promo = self.promotions.filter(el => el.id === parseInt(id, 10))[0];
-      if (!promo) return 0;
+      const promo = self.promotions.find(el => el.id === parseInt(id, 10));
+      // if (!promo) return 0;
       if (promo.kind !== 'percentage') return promo.amount;
       return self.orderItemsTotal * promo.amount;
     },
-    productName(id, type = 'VendorProduct') {
+    getProduct(id, type = 'Vendor::Product') {
       const self = this;
-      const product = self[
-        type === 'VendorProduct' ? 'products' : 'packages'
-      ].filter(el => el.id === parseInt(id, 10))[0];
+      const items = self[type === 'Vendor::Product' ? 'products' : 'packages']
+      if (items)
+        return items.find(el => el.id === parseInt(id, 10));
+    },
+    productName(id, type = 'Vendor::Product') {
+      const self = this;
+      const product = self.getProduct(id, type)
+      if (!product) return ''; // may be loading
       return product ? product.name : '';
     },
-    productPrice(id, type = 'VendorProduct') {
+    productPrice(id, type = 'Vendor::Product') {
       const self = this;
-      const product = self[
-        type === 'VendorProduct' ? 'products' : 'packages'
-      ].filter(el => el.id === parseInt(id, 10))[0];
+      const product = self.getProduct(id, type)
+      console.log('GET PRODUCT PRICE', id, type, product, this.products)
+      if (!product) return 0; // may be loading
       return product ? product.price : 0;
     },
-    productDuration(id, type = 'VendorProduct') {
+    productDuration(id, type = 'Vendor::Product') {
       const self = this;
-      const product = self[
-        type === 'VendorProduct' ? 'products' : 'packages'
-      ].filter(el => el.id === parseInt(id, 10))[0];
+      const product = self.getProduct(id, type)
+      if (!product) return 0; // may be loading
       return product ? parseInt(product.data.duration, 10) : 0;
     },
 
@@ -694,12 +698,13 @@ export default {
     addOrderPromotion(promotion) {
       const self = this;
       self.promotionsOpened = false;
-      self.order.vendor_coupon_id = promotion.id;
+      self.order.vendor_coupon_ids.push(promotion.id);
       self.showSave = true;
     },
-    deleteOrderPromotion() {
+    deleteOrderPromotion(coupon_id) {
       const self = this;
-      self.order.vendor_coupon_id = null;
+      const index = self.order.vendor_coupon_ids.indexOf(coupon_id)
+      self.order.vendor_coupon_ids.splice(index, 1);
       self.showSave = true;
     },
     save() {
@@ -717,7 +722,7 @@ export default {
       data.discount = self.orderDiscountTotal;
       delete data.vendor_order_items;
 
-      const needNewEvent =        self.orderChangedToPaid
+      const needNewEvent = self.orderChangedToPaid
         && !data.event_id
         && data.data.date
         && data.data.nurse
@@ -746,6 +751,7 @@ export default {
           resource_type: 'VendorOrder',
         };
       }
+
       API.saveOrder(data).then((order) => {
         self.order = order;
         self.$events.$emit('invoicing:reloadListsOrders');

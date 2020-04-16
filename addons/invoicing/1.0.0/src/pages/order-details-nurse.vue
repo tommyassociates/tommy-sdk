@@ -194,19 +194,19 @@
         }
         return duration;
       },
-      productName(id, type = 'VendorProduct') {
+      productName(id, type = 'Vendor::Product') {
         const self = this;
-        const product = self[type === 'VendorProduct' ? 'products' : 'packages'].filter(el => el.id === parseInt(id, 10))[0];
+        const product = self[type === 'Vendor::Product' ? 'products' : 'packages'].filter(el => el.id === parseInt(id, 10))[0];
         return product ? product.name : '';
       },
-      productPrice(id, type = 'VendorProduct') {
+      productPrice(id, type = 'Vendor::Product') {
         const self = this;
-        const product = self[type === 'VendorProduct' ? 'products' : 'packages'].filter(el => el.id === parseInt(id, 10))[0];
+        const product = self[type === 'Vendor::Product' ? 'products' : 'packages'].filter(el => el.id === parseInt(id, 10))[0];
         return product ? product.price : 0;
       },
-      productDuration(id, type = 'VendorProduct') {
+      productDuration(id, type = 'Vendor::Product') {
         const self = this;
-        const product = self[type === 'VendorProduct' ? 'products' : 'packages'].filter(el => el.id === parseInt(id, 10))[0];
+        const product = self[type === 'Vendor::Product' ? 'products' : 'packages'].filter(el => el.id === parseInt(id, 10))[0];
         return product ? parseInt(product.data.duration, 10) : 0;
       },
       formatOrderDate(date) {

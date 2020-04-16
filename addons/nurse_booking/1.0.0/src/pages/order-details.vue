@@ -44,10 +44,17 @@
         :title="`${$t('nurse_booking.order_details.time_label')}:`"
         :after="formatDate(date, 'MMMM D, YYYY HH:mm')"
       ></f7-list-item>
-      <li class="item-content" v-if="coupon">
+      <!-- <li class="item-content" v-if="coupons">
         <div class="item-inner">
           <div class="item-title">{{$t('nurse_booking.order_details.coupons_label')}}:</div>
-          <div class="item-after price">-¥{{coupon.amount}}</div>
+          <div class="item-after price">-¥{{coupons.amount}}</div>
+        </div>
+      </li> -->
+
+      <li class="item-content item-total-price" v-if="discount">
+        <div class="item-inner">
+          <div class="item-title">{{$t('nurse_booking.order_details.coupons_label')}}:</div>
+          <div class="item-after price">¥{{discount}}</div>
         </div>
       </li>
       <li class="item-content item-total-price">
@@ -63,9 +70,9 @@
       ></f7-list-item>
 
       <template v-if="status">
-        <a v-if="status.progress" href="#" class="order-details-white-button" @click="cancelOrder">{{$t('nurse_booking.order_details.cancel_button')}}</a>
         <a v-if="status.pending" href="#" class="order-details-red-button" @click="payOrder">{{$t('nurse_booking.order_details.pay_button')}}</a>
         <a v-if="status.complete || status.canceled" href="#" class="order-details-red-button" @click="repeatOrder">{{$t('nurse_booking.order_details.repeat_button')}}</a>
+        <a v-if="status.pending || status.progress" href="#" class="order-details-white-button" @click="cancelOrder">{{$t('nurse_booking.order_details.cancel_button')}}</a>
       </template>
     </f7-list>
 
@@ -79,12 +86,12 @@
   export default {
     data() {
       const self = this;
-      const { transaction, services, coupon, location, date, nurse } = API.cache.booking;
+      const { transaction, services, coupons, location, date, nurse } = API.cache.booking;
       const data = {
         teamId: self.$root.team ? self.$root.team.id : self.$addons.addons.nurse_booking.data.nursing_team_id,
         transaction: null,
         services: null,
-        coupon: null,
+        coupons: null,
         location: null,
         date: null,
         order: null,
@@ -97,7 +104,7 @@
         Object.assign(data, {
           transaction,
           services,
-          coupon,
+          coupons,
           location,
           date,
           nurse,
@@ -106,17 +113,18 @@
       return data;
     },
     computed: {
-      totalComputed() {
-        const self = this;
-        const { services, coupon, total } = self;
-        let servicesTotal = 0;
-        services.forEach((el) => {
-          servicesTotal += el.price;
-        });
-        let discount = 0;
-        if (coupon) discount = coupon.kind !== 'percentage' ? coupon.amount : coupon.amount * servicesTotal;
-        return total || Math.max((servicesTotal - discount), 0);
-      },
+      // totalComputed() {
+      //   return calculateOrder(self)
+      //   // const self = this;
+      //   // const { services, coupons, total } = self;
+      //   // let servicesTotal = 0;
+      //   // services.forEach((el) => {
+      //   //   servicesTotal += el.price;
+      //   // });
+      //   // let discount = 0;
+      //   // if (coupons) discount = coupons.kind !== 'percentage' ? coupons.amount : coupons.amount * servicesTotal;
+      //   // return total || Math.max((servicesTotal - discount), 0);
+      // },
       serviceName() {
         const self = this;
         return self.services.map(el => el.name).join(', ');
@@ -145,14 +153,23 @@
         self.transaction = {
           card_name: order.wallet_transaction ? order.wallet_transaction.card_name : null,
         };
+        self.discount = order.discount;
         self.total = order.total;
-        if (order.vendor_coupon_id) {
-          self.coupon = {
-            id: order.vendor_coupon_id,
-            kind: 'fixed',
-            amount: order.discount,
-          };
-        }
+        // if (order.vendor_coupon_ids) {
+        //   self.coupons = {
+        //     id: order.vendor_coupons_id,
+        //     kind: 'fixed',
+        //     amount: order.discount,
+        //   };
+        // }
+        // self.coupons = []
+        // API.getCouponList(self.teamId).then((coupons) => {
+        //   coupons.forEach(coupon => {
+        //     if (order.vendor_coupon_ids.some(x => x.id === coupon.id)) {
+        //       self.coupons.push(coupon)
+        //     }
+        //   });
+        // });
         Promise.all(order.vendor_order_items.map((el) => {
           return API.getServiceDetails(self.teamId, el.orderable_id, el.orderable_type).then((service) => {
             service.quantity = el.quantity;
@@ -177,11 +194,11 @@
           return {
             vendor_product_id: el.vendor_product_id,
             orderable_id: el.vendor_product_id,
-            orderable_type: el.vendor_package_products ? 'VendorPackage' : 'VendorProduct',
+            orderable_type: el.package_products ? 'Vendor::Package' : 'Vendor::Product',
             quantity: el.quantity,
           };
         });
-        delete API.cache.booking.coupon;
+        delete API.cache.booking.coupons;
 
         API.cache.booking.services = services;
         self.$f7router.navigate('/nurse_booking/order-confirm/');
@@ -221,7 +238,7 @@
           vendor_order_items_attributes: (order.vendor_order_items || []).map((el) => {
             return {
               orderable_id: el.vendor_product_id,
-              orderable_type: el.vendor_package_products ? 'VendorPackage' : 'VendorProduct',
+              orderable_type: el.package_products ? 'Vendor::Package' : 'Vendor::Product',
               quantity: el.quantity,
             };
           }),
@@ -229,7 +246,7 @@
           productName: order.name,
           productId: order.vendor_product_id || order.vendor_order_items[0],
           total: order.total,
-          couponId: order.vendor_coupon_id,
+          couponsIds: order.vendor_coupons_ids,
           discount: order.discount,
           location: order.data.location,
           date: order.data.date,

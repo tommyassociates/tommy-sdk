@@ -22,6 +22,7 @@ const API = {
     return api.call({
       method: order.id ? 'PUT' : 'POST',
       endpoint: `vendor/manager/orders/${order.id || ''}`,
+      json: true,
       data: order,
     });
   },

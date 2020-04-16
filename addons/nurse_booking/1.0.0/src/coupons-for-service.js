@@ -4,8 +4,9 @@ import cnCategories from './cn-categories';
 // service.category = 常规家政
 
 export default function (service = {}, coupons = [], userId) {
-  const isPackage = !!service.vendor_package_products;
+  const isPackage = !!service.package_products;
   let match = coupons.filter((c) => {
+    if (c.vendor_product_id === null && c.vendor_package_id === null && (c.category === null || c.category === '')) return true;
     if (c.category === service.category || service.category === cnCategories[c.category]) return true;
     if (isPackage && c.vendor_package_id === service.id) return true;
     if (!isPackage && c.vendor_product_id === service.id) return true;

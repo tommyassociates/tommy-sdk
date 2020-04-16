@@ -9,7 +9,7 @@ export default function (data, createNewOrder = true) {
   const tommy = window.tommy;
   const f7 = tommy.app.f7;
   const {
-    teamId, productName, total, discount = 0, location, date, couponId, orderId, nurse, vendor_order_items_attributes, duration,
+    teamId, productName, total, discount = 0, location, date, couponIds, orderId, nurse, vendor_order_items_attributes, duration,
   } = data;
 
   const successUrl = '/nurse_booking/order-success/';
@@ -17,7 +17,7 @@ export default function (data, createNewOrder = true) {
 
   const order = {
     vendor_order_items_attributes,
-    vendor_coupon_id: couponId || null,
+    vendor_coupon_ids: couponIds || null,
     name: productName,
     status: 'pending',
     comment: '',
