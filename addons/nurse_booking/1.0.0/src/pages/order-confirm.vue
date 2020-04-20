@@ -179,7 +179,7 @@
         });
         if (!duration) duration = 60;
 
-        let discount = 0;
+        let discount = self.couponDiscount;
         // if (coupon) discount = self.couponDiscount;
 
         payOrder({

@@ -129,9 +129,12 @@
       </f7-list-item>
 
       <!-- coupon switch -->
-      <!-- <f7-list-item divider title="111"></f7-list-item> -->
       <f7-list-item>
-        <span>{{$t('invoicing.promotion.valid')}}</span>
+        <span>{{$t('invoicing.promotion.stackable_label', 'Stackable')}}</span>
+        <f7-toggle :checked="item.stackable" @change="repeat = $event.target.checked; enableSave()" color="#FF5413"></f7-toggle>
+      </f7-list-item>
+      <f7-list-item>
+        <span>{{$t('invoicing.promotion.valid', 'Valid')}}</span>
         <f7-toggle :checked="couponValid" @change="toggleCouponValid" color="#FF5413"></f7-toggle>
       </f7-list-item>
     </f7-list>
@@ -261,6 +264,7 @@
           valid_from: null,
           valid_to: null,
           max_uses: null,
+          stackable: true,
           used: !self.couponValid,
         };
       } else {

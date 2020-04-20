@@ -63,11 +63,12 @@
         }
       });
       if (service.package_products && service.package_products.length) {
-        products = service.package_products.map((product) => {
-          return (API.cache.services || []).filter((s) => {
-            return s.id === product.vendor_product_id && !s.package_products;
-          })[0];
-        });
+        products = service.package_products.map(packageProduct => {
+          return (API.cache.services || []).find((s) => {
+            // console.log('FILTERINGGGGGGGGGGGGGGGGg', s, product, s.id, product.vendor_product_id)
+            return s.id === packageProduct.product_id && !s.package_products;
+          });
+        }); //.filter(_ => _);
       }
       return {
         service,

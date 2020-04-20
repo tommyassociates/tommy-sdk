@@ -7,6 +7,7 @@ export default function (data, createNewOrder = true) {
   let succeed;
   let errored;
   const tommy = window.tommy;
+  const moment = tommy.moment;
   const f7 = tommy.app.f7;
   const {
     teamId, productName, total, discount = 0, location, date, couponIds, orderId, nurse, vendor_order_items_attributes, duration,
@@ -17,10 +18,11 @@ export default function (data, createNewOrder = true) {
 
   const order = {
     vendor_order_items_attributes,
-    vendor_coupon_ids: couponIds || null,
+    vendor_coupon_ids: couponIds,
     name: productName,
     status: 'pending',
-    comment: '',
+    // comment: '',
+    team_id: teamId,
     assignee_id: nurse.user_id,
     assignee_team_id: teamId,
     data: {
@@ -33,28 +35,43 @@ export default function (data, createNewOrder = true) {
     total,
   };
 
-  let orderDate = order.data.date;
-  if (typeof orderDate === 'string') orderDate = parseInt(orderDate, 10);
-  let end_at;
+  let startDate = order.data.date;
+  if (typeof startDate === 'string') startDate = parseInt(startDate, 10);
+  let endDate;
   if (order.data.duration && order.data.duration > 0) {
-    end_at = orderDate + parseInt(order.data.duration, 10) * 60 * 1000;
+    endDate = startDate + parseInt(order.data.duration, 10) * 60 * 1000;
   } else {
-    end_at = orderDate + 60 * 60 * 1000;
+    endDate = startDate + 60 * 60 * 1000;
   }
-  order.event_attributes = {
-    addon: 'nurse_booking',
-    title: order.name,
-    start_at: new Date(orderDate).toJSON(),
-    end_at: new Date(end_at).toJSON(),
-    location: `${order.data.location.city} ${order.data.location.address}`,
-    user_id: order.user_id,
-    team_id: null,
-    assignee_id: order.data.nurse.user_id,
-    assignee_team_id: teamId,
-    kind: 'Booking',
-    resource_id: order.id,
-    resource_type: 'VendorOrder',
-  };
+
+  const startTime = moment(startDate).format('YYYY-MM-DDTHH:mm:ss')
+  const endTime = moment(endDate).format('YYYY-MM-DDTHH:mm:ss')
+
+  order.workforce_shift_attributes = {
+    event_attributes: {
+      title: order.name,
+      location_name: order.data.location.city,
+      address: order.data.location.address,
+      details: productName,
+      start_at: startTime, // new Date(startDate).toJSON(),
+      end_at: endTime // new Date(endDate).toJSON()
+    }
+  }
+
+  // order.event_attributes = {
+  //   // addon: 'nurse_booking',
+  //   title: order.name,
+  //   start_at: new Date(startDate).toJSON(),
+  //   endDate: new Date(endDate).toJSON(),
+  //   location_name: `${order.data.location.city} ${order.data.location.address}`,
+  //   user_id: order.user_id,
+  //   team_id: null,
+  //   assignee_id: order.data.nurse.user_id,
+  //   assignee_team_id: teamId,
+  //   kind: 'Booking',
+  //   resource_id: order.id,
+  //   resource_type: 'VendorOrder',
+  // };
 
   function pay(responseOrder) {
     if (total === 0) {

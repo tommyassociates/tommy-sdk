@@ -28,14 +28,14 @@
         :key="key"
       >
         <div class="availability__list-date">
-          <strong>{{dayOrToday(item.start_at)}}</strong>
-          <span>{{formatDate(item.start_at, 'Do MMM')}}</span>
+          <strong>{{dayOrToday(item.date)}}</strong>
+          <span>{{formatDate(item.date, 'Do MMM')}}</span>
         </div>
         <div class="availability__toggle-container">
           <!-- item-title -->
           <a
             href="#"
-            :class="availabilityClass('am', item.data)"
+            :class="availabilityClass('am', item)"
             class="availability__toggle-availability"
             @click="toggle(item, key, 'am')"
           >
@@ -44,7 +44,7 @@
           <a
             href="#"
             class="availability__toggle-availability"
-            :class="availabilityClass('pm', item.data)"
+            :class="availabilityClass('pm', item)"
             @click="toggle(item, key, 'pm')"
           >
             <span v-html="$t('availability.word.pm', 'pm')"></span>
@@ -52,7 +52,7 @@
           <a
             href="#"
             class="availability__toggle-availability"
-            :class="availabilityClass('nd', item.data)"
+            :class="availabilityClass('nd', item)"
             @click="toggle(item, key, 'nd')"
           >
             <span v-html="$t('availability.word.nd', 'nd')"></span>
@@ -76,7 +76,7 @@
         const date = current.format('YYYY-MM-DD');
         if (!items[date]) {
           items[date] = {
-            start_at: current.format(),
+            date: current.format(),
             data: {},
           };
         }
@@ -135,11 +135,11 @@
       },
       toggle(item, key, shift) {
         const self = this;
-        if (item.data[`${shift}_locked`] === 'true' || item.data[`${shift}_locked`] === true) return;
-        const itemAvail = item.data[shift];
-        if (!itemAvail || itemAvail === '0') item.data[shift] = 1;
-        if (itemAvail === 1 || itemAvail === '1') item.data[shift] = -1;
-        if (itemAvail === -1 || itemAvail === '-1') item.data[shift] = 0;
+        if (item[`${shift}_locked`] === 'true' || item[`${shift}_locked`] === true) return;
+        const itemAvail = item[shift];
+        if (!itemAvail || itemAvail === '0') item[shift] = 1;
+        if (itemAvail === 1 || itemAvail === '1') item[shift] = -1;
+        if (itemAvail === -1 || itemAvail === '-1') item[shift] = 0;
         item.changed = true;
         self.items[key] = item;
         self.formChanged = true;
@@ -180,23 +180,43 @@
 
         self.showRefreshPanel = false;
 
-        return self.$api
-          .getFragments(params, { cache: false })
+        self.$api.call({
+            endpoint: '/workforce/availabilities/',
+            cache: false
+          })
           .then((items) => {
             self.lastUpdated = new Date();
             self.refreshPanelTimeout = setTimeout(() => {
               self.showRefreshPanel = true;
             }, 41 * 1000);
             items.forEach((item) => {
-              const date = self.$moment(item.start_at).format('YYYY-MM-DD');
-              if (!item.data) item.data = {};
-              if (self.items[date] && new Date(item.created_at).getTime() < new Date(self.items[date].created_at).getTime()) {
-                return;
-              }
+              const date = self.$moment(item.date).format('YYYY-MM-DD');
+              // if (!item.data) item.data = {};
+              // if (self.items[date] && new Date(item.created_at).getTime() < new Date(self.items[date].created_at).getTime()) {
+              //   return;
+              // }
               self.items[date] = item;
               self.$forceUpdate();
             });
           });
+
+        // return self.$api
+        //   .getFragments(params, { cache: false })
+        //   .then((items) => {
+        //     self.lastUpdated = new Date();
+        //     self.refreshPanelTimeout = setTimeout(() => {
+        //       self.showRefreshPanel = true;
+        //     }, 41 * 1000);
+        //     items.forEach((item) => {
+        //       const date = self.$moment(item.start_at).format('YYYY-MM-DD');
+        //       if (!item.data) item.data = {};
+        //       if (self.items[date] && new Date(item.created_at).getTime() < new Date(self.items[date].created_at).getTime()) {
+        //         return;
+        //       }
+        //       self.items[date] = item;
+        //       self.$forceUpdate();
+        //     });
+        //   });
       },
       save() {
         const self = this;
@@ -206,35 +226,53 @@
           if (!item.changed) return;
           item.changed = false;
           const itemData = {
-            am: item.data.am || 0,
-            pm: item.data.pm || 0,
-            nd: item.data.nd || 0,
+            am: item.am || 0,
+            pm: item.pm || 0,
+            nd: item.nd || 0,
           };
-          if (item.data.am_locked === true || item.data.am_locked === 'true') itemData.am_locked = true;
-          if (item.data.pm_locked === true || item.data.pm_locked === 'true') itemData.pm_locked = true;
-          if (item.data.nd_locked === true || item.data.nd_locked === 'true') itemData.nd_locked = true;
+          // const itemData = {
+          //   am: item.data.am || 0,
+          //   pm: item.data.pm || 0,
+          //   nd: item.data.nd || 0,
+          // };
+          // if (item.data.am_locked === true || item.data.am_locked === 'true') itemData.am_locked = true;
+          // if (item.data.pm_locked === true || item.data.pm_locked === 'true') itemData.pm_locked = true;
+          // if (item.data.nd_locked === true || item.data.nd_locked === 'true') itemData.nd_locked = true;
+          // const itemToSend = {
+          //   ...item,
+          //   addon: 'availability',
+          //   kind: 'Availability',
+          //   data: JSON.stringify(itemData),
+          //   start_at: key,
+          //   user_id: self.actor_id || self.$root.user.id,
+          // };
           const itemToSend = {
             ...item,
-            addon: 'availability',
-            kind: 'Availability',
-            data: JSON.stringify(itemData),
-            start_at: key,
+            ...itemData,
             user_id: self.actor_id || self.$root.user.id,
           };
           if (self.actor_id) {
             itemToSend.actor_id = self.actor_id;
           }
-          if (item.id) {
-            self.$api.updateFragment(item.id, Object.assign(itemToSend)).then((response) => {
-              self.items[key] = response;
-              self.$forceUpdate();
-            });
-          } else {
-            self.$api.createFragment(itemToSend).then((response) => {
-              self.items[key] = response;
-              self.$forceUpdate();
-            });
-          }
+
+          console.log('save coupon', itemToSend)
+          self.$api.call({
+            method: 'PUT',
+            endpoint: '/workforce/availabilities/' + key,
+            data: itemToSend
+          })
+          // '/workforce/availabilities/date'
+          // if (item.id) {
+          //   self.$api.updateFragment(item.id, Object.assign(itemToSend)).then((response) => {
+          //     self.items[key] = response;
+          //     self.$forceUpdate();
+          //   });
+          // } else {
+          //   self.$api.createFragment(itemToSend).then((response) => {
+          //     self.items[key] = response;
+          //     self.$forceUpdate();
+          //   });
+          // }
         });
       },
     },

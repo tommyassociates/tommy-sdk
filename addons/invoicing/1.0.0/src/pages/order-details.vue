@@ -722,33 +722,71 @@ export default {
       data.discount = self.orderDiscountTotal;
       delete data.vendor_order_items;
 
-      const needNewEvent = self.orderChangedToPaid
-        && !data.event_id
+      // const needNewEvent = self.orderChangedToPaid
+      //   && !data.event_id
+      //   && data.data.date
+      //   && data.data.nurse
+      //   && data.data.location
+      //   && data.id
+      //   && data.user_id;
+      // if (needNewEvent) {
+      //   let orderDate = data.data.date;
+      //   if (typeof orderDate === 'string') orderDate = parseInt(orderDate, 10);
+      //   let end_at;
+      //   if (data.data.duration && data.data.duration > 0) {
+      //     end_at = orderDate + parseInt(data.data.duration, 10) * 60 * 1000;
+      //   }
+      //   data.event_attributes = {
+      //     addon: 'nurse_booking',
+      //     title: data.name,
+      //     start_at: new Date(orderDate).toJSON(),
+      //     end_at: new Date(end_at).toJSON(),
+      //     location: `${data.data.location.city} ${data.data.location.address}`,
+      //     user_id: data.user_id,
+      //     team_id: null,
+      //     assignee_id: data.data.nurse.user_id,
+      //     assignee_team_id: self.$root.team.id,
+      //     kind: 'Booking',
+      //     resource_id: data.id,
+      //     resource_type: 'VendorOrder',
+      //   };
+      // }
+
+      const needNewShift = self.orderChangedToPaid
+        && !data.workforce_shift_id
         && data.data.date
         && data.data.nurse
         && data.data.location
         && data.id
         && data.user_id;
-      if (needNewEvent) {
-        let orderDate = data.data.date;
-        if (typeof orderDate === 'string') orderDate = parseInt(orderDate, 10);
-        let end_at;
-        if (data.data.duration && data.data.duration > 0) {
-          end_at = orderDate + parseInt(data.data.duration, 10) * 60 * 1000;
+      if (needNewShift) {
+        // let orderDate = data.data.date;
+        // if (typeof orderDate === 'string') orderDate = parseInt(orderDate, 10);
+        // let end_at;
+        // if (data.data.duration && data.data.duration > 0) {
+        //   end_at = orderDate + parseInt(data.data.duration, 10) * 60 * 1000;
+        // }
+        let startDate = order.data.date;
+        if (typeof startDate === 'string') startDate = parseInt(startDate, 10);
+        let endDate;
+        if (order.data.duration && order.data.duration > 0) {
+          endDate = startDate + parseInt(order.data.duration, 10) * 60 * 1000;
+        } else {
+          endDate = startDate + 60 * 60 * 1000;
         }
-        data.event_attributes = {
-          addon: 'nurse_booking',
-          title: data.name,
-          start_at: new Date(orderDate).toJSON(),
-          end_at: new Date(end_at).toJSON(),
-          location: `${data.data.location.city} ${data.data.location.address}`,
-          user_id: data.user_id,
-          team_id: null,
-          assignee_id: data.data.nurse.user_id,
-          assignee_team_id: self.$root.team.id,
-          kind: 'Booking',
-          resource_id: data.id,
-          resource_type: 'VendorOrder',
+
+        const startTime = moment(startDate).format('YYYY-MM-DDTHH:mm:ss')
+        const endTime = moment(endDate).format('YYYY-MM-DDTHH:mm:ss')
+
+        order.workforce_shift_attributes = {
+          event_attributes: {
+            title: order.name,
+            location_name: order.data.location.city,
+            address: order.data.location.address,
+            details: productName,
+            start_at: startTime, // new Date(startDate).toJSON(),
+            end_at: endTime // new Date(endDate).toJSON() 
+          }
         };
       }
 

@@ -1,5 +1,6 @@
 const tommy = window.tommy;
 const api = tommy.api;
+const moment = tommy.moment;
 
 const API = {
   cache: {
@@ -56,13 +57,14 @@ const API = {
     });
   },
   getNurseList(teamId, startTime, endTime) {
-    const startDate = tommy.moment(new Date(startTime)).toISOString(true);
-    const endDate = tommy.moment(new Date(endTime)).toISOString(true);
+    console.log('getNurseList @@@@@@@@@@@@@@@@', startTime, endTime, new Date().getTimezoneOffset(), tommy.moment(new Date(startTime)).toISOString(true))
+    const startDate = moment(new Date(startTime)).toISOString(true);
+    const endDate = moment(new Date(endTime)).toISOString(true);
     return api.call({
       endpoint: `teams/${teamId}/members`,
       method: 'GET',
       data: {
-        tags: ['Employee'],
+        tags: ['Available For Work'], //['Employee'],
         is_available_between: [startDate, endDate],
         timezone_offset: new Date().getTimezoneOffset(),
       },

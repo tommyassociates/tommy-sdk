@@ -1,0 +1,14 @@
+{
+  "actions": {
+    "notify_nurse_on_booking_paid": {
+      "mappings": {
+        "message": "收到新的订单，请在“订单”中查看。"
+      }
+    },
+    "notify_nurse_on_booking_canceled": {
+      "mappings": {
+        "message": "您有一单订单被取消，请在“订单”中查看。"
+      }
+    }
+  }
+}

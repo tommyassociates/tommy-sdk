@@ -86,15 +86,18 @@
         }
       }
       // const timezoneOffset = new Date().getTimezoneOffset() * -1 * 60 * 1000;
+      // API
+      //   .getNurseList(teamId, new Date(startTime), new Date(endTime))
+      //   .then((nurses) => {
+      //     if (self.$root.teamMembers && nurses.length === self.$root.teamMembers.length) {
+      //       self.nurses = self.$root.teamMembers.filter(m => m.tags.indexOf('Available For Work') >= 0);
+      //     } else {
+      //       self.nurses = nurses;
+      //     }
+      //   });
       API
         .getNurseList(teamId, new Date(startTime), new Date(endTime))
-        .then((nurses) => {
-          if (self.$root.teamMembers && nurses.length === self.$root.teamMembers.length) {
-            self.nurses = self.$root.teamMembers.filter(m => m.tags.indexOf('Available For Work') >= 0);
-          } else {
-            self.nurses = nurses;
-          }
-        });
+        .then(nurses => self.nurses = nurses);
     },
     methods: {
       selectNurse(nurse) {
@@ -112,4 +115,3 @@
     },
   };
 </script>
-
