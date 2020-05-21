@@ -84,7 +84,7 @@
         :loaded="loaded.attendance"
       />
       <Photo ref="photo" direction="front"/>
-      <Geo ref="geo"/>
+      <Geo ref="geo" :dialog="false"/>
     </f7-page-content>
   </f7-page>
 </template>
@@ -168,6 +168,7 @@
     methods: {
       clockOnClick() {
         const self = this;
+        self.$f7.preloader.show()
         self.$refs.geo.takeGeoAsync().then(cords => {
           self.$refs.photo.takePhotoAsync().then(photo => {
             const form = new FormData();
@@ -186,12 +187,14 @@
             API.setAttendances(form).then(() => {
               self.updateAll();
               self.clock_on = true;
+              self.$f7.preloader.hide()
             });
           });
         });
       },
       clockOffClick() {
         const self = this;
+        self.$f7.preloader.show()
         self.$refs.geo.takeGeoAsync().then(cords => {
           self.$refs.photo.takePhotoAsync().then(photo => {
             const form = new FormData();
@@ -212,6 +215,7 @@
             API.setAttendances(form).then(() => {
               self.updateAll();
               self.clock_on = false;
+              self.$f7.preloader.hide()
             });
           });
         });
