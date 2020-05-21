@@ -49,21 +49,25 @@ const AttendanceService = {
   splitAttendanceIntoDays(data = [], self) {
 
     //format the data.
-    const today = self.$moment(new Date()).subtract(1, 'day');
-    const yesterday = self.$moment(new Date()).subtract(2, 'day');
+    const today = self.$moment(new Date()).format('YYYY-MM-DD');
+    const yesterday = self.$moment(today).subtract(1, 'day').format('YYYY-MM-DD');
+
+    console.log(today);
+    console.log(yesterday);
 
     const days = data.reduce((days, attendance) => {
-      const date = attendance.timestamp.split('T')[0];
+      const dateTimestamp = attendance.timestamp; //.split('T')[0];
+      const date = self.$moment(dateTimestamp).format('YYYY-MM-DD');
       if (!days[date]) {
 
         //work out title.
         let title = '';
-        if (self.$moment(date).isSame(today, 'day')) {
+        if (self.$moment(dateTimestamp).format('YYYY-MM-DD') === today) {
           title = self.$t('time_clock.index.today_title');
-        } else if (self.$moment(date).isSame(yesterday, 'day')) {
+        } else if (self.$moment(dateTimestamp).format('YYYY-MM-DD') === yesterday) {
           title = self.$t('time_clock.index.yesterday_title');
         } else {
-          title = self.$moment(date).format('ddd Do MMM, YYYY');
+          title = self.$moment(dateTimestamp).format('ddd Do MMM, YYYY');
         }
 
         days[date] = {
