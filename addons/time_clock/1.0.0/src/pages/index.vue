@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="time-clock-main-page" :page-content="false">
+  <f7-page class="time-clock-main-page" :page-content="false" ptr @ptr:refresh="onPtrRefresh">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{$t('time_clock.index.title')}}</f7-nav-title>
@@ -303,13 +303,15 @@
 
       updateAll() {
         const self = this;
-        self.updateAttendances();
-        self.updateAttendancesActive();
+        return self.updateAttendances().then(() => {
+          return self.updateAttendancesActive();
+        });
+
       },
       updateAttendances() {
         const self = this;
         self.loaded.attendance = false;
-        API.getAttendances(null, false, self.viewOthers).then(data => {
+        return API.getAttendances(null, false, self.viewOthers).then(data => {
           self.attendanceData = AttendanceService.prepareAttendances(data, self);
           self.loaded.attendance = true;
           self.updateStatus();
@@ -318,7 +320,7 @@
       updateAttendancesActive() {
         const self = this;
         self.loaded.active = false;
-        API.getAttendancesActive(null, false, self.viewOthers).then(data => {
+        return API.getAttendancesActive(null, false, self.viewOthers).then(data => {
           self.activeData = AttendanceService.prepareAttendance(data, self);
           if (self.activeData !== null) {
             self.loaded.timestamp = self.activeData.timestamp;
@@ -374,6 +376,15 @@
           const duration = self.$moment.duration(endTime.diff(startTime));
           self.loaded.duration = duration.asHours();
         }
+      },
+
+      onPtrRefresh(e) {
+        const done = e.detail;
+        const self = this;
+        self.updateAll()
+          .then(() => {
+            done();
+          });
       },
     },
     beforeDestroy() {
