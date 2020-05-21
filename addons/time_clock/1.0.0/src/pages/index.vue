@@ -112,9 +112,7 @@
         clock_on: false,
         break_on: false,
         activeData: [],
-        formattedActiveData: {},
         attendanceData: [],
-        formattedAttendanceData: {},
         loaded: {
           first: false,
           active: false,
@@ -163,6 +161,14 @@
             height: "74px"
           };
         }
+      },
+      formattedAttendanceData() {
+        const self = this;
+        return AttendanceService.splitAttendanceIntoDays(self.attendanceData, self);
+      },
+      formattedActiveData() {
+        const self = this;
+        return AttendanceService.formatAttendanceActive(self.activeData, self);
       },
     },
     methods: {
@@ -317,7 +323,7 @@
           if (self.activeData !== null) {
             self.loaded.timestamp = self.activeData.timestamp;
           }
-          self.formattedActiveData = AttendanceService.formatAttendanceActive(self.activeData, self);
+          //self.formattedActiveData = AttendanceService.formatAttendanceActive(self.activeData, self);
           self.loaded.active = true;
         });
       },
@@ -398,7 +404,7 @@
         self.viewOthers = API.checkPermision(v[0], self);
         API.getAttendances(null, false, self.viewOthers).then(data => {
           self.attendanceData = AttendanceService.prepareAttendances(data, self);
-          self.formattedAttendanceData = AttendanceService.splitAttendanceIntoDays(self.attendanceData, self);
+          //self.formattedAttendanceData = AttendanceService.splitAttendanceIntoDays(self.attendanceData, self);
           self.loaded.attendance = true;
           self.loaded.first = true;
           self.updateStatus();
@@ -407,7 +413,7 @@
         API.getAttendancesActive(null, false, self.viewOthers).then(data => {
           self.activeData = AttendanceService.prepareAttendance(data, self);
           if (self.activeData !== null) {
-            self.formattedActiveData = AttendanceService.formatAttendanceActive(self.activeData, self);
+            // self.formattedActiveData = AttendanceService.formatAttendanceActive(self.activeData, self);
             self.loaded.timestamp = self.activeData.timestamp;
           }
           self.loaded.active = true;
