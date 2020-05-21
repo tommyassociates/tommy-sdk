@@ -189,6 +189,8 @@
               self.clock_on = true;
               self.$f7.preloader.hide()
             });
+          }).catch(() => {
+            self.$f7.preloader.hide();
           });
         });
       },
@@ -217,6 +219,8 @@
               self.clock_on = false;
               self.$f7.preloader.hide()
             });
+          }).catch(() => {
+            self.$f7.preloader.hide();
           });
         });
       },
