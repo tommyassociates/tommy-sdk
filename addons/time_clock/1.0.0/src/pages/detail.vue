@@ -167,16 +167,20 @@ export default {
     },
     openMapPage() {
       const self = this;
-      self.$f7router.navigate("/time-clock/map/", {
-        props: {
-          edit: self.edit_acces,
-          latitude: self.detail_data.latitude,
-          longitude: self.detail_data.longitude,
-          accuracy: self.detail_data.accuracy,
-          address: self.detail_data.address,
-          callback: self.editCoordinates
-        }
-      });
+      const url = `https://www.google.com/maps/place/${self.detail_data.latitude}+${self.detail_data.longitude}`;
+
+      window.open(url, '_system', 'location=yes,hidden=yes,beforeload=yes');
+
+      // self.$f7router.navigate("/time-clock/map/", {
+      //   props: {
+      //     edit: self.edit_acces,
+      //     latitude: self.detail_data.latitude,
+      //     longitude: self.detail_data.longitude,
+      //     accuracy: self.detail_data.accuracy,
+      //     address: self.detail_data.address,
+      //     callback: self.editCoordinates
+      //   }
+      // });
     },
     editCoordinates(latitude, longitude, accuracy, address) {
       const self = this;
