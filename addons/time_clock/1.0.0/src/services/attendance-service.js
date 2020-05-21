@@ -49,8 +49,8 @@ const AttendanceService = {
   splitAttendanceIntoDays(data = [], self) {
 
     //format the data.
-    const today = self.$moment(new Date());
-    const yesterday = self.$moment(new Date()).subtract(1, 'day');
+    const today = self.$moment(new Date()).subtract(1, 'day');
+    const yesterday = self.$moment(new Date()).subtract(2, 'day');
 
     const days = data.reduce((days, attendance) => {
       const date = attendance.timestamp.split('T')[0];
