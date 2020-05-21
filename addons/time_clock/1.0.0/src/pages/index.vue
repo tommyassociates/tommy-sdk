@@ -357,7 +357,7 @@
       formatDuration() {
         const self = this;
         if (self.activeData !== null) {
-          return self.$moment.utc(self.$moment.duration(self.loaded.duration, "hours").asMilliseconds()).format("H:mm");
+          return self.$moment.utc(self.$moment.duration(self.loaded.duration, "hours").asMilliseconds()).format("H:mm:ss");
         }
       },
       calculateDuration() {
@@ -385,7 +385,7 @@
 
       self.loaded.interval = setInterval(() => {
         self.calculateDuration();
-      }, 60000); //1minute
+      }, 1000); //1minute
 
 
       return Promise.all([
