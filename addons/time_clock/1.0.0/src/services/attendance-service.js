@@ -8,13 +8,15 @@ const AttendanceService = {
    * @returns {*}
    */
   prepareAttendances(data, self) {
+    if (data === null) return null;
 
     data.forEach(e => {
+      console.log(e.image);
       const user = self.$root.teamMembers.find(
         member => member.user_id === e.user_id
       );
       e.user_name = `${user.first_name} ${user.last_name}`;
-      e.icon_url = user.icon_url;
+      e.icon_url = e.image ? e.image.url : '';
     });
     return data;
   },
@@ -33,7 +35,7 @@ const AttendanceService = {
       member => member.user_id === data.user_id
     );
     data.user_name = `${user.first_name} ${user.last_name}`;
-    data.icon_url = user.icon_url;
+    data.icon_url = data.image ? data.image.url : '';
     return data;
 
 
@@ -78,7 +80,7 @@ const AttendanceService = {
       days[date].attendances.push(attendance);
       return days;
     }, {});
-
+console.log(days);
     return days;
   },
 
