@@ -82,6 +82,7 @@
       <Events
         :data="formattedAttendanceData"
         :loaded="loaded.attendance"
+        v-if="loaded.attendance"
       />
       <Photo ref="photo" direction="front"/>
       <Geo ref="geo" :dialog="false"/>
