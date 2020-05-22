@@ -8,13 +8,15 @@ const AttendanceService = {
    * @returns {*}
    */
   prepareAttendances(data, self) {
+    if (data === null) return null;
 
     data.forEach(e => {
+      console.log(e.image);
       const user = self.$root.teamMembers.find(
         member => member.user_id === e.user_id
       );
       e.user_name = `${user.first_name} ${user.last_name}`;
-      e.icon_url = user.icon_url;
+      e.icon_url = e.image ? e.image.url : '';
     });
     return data;
   },
@@ -33,7 +35,7 @@ const AttendanceService = {
       member => member.user_id === data.user_id
     );
     data.user_name = `${user.first_name} ${user.last_name}`;
-    data.icon_url = user.icon_url;
+    data.icon_url = data.image ? data.image.url : '';
     return data;
 
 
@@ -49,21 +51,25 @@ const AttendanceService = {
   splitAttendanceIntoDays(data = [], self) {
 
     //format the data.
-    const today = self.$moment(new Date());
-    const yesterday = self.$moment(new Date()).subtract(1, 'day');
+    const today = self.$moment(new Date()).format('YYYY-MM-DD');
+    const yesterday = self.$moment(today).subtract(1, 'day').format('YYYY-MM-DD');
+
+    console.log(today);
+    console.log(yesterday);
 
     const days = data.reduce((days, attendance) => {
-      const date = attendance.timestamp.split('T')[0];
+      const dateTimestamp = attendance.timestamp; //.split('T')[0];
+      const date = self.$moment(dateTimestamp).format('YYYY-MM-DD');
       if (!days[date]) {
 
         //work out title.
         let title = '';
-        if (self.$moment(date).isSame(today, 'day')) {
+        if (self.$moment(dateTimestamp).format('YYYY-MM-DD') === today) {
           title = self.$t('time_clock.index.today_title');
-        } else if (self.$moment(date).isSame(yesterday, 'day')) {
+        } else if (self.$moment(dateTimestamp).format('YYYY-MM-DD') === yesterday) {
           title = self.$t('time_clock.index.yesterday_title');
         } else {
-          title = self.$moment(date).format('ddd Do MMM, YYYY');
+          title = self.$moment(dateTimestamp).format('ddd Do MMM, YYYY');
         }
 
         days[date] = {
@@ -74,7 +80,7 @@ const AttendanceService = {
       days[date].attendances.push(attendance);
       return days;
     }, {});
-
+console.log(days);
     return days;
   },
 

@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="time-clock-main-page" :page-content="false">
+  <f7-page class="time-clock-main-page" :page-content="false" ptr @ptr:refresh="onPtrRefresh">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{$t('time_clock.index.title')}}</f7-nav-title>
@@ -10,9 +10,9 @@
         <f7-link href="/time-clock/search/" icon-only>
           <f7-icon f7="search"/>
         </f7-link>
-        <f7-link href="/time-clock/settings/" icon-only>
+        <!--<f7-link href="/time-clock/settings/" icon-only>
           <f7-icon f7="gear"/>
-        </f7-link>
+        </f7-link>-->
       </f7-nav-right>
     </f7-navbar>
 
@@ -82,9 +82,10 @@
       <Events
         :data="formattedAttendanceData"
         :loaded="loaded.attendance"
+        v-if="loaded.attendance"
       />
       <Photo ref="photo" direction="front"/>
-      <Geo ref="geo"/>
+      <Geo ref="geo" :dialog="false"/>
     </f7-page-content>
   </f7-page>
 </template>
@@ -94,11 +95,9 @@
 
   import ActiveAvatar from "../components/circle-avatar.vue";
   import Events from "../components/events.vue";
-  import Photo from '../components/photo.vue';
+  import Photo from 'tommy_core/src/components/photo.vue';
   import Geo from "../components/geo.vue";
   import Blob from "../mixins/baseToBlob.vue";
-
-  // import photoService from '../photo-service';
 
 
   /*
@@ -114,9 +113,7 @@
         clock_on: false,
         break_on: false,
         activeData: [],
-        formattedActiveData: {},
         attendanceData: [],
-        formattedAttendanceData: {},
         loaded: {
           first: false,
           active: false,
@@ -166,45 +163,21 @@
           };
         }
       },
+      formattedAttendanceData() {
+        const self = this;
+        return AttendanceService.splitAttendanceIntoDays(self.attendanceData, self);
+      },
+      formattedActiveData() {
+        const self = this;
+        return AttendanceService.formatAttendanceActive(self.activeData, self);
+      },
     },
     methods: {
       clockOnClick() {
         const self = this;
+        self.$f7.preloader.show()
         self.$refs.geo.takeGeoAsync().then(cords => {
-
-          // photoService.init({
-          //   f7: self.$f7,
-          //   success(response) {
-          //     // if (response.icon_url) {
-          //     //   self.$root.user.icon_url = response.icon_url;
-          //     //   self.$root.setUser(self.$root.user);
-          //     // }
-          //     // self.submit();
-          //
-          //     console.log('clockOnClick - photo');
-          //       const form = new FormData();
-          //       form.append("event_id", API.shifts_active_id);
-          //       form.append("latitude", cords.latitude);
-          //       form.append("longitude", cords.longitude);
-          //       form.append("accuracy", cords.accuracy);
-          //       form.append("status", "start");
-          //       form.append("address", cords.name);
-          //       form.append(
-          //         "image",
-          //         self.dataURLToBlob(photo),
-          //         `attendance_start.jpg`
-          //       );
-          //
-          //       API.setAttendances(form).then(() => {
-          //         self.updateAll();
-          //         self.clock_on = true;
-          //       });
-          //   },
-          // });
-          // photoService.capturePhotoEdit();
-
           self.$refs.photo.takePhotoAsync().then(photo => {
-            console.log('clockOnClick - photo');
             const form = new FormData();
             form.append("event_id", API.shifts_active_id);
             form.append("latitude", cords.latitude);
@@ -214,26 +187,25 @@
             form.append("address", cords.name);
             form.append(
               "image",
-              // self.dataURLToBlob(photo),
-              photo,
+              self.dataURLToBlob(photo),
               `attendance_start.jpg`
             );
 
             API.setAttendances(form).then(() => {
-              console.log('in set attendances');
               self.updateAll();
               self.clock_on = true;
-              console.log('done');
+              self.$f7.preloader.hide()
             });
+          }).catch(() => {
+            self.$f7.preloader.hide();
           });
         });
       },
       clockOffClick() {
         const self = this;
+        self.$f7.preloader.show()
         self.$refs.geo.takeGeoAsync().then(cords => {
           self.$refs.photo.takePhotoAsync().then(photo => {
-            console.log('clockOffClick - photo');
-            console.log(photo);
             const form = new FormData();
             form.append("event_id", API.shifts_active_id);
             form.append("latitude", cords.latitude);
@@ -243,19 +215,19 @@
             form.append("address", cords.name);
             form.append(
               "image",
-              //self.dataURLToBlob(photo),
-              photo,
+              self.dataURLToBlob(photo),
               `attendance_stop.jpg`
             );
 
             self.loaded.duration = 0;
 
             API.setAttendances(form).then(() => {
-              console.log('in set attendances');
               self.updateAll();
               self.clock_on = false;
-              console.log('done');
+              self.$f7.preloader.hide()
             });
+          }).catch(() => {
+            self.$f7.preloader.hide();
           });
         });
       },
@@ -332,13 +304,15 @@
 
       updateAll() {
         const self = this;
-        self.updateAttendances();
-        self.updateAttendancesActive();
+        return self.updateAttendances().then(() => {
+          return self.updateAttendancesActive();
+        });
+
       },
       updateAttendances() {
         const self = this;
         self.loaded.attendance = false;
-        API.getAttendances(null, false, self.viewOthers).then(data => {
+        return API.getAttendances(null, false, self.viewOthers).then(data => {
           self.attendanceData = AttendanceService.prepareAttendances(data, self);
           self.loaded.attendance = true;
           self.updateStatus();
@@ -347,12 +321,12 @@
       updateAttendancesActive() {
         const self = this;
         self.loaded.active = false;
-        API.getAttendancesActive(null, false, self.viewOthers).then(data => {
+        return API.getAttendancesActive(null, false, self.viewOthers).then(data => {
           self.activeData = AttendanceService.prepareAttendance(data, self);
           if (self.activeData !== null) {
             self.loaded.timestamp = self.activeData.timestamp;
           }
-          self.formattedActiveData = AttendanceService.formatAttendanceActive(self.activeData, self);
+          //self.formattedActiveData = AttendanceService.formatAttendanceActive(self.activeData, self);
           self.loaded.active = true;
         });
       },
@@ -392,7 +366,7 @@
       formatDuration() {
         const self = this;
         if (self.activeData !== null) {
-          return self.$moment.utc(self.$moment.duration(self.loaded.duration, "hours").asMilliseconds()).format("H:mm");
+          return self.$moment.utc(self.$moment.duration(self.loaded.duration, "hours").asMilliseconds()).format("H:mm:ss");
         }
       },
       calculateDuration() {
@@ -403,6 +377,15 @@
           const duration = self.$moment.duration(endTime.diff(startTime));
           self.loaded.duration = duration.asHours();
         }
+      },
+
+      onPtrRefresh(e) {
+        const done = e.detail;
+        const self = this;
+        self.updateAll()
+          .then(() => {
+            done();
+          });
       },
     },
     beforeDestroy() {
@@ -420,7 +403,7 @@
 
       self.loaded.interval = setInterval(() => {
         self.calculateDuration();
-      }, 60000); //1minute
+      }, 1000); //1minute
 
 
       return Promise.all([
@@ -433,7 +416,7 @@
         self.viewOthers = API.checkPermision(v[0], self);
         API.getAttendances(null, false, self.viewOthers).then(data => {
           self.attendanceData = AttendanceService.prepareAttendances(data, self);
-          self.formattedAttendanceData = AttendanceService.splitAttendanceIntoDays(self.attendanceData, self);
+          //self.formattedAttendanceData = AttendanceService.splitAttendanceIntoDays(self.attendanceData, self);
           self.loaded.attendance = true;
           self.loaded.first = true;
           self.updateStatus();
@@ -442,7 +425,7 @@
         API.getAttendancesActive(null, false, self.viewOthers).then(data => {
           self.activeData = AttendanceService.prepareAttendance(data, self);
           if (self.activeData !== null) {
-            self.formattedActiveData = AttendanceService.formatAttendanceActive(self.activeData, self);
+            // self.formattedActiveData = AttendanceService.formatAttendanceActive(self.activeData, self);
             self.loaded.timestamp = self.activeData.timestamp;
           }
           self.loaded.active = true;
