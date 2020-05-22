@@ -114,7 +114,6 @@
         const hours = self.selectedHours;
 
         API.cache.booking.date = new Date(parseInt(date, 10)).getTime() + hours * 60 * 60 * 1000;
-        console.log('booking.date, @@@@@@@@@@@@@@@@@@@@@', self.selectedDate, self.selectedHours, API.cache.booking.date)
         
         if (self.$f7route.query.back) {
           self.$f7router.back();

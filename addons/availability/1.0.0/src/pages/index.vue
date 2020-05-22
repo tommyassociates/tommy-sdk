@@ -166,8 +166,8 @@
         const self = this;
         // eslint-disable-next-line
         const params = {
-          addon: 'availability',
-          kind: 'Availability',
+          // addon: 'availability',
+          // kind: 'Availability',
           user_id: self.actor_id || self.$root.user.id,
           date_range: [
             self.startAt.utc().format(),
@@ -182,7 +182,8 @@
 
         self.$api.call({
             endpoint: '/workforce/availabilities/',
-            cache: false
+            cache: false,
+            data: params
           })
           .then((items) => {
             self.lastUpdated = new Date();

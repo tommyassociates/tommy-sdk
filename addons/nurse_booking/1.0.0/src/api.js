@@ -57,7 +57,6 @@ const API = {
     });
   },
   getNurseList(teamId, startTime, endTime) {
-    console.log('getNurseList @@@@@@@@@@@@@@@@', startTime, endTime, new Date().getTimezoneOffset(), tommy.moment(new Date(startTime)).toISOString(true))
     const startDate = moment(new Date(startTime)).toISOString(true);
     const endDate = moment(new Date(endTime)).toISOString(true);
     return api.call({

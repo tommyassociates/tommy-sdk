@@ -2,6 +2,7 @@ import API from './api';
 
 let paying = false;
 export default function (data, createNewOrder = true) {
+  console.log('pay order', data, createNewOrder, paying)
   if (paying) return;
   paying = true;
   let succeed;
@@ -94,6 +95,7 @@ export default function (data, createNewOrder = true) {
         order_id: responseOrder.id,
       },
       (transaction, walletData = {}) => {
+        console.log('transaction onSuccess')
         paying = false;
         succeed = true;
         if (errored) return;
@@ -109,6 +111,7 @@ export default function (data, createNewOrder = true) {
         });
       },
       (transaction, walletData = {}) => {
+        console.log('transaction onError')
         paying = false;
         errored = true;
         if (succeed) return;
@@ -117,14 +120,16 @@ export default function (data, createNewOrder = true) {
         }).catch(() => {
           f7.views.main.router.navigate(`${errorUrl}?id=${responseOrder.id}`);
         });
+      },
+      () => {
+        console.log('transaction onClose')
+        paying = false;
       }
     );
   }
 
   if (createNewOrder) {
-    API.sendOrder(teamId, order).then(pay).catch(() => {
-      paying = false;
-    });
+    API.sendOrder(teamId, order).then(pay).catch(_ => paying = false);
   } else {
     pay({ id: orderId, ...order });
   }

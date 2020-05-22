@@ -93,6 +93,7 @@
         location: API.cache.booking.location,
         date: API.cache.booking.date,
         nurse: API.cache.booking.nurse,
+        created: false
       };
     },
     computed: {
@@ -194,7 +195,8 @@
           date,
           nurse,
           duration,
-        });
+        }, !this.created);
+        this.created = true
       },
     },
   };
