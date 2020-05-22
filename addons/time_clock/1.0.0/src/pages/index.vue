@@ -10,9 +10,9 @@
         <f7-link href="/time-clock/search/" icon-only>
           <f7-icon f7="search"/>
         </f7-link>
-        <f7-link href="/time-clock/settings/" icon-only>
+        <!--<f7-link href="/time-clock/settings/" icon-only>
           <f7-icon f7="gear"/>
-        </f7-link>
+        </f7-link>-->
       </f7-nav-right>
     </f7-navbar>
 
