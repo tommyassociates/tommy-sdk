@@ -1,0 +1,68 @@
+{
+  "index": {
+    "title": "时间表",
+    "current_title": "当前",
+    "submitted_title": "已提交\n",
+    "approved_title": "已批准\n",
+    "items_label": "项目\n"
+  },
+  "select_period": {
+    "title": "选择时期\n",
+    "confirm_button": "完成了\n"
+  },
+  "timesheet_details": {
+    "title": "时间表\n",
+    "details_title": "细节\n",
+    "id_label": "时间表ID\n",
+    "id_default": "尚未授予\n",
+    "date_label": "日期范围\n",
+    "status_label": "状态",
+    "items_title": "物品\n",
+    "items_none": "\n未找到任何项目！点击“ +”添加新项目。",
+    "copy_button": "复制\n",
+    "delete_button": "删除"
+  },
+  "timesheet_details_shift": {
+    "title": "新转变\n",
+    "name_label": "名称\n",
+    "role_title": "角色\n",
+    "location_title": "位置\n",
+    "address_label": "地址\n",
+    "address_default": "输入特定地址...\n",
+    "start_date_label": "开始日期\n",
+    "edit_button": "编辑",
+    "delete_button": "删除"
+  },
+  "timesheet_details_shift_event": {
+    "title": "新事件\n",
+    "time_label": "时间\n",
+    "date_label": "日期\n",
+    "where_label": "哪里\n",
+    "photo_label": "照片\n",
+    "action_label": "行动",
+    "action_options": ["开始\n", "暂停", "恢复\n", "停止\n"],
+    "delete_button": "Delete"
+  },
+  "manager": {
+    "title": "经理\n",
+    "unsubmitted_label": "未提交\n",
+    "submitted_label": "已提交\n",
+    "denied_label": "被拒绝\n",
+    "approved_label": "已批准\n",
+    "deny_button": "拒绝\n",
+    "approve_label": "批准\n"
+  },
+  "approve_bulk": {
+    "title": "批准",
+    "select_all_label": "全选\n",
+    "items_label": "项目\n",
+    "hours_label": "小时\n"
+  },
+  "settings_onclick": {
+    "title": "点击显示\n",
+    "enabled_label": "已启用\n",
+    "active_title": "活性\n",
+    "available_title": "可用的\n",
+    "onclick_options": ["上次有效日期\n", "头像照片\n", "名称\n", "标签清单\n", "角色清单\n"]
+  }
+}
