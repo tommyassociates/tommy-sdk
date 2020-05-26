@@ -28,8 +28,8 @@
   </f7-page>
 </template>
 <script>
-  import API from "../api";
-  import TimeSheetService from "../services/time-sheet-service";
+  // import API from "../api";
+  // import TimeSheetService from "../services/time-sheet-service";
 
 
   export default {
@@ -46,8 +46,8 @@
     mixins: [Blob],
     created() {
       const self = this;
-      API.actorId = API.getUserId(self);
-      API.actor = API.getActor(self);
+      // API.actorId = API.getUserId(self);
+      // API.actor = API.getActor(self);
     },
     computed: {
 
