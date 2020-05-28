@@ -4,7 +4,8 @@
     "current_title": "当前",
     "submitted_title": "已提交",
     "approved_title": "已批准",
-    "items_label": "项目"
+    "items_label_singular": "项目",
+    "items_label_plural": "物品"
   },
   "select_period": {
     "title": "选择时期",

@@ -2,7 +2,6 @@ const TimesheetService = {
   test: undefined,
 
 
-
   /**
    * Return the data format for use by the <Events> component.
    * @param data
@@ -25,6 +24,7 @@ const TimesheetService = {
 
       const items = timesheetsItemsData.filter(timesheetsItem => +timesheetsItem.timesheet_id === +timesheet.id);
       const title = TimesheetService.dateRangeFormat(timesheet.start_date, timesheet.end_date, self);
+      //const itemsString = items.length === 1 ? self.$t('time_sheets.index.items_label_singular') : self.$t('time_sheets.index.items_label_plural');
       const description = `${items.length} Items`;
       const workHours = items.reduce((totalHours, item) => +totalHours + +item.work_hours, 0);
       const hours = Math.floor(workHours);

@@ -1,4 +1,4 @@
-.list.time-clock-list {
+.list.time-sheet-list {
     margin-top: 0 !important;
     margin-bottom: 0 !important;
     .item-content {
@@ -17,6 +17,9 @@
         height: 1px;
         transform-origin: 50% 100%;
       }
+      .item-inner {
+        align-self: center;
+      }
     }
     li:last-child .item-content:after{
       content: none;
@@ -26,19 +29,15 @@
       min-height: 64px;
       align-self: stretch;
     }
-    .time-clock-item-image {
-      width: 64px;
-      height: 64px;
-      background: #eee;
-      background-size: 100% auto;
-      background-position: center;
-      background-repeat: no-repeat;
-    }
     .item-title {
-      font-size: 20px;
+      font-size: 18px;
       font-weight: normal !important;
+      color: #333333;
+      display: block;
+      padding-top: 2px;
+      padding-bottom: 2px;
     }
-    .description{    
+    .description{
       overflow: hidden;
       text-overflow: ellipsis;
       display: -webkit-box;
@@ -47,6 +46,8 @@
       color: #666666;
       font-size: 16px;
       max-height: 40px;
+      padding-top: 2px;
+      padding-bottom: 2px;
     }
     .item-inner{
         margin-left: 12px !important;

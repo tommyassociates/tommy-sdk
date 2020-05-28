@@ -91,7 +91,7 @@
 </template>
 <script>
   import API from "../api";
-  import TimesheetService from "../services/attendance-service";
+  import AttendandcService from "../services/attendance-service";
 
   import ActiveAvatar from "../components/circle-avatar.vue";
   import Events from "../components/events.vue";
@@ -165,11 +165,11 @@
       },
       formattedAttendanceData() {
         const self = this;
-        return AttendanceService.splitAttendanceIntoDays(self.attendanceData, self);
+        return AttendandcService.splitAttendanceIntoDays(self.attendanceData, self);
       },
       formattedActiveData() {
         const self = this;
-        return AttendanceService.formatAttendanceActive(self.activeData, self);
+        return AttendandcService.formatAttendanceActive(self.activeData, self);
       },
     },
     methods: {

@@ -2,7 +2,7 @@
   <div v-if="data">
 
 
-    <f7-list media-list class="time-clock-list" v-if="loaded">
+    <f7-list media-list class="time-sheet-list" v-if="loaded">
       <f7-list-item
         v-for="(timesheets, index) in data"
         :key="'timesheets_'+index"
