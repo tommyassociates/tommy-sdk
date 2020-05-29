@@ -44,22 +44,23 @@ const TimesheetService = {
     return formattedData;
   },
 
-  formatTimesheetsItemsData(timesheetsItemsData, self) {
+  formatTimesheetsShiftsData(timesheetsShiftsData, self) {
     let formattedData = [];
-    timesheetsItemsData.forEach(timesheetItem => {
+    timesheetsShiftsData.forEach(timesheetShift => {
 
-      const title = self.$moment(timesheetItem.start_date).format('ddd, D MMM');
-      const description = timesheetItem.address;
-      const workHours = timesheetItem.work_hours;
+      const title = self.$moment(timesheetShift.start_date).format('ddd, D MMM');
+      const description = timesheetShift.address;
+      const workHours = timesheetShift.work_hours;
       const hours = Math.floor(workHours);
       const minutes = String(parseFloat(workHours - hours).toFixed(2)).replace('0.', '');
 
       const data = {
-        id: timesheetItem.id,
+        id: timesheetShift.id,
         title,
         description,
         hours,
         minutes,
+        work_hours: workHours,
       };
 
       formattedData.push(data);

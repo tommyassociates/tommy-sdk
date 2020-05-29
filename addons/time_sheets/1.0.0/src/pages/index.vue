@@ -46,7 +46,7 @@
       const self = this;
       return {
         timesheetsData: [],
-        timesheetsItemsData: [],
+        timesheetsShiftsData: [],
         loaded: false,
       };
     },
@@ -77,7 +77,7 @@
       },
       formattedTimesheetsData() {
         const self = this;
-        return TimesheetService.formatTimesheetsData(self.timesheetsData, self.timesheetsItemsData, self);
+        return TimesheetService.formatTimesheetsData(self.timesheetsData, self.timesheetsShiftsData, self);
       }
     },
     methods: {},
@@ -113,8 +113,8 @@
         // });
         API.getTimesheets().then(timesheets => {
           self.timesheetsData = timesheets;
-          API.getTimesheetsItems().then(timesheetsItems => {
-            self.timesheetsItemsData = timesheetsItems;
+          API.getTimesheetsShifts().then(timesheetsShifts => {
+            self.timesheetsShiftsData = timesheetsShifts;
             self.loaded = true;
           });
         });

@@ -74,7 +74,7 @@ const API = {
       });
   },
 
-  getTimesheetsItems(cache = true) {
+  getTimesheetsShifts(cache = true) {
     return api
       .call({
         endpoint: `workforce/timesheet_items`,
@@ -96,6 +96,57 @@ const API = {
       .then(data => {
         return data;
       });
+  },
+
+  deleteTimesheetShift(id) {
+    return api
+      .call({
+        endpoint: `workforce/timesheet_items/${id}`,
+        method: "DELETE",
+        cache: false,
+      })
+      .then(data => {
+        return data;
+      });
+  },
+
+  createTimesheetShift(data) {
+    console.log('createTimesheetShift', data);
+    return api
+      .call({
+        endpoint: `workforce/timesheet_items`,
+        method: "POST",
+        data,
+      })
+      .then(data => {
+        return data;
+      });
+  },
+
+
+
+  /**
+   * Will remove an item from the tommy.cache
+   * @param cacheKey
+   * @param key
+   * @param value
+   */
+  // removeItemFromCache(cacheKey, key, value) {
+  //   return new Promise((resolve, reject) => {
+  //     const cacheData = cache.get('api', cacheKey);console.log(cacheData);
+  //     const data = [...cacheData];
+  //     const filteredData = data.filter(d => +d[key] !== +value);
+  //     cache.set('api', cacheKey, filteredData);
+  //     resolve(filteredData);
+  //   });
+  // },
+
+  removeItemFromObject(data, key, value) {
+    return new Promise((resolve, reject) => {
+      const newData = [...data];
+      const filteredData = newData.filter(d => +d[key] !== +value);
+      resolve(filteredData);
+    });
   },
 
 

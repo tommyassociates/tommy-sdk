@@ -1,6 +1,7 @@
 import Index from "./pages/index.vue";
 import Settings from "./pages/settings.vue";
 import Detail from "./pages/detail.vue";
+import ShiftDetail from "./pages/shift-detail.vue";
 import Search from "./pages/search.vue";
 import SelectPicker from "./pages/select-picker.vue";
 import MapPage from "./pages/map.vue";
@@ -11,12 +12,16 @@ const routes = [
     component: Index,
   },
   {
-    path: "/time-sheets/settings/",
-    component: Settings,
-  },
-  {
     path: "/time-sheets/detail/:id",
     component: Detail,
+  },
+  {
+    path: "/time-sheets/item-detail/:id",
+    component: ShiftDetail,
+  },
+  {
+    path: "/time-sheets/settings/",
+    component: Settings,
   },
   {
     path: "/time-sheets/search/",

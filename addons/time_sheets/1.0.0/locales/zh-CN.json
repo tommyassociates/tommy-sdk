@@ -28,13 +28,17 @@
     "confirm_button": "确认"
   },
   "timesheet_details_shift": {
-    "title": "新转变",
+    "title": "转移",
     "name_label": "名称",
     "role_title": "角色",
+    "role_label": "角色",
     "location_title": "位置",
+    "location_label": "位置",
     "address_label": "地址",
     "address_default": "输入特定地址...",
     "start_date_label": "开始日期",
+    "work_hours_label": "工作时间",
+    "break_hours_label": "休息时间",
     "edit_button": "编辑",
     "delete_button": "删除"
   },

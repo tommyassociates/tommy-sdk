@@ -6,7 +6,7 @@
   >
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{$t('time_sheets.timesheet_details.title')}}</f7-nav-title>
+      <f7-nav-title>{{$t('time_sheets.timesheet_details_shift.title')}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
         <f7-link icon-only @click="editAttendance" v-if="edit_acces">
           <f7-icon f7="check"/>
@@ -14,80 +14,51 @@
       </f7-nav-right>
     </f7-navbar>
     <f7-toolbar v-if="edit_acces">
-      <f7-button @click="deleteClick()">{{$t('time_sheets.timesheet_details.delete_button')}}</f7-button>
+      <f7-button @click="deleteClick()">{{$t('time_sheets.timesheet_details_shift.delete_button')}}</f7-button>
     </f7-toolbar>
     <template v-if="loaded">
       <f7-list media-list>
-        <f7-list-item
-          :title="$t('time_sheets.timesheet_details.id_label')"
-        >
+        <f7-list-item :title="$t('time_sheets.timesheet_details_shift.work_hours_label')">
           <div slot="after">
-            {{timesheet.id}}
+            {{timesheetShift.work_hours}}
+          </div>
+        </f7-list-item>
+        <f7-list-item :title="$t('time_sheets.timesheet_details_shift.break_hours_label')">
+          <div slot="after">
+            {{timesheetShift.break_hours}}
           </div>
         </f7-list-item>
 
-        <f7-list-item
-          :title="$t('time_sheets.timesheet_details.date_label')"
-        >
-          <div slot="after">
-            {{ dateRangeFormat(timesheet.start_date, timesheet.end_date) }}
-          </div>
-        </f7-list-item>
 
-        <f7-list-item
-          :title="$t('time_sheets.timesheet_details.status_label')"
-        >
-          <div slot="after">
-            {{timesheet.status}}
-          </div>
-        </f7-list-item>
+      </f7-list>
 
-        <f7-list-item
-          :title="$t('time_sheets.timesheet_details.hours_label')"
-        >
+
+      <f7-block-title class="time-clock-divider">{{ $t('time_sheets.timesheet_details_shift.role_title') }}
+      </f7-block-title>
+
+      <f7-list media-list>
+        <f7-list-item :title="$t('time_sheets.timesheet_details_shift.role_label')">
           <div slot="after">
-            {{ hoursTotal }}
+            {{timesheetShift.role}}
           </div>
         </f7-list-item>
       </f7-list>
 
-      <f7-block-title class="time-clock-divider">{{ $t('time_sheets.timesheet_details.items_title') }}</f7-block-title>
 
-      <template v-if="timesheetShifts.length">
-        <f7-list media-list class="time-sheet-list">
-          <f7-list-item
-            swipeout
-            v-for="(timesheetShift, index) in timesheetShifts"
-            :key="'timesheetShift_'+index"
-            :title="timesheetShift.title"
-            :subtitle="`${timesheetShift.description} hello`"
-            :link="'/time-sheets/item-detail/' + timesheetShift.id"
-            @swipeout:deleted="onSwipeoutDeleted(timesheetShift)"
-          >
-            <div
-              slot="media"
-            >
-              <div class="circle">
-                <div class="circle__content">
-                  <span class="circle__text">{{ timesheetShift.hours }}h</span>
-                  <span class="circle__text circle__text--small">{{ timesheetShift.minutes }}m</span>
-                </div>
-              </div>
-            </div>
-
-            <f7-swipeout-actions right>
-              <f7-swipeout-button @click="copyTimesheetShift(timesheetShift.id)">Copy</f7-swipeout-button>
-              <f7-swipeout-button delete>Delete</f7-swipeout-button>
-            </f7-swipeout-actions>
-          </f7-list-item>
-        </f7-list>
-      </template>
-      <template v-else>
-        <div class="p-16">
-          <img :src="`${$addonAssetsUrl}no-items-found.svg`">
-          <p>{{ $t('time_sheets.timesheet_details.items_none') }}</p>
-        </div>
-      </template>
+      <f7-block-title class="time-clock-divider">{{ $t('time_sheets.timesheet_details_shift.location_title') }}
+      </f7-block-title>
+      <f7-list media-list>
+        <f7-list-item :title="$t('time_sheets.timesheet_details_shift.location_label')">
+          <div slot="after">
+            {{timesheetShift.location}}
+          </div>
+        </f7-list-item>
+        <f7-list-item :title="$t('time_sheets.timesheet_details_shift.address_label')">
+          <div slot="after">
+            {{timesheetShift.address}}
+          </div>
+        </f7-list-item>
+      </f7-list>
 
 
     </template>
@@ -138,7 +109,7 @@
   import TimesheetService from "../services/timesheet-service";
 
   export default {
-    name: "TimesheetDetail",
+    name: "TimesheetShiftDetail",
     mixins: [dialog, timePicker],
     methods: {
       changeAction(val) {
@@ -411,55 +382,26 @@
         return TimesheetService.dateRangeFormat(startDate, endDate, self);
       },
 
-      onSwipeoutDeleted(timesheetShift) {
+      onSwipeoutDeleted(timesheetItem) {
         const self = this;
-        const timesheetId = timesheetShift.id;
+        const timesheetId = timesheetItem.id;
 
         // API.removeItemFromCache('workforce/timesheet_items', 'id', timesheetId).then((updatedCache) => {
         //   self.timesheetsItemsData = updatedCache;
         // });
 
-        API.removeItemFromObject(self.timesheetsShiftsData, 'id', timesheetId).then(newData => {
-          self.timesheetsShiftsData = newData;
+        API.removeItemFromObject(self.timesheetsItemsData, 'id', timesheetId).then(newData => {
+          self.timesheetsItemsData = newData;
         });
-      },
 
-      copyTimesheetShift(timesheetShiftId) {
-        const self = this;
-        console.log(timesheetShiftId);
-        const timesheetShift = self.timesheetsShiftsData.find(timesheetShift => +timesheetShift.id === +timesheetShiftId);
-        delete timesheetShift.id;
-        API.createTimesheetShift(timesheetShift).then(response => console.log(response));
+        //workforce/timesheet_items
+        // API.deleteTimesheetItem(timesheetId);
       },
     },
     computed: {
-      dateField() {
+      timesheetShift() {
         const self = this;
-        if (!self.detail_data) return null;
-        return self.$moment(self.detail_data.timestamp).format("DD MMM YYYY");
-      },
-      timeField() {
-        const self = this;
-        if (!self.detail_data) return null;
-        return self.$moment(self.detail_data.timestamp).format("H:mm");
-      },
-
-      hoursTotal() {
-        const self = this;
-        const timesheetShifts = self.timesheetShifts;
-        const hours = timesheetShifts.reduce((totalHours, timesheetShift) => Math.trunc(totalHours) + Math.trunc(timesheetShift.work_hours), 0);
-        return parseFloat(hours).toFixed(2);
-      },
-
-      timesheet() {
-        const self = this;
-        return self.timesheetsData.find(timesheet => +timesheet.id === +self.edit_id);
-      },
-
-      timesheetShifts() {
-        const self = this;
-        const timesheetShifts = self.timesheetsShiftsData.filter(timesheetShift => +timesheetShift.timesheet_id === +self.edit_id);
-        return TimesheetService.formatTimesheetsShiftsData(timesheetShifts, self);
+        return self.timesheetsShiftsData.find(timesheetShift => +timesheetShift.id === +self.edit_id);
       },
     },
     mounted() {
@@ -494,15 +436,10 @@
       // });
 
 
-      API.getTimesheets().then(timesheets => {
-        self.timesheetsData = timesheets;
-        API.getTimesheetsShifts().then(timesheetsShifts => {
-          self.timesheetsShiftsData = timesheetsShifts;
-          self.loaded = true;
-
-          self.edit_acces = true;
-
-        });
+      API.getTimesheetsShifts().then(timesheetsShifts => {
+        self.timesheetsShiftsData = timesheetsShifts;
+        self.loaded = true;
+        self.edit_acces = true;
       });
 
 
@@ -524,7 +461,6 @@
 
         edit_id: self.$f7route.params.id,
         edit_acces: false,
-        timesheetsData: [],
         timesheetsShiftsData: [],
         loaded: false,
       };

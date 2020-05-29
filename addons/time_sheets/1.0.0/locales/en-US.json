@@ -28,13 +28,17 @@
     "confirm_button": "Confirm"
   },
   "timesheet_details_shift": {
-    "title": "New Shift",
+    "title": "Shift",
     "name_label": "Name",
     "role_title": "Role",
+    "role_label": "Role",
     "location_title": "Location",
+    "location_label": "Location",
     "address_label": "Address",
     "address_default": "Enter specific address...",
     "start_date_label": "Start Date",
+    "work_hours_label": "Work hours",
+    "break_hours_label": "Break hours",
     "edit_button": "Edit",
     "delete_button": "Delete"
   },
