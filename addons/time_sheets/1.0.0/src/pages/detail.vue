@@ -8,13 +8,18 @@
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('time_sheets.timesheet_details.title')}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
-        <f7-link icon-only @click="editAttendance" v-if="edit_acces">
+        <f7-link icon-only @click="editAttendance" v-if="editAccess">
           <f7-icon f7="check"/>
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
-    <f7-toolbar v-if="edit_acces">
-      <f7-button @click="deleteClick()">{{$t('time_sheets.timesheet_details.delete_button')}}</f7-button>
+    <f7-toolbar v-if="loaded">
+      <f7-button @click="deleteClick()" class="button button--red-text" v-if="editAccess">
+        {{$t('time_sheets.timesheet_details.delete_button')}}
+      </f7-button>
+      <f7-button @click="submitForApprovalClick()" :class="submitForApprovalButtonClasses" v-if="!editAccess">
+        {{$t('time_sheets.timesheet_details.submit_for_approval_button')}}
+      </f7-button>
     </f7-toolbar>
     <template v-if="loaded">
       <f7-list media-list>
@@ -60,7 +65,7 @@
             v-for="(timesheetShift, index) in timesheetShifts"
             :key="'timesheetShift_'+index"
             :title="timesheetShift.title"
-            :subtitle="`${timesheetShift.description} hello`"
+            :subtitle="`${timesheetShift.description ? timesheetShift.description : ''}`"
             :link="'/time-sheets/item-detail/' + timesheetShift.id"
             @swipeout:deleted="onSwipeoutDeleted(timesheetShift)"
           >
@@ -141,6 +146,71 @@
     name: "TimesheetDetail",
     mixins: [dialog, timePicker],
     methods: {
+      deleteTimesheet() {
+        const self = this;
+        if (!self.editAccess) return;
+        API.deleteTimesheet(self.timesheet.id, true).then((response) => {
+          console.log('deleteTimesheet', response);
+          self.$f7router.back();
+          self.$events.$emit("time_sheets:timesheet_delete", self.timesheet);
+        });
+      },
+      deleteClick() {
+        const self = this;
+        self.confirmDialog(
+          false,
+          self.$t("time_sheets.timesheet_details.delete_text"),
+          self.$t("time_sheets.timesheet_details.confirm_button"),
+          self.$t("time_sheets.timesheet_details.cancel_button"),
+          self.deleteTimesheet,
+          false,
+          null,
+          true,
+          false
+        );
+      },
+      submitForApprovalClick() {
+        const self = this;
+        if (self.editAccess) return;
+        const data = {
+          status: 'submitted'
+        };
+        API.updateTimesheet(self.edit_id, data);
+      },
+      dateRangeFormat(startDate = '', endDate = '') {
+        const self = this;
+        return TimesheetService.dateRangeFormat(startDate, endDate, self);
+      },
+
+      onSwipeoutDeleted(timesheetShift) {
+        const self = this;
+        const timesheetId = timesheetShift.id;
+
+        // API.removeItemFromCache('workforce/timesheet_items', 'id', timesheetId).then((updatedCache) => {
+        //   self.timesheetsItemsData = updatedCache;
+        // });
+
+        API.removeItemFromObject(self.timesheetsShiftsData, 'id', timesheetId).then(newData => {
+          self.timesheetsShiftsData = newData;
+          API.removeItemFromCache('workforce/timesheet_items', 'id', timesheetId);
+        });
+      },
+
+      copyTimesheetShift(timesheetShiftId) {
+        const self = this;
+        console.log(timesheetShiftId);
+        const timesheetShift = self.timesheetsShiftsData.find(timesheetShift => +timesheetShift.id === +timesheetShiftId);
+        delete timesheetShift.id;
+        API.createTimesheetShift(timesheetShift).then(response => console.log(response));
+      },
+
+
+
+
+
+
+
+
       changeAction(val) {
         const self = this;
         self.detail_data.status = val;
@@ -188,7 +258,7 @@
       },
       openSelector() {
         const self = this;
-        if (!self.edit_acces) return;
+        if (!self.editAccess) return;
         self.$f7router.navigate("/time-clock/select-picker/", {
           props: {
             selected: self.detail_data.user_id,
@@ -216,7 +286,7 @@
       },
       editAttendance() {
         const self = this;
-        if (!self.edit_acces) return;
+        if (!self.editAccess) return;
         const form = new FormData();
 
         if (
@@ -247,32 +317,10 @@
           self.$events.$emit("time_sheets:attedance_edit", self.detail_data);
         });
       },
-      deleteTimesheet() {
-        const self = this;
-        if (!self.edit_acces) return;
-        API.deleteTimesheet(self.timesheet.id).then((response) => {
-          console.log('deleteTimesheet', response);
-          self.$f7router.back();
-          self.$events.$emit("time_sheets:timesheet_delete", self.timesheet);
-        });
-      },
-      deleteClick() {
-        const self = this;
-        self.confirmDialog(
-          false,
-          self.$t("time_sheets.timesheet_details.delete_text"),
-          self.$t("time_sheets.timesheet_details.confirm_button"),
-          self.$t("time_sheets.timesheet_details.cancel_button"),
-          self.deleteTimesheet,
-          false,
-          null,
-          true,
-          false
-        );
-      },
+
       openCalendar() {
         const self = this;
-        if (self.edit_acces) self.calendarInstance.open();
+        if (self.editAccess) self.calendarInstance.open();
       },
       createCalendar() {
         const self = this;
@@ -342,7 +390,7 @@
           },
           renderNavbar() {
             let editHtml = "";
-            if (self.edit_acces) {
+            if (self.editAccess) {
               editHtml = `
               <a href="#" class="link icon-only" id="time-clock-reload-photo" ref="reloadPhoto">
                 <i class="icon f7-icons color-white">reload</i>
@@ -403,34 +451,10 @@
       },
       openTimePickerDetail() {
         const self = this;
-        if (self.edit_acces) self.openTimePicker();
+        if (self.editAccess) self.openTimePicker();
       },
 
-      dateRangeFormat(startDate = '', endDate = '') {
-        const self = this;
-        return TimesheetService.dateRangeFormat(startDate, endDate, self);
-      },
 
-      onSwipeoutDeleted(timesheetShift) {
-        const self = this;
-        const timesheetId = timesheetShift.id;
-
-        // API.removeItemFromCache('workforce/timesheet_items', 'id', timesheetId).then((updatedCache) => {
-        //   self.timesheetsItemsData = updatedCache;
-        // });
-
-        API.removeItemFromObject(self.timesheetsShiftsData, 'id', timesheetId).then(newData => {
-          self.timesheetsShiftsData = newData;
-        });
-      },
-
-      copyTimesheetShift(timesheetShiftId) {
-        const self = this;
-        console.log(timesheetShiftId);
-        const timesheetShift = self.timesheetsShiftsData.find(timesheetShift => +timesheetShift.id === +timesheetShiftId);
-        delete timesheetShift.id;
-        API.createTimesheetShift(timesheetShift).then(response => console.log(response));
-      },
     },
     computed: {
       dateField() {
@@ -461,6 +485,15 @@
         const timesheetShifts = self.timesheetsShiftsData.filter(timesheetShift => +timesheetShift.timesheet_id === +self.edit_id);
         return TimesheetService.formatTimesheetsShiftsData(timesheetShifts, self);
       },
+
+      submitForApprovalButtonClasses() {
+        const self = this;
+        return {
+          'button': true,
+          'button--red': true,
+          'disabled': self.timesheet.status === 'submitted',
+        }
+      }
     },
     mounted() {
       const self = this;
@@ -500,7 +533,7 @@
           self.timesheetsShiftsData = timesheetsShifts;
           self.loaded = true;
 
-          self.edit_acces = true;
+          self.editAccess = false;
 
         });
       });
@@ -523,7 +556,7 @@
         // loaded: false
 
         edit_id: self.$f7route.params.id,
-        edit_acces: false,
+        editAccess: false,
         timesheetsData: [],
         timesheetsShiftsData: [],
         loaded: false,

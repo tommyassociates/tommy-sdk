@@ -25,7 +25,8 @@
     "delete_button": "Delete",
     "delete_text": "Are you sure you want to delete this entry?",
     "cancel_button": "Cancel",
-    "confirm_button": "Confirm"
+    "confirm_button": "Confirm",
+    "submit_for_approval_button":  "Submit for approval"
   },
   "timesheet_details_shift": {
     "title": "Shift",

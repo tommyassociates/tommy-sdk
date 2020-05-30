@@ -86,10 +86,22 @@ const API = {
       });
   },
 
-  deleteTimesheet(id) {
+  updateTimesheet(id, data) {
+    const endpoint = `workforce/timesheets/${id}`;
     return api
       .call({
-        endpoint: `workforce/timesheets/${id}`,
+        endpoint,
+        method: "PUT",
+        data,
+      });
+  },
+
+  deleteTimesheet(id, isManager = false) {
+    const endpoint = `workforce/${isManager ? 'manager/' : ''}timesheets/${id}`;
+    console.log(endpoint);
+    return api
+      .call({
+        endpoint,
         method: "DELETE",
         cache: false,
       })
@@ -131,15 +143,15 @@ const API = {
    * @param key
    * @param value
    */
-  // removeItemFromCache(cacheKey, key, value) {
-  //   return new Promise((resolve, reject) => {
-  //     const cacheData = cache.get('api', cacheKey);console.log(cacheData);
-  //     const data = [...cacheData];
-  //     const filteredData = data.filter(d => +d[key] !== +value);
-  //     cache.set('api', cacheKey, filteredData);
-  //     resolve(filteredData);
-  //   });
-  // },
+  removeItemFromCache(cacheKey, key, value) {
+    return new Promise((resolve, reject) => {
+      const cacheData = cache.get('api', cacheKey);console.log(cacheData);
+      const data = [...cacheData];
+      const filteredData = data.filter(d => +d[key] !== +value);
+      cache.set('api', cacheKey, filteredData);
+      resolve(filteredData);
+    });
+  },
 
   removeItemFromObject(data, key, value) {
     return new Promise((resolve, reject) => {

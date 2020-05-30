@@ -8,12 +8,12 @@
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('time_sheets.timesheet_details_shift.title')}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
-        <f7-link icon-only @click="editAttendance" v-if="edit_acces">
+        <f7-link icon-only @click="editAttendance" v-if="editAccess">
           <f7-icon f7="check"/>
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
-    <f7-toolbar v-if="edit_acces">
+    <f7-toolbar v-if="editAccess">
       <f7-button @click="deleteClick()">{{$t('time_sheets.timesheet_details_shift.delete_button')}}</f7-button>
     </f7-toolbar>
     <template v-if="loaded">
@@ -159,7 +159,7 @@
       },
       openSelector() {
         const self = this;
-        if (!self.edit_acces) return;
+        if (!self.editAccess) return;
         self.$f7router.navigate("/time-clock/select-picker/", {
           props: {
             selected: self.detail_data.user_id,
@@ -187,7 +187,7 @@
       },
       editAttendance() {
         const self = this;
-        if (!self.edit_acces) return;
+        if (!self.editAccess) return;
         const form = new FormData();
 
         if (
@@ -220,7 +220,7 @@
       },
       deleteTimesheet() {
         const self = this;
-        if (!self.edit_acces) return;
+        if (!self.editAccess) return;
         API.deleteTimesheet(self.timesheet.id).then((response) => {
           console.log('deleteTimesheet', response);
           self.$f7router.back();
@@ -243,7 +243,7 @@
       },
       openCalendar() {
         const self = this;
-        if (self.edit_acces) self.calendarInstance.open();
+        if (self.editAccess) self.calendarInstance.open();
       },
       createCalendar() {
         const self = this;
@@ -313,7 +313,7 @@
           },
           renderNavbar() {
             let editHtml = "";
-            if (self.edit_acces) {
+            if (self.editAccess) {
               editHtml = `
               <a href="#" class="link icon-only" id="time-clock-reload-photo" ref="reloadPhoto">
                 <i class="icon f7-icons color-white">reload</i>
@@ -374,7 +374,7 @@
       },
       openTimePickerDetail() {
         const self = this;
-        if (self.edit_acces) self.openTimePicker();
+        if (self.editAccess) self.openTimePicker();
       },
 
       dateRangeFormat(startDate = '', endDate = '') {
@@ -439,7 +439,7 @@
       API.getTimesheetsShifts().then(timesheetsShifts => {
         self.timesheetsShiftsData = timesheetsShifts;
         self.loaded = true;
-        self.edit_acces = true;
+        self.editAccess = true;
       });
 
 
@@ -460,7 +460,7 @@
         // loaded: false
 
         edit_id: self.$f7route.params.id,
-        edit_acces: false,
+        editAccess: false,
         timesheetsShiftsData: [],
         loaded: false,
       };
