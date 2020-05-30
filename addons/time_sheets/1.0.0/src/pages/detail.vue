@@ -60,31 +60,41 @@
 
       <template v-if="timesheetShifts.length">
         <f7-list media-list class="time-sheet-list">
-          <f7-list-item
-            swipeout
-            v-for="(timesheetShift, index) in timesheetShifts"
-            :key="'timesheetShift_'+index"
-            :title="timesheetShift.title"
-            :subtitle="`${timesheetShift.description ? timesheetShift.description : ''}`"
-            :link="'/time-sheets/item-detail/' + timesheetShift.id"
-            @swipeout:deleted="onSwipeoutDeleted(timesheetShift)"
-          >
-            <div
-              slot="media"
+          <template v-if="editAccess">
+            <f7-list-item
+              swipeout
+              v-for="(timesheetShift, index) in timesheetShifts"
+              :key="'timesheetShift_'+index"
+              :title="timesheetShift.title"
+              :subtitle="`${timesheetShift.description ? timesheetShift.description : ''}`"
+              :link="'/time-sheets/item-detail/' + timesheetShift.id"
+              @swipeout:deleted="onSwipeoutDeleted(timesheetShift)"
             >
-              <div class="circle">
-                <div class="circle__content">
-                  <span class="circle__text">{{ timesheetShift.hours }}h</span>
-                  <span class="circle__text circle__text--small">{{ timesheetShift.minutes }}m</span>
-                </div>
+              <div slot="media">
+                <hours-minutes-badge :hours="String(timesheetShift.hours)"
+                                     :minutes="String(timesheetShift.minutes)"></hours-minutes-badge>
               </div>
-            </div>
 
-            <f7-swipeout-actions right>
-              <f7-swipeout-button @click="copyTimesheetShift(timesheetShift.id)">Copy</f7-swipeout-button>
-              <f7-swipeout-button delete>Delete</f7-swipeout-button>
-            </f7-swipeout-actions>
-          </f7-list-item>
+              <f7-swipeout-actions right>
+                <f7-swipeout-button @click="copyTimesheetShift(timesheetShift.id)">Copy</f7-swipeout-button>
+                <f7-swipeout-button delete>Delete</f7-swipeout-button>
+              </f7-swipeout-actions>
+            </f7-list-item>
+          </template>
+          <template v-if="!editAccess">
+            <f7-list-item
+              v-for="(timesheetShift, index) in timesheetShifts"
+              :key="'timesheetShift_'+index"
+              :title="timesheetShift.title"
+              :subtitle="`${timesheetShift.description ? timesheetShift.description : ''}`"
+              :link="'/time-sheets/item-detail/' + timesheetShift.id"
+            >
+              <div slot="media">
+                <hours-minutes-badge :hours="String(timesheetShift.hours)"
+                                     :minutes="String(timesheetShift.minutes)"></hours-minutes-badge>
+              </div>
+            </f7-list-item>
+          </template>
         </f7-list>
       </template>
       <template v-else>
@@ -140,11 +150,15 @@
   import API from "../api";
   import dialog from "../mixins/dialog.vue";
   import timePicker from "../mixins/time-picker.vue";
+  import hoursMinutesBadge from '../components/hours-minutes-badge.vue';
   import TimesheetService from "../services/timesheet-service";
 
   export default {
     name: "TimesheetDetail",
     mixins: [dialog, timePicker],
+    components: {
+      hoursMinutesBadge
+    },
     methods: {
       deleteTimesheet() {
         const self = this;
@@ -185,7 +199,7 @@
       onSwipeoutDeleted(timesheetShift) {
         const self = this;
         const timesheetId = timesheetShift.id;
-
+        if (!self.editAccess) return;
         // API.removeItemFromCache('workforce/timesheet_items', 'id', timesheetId).then((updatedCache) => {
         //   self.timesheetsItemsData = updatedCache;
         // });
@@ -203,12 +217,6 @@
         delete timesheetShift.id;
         API.createTimesheetShift(timesheetShift).then(response => console.log(response));
       },
-
-
-
-
-
-
 
 
       changeAction(val) {

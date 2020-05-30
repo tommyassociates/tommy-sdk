@@ -9,15 +9,9 @@
         :title="timesheets.title"
         :link="'/time-sheets/detail/' + timesheets.id"
       >
-        <div
-          slot="media"
-        >
-          <div class="circle">
-            <div class="circle__content">
-              <span class="circle__text">{{ timesheets.hours }}h</span>
-              <span class="circle__text circle__text--small">{{ timesheets.minutes }}m</span>
-            </div>
-          </div>
+        <div slot="media">
+          <hours-minutes-badge :hours="String(timesheets.hours)"
+                               :minutes="String(timesheets.minutes)"></hours-minutes-badge>
         </div>
         <div class="description">{{ timesheets.description }}</div>
       </f7-list-item>
@@ -45,8 +39,13 @@
 </template>
 
 <script>
+  import hoursMinutesBadge from '../components/hours-minutes-badge.vue';
+
   export default {
     name: "Events",
+    components: {
+      hoursMinutesBadge
+    },
     props: {
       data: {
         type: Array,
