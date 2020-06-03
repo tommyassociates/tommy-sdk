@@ -8,8 +8,8 @@
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('time_sheets.timesheet_details.title')}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
-        <f7-link icon-only @click="editAttendance" v-if="editAccess">
-          <f7-icon f7="check"/>
+        <f7-link icon-only @click="createTimesheetShift()">
+          <f7-icon f7="add"/>
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
@@ -76,7 +76,7 @@
               </div>
 
               <f7-swipeout-actions right>
-                <f7-swipeout-button @click="copyTimesheetShift(timesheetShift.id)">Copy</f7-swipeout-button>
+                <f7-swipeout-button close @click="copyTimesheetShift(timesheetShift.id)">Copy</f7-swipeout-button>
                 <f7-swipeout-button delete>Delete</f7-swipeout-button>
               </f7-swipeout-actions>
             </f7-list-item>
@@ -98,8 +98,8 @@
         </f7-list>
       </template>
       <template v-else>
-        <div class="p-16">
-          <img :src="`${$addonAssetsUrl}no-items-found.svg`">
+        <div class="p-16 text-align-center">
+          <img :src="`${addonAssetsUrl()}no-items-found.svg`">
           <p>{{ $t('time_sheets.timesheet_details.items_none') }}</p>
         </div>
       </template>
@@ -148,6 +148,7 @@
 </template>
 <script>
   import API from "../api";
+  import addonAssetsUrl from '../utils/addon-assets-url';
   import dialog from "../mixins/dialog.vue";
   import timePicker from "../mixins/time-picker.vue";
   import hoursMinutesBadge from '../components/hours-minutes-badge.vue';
@@ -160,13 +161,14 @@
       hoursMinutesBadge
     },
     methods: {
+      addonAssetsUrl,
       deleteTimesheet() {
         const self = this;
         if (!self.editAccess) return;
-        API.deleteTimesheet(self.timesheet.id, true).then((response) => {
+        API.deleteTimesheet(self.timesheet.id, false).then((response) => {
           console.log('deleteTimesheet', response);
           self.$f7router.back();
-          self.$events.$emit("time_sheets:timesheet_delete", self.timesheet);
+          self.$events.$emit("time_sheets:timesheet_deleted", self.timesheet);
         });
       },
       deleteClick() {
@@ -199,15 +201,20 @@
       onSwipeoutDeleted(timesheetShift) {
         const self = this;
         const timesheetId = timesheetShift.id;
-        if (!self.editAccess) return;
+        // if (!self.editAccess) return;
         // API.removeItemFromCache('workforce/timesheet_items', 'id', timesheetId).then((updatedCache) => {
         //   self.timesheetsItemsData = updatedCache;
         // });
 
-        API.removeItemFromObject(self.timesheetsShiftsData, 'id', timesheetId).then(newData => {
-          self.timesheetsShiftsData = newData;
-          API.removeItemFromCache('workforce/timesheet_items', 'id', timesheetId);
+        API.deleteTimesheetShift(timesheetId).then(response => {
+          console.log('deleteTimesheetShift', response);
+          self.$events.$emit("time_sheets:timesheet_shift_deleted");
         });
+
+        // API.removeItemFromObject(self.timesheetsShiftsData, 'id', timesheetId).then(newData => {
+        //   self.timesheetsShiftsData = newData;
+        //   // API.removeItemFromCache('workforce/timesheet_items', 'id', timesheetId);
+        // });
       },
 
       copyTimesheetShift(timesheetShiftId) {
@@ -215,7 +222,19 @@
         console.log(timesheetShiftId);
         const timesheetShift = self.timesheetsShiftsData.find(timesheetShift => +timesheetShift.id === +timesheetShiftId);
         delete timesheetShift.id;
-        API.createTimesheetShift(timesheetShift).then(response => console.log(response));
+        API.createTimesheetShift(timesheetShift).then(response => {
+          console.log(response);
+          self.timesheetsShiftsData.push(response);
+
+          self.$events.$emit("time_sheets:timesheet_shift_created", response);
+        });
+      },
+
+      createTimesheetShift() {
+        console.log('createTimesheetShift');
+        const self = this;
+        const url = `/time-sheets/item-detail/create/${self.edit_id}`;
+        self.$f7router.navigate(url);
       },
 
 
@@ -535,13 +554,14 @@
       // });
 
 
-      API.getTimesheets().then(timesheets => {
+      API.getTimesheets(false).then(timesheets => {
         self.timesheetsData = timesheets;
-        API.getTimesheetsShifts().then(timesheetsShifts => {
+        API.getTimesheetsShifts(false).then(timesheetsShifts => {
           self.timesheetsShiftsData = timesheetsShifts;
           self.loaded = true;
 
-          self.editAccess = false;
+          //self.editAccess = false;
+
 
         });
       });
@@ -564,7 +584,7 @@
         // loaded: false
 
         edit_id: self.$f7route.params.id,
-        editAccess: false,
+        editAccess: true,
         timesheetsData: [],
         timesheetsShiftsData: [],
         loaded: false,

@@ -1,5 +1,7 @@
 <template>
-  <f7-page class="time-clock-main-page" :page-content="false">
+  <f7-page class="time-clock-main-page" :page-content="false"
+           @page:beforeremove="onPageBeforeRemove"
+           @page:beforeout="onPageBeforeOut">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{$t('time_sheets.index.title')}}</f7-nav-title>
@@ -13,6 +15,9 @@
         <!--<f7-link href="/time-clock/settings/" icon-only>
           <f7-icon f7="gear"/>
         </f7-link>-->
+        <f7-link icon-only @click="addTimesheet">
+          <f7-icon f7="add"></f7-icon>
+        </f7-link>
       </f7-nav-right>
     </f7-navbar>
 
@@ -35,7 +40,7 @@
   import ActiveAvatar from "../components/circle-avatar.vue";
   import Events from "../components/events.vue";
   import Blob from "../mixins/baseToBlob.vue";
-
+  import timePicker from "../mixins/time-picker.vue";
 
   /*
   TODO: add shift empty page
@@ -49,19 +54,28 @@
         timesheetsData: [],
         timesheetsShiftsData: [],
         loaded: false,
+        timesheetStartDay: 'Mon',
+        timesheetDuration: 'Week', //Week Fortnight Month
       };
     },
     components: {
       ActiveAvatar,
       Events,
     },
-    mixins: [Blob],
+    mixins: [Blob, timePicker],
     created() {
       const self = this;
       API.actorId = API.getUserId(self);
       API.actor = API.getActor(self);
-      self.$events.$on("time_sheets:attedance_edit", self.updateAll);
-      self.$events.$on("time_sheets:timesheet_delete", self.updateAll);
+
+      self.$events.$on("time_sheets:timesheet_edited", self.updateAll);
+      self.$events.$on("time_sheets:timesheet_created", self.updateAll);
+      self.$events.$on("time_sheets:timesheet_deleted", self.updateAll);
+
+      self.$events.$on("time_sheets:timesheet_shift_edited", self.updateAll);
+      self.$events.$on("time_sheets:timesheet_shift_created", self.updateAll);
+      self.$events.$on("time_sheets:timesheet_shift_deleted", self.updateAll);
+
     },
     computed: {
       toolbarStyle() {
@@ -81,9 +95,42 @@
         return TimesheetService.formatTimesheetsData(self.timesheetsData, self.timesheetsShiftsData, self);
       }
     },
-    methods: {},
+    methods: {
+      addTimesheet() {
+        const self = this;
+        self.openTimePicker();
+      },
+      onPageBeforeRemove() {
+        const self = this;
+      },
+      onPageBeforeOut() {
+        const self = this;
+      },
+
+      updateAll() {
+        const self = this;
+        API.getTimesheets().then(timesheets => {
+          self.timesheetsData = timesheets;
+          console.table(timesheets);
+          API.getTimesheetsShifts().then(timesheetsShifts => {
+            self.timesheetsShiftsData = timesheetsShifts;
+            console.table(timesheetsShifts);
+            self.loaded = true;
+          });
+        });
+      },
+    },
     beforeDestroy() {
       const self = this;
+
+      self.$events.$off("time_sheets:timesheet_edited", self.updateAll);
+      self.$events.$off("time_sheets:timesheet_created", self.updateAll);
+      self.$events.$off("time_sheets:timesheet_deleted", self.updateAll);
+
+      self.$events.$off("time_sheets:timesheet_shift_edited", self.updateAll);
+      self.$events.$off("time_sheets:timesheet_shift_created", self.updateAll);
+      self.$events.$off("time_sheets:timesheet_shift_deleted", self.updateAll);
+
     },
     mounted() {
       const self = this;
@@ -112,14 +159,13 @@
         //   }
         //   self.loaded.active = true;
         // });
-        API.getTimesheets().then(timesheets => {
-          self.timesheetsData = timesheets;
-          API.getTimesheetsShifts().then(timesheetsShifts => {
-            self.timesheetsShiftsData = timesheetsShifts;
-            self.loaded = true;
-          });
-        });
 
+
+
+        self.updateAll();
+        self.$nextTick(() => {
+          self.createTimePicker(new Date());
+        });
 
       });
 

@@ -62,7 +62,7 @@ const API = {
   },*/
 
 
-  getTimesheets(cache = true) {
+  getTimesheets(cache = false) {
     return api
       .call({
         endpoint: "workforce/timesheets",
@@ -74,7 +74,7 @@ const API = {
       });
   },
 
-  getTimesheetsShifts(cache = true) {
+  getTimesheetsShifts(cache = false) {
     return api
       .call({
         endpoint: `workforce/timesheet_items`,
@@ -98,15 +98,24 @@ const API = {
 
   deleteTimesheet(id, isManager = false) {
     const endpoint = `workforce/${isManager ? 'manager/' : ''}timesheets/${id}`;
-    console.log(endpoint);
+    console.log('deleteTimesheet', endpoint);
     return api
       .call({
         endpoint,
         method: "DELETE",
-        cache: false,
       })
       .then(data => {
         return data;
+      });
+  },
+
+  updateTimesheetShift(id, data) {
+    const endpoint = `workforce/timesheet_items/${id}`;
+    return api
+      .call({
+        endpoint,
+        method: "PUT",
+        data,
       });
   },
 
@@ -115,9 +124,9 @@ const API = {
       .call({
         endpoint: `workforce/timesheet_items/${id}`,
         method: "DELETE",
-        cache: false,
       })
       .then(data => {
+        console.log('deleteTimesheetShift', data);
         return data;
       });
   },
@@ -164,7 +173,9 @@ const API = {
 
 
 
-
+  addonAssetsUrl() {
+    return 'addons/time_sheets/versions/1.0.0/files/assets/';
+  },
 
 
   getShiftActive() {

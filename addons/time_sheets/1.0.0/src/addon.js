@@ -16,6 +16,10 @@ const routes = [
     component: Detail,
   },
   {
+    path: "/time-sheets/item-detail/create/:timesheetId",
+    component: ShiftDetail,
+  },
+  {
     path: "/time-sheets/item-detail/:id",
     component: ShiftDetail,
   },
