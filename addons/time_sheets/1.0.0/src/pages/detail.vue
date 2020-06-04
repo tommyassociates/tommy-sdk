@@ -481,7 +481,20 @@
         if (self.editAccess) self.openTimePicker();
       },
 
+      updateAll() {
+        const self = this;
+        API.getTimesheets(false).then(timesheets => {
+          self.timesheetsData = timesheets;
+          API.getTimesheetsShifts(false).then(timesheetsShifts => {
+            self.timesheetsShiftsData = timesheetsShifts;
+            self.loaded = true;
 
+            //self.editAccess = false;
+
+
+          });
+        });
+      },
     },
     computed: {
       dateField() {
@@ -520,7 +533,17 @@
           'button--red': true,
           'disabled': self.timesheet.status === 'submitted',
         }
-      }
+      },
+
+
+    },
+    beforeDestroy() {
+      const self = this;
+
+      self.$events.$off("time_sheets:timesheet_shift_edited", self.updateAll);
+      self.$events.$off("time_sheets:timesheet_shift_created", self.updateAll);
+      self.$events.$off("time_sheets:timesheet_shift_deleted", self.updateAll);
+
     },
     mounted() {
       const self = this;
@@ -554,22 +577,16 @@
       // });
 
 
-      API.getTimesheets(false).then(timesheets => {
-        self.timesheetsData = timesheets;
-        API.getTimesheetsShifts(false).then(timesheetsShifts => {
-          self.timesheetsShiftsData = timesheetsShifts;
-          self.loaded = true;
-
-          //self.editAccess = false;
-
-
-        });
-      });
+      self.updateAll();
 
 
     },
     created() {
       const self = this;
+
+      self.$events.$on("time_sheets:timesheet_shift_edited", self.updateAll);
+      self.$events.$on("time_sheets:timesheet_shift_created", self.updateAll);
+      self.$events.$on("time_sheets:timesheet_shift_deleted", self.updateAll);
     },
     data() {
       const self = this;

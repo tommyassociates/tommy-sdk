@@ -59,8 +59,8 @@
       <f7-list media-list class="topset list-with-fields inline-labels">
         <f7-list-item :title="$t('time_sheets.timesheet_details_shift.location_label')">
           <f7-input type="text" name="location"
-                    :value="timesheetShift.location"
-                    @input="timesheetShift.location = $event.target.value; updateTimesheetShiftChanged();"></f7-input>
+                    :value="timesheetShift.location_name"
+                    @input="timesheetShift.location_name = $event.target.value; updateTimesheetShiftChanged();"></f7-input>
         </f7-list-item>
         <f7-list-item :title="$t('time_sheets.timesheet_details_shift.address_label')">
           <f7-input type="text" name="address"
@@ -191,6 +191,8 @@
         } else {
           const timesheetShiftData = {...self.timesheetShift};
           delete timesheetShiftData.id;
+          console.clear();
+          console.log(timesheetShiftData);
           API.updateTimesheetShift(self.edit_id, timesheetShiftData).then(() => {
             self.$f7router.back();
             self.$events.$emit("time_sheets:timesheet_shift_edited", self.timesheetShift);
