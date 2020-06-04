@@ -39,8 +39,7 @@
 
   import ActiveAvatar from "../components/circle-avatar.vue";
   import Events from "../components/events.vue";
-  import Blob from "../mixins/baseToBlob.vue";
-  import timePicker from "../mixins/time-picker.vue";
+  import timePeriodPicker from "../mixins/time-period-picker.vue";
 
   /*
   TODO: add shift empty page
@@ -55,14 +54,14 @@
         timesheetsShiftsData: [],
         loaded: false,
         timesheetStartDay: 'Mon',
-        timesheetDuration: 'Week', //Week Fortnight Month
+        timesheetDuration: 'week', //week fortnight month
       };
     },
     components: {
       ActiveAvatar,
       Events,
     },
-    mixins: [Blob, timePicker],
+    mixins: [timePeriodPicker],
     created() {
       const self = this;
       API.actorId = API.getUserId(self);
@@ -98,7 +97,7 @@
     methods: {
       addTimesheet() {
         const self = this;
-        self.openTimePicker();
+        self.openTimePeriodPicker();
       },
       onPageBeforeRemove() {
         const self = this;
@@ -164,7 +163,7 @@
 
         self.updateAll();
         self.$nextTick(() => {
-          self.createTimePicker(new Date());
+          self.createTimePeriodPicker(self.timesheetStartDay, self.timesheetDuration);
         });
 
       });
