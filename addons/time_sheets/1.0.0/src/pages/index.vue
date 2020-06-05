@@ -53,7 +53,7 @@
         timesheetsData: [],
         timesheetsShiftsData: [],
         loaded: false,
-        timesheetStartDay: 'Mon',
+        timesheetStartDay: 'sun',
         timesheetDuration: 'week', //week fortnight month
       };
     },

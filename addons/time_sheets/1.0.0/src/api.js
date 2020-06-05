@@ -86,6 +86,19 @@ const API = {
       });
   },
 
+  createTimesheet(data) {
+    console.log('createTimesheet', data);
+    return api
+      .call({
+        endpoint: `workforce/timesheets`,
+        method: "POST",
+        data,
+      })
+      .then(data => {
+        return data;
+      });
+  },
+
   updateTimesheet(id, data) {
     const endpoint = `workforce/timesheets/${id}`;
     return api
