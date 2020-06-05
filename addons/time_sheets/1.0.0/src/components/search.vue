@@ -1,7 +1,7 @@
 <template>
   <div class="message-list-search">
     <p class="icon">
-      <img :src="`${$addonAssetsUrl}icon-search.svg`"/>
+      <f7-icon f7="search"/>
     </p>
     <p @click="$emit('clickOpened')">Search Team, Contacts, Tags, Roles</p>
   </div>

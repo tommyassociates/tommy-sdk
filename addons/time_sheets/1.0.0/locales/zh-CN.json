@@ -74,5 +74,13 @@
     "active_title": "活性",
     "available_title": "可用的",
     "onclick_options": ["上次有效日期", "头像照片", "名称", "标签清单", "角色清单"]
+  },
+  "settings": {
+    "title": "设定值",
+    "time_period_label": "时间段",
+    "week_start_label": "周开始",
+    "who_can_view_timesheets_title": "谁可以查看时间表",
+    "who_can_manage_items_title": "谁可以管理项目",
+    "who_can_manage_timesheets_title": "谁可以管理时间表"
   }
 }

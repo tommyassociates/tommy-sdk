@@ -74,5 +74,13 @@
     "active_title": "ACTIVE",
     "available_title": "AVAILABLE",
     "onclick_options": ["Last Active Date", "Profile Photo", "Name", "Tag List", "Role List"]
+  },
+  "settings": {
+    "title": "Settings",
+    "time_period_label": "Time Period",
+    "week_start_label": "Week Start",
+    "who_can_view_timesheets_title": "Who can view timesheets",
+    "who_can_manage_items_title": "Who can manage items",
+    "who_can_manage_timesheets_title": "Who can manage timesheets"
   }
 }

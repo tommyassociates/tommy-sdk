@@ -12,9 +12,9 @@
         <f7-link href="/time-sheets/search/" icon-only>
           <f7-icon f7="search"/>
         </f7-link>
-        <!--<f7-link href="/time-clock/settings/" icon-only>
+        <f7-link href="/time-sheets/settings/" icon-only>
           <f7-icon f7="gear"/>
-        </f7-link>-->
+        </f7-link>
         <f7-link icon-only @click="addTimesheet">
           <f7-icon f7="add"></f7-icon>
         </f7-link>

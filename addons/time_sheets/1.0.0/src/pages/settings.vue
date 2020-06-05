@@ -2,27 +2,35 @@
   <f7-page class="time-clock-settings-page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{$t('time_clock.settings.title')}}</f7-nav-title>
+      <f7-nav-title>{{$t('time_sheets.settings.title')}}</f7-nav-title>
       <f7-nav-right>
         <f7-link icon-only class="back">
-          <f7-icon f7="check" />
+          <f7-icon f7="check"/>
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
 
     <f7-page-content ref="pageContent">
-      <!--
-      <f7-block-title class="time-clock-divider">{{$t('time_clock.settings.required_title')}}</f7-block-title>
+
       <f7-list>
-        <f7-list-item :title="$t('time_clock.settings.gps_label')" >
-          <f7-toggle slot="after"></f7-toggle>
+        <f7-list-item :title="$t('time_sheets.settings.time_period_label')">
+          <time-period-select
+            v-model="timePeriod"
+            @change="onTimePeriodChange"
+            @save="onTimePeriodSave">
+          </time-period-select>
         </f7-list-item>
-        <f7-list-item :title="$t('time_clock.settings.photo_label')" >
-          <f7-toggle slot="after"></f7-toggle>
+        <f7-list-item :title="$t('time_sheets.settings.week_start_label')">
+          <day-select
+            v-model="day"
+            @change="onDayChange"
+            @save="onDaySave">
+          </day-select>
         </f7-list-item>
       </f7-list>
 
-      <f7-block-title class="time-clock-divider">{{$t('time_clock.settings.who_can_edit_title')}}</f7-block-title>
+      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_view_timesheets_title')}}
+      </f7-block-title>
       <f7-list class="message-list">
         <f7-list-item >
           <search-cmp @clickOpened="togglePopup(true)"></search-cmp>
@@ -35,72 +43,130 @@
         </f7-list-item>
       </f7-list>
 
-      <f7-block-title class="time-clock-divider">{{$t('time_clock.settings.who_can_clock_manually_title')}}</f7-block-title>
-      <f7-block-title class="time-clock-divider">{{$t('time_clock.settings.who_can_clock_title')}}</f7-block-title>
-      <f7-block-title class="time-clock-divider">{{$t('time_clock.settings.who_can_break_title')}}</f7-block-title>
--->
+
+      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_manage_items_title')}}
+      </f7-block-title>
+      <f7-list class="message-list">
+        <f7-list-item >
+          <search-cmp @clickOpened="togglePopup(true)"></search-cmp>
+        </f7-list-item>
+        <f7-list-item >
+          <tag-cmp
+            :name="seeUser.name"
+            @clearName="clearUser(true)"
+          ></tag-cmp>
+        </f7-list-item>
+      </f7-list>
+
+      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_manage_timesheets_title')}}
+      </f7-block-title>
+      <f7-list class="message-list">
+        <f7-list-item >
+          <search-cmp @clickOpened="togglePopup(true)"></search-cmp>
+        </f7-list-item>
+        <f7-list-item >
+          <tag-cmp
+            :name="seeUser.name"
+            @clearName="clearUser(true)"
+          ></tag-cmp>
+        </f7-list-item>
+      </f7-list>
+
+
+
+
 
     </f7-page-content>
 
-    <!-- Popup
-    <group-popup-cmp
-      :opened="customerPopupOpened"
-      @closed="customerPopupOpened = false"
-      :items="items"
-      @checkedGroup="checkedGroup"
-      :checkedId="checkedId"
-    ></group-popup-cmp>
- -->
+    <!-- Popup -->
+        <group-popup-cmp
+          :opened="customerPopupOpened"
+          @closed="customerPopupOpened = false"
+          :items="items"
+          @checkedGroup="checkedGroup"
+          :checkedId="checkedId"
+        ></group-popup-cmp>
+
 
   </f7-page>
 </template>
 
 <script>
   import API from '../api';
-  // import GroupPopupCmp from '../components/group-popup.vue';
-  // import SearchCmp from '../components/search.vue';
-  // import TagCmp from '../components/tag.vue';
+  import GroupPopupCmp from '../components/group-popup.vue';
+  import SearchCmp from '../components/search.vue';
+  import TagCmp from '../components/tag.vue';
 
-  //import tagSelect from '../components/tag-select.vue';
+  import timePeriodSelect from 'tommy_core/src/components/time-period-select.vue';
+  import daySelect from 'tommy_core/src/components/day-select.vue';
+
+  // import tagSelect from '../components/tag-select.vue';
 
   export default {
-    name: "TimeClockSettings",
+    name: "TimeSheetSettings",
     components: {
-      // GroupPopupCmp,
-      // SearchCmp,
-      // TagCmp,
+      GroupPopupCmp,
+      SearchCmp,
+      TagCmp,
+      timePeriodSelect,
+      daySelect,
     },
     mounted() {
       const self = this;
-      self.$api.getInstalledAddonPermission('wallet_accounts', 'wallet_accounts_transaction_create_access', {
-        resource_id: undefined,
-        with_filters: true,
-      }).then((permission) => {
-        permission.resource_id = undefined;
-        self.permissions.push(permission);
-      });
-      self.$api.getInstalledAddonPermission('wallet_accounts', 'wallet_accounts_transaction_edit_access', {
-        resource_id: undefined,
-        with_filters: true,
-      }).then((permission) => {
-        permission.resource_id = undefined;
-        self.permissions.push(permission);
-      });
+      // self.$api.getInstalledAddonPermission('wallet_accounts', 'wallet_accounts_transaction_create_access', {
+      //   resource_id: undefined,
+      //   with_filters: true,
+      // }).then((permission) => {
+      //   permission.resource_id = undefined;
+      //   self.permissions.push(permission);
+      // });
+      // self.$api.getInstalledAddonPermission('wallet_accounts', 'wallet_accounts_transaction_edit_access', {
+      //   resource_id: undefined,
+      //   with_filters: true,
+      // }).then((permission) => {
+      //   permission.resource_id = undefined;
+      //   self.permissions.push(permission);
+      // });
 
-      // self.items = [
-      //   {
-      //     id: 1215,
-      //     name: 'elder',
-      //   },
-      //   {
-      //     id: 155,
-      //     name: 'manager',
-      //   },
-      // ];
+      self.items = [
+        {
+          id: 1215,
+          name: 'elder',
+        },
+        {
+          id: 155,
+          name: 'manager',
+        },
+      ];
 
 
     },
     methods: {
+
+      onTimePeriodChange(value) {
+        const self = this;
+        console.log('search - date range change: ' + value);
+      },
+
+      onTimePeriodSave(value) {
+        const self = this;
+        console.log('search - date range save: ' + value);
+
+      },
+
+      onDayChange(value) {
+        const self = this;
+        console.log('search - dat change: ' + value);
+      },
+
+      onDaySave(value) {
+        const self = this;
+        // self.day = value;
+        console.log('search - dat save: ' + value);
+
+      },
+
+
       saveListPermission(permission) {
         const self = this;
         self.$api.updateInstalledAddonPermission('wallet_accounts', permission.name, {
@@ -122,51 +188,54 @@
 
 
 //copied from broadcast.
-//       clearUser(isSee) {
-//         const user = {
-//           id: null,
-//           name: null,
-//         };
-//         if (isSee) {
-//           this.seeUser = user;
-//         } else {
-//           this.sendUser = user;
-//         }
-//       },
-//       checkedGroup(id) {
-//         const item = this.items.filter(i => i.id === id)[0];
-//         if (this.isSee) {
-//           this.seeUser = item;
-//         } else {
-//           this.sendUser = item;
-//         }
-//         this.checkedId = this.isSee ? this.seeUser.id : this.sendUser.id;
-//       },
-//       togglePopup(isSee) {
-//         this.isSee = isSee;
-//         this.checkedId = isSee ? this.seeUser.id : this.sendUser.id;
-//         this.customerPopupOpened = true;
-//       },
+      clearUser(isSee) {
+        const user = {
+          id: null,
+          name: null,
+        };
+        if (isSee) {
+          this.seeUser = user;
+        } else {
+          this.sendUser = user;
+        }
+      },
+      checkedGroup(id) {
+        const item = this.items.filter(i => i.id === id)[0];
+        if (this.isSee) {
+          this.seeUser = item;
+        } else {
+          this.sendUser = item;
+        }
+        this.checkedId = this.isSee ? this.seeUser.id : this.sendUser.id;
+      },
+      togglePopup(isSee) {
+        this.isSee = isSee;
+        this.checkedId = isSee ? this.seeUser.id : this.sendUser.id;
+        this.customerPopupOpened = true;
+      },
     },
     data() {
       return {
         hasActorId: API.actorId,
         permissions: [],
 
+        timePeriod: '',
+        day: '',
+
         //copied from broadcast.
-        // lists: null,
-        // customerPopupOpened: false,
-        // items: null,
-        // seeUser: {
-        //   id: null,
-        //   name: null,
-        // },
-        // sendUser: {
-        //   id: null,
-        //   name: null,
-        // },
-        // isSee: null,
-        // checkedId: null,
+        lists: null,
+        customerPopupOpened: false,
+        items: null,
+        seeUser: {
+          id: null,
+          name: null,
+        },
+        sendUser: {
+          id: null,
+          name: null,
+        },
+        isSee: null,
+        checkedId: null,
       };
     }
   };

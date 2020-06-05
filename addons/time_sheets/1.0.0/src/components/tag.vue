@@ -7,7 +7,7 @@
     <div class="title">
       <p class="name">{{name ? name : 'No one is chosen'}}</p>
       <p @click="$emit('clearName')" v-if="name">
-        <img :src="`${$addonAssetsUrl}icon-x.svg`"/>
+        <f7-icon f7="close"/>
       </p>
     </div>
   </div>
