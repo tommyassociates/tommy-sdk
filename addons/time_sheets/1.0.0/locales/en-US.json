@@ -1,6 +1,7 @@
 {
   "index": {
     "title": "Time Sheets",
+    "manager_title": "Manage Time Sheets",
     "current_title": "Current",
     "submitted_title": "Submitted",
     "approved_title": "Approved",

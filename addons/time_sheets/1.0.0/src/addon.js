@@ -6,6 +6,7 @@ import Search from "./pages/search.vue";
 import SelectPicker from "./pages/select-picker.vue";
 import MapPage from "./pages/map.vue";
 
+
 const routes = [
   {
     path: "/time-sheets/",

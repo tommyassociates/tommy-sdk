@@ -4,21 +4,30 @@
            @page:beforeout="onPageBeforeOut">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
-      <f7-nav-title>{{$t('time_sheets.index.title')}}</f7-nav-title>
-      <f7-nav-right class="time-sheets-navbar-links">
-        <f7-link href="/time-sheets/add/" icon-only>
-          <f7-icon f7="plus"/>
-        </f7-link>
-        <f7-link href="/time-sheets/search/" icon-only>
-          <f7-icon f7="search"/>
-        </f7-link>
-        <f7-link href="/time-sheets/settings/" icon-only v-if="isTeamManager">
-          <f7-icon f7="gear"/>
-        </f7-link>
-        <f7-link icon-only @click="addTimesheet">
-          <f7-icon f7="add"></f7-icon>
-        </f7-link>
-      </f7-nav-right>
+      <template v-if="isTeamMember">
+        <f7-nav-title>{{$t('time_sheets.index.title')}}</f7-nav-title>
+        <f7-nav-right class="time-sheets-navbar-links">
+          <f7-link href="/time-sheets/add/" icon-only>
+            <f7-icon f7="plus"/>
+          </f7-link>
+          <f7-link href="/time-sheets/search/" icon-only>
+            <f7-icon f7="search"/>
+          </f7-link>
+          <f7-link icon-only @click="addTimesheet">
+            <f7-icon f7="add"></f7-icon>
+          </f7-link>
+        </f7-nav-right>
+      </template>
+      <template v-if="isTeamManager">
+        <f7-nav-title>{{$t('time_sheets.index.manager_title')}}</f7-nav-title>
+        <f7-nav-right class="time-sheets-navbar-links">
+          <f7-link href="/time-sheets/settings/" icon-only>
+            <f7-icon f7="gear"/>
+          </f7-link>
+        </f7-nav-right>
+      </template>
+
+
     </f7-navbar>
 
 
@@ -30,6 +39,30 @@
           :loaded="true"
           v-if="timesheetsData.length"
         />
+      </template>
+      <template v-if="isTeamManager">
+        <f7-list>
+          <f7-list-item :title="$t('time_sheets.manager.unsubmitted_label')"
+                        :link="'/time-sheets/manager/unsubmitted/'"
+                        :badge="22">
+
+          </f7-list-item>
+          <f7-list-item :title="$t('time_sheets.manager.submitted_label')"
+                        :link="'/time-sheets/manager/submitted/'"
+                        :badge="22">
+
+          </f7-list-item>
+          <f7-list-item :title="$t('time_sheets.manager.denied_label')"
+                        :link="'/time-sheets/manager/denied/'"
+                        :badge="22">
+
+          </f7-list-item>
+          <f7-list-item :title="$t('time_sheets.manager.approved_label')"
+                        :link="'/time-sheets/manager/approved/'"
+                        :badge="22">
+
+          </f7-list-item>
+        </f7-list>
       </template>
     </f7-page-content>
   </f7-page>

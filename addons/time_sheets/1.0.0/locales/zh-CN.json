@@ -1,6 +1,7 @@
 {
   "index": {
     "title": "时间表",
+    "manager_title": "管理时间表",
     "current_title": "当前",
     "submitted_title": "已提交",
     "approved_title": "已批准",
