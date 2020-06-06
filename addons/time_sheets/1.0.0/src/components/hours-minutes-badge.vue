@@ -1,5 +1,5 @@
 <template>
-  <div class="circle">
+  <div class="circle" :class="extraCssClasses">
     <div class="circle__content">
       <span class="circle__text">{{ hours }}h</span>
       <span class="circle__text circle__text--small">{{ minutes }}m</span>
@@ -19,6 +19,10 @@
         type: String,
         default: 0
       },
+      extraCssClasses: {
+        type: String,
+        default: '',
+      }
     },
     data() {
       const self = this;

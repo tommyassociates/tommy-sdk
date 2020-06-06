@@ -11,7 +11,8 @@
       >
         <div slot="media">
           <hours-minutes-badge :hours="String(timesheets.hours)"
-                               :minutes="String(timesheets.minutes)"></hours-minutes-badge>
+                               :minutes="String(timesheets.minutes)"
+                               :extra-css-classes="String(timesheets.extra_css_classes)"></hours-minutes-badge>
         </div>
         <div class="description">{{ timesheets.description }}</div>
       </f7-list-item>
