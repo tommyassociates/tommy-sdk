@@ -29,6 +29,11 @@ const TimesheetService = {
       const workHours = items.reduce((totalHours, item) => +totalHours + +item.work_hours, 0);
       const hours = Math.floor(workHours);
       const minutes = String(parseFloat(workHours - hours).toFixed(2)).replace('0.', '');
+      const extraCssClasses = timesheet.status === 'unsubmitted'
+        ? 'circle--red'
+        : timesheet.status === 'submitted'
+          ? 'circle--orange'
+          : 'circle--green';
 
       const data = {
         id: timesheet.id,
@@ -36,6 +41,7 @@ const TimesheetService = {
         description,
         hours,
         minutes,
+        extra_css_classes: extraCssClasses,
       };
 
       formattedData.push(data);

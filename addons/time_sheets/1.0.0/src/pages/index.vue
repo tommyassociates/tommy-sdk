@@ -12,7 +12,7 @@
         <f7-link href="/time-sheets/search/" icon-only>
           <f7-icon f7="search"/>
         </f7-link>
-        <f7-link href="/time-sheets/settings/" icon-only>
+        <f7-link href="/time-sheets/settings/" icon-only v-if="isTeamManager">
           <f7-icon f7="gear"/>
         </f7-link>
         <f7-link icon-only @click="addTimesheet">
@@ -23,12 +23,14 @@
 
 
     <f7-page-content>
-      <!--Events -->
-      <Events
-        :data="formattedTimesheetsData"
-        :loaded="true"
-        v-if="timesheetsData.length"
-      />
+      <template v-if="isTeamMember">
+        <!--Events -->
+        <Events
+          :data="formattedTimesheetsData"
+          :loaded="true"
+          v-if="timesheetsData.length"
+        />
+      </template>
     </f7-page-content>
   </f7-page>
 </template>
@@ -92,7 +94,19 @@
       formattedTimesheetsData() {
         const self = this;
         return TimesheetService.formatTimesheetsData(self.timesheetsData, self.timesheetsShiftsData, self);
-      }
+      },
+
+      isTeamMember() {
+        const self = this;
+        console.log('isteam member');
+        console.log(self.$root.account.roles);
+        return self.$root.account.roles.includes('Team Member');
+      },
+
+      isTeamManager() {
+        const self = this;
+        return self.$root.account.roles.includes('Team Manager');
+      },
     },
     methods: {
       addTimesheet() {
@@ -134,6 +148,13 @@
     mounted() {
       const self = this;
 
+      //load settings
+      // self.$api.getInstalledAddonSetting('time_sheets', 'time_period', {}).then(response => {
+      //   console.log('get installed addon.');
+      //   console.log(response);
+      // });
+
+
       return Promise.all([
         self.$api.getInstalledAddonPermission(
           "time_sheets",
@@ -158,7 +179,6 @@
         //   }
         //   self.loaded.active = true;
         // });
-
 
 
         self.updateAll();

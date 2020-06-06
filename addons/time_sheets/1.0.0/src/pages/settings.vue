@@ -12,7 +12,7 @@
 
     <f7-page-content ref="pageContent">
 
-      <f7-list>
+      <f7-list style="margin-bottom:0">
         <f7-list-item :title="$t('time_sheets.settings.time_period_label')">
           <time-period-select
             v-model="timePeriod"
@@ -72,7 +72,7 @@
         </f7-list-item>
       </f7-list>
 
-
+      <permission-select></permission-select>
 
 
 
@@ -100,6 +100,8 @@
   import timePeriodSelect from 'tommy_core/src/components/time-period-select.vue';
   import daySelect from 'tommy_core/src/components/day-select.vue';
 
+  import permissionSelect from 'tommy_core/src/components/permission-select.vue';
+
   // import tagSelect from '../components/tag-select.vue';
 
   export default {
@@ -110,6 +112,7 @@
       TagCmp,
       timePeriodSelect,
       daySelect,
+      permissionSelect,
     },
     mounted() {
       const self = this;
@@ -139,7 +142,6 @@
         },
       ];
 
-
     },
     methods: {
 
@@ -151,6 +153,12 @@
       onTimePeriodSave(value) {
         const self = this;
         console.log('search - date range save: ' + value);
+        self.$api.updateInstalledAddonSetting('time_sheets', 'time_period', value).then(response => {
+          console.log('updateInstalledAddonSetting time_period');
+          console.log(response);
+          const self=this;
+          self.timePeriod = response;
+        });
 
       },
 
@@ -163,13 +171,19 @@
         const self = this;
         // self.day = value;
         console.log('search - dat save: ' + value);
+        self.$api.updateInstalledAddonSetting('time_sheets', 'day', value).then(response => {
+          console.log('updateInstalledAddonSetting day');
+          console.log(response);
+          const self=this;
+          self.timePeriod = response;
+        });
 
       },
 
 
       saveListPermission(permission) {
         const self = this;
-        self.$api.updateInstalledAddonPermission('wallet_accounts', permission.name, {
+        tommy.api.updateInstalledAddonPermission('wallet_accounts', permission.name, {
           resource_id: permission.resource_id,
           with_filters: true,
           filters: JSON.stringify(permission.filters),

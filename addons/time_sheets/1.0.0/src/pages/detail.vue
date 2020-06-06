@@ -4,145 +4,148 @@
     @page:beforeremove="onPageBeforeRemove"
     @page:beforeout="onPageBeforeOut"
   >
-    <f7-navbar>
-      <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{$t('time_sheets.timesheet_details.title')}}</f7-nav-title>
-      <f7-nav-right class="whs-navbar-links">
-        <f7-link icon-only @click="createTimesheetShift()">
-          <f7-icon f7="add"/>
-        </f7-link>
-      </f7-nav-right>
-    </f7-navbar>
-    <f7-toolbar v-if="loaded">
-      <f7-button @click="deleteClick()" class="button button--red-text" v-if="editAccess">
-        {{$t('time_sheets.timesheet_details.delete_button')}}
-      </f7-button>
-      <f7-button @click="submitForApprovalClick()" :class="submitForApprovalButtonClasses" v-if="!editAccess">
-        {{$t('time_sheets.timesheet_details.submit_for_approval_button')}}
-      </f7-button>
-    </f7-toolbar>
-    <template v-if="loaded">
-      <f7-list media-list>
-        <f7-list-item
-          :title="$t('time_sheets.timesheet_details.id_label')"
-        >
-          <div slot="after">
-            {{timesheet.id}}
-          </div>
-        </f7-list-item>
+    <template v-if="isTeamMember">
+      <f7-navbar>
+        <tommy-nav-back></tommy-nav-back>
+        <f7-nav-title>{{$t('time_sheets.timesheet_details.title')}}</f7-nav-title>
+        <f7-nav-right class="whs-navbar-links">
+          <f7-link icon-only @click="createTimesheetShift()">
+            <f7-icon f7="add"/>
+          </f7-link>
+        </f7-nav-right>
+      </f7-navbar>
+      <f7-toolbar v-if="loaded">
+        <f7-button @click="deleteClick()" class="button button--red-text">
+          {{$t('time_sheets.timesheet_details.delete_button')}}
+        </f7-button>
+        <f7-button @click="submitForApprovalClick()" :class="submitForApprovalButtonClasses">
+          {{$t('time_sheets.timesheet_details.submit_for_approval_button')}}
+        </f7-button>
+      </f7-toolbar>
+      <template v-if="loaded">
+        <f7-list media-list>
+          <f7-list-item
+            :title="$t('time_sheets.timesheet_details.id_label')"
+          >
+            <div slot="after">
+              {{timesheet.id}}
+            </div>
+          </f7-list-item>
 
-        <f7-list-item
-          :title="$t('time_sheets.timesheet_details.date_label')"
-        >
-          <div slot="after">
-            {{ dateRangeFormat(timesheet.start_date, timesheet.end_date) }}
-          </div>
-        </f7-list-item>
+          <f7-list-item
+            :title="$t('time_sheets.timesheet_details.date_label')"
+          >
+            <div slot="after">
+              {{ dateRangeFormat(timesheet.start_date, timesheet.end_date) }}
+            </div>
+          </f7-list-item>
 
-        <f7-list-item
-          :title="$t('time_sheets.timesheet_details.status_label')"
-        >
-          <div slot="after">
-            {{timesheet.status}}
-          </div>
-        </f7-list-item>
+          <f7-list-item
+            :title="$t('time_sheets.timesheet_details.status_label')"
+          >
+            <div slot="after">
+              {{timesheet.status}}
+            </div>
+          </f7-list-item>
 
-        <f7-list-item
-          :title="$t('time_sheets.timesheet_details.hours_label')"
-        >
-          <div slot="after">
-            {{ hoursTotal }}
+          <f7-list-item
+            :title="$t('time_sheets.timesheet_details.hours_label')"
+          >
+            <div slot="after">
+              {{ hoursTotal }}
+            </div>
+          </f7-list-item>
+        </f7-list>
+
+        <f7-block-title class="time-clock-divider">{{ $t('time_sheets.timesheet_details.items_title') }}
+        </f7-block-title>
+
+        <template v-if="timesheetShifts.length">
+          <f7-list media-list class="time-sheet-list">
+            <template v-if="editAccess">
+              <f7-list-item
+                swipeout
+                v-for="(timesheetShift, index) in timesheetShifts"
+                :key="'timesheetShift_'+index"
+                :title="timesheetShift.title"
+                :subtitle="`${timesheetShift.description ? timesheetShift.description : ''}`"
+                :link="'/time-sheets/item-detail/' + timesheetShift.id"
+                @swipeout:deleted="onSwipeoutDeleted(timesheetShift)"
+              >
+                <div slot="media">
+                  <hours-minutes-badge :hours="String(timesheetShift.hours)"
+                                       :minutes="String(timesheetShift.minutes)"></hours-minutes-badge>
+                </div>
+
+                <f7-swipeout-actions right>
+                  <f7-swipeout-button close @click="copyTimesheetShift(timesheetShift.id)">Copy</f7-swipeout-button>
+                  <f7-swipeout-button delete>Delete</f7-swipeout-button>
+                </f7-swipeout-actions>
+              </f7-list-item>
+            </template>
+            <template v-if="!editAccess">
+              <f7-list-item
+                v-for="(timesheetShift, index) in timesheetShifts"
+                :key="'timesheetShift_'+index"
+                :title="timesheetShift.title"
+                :subtitle="`${timesheetShift.description ? timesheetShift.description : ''}`"
+                :link="'/time-sheets/item-detail/' + timesheetShift.id"
+              >
+                <div slot="media">
+                  <hours-minutes-badge :hours="String(timesheetShift.hours)"
+                                       :minutes="String(timesheetShift.minutes)"></hours-minutes-badge>
+                </div>
+              </f7-list-item>
+            </template>
+          </f7-list>
+        </template>
+        <template v-else>
+          <div class="p-16 text-align-center">
+            <img :src="`${addonAssetsUrl()}no-items-found.svg`">
+            <p>{{ $t('time_sheets.timesheet_details.items_none') }}</p>
+          </div>
+        </template>
+
+
+      </template>
+
+      <f7-list media-list v-if="!loaded" class="skeleton-effect-blink skeleton-text">
+        <f7-list-item title="__________" after="________"></f7-list-item>
+        <f7-list-item title="__________" after="________"></f7-list-item>
+        <f7-list-item title="__________">
+          <div slot="after" class="after-container">
+            <div class="name">_______</div>
+            <div class="image"></div>
           </div>
         </f7-list-item>
+        <f7-list-item title="__________" after="________"></f7-list-item>
+        <f7-list-item title="__________">
+          <div slot="after" class="after-container">
+            <div class="image"></div>
+          </div>
+        </f7-list-item>
+        <f7-list-item title="__________" after="________"></f7-list-item>
       </f7-list>
 
-      <f7-block-title class="time-clock-divider">{{ $t('time_sheets.timesheet_details.items_title') }}</f7-block-title>
+      <f7-sheet class="time-clock-action-sheet" ref="actionSheet">
+        <f7-toolbar>
+          <div class="left">
+            <f7-link
+              sheet-close
+              class="cancel"
+              @click="clearAction"
+            >{{$t('time_sheets.event_details.cancel_button')}}
+            </f7-link>
+          </div>
+          <div class="right">
+            <f7-link sheet-close @click="setAction">{{$t('time_sheets.event_details.done_button')}}</f7-link>
+          </div>
+        </f7-toolbar>
+        <f7-page-content>
 
-      <template v-if="timesheetShifts.length">
-        <f7-list media-list class="time-sheet-list">
-          <template v-if="editAccess">
-            <f7-list-item
-              swipeout
-              v-for="(timesheetShift, index) in timesheetShifts"
-              :key="'timesheetShift_'+index"
-              :title="timesheetShift.title"
-              :subtitle="`${timesheetShift.description ? timesheetShift.description : ''}`"
-              :link="'/time-sheets/item-detail/' + timesheetShift.id"
-              @swipeout:deleted="onSwipeoutDeleted(timesheetShift)"
-            >
-              <div slot="media">
-                <hours-minutes-badge :hours="String(timesheetShift.hours)"
-                                     :minutes="String(timesheetShift.minutes)"></hours-minutes-badge>
-              </div>
-
-              <f7-swipeout-actions right>
-                <f7-swipeout-button close @click="copyTimesheetShift(timesheetShift.id)">Copy</f7-swipeout-button>
-                <f7-swipeout-button delete>Delete</f7-swipeout-button>
-              </f7-swipeout-actions>
-            </f7-list-item>
-          </template>
-          <template v-if="!editAccess">
-            <f7-list-item
-              v-for="(timesheetShift, index) in timesheetShifts"
-              :key="'timesheetShift_'+index"
-              :title="timesheetShift.title"
-              :subtitle="`${timesheetShift.description ? timesheetShift.description : ''}`"
-              :link="'/time-sheets/item-detail/' + timesheetShift.id"
-            >
-              <div slot="media">
-                <hours-minutes-badge :hours="String(timesheetShift.hours)"
-                                     :minutes="String(timesheetShift.minutes)"></hours-minutes-badge>
-              </div>
-            </f7-list-item>
-          </template>
-        </f7-list>
-      </template>
-      <template v-else>
-        <div class="p-16 text-align-center">
-          <img :src="`${addonAssetsUrl()}no-items-found.svg`">
-          <p>{{ $t('time_sheets.timesheet_details.items_none') }}</p>
-        </div>
-      </template>
-
-
+        </f7-page-content>
+      </f7-sheet>
     </template>
-
-    <f7-list media-list v-if="!loaded" class="skeleton-effect-blink skeleton-text">
-      <f7-list-item title="__________" after="________"></f7-list-item>
-      <f7-list-item title="__________" after="________"></f7-list-item>
-      <f7-list-item title="__________">
-        <div slot="after" class="after-container">
-          <div class="name">_______</div>
-          <div class="image"></div>
-        </div>
-      </f7-list-item>
-      <f7-list-item title="__________" after="________"></f7-list-item>
-      <f7-list-item title="__________">
-        <div slot="after" class="after-container">
-          <div class="image"></div>
-        </div>
-      </f7-list-item>
-      <f7-list-item title="__________" after="________"></f7-list-item>
-    </f7-list>
-
-    <f7-sheet class="time-clock-action-sheet" ref="actionSheet">
-      <f7-toolbar>
-        <div class="left">
-          <f7-link
-            sheet-close
-            class="cancel"
-            @click="clearAction"
-          >{{$t('time_sheets.event_details.cancel_button')}}
-          </f7-link>
-        </div>
-        <div class="right">
-          <f7-link sheet-close @click="setAction">{{$t('time_sheets.event_details.done_button')}}</f7-link>
-        </div>
-      </f7-toolbar>
-      <f7-page-content>
-
-      </f7-page-content>
-    </f7-sheet>
 
   </f7-page>
 </template>
@@ -164,7 +167,7 @@
       addonAssetsUrl,
       deleteTimesheet() {
         const self = this;
-        if (!self.editAccess) return;
+        // if (!self.editAccess) return;
         API.deleteTimesheet(self.timesheet.id, false).then((response) => {
           console.log('deleteTimesheet', response);
           self.$f7router.back();
@@ -187,7 +190,7 @@
       },
       submitForApprovalClick() {
         const self = this;
-        if (self.editAccess) return;
+        // if (self.editAccess) return;
         const data = {
           status: 'submitted'
         };
@@ -533,6 +536,16 @@
           'button--red': true,
           'disabled': self.timesheet.status === 'submitted',
         }
+      },
+
+      isTeamMember() {
+        const self = this;
+        return self.$root.account.roles.includes('Team Member');
+      },
+
+      isTeamManager() {
+        const self = this;
+        return self.$root.account.roles.includes('Team Manager');
       },
 
 
