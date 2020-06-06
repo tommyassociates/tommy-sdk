@@ -26,16 +26,18 @@
 
         </f7-list-item>
 
-        <f7-list-item :title="$t('time_sheets.timesheet_details_shift.work_hours_label', 'Work hours')">
-          <f7-input type="numeric" name="work_hours"
-                    :value="timesheetShift.work_hours"
-                    @input="timesheetShift.work_hours = $event.target.value; updateTimesheetShiftChanged();"></f7-input>
+        <f7-list-item :title="$t('time_sheets.timesheet_details_shift.work_hours_label', 'Work hours')"
+                      @click.native="openWorkHoursTimePicker">
+          <div class="item-input-wrap">
+            {{timesheetShift.work_hours}}
+          </div>
         </f7-list-item>
 
-        <f7-list-item :title="$t('time_sheets.timesheet_details_shift.break_hours_label', 'Break hours')">
-          <f7-input type="numeric" name="break_hours"
-                    :value="timesheetShift.break_hours"
-                    @input="timesheetShift.break_hours = $event.target.value; updateTimesheetShiftChanged();"></f7-input>
+        <f7-list-item :title="$t('time_sheets.timesheet_details_shift.break_hours_label', 'Break hours')"
+                      @click.native="openBreakHoursTimePicker">
+          <div class="item-input-wrap">
+            {{timesheetShift.break_hours}}
+          </div>
         </f7-list-item>
 
 
@@ -96,13 +98,14 @@
 <script>
   import API from "../api";
   import dialog from "../mixins/dialog.vue";
-  // import timePicker from "../mixins/time-picker.vue";
+  import workHoursTimePicker from "../mixins/work-hours-time-picker.vue";
+  import breakHoursTimePicker from "../mixins/break-hours-time-picker.vue";
   import TimesheetService from "../services/timesheet-service";
 
 
   export default {
     name: "TimesheetShiftDetail",
-    mixins: [dialog],
+    mixins: [dialog, workHoursTimePicker, breakHoursTimePicker],
     methods: {
       // changeAction(val) {
       //   const self = this;
@@ -264,6 +267,8 @@
         const self = this;
         // self.$refs.actionSheet.$destroy();
         if (self.calendarInstance) self.calendarInstance.destroy();
+        if (self.workHoursTimePicker) self.workHoursTimePicker.destroy();
+        if (self.breakHoursTimePicker) self.breakHoursTimePicker.destroy();
       },
       // prepareAttendance(data) {
       //   const self = this;
@@ -363,10 +368,15 @@
         });
         return typeof view !== "undefined";
       },
-      // openTimePickerDetail() {
-      //   const self = this;
-      //   if (self.editAccess) self.openTimePicker();
-      // },
+      openWorkHoursTimePicker() {
+        const self = this;
+        self.workHoursTimePickerInstance.open();
+      },
+      openBreakHoursTimePicker() {
+        const self = this;
+        self.breakHoursTimePickerInstance.open();
+      },
+
 
       dateRangeFormat(startDate = '', endDate = '') {
         const self = this;
@@ -460,6 +470,8 @@
 
             self.$nextTick(() => {
               self.createCalendar();
+              self.createWorkHoursTimePicker(self.timesheetShift.work_hours);
+              self.createBreakHoursTimePicker(self.timesheetShift.break_hours);
             });
           });
         } else {
@@ -474,6 +486,8 @@
           self.timesheetShiftOriginal = {...self.timesheetShift};
           self.$nextTick(() => {
             self.createCalendar();
+            self.createWorkHoursTimePicker(self.timesheetShift.work_hours);
+            self.createBreakHoursTimePicker(self.timesheetShift.break_hours);
           });
         }
       });
