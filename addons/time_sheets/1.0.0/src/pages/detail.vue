@@ -14,7 +14,7 @@
           </f7-link>
         </f7-nav-right>
       </f7-navbar>
-      <f7-toolbar v-if="loaded">
+      <f7-toolbar v-if="loaded && canEditTimesheetShifts">
         <f7-button @click="deleteClick()" class="button button--red-text">
           {{$t('time_sheets.timesheet_details.delete_button')}}
         </f7-button>
@@ -62,7 +62,7 @@
 
         <template v-if="timesheetShifts.length">
           <f7-list media-list class="time-sheet-list">
-            <template v-if="editAccess">
+            <template v-if="canEditTimesheetShifts">
               <f7-list-item
                 swipeout
                 v-for="(timesheetShift, index) in timesheetShifts"
@@ -83,7 +83,7 @@
                 </f7-swipeout-actions>
               </f7-list-item>
             </template>
-            <template v-if="!editAccess">
+            <template v-if="!canEditTimesheetShifts">
               <f7-list-item
                 v-for="(timesheetShift, index) in timesheetShifts"
                 :key="'timesheetShift_'+index"
@@ -550,6 +550,11 @@
         return self.$root.account.roles.includes('Team Manager');
       },
 
+      canEditTimesheetShifts() {
+        const self = this;
+        return self.timesheet.status === 'unsubmitted';
+      },
+
 
     },
     beforeDestroy() {
@@ -591,6 +596,8 @@
 
       // });
 
+      //
+
 
       self.updateAll();
 
@@ -616,7 +623,7 @@
         // loaded: false
 
         edit_id: self.$f7route.params.id,
-        editAccess: true,
+        editAccess: false,
         timesheetsData: [],
         timesheetsShiftsData: [],
         loaded: false,
