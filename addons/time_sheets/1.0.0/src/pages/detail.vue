@@ -194,7 +194,9 @@
         const data = {
           status: 'submitted'
         };
-        API.updateTimesheet(self.edit_id, data);
+        API.updateTimesheet(self.edit_id, data).then(response => {
+          self.$events.$emit("time_sheets:timesheet_shift_edited");
+        });
       },
       dateRangeFormat(startDate = '', endDate = '') {
         const self = this;
