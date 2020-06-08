@@ -131,10 +131,12 @@
       //   self.permissions.push(permission);
       // });
 
-      self.$api.getInstalledAddonSetting('time_sheets', 'time_period').then(setting => {
-        console.log('setting', setting);
+      self.$api.getInstalledAddonSetting('time_sheets', 'time_sheets').then(response => {
+console.log('getSettings: ',response);
+
         const self=this;
-        self.settings.timePeriod = setting.data.timePeriod;
+        self.settings.day = response !== null && response.data && response.data.day ? response.data.day : 'mon';
+        self.settings.timePeriod = response !== null && response.data && response.data.timePeriod ? response.data.timePeriod : 'week';
       });
 
       self.items = [
@@ -159,15 +161,13 @@
       onTimePeriodSave(value) {
         const self = this;
         console.log('search - date range save: ' + value);
-        const settings = {
-          time_period: value
-        };
         self.settings.timePeriod = value;
 
-        self.$api.updateInstalledAddonSetting('time_sheets', 'time_period', JSON.stringify(settings)).then(response => {
-          console.log('updateInstalledAddonSetting time_period');
-          console.log(response);
-        });
+        const data = {
+          data: JSON.stringify(self.settings)
+        };
+
+        self.$api.updateInstalledAddonSetting('time_sheets', 'time_sheets', data);
 
       },
 
@@ -178,22 +178,14 @@
 
       onDaySave(value) {
         const self = this;
-        // self.day = value;
         console.log('search - dat save: ' + value);
-        const settings = {
-          day: value
-        };
-        const options = {
-          data: {
-            locale: self.$root.language,
-          }
-        }
         self.settings.day = value;
 
-        self.$api.updateInstalledAddonSetting('time_sheets', 'day', JSON.stringify(settings), options).then(response => {
-          console.log('updateInstalledAddonSetting day');
-          console.log(response);
-        });
+        const data = {
+          data: JSON.stringify(self.settings)
+        };
+
+        self.$api.updateInstalledAddonSetting('time_sheets', 'time_sheets', data);
 
       },
 

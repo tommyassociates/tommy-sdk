@@ -66,6 +66,8 @@ const API = {
     });
   },
   saveSettings(vitalsElement, settings = {}) {
+    console.log('saveSettingsVitals');
+    console.log(settings);
     return api.call({
       endpoint: `addons/health_vitals/install/settings/${vitalsElement}`,
       method: 'PUT',

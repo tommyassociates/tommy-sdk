@@ -43,6 +43,7 @@
       API.getSettings(self.vitalsElement).then((res) => {
         if (!res) return;
         self.settings = res;
+        console.log('getSettingsVitals', res);
         settings = self.settings;
       });
     },
@@ -58,5 +59,6 @@
       },
     },
   };
+
 </script>
 
