@@ -1,0 +1,74 @@
+---
+  title: "Time Sheets"
+  package: "time_sheets"
+  summary: "Manage your time sheets."
+  description: "Manage your time."
+  version: "1.0.0"
+  developer: "Tommy Labs GmbH"
+  homepage: "https://mytommy.com"
+  private: false
+  locales:
+    - en-US
+    - zh-CN
+  roles:
+    - Team Manager
+    - Team Admin
+    - Team Member
+  permissions:
+    addon_access:
+      title: "Allow Team Member Access"
+      hint: "Select Team Members who can access this Add-on"
+      default_roles:
+        - Team Manager
+        - Team Admin
+        - Team Member
+      operations:
+        - read
+    attendance_other_access:
+      title: "Who Can View Other Team Members Events"
+      hint: "Select Team Members who can view events created by others"
+      resource_type: WorkforceAttendance
+      default_roles:
+        - Team Manager
+        - Team Admin
+      operations:
+        - read
+    attendance_edit_access:
+      title: "Who Can edit attendances"
+      hint: "Select Team Members who can edit attendances"
+      resource_type: WorkforceAttendance
+      default_roles:
+        - Team Admin
+      operations:
+        - update
+    timesheets_other_access:
+      title: "Who Can View Other Team Members Timesheets"
+      hint: "Select Team Members who can view timesheets created by others"
+      resource_type: WorkforceTimesheet
+      default_roles:
+        - Team Manager
+        - Team Admin
+      operations:
+        - read
+    timesheets_edit_access:
+      title: "Who Can edit timesheets"
+      hint: "Select Team Members who can edit timesheets"
+      resource_type: WorkforceTimesheet
+      default_roles:
+        - Team Admin
+      operations:
+        - update
+  assets:
+    -
+      type: "stylesheet"
+      file: "build/addon.css"
+    -
+      type: "javascript"
+      file: "build/addon.js"
+  views:
+    index:
+      title: "Time Clock"
+      type: "page"
+      index: true
+      path: "/time-sheets/"
+      actor_permission: addon_actor_access

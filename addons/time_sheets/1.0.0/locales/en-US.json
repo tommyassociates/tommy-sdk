@@ -1,0 +1,87 @@
+{
+  "index": {
+    "title": "Time Sheets",
+    "manager_title": "Manage Time Sheets",
+    "current_title": "Current",
+    "submitted_title": "Submitted",
+    "approved_title": "Approved",
+    "items_label_singular": "Item",
+    "items_label_plural": "Items"
+  },
+  "select_period": {
+    "title": "Select Period",
+    "confirm_button": "Done"
+  },
+  "timesheet_details": {
+    "title": "Time sheet",
+    "details_title": "Details",
+    "id_label": "Time sheet ID",
+    "id_default": "Not yet granted",
+    "date_label": "Date Range",
+    "status_label": "Status",
+    "hours_label": "Hours",
+    "items_title": "Items",
+    "items_none": "No items found! Click '+' to add new items.",
+    "copy_button": "Copy",
+    "delete_button": "Delete",
+    "delete_text": "Are you sure you want to delete this entry?",
+    "cancel_button": "Cancel",
+    "confirm_button": "Confirm",
+    "submit_for_approval_button":  "Submit for approval"
+  },
+  "timesheet_details_shift": {
+    "title": "Shift",
+    "name_label": "Name",
+    "role_title": "Role",
+    "role_label": "Role",
+    "location_title": "Location",
+    "location_label": "Location",
+    "address_label": "Address",
+    "address_default": "Enter specific address...",
+    "start_date_label": "Start Date",
+    "work_hours_label": "Work hours",
+    "break_hours_label": "Break hours",
+    "edit_button": "Edit",
+    "delete_button": "Delete"
+  },
+  "timesheet_details_shift_event": {
+    "title": "New Event",
+    "time_label": "Time",
+    "date_label": "Date",
+    "where_label": "Where",
+    "photo_label": "Photo",
+    "action_label": "Action",
+    "action_options": ["Start", "Pause", "Resume", "Stop"],
+    "delete_button": "Delete"
+  },
+  "manager": {
+    "title": "Manager",
+    "unsubmitted_label": "Unsubmitted",
+    "submitted_label": "Submitted",
+    "denied_label": "Denied",
+    "approved_label": "Approved",
+    "deny_button": "Deny",
+    "approve_label": "Approve"
+  },
+  "approve_bulk": {
+    "title": "Approve",
+    "select_all_label": "Select All",
+    "items_label": "items",
+    "hours_label": "hours"
+  },
+  "settings_onclick": {
+    "title": "Display On Click",
+    "enabled_label": "Enabled",
+    "active_title": "ACTIVE",
+    "available_title": "AVAILABLE",
+    "onclick_options": ["Last Active Date", "Profile Photo", "Name", "Tag List", "Role List"]
+  },
+  "settings": {
+    "title": "Settings",
+    "time_period_label": "Time Period",
+    "week_start_label": "Week Start",
+    "who_can_view_timesheets_title": "Who can view timesheets",
+    "who_can_manage_items_title": "Who can manage items",
+    "who_can_manage_timesheets_title": "Who can manage timesheets"
+  }
+}

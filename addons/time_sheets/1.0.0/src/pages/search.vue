@@ -3,7 +3,7 @@
            @page:beforeout="pageBeforeOut">
     <f7-navbar>
       <tommy-nav-back force></tommy-nav-back>
-      <f7-nav-title>{{$t('time_clock.search.title')}}</f7-nav-title>
+      <f7-nav-title>{{$t('time_sheets.search.title')}}</f7-nav-title>
     </f7-navbar>
     <f7-page-content ref="pageContent">
       <f7-list class="time-clock-searchbar-list">
@@ -17,11 +17,11 @@
         <f7-icon slot="media" icon="demo-list-icon"></f7-icon>
         <f7-searchbar
           class="time-clock-searchbar"
-          :placeholder="$t('time_clock.search.search_placeholder')"
+          :placeholder="$t('time_sheets.search.search_placeholder')"
           customSearch
           :backdrop="false"
           disableButton
-          :disable-button-text="$t('time_clock.search.search_disable_button')"
+          :disable-button-text="$t('time_sheets.search.search_disable_button')"
           :value="search"
           @input="onSearchbarSearch($event.target.value)"
           @searchbar:clear="onSearchbarClear"
@@ -47,7 +47,7 @@
           :loaded="loaded.attendance"
         />
       </template>
-      <div class="not-found" v-if="attendanceData.length === 0"><p>{{$t('time_clock.search.not_found')}}</p></div>
+      <div class="not-found" v-if="attendanceData.length === 0"><p>{{$t('time_sheets.search.not_found')}}</p></div>
 
     </f7-page-content>
   </f7-page>
@@ -56,7 +56,7 @@
   import API from "../api";
   import Events from "../components/events.vue";
   import dateRangeSelect from 'tommy_core/src/components/date-range-select.vue';
-  import TimesheetService from "../services/attendance-service";
+  import TimesheetService from "../services/timesheet-service";
 
   export default {
     name: "TimeClockSearch",
@@ -155,14 +155,14 @@
         }
 
         API.getAttendances(null, false, self.viewOthers, otherOptions).then(data => {
-          self.attendanceData = AttendanceService.prepareAttendances(data, self);
-          self.formattedAttendanceData = AttendanceService.splitAttendanceIntoDays(self.attendanceData, self);
+          self.attendanceData = TimesheetService.prepareAttendances(data, self);
+          self.formattedAttendanceData = TimesheetService.splitAttendanceIntoDays(self.attendanceData, self);
           self.loaded.attendance = true;
           self.loaded.first = true;
         });
         API.getAttendancesActive(null, false, self.viewOthers, otherOptions).then(data => {
-          self.activeData = AttendanceService.prepareAttendance(data, self);
-          self.formattedActiveData = AttendanceService.formatAttendanceActive(self.activeData, self);
+          self.activeData = TimesheetService.prepareAttendance(data, self);
+          self.formattedActiveData = TimesheetService.formatAttendanceActive(self.activeData, self);
           self.loaded.active = true;
         });
       },
@@ -177,7 +177,7 @@
 
       return Promise.all([
         self.$api.getInstalledAddonPermission(
-          "time_clock",
+          "time_sheets",
           "attendance_other_access",
           {with_filters: true}
         )
