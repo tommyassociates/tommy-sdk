@@ -124,15 +124,15 @@ function createConfig(pkg, version) {
     },
     plugins: [
       new webpack.DefinePlugin(helpers.getSdkVariables()),
-      new UglifyJsPlugin({
-        uglifyOptions: {
-          compress: {
-            // warnings: false
-          }
-        },
-        sourceMap: true,
-        parallel: true
-      }),
+      // new UglifyJsPlugin({
+      //   uglifyOptions: {
+      //     compress: {
+      //       // warnings: false
+      //     }
+      //   },
+      //   sourceMap: true,
+      //   parallel: true
+      // }),
       // new OptimizeCSSPlugin({
       //   cssProcessorOptions: {
       //     safe: true,
