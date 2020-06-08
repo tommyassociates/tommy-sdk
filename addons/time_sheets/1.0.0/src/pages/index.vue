@@ -90,8 +90,10 @@
         managerTimesheetsData: [],
         managerTimesheetsShiftsData: [],
         loaded: false,
-        timesheetStartDay: 'sun',
-        timesheetDuration: 'week', //week fortnight month
+        settings: {
+          day: 'mon',
+          timePeriod: 'week',
+        },
       };
     },
     components: {
@@ -180,11 +182,6 @@
     mounted() {
       const self = this;
 
-      //load settings
-      // self.$api.getInstalledAddonSetting('time_sheets', 'time_period', {}).then(response => {
-      //   console.log('get installed addon.');
-      //   console.log(response);
-      // });
 
 
       return Promise.all([
@@ -212,11 +209,18 @@
         //   self.loaded.active = true;
         // });
 
+        self.$api.getInstalledAddonSetting('time_sheets', 'time_sheets').then(response => {
+          const self=this;
+          self.settings.day = response !== null && response.data && response.data.day ? response.data.day : 'mon';
+          self.settings.timePeriod = response !== null && response.data && response.data.timePeriod ? response.data.timePeriod : 'week';
+          self.updateAll();
 
-        self.updateAll();
-        self.$nextTick(() => {
-          self.createTimePeriodPicker(self.timesheetStartDay, self.timesheetDuration);
+          self.$nextTick(() => {
+            self.createTimePeriodPicker(self.settings.day, self.settings.timePeriod);
+          });
         });
+
+
 
       });
 

@@ -132,8 +132,6 @@
       // });
 
       self.$api.getInstalledAddonSetting('time_sheets', 'time_sheets').then(response => {
-console.log('getSettings: ',response);
-
         const self=this;
         self.settings.day = response !== null && response.data && response.data.day ? response.data.day : 'mon';
         self.settings.timePeriod = response !== null && response.data && response.data.timePeriod ? response.data.timePeriod : 'week';

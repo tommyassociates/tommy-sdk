@@ -1,5 +1,6 @@
 <script>
   import API from '../api';
+
   export default {
     methods: {
       openTimePeriodPicker() {
@@ -29,36 +30,68 @@
             break;
 
           case 'FORTNIGHT':
-            //TODO. Need to work out how to determine the start of a fortnight.
+
+            //Get start day.
+            while (currentDate.format('ddd').toUpperCase() !== startDay.toUpperCase()) {
+              currentDate = currentDate.subtract('1', 'day');
+            }
+
+            //Get the week number
+            const weekNumber = currentDate.week() - self.$moment(currentDate).startOf('month').week() + 1;
+
+            //Check if we need to subtract a week from the current date. We will if its an even weekNumber
+            const isOdd = x => x % 2 === 1;
+            if (!isOdd(weekNumber)) {
+              currentDate = currentDate.subtract('1', 'week');
+            }
+
+            console.log('weekNumber', weekNumber);
+
             break;
 
           case 'MONTH':
             currentDate = currentDate.startOf('month');
+
             break;
+
+          default:
+          //custom range
+          //TODO.
         }
 
 
         while (currentItem <= maxItems) {
           const startDate = self.$moment(currentDate);
+          const endDate = self.getEndDate(duration, currentDate);
           switch (duration.toUpperCase()) {
             case 'WEEK':
-              const endDate = self.getEndDate(duration, currentDate);
+              // const endDate = self.getEndDate(duration, currentDate);
               displayValues.push(`${startDate.format('DD MMM YY')} - ${endDate.format('DD MMM YY')}`);
               values.push(startDate.format('YYYY-MM-DD'));
+              currentDate = currentDate.subtract('1', duration);
               break;
 
             case 'FORTNIGHT':
               //TODO.
+              // const endDate = self.getEndDate(duration, currentDate);
+              displayValues.push(`${startDate.format('DD MMM YY')} - ${endDate.format('DD MMM YY')}`);
+              values.push(startDate.format('YYYY-MM-DD'));
+              currentDate = currentDate.subtract('2', 'week');
               break;
 
             case 'MONTH':
               displayValues.push(`${startDate.format('MMM YY')}`);
               values.push(startDate.format('YYYY-MM-DD'));
+              currentDate = currentDate.subtract('1', duration);
               break;
+
+            default:
+            //custom range
+            //TODO.
           }
 
           currentItem++;
-          currentDate = currentDate.subtract('1', duration);
+
         }
 
 
@@ -121,7 +154,7 @@
             return self.$moment(currentDate).add('6', 'days');
 
           case 'FORTNIGHT':
-            //TODO.
+            return self.$moment(currentDate).add('13', 'days');
             break;
 
           case 'MONTH':
