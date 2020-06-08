@@ -22,6 +22,7 @@ app.init({
   routes,
   language,
   locales: {},
+  pushState: true,
   components,
   data() {
     const actorId = localStorage.actorId ? parseInt(localStorage.actorId, 10) : null;
@@ -116,21 +117,25 @@ app.init({
             self.$addons.initAddon(addon).catch(() => {});
 
             // Load the addon routes programatically for HMR
-            import(`../addons/${addon.package}/${addon.version}/src/addon.scss`)
-            import(`../addons/${addon.package}/${addon.version}/src/addon.js`)
-              .then(m => {
-                const routes = m.default;
-                self.$f7.routes.push(...routes);
-                self.$f7.views.main.routes.push(...routes);
+            if (addon.assets) {
+              import(`../addons/${addon.package}/${addon.version}/src/addon.scss`)
+              import(`../addons/${addon.package}/${addon.version}/src/addon.js`)
+                .then(m => {
+                  const routes = m.default;
+                  self.$f7.routes.push(...routes);
+                  self.$f7.views.main.routes.push(...routes);
 
-                // Load the default addon if specified
-                if (SDK_CONFIG.autoloadAddonPath &&
-                    SDK_CONFIG.autoloadAddonPath === addon.entry_path) {
-                  const entryUrl = this.addonUrl(addon)
-                  console.log('loading initial addon', entryUrl)
-                  self.$f7.views.main.router.navigate(entryUrl)
-                }
-              })
+                  // Load the default addon if specified
+                  const loadAddon = (SDK_CONFIG.autoloadAddonPath &&
+                      SDK_CONFIG.autoloadAddonPath === addon.entry_path) ||
+                      window.location.href.indexOf(addon.entry_path) !== -1
+                  if (loadAddon) {
+                    const entryUrl = this.addonUrl(addon)
+                    console.log('loading initial addon', entryUrl)
+                    self.$f7.views.main.router.navigate(entryUrl)
+                  }
+                })
+            }
           });
         })
         .catch((error) => {
