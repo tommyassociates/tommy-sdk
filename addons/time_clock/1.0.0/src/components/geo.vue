@@ -22,7 +22,7 @@ export default {
         );
       navigator.geolocation.getCurrentPosition(self.onSuccess, self.onError, {
         maximumAge: 600000,
-        timeout: 10000,
+        timeout: 30000,
         enableHighAccuracy: true
       });
     },
@@ -50,7 +50,7 @@ export default {
         position.coords.name = "";
         self.getStreetName(position.coords, resolve, reject);
       } else {
-        self.$emit("geo:taken", position.coords);        
+        self.$emit("geo:taken", position.coords);
         if (typeof resolve === 'function') resolve(position.coords);
       }
     },
