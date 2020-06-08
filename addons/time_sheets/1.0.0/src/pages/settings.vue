@@ -15,64 +15,64 @@
       <f7-list style="margin-bottom:0">
         <f7-list-item :title="$t('time_sheets.settings.time_period_label')">
           <time-period-select
-            v-model="timePeriod"
+            v-model="settings.timePeriod"
             @change="onTimePeriodChange"
             @save="onTimePeriodSave">
           </time-period-select>
         </f7-list-item>
         <f7-list-item :title="$t('time_sheets.settings.week_start_label')">
           <day-select
-            v-model="day"
+            v-model="settings.day"
             @change="onDayChange"
             @save="onDaySave">
           </day-select>
         </f7-list-item>
       </f7-list>
 
-      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_view_timesheets_title')}}
-      </f7-block-title>
-      <f7-list class="message-list">
-        <f7-list-item >
-          <search-cmp @clickOpened="togglePopup(true)"></search-cmp>
-        </f7-list-item>
-        <f7-list-item >
-          <tag-cmp
-            :name="seeUser.name"
-            @clearName="clearUser(true)"
-          ></tag-cmp>
-        </f7-list-item>
-      </f7-list>
+<!--      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_view_timesheets_title')}}-->
+<!--      </f7-block-title>-->
+<!--      <f7-list class="message-list">-->
+<!--        <f7-list-item >-->
+<!--          <search-cmp @clickOpened="togglePopup(true)"></search-cmp>-->
+<!--        </f7-list-item>-->
+<!--        <f7-list-item >-->
+<!--          <tag-cmp-->
+<!--            :name="seeUser.name"-->
+<!--            @clearName="clearUser(true)"-->
+<!--          ></tag-cmp>-->
+<!--        </f7-list-item>-->
+<!--      </f7-list>-->
 
 
-      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_manage_items_title')}}
-      </f7-block-title>
-      <f7-list class="message-list">
-        <f7-list-item >
-          <search-cmp @clickOpened="togglePopup(true)"></search-cmp>
-        </f7-list-item>
-        <f7-list-item >
-          <tag-cmp
-            :name="seeUser.name"
-            @clearName="clearUser(true)"
-          ></tag-cmp>
-        </f7-list-item>
-      </f7-list>
+<!--      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_manage_items_title')}}-->
+<!--      </f7-block-title>-->
+<!--      <f7-list class="message-list">-->
+<!--        <f7-list-item >-->
+<!--          <search-cmp @clickOpened="togglePopup(true)"></search-cmp>-->
+<!--        </f7-list-item>-->
+<!--        <f7-list-item >-->
+<!--          <tag-cmp-->
+<!--            :name="seeUser.name"-->
+<!--            @clearName="clearUser(true)"-->
+<!--          ></tag-cmp>-->
+<!--        </f7-list-item>-->
+<!--      </f7-list>-->
 
-      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_manage_timesheets_title')}}
-      </f7-block-title>
-      <f7-list class="message-list">
-        <f7-list-item >
-          <search-cmp @clickOpened="togglePopup(true)"></search-cmp>
-        </f7-list-item>
-        <f7-list-item >
-          <tag-cmp
-            :name="seeUser.name"
-            @clearName="clearUser(true)"
-          ></tag-cmp>
-        </f7-list-item>
-      </f7-list>
+<!--      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_manage_timesheets_title')}}-->
+<!--      </f7-block-title>-->
+<!--      <f7-list class="message-list">-->
+<!--        <f7-list-item >-->
+<!--          <search-cmp @clickOpened="togglePopup(true)"></search-cmp>-->
+<!--        </f7-list-item>-->
+<!--        <f7-list-item >-->
+<!--          <tag-cmp-->
+<!--            :name="seeUser.name"-->
+<!--            @clearName="clearUser(true)"-->
+<!--          ></tag-cmp>-->
+<!--        </f7-list-item>-->
+<!--      </f7-list>-->
 
-      <permission-select></permission-select>
+<!--      <permission-select></permission-select>-->
 
 
 
@@ -131,6 +131,12 @@
       //   self.permissions.push(permission);
       // });
 
+      self.$api.getInstalledAddonSetting('time_sheets', 'time_period').then(setting => {
+        console.log('setting', setting);
+        const self=this;
+        self.settings.timePeriod = setting.data.timePeriod;
+      });
+
       self.items = [
         {
           id: 1215,
@@ -153,11 +159,14 @@
       onTimePeriodSave(value) {
         const self = this;
         console.log('search - date range save: ' + value);
-        self.$api.updateInstalledAddonSetting('time_sheets', 'time_period', value).then(response => {
+        const settings = {
+          time_period: value
+        };
+        self.settings.timePeriod = value;
+
+        self.$api.updateInstalledAddonSetting('time_sheets', 'time_period', JSON.stringify(settings)).then(response => {
           console.log('updateInstalledAddonSetting time_period');
           console.log(response);
-          const self=this;
-          self.timePeriod = response;
         });
 
       },
@@ -171,11 +180,19 @@
         const self = this;
         // self.day = value;
         console.log('search - dat save: ' + value);
-        self.$api.updateInstalledAddonSetting('time_sheets', 'day', value).then(response => {
+        const settings = {
+          day: value
+        };
+        const options = {
+          data: {
+            locale: self.$root.language,
+          }
+        }
+        self.settings.day = value;
+
+        self.$api.updateInstalledAddonSetting('time_sheets', 'day', JSON.stringify(settings), options).then(response => {
           console.log('updateInstalledAddonSetting day');
           console.log(response);
-          const self=this;
-          self.timePeriod = response;
         });
 
       },
@@ -233,8 +250,11 @@
         hasActorId: API.actorId,
         permissions: [],
 
-        timePeriod: '',
-        day: '',
+        settings: {
+          timePeriod: '',
+          day: '',
+        },
+
 
         //copied from broadcast.
         lists: null,

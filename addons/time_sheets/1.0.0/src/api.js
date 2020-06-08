@@ -159,6 +159,32 @@ const API = {
 
 
 
+  getManagerTimesheets(cache = false) {
+    return api
+      .call({
+        endpoint: "workforce/manager/timesheets",
+        method: "GET",
+        cache,
+      })
+      .then(data => {
+        return data;
+      });
+  },
+
+  getManagerTimesheetsShifts(cache = false) {
+    return api
+      .call({
+        endpoint: "workforce/manager/timesheet_items",
+        method: "GET",
+        cache,
+      })
+      .then(data => {
+        return data;
+      });
+  },
+
+
+
   /**
    * Will remove an item from the tommy.cache
    * @param cacheKey

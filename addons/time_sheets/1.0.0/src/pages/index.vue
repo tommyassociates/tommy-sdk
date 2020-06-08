@@ -87,6 +87,8 @@
       return {
         timesheetsData: [],
         timesheetsShiftsData: [],
+        managerTimesheetsData: [],
+        managerTimesheetsShiftsData: [],
         loaded: false,
         timesheetStartDay: 'sun',
         timesheetDuration: 'week', //week fortnight month
@@ -112,18 +114,6 @@
 
     },
     computed: {
-      toolbarStyle() {
-        const self = this;
-        if (self.clock_on && !self.break_on) {
-          return {
-            height: "136px"
-          };
-        } else {
-          return {
-            height: "74px"
-          };
-        }
-      },
       formattedTimesheetsData() {
         const self = this;
         return TimesheetService.formatTimesheetsData(self.timesheetsData, self.timesheetsShiftsData, self);
@@ -155,15 +145,24 @@
 
       updateAll() {
         const self = this;
-        API.getTimesheets().then(timesheets => {
-          self.timesheetsData = timesheets;
-          console.table(timesheets);
-          API.getTimesheetsShifts().then(timesheetsShifts => {
-            self.timesheetsShiftsData = timesheetsShifts;
-            console.table(timesheetsShifts);
-            self.loaded = true;
+        if (self.isTeamMember) {
+          API.getTimesheets().then(timesheets => {
+            self.timesheetsData = timesheets;
+            API.getTimesheetsShifts().then(timesheetsShifts => {
+              self.timesheetsShiftsData = timesheetsShifts;
+              self.loaded = true;
+            });
           });
-        });
+        } else if (self.isTeamManager) {
+          API.getManagerTimesheets().then(managerTimesheets => {
+            self.timesheetsData = managerTimesheets;
+            API.getManagerTimesheetsShifts().then(managerTimesheetsShifts => {
+              self.managerTimesheetsShiftsData = managerTimesheetsShifts;
+              console.table(managerTimesheetsShifts);
+              self.loaded = true;
+            });
+          });
+        }
       },
     },
     beforeDestroy() {
