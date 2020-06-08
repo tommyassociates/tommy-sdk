@@ -40,26 +40,28 @@
           v-if="timesheetsData.length"
         />
       </template>
-      <template v-if="isTeamManager">
+      <template v-if="isTeamManager && loaded">
         <f7-list>
           <f7-list-item :title="$t('time_sheets.manager.unsubmitted_label')"
                         :link="'/time-sheets/manager/unsubmitted/'"
-                        :badge="22">
+                        :badge="+unsubmittedTimesheets.length"
+                        class="list-item--red-badge list-item--red-chevron">
 
           </f7-list-item>
           <f7-list-item :title="$t('time_sheets.manager.submitted_label')"
                         :link="'/time-sheets/manager/submitted/'"
-                        :badge="22">
+                        :badge="+submittedTimesheets.length"
+                        class="list-item--grey-outline-badge">
 
           </f7-list-item>
           <f7-list-item :title="$t('time_sheets.manager.denied_label')"
                         :link="'/time-sheets/manager/denied/'"
-                        :badge="22">
+                        :badge="+deniedTimesheets.length">
 
           </f7-list-item>
           <f7-list-item :title="$t('time_sheets.manager.approved_label')"
                         :link="'/time-sheets/manager/approved/'"
-                        :badge="22">
+                        :badge="+approvedTimesheets.length">
 
           </f7-list-item>
         </f7-list>
@@ -132,6 +134,29 @@
         const self = this;
         return self.$root.account.roles.includes('Team Manager');
       },
+
+      unsubmittedTimesheets() {
+        console.log('unsubmittedTimesheets');
+        const self = this;
+        return self.managerTimesheetsData.filter(timesheet => timesheet.status === 'unsubmitted');
+      },
+
+      submittedTimesheets() {
+        const self = this;
+        return self.managerTimesheetsData.filter(timesheet => timesheet.status === 'submitted');
+      },
+
+      deniedTimesheets() {
+        const self = this;
+        return self.managerTimesheetsData.filter(timesheet => timesheet.status === 'denied');
+      },
+
+      approvedTimesheets() {
+        const self = this;
+        return self.managerTimesheetsData.filter(timesheet => timesheet.status === 'approved');
+      },
+
+
     },
     methods: {
       addTimesheet() {
@@ -157,7 +182,8 @@
           });
         } else if (self.isTeamManager) {
           API.getManagerTimesheets().then(managerTimesheets => {
-            self.timesheetsData = managerTimesheets;
+            self.managerTimesheetsData = managerTimesheets;
+            self.loaded = true; //This needs to be removed once API.getManagerTimesheetsShifts() is working below.
             API.getManagerTimesheetsShifts().then(managerTimesheetsShifts => {
               self.managerTimesheetsShiftsData = managerTimesheetsShifts;
               console.table(managerTimesheetsShifts);
@@ -181,7 +207,6 @@
     },
     mounted() {
       const self = this;
-
 
 
       return Promise.all([
@@ -210,7 +235,7 @@
         // });
 
         self.$api.getInstalledAddonSetting('time_sheets', 'time_sheets').then(response => {
-          const self=this;
+          const self = this;
           self.settings.day = response !== null && response.data && response.data.day ? response.data.day : 'mon';
           self.settings.timePeriod = response !== null && response.data && response.data.timePeriod ? response.data.timePeriod : 'week';
           self.updateAll();
@@ -219,7 +244,6 @@
             self.createTimePeriodPicker(self.settings.day, self.settings.timePeriod);
           });
         });
-
 
 
       });
