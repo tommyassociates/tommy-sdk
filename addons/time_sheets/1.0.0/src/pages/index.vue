@@ -10,9 +10,6 @@
           <f7-link href="/time-sheets/add/" icon-only>
             <f7-icon f7="plus"/>
           </f7-link>
-          <f7-link href="/time-sheets/search/" icon-only>
-            <f7-icon f7="search"/>
-          </f7-link>
           <f7-link icon-only @click="addTimesheet">
             <f7-icon f7="add"></f7-icon>
           </f7-link>
