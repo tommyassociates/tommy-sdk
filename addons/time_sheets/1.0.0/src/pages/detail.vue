@@ -195,7 +195,7 @@
           status: 'submitted'
         };
         API.updateTimesheet(self.edit_id, data).then(response => {
-          self.$events.$emit("time_sheets:timesheet_shift_edited");
+          self.$events.$emit("time_sheets:timesheet_edited");
         });
       },
       dateRangeFormat(startDate = '', endDate = '') {

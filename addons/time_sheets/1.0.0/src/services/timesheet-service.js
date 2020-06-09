@@ -83,6 +83,38 @@ const TimesheetService = {
       ? `${startDateFormatted} - ${endDateFormatted}`
       : `${startDateFormatted}${endDateFormatted}`;
   },
+
+  formattedManagerTimesheetsData(managerTimesheetsData, managerTimesheetsShiftsData, status, self) {
+    let formattedData = [];
+    managerTimesheetsData
+      .filter(managerTimesheet => managerTimesheet.status === status)
+      .forEach(managerTimesheet => {
+
+        const teamMember = self.$root.teamMembers.find(teamMember => +teamMember.id === +managerTimesheet.user_id);
+        const title = teamMember ? String(`${teamMember.first_name} ${teamMember.last_name}`).trim() : 'TO';
+        const timesheetsShifts = managerTimesheetsShiftsData
+          .filter(timesheetShift => timesheetShift.timesheet_id === +managerTimesheet.id);
+        const itemsString = timesheetsShifts.length === 1
+          ? self.$t('time_sheets.index.items_label_singular')
+          : self.$t('time_sheets.index.items_label_plural');
+        const workHours = timesheetsShifts.reduce((totalHours, item) => +totalHours + +item.work_hours, 0);
+        const workHoursString = workHours === 1
+          ? self.$t('time_sheets.index.hours_label_singular')
+          : self.$t('time_sheets.index.hours_label_plural');
+        const description = `${timesheetsShifts.length} ${itemsString} ${workHours} ${workHoursString}`;
+
+        const data = {
+          id: managerTimesheet.id,
+          teamMember,
+          title,
+          description,
+        };
+
+        formattedData.push(data);
+
+      });
+    return formattedData;
+  },
 };
 
 

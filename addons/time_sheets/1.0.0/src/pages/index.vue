@@ -40,24 +40,24 @@
       <template v-if="isTeamManager && loaded">
         <f7-list>
           <f7-list-item :title="$t('time_sheets.manager.unsubmitted_label')"
-                        :link="'/time-sheets/manager/unsubmitted/'"
+                        :link="'/time-sheets/manager/time-sheets/unsubmitted/'"
                         :badge="+unsubmittedTimesheets.length"
                         class="list-item--red-badge list-item--red-chevron">
 
           </f7-list-item>
           <f7-list-item :title="$t('time_sheets.manager.submitted_label')"
-                        :link="'/time-sheets/manager/submitted/'"
+                        :link="'/time-sheets/manager/time-sheets/submitted/'"
                         :badge="+submittedTimesheets.length"
                         class="list-item--grey-outline-badge">
 
           </f7-list-item>
           <f7-list-item :title="$t('time_sheets.manager.denied_label')"
-                        :link="'/time-sheets/manager/denied/'"
+                        :link="'/time-sheets/manager/time-sheets/denied/'"
                         :badge="+deniedTimesheets.length">
 
           </f7-list-item>
           <f7-list-item :title="$t('time_sheets.manager.approved_label')"
-                        :link="'/time-sheets/manager/approved/'"
+                        :link="'/time-sheets/manager/time-sheets/approved/'"
                         :badge="+approvedTimesheets.length">
 
           </f7-list-item>

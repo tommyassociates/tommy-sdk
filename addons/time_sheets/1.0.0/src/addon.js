@@ -5,6 +5,8 @@ import ShiftDetail from "./pages/shift-detail.vue";
 import SelectPicker from "./pages/select-picker.vue";
 import MapPage from "./pages/map.vue";
 
+import ManagerTimeSheets from './pages/manager/time-sheets';
+
 
 const routes = [
   {
@@ -34,6 +36,10 @@ const routes = [
   {
     path: "/time-sheets/map/",
     component: MapPage,
+  },
+  {
+    path: "/time-sheets/manager/time-sheets/:status/",
+    component: ManagerTimeSheets,
   },
 ];
 

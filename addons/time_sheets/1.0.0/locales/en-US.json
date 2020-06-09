@@ -6,7 +6,9 @@
     "submitted_title": "Submitted",
     "approved_title": "Approved",
     "items_label_singular": "Item",
-    "items_label_plural": "Items"
+    "items_label_plural": "Items",
+    "hours_label_singular": "Hour",
+    "hours_label_plural": "Hours"
   },
   "select_period": {
     "title": "Select Period",

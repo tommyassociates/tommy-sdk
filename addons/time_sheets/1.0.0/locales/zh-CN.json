@@ -6,7 +6,9 @@
     "submitted_title": "已提交",
     "approved_title": "已批准",
     "items_label_singular": "项目",
-    "items_label_plural": "物品"
+    "items_label_plural": "物品",
+    "hours_label_singular": "小时",
+    "hours_label_plural": "小时"
   },
   "select_period": {
     "title": "选择时期",
