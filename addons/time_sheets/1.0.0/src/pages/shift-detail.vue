@@ -8,12 +8,12 @@
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('time_sheets.timesheet_details_shift.title')}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
-        <f7-link icon-only @click="saveTimesheetShift" v-if="timesheetShiftChanged">
+        <f7-link icon-only @click="saveTimesheetShift" v-if="timesheetShiftChanged && canEditTimesheetShift">
           <f7-icon f7="check" color="orange"/>
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
-    <f7-toolbar v-if="showDeleteButton">
+    <f7-toolbar v-if="canDeleteTimesheetShift">
       <f7-button @click="deleteClick()">{{$t('time_sheets.timesheet_details_shift.delete_button')}}</f7-button>
     </f7-toolbar>
     <template v-if="loaded">
@@ -51,7 +51,8 @@
         <f7-list-item :title="$t('time_sheets.timesheet_details_shift.role_label')">
           <f7-input type="text" name="role"
                     :value="timesheetShift.role"
-                    @input="timesheetShift.role = $event.target.value; updateTimesheetShiftChanged();"></f7-input>
+                    @input="timesheetShift.role = $event.target.value; updateTimesheetShiftChanged();"
+                    :readonly="!canEditTimesheetShift"></f7-input>
         </f7-list-item>
       </f7-list>
 
@@ -62,12 +63,14 @@
         <f7-list-item :title="$t('time_sheets.timesheet_details_shift.location_label')">
           <f7-input type="text" name="location"
                     :value="timesheetShift.location_name"
-                    @input="timesheetShift.location_name = $event.target.value; updateTimesheetShiftChanged();"></f7-input>
+                    @input="timesheetShift.location_name = $event.target.value; updateTimesheetShiftChanged();"
+                    :readonly="!canEditTimesheetShift"></f7-input>
         </f7-list-item>
         <f7-list-item :title="$t('time_sheets.timesheet_details_shift.address_label')">
           <f7-input type="text" name="address"
                     :value="timesheetShift.address"
-                    @input="timesheetShift.address = $event.target.value; updateTimesheetShiftChanged();"></f7-input>
+                    @input="timesheetShift.address = $event.target.value; updateTimesheetShiftChanged();"
+                    :readonly="!canEditTimesheetShift"></f7-input>
         </f7-list-item>
       </f7-list>
 
@@ -229,6 +232,7 @@
       openCalendar() {
         const self = this;
         // if (self.editAccess) self.calendarInstance.open();
+        if (!self.canEditTimesheetShift) return;
         self.calendarInstance.open();
       },
       createCalendar() {
@@ -370,10 +374,12 @@
       },
       openWorkHoursTimePicker() {
         const self = this;
+        if (!self.canEditTimesheetShift) return;
         self.workHoursTimePickerInstance.open();
       },
       openBreakHoursTimePicker() {
         const self = this;
+        if (!self.canEditTimesheetShift) return;
         self.breakHoursTimePickerInstance.open();
       },
 
@@ -413,9 +419,14 @@
         return self.$moment(self.timesheetShift.start_date).format("DD MMM YYYY");
       },
 
-      showDeleteButton() {
+      canDeleteTimesheetShift() {
         const self = this;
-        return self.loaded && +self.edit_id > 0;
+        return self.loaded && +self.edit_id > 0 && self.timesheet.status === 'unsubmitted';
+      },
+
+      canEditTimesheetShift() {
+        const self = this;
+        return self.loaded && +self.edit_id > 0 && self.timesheet.status === 'unsubmitted';
       },
 
       timesheet() {
