@@ -536,6 +536,7 @@
         return {
           'button': true,
           'button--red': true,
+          'button--underline': true,
           'disabled': self.timesheet.status === 'submitted',
         }
       },

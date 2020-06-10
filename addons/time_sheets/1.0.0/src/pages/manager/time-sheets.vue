@@ -5,42 +5,97 @@
     <template v-if="isTeamManager">
       <f7-navbar>
         <tommy-nav-back></tommy-nav-back>
-        <f7-nav-title>{{$t('time_sheets.timesheet_details.title')}}</f7-nav-title>
+        <f7-nav-title>{{$t(`time_sheets.manager.${status}_label`)}}</f7-nav-title>
         <f7-nav-right class="whs-navbar-links">
-          <f7-link icon-only @click="createTimesheetShift()">
-            <f7-icon f7="add"/>
+          <f7-link icon-only @click="toggleSelectMultiple()" :style="`${isMultipleSelected?'':'color:black'}`"
+                   v-if="canUpdateTimesheetStatus">
+            <select-multiple-icon></select-multiple-icon>
           </f7-link>
         </f7-nav-right>
       </f7-navbar>
+      <f7-toolbar v-if="loaded && isMultipleSelected && canUpdateTimesheetStatus">
+        <f7-button @click="denyBulkClick()" :class="denyBulkButtonClasses">
+          {{$t('time_sheets.manager.deny_button')}}
+        </f7-button>
+        <f7-button @click="approveBulkClick()" :class="approveBulkButtonClasses">
+          {{$t('time_sheets.manager.approve_button')}}
+        </f7-button>
+      </f7-toolbar>
+
+
       <template v-if="loaded">
 
 
         <template v-if="formattedManagerTimesheetsData.length">
-          <f7-list media-list class="time-sheet-list">
+          <template v-if="isMultipleSelected">
+            <f7-list media-list class="time-sheet-list">
+              <f7-list-item
+                checkbox
+                checkbox-icon="start"
+                :title="$t('time_sheets.manager.select_all')"
+                @change="selectAllClick('selectAll')"
+                name="selectAll"
+                value="1"
+              >
+              </f7-list-item>
 
               <f7-list-item
-                swipeout
+                checkbox
+                checkbox-icon="start"
                 v-for="(timesheet, index) in formattedManagerTimesheetsData"
                 :key="'timesheet_'+index"
                 :title="timesheet.title"
                 :subtitle="`${timesheet.description ? timesheet.description : ''}`"
-                :link="'/time-sheets/item-detail/' + timesheet.id"
-                @swipeout:deleted="onSwipeoutDeleted(timesheet)"
+                @change="toggleSelectedTimesheet(timesheet.id)"
               >
                 <div slot="media">
-                  <tommy-circle-avatar :data="timesheet.teamMember" :size="60"></tommy-circle-avatar>
+                  <circle-avatar :data="timesheet.teamMember" :size="60" :display-image="false"></circle-avatar>
                 </div>
-
-                <f7-swipeout-actions right>
-                  <f7-swipeout-button delete @click="denyTimesheetShift(timesheet.id)" class="swipeout-standard">Deny</f7-swipeout-button>
-                  <f7-swipeout-button delete @click="approveTimesheetShift(timesheet.id)">Approve</f7-swipeout-button>
-                </f7-swipeout-actions>
               </f7-list-item>
+            </f7-list>
+          </template>
 
+          <template v-else>
+            <template v-if="canUpdateTimesheetStatus">
+              <f7-list media-list class="time-sheet-list">
+                <f7-list-item
+                  swipeout
+                  v-for="(timesheet, index) in formattedManagerTimesheetsData"
+                  :key="'timesheet_'+index"
+                  :title="timesheet.title"
+                  :subtitle="`${timesheet.description ? timesheet.description : ''}`"
+                  @swipeout:deleted="onSwipeoutDeleted(timesheet)"
+                >
+                  <div slot="media">
+                    <circle-avatar :data="timesheet.teamMember" :size="60" :display-image="false"></circle-avatar>
+                  </div>
 
+                  <f7-swipeout-actions right>
+                    <f7-swipeout-button delete @click="denyTimesheetShift(timesheet.id)" class="swipeout-standard">Deny
+                    </f7-swipeout-button>
+                    <f7-swipeout-button delete @click="approveTimesheetShift(timesheet.id)">Approve</f7-swipeout-button>
+                  </f7-swipeout-actions>
+                </f7-list-item>
+              </f7-list>
+            </template>
+            <template v-else>
+              <f7-list media-list class="time-sheet-list">
+                <f7-list-item
+                  v-for="(timesheet, index) in formattedManagerTimesheetsData"
+                  :key="'timesheet_'+index"
+                  :title="timesheet.title"
+                  :subtitle="`${timesheet.description ? timesheet.description : ''}`"
+                >
+                  <div slot="media">
+                    <circle-avatar :data="timesheet.teamMember" :size="60" :display-image="false"></circle-avatar>
+                  </div>
+                </f7-list-item>
+              </f7-list>
+            </template>
 
-          </f7-list>
+          </template>
         </template>
+
         <template v-else>
           <div class="p-16 text-align-center">
             <img :src="`${addonAssetsUrl()}no-items-found.svg`">
@@ -79,9 +134,15 @@
   import addonAssetsUrl from '../../utils/addon-assets-url';
   import TimesheetService from "../../services/timesheet-service";
   import circleAvatar from "tommy-core/src/components/circle-avatar";
+  import SelectMultipleIcon from "../../components/icons/select-multiple-icon";
+
 
   export default {
     name: "TimesheetsManagerTimesheets",
+    components: {
+      SelectMultipleIcon,
+      circleAvatar
+    },
     methods: {
       addonAssetsUrl,
       deleteTimesheet() {
@@ -144,15 +205,36 @@
       approveTimesheetShift(timesheetId) {
         const self = this;
         const data = {
-          status: 'denied'
+          status: 'approved'
         };
         API.updateTimesheet(timesheetId, data).then(response => {
           self.$events.$emit("time_sheets:timesheet_edited");
         });
       },
 
+      denyBulkClick() {
+        const self = this;
+        self.isActionsDisabled = true;
+        const data = {
+          status: 'denied',
+          ids: self.selectedTimesheets,
+        };
+        API.updateManagerTimesheetsBulk(data).then(response => {
+          self.$events.$emit("time_sheets:timesheet_edited");
+        });
+      },
 
-
+      approveBulkClick() {
+        const self = this;
+        self.isActionsDisabled = true;
+        const data = {
+          status: 'approved',
+          ids: self.selectedTimesheets,
+        };
+        API.updateManagerTimesheetsBulk(data).then(response => {
+          self.$events.$emit("time_sheets:timesheet_edited");
+        });
+      },
 
 
       updateAll() {
@@ -166,8 +248,31 @@
             self.loaded = true;
           });
         });
+      },
 
+      toggleSelectMultiple() {
+        console.log('toggleSelectMultiple');
+        const self = this;
+        self.isMultipleSelected = !self.isMultipleSelected;
+      },
 
+      selectAllClick(e) {
+        console.log(e);
+      },
+
+      toggleSelectedTimesheet(timesheetId, e) {
+        const self = this;
+        console.log('toggle', timesheetId);
+        if (self.selectedTimesheets.includes(timesheetId)) {
+          console.log('toggle FOUND', timesheetId);
+          let newData = [...self.selectedTimesheets].filter(t => +t.id !== +timesheetId);
+          self.selectedTimesheets = newData;
+        } else {
+          console.log('toggleNOT FOUND', timesheetId);
+          let newData = [...self.selectedTimesheets];
+          newData.push(timesheetId);
+          self.selectedTimesheets = newData;
+        }
       },
     },
     computed: {
@@ -209,6 +314,27 @@
         return TimesheetService.formattedManagerTimesheetsData(self.managerTimesheetsData, self.managerTimesheetsShiftsData, self.status, self);
       },
 
+      denyBulkButtonClasses() {
+        return {
+          'button': true,
+          'button--dark-text': true,
+          'disabled': self.isActionsDisabled,
+        }
+      },
+
+      approveBulkButtonClasses() {
+        return {
+          'button': true,
+          'button--red-text': true,
+          'button--left-divider': true,
+          'disabled': self.isActionsDisabled,
+        }
+      },
+
+      canUpdateTimesheetStatus() {
+        const self = this;
+        return self.status === 'submitted';
+      },
 
 
     },
@@ -277,6 +403,9 @@
         managerTimesheetsData: [],
         managerTimesheetsShiftsData: [],
         loaded: false,
+        isActionsDisabled: false,
+        isMultipleSelected: false,
+        selectedTimesheets: [],
       };
     }
   };

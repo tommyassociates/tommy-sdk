@@ -63,7 +63,9 @@
     "denied_label": "被拒绝",
     "approved_label": "已批准",
     "deny_button": "拒绝",
-    "approve_label": "批准"
+    "approve_label": "批准",
+    "approve_button": "批准",
+    "select_all": "全选"
   },
   "approve_bulk": {
     "title": "批准",

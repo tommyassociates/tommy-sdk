@@ -183,6 +183,17 @@ const API = {
       });
   },
 
+  updateManagerTimesheetsBulk(data) {
+    const endpoint = `workforce/manager/timesheets/bulk_update`;
+    return api
+      .call({
+        endpoint,
+        method: "PUT",
+        data,
+      });
+  },
+
+
 
 
   /**

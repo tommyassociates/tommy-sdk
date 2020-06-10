@@ -63,7 +63,9 @@
     "denied_label": "Denied",
     "approved_label": "Approved",
     "deny_button": "Deny",
-    "approve_label": "Approve"
+    "approve_label": "Approve",
+    "approve_button": "Approve",
+    "select_all": "Select All"
   },
   "approve_bulk": {
     "title": "Approve",
