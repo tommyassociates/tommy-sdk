@@ -65,7 +65,9 @@
     "deny_button": "拒绝",
     "approve_label": "批准",
     "approve_button": "批准",
-    "select_all": "全选"
+    "select_all": "全选",
+    "deny_bulk_zero_selected": "要拒绝时间表，请至少选择一个时间表",
+    "approve_bulk_zero_selected": "要批准时间表，请至少选择一个时间表"
   },
   "approve_bulk": {
     "title": "批准",

@@ -218,26 +218,36 @@
 
       denyBulkClick() {
         const self = this;
-        self.isActionsDisabled = true;
-        const data = {
-          status: 'denied',
-          timesheet_ids: self.selectedTimesheets,
-        };
-        API.updateManagerTimesheetsBulk(data).then(response => {
-          self.$events.$emit("time_sheets:timesheet_edited");
-        });
+        const selectedItemsCount = self.formattedManagerTimesheetsData.filter(t => t.isSelected === 'selected').length;
+        if (selectedItemsCount === 0) {
+          self.$f7.dialog.alert(self.$t('time_sheets.manager.deny_bulk_zero_selected'), 'Tommy');
+        } else {
+          self.isActionsDisabled = true;
+          const data = {
+            status: 'denied',
+            timesheet_ids: self.selectedTimesheets,
+          };
+          API.updateManagerTimesheetsBulk(data).then(response => {
+            self.$events.$emit("time_sheets:timesheet_edited");
+          });
+        }
       },
 
       approveBulkClick() {
         const self = this;
-        self.isActionsDisabled = true;
-        const data = {
-          status: 'approved',
-          timesheet_ids: self.selectedTimesheets,
-        };
-        API.updateManagerTimesheetsBulk(data).then(response => {
-          self.$events.$emit("time_sheets:timesheet_edited");
-        });
+        const selectedItemsCount = self.formattedManagerTimesheetsData.filter(t => t.isSelected === 'selected').length;
+        if (selectedItemsCount === 0) {
+          self.$f7.dialog.alert(self.$t('time_sheets.manager.approve_bulk_zero_selected'), 'Tommy');
+        } else {
+          self.isActionsDisabled = true;
+          const data = {
+            status: 'approved',
+            timesheet_ids: self.selectedTimesheets,
+          };
+          API.updateManagerTimesheetsBulk(data).then(response => {
+            self.$events.$emit("time_sheets:timesheet_edited");
+          });
+        }
       },
 
 

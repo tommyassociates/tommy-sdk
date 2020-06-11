@@ -65,7 +65,9 @@
     "deny_button": "Deny",
     "approve_label": "Approve",
     "approve_button": "Approve",
-    "select_all": "Select All"
+    "select_all": "Select All",
+    "deny_bulk_zero_selected": "To deny timesheets, please select at least one timesheet",
+    "approve_bulk_zero_selected": "To approve timesheets, please select at least one timesheet"
   },
   "approve_bulk": {
     "title": "Approve",
