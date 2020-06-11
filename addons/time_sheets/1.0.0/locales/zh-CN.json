@@ -25,6 +25,7 @@
     "items_title": "物品",
     "items_none": "未找到任何项目！点击“ +”添加新项目。",
     "copy_button": "复制",
+    "edit_button": "编辑",
     "delete_button": "删除",
     "delete_text": "您确定要删除该条目吗",
     "cancel_button": "取消",

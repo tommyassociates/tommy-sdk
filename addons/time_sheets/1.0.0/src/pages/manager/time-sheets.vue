@@ -51,6 +51,7 @@
                 v-model="timesheet.isSelected"
                 input-value="1"
                 :checked="timesheet.isSelected === 'selected'"
+                :link="`/time-sheets/manager/time-sheets/detail/${timesheet.id}`"
               >
                 <div slot="media">
                   <circle-avatar :data="timesheet.teamMember" :size="60" :display-image="false"></circle-avatar>
@@ -69,6 +70,7 @@
                   :title="timesheet.title"
                   :subtitle="`${timesheet.description ? timesheet.description : ''}`"
                   @swipeout:deleted="onSwipeoutDeleted(timesheet)"
+                  :link="`/time-sheets/manager/time-sheets/detail/${timesheet.id}`"
                 >
                   <div slot="media">
                     <circle-avatar :data="timesheet.teamMember" :size="60" :display-image="false"></circle-avatar>
@@ -89,6 +91,7 @@
                   :key="'timesheet_'+index"
                   :title="timesheet.title"
                   :subtitle="`${timesheet.description ? timesheet.description : ''}`"
+                  :link="`/time-sheets/manager/time-sheets/detail/${timesheet.id}`"
                 >
                   <div slot="media">
                     <circle-avatar :data="timesheet.teamMember" :size="60" :display-image="false"></circle-avatar>

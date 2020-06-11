@@ -5,7 +5,9 @@ import ShiftDetail from "./pages/shift-detail.vue";
 import SelectPicker from "./pages/select-picker.vue";
 import MapPage from "./pages/map.vue";
 
-import ManagerTimeSheets from './pages/manager/time-sheets';
+import ManagerTimeSheets from './pages/manager/time-sheets.vue';
+import ManagerDetail from './pages/manager/detail.vue';
+import ManagerShiftDetail from './pages/manager/shift-detail.vue';
 
 
 const routes = [
@@ -40,6 +42,18 @@ const routes = [
   {
     path: "/time-sheets/manager/time-sheets/:status/",
     component: ManagerTimeSheets,
+  },
+  {
+    path: "/time-sheets/manager/time-sheets/detail/:id",
+    component: ManagerDetail,
+  },
+  {
+    path: "/time-sheets/manager/time-sheets/item-detail/:id",
+    component: ManagerShiftDetail,
+  },
+  {
+    path: "/time-sheets/manager/time-sheets/item-detail/create/:managerTimesheetId",
+    component: ManagerShiftDetail,
   },
 ];
 

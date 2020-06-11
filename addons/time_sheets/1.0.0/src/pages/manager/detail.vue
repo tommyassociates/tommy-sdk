@@ -4,49 +4,31 @@
     @page:beforeremove="onPageBeforeRemove"
     @page:beforeout="onPageBeforeOut"
   >
-    <template v-if="isTeamMember">
+    <template v-if="isTeamManager">
       <f7-navbar>
         <tommy-nav-back></tommy-nav-back>
         <f7-nav-title>{{$t('time_sheets.timesheet_details.title')}}</f7-nav-title>
         <f7-nav-right class="whs-navbar-links">
-          <f7-link icon-only @click="createTimesheetShift()">
+          <f7-link icon-only @click="createManagerTimesheetShift()">
             <f7-icon f7="add"/>
           </f7-link>
         </f7-nav-right>
       </f7-navbar>
-      <f7-toolbar v-if="loaded && canEditTimesheetShifts">
+      <f7-toolbar v-if="loaded">
         <f7-button @click="deleteClick()" class="button button--red-text">
           {{$t('time_sheets.timesheet_details.delete_button')}}
-        </f7-button>
-        <f7-button @click="submitForApprovalClick()" :class="submitForApprovalButtonClasses">
-          {{$t('time_sheets.timesheet_details.submit_for_approval_button')}}
         </f7-button>
       </f7-toolbar>
       <template v-if="loaded">
         <f7-list media-list>
           <f7-list-item
-            :title="$t('time_sheets.timesheet_details.id_label')"
-          >
-            <div slot="after">
-              {{timesheet.id}}
-            </div>
-          </f7-list-item>
-
-          <f7-list-item
             :title="$t('time_sheets.timesheet_details.date_label')"
           >
             <div slot="after">
-              {{ dateRangeFormat(timesheet.start_date, timesheet.end_date) }}
+              {{ dateRangeFormat(managerTimesheet.start_date, managerTimesheet.end_date) }}
             </div>
           </f7-list-item>
 
-          <f7-list-item
-            :title="$t('time_sheets.timesheet_details.status_label')"
-          >
-            <div slot="after">
-              {{timesheet.status}}
-            </div>
-          </f7-list-item>
 
           <f7-list-item
             :title="$t('time_sheets.timesheet_details.hours_label')"
@@ -60,43 +42,31 @@
         <f7-block-title class="time-clock-divider">{{ $t('time_sheets.timesheet_details.items_title') }}
         </f7-block-title>
 
-        <template v-if="timesheetShifts.length">
+        <template v-if="managerTimesheetShifts.length">
           <f7-list media-list class="time-sheet-list">
-            <template v-if="canEditTimesheetShifts">
-              <f7-list-item
-                swipeout
-                v-for="(timesheetShift, index) in timesheetShifts"
-                :key="'timesheetShift_'+index"
-                :title="timesheetShift.title"
-                :subtitle="`${timesheetShift.description ? timesheetShift.description : ''}`"
-                :link="'/time-sheets/item-detail/' + timesheetShift.id"
-                @swipeout:deleted="onSwipeoutDeleted(timesheetShift)"
-              >
-                <div slot="media">
-                  <hours-minutes-badge :hours="String(timesheetShift.hours)"
-                                       :minutes="String(timesheetShift.minutes)"></hours-minutes-badge>
-                </div>
 
-                <f7-swipeout-actions right>
-                  <f7-swipeout-button close @click="copyTimesheetShift(timesheetShift.id)">{{ $t('time_sheets.timesheet_details.copy_button') }}</f7-swipeout-button>
-                  <f7-swipeout-button delete>{{ $t('time_sheets.timesheet_details.delete_button') }}</f7-swipeout-button>
-                </f7-swipeout-actions>
-              </f7-list-item>
-            </template>
-            <template v-if="!canEditTimesheetShifts">
-              <f7-list-item
-                v-for="(timesheetShift, index) in timesheetShifts"
-                :key="'timesheetShift_'+index"
-                :title="timesheetShift.title"
-                :subtitle="`${timesheetShift.description ? timesheetShift.description : ''}`"
-                :link="'/time-sheets/item-detail/' + timesheetShift.id"
-              >
-                <div slot="media">
-                  <hours-minutes-badge :hours="String(timesheetShift.hours)"
-                                       :minutes="String(timesheetShift.minutes)"></hours-minutes-badge>
-                </div>
-              </f7-list-item>
-            </template>
+            <f7-list-item
+              swipeout
+              v-for="(managerTimesheetShift, index) in managerTimesheetShifts"
+              :key="'managerTimesheetShift_'+index"
+              :title="managerTimesheetShift.title"
+              :subtitle="`${managerTimesheetShift.description ? managerTimesheetShift.description : ''}`"
+              :link="'/time-sheets/manager/time-sheets/item-detail/' + managerTimesheetShift.id"
+              @swipeout:deleted="onSwipeoutDeleted(managerTimesheetShift)"
+            >
+              <div slot="media">
+                <hours-minutes-badge :hours="String(managerTimesheetShift.hours)"
+                                     :minutes="String(managerTimesheetShift.minutes)"></hours-minutes-badge>
+              </div>
+
+              <f7-swipeout-actions right>
+                <f7-swipeout-button close @click="editManagerTimesheetShift(managerTimesheetShift.id)">
+                  {{ $t('time_sheets.timesheet_details.edit_button') }}
+                </f7-swipeout-button>
+                <f7-swipeout-button delete>{{ $t('time_sheets.timesheet_details.delete_button') }}</f7-swipeout-button>
+              </f7-swipeout-actions>
+            </f7-list-item>
+
           </f7-list>
         </template>
         <template v-else>
@@ -150,28 +120,28 @@
   </f7-page>
 </template>
 <script>
-  import API from "../api";
-  import addonAssetsUrl from '../utils/addon-assets-url';
-  import dialog from "../mixins/dialog.vue";
-  import timePicker from "../mixins/time-picker.vue";
-  import hoursMinutesBadge from '../components/hours-minutes-badge.vue';
-  import TimesheetService from "../services/timesheet-service";
+  import API from "../../api";
+  import addonAssetsUrl from '../../utils/addon-assets-url';
+  import dialog from "../../mixins/dialog.vue";
+  import timePicker from "../../mixins/time-picker.vue";
+  import hoursMinutesBadge from '../../components/hours-minutes-badge.vue';
+  import TimesheetService from "../../services/timesheet-service";
 
   export default {
-    name: "TimesheetDetail",
+    name: "TimesheetsManagerDetail",
     mixins: [dialog, timePicker],
     components: {
       hoursMinutesBadge
     },
     methods: {
       addonAssetsUrl,
-      deleteTimesheet() {
+      deleteManagerTimesheet() {
         const self = this;
         // if (!self.editAccess) return;
-        API.deleteTimesheet(self.timesheet.id, false).then((response) => {
+        API.deleteManagerTimesheet(self.managerTimesheet.id, false).then((response) => {
           console.log('deleteTimesheet', response);
           self.$f7router.back();
-          self.$events.$emit("time_sheets:timesheet_deleted", self.timesheet);
+          self.$events.$emit("time_sheets:timesheet_deleted", self.managerTimesheet);
         });
       },
       deleteClick() {
@@ -181,38 +151,28 @@
           self.$t("time_sheets.timesheet_details.delete_text"),
           self.$t("time_sheets.timesheet_details.confirm_button"),
           self.$t("time_sheets.timesheet_details.cancel_button"),
-          self.deleteTimesheet,
+          self.deleteManagerTimesheet,
           false,
           null,
           true,
           false
         );
       },
-      submitForApprovalClick() {
-        const self = this;
-        // if (self.editAccess) return;
-        const data = {
-          status: 'submitted'
-        };
-        API.updateTimesheet(self.edit_id, data).then(response => {
-          self.$events.$emit("time_sheets:timesheet_edited");
-        });
-      },
       dateRangeFormat(startDate = '', endDate = '') {
         const self = this;
         return TimesheetService.dateRangeFormat(startDate, endDate, self);
       },
 
-      onSwipeoutDeleted(timesheetShift) {
+      onSwipeoutDeleted(managerTimesheetShift) {
         const self = this;
-        const timesheetId = timesheetShift.id;
+        const managerTimesheetId = managerTimesheetShift.id;
         // if (!self.editAccess) return;
         // API.removeItemFromCache('workforce/timesheet_items', 'id', timesheetId).then((updatedCache) => {
         //   self.timesheetsItemsData = updatedCache;
         // });
 
-        API.deleteTimesheetShift(timesheetId).then(response => {
-          console.log('deleteTimesheetShift', response);
+        API.deleteManagerTimesheetShift(managerTimesheetId).then(response => {
+          console.log('deleteManagerTimesheetShift', response);
           self.$events.$emit("time_sheets:timesheet_shift_deleted");
         });
 
@@ -222,23 +182,16 @@
         // });
       },
 
-      copyTimesheetShift(timesheetShiftId) {
+      createManagerTimesheetShift() {
+        console.log('createManagerTimesheetShift');
         const self = this;
-        console.log(timesheetShiftId);
-        const timesheetShift = self.timesheetsShiftsData.find(timesheetShift => +timesheetShift.id === +timesheetShiftId);
-        delete timesheetShift.id;
-        API.createTimesheetShift(timesheetShift).then(response => {
-          console.log(response);
-          self.timesheetsShiftsData.push(response);
-
-          self.$events.$emit("time_sheets:timesheet_shift_created", response);
-        });
+        const url = `/time-sheets/manager/time-sheets/item-detail/create/${self.edit_id}`;
+        self.$f7router.navigate(url);
       },
 
-      createTimesheetShift() {
-        console.log('createTimesheetShift');
+      editManagerTimesheetShift(managerTimesheetId) {
         const self = this;
-        const url = `/time-sheets/item-detail/create/${self.edit_id}`;
+        const url = `/time-sheets/manager/time-sheets/item-detail/${managerTimesheetId}`;
         self.$f7router.navigate(url);
       },
 
@@ -488,10 +441,10 @@
 
       updateAll() {
         const self = this;
-        API.getTimesheets(false).then(timesheets => {
-          self.timesheetsData = timesheets;
-          API.getTimesheetsShifts(false).then(timesheetsShifts => {
-            self.timesheetsShiftsData = timesheetsShifts;
+        API.getManagerTimesheets(false).then(managerTimesheets => {
+          self.managerTimesheetsData = managerTimesheets;
+          API.getManagerTimesheetsShifts(false).then(managerTimesheetsShifts => {
+            self.managerTimesheetsShiftsData = managerTimesheetsShifts;
             self.loaded = true;
 
             //self.editAccess = false;
@@ -515,30 +468,20 @@
 
       hoursTotal() {
         const self = this;
-        const timesheetShifts = self.timesheetShifts;
-        const hours = timesheetShifts.reduce((totalHours, timesheetShift) => Math.trunc(totalHours) + Math.trunc(timesheetShift.work_hours), 0);
+        const managerTimesheetShifts = self.managerTimesheetShifts;
+        const hours = managerTimesheetShifts.reduce((totalHours, managerTimesheetShift) => Math.trunc(totalHours) + Math.trunc(managerTimesheetShift.work_hours), 0);
         return parseFloat(hours).toFixed(2);
       },
 
-      timesheet() {
+      managerTimesheet() {
         const self = this;
-        return self.timesheetsData.find(timesheet => +timesheet.id === +self.edit_id);
+        return self.managerTimesheetsData.find(managerTimesheet => +managerTimesheet.id === +self.edit_id);
       },
 
-      timesheetShifts() {
+      managerTimesheetShifts() {
         const self = this;
-        const timesheetShifts = self.timesheetsShiftsData.filter(timesheetShift => +timesheetShift.timesheet_id === +self.edit_id);
-        return TimesheetService.formatTimesheetsShiftsData(timesheetShifts, self);
-      },
-
-      submitForApprovalButtonClasses() {
-        const self = this;
-        return {
-          'button': true,
-          'button--red': true,
-          'button--underline': true,
-          'disabled': self.timesheet.status === 'submitted',
-        }
+        const managerTimesheetShifts = self.managerTimesheetsShiftsData.filter(managerTimesheetShift => +managerTimesheetShift.timesheet_id === +self.edit_id);
+        return TimesheetService.formatTimesheetsShiftsData(managerTimesheetShifts, self);
       },
 
       isTeamMember() {
@@ -553,7 +496,7 @@
 
       canEditTimesheetShifts() {
         const self = this;
-        return self.timesheet.status === 'unsubmitted';
+        return self.managerTimesheet.status === 'unsubmitted';
       },
 
 
@@ -625,8 +568,8 @@
 
         edit_id: self.$f7route.params.id,
         editAccess: false,
-        timesheetsData: [],
-        timesheetsShiftsData: [],
+        managerTimesheetsData: [],
+        managerTimesheetsShiftsData: [],
         loaded: false,
       };
     }
