@@ -102,12 +102,14 @@ const TimesheetService = {
           ? self.$t('time_sheets.index.hours_label_singular')
           : self.$t('time_sheets.index.hours_label_plural');
         const description = `${timesheetsShifts.length} ${itemsString} ${workHours} ${workHoursString}`;
+        const isSelected = managerTimesheet.isSelected;
 
         const data = {
           id: managerTimesheet.id,
           teamMember,
           title,
           description,
+          isSelected,
         };
 
         formattedData.push(data);

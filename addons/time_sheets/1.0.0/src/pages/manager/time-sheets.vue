@@ -33,9 +33,10 @@
                 checkbox
                 checkbox-icon="start"
                 :title="$t('time_sheets.manager.select_all')"
-                @change="selectAllClick('selectAll')"
-                name="selectAll"
-                value="1"
+                @change="selectAllClick()"
+                v-model="selectAll"
+                input-value="1"
+                :checked="selectAll === 'selected'"
               >
               </f7-list-item>
 
@@ -46,7 +47,10 @@
                 :key="'timesheet_'+index"
                 :title="timesheet.title"
                 :subtitle="`${timesheet.description ? timesheet.description : ''}`"
-                @change="toggleSelectedTimesheet(timesheet.id)"
+                @change="toggleSelectedTimesheet(timesheet)"
+                v-model="timesheet.isSelected"
+                input-value="1"
+                :checked="timesheet.isSelected === 'selected'"
               >
                 <div slot="media">
                   <circle-avatar :data="timesheet.teamMember" :size="60" :display-image="false"></circle-avatar>
@@ -217,7 +221,7 @@
         self.isActionsDisabled = true;
         const data = {
           status: 'denied',
-          ids: self.selectedTimesheets,
+          timesheet_ids: self.selectedTimesheets,
         };
         API.updateManagerTimesheetsBulk(data).then(response => {
           self.$events.$emit("time_sheets:timesheet_edited");
@@ -229,7 +233,7 @@
         self.isActionsDisabled = true;
         const data = {
           status: 'approved',
-          ids: self.selectedTimesheets,
+          timesheet_ids: self.selectedTimesheets,
         };
         API.updateManagerTimesheetsBulk(data).then(response => {
           self.$events.$emit("time_sheets:timesheet_edited");
@@ -240,7 +244,12 @@
       updateAll() {
         const self = this;
         API.getManagerTimesheets().then(managerTimesheets => {
-          self.managerTimesheetsData = managerTimesheets;
+          let managerTimesheetsData = managerTimesheets;
+          managerTimesheetsData.forEach(timesheet => {
+            timesheet.isSelected = '0';
+          });
+
+          self.managerTimesheetsData = managerTimesheetsData;
           // self.loaded = true; //This needs to be removed once API.getManagerTimesheetsShifts() is working below.
           API.getManagerTimesheetsShifts().then(managerTimesheetsShifts => {
             self.managerTimesheetsShiftsData = managerTimesheetsShifts;
@@ -257,22 +266,32 @@
       },
 
       selectAllClick(e) {
-        console.log(e);
+        const self = this;
+        self.selectAll = self.selectAll === 'selected' ? '' : 'selected';
+
+        if (self.selectAll === 'selected') {
+          self.managerTimesheetsData.forEach(t => {
+            if (t.status === 'submitted') {
+              t.isSelected = 'selected';
+            }
+          });
+        } else {
+          self.managerTimesheetsData.forEach(t => t.isSelected = '');
+        }
       },
 
-      toggleSelectedTimesheet(timesheetId, e) {
+      toggleSelectedTimesheet(timesheet) {
         const self = this;
-        console.log('toggle', timesheetId);
-        if (self.selectedTimesheets.includes(timesheetId)) {
-          console.log('toggle FOUND', timesheetId);
-          let newData = [...self.selectedTimesheets].filter(t => +t.id !== +timesheetId);
-          self.selectedTimesheets = newData;
-        } else {
-          console.log('toggleNOT FOUND', timesheetId);
-          let newData = [...self.selectedTimesheets];
-          newData.push(timesheetId);
-          self.selectedTimesheets = newData;
-        }
+        self.managerTimesheetsData.forEach(t => {
+          if (+t.id === +timesheet.id) {
+            t.isSelected = t.isSelected === 'selected' ? '' : 'selected';
+          }
+        });
+
+        const itemsCount = self.formattedManagerTimesheetsData.length;
+        const selectedItemsCount = self.formattedManagerTimesheetsData.filter(t => t.isSelected === 'selected').length;
+        console.log({itemsCount, selectedItemsCount});
+        self.selectAll = +itemsCount === +selectedItemsCount ? 'selected' : '';
       },
     },
     computed: {
@@ -405,7 +424,7 @@
         loaded: false,
         isActionsDisabled: false,
         isMultipleSelected: false,
-        selectedTimesheets: [],
+        selectAll: 0,
       };
     }
   };
