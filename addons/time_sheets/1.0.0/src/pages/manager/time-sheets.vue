@@ -75,9 +75,9 @@
                   </div>
 
                   <f7-swipeout-actions right>
-                    <f7-swipeout-button delete @click="denyTimesheetShift(timesheet.id)" class="swipeout-standard">Deny
+                    <f7-swipeout-button delete @click="denyTimesheet(timesheet.id)" class="swipeout-standard">Deny
                     </f7-swipeout-button>
-                    <f7-swipeout-button delete @click="approveTimesheetShift(timesheet.id)">Approve</f7-swipeout-button>
+                    <f7-swipeout-button delete @click="approveTimesheet(timesheet.id)">Approve</f7-swipeout-button>
                   </f7-swipeout-actions>
                 </f7-list-item>
               </f7-list>
@@ -196,7 +196,7 @@
         // });
       },
 
-      denyTimesheetShift(timesheetId) {
+      denyTimesheet(timesheetId) {
         const self = this;
         const data = {
           status: 'denied'
@@ -206,7 +206,7 @@
         });
       },
 
-      approveTimesheetShift(timesheetId) {
+      approveTimesheet(timesheetId) {
         const self = this;
         const data = {
           status: 'approved'
