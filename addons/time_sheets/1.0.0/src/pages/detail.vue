@@ -65,6 +65,7 @@
             <template v-if="canEditTimesheetShifts">
               <f7-list-item
                 swipeout
+                chevron-center
                 v-for="(timesheetShift, index) in timesheetShifts"
                 :key="'timesheetShift_'+index"
                 :title="timesheetShift.title"
@@ -76,6 +77,7 @@
                   <hours-minutes-badge :hours="String(timesheetShift.hours)"
                                        :minutes="String(timesheetShift.minutes)"></hours-minutes-badge>
                 </div>
+
 
                 <f7-swipeout-actions right>
                   <f7-swipeout-button close @click="copyTimesheetShift(timesheetShift.id)">{{
@@ -159,6 +161,7 @@
   import timePicker from "../mixins/time-picker.vue";
   import hoursMinutesBadge from '../components/hours-minutes-badge.vue';
   import TimesheetService from "../services/timesheet-service";
+  import sumArrayOfTimes from "../utils/sum-array-of-times";
 
   export default {
     name: "TimesheetDetail",
@@ -518,20 +521,23 @@
 
       hoursTotal() {
         const self = this;
-        const timesheetShifts = self.timesheetShifts;
-        const startDate = self.$moment();
-        let endDate = self.$moment(startDate);
-        timesheetShifts.forEach(timesheetShift => {
-          const workHours = timesheetShift.work_hours;
-          const [hours, minutes] = workHours.split('.');
-          endDate = self.$moment(endDate)
-            .add(hours, 'hours')
-            .add(minutes, 'minutes');
-        });
+        const times = self.timesheetShifts.map(item => item.work_hours);
+        return sumArrayOfTimes(times, self);
 
-        const hours = self.$moment.duration(endDate.diff(startDate)).hours();
-        const minutes = self.$moment.duration(endDate.diff(startDate)).minutes();
-        return `${hours}:${minutes}`;
+        // const timesheetShifts = self.timesheetShifts;
+        // const startDate = self.$moment();
+        // let endDate = self.$moment(startDate);
+        // timesheetShifts.forEach(timesheetShift => {
+        //   const workHours = timesheetShift.work_hours;
+        //   const [hours, minutes] = workHours.split('.');
+        //   endDate = self.$moment(endDate)
+        //     .add(hours, 'hours')
+        //     .add(minutes, 'minutes');
+        // });
+        //
+        // const hours = self.$moment.duration(endDate.diff(startDate)).hours();
+        // const minutes = self.$moment.duration(endDate.diff(startDate)).minutes();
+        // return `${hours}:${minutes}`;
       },
 
       timesheet() {

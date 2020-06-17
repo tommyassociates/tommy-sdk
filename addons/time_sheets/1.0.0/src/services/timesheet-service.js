@@ -1,3 +1,5 @@
+import sumArrayOfTimes from "../utils/sum-array-of-times";
+
 const TimesheetService = {
   test: undefined,
 
@@ -26,7 +28,8 @@ const TimesheetService = {
       const title = TimesheetService.dateRangeFormat(timesheet.start_date, timesheet.end_date, self);
       const itemsString = items.length === 1 ? self.$t('time_sheets.index.items_label_singular') : self.$t('time_sheets.index.items_label_plural');
       const description = `${items.length} ${itemsString}`;
-      const workHours = items.reduce((totalHours, item) => +totalHours + +item.work_hours, 0);
+      const times = items.map(item => item.work_hours);
+      const workHours = sumArrayOfTimes(times, self, '.');
       const hours = Math.floor(workHours);
       const minutes = String(parseFloat(workHours - hours).toFixed(2)).replace('0.', '');
       const extraCssClasses = timesheet.status === 'unsubmitted'
@@ -97,18 +100,24 @@ const TimesheetService = {
         const itemsString = timesheetsShifts.length === 1
           ? self.$t('time_sheets.index.items_label_singular')
           : self.$t('time_sheets.index.items_label_plural');
-        const workHours = timesheetsShifts.reduce((totalHours, item) => +totalHours + +item.work_hours, 0);
+        const itemsDescription = `${timesheetsShifts.length} ${itemsString}`;
+
+        const times = timesheetsShifts.map(item => item.work_hours);
+        const workHours = sumArrayOfTimes(times, self);
+
         const workHoursString = workHours === 1
           ? self.$t('time_sheets.index.hours_label_singular')
           : self.$t('time_sheets.index.hours_label_plural');
-        const description = `${timesheetsShifts.length} ${itemsString} ${workHours} ${workHoursString}`;
+        const workHoursDescription = `${workHours} ${workHoursString}`;
+
         const isSelected = managerTimesheet.isSelected;
 
         const data = {
           id: managerTimesheet.id,
           teamMember,
           title,
-          description,
+          itemsDescription,
+          workHoursDescription,
           isSelected,
         };
 
