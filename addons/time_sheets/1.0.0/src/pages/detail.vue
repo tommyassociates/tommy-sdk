@@ -529,7 +529,9 @@
             .add(minutes, 'minutes');
         });
 
-        return self.$moment.duration(startDate.diff(endDate)).asHours();
+        const hours = self.$moment.duration(endDate.diff(startDate)).hours();
+        const minutes = self.$moment.duration(endDate.diff(startDate)).minutes();
+        return `${hours}:${minutes}`;
       },
 
       timesheet() {
