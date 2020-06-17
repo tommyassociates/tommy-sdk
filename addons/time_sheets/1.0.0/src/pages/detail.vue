@@ -78,8 +78,11 @@
                 </div>
 
                 <f7-swipeout-actions right>
-                  <f7-swipeout-button close @click="copyTimesheetShift(timesheetShift.id)">{{ $t('time_sheets.timesheet_details.copy_button') }}</f7-swipeout-button>
-                  <f7-swipeout-button delete>{{ $t('time_sheets.timesheet_details.delete_button') }}</f7-swipeout-button>
+                  <f7-swipeout-button close @click="copyTimesheetShift(timesheetShift.id)">{{
+                    $t('time_sheets.timesheet_details.copy_button') }}
+                  </f7-swipeout-button>
+                  <f7-swipeout-button delete>{{ $t('time_sheets.timesheet_details.delete_button') }}
+                  </f7-swipeout-button>
                 </f7-swipeout-actions>
               </f7-list-item>
             </template>
@@ -516,8 +519,17 @@
       hoursTotal() {
         const self = this;
         const timesheetShifts = self.timesheetShifts;
-        const hours = timesheetShifts.reduce((totalHours, timesheetShift) => Math.trunc(totalHours) + Math.trunc(timesheetShift.work_hours), 0);
-        return parseFloat(hours).toFixed(2);
+        const startDate = self.$moment();
+        let endDate = self.$moment(startDate);
+        timesheetShifts.forEach(timesheetShift => {
+          const workHours = timesheetShift.work_hours;
+          const [hours, minutes] = workHours.split('.');
+          endDate = self.$moment(endDate)
+            .add(hours, 'hours')
+            .add(minutes, 'minutes');
+        });
+
+        return self.$moment.duration(startDate.diff(endDate)).asHours();
       },
 
       timesheet() {
