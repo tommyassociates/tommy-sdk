@@ -39,28 +39,46 @@
           </f7-list-item>
         </f7-list>
 
-        <f7-block-title class="time-clock-divider">{{ $t('time_sheets.timesheet_details.items_title') }}
+        <f7-block-title class="time-clock-divider">{{ $t('time_sheets.timesheet_details_attendance.timeline_title') }}
         </f7-block-title>
 
-        <template v-if="managerTimesheetShifts.length">
-          <f7-list media-list class="time-sheet-list">
+        <template v-if="managerAttendances.length">
+          <f7-list media-list class="attendance-list">
 
             <f7-list-item
               swipeout
-              v-for="(managerTimesheetShift, index) in managerTimesheetShifts"
-              :key="'managerTimesheetShift_'+index"
-              :title="managerTimesheetShift.title"
-              :subtitle="`${managerTimesheetShift.description ? managerTimesheetShift.description : ''}`"
-              :link="'/time-sheets/manager/time-sheets/item-detail/' + managerTimesheetShift.id"
-              @swipeout:deleted="onSwipeoutDeleted(managerTimesheetShift)"
+              v-for="(managerAttendance, index) in managerAttendances"
+              :key="'managerAttendance_'+index"
+              :after="managerAttendance.startTime"
+              :link="'/time-sheets/manager/time-sheets/attendance-detail/' + managerAttendance.id"
+              @swipeout:deleted="onSwipeoutDeleted(managerAttendance)"
             >
-              <div slot="media">
-                <hours-minutes-badge :hours="String(managerTimesheetShift.hours)"
-                                     :minutes="String(managerTimesheetShift.minutes)"></hours-minutes-badge>
+              <div slot="media" style="color:#999">
+                <play-icon v-if="managerAttendance.status === 'start'"></play-icon>
+                <pause-icon v-if="managerAttendance.status === 'pause'"></pause-icon>
+                <resume-icon v-if="managerAttendance.status === 'resume'"></resume-icon>
+                <stop-icon v-if="managerAttendance.status === 'stop'"></stop-icon>
               </div>
 
+              <div slot="title">
+                <div class="item-title__container">
+                  <div class="item-title__title">{{ managerAttendance.status }}</div>
+                  <div class="item-title__images-container">
+                    <div class="item-title__image-icon">
+                      <ImageIcon></ImageIcon>
+                    </div>
+                    <div class="item-title__location-icon">
+                      <LocationIcon></LocationIcon>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div slot="after-end" class="item-after--after-end">{{ managerAttendance.attendanceDate }}</div>
+
+
               <f7-swipeout-actions right>
-                <f7-swipeout-button close @click="editManagerTimesheetShift(managerTimesheetShift.id)">
+                <f7-swipeout-button close @click="editManagerTimesheetShift(managerAttendance.id)">
                   {{ $t('time_sheets.timesheet_details.edit_button') }}
                 </f7-swipeout-button>
                 <f7-swipeout-button delete>{{ $t('time_sheets.timesheet_details.delete_button') }}</f7-swipeout-button>
@@ -127,10 +145,23 @@
   import hoursMinutesBadge from '../../components/hours-minutes-badge.vue';
   import TimesheetService from "../../services/timesheet-service";
 
+  import PlayIcon from "../../components/icons/play-icon";
+  import PauseIcon from "../../components/icons/pause-icon";
+  import ResumeIcon from "../../components/icons/resume-icon";
+  import StopIcon from "../../components/icons/stop-icon";
+  import ImageIcon from '../../components/icons/image-icon';
+  import LocationIcon from '../../components/icons/location-icon';
+
   export default {
     name: "TimesheetsManagerDetail",
     mixins: [dialog, timePicker],
     components: {
+      StopIcon,
+      ResumeIcon,
+      PauseIcon,
+      PlayIcon,
+      ImageIcon,
+      LocationIcon,
       hoursMinutesBadge
     },
     methods: {
@@ -163,23 +194,14 @@
         return TimesheetService.dateRangeFormat(startDate, endDate, self);
       },
 
-      onSwipeoutDeleted(managerTimesheetShift) {
+      onSwipeoutDeleted(managerAttendance) {
         const self = this;
-        const managerTimesheetId = managerTimesheetShift.id;
-        // if (!self.editAccess) return;
-        // API.removeItemFromCache('workforce/timesheet_items', 'id', timesheetId).then((updatedCache) => {
-        //   self.timesheetsItemsData = updatedCache;
-        // });
+        const managerAttendanceId = managerAttendance.id;
 
-        API.deleteManagerTimesheetShift(managerTimesheetId).then(response => {
-          console.log('deleteManagerTimesheetShift', response);
-          self.$events.$emit("time_sheets:timesheet_shift_deleted");
+        API.deleteAttendance(managerAttendanceId).then(response => {
+          console.log('deleteManagerAttendance', response);
+          self.$events.$emit("time_sheets:timesheet_attendance_deleted");
         });
-
-        // API.removeItemFromObject(self.timesheetsShiftsData, 'id', timesheetId).then(newData => {
-        //   self.timesheetsShiftsData = newData;
-        //   // API.removeItemFromCache('workforce/timesheet_items', 'id', timesheetId);
-        // });
       },
 
       createManagerTimesheetShift() {
@@ -191,7 +213,7 @@
 
       editManagerTimesheetShift(managerTimesheetId) {
         const self = this;
-        const url = `/time-sheets/manager/time-sheets/item-detail/${managerTimesheetId}`;
+        const url = `/time-sheets/manager/time-sheets/attendance-detail/${managerTimesheetId}`;
         self.$f7router.navigate(url);
       },
 
@@ -445,13 +467,27 @@
           self.managerTimesheetsData = managerTimesheets;
           API.getManagerTimesheetsShifts(false).then(managerTimesheetsShifts => {
             self.managerTimesheetsShiftsData = managerTimesheetsShifts;
-            self.loaded = true;
 
             //self.editAccess = false;
+            API.getManagerAttendances().then(managerAttendances => {
+              self.managerAttendancesData = managerAttendances;
+              self.loaded = true;
+            });
 
 
           });
         });
+
+        // tommy.api
+        //   .call({
+        //     endpoint: "/workforce/manager/attendances/86",
+        //     method: "GET",
+        //     cache: false,
+        //   })
+        //   .then(data => {
+        //     console.table(data);
+        //     return data;
+        //   });
       },
     },
     computed: {
@@ -482,6 +518,11 @@
         const self = this;
         const managerTimesheetShifts = self.managerTimesheetsShiftsData.filter(managerTimesheetShift => +managerTimesheetShift.timesheet_id === +self.edit_id);
         return TimesheetService.formatTimesheetsShiftsData(managerTimesheetShifts, self);
+      },
+
+      managerAttendances() {
+        const self = this;
+        return TimesheetService.formattedManagerAttendancesData(self.managerAttendancesData, self);
       },
 
       isTeamMember() {
@@ -570,6 +611,7 @@
         editAccess: false,
         managerTimesheetsData: [],
         managerTimesheetsShiftsData: [],
+        managerAttendancesData: [],
         loaded: false,
       };
     }

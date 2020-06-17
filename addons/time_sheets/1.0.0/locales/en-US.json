@@ -57,6 +57,9 @@
     "action_options": ["Start", "Pause", "Resume", "Stop"],
     "delete_button": "Delete"
   },
+  "timesheet_details_attendance": {
+    "timeline_title": "Timeline"
+  },
   "manager": {
     "title": "Manager",
     "unsubmitted_label": "Unsubmitted",

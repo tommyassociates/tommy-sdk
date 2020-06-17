@@ -117,6 +117,27 @@ const TimesheetService = {
       });
     return formattedData;
   },
+
+  formattedManagerAttendancesData(managerAttendancesData, self) {
+    let formattedData = [];
+    managerAttendancesData
+      .forEach(attendance => {
+
+        const attendanceDate = self.$moment(attendance.timestamp).format('ddd, D MMM YY');
+        const startTime = self.$moment(attendance.timestamp).format('h:mma');
+        const data = {
+          id: attendance.id,
+          status: attendance.status,
+          hours: 10,
+          attendanceDate,
+          startTime,
+        };
+
+        formattedData.push(data);
+
+      });
+    return formattedData;
+  },
 };
 
 

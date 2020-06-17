@@ -183,6 +183,20 @@ const API = {
       });
   },
 
+  getManagerAttendances(cache = false) {
+    return api
+      .call({
+        endpoint: "workforce/manager/attendances",
+        method: "GET",
+        cache,
+      })
+      .then(data => {
+        return data;
+      });
+  },
+
+
+
   updateManagerTimesheetsBulk(data) {
     const endpoint = `workforce/manager/timesheets/bulk_update`;
     return api

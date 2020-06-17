@@ -57,6 +57,9 @@
     "action_options": ["开始", "暂停", "恢复", "停止"],
     "delete_button": "Delete"
   },
+  "timesheet_details_attendance": {
+    "timeline_title": "时间线"
+  },
   "manager": {
     "title": "经理",
     "unsubmitted_label": "未提交",

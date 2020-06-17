@@ -8,6 +8,7 @@ import MapPage from "./pages/map.vue";
 import ManagerTimeSheets from './pages/manager/time-sheets.vue';
 import ManagerDetail from './pages/manager/detail.vue';
 import ManagerShiftDetail from './pages/manager/shift-detail.vue';
+import ManagerAttendanceDetail from './pages/manager/attendance-detail.vue';
 
 
 const routes = [
@@ -55,6 +56,12 @@ const routes = [
     path: "/time-sheets/manager/time-sheets/item-detail/create/:managerTimesheetId",
     component: ManagerShiftDetail,
   },
+  {
+    path: "/time-sheets/manager/time-sheets/attendance-detail/:attendanceId",
+    component: ManagerAttendanceDetail,
+  },
+
+
 ];
 
 export default routes;
