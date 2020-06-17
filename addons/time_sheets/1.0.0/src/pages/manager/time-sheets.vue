@@ -222,7 +222,7 @@
         const data = {
           status: 'approved'
         };
-        API.updateTimesheet(timesheetId, data).then(response => {
+        API.updateManagerTimesheet(timesheetId, data).then(response => {
           self.$events.$emit("time_sheets:timesheet_edited");
         });
       },

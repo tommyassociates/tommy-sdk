@@ -183,19 +183,35 @@ const API = {
       });
   },
 
-  getManagerAttendances(cache = false) {
+  getManagerAttendances({cache = false, otherOptions = {}}) {
+    let options = {
+      endpoint: "workforce/manager/attendances",
+      method: "GET",
+      cache,
+    }
+
+    const querystring = Object.keys(otherOptions).map((key) => {
+      return (key) + '=' + (otherOptions[key])
+    }).join('&');
+
+    if (querystring) options.endpoint = options.endpoint + '?' + querystring;
+
     return api
-      .call({
-        endpoint: "workforce/manager/attendances",
-        method: "GET",
-        cache,
-      })
+      .call(options)
       .then(data => {
         return data;
       });
   },
 
-
+  updateManagerTimesheet(id, data) {
+    const endpoint = `workforce/manager/timesheets/${id}`;
+    return api
+      .call({
+        endpoint,
+        method: "PUT",
+        data,
+      });
+  },
 
   updateManagerTimesheetsBulk(data) {
     const endpoint = `workforce/manager/timesheets/bulk_update`;
