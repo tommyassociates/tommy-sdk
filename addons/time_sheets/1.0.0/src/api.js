@@ -195,6 +195,7 @@ const API = {
     }).join('&');
 
     if (querystring) options.endpoint = options.endpoint + '?' + querystring;
+    console.log(`%c ${options.endpoint}`, 'color:white;background:red;font-weight:bold');
 
     return api
       .call(options)

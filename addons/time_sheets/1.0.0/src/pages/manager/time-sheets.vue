@@ -46,7 +46,6 @@
                 v-for="(timesheet, index) in formattedManagerTimesheetsData"
                 :key="'timesheet_'+index"
                 :title="timesheet.title"
-                :subtitle="`${timesheet.description ? timesheet.description : ''}`"
                 @change="toggleSelectedTimesheet(timesheet)"
                 v-model="timesheet.isSelected"
                 input-value="1"
@@ -55,6 +54,15 @@
               >
                 <div slot="media">
                   <circle-avatar :data="timesheet.teamMember" :size="60" :display-image="false"></circle-avatar>
+                </div>
+
+                <div slot="subtitle">
+                  <div class="item-subtitle__items-description">
+                    {{ timesheet.itemsDescription }}
+                  </div>
+                  <div class="item-subtitle__work-hours-description">
+                    {{ timesheet.workHoursDescription }}
+                  </div>
                 </div>
               </f7-list-item>
             </f7-list>
@@ -98,11 +106,19 @@
                   v-for="(timesheet, index) in formattedManagerTimesheetsData"
                   :key="'timesheet_'+index"
                   :title="timesheet.title"
-                  :subtitle="`${timesheet.description ? timesheet.description : ''}`"
                   :link="`/time-sheets/manager/time-sheets/detail/${timesheet.id}`"
                 >
                   <div slot="media">
                     <circle-avatar :data="timesheet.teamMember" :size="60" :display-image="false"></circle-avatar>
+                  </div>
+
+                  <div slot="subtitle">
+                    <div class="item-subtitle__items-description">
+                      {{ timesheet.itemsDescription }}
+                    </div>
+                    <div class="item-subtitle__work-hours-description">
+                      {{ timesheet.workHoursDescription }}
+                    </div>
                   </div>
                 </f7-list-item>
               </f7-list>
