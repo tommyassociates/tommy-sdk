@@ -93,5 +93,9 @@
     "who_can_view_timesheets_title": "谁可以查看时间表",
     "who_can_manage_items_title": "谁可以管理项目",
     "who_can_manage_timesheets_title": "谁可以管理时间表"
+  },
+  "search": {
+    "search_placeholder": "搜索位置，角色，标签，团队成员..",
+    "search_disable_button": "取消"
   }
 }

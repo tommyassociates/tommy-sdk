@@ -468,8 +468,17 @@
           API.getManagerTimesheetsShifts(false).then(managerTimesheetsShifts => {
             self.managerTimesheetsShiftsData = managerTimesheetsShifts;
 
+
             //self.editAccess = false;
-            API.getManagerAttendances().then(managerAttendances => {
+            console.log(self.managerTimesheet.start_date);
+            console.log(self.managerTimesheet.end_date);
+            const startDate = self.$moment(self.managerTimesheet.start_date).valueOf();
+            const endDate = self.$moment(self.managerTimesheet.end_date).valueOf();
+
+            const otherOptions = {
+              date_range: `${startDate},${endDate}`
+            };
+            API.getManagerAttendances({otherOptions}).then(managerAttendances => {
               self.managerAttendancesData = managerAttendances;
               self.loaded = true;
             });

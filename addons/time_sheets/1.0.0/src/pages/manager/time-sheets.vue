@@ -23,6 +23,8 @@
       </f7-toolbar>
 
 
+
+
       <template v-if="loaded">
 
 
@@ -330,6 +332,11 @@
         console.log({itemsCount, selectedItemsCount});
         self.selectAll = +itemsCount === +selectedItemsCount ? 'selected' : '';
       },
+
+
+
+
+
     },
     computed: {
       dateField() {
@@ -462,6 +469,8 @@
         isActionsDisabled: false,
         isMultipleSelected: false,
         selectAll: 0,
+
+
       };
     }
   };

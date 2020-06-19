@@ -157,36 +157,21 @@ const API = {
       });
   },
 
-
-
-  getManagerTimesheets(cache = false) {
-    return api
-      .call({
-        endpoint: "workforce/manager/timesheets",
-        method: "GET",
-        cache,
-      })
-      .then(data => {
-        return data;
-      });
-  },
-
-  getManagerTimesheetsShifts(cache = false) {
-    return api
-      .call({
-        endpoint: "workforce/manager/timesheet_items",
-        method: "GET",
-        cache,
-      })
-      .then(data => {
-        return data;
-      });
-  },
-
-  getManagerAttendances({cache = false, otherOptions = {}}) {
+  /**
+   * Used for a generic GET api call.
+   * @param endpoint
+   * @param cache
+   * @param otherOptions
+   * @returns {Promise<T>}
+   */
+  call({endpoint = '', cache = false, otherOptions = {}} = {}) {
+    if (endpoint === '') {
+      console.log(`%c Endpoint is not defined.`, 'color:white;background:red;font-weight:bold');
+      return;
+    }
     let options = {
-      endpoint: "workforce/manager/attendances",
-      method: "GET",
+      endpoint,
+      method: 'GET',
       cache,
     }
 
@@ -195,13 +180,27 @@ const API = {
     }).join('&');
 
     if (querystring) options.endpoint = options.endpoint + '?' + querystring;
-    console.log(`%c ${options.endpoint}`, 'color:white;background:red;font-weight:bold');
 
     return api
       .call(options)
       .then(data => {
         return data;
       });
+  },
+
+  getManagerTimesheets({cache = false, otherOptions = {}} = {}) {
+    const endpoint = 'workforce/manager/timesheets';
+    return this.call({endpoint, cache, otherOptions});
+  },
+
+  getManagerTimesheetsShifts({cache = false, otherOptions = {}} = {}) {
+    const endpoint = 'workforce/manager/timesheet_items';
+    return this.call({endpoint, cache, otherOptions});
+  },
+
+  getManagerAttendances({cache = false, otherOptions = {}} = {}) {
+    const endpoint = 'workforce/manager/attendances';
+    return this.call({endpoint, cache, otherOptions});
   },
 
   updateManagerTimesheet(id, data) {

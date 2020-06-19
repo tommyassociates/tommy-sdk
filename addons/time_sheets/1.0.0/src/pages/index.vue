@@ -39,6 +39,23 @@
       </template>
       <template v-if="isTeamManager && loaded">
         <f7-list>
+          <f7-searchbar
+            class=""
+            :placeholder="$t('time_sheets.search.search_placeholder')"
+            customSearch
+            :backdrop="false"
+            disableButton
+            :disable-button-text="$t('time_sheets.search.search_disable_button')"
+            :value="search"
+            @input="onSearchbarSearch($event.target.value)"
+            @searchbar:clear="onSearchbarClear"
+            @searchbar:enable="searchEnabled = true"
+            @searchbar:disable="searchEnabled = false"
+            ref="searhbar"
+          />
+        </f7-list>
+
+        <f7-list>
           <f7-list-item :title="$t('time_sheets.manager.unsubmitted_label')"
                         :link="'/time-sheets/manager/time-sheets/unsubmitted/'"
                         :badge="+unsubmittedTimesheets.length"
@@ -93,6 +110,10 @@
           day: 'mon',
           timePeriod: 'week',
         },
+
+        delayTimerSearch: null,
+        search: '',
+        searchEnabled: false,
       };
     },
     components: {
@@ -152,7 +173,10 @@
         const self = this;
         return self.managerTimesheetsData.filter(timesheet => timesheet.status === 'approved');
       },
-
+      isSearch() {
+        const self = this;
+        return self.search;
+      }
 
     },
     methods: {
@@ -178,10 +202,14 @@
             });
           });
         } else if (self.isTeamManager) {
-          API.getManagerTimesheets().then(managerTimesheets => {
+          let otherOptions = {};
+          if (self.search.trim() !== '') {
+            otherOptions.search = encodeURIComponent(self.search.trim());
+          }
+          API.getManagerTimesheets({otherOptions}).then(managerTimesheets => {
             self.managerTimesheetsData = managerTimesheets;
             self.loaded = true; //This needs to be removed once API.getManagerTimesheetsShifts() is working below.
-            API.getManagerTimesheetsShifts().then(managerTimesheetsShifts => {
+            API.getManagerTimesheetsShifts({otherOptions}).then(managerTimesheetsShifts => {
               self.managerTimesheetsShiftsData = managerTimesheetsShifts;
               console.table(managerTimesheetsShifts);
               self.loaded = true;
@@ -189,6 +217,26 @@
           });
         }
       },
+
+      onSearchbarSearch(val) {
+        const self = this;
+        self.search = val;
+        clearTimeout(self.delayTimerSearch);
+        self.delayTimerSearch = setTimeout(() => {
+          self.getSearchData(val)
+        }, 1000);
+      },
+      getSearchData(searchText) {
+        const self = this;
+        self.search = searchText;
+        self.updateAll();
+      },
+      onSearchbarClear() {
+        const self = this;
+        self.search = '';
+        self.updateAll();
+      },
+
     },
     beforeDestroy() {
       const self = this;

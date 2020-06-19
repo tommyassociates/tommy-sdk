@@ -93,5 +93,9 @@
     "who_can_view_timesheets_title": "Who can view timesheets",
     "who_can_manage_items_title": "Who can manage items",
     "who_can_manage_timesheets_title": "Who can manage timesheets"
+  },
+  "search": {
+    "search_placeholder": "Search Location, Role, Tag, Team Member...",
+    "search_disable_button": "Cancel"
   }
 }
