@@ -184,10 +184,13 @@
       //   });
       // },
       saveTimesheetShift() {
+        console.log('saveTimesheetShift');
         const self = this;
 
         if (self.timesheetId) {
+          console.log('is timesheet shift', self.timesheetId);
           const timesheetShiftData = {...self.timesheetShift};
+          console.log('timesheetShiftData', timesheetShiftData);
           API.createTimesheetShift(timesheetShiftData).then((response) => {
             console.log('createTimesheetShift response', response);
             self.$f7router.back();
@@ -195,6 +198,7 @@
           });
 
         } else {
+          console.log('NOT timesheet shift');
           const timesheetShiftData = {...self.timesheetShift};
           delete timesheetShiftData.id;
           console.clear();
@@ -232,7 +236,7 @@
       openCalendar() {
         const self = this;
         // if (self.editAccess) self.calendarInstance.open();
-        if (!self.canEditTimesheetShift) return;
+        // if (!self.canEditTimesheetShift) return;
         self.calendarInstance.open();
       },
       createCalendar() {
@@ -374,12 +378,12 @@
       },
       openWorkHoursTimePicker() {
         const self = this;
-        if (!self.canEditTimesheetShift) return;
+        // if (!self.canEditTimesheetShift) return;
         self.workHoursTimePickerInstance.open();
       },
       openBreakHoursTimePicker() {
         const self = this;
-        if (!self.canEditTimesheetShift) return;
+        // if (!self.canEditTimesheetShift) return;
         self.breakHoursTimePickerInstance.open();
       },
 
@@ -426,7 +430,8 @@
 
       canEditTimesheetShift() {
         const self = this;
-        return self.loaded && +self.edit_id > 0 && self.timesheet.status === 'unsubmitted';
+        // return self.loaded && +self.edit_id > 0 && self.timesheet.status === 'unsubmitted';
+        return self.loaded && self.timesheet.status === 'unsubmitted';
       },
 
       timesheet() {
@@ -493,8 +498,11 @@
             user_id: self.$root.account.user_id,
             timesheet_id: self.timesheetId,
             start_date: self.timesheet.start_date,
+            work_hours: '0.0',
+            break_hours: '0.0',
           };
           self.timesheetShiftOriginal = {...self.timesheetShift};
+
           self.$nextTick(() => {
             self.createCalendar();
             self.createWorkHoursTimePicker(self.timesheetShift.work_hours);

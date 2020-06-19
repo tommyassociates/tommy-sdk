@@ -7,7 +7,7 @@
       },
       createBreakHoursTimePicker(target) {
         const self = this;
-        const time = target !== undefined ? target.split('.') : '0.00'.split('.');
+        const time = target !== undefined ? target.split('.') : '0.0'.split('.');
         const hours = time.length === 2 ? time[0] : time;
         const minutes = time.length === 2 ? time[1] : '00';
         const hoursArr = [];

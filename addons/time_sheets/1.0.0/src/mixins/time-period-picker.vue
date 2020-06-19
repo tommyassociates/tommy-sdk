@@ -139,6 +139,7 @@
             };
             console.log('newTmesheetData', newTmesheetData);
             API.createTimesheet(newTmesheetData).then(timesheet => {
+              console.log('timesheet created', timesheet);
               const url = `/time-sheets/detail/${timesheet.id}`;
               self.$f7router.navigate(url);
               self.$events.$emit("time_sheets:timesheet_created", timesheet);

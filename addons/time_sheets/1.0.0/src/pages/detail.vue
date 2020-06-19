@@ -9,7 +9,7 @@
         <tommy-nav-back></tommy-nav-back>
         <f7-nav-title>{{$t('time_sheets.timesheet_details.title')}}</f7-nav-title>
         <f7-nav-right class="whs-navbar-links">
-          <f7-link icon-only @click="createTimesheetShift()">
+          <f7-link icon-only @click="createTimesheetShift()" v-if="loaded && canEditTimesheetShifts">
             <f7-icon f7="add"/>
           </f7-link>
         </f7-nav-right>
@@ -575,8 +575,6 @@
         const self = this;
         return self.timesheet.status === 'unsubmitted';
       },
-
-
     },
     beforeDestroy() {
       const self = this;
