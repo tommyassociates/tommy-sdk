@@ -110,79 +110,6 @@
     name: "TimesheetShiftDetail",
     mixins: [dialog, workHoursTimePicker, breakHoursTimePicker],
     methods: {
-      // changeAction(val) {
-      //   const self = this;
-      //   self.detail_data.status = val;
-      // },
-      // setAction() {
-      //   const self = this;
-      //   if (self.new_action !== null)
-      //     self.detail_data.event = String(self.new_action);
-      // },
-      // clearAction() {
-      //   const self = this;
-      //   self.new_action = null;
-      // },
-      // getPhotoCamera(photo) {
-      //   const self = this;
-      // },
-      // openMapPage() {
-      //   const self = this;
-      //   const url = `https://www.google.com/maps/place/${self.detail_data.latitude}+${self.detail_data.longitude}`;
-      //
-      //   window.open(url, '_system', 'location=yes,hidden=yes,beforeload=yes');
-      //
-      //   // self.$f7router.navigate("/time-clock/map/", {
-      //   //   props: {
-      //   //     edit: self.edit_acces,
-      //   //     latitude: self.detail_data.latitude,
-      //   //     longitude: self.detail_data.longitude,
-      //   //     accuracy: self.detail_data.accuracy,
-      //   //     address: self.detail_data.address,
-      //   //     callback: self.editCoordinates
-      //   //   }
-      //   // });
-      // },
-      // editCoordinates(latitude, longitude, accuracy, address) {
-      //   const self = this;
-      //   self.detail_data.latitude = latitude;
-      //   self.detail_data.longitude = longitude;
-      //   self.detail_data.accuracy = accuracy;
-      //   self.detail_data.address = address;
-      // },
-      // openPhoto() {
-      //   const self = this;
-      //   self.$refs.actionSheet.close();
-      //   self.photoPreview.open();
-      // },
-      // openSelector() {
-      //   const self = this;
-      //   if (!self.editAccess) return;
-      //   self.$f7router.navigate("/time-clock/select-picker/", {
-      //     props: {
-      //       selected: self.detail_data.user_id,
-      //       pageTitle: self.$t("time_sheets.event_details.who_label"),
-      //       multiply: false,
-      //       getData: self.getDataUser,
-      //       type: "team",
-      //       saveChange(user) {
-      //         self.detail_data.user_id = user.user_id;
-      //         self.detail_data.user_name = user.first_name + " " + user.last_name;
-      //         self.detail_data.icon_url = user.icon_url;
-      //       }
-      //     }
-      //   });
-      // },
-      // getDataUser(self) {
-      //   self.$api.getCurrentTeamMembers({cache: true}).then(tagItems => {
-      //     tagItems.forEach((item, index) => {
-      //       item.context = "members";
-      //     });
-      //     Object.assign(self.targets, tagItems);
-      //     self.loaded = true;
-      //     self.createSearchbar();
-      //   });
-      // },
       saveTimesheetShift() {
         console.log('saveTimesheetShift');
         const self = this;
@@ -278,93 +205,6 @@
         if (self.workHoursTimePicker) self.workHoursTimePicker.destroy();
         if (self.breakHoursTimePicker) self.breakHoursTimePicker.destroy();
       },
-      // prepareAttendance(data) {
-      //   const self = this;
-      //   const user = self.$root.teamMembers.filter(
-      //     member => member.user_id === data.user_id
-      //   );
-      //   data.user_name = user[0].first_name + " " + user[0].last_name;
-      //   data.icon_url = user[0].icon_url;
-      //   return data;
-      // },
-      // createPhotoPreview() {
-      //   const self = this;
-      //   self.photoPreview = self.$f7.photoBrowser.create({
-      //     photos: [
-      //       {
-      //         url: self.image_preview
-      //       }
-      //     ],
-      //     theme: "dark",
-      //     type: "standalone",
-      //     toolbar: false,
-      //     backLinkText: "",
-      //     swiper: {
-      //       initialSlide: 0,
-      //       spaceBetween: 20,
-      //       speed: 300,
-      //       loop: false,
-      //       preloadImages: true,
-      //       navigation: {},
-      //       zoom: {
-      //         enabled: true,
-      //         maxRatio: 3,
-      //         minRatio: 1
-      //       },
-      //       lazy: {
-      //         enabled: false
-      //       }
-      //     },
-      //     renderNavbar() {
-      //       let editHtml = "";
-      //       if (self.editAccess) {
-      //         editHtml = `
-      //         <a href="#" class="link icon-only" id="time-clock-reload-photo" ref="reloadPhoto">
-      //           <i class="icon f7-icons color-white">reload</i>
-      //         </a>
-      //       `;
-      //       }
-      //       const navbarHtml = `
-      //       <div class="navbar">
-      //         <div class="navbar-inner sliding">
-      //           <div class="left">
-      //             <a href="#" class="link popup-close icon-only" data-popup=".photo-browser-popup">
-      //               <i class="icon icon-back color-white"></i>
-      //             </a>
-      //           </div>
-      //           <div class="right">${editHtml}</div>
-      //         </div>
-      //       </div>
-      //     `.trim();
-      //       return navbarHtml;
-      //     },
-      //     on: {
-      //       open: () => {
-      //         self.$f7
-      //           .$("#time-clock-reload-photo")
-      //           .on("click", self.reloadPhoto);
-      //       },
-      //       close: () => {
-      //         self.$f7.$("#time-clock-reload-photo").off("click");
-      //       }
-      //     }
-      //   });
-      // },
-      // reloadPhoto() {
-      //   const self = this;
-      //   self.$refs.photo.takePhotoAsync().then(photo => {
-      //     self.image_preview = photo;
-      //     self.photoPreview.swiper.removeSlide(0);
-      //     self.photoPreview.swiper.appendSlide(
-      //       `<div class="photo-browser-slide swiper-slide swiper-slide-active" data-swiper-slide-index="0"><span class="swiper-zoom-container"><img src="${photo}" ></span></div>`
-      //     );
-      //     self.photoPreview.params.photos = [
-      //       {
-      //         url: photo
-      //       }
-      //     ];
-      //   });
-      // },
       checkPermision(p) {
         const self = this;
         let view = p.filters.find(e => {
@@ -476,7 +316,10 @@
 
 
         if (self.edit_id) {
-          API.getTimesheetsShifts().then(timesheetsShifts => {
+          const otherOptions = {
+            limit: 200,
+          };
+          API.getTimesheetsShifts({otherOptions}).then(timesheetsShifts => {
             self.timesheetsShiftsData = timesheetsShifts;
             self.loaded = true;
             self.editAccess = true;
