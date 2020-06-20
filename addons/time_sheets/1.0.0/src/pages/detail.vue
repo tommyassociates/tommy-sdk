@@ -493,10 +493,14 @@
       },
 
       updateAll() {
+        console.log('updateAll');
         const self = this;
-        API.getTimesheets(false).then(timesheets => {
+        API.getTimesheets().then(timesheets => {
           self.timesheetsData = timesheets;
-          API.getTimesheetsShifts(false).then(timesheetsShifts => {
+          const otherOptions = {
+            limit: 200,
+          };
+          API.getTimesheetsShifts({otherOptions}).then(timesheetsShifts => {
             self.timesheetsShiftsData = timesheetsShifts;
             self.loaded = true;
 

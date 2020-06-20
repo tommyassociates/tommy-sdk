@@ -196,7 +196,10 @@
         if (self.isTeamMember) {
           API.getTimesheets().then(timesheets => {
             self.timesheetsData = timesheets;
-            API.getTimesheetsShifts().then(timesheetsShifts => {
+            const otherOptions = {
+              limit: 200,
+            };
+            API.getTimesheetsShifts({otherOptions}).then(timesheetsShifts => {
               self.timesheetsShiftsData = timesheetsShifts;
               self.loaded = true;
             });

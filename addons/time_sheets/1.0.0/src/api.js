@@ -61,29 +61,14 @@ const API = {
       });
   },*/
 
-
-  getTimesheets(cache = false) {
-    return api
-      .call({
-        endpoint: "workforce/timesheets",
-        method: "GET",
-        cache,
-      })
-      .then(data => {
-        return data;
-      });
+  getTimesheets({cache = false, otherOptions = {}} = {}) {
+    const endpoint = 'workforce/timesheets';
+    return this.call({endpoint, cache, otherOptions});
   },
 
-  getTimesheetsShifts(cache = false) {
-    return api
-      .call({
-        endpoint: `workforce/timesheet_items`,
-        method: "GET",
-        cache,
-      })
-      .then(data => {
-        return data;
-      });
+  getTimesheetsShifts({cache = false, otherOptions = {}} = {}) {
+    const endpoint = 'workforce/timesheet_items';
+    return this.call({endpoint, cache, otherOptions});
   },
 
   createTimesheet(data) {

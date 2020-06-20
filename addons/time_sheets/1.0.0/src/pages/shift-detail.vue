@@ -236,7 +236,7 @@
       openCalendar() {
         const self = this;
         // if (self.editAccess) self.calendarInstance.open();
-        // if (!self.canEditTimesheetShift) return;
+        if (!self.canEditTimesheetShift) return;
         self.calendarInstance.open();
       },
       createCalendar() {
@@ -378,12 +378,12 @@
       },
       openWorkHoursTimePicker() {
         const self = this;
-        // if (!self.canEditTimesheetShift) return;
+        if (!self.canEditTimesheetShift) return;
         self.workHoursTimePickerInstance.open();
       },
       openBreakHoursTimePicker() {
         const self = this;
-        // if (!self.canEditTimesheetShift) return;
+        if (!self.canEditTimesheetShift) return;
         self.breakHoursTimePickerInstance.open();
       },
 
