@@ -197,6 +197,8 @@
       submitForApprovalClick() {
         const self = this;
         // if (self.editAccess) return;
+
+        if (self.timesheetsShiftsData.length === 0) return;
         const data = {
           status: 'submitted'
         };
@@ -562,7 +564,7 @@
           'button': true,
           'button--red': true,
           'button--underline': true,
-          'disabled': self.timesheet.status === 'submitted',
+          'disabled': self.timesheet.status === 'submitted' || self.timesheetsShiftsData.length === 0,
         }
       },
 
