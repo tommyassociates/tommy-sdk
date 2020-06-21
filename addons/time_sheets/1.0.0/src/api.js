@@ -75,7 +75,7 @@ const API = {
     console.log('createTimesheet', data);
     return api
       .call({
-        endpoint: `workforce/timesheets`,
+        endpoint: `workforce/manager/timesheets`,
         method: "POST",
         data,
       })

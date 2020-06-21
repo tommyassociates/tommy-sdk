@@ -499,6 +499,7 @@
           self.timesheetsData = timesheets;
           const otherOptions = {
             limit: 200,
+            timesheet_id: self.edit_id,
           };
           API.getTimesheetsShifts({otherOptions}).then(timesheetsShifts => {
             self.timesheetsShiftsData = timesheetsShifts;
