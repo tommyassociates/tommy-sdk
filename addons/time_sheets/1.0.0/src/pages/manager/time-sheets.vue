@@ -52,7 +52,6 @@
                 v-model="timesheet.isSelected"
                 input-value="1"
                 :checked="timesheet.isSelected === 'selected'"
-                :link="`/time-sheets/manager/time-sheets/detail/${timesheet.id}`"
               >
                 <div slot="media">
                   <circle-avatar :data="timesheet.teamMember" :size="60" :display-image="false"></circle-avatar>
