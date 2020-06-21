@@ -204,6 +204,7 @@
         };
         API.updateTimesheet(self.edit_id, data).then(response => {
           self.$events.$emit("time_sheets:timesheet_edited");
+          self.$f7router.back();
         });
       },
       dateRangeFormat(startDate = '', endDate = '') {
