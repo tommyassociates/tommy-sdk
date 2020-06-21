@@ -205,7 +205,9 @@
             });
           });
         } else if (self.isTeamManager) {
-          let otherOptions = {};
+          let otherOptions = {
+            limit: 200,
+          };
           if (self.search.trim() !== '') {
             otherOptions.search = encodeURIComponent(self.search.trim());
           }

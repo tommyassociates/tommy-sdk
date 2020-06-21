@@ -127,22 +127,27 @@ const TimesheetService = {
     return formattedData;
   },
 
-  formattedManagerAttendancesData(managerAttendancesData, self) {
+  formattedManagerAttendancesData(managerAttendancesData, startDate, endDate, self) {
     let formattedData = [];
     managerAttendancesData
       .forEach(attendance => {
 
-        const attendanceDate = self.$moment(attendance.timestamp).format('ddd, D MMM YY');
-        const startTime = self.$moment(attendance.timestamp).format('h:mma');
-        const data = {
-          id: attendance.id,
-          status: attendance.status,
-          hours: 10,
-          attendanceDate,
-          startTime,
-        };
+        //TODO Get date range from endpoint.
+        const isInDateRange = self.$moment(attendance.timestamp).isBetween(self.$moment(startDate), self.$moment(endDate));
+        if (isInDateRange) {
 
-        formattedData.push(data);
+          const attendanceDate = self.$moment(attendance.timestamp).format('ddd, D MMM YY');
+          const startTime = self.$moment(attendance.timestamp).format('h:mma');
+          const data = {
+            id: attendance.id,
+            status: attendance.status,
+            hours: 10,
+            attendanceDate,
+            startTime,
+          };
+
+          formattedData.push(data);
+        }
 
       });
     return formattedData;

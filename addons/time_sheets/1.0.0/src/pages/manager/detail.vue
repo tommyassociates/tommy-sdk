@@ -463,9 +463,17 @@
 
       updateAll() {
         const self = this;
-        API.getManagerTimesheets(false).then(managerTimesheets => {
+        const otherOptions = {
+          timesheet_id: self.edit_id,
+        };
+        API.getManagerTimesheets({otherOptions}).then(managerTimesheets => {
           self.managerTimesheetsData = managerTimesheets;
-          API.getManagerTimesheetsShifts(false).then(managerTimesheetsShifts => {
+
+          const otherOptions = {
+            timesheet_id: self.edit_id,
+            limit: 200,
+          };
+          API.getManagerTimesheetsShifts({otherOptions}).then(managerTimesheetsShifts => {
             self.managerTimesheetsShiftsData = managerTimesheetsShifts;
 
 
@@ -475,8 +483,11 @@
             const startDate = self.$moment(self.managerTimesheet.start_date).valueOf();
             const endDate = self.$moment(self.managerTimesheet.end_date).valueOf();
 
+            //TODO Get date range from endpoint.
             const otherOptions = {
-              date_range: `${startDate},${endDate}`
+              //date_range: `${startDate},${endDate}`
+              timesheet_item_id: self.edit_id,
+              limit: 200,
             };
             API.getManagerAttendances({otherOptions}).then(managerAttendances => {
               self.managerAttendancesData = managerAttendances;
@@ -531,7 +542,7 @@
 
       managerAttendances() {
         const self = this;
-        return TimesheetService.formattedManagerAttendancesData(self.managerAttendancesData, self);
+        return TimesheetService.formattedManagerAttendancesData(self.managerAttendancesData, self.managerTimesheet.start_date, self.managerTimesheet.end_date, self);
       },
 
       isTeamMember() {

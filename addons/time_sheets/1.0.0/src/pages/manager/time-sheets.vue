@@ -282,15 +282,22 @@
 
       updateAll() {
         const self = this;
-        API.getManagerTimesheets().then(managerTimesheets => {
+        const otherOptions = {
+          limit: 200,
+        };
+        API.getManagerTimesheets({otherOptions}).then(managerTimesheets => {
           let managerTimesheetsData = managerTimesheets;
           managerTimesheetsData.forEach(timesheet => {
             timesheet.isSelected = '0';
           });
 
           self.managerTimesheetsData = managerTimesheetsData;
-          // self.loaded = true; //This needs to be removed once API.getManagerTimesheetsShifts() is working below.
-          API.getManagerTimesheetsShifts().then(managerTimesheetsShifts => {
+
+          const otherOptions = {
+            limit: 200,
+          };
+
+          API.getManagerTimesheetsShifts({otherOptions}).then(managerTimesheetsShifts => {
             self.managerTimesheetsShiftsData = managerTimesheetsShifts;
             console.table(managerTimesheetsShifts);
             self.loaded = true;
