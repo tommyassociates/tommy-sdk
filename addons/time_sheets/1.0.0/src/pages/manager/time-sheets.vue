@@ -8,16 +8,16 @@
         <f7-nav-title>{{$t(`time_sheets.manager.${status}_label`)}}</f7-nav-title>
         <f7-nav-right class="whs-navbar-links">
           <f7-link icon-only @click="toggleSelectMultiple()" :style="`${isMultipleSelected?'':'color:black'}`"
-                   v-if="canUpdateTimesheetStatus">
+                   v-if="canToggleMultiple">
             <select-multiple-icon></select-multiple-icon>
           </f7-link>
         </f7-nav-right>
       </f7-navbar>
-      <f7-toolbar v-if="loaded && isMultipleSelected && canUpdateTimesheetStatus">
+      <f7-toolbar v-if="loaded && isMultipleSelected">
         <f7-button @click="denyBulkClick()" :class="denyBulkButtonClasses">
           {{$t('time_sheets.manager.deny_button')}}
         </f7-button>
-        <f7-button @click="approveBulkClick()" :class="approveBulkButtonClasses">
+        <f7-button @click="approveBulkClick()" :class="approveBulkButtonClasses" v-if="canApproveTimesheet">
           {{$t('time_sheets.manager.approve_button')}}
         </f7-button>
       </f7-toolbar>
@@ -405,6 +405,26 @@
       canUpdateTimesheetStatus() {
         const self = this;
         return self.status === 'submitted';
+      },
+
+      canDeleteTimesheet() {
+        const self = this;
+        return true;
+      },
+
+      canApproveTimesheet() {
+        const self = this;
+        return self.status === 'submitted';
+      },
+
+      canDenyTimesheet() {
+        const self = this;
+        return self.status === 'submitted';
+      },
+
+      canToggleMultiple() {
+        const self = this;
+        return self.status !== 'denied';
       },
 
 
