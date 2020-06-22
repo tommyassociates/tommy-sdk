@@ -23,8 +23,6 @@
       </f7-toolbar>
 
 
-
-
       <template v-if="loaded">
 
 
@@ -86,10 +84,10 @@
 
                   <div slot="subtitle">
                     <div class="item-subtitle__items-description">
-                    {{ timesheet.itemsDescription }}
+                      {{ timesheet.itemsDescription }}
                     </div>
                     <div class="item-subtitle__work-hours-description">
-                    {{ timesheet.workHoursDescription }}
+                      {{ timesheet.workHoursDescription }}
                     </div>
                   </div>
 
@@ -268,10 +266,17 @@
           self.$f7.dialog.alert(self.$t('time_sheets.manager.approve_bulk_zero_selected'), 'Tommy');
         } else {
           self.isActionsDisabled = true;
+
+          const timesheetIds = self.formattedManagerTimesheetsData
+            .filter(timesheet => timesheet.isSelected === 'selected')
+            .map(timesheet => timesheet.id);
+
           const data = {
             status: 'approved',
-            timesheet_ids: self.selectedTimesheets,
+            timesheet_ids: timesheetIds,
           };
+
+          console.log(data);
           API.updateManagerTimesheetsBulk(data).then(response => {
             self.$events.$emit("time_sheets:timesheet_edited");
           });
@@ -338,9 +343,6 @@
         console.log({itemsCount, selectedItemsCount});
         self.selectAll = +itemsCount === +selectedItemsCount ? 'selected' : '';
       },
-
-
-
 
 
     },
