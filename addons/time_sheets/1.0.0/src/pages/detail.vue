@@ -62,7 +62,7 @@
 
         <template v-if="timesheetShifts.length">
           <f7-list media-list class="time-sheet-list">
-            <template v-if="canEditTimesheetShifts">
+            <template v-if="loaded && canEditTimesheetShifts">
               <f7-list-item
                 swipeout
                 chevron-center
@@ -88,7 +88,7 @@
                 </f7-swipeout-actions>
               </f7-list-item>
             </template>
-            <template v-if="!canEditTimesheetShifts">
+            <template v-if="loaded && !canEditTimesheetShifts">
               <f7-list-item
                 v-for="(timesheetShift, index) in timesheetShifts"
                 :key="'timesheetShift_'+index"
@@ -581,7 +581,7 @@
 
       canEditTimesheetShifts() {
         const self = this;
-        return self.timesheet.status === 'unsubmitted';
+        return self.timesheet && self.timesheet.status === 'unsubmitted';
       },
     },
     beforeDestroy() {

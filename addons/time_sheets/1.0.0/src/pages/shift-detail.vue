@@ -140,8 +140,8 @@
       deleteTimesheet() {
         const self = this;
         if (!self.editAccess) return;
-        API.deleteTimesheet(self.timesheet.id).then((response) => {
-          console.log('deleteTimesheet', response);
+        API.deleteTimesheetShift(self.edit_id).then((response) => {
+          console.log('deleteTimesheetShift', response);
           self.$f7router.back();
           self.$events.$emit("time_sheets:timesheet_shift_deleted", self.timesheet);
         });
