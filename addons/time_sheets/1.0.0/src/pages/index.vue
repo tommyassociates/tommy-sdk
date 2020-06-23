@@ -39,6 +39,20 @@
       </template>
       <template v-if="isTeamManager && loaded">
         <f7-list>
+
+          <date-range-select
+            v-model="dateRange"
+            @change="onDateRangeChange"
+            @save="onDateRangeSave"
+          ></date-range-select>
+
+          <tag-select
+            title=""
+            v-model="tags"
+            @change="onTagsChange"
+            @save="onTagsSave"
+          ></tag-select>
+          <!--
           <f7-searchbar
             class=""
             :placeholder="$t('time_sheets.search.search_placeholder')"
@@ -52,7 +66,7 @@
             @searchbar:enable="searchEnabled = true"
             @searchbar:disable="searchEnabled = false"
             ref="searhbar"
-          />
+          />-->
         </f7-list>
 
         <f7-list>
@@ -92,6 +106,10 @@
   import Events from "../components/events.vue";
   import timePeriodPicker from "../mixins/time-period-picker.vue";
 
+  import TagSelect from 'tommy-core/src/components/tag-select';
+  import PermissionSelect from 'tommy-core/src/components/permission-select';
+  import DateRangeSelect from 'tommy-core/src/components/date-range-select';
+
   /*
   TODO: add shift empty page
 
@@ -111,14 +129,20 @@
           timePeriod: 'week',
         },
 
-        delayTimerSearch: null,
-        search: '',
-        searchEnabled: false,
+        // delayTimerSearch: null,
+        // search: '',
+        // searchEnabled: false,
+
+        tags: [],
+        dateRange: null,
       };
     },
     components: {
       ActiveAvatar,
       Events,
+      TagSelect,
+      PermissionSelect,
+      DateRangeSelect
     },
     mixins: [timePeriodPicker],
     created() {
@@ -173,10 +197,10 @@
         const self = this;
         return self.managerTimesheetsData.filter(timesheet => timesheet.status === 'approved');
       },
-      isSearch() {
-        const self = this;
-        return self.search;
-      }
+      // isSearch() {
+      //   const self = this;
+      //   return self.search;
+      // }
 
     },
     methods: {
@@ -208,12 +232,23 @@
           let otherOptions = {
             limit: 200,
           };
-          if (self.search.trim() !== '') {
-            otherOptions.search = encodeURIComponent(self.search.trim());
+          // if (self.search.trim() !== '') {
+          //   otherOptions.search = encodeURIComponent(self.search.trim());
+          // }
+          if (self.dateRange) {
+            otherOptions.date_range = self.dateRange;
           }
+          if (self.tags.length) {
+            otherOptions.tags = encodeURIComponent(self.tags.map(tag => tag.name));
+          }
+          console.log(otherOptions);
           API.getManagerTimesheets({otherOptions}).then(managerTimesheets => {
             self.managerTimesheetsData = managerTimesheets;
             self.loaded = true; //This needs to be removed once API.getManagerTimesheetsShifts() is working below.
+
+            const otherOptions = {
+              limit: 200,
+            };
             API.getManagerTimesheetsShifts({otherOptions}).then(managerTimesheetsShifts => {
               self.managerTimesheetsShiftsData = managerTimesheetsShifts;
               console.table(managerTimesheetsShifts);
@@ -223,22 +258,40 @@
         }
       },
 
-      onSearchbarSearch(val) {
-        const self = this;
-        self.search = val;
-        clearTimeout(self.delayTimerSearch);
-        self.delayTimerSearch = setTimeout(() => {
-          self.getSearchData(val)
-        }, 1000);
+      // onSearchbarSearch(val) {
+      //   const self = this;
+      //   self.search = val;
+      //   clearTimeout(self.delayTimerSearch);
+      //   self.delayTimerSearch = setTimeout(() => {
+      //     self.getSearchData(val)
+      //   }, 1000);
+      // },
+      // getSearchData(searchText) {
+      //   const self = this;
+      //   self.search = searchText;
+      //   self.updateAll();
+      // },
+      // onSearchbarClear() {
+      //   const self = this;
+      //   self.search = '';
+      //   self.updateAll();
+      // },
+
+      onDateRangeChange(value) {
+        console.log('example addon: date range changed', value)
       },
-      getSearchData(searchText) {
+
+      onDateRangeSave() {
+        console.log('example addon: save requested');
         const self = this;
-        self.search = searchText;
         self.updateAll();
       },
-      onSearchbarClear() {
+      onTagsChange(value) {
+        console.log('example addon: tags changed', value)
+      },
+      onTagsSave() {
+        console.log('example addon: save requested');
         const self = this;
-        self.search = '';
         self.updateAll();
       },
 

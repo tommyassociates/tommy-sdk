@@ -206,20 +206,8 @@
       onSwipeoutDeleted(timesheetShift) {
         const self = this;
         const timesheetId = timesheetShift.id;
-        // if (!self.editAccess) return;
-        // API.removeItemFromCache('workforce/timesheet_items', 'id', timesheetId).then((updatedCache) => {
-        //   self.timesheetsItemsData = updatedCache;
-        // });
 
-        API.deleteTimesheetShift(timesheetId).then(response => {
-          console.log('deleteTimesheetShift', response);
-          self.$events.$emit("time_sheets:timesheet_shift_deleted");
-        });
-
-        // API.removeItemFromObject(self.timesheetsShiftsData, 'id', timesheetId).then(newData => {
-        //   self.timesheetsShiftsData = newData;
-        //   // API.removeItemFromCache('workforce/timesheet_items', 'id', timesheetId);
-        // });
+        //do nothing
       },
 
       denyTimesheet(timesheetId) {
