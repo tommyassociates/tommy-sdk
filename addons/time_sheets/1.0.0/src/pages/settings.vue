@@ -29,8 +29,8 @@
         </f7-list-item>
       </f7-list>
 
-<!--      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_view_timesheets_title')}}-->
-<!--      </f7-block-title>-->
+      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_view_timesheets_title')}}
+      </f7-block-title>
 <!--      <f7-list class="message-list">-->
 <!--        <f7-list-item >-->
 <!--          <search-cmp @clickOpened="togglePopup(true)"></search-cmp>-->
@@ -44,8 +44,8 @@
 <!--      </f7-list>-->
 
 
-<!--      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_manage_items_title')}}-->
-<!--      </f7-block-title>-->
+      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_manage_items_title')}}
+      </f7-block-title>
 <!--      <f7-list class="message-list">-->
 <!--        <f7-list-item >-->
 <!--          <search-cmp @clickOpened="togglePopup(true)"></search-cmp>-->
@@ -58,8 +58,8 @@
 <!--        </f7-list-item>-->
 <!--      </f7-list>-->
 
-<!--      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_manage_timesheets_title')}}-->
-<!--      </f7-block-title>-->
+      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_manage_timesheets_title')}}
+      </f7-block-title>
 <!--      <f7-list class="message-list">-->
 <!--        <f7-list-item >-->
 <!--          <search-cmp @clickOpened="togglePopup(true)"></search-cmp>-->
@@ -72,7 +72,7 @@
 <!--        </f7-list-item>-->
 <!--      </f7-list>-->
 
-<!--      <permission-select></permission-select>-->
+<!--      <permission-select title="test" addonPackage="time_sheets"></permission-select>-->
 
 
 
