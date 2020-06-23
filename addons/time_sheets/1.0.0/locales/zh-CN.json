@@ -30,7 +30,8 @@
     "delete_text": "您确定要删除该条目吗",
     "cancel_button": "取消",
     "confirm_button": "确认",
-    "submit_for_approval_button":  "提请批准"
+    "submit_for_approval_button":  "提请批准",
+    "done_button": "完成了"
   },
   "timesheet_details_shift": {
     "title": "转移",
@@ -58,7 +59,15 @@
     "delete_button": "Delete"
   },
   "timesheet_details_attendance": {
-    "timeline_title": "时间线"
+    "timeline_title": "时间线",
+    "cancel_button": "取消",
+    "done_button": "完成了",
+    "clock_event_options":{
+      "start": "上班打卡",
+      "stop": "下班打卡",
+      "pause": "开始休息",
+      "resume": "结束休息"
+    }
   },
   "manager": {
     "title": "经理",

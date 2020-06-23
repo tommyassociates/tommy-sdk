@@ -1,0 +1,23 @@
+.timesheets-action-sheet{
+  .list{
+    margin: 0 !important;
+  }
+  .item-content{
+    height: 50px;
+  }
+  .item-title{
+    font-size: 18px;
+    color: #333333;
+  }
+  .toolbar{
+    height: 50px !important;
+    background-color: #fff !important;
+  }
+  .toolbar-inner{
+    font-size: 18px;
+    padding: 0 15px !important;
+  }
+  .cancel{
+    color: #999;
+  }
+}

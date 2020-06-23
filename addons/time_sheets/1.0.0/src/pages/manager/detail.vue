@@ -122,11 +122,11 @@
               sheet-close
               class="cancel"
               @click="clearAction"
-            >{{$t('time_sheets.event_details.cancel_button')}}
+            >{{$t('time_sheets.timesheet_details.cancel_button')}}
             </f7-link>
           </div>
           <div class="right">
-            <f7-link sheet-close @click="setAction">{{$t('time_sheets.event_details.done_button')}}</f7-link>
+            <f7-link sheet-close @click="setAction">{{$t('time_sheets.timesheet_details.done_button')}}</f7-link>
           </div>
         </f7-toolbar>
         <f7-page-content>

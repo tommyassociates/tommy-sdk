@@ -133,8 +133,8 @@ const TimesheetService = {
       .forEach(attendance => {
 
         //TODO Get date range from endpoint.
-        const isInDateRange = self.$moment(attendance.timestamp).isBetween(self.$moment(startDate), self.$moment(endDate));
-        if (isInDateRange) {
+        // const isInDateRange = self.$moment(attendance.timestamp).isBetween(self.$moment(startDate), self.$moment(endDate));
+        // if (isInDateRange) {
 
           const attendanceDate = self.$moment(attendance.timestamp).format('ddd, D MMM YY');
           const startTime = self.$moment(attendance.timestamp).format('h:mma');
@@ -147,7 +147,7 @@ const TimesheetService = {
           };
 
           formattedData.push(data);
-        }
+        // }
 
       });
     return formattedData;

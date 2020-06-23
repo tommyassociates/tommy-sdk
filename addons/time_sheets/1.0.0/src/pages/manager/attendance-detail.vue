@@ -9,7 +9,7 @@
       <f7-nav-title>{{$t('time_clock.event_details.title')}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
         <f7-link icon-only @click="editAttendance" v-if="edit_acces">
-          <f7-icon f7="check" />
+          <f7-icon f7="check"/>
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
@@ -23,7 +23,7 @@
         @click.native="openTimePickerDetail()"
       >
         <div slot="after">
-          <input type="text" id="timePicker" readonly :value="timeField" />
+          <input type="text" id="timePicker" readonly :value="timeField"/>
         </div>
       </f7-list-item>
       <f7-list-item
@@ -85,25 +85,27 @@
       <f7-list-item title="__________" after="________"></f7-list-item>
     </f7-list>
 
-    <f7-sheet class="time-clock-action-sheet" ref="actionSheet">
+    <f7-sheet class="timesheets-action-sheet" ref="actionSheet">
       <f7-toolbar>
         <div class="left">
           <f7-link
             sheet-close
             class="cancel"
             @click="clearAction"
-          >{{$t('time_clock.event_details.cancel_button')}}</f7-link>
+          >{{$t('time_sheets.timesheet_details_attendance.cancel_button')}}
+          </f7-link>
         </div>
         <div class="right">
-          <f7-link sheet-close @click="setAction">{{$t('time_clock.event_details.done_button')}}</f7-link>
+          <f7-link sheet-close @click="setAction">{{$t('time_sheets.timesheet_details_attendance.done_button')}}
+          </f7-link>
         </div>
       </f7-toolbar>
       <f7-page-content>
-        <f7-list v-if="edit_acces && loaded">
+        <f7-list v-if="loaded">
           <f7-list-item
             radio
             :checked="detail_data.status === 'start'"
-            :title="$t('time_clock.index.clock_event_options.start')"
+            :title="$t('time_sheets.timesheet_details_attendance.clock_event_options.start')"
             name="time-clock-detail-action"
             @change="changeAction('start')"
             value="start"
@@ -111,7 +113,7 @@
           <f7-list-item
             radio
             :checked="detail_data.status === 'stop'"
-            :title="$t('time_clock.index.clock_event_options.stop')"
+            :title="$t('time_sheets.timesheet_details_attendance.clock_event_options.stop')"
             name="time-clock-detail-action"
             @change="changeAction('stop')"
             value="stop"
@@ -119,7 +121,7 @@
           <f7-list-item
             radio
             :checked="detail_data.status === 'pause'"
-            :title="$t('time_clock.index.clock_event_options.pause')"
+            :title="$t('time_sheets.timesheet_details_attendance.clock_event_options.pause')"
             name="time-clock-detail-action"
             @change="changeAction('pause')"
             value="pause"
@@ -127,7 +129,7 @@
           <f7-list-item
             radio
             :checked="detail_data.status === 'resume'"
-            :title="$t('time_clock.index.clock_event_options.resume')"
+            :title="$t('time_sheets.timesheet_details_attendance.clock_event_options.resume')"
             name="time-clock-detail-action"
             @change="changeAction('resume')"
             value="resume"
@@ -135,7 +137,7 @@
         </f7-list>
       </f7-page-content>
     </f7-sheet>
-    <Photo ref="photo" direction="front" v-if="edit_acces" />
+    <Photo ref="photo" direction="front" v-if="edit_acces"/>
   </f7-page>
 </template>
 <script>
@@ -144,10 +146,11 @@
   import timePicker from "../../mixins/time-picker.vue";
   import Blob from "../../mixins/baseToBlob.vue";
   import Photo from '../../components/photo.vue';
+
   export default {
     name: "TimesheetManagerAttendanceDetail",
     mixins: [dialog, timePicker, Blob],
-    components: { Photo },
+    components: {Photo},
     methods: {
       changeAction(val) {
         const self = this;
@@ -213,7 +216,7 @@
         });
       },
       getDataUser(self) {
-        self.$api.getCurrentTeamMembers({ cache: true }).then(tagItems => {
+        self.$api.getCurrentTeamMembers({cache: true}).then(tagItems => {
           tagItems.forEach((item, index) => {
             item.context = "members";
           });
@@ -432,12 +435,13 @@
           with_filters: true
         })
         .then(v => {
-          self.edit_acces = self.checkPermision(v);
+          // self.edit_acces = self.checkPermision(v);
 
           API.getAttendancesDetail(self.edit_id).then(data => {
             self.detail_data = self.prepareAttendance(data);
             if (typeof self.detail_data.image !== "undefined")
               self.image_preview = self.detail_data.image.url;
+
             self.loaded = true;
             if (self.edit_acces) {
               self.$nextTick(() => {
@@ -463,7 +467,7 @@
         sheet_action_opened: false,
         new_action: null,
         edit_id: self.$f7route.params.attendanceId,
-        edit_acces: false,
+        edit_acces: true,
         detail_data: null,
         loaded: false
       };
