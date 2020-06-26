@@ -71,14 +71,13 @@ const API = {
         return data;
       });
   },
-  getAttendances(data = null, cache = false, others = false, otherOptions = {}) {
+  getAttendances({cache = false, others = false, otherOptions = {}} = {}) {
     let options = {
       endpoint: "workforce/attendances",
       method: "GET",
       with_permission_to: true,
       with_filters: true,
       cache: cache,
-      data,
     }
     // if (!others) options.endpoint = options.endpoint + '&user_id='+ API.actorId;
 
@@ -86,11 +85,7 @@ const API = {
       otherOptions.user_id = API.actorId;
     }
 
-    const querystring = Object.keys(otherOptions).map((key) => {
-      return (key) + '=' + (otherOptions[key])
-    }).join('&');
-
-    if (querystring) options.endpoint = options.endpoint + '?' + querystring;
+    options.data = otherOptions;
 
     return api
       .call(options)
@@ -98,24 +93,18 @@ const API = {
         return data;
       });
   },
-  getAttendancesActive(data = null, cache = false, others = false, otherOptions = {}) {
+  getAttendancesActive({cache = false, others = false, otherOptions = {}} = {}) {
     let options = {
       endpoint: "workforce/attendances/active",
       method: "GET",
       cache: cache,
-      data,
     }
 
     if (!others) {
       otherOptions.user_id = API.actorId;
     }
 
-    const querystring = Object.keys(otherOptions).map((key) => {
-      return (key) + '=' + (otherOptions[key])
-    }).join('&');
-
-    if (querystring) options.endpoint = options.endpoint + '?' + querystring;
-
+    options.data = otherOptions;
 
     return api
       .call(options)

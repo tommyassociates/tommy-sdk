@@ -312,7 +312,10 @@
       updateAttendances() {
         const self = this;
         self.loaded.attendance = false;
-        return API.getAttendances(null, false, self.viewOthers).then(data => {
+        const otherOptions = {
+          others: self.viewOthers,
+        };
+        return API.getAttendances({otherOptions}).then(data => {
           self.attendanceData = AttendanceService.prepareAttendances(data, self);
           self.loaded.attendance = true;
           self.updateStatus();
@@ -321,7 +324,10 @@
       updateAttendancesActive() {
         const self = this;
         self.loaded.active = false;
-        return API.getAttendancesActive(null, false, self.viewOthers).then(data => {
+        const otherOptions = {
+          others: self.viewOthers,
+        };
+        return API.getAttendancesActive({otherOptions}).then(data => {
           self.activeData = AttendanceService.prepareAttendance(data, self);
           if (self.activeData !== null) {
             self.loaded.timestamp = self.activeData.timestamp;
@@ -414,7 +420,10 @@
         )
       ]).then(v => {
         self.viewOthers = API.checkPermision(v[0], self);
-        API.getAttendances(null, false, self.viewOthers).then(data => {
+        const otherOptions = {
+          others: self.viewOthers,
+        };
+        API.getAttendances({otherOptions}).then(data => {
           self.attendanceData = AttendanceService.prepareAttendances(data, self);
           //self.formattedAttendanceData = TimesheetService.splitAttendanceIntoDays(self.attendanceData, self);
           self.loaded.attendance = true;
@@ -422,7 +431,7 @@
           self.updateStatus();
           self.calculateDuration();
         });
-        API.getAttendancesActive(null, false, self.viewOthers).then(data => {
+        API.getAttendancesActive({otherOptions}).then(data => {
           self.activeData = AttendanceService.prepareAttendance(data, self);
           if (self.activeData !== null) {
             // self.formattedActiveData = TimesheetService.formatAttendanceActive(self.activeData, self);

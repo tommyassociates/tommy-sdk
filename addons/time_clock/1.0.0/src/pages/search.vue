@@ -147,7 +147,9 @@
 
       refreshSearchResults() {
         const self = this;
-        const otherOptions = {};
+        let otherOptions = {
+          others: self.viewOthers,
+        };
         if (self.dateRange) {
           otherOptions.date_range = self.dateRange;
         }
@@ -155,13 +157,13 @@
           otherOptions.search = encodeURIComponent(self.search);
         }
 
-        API.getAttendances(null, false, self.viewOthers, otherOptions).then(data => {
+        API.getAttendances({otherOptions}).then(data => {
           self.attendanceData = AttendanceService.prepareAttendances(data, self);
           self.formattedAttendanceData = AttendanceService.splitAttendanceIntoDays(self.attendanceData, self);
           self.loaded.attendance = true;
           self.loaded.first = true;
         });
-        API.getAttendancesActive(null, false, self.viewOthers, otherOptions).then(data => {
+        API.getAttendancesActive({otherOptions}).then(data => {
           self.activeData = AttendanceService.prepareAttendance(data, self);
           self.formattedActiveData = AttendanceService.formatAttendanceActive(self.activeData, self);
           self.loaded.active = true;
