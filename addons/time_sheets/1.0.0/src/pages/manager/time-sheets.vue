@@ -277,6 +277,14 @@
         const otherOptions = {
           limit: 200,
         };
+
+        if (self.searchDateRange) {
+          otherOptions.date_range = self.searchDateRange;
+        }
+        if (self.searchTags.length) {
+          otherOptions.tags = encodeURIComponent(self.searchTags.map(tag => tag.name));
+        }
+
         API.getManagerTimesheets({otherOptions}).then(managerTimesheets => {
           let managerTimesheetsData = managerTimesheets;
           managerTimesheetsData.forEach(timesheet => {
@@ -425,6 +433,18 @@
     },
     mounted() {
       const self = this;
+
+      /**
+       * Use localStorage to persist the search results.
+       */
+      if (localStorage.timesheetsSearchDateRange) {
+        self.searchDateRange = JSON.parse(localStorage.timesheetsSearchDateRange);
+      }
+      if (localStorage.timesheetsSearchTags) {
+        self.searchTags = JSON.parse(localStorage.timesheetsSearchTags);
+      }
+
+
       // self.$api
       //   .getInstalledAddonPermission("time_sheets", "attendance_edit_access", {
       //     with_filters: true
@@ -485,6 +505,9 @@
         isActionsDisabled: false,
         isMultipleSelected: false,
         selectAll: 0,
+
+        searchTags: [],
+        searchDateRange: null,
 
 
       };

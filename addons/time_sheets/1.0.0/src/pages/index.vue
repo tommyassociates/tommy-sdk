@@ -41,14 +41,15 @@
         <f7-list>
 
           <date-range-select
-            v-model="dateRange"
+            v-model="searchDateRange"
             @change="onDateRangeChange"
             @save="onDateRangeSave"
           ></date-range-select>
 
           <tag-select
             title=""
-            v-model="tags"
+            v-model="searchTags"
+            refs="searchTags"
             @change="onTagsChange"
             @save="onTagsSave"
           ></tag-select>
@@ -133,8 +134,8 @@
         // search: '',
         // searchEnabled: false,
 
-        tags: [],
-        dateRange: null,
+        searchTags: [],
+        searchDateRange: null,
       };
     },
     components: {
@@ -203,6 +204,13 @@
       // }
 
     },
+    watch: {
+      searchTags: function (val) {
+        const self = this;
+        localStorage.timesheetsSearchTags = JSON.stringify(val);
+        self.updateAll();
+      },
+    },
     methods: {
       addTimesheet() {
         const self = this;
@@ -235,11 +243,11 @@
           // if (self.search.trim() !== '') {
           //   otherOptions.search = encodeURIComponent(self.search.trim());
           // }
-          if (self.dateRange) {
-            otherOptions.date_range = self.dateRange;
+          if (self.searchDateRange) {
+            otherOptions.date_range = self.searchDateRange;
           }
-          if (self.tags.length) {
-            otherOptions.tags = encodeURIComponent(self.tags.map(tag => tag.name));
+          if (self.searchTags.length) {
+            otherOptions.tags = encodeURIComponent(self.searchTags.map(tag => tag.name));
           }
           console.log(otherOptions);
           API.getManagerTimesheets({otherOptions}).then(managerTimesheets => {
@@ -285,14 +293,19 @@
         console.log('example addon: save requested');
         const self = this;
         self.updateAll();
+
+        localStorage.timesheetsSearchDateRange = JSON.stringify(self.searchDateRange);
       },
       onTagsChange(value) {
         console.log('example addon: tags changed', value)
+        localStorage.timesheetsSearchTags = JSON.stringify(value);
       },
       onTagsSave() {
         console.log('example addon: save requested');
         const self = this;
         self.updateAll();
+
+        localStorage.timesheetsSearchTags = JSON.stringify(self.searchTags);
       },
 
     },
@@ -311,6 +324,15 @@
     mounted() {
       const self = this;
 
+      /**
+       * Use localStorage to persist the search results.
+       */
+      if (localStorage.timesheetsSearchDateRange) {
+        self.searchDateRange = JSON.parse(localStorage.timesheetsSearchDateRange);
+      }
+      if (localStorage.timesheetsSearchTags) {
+        self.searchTags = JSON.parse(localStorage.timesheetsSearchTags);
+      }
 
       return Promise.all([
         self.$api.getInstalledAddonPermission(
