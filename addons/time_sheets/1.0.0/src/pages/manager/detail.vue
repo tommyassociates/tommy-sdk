@@ -485,8 +485,9 @@
 
             //TODO Get date range from endpoint.
             const otherOptions = {
-              //date_range: `${startDate},${endDate}`
-              timesheet_item_id: self.edit_id,
+              // date_range: '159093360,159343920',
+              // date_range: `2020-05-01,2020-05-31`,
+              // timesheet_item_id: self.edit_id,
               limit: 200,
             };
             API.getManagerAttendances({otherOptions}).then(managerAttendances => {

@@ -152,6 +152,7 @@
         };
         if (self.dateRange) {
           otherOptions.date_range = self.dateRange;
+          console.log('daterange', self.dateRange);
         }
         if (self.search) {
           otherOptions.search = encodeURIComponent(self.search);

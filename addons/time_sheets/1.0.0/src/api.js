@@ -158,13 +158,8 @@ const API = {
       endpoint,
       method: 'GET',
       cache,
+      data: otherOptions,
     }
-
-    const querystring = Object.keys(otherOptions).map((key) => {
-      return (key) + '=' + (otherOptions[key])
-    }).join('&');
-
-    if (querystring) options.endpoint = options.endpoint + '?' + querystring;
 
     return api
       .call(options)
@@ -183,8 +178,8 @@ const API = {
     return this.call({endpoint, cache, otherOptions});
   },
 
-  getManagerAttendances({cache = false, otherOptions = {}} = {}) {
-    const endpoint = 'workforce/manager/attendances';
+  getManagerAttendances({cache = false, otherOptions = {}, id = ''} = {}) {
+    const endpoint = `workforce/manager/attendances${id !== '' ? `/${id}` : ''}`;
     return this.call({endpoint, cache, otherOptions});
   },
 

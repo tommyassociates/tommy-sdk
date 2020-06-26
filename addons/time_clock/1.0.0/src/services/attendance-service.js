@@ -11,7 +11,6 @@ const AttendanceService = {
     if (data === null) return null;
 
     data.forEach(e => {
-      console.log(e.image);
       const user = self.$root.teamMembers.find(
         member => member.user_id === e.user_id
       );
@@ -53,9 +52,6 @@ const AttendanceService = {
     //format the data.
     const today = self.$moment(new Date()).format('YYYY-MM-DD');
     const yesterday = self.$moment(today).subtract(1, 'day').format('YYYY-MM-DD');
-
-    console.log(today);
-    console.log(yesterday);
 
     const days = data.reduce((days, attendance) => {
       const dateTimestamp = attendance.timestamp; //.split('T')[0];
