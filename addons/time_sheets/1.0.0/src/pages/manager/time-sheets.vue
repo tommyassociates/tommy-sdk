@@ -237,9 +237,14 @@
           self.$f7.dialog.alert(self.$t('time_sheets.manager.deny_bulk_zero_selected'), 'Tommy');
         } else {
           self.isActionsDisabled = true;
+
+          const timesheetIds = self.formattedManagerTimesheetsData
+            .filter(timesheet => timesheet.isSelected === 'selected')
+            .map(timesheet => timesheet.id);
+
           const data = {
             status: 'denied',
-            timesheet_ids: self.selectedTimesheets,
+            ids: timesheetIds,
           };
           API.updateManagerTimesheetsBulk(data).then(response => {
             self.$events.$emit("time_sheets:timesheet_edited");
@@ -261,7 +266,7 @@
 
           const data = {
             status: 'approved',
-            timesheet_ids: timesheetIds,
+            ids: timesheetIds,
           };
 
           console.log(data);
