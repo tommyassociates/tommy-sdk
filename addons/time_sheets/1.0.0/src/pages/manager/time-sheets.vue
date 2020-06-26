@@ -236,7 +236,6 @@
         if (selectedItemsCount === 0) {
           self.$f7.dialog.alert(self.$t('time_sheets.manager.deny_bulk_zero_selected'), 'Tommy');
         } else {
-          self.isActionsDisabled = true;
 
           const timesheetIds = self.formattedManagerTimesheetsData
             .filter(timesheet => timesheet.isSelected === 'selected')
@@ -258,7 +257,6 @@
         if (selectedItemsCount === 0) {
           self.$f7.dialog.alert(self.$t('time_sheets.manager.approve_bulk_zero_selected'), 'Tommy');
         } else {
-          self.isActionsDisabled = true;
 
           const timesheetIds = self.formattedManagerTimesheetsData
             .filter(timesheet => timesheet.isSelected === 'selected')
@@ -390,7 +388,6 @@
         return {
           'button': true,
           'button--dark-text': true,
-          'disabled': self.isActionsDisabled,
         }
       },
 
@@ -399,7 +396,6 @@
           'button': true,
           'button--red-text': true,
           'button--left-divider': true,
-          'disabled': self.isActionsDisabled,
         }
       },
 
@@ -507,7 +503,6 @@
         managerTimesheetsData: [],
         managerTimesheetsShiftsData: [],
         loaded: false,
-        isActionsDisabled: false,
         isMultipleSelected: false,
         selectAll: 0,
 
