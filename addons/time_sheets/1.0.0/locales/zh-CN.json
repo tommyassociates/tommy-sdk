@@ -56,11 +56,21 @@
     "photo_label": "照片",
     "action_label": "行动",
     "action_options": ["开始", "暂停", "恢复", "停止"],
-    "delete_button": "Delete"
+    "delete_button": "删除"
   },
   "timesheet_details_attendance": {
-    "timeline_title": "时间线",
+    "timeline_title": "时间线"
+  },
+  "timesheet_attendance_detail": {
+    "title": "出勤率",
+    "time_label": "时间",
+    "date_label": "日期",
+    "who_label": "WHO",
+    "where_label": "哪里",
+    "photo_label": "照片",
+    "action_label": "行动",
     "cancel_button": "取消",
+    "delete_button": "删除",
     "done_button": "完成了",
     "clock_event_options":{
       "start": "上班打卡",

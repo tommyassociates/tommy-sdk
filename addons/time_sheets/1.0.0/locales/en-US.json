@@ -59,8 +59,18 @@
     "delete_button": "Delete"
   },
   "timesheet_details_attendance": {
-    "timeline_title": "Timeline",
+    "timeline_title": "Timeline"
+  },
+  "timesheet_attendance_detail": {
+    "title": "Attendance",
+    "time_label": "Time",
+    "date_label": "Date",
+    "who_label": "Who",
+    "where_label": "Where",
+    "photo_label": "Photo",
+    "action_label": "Action",
     "cancel_button": "Cancel",
+    "delete_button": "Delete",
     "done_button": "Done",
     "clock_event_options":{
       "start": "Clock On",

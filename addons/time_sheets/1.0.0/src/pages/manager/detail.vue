@@ -115,24 +115,7 @@
         <f7-list-item title="__________" after="________"></f7-list-item>
       </f7-list>
 
-      <f7-sheet class="time-clock-action-sheet" ref="actionSheet">
-        <f7-toolbar>
-          <div class="left">
-            <f7-link
-              sheet-close
-              class="cancel"
-              @click="clearAction"
-            >{{$t('time_sheets.timesheet_details.cancel_button')}}
-            </f7-link>
-          </div>
-          <div class="right">
-            <f7-link sheet-close @click="setAction">{{$t('time_sheets.timesheet_details.done_button')}}</f7-link>
-          </div>
-        </f7-toolbar>
-        <f7-page-content>
 
-        </f7-page-content>
-      </f7-sheet>
     </template>
 
   </f7-page>
@@ -260,7 +243,6 @@
       },
       openPhoto() {
         const self = this;
-        self.$refs.actionSheet.close();
         self.photoPreview.open();
       },
       openSelector() {
@@ -351,11 +333,9 @@
       },
       onPageBeforeOut() {
         const self = this;
-        self.$refs.actionSheet.close();
       },
       onPageBeforeRemove() {
         const self = this;
-        self.$refs.actionSheet.$destroy();
         if (self.calendarInstance) self.calendarInstance.destroy();
       },
       prepareAttendance(data) {
@@ -487,7 +467,7 @@
             const otherOptions = {
               // date_range: '159093360,159343920',
               // date_range: `2020-05-01,2020-05-31`,
-              // timesheet_item_id: self.edit_id,
+              timesheet_item_id: self.edit_id,
               limit: 200,
             };
             API.getManagerAttendances({otherOptions}).then(managerAttendances => {

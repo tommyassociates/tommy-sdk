@@ -6,7 +6,7 @@
   >
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{$t('time_clock.event_details.title')}}</f7-nav-title>
+      <f7-nav-title>{{$t('time_sheets.timesheet_attendance_detail.title')}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
         <f7-link icon-only @click="editAttendance" v-if="edit_acces">
           <f7-icon f7="check" />
@@ -14,11 +14,11 @@
       </f7-nav-right>
     </f7-navbar>
     <f7-toolbar v-if="edit_acces">
-      <f7-button @click="deleteClick()">{{$t('time_clock.event_details.delete_button')}}</f7-button>
+      <f7-button @click="deleteClick()">{{$t('time_sheets.timesheet_attendance_detail.delete_button')}}</f7-button>
     </f7-toolbar>
     <f7-list media-list v-if="loaded">
       <f7-list-item
-        :title="$t('time_clock.event_details.time_label')"
+        :title="$t('time_sheets.timesheet_attendance_detail.time_label')"
         :link="edit_acces"
         @click.native="openTimePickerDetail()"
       >
@@ -27,13 +27,13 @@
         </div>
       </f7-list-item>
       <f7-list-item
-        :title="$t('time_clock.event_details.date_label')"
+        :title="$t('time_sheets.timesheet_attendance_detail.date_label')"
         :link="edit_acces"
         @click.native="openCalendar()"
         :after="dateField"
       ></f7-list-item>
       <f7-list-item
-        :title="$t('time_clock.event_details.who_label')"
+        :title="$t('time_sheets.timesheet_attendance_detail.who_label')"
         :link="edit_acces"
         @click.native="openSelector()"
       >
@@ -43,13 +43,13 @@
         </div>
       </f7-list-item>
       <f7-list-item
-        :title="$t('time_clock.event_details.where_label')"
+        :title="$t('time_sheets.timesheet_attendance_detail.where_label')"
         :link="true"
         :after="detail_data.address"
         @click.native="openMapPage"
       ></f7-list-item>
       <f7-list-item
-        :title="$t('time_clock.event_details.photo_label')"
+        :title="$t('time_sheets.timesheet_attendance_detail.photo_label')"
         :link="true"
         @click.native="openPhoto()"
         v-if="detail_data.status === 'start' || detail_data.status === 'stop'"
@@ -59,7 +59,7 @@
         </div>
       </f7-list-item>
       <f7-list-item
-        :title="$t('time_clock.event_details.action_label')"
+        :title="$t('time_sheets.timesheet_attendance_detail.action_label')"
         :link="edit_acces"
         sheet-open=".time-clock-action-sheet"
         :after="$t('time_clock.index.clock_event_options.'+detail_data.status)"
@@ -92,10 +92,10 @@
             sheet-close
             class="cancel"
             @click="clearAction"
-          >{{$t('time_clock.event_details.cancel_button')}}</f7-link>
+          >{{$t('time_sheets.timesheet_attendance_detail.cancel_button')}}</f7-link>
         </div>
         <div class="right">
-          <f7-link sheet-close @click="setAction">{{$t('time_clock.event_details.done_button')}}</f7-link>
+          <f7-link sheet-close @click="setAction">{{$t('time_sheets.timesheet_attendance_detail.done_button')}}</f7-link>
         </div>
       </f7-toolbar>
       <f7-page-content>
@@ -103,7 +103,7 @@
           <f7-list-item
             radio
             :checked="detail_data.status === 'start'"
-            :title="$t('time_clock.index.clock_event_options.start')"
+            :title="$t('time_sheets.timesheet_attendance_detail.clock_event_options.start')"
             name="time-clock-detail-action"
             @change="changeAction('start')"
             value="start"
@@ -111,7 +111,7 @@
           <f7-list-item
             radio
             :checked="detail_data.status === 'stop'"
-            :title="$t('time_clock.index.clock_event_options.stop')"
+            :title="$t('time_sheets.timesheet_attendance_detail.clock_event_options.stop')"
             name="time-clock-detail-action"
             @change="changeAction('stop')"
             value="stop"
@@ -119,7 +119,7 @@
           <f7-list-item
             radio
             :checked="detail_data.status === 'pause'"
-            :title="$t('time_clock.index.clock_event_options.pause')"
+            :title="$t('time_sheets.timesheet_attendance_detail.clock_event_options.pause')"
             name="time-clock-detail-action"
             @change="changeAction('pause')"
             value="pause"
@@ -127,7 +127,7 @@
           <f7-list-item
             radio
             :checked="detail_data.status === 'resume'"
-            :title="$t('time_clock.index.clock_event_options.resume')"
+            :title="$t('time_sheets.timesheet_attendance_detail.clock_event_options.resume')"
             name="time-clock-detail-action"
             @change="changeAction('resume')"
             value="resume"
@@ -145,7 +145,7 @@
   import Blob from "../../mixins/baseToBlob.vue";
   import Photo from '../../components/photo.vue';
   export default {
-    name: "DetailActivity",
+    name: "TimesheetsManagerAttendanceDetail",
     mixins: [dialog, timePicker, Blob],
     components: { Photo },
     methods: {
