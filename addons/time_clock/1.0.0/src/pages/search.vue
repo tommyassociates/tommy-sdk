@@ -54,9 +54,10 @@
 </template>
 <script>
   import API from "../api";
+  import AttendanceService from "../services/attendance-service";
+
   import Events from "../components/events.vue";
   import dateRangeSelect from 'tommy_core/src/components/date-range-select.vue';
-  import TimesheetService from "../services/attendance-service";
 
   export default {
     name: "TimeClockSearch",
