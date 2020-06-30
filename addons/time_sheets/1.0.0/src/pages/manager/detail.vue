@@ -9,7 +9,7 @@
         <tommy-nav-back></tommy-nav-back>
         <f7-nav-title>{{$t('time_sheets.timesheet_details.title')}}</f7-nav-title>
         <f7-nav-right class="whs-navbar-links">
-          <f7-link icon-only @click="createManagerTimesheetShift()">
+          <f7-link icon-only :href="`/time-sheets/manager/time-sheets/attendance-detail/create/${edit_id}`">
             <f7-icon f7="add"/>
           </f7-link>
         </f7-nav-right>
@@ -185,13 +185,6 @@
           console.log('deleteManagerAttendance', response);
           self.$events.$emit("time_sheets:timesheet_attendance_deleted");
         });
-      },
-
-      createManagerTimesheetShift() {
-        console.log('createManagerTimesheetShift');
-        const self = this;
-        const url = `/time-sheets/manager/time-sheets/item-detail/create/${self.edit_id}`;
-        self.$f7router.navigate(url);
       },
 
       editManagerTimesheetShift(managerTimesheetId) {
@@ -550,6 +543,10 @@
       self.$events.$off("time_sheets:timesheet_shift_created", self.updateAll);
       self.$events.$off("time_sheets:timesheet_shift_deleted", self.updateAll);
 
+      self.$events.$off("time_sheets:attendance_edited", self.updateAll);
+      self.$events.$off("time_sheets:attendance_created", self.updateAll);
+      self.$events.$off("time_sheets:attendance_deleted", self.updateAll);
+
     },
     mounted() {
       const self = this;
@@ -595,6 +592,10 @@
       self.$events.$on("time_sheets:timesheet_shift_edited", self.updateAll);
       self.$events.$on("time_sheets:timesheet_shift_created", self.updateAll);
       self.$events.$on("time_sheets:timesheet_shift_deleted", self.updateAll);
+
+      self.$events.$on("time_sheets:attendance_edited", self.updateAll);
+      self.$events.$on("time_sheets:attendance_created", self.updateAll);
+      self.$events.$on("time_sheets:attendance_deleted", self.updateAll);
     },
     data() {
       const self = this;

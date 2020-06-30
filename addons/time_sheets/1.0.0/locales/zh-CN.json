@@ -76,8 +76,11 @@
       "start": "上班打卡",
       "stop": "下班打卡",
       "pause": "开始休息",
-      "resume": "结束休息"
-    }
+      "resume": "结束休息",
+      "not_set": "没有设置"
+    },
+    "delete_text": "您确定要删除该条目吗",
+    "confirm_button": "确认"
   },
   "manager": {
     "title": "经理",

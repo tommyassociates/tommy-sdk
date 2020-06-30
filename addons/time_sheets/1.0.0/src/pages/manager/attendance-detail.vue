@@ -1,6 +1,6 @@
 <template>
   <f7-page
-    class="time-clock-detail-page"
+    class="time-sheets-detail-page"
     @page:beforeremove="onPageBeforeRemove"
     @page:beforeout="onPageBeforeOut"
   >
@@ -9,7 +9,7 @@
       <f7-nav-title>{{$t('time_sheets.timesheet_attendance_detail.title')}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
         <f7-link icon-only @click="editAttendance" v-if="edit_acces">
-          <f7-icon f7="check" />
+          <f7-icon f7="check"/>
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
@@ -23,7 +23,7 @@
         @click.native="openTimePickerDetail()"
       >
         <div slot="after">
-          <input type="text" id="timePicker" readonly :value="timeField" />
+          <input type="text" id="timePicker" readonly :value="timeField"/>
         </div>
       </f7-list-item>
       <f7-list-item
@@ -61,8 +61,8 @@
       <f7-list-item
         :title="$t('time_sheets.timesheet_attendance_detail.action_label')"
         :link="edit_acces"
-        sheet-open=".time-clock-action-sheet"
-        :after="$t('time_clock.index.clock_event_options.'+detail_data.status)"
+        sheet-open=".time-sheets-action-sheet"
+        :after="$t('time_sheets.timesheet_attendance_detail.clock_event_options.'+detail_data.status)"
         @click="sheet_action_opened = true"
       ></f7-list-item>
     </f7-list>
@@ -85,17 +85,19 @@
       <f7-list-item title="__________" after="________"></f7-list-item>
     </f7-list>
 
-    <f7-sheet class="time-clock-action-sheet" ref="actionSheet">
+    <f7-sheet class="time-sheets-action-sheet" ref="actionSheet">
       <f7-toolbar>
         <div class="left">
           <f7-link
             sheet-close
             class="cancel"
             @click="clearAction"
-          >{{$t('time_sheets.timesheet_attendance_detail.cancel_button')}}</f7-link>
+          >{{$t('time_sheets.timesheet_attendance_detail.cancel_button')}}
+          </f7-link>
         </div>
         <div class="right">
-          <f7-link sheet-close @click="setAction">{{$t('time_sheets.timesheet_attendance_detail.done_button')}}</f7-link>
+          <f7-link sheet-close @click="setAction">{{$t('time_sheets.timesheet_attendance_detail.done_button')}}
+          </f7-link>
         </div>
       </f7-toolbar>
       <f7-page-content>
@@ -104,7 +106,7 @@
             radio
             :checked="detail_data.status === 'start'"
             :title="$t('time_sheets.timesheet_attendance_detail.clock_event_options.start')"
-            name="time-clock-detail-action"
+            name="time-sheets-detail-action"
             @change="changeAction('start')"
             value="start"
           />
@@ -112,7 +114,7 @@
             radio
             :checked="detail_data.status === 'stop'"
             :title="$t('time_sheets.timesheet_attendance_detail.clock_event_options.stop')"
-            name="time-clock-detail-action"
+            name="time-sheets-detail-action"
             @change="changeAction('stop')"
             value="stop"
           />
@@ -120,7 +122,7 @@
             radio
             :checked="detail_data.status === 'pause'"
             :title="$t('time_sheets.timesheet_attendance_detail.clock_event_options.pause')"
-            name="time-clock-detail-action"
+            name="time-sheets-detail-action"
             @change="changeAction('pause')"
             value="pause"
           />
@@ -128,14 +130,14 @@
             radio
             :checked="detail_data.status === 'resume'"
             :title="$t('time_sheets.timesheet_attendance_detail.clock_event_options.resume')"
-            name="time-clock-detail-action"
+            name="time-sheets-detail-action"
             @change="changeAction('resume')"
             value="resume"
           />
         </f7-list>
       </f7-page-content>
     </f7-sheet>
-    <Photo ref="photo" direction="front" v-if="edit_acces" />
+    <Photo ref="photo" direction="front" v-if="edit_acces"/>
   </f7-page>
 </template>
 <script>
@@ -144,10 +146,11 @@
   import timePicker from "../../mixins/time-picker.vue";
   import Blob from "../../mixins/baseToBlob.vue";
   import Photo from '../../components/photo.vue';
+
   export default {
     name: "TimesheetsManagerAttendanceDetail",
     mixins: [dialog, timePicker, Blob],
-    components: { Photo },
+    components: {Photo},
     methods: {
       changeAction(val) {
         const self = this;
@@ -170,17 +173,6 @@
         const url = `https://www.google.com/maps/place/${self.detail_data.latitude}+${self.detail_data.longitude}`;
 
         window.open(url, '_system', 'location=yes,hidden=yes,beforeload=yes');
-
-        // self.$f7router.navigate("/time-clock/map/", {
-        //   props: {
-        //     edit: self.edit_acces,
-        //     latitude: self.detail_data.latitude,
-        //     longitude: self.detail_data.longitude,
-        //     accuracy: self.detail_data.accuracy,
-        //     address: self.detail_data.address,
-        //     callback: self.editCoordinates
-        //   }
-        // });
       },
       editCoordinates(latitude, longitude, accuracy, address) {
         const self = this;
@@ -197,10 +189,10 @@
       openSelector() {
         const self = this;
         if (!self.edit_acces) return;
-        self.$f7router.navigate("/time-clock/select-picker/", {
+        self.$f7router.navigate("/time-sheets/select-picker/", {
           props: {
             selected: self.detail_data.user_id,
-            pageTitle: self.$t("time_clock.event_details.who_label"),
+            pageTitle: self.$t("time_sheets.timesheet_attendance_detail.who_label"),
             multiply: false,
             getData: self.getDataUser,
             type: "team",
@@ -213,7 +205,7 @@
         });
       },
       getDataUser(self) {
-        self.$api.getCurrentTeamMembers({ cache: true }).then(tagItems => {
+        self.$api.getCurrentTeamMembers({cache: true}).then(tagItems => {
           tagItems.forEach((item, index) => {
             item.context = "members";
           });
@@ -254,32 +246,35 @@
         form.append("user_id", self.detail_data.user_id);
         form.append("timestamp", self.detail_data.timestamp);
 
-
-
-        API.editAttendance(self.detail_data.id, form).then(() => {
-          self.$f7router.back();
-          if (self.$f7route.params.managerTimesheetId) {
-            self.$events.$emit("time_sheets:attendance_created", self.detail_data);
-          } else {
+        if (+self.edit_id > 0) {
+          API.updateManagerAttendance({id: self.detail_data.id, data: form}).then(() => {
             self.$events.$emit("time_sheets:attendance_edited", self.detail_data);
-          }
-        });
+            self.$f7router.back();
+          });
+
+        } else {
+          API.createManagerAttendance({data: form}).then(()  => {
+            self.$events.$emit("time_sheets:attendance_created", self.detail_data);
+            self.$f7router.back();
+          });
+        }
+
       },
       deleteAttendance() {
         const self = this;
         if (!self.edit_acces) return;
-        API.deleteAttendance(self.detail_data.id).then(() => {
+        API.deleteManagerAttendance(self.detail_data.id).then(() => {
           self.$f7router.back();
-          self.$events.$emit("time_clock:attedance_delete", self.detail_data);
+          self.$events.$emit("time_sheets:attendance_deleted", self.detail_data);
         });
       },
       deleteClick() {
         const self = this;
         self.confirmDialog(
           false,
-          self.$t("time_clock.event_details.delete_text"),
-          self.$t("time_clock.event_details.confirm_button"),
-          self.$t("time_clock.event_details.cancel_button"),
+          self.$t("time_sheets.timesheet_attendance_detail.delete_text"),
+          self.$t("time_sheets.timesheet_attendance_detail.confirm_button"),
+          self.$t("time_sheets.timesheet_attendance_detail.cancel_button"),
           self.deleteAttendance,
           false,
           null,
@@ -293,7 +288,9 @@
       },
       createCalendar() {
         const self = this;
-        let date = new Date(self.detail_data.timestamp);
+        let date = self.detail_data !== null && self.detail_data.timestamp
+          ? new Date(self.detail_data.timestamp)
+          : new Date();
         self.calendarInstance = self.$f7.calendar.create({
           value: [date],
           openIn: "customModal",
@@ -301,7 +298,9 @@
           closeOnSelect: true,
           on: {
             change(cal, val) {
-              const date = new Date(self.detail_data.timestamp);
+              const date = self.detail_data !== null && self.detail_data.timestamp
+                ? new Date(self.detail_data.timestamp)
+                : new Date();
               const date_new = new Date(val[0]);
               date.setFullYear(date_new.getFullYear());
               date.setMonth(date_new.getMonth());
@@ -325,8 +324,10 @@
         const user = self.$root.teamMembers.filter(
           member => member.user_id === data.user_id
         );
-        data.user_name = user[0].first_name + " " + user[0].last_name;
-        data.icon_url = user[0].icon_url;
+        if (user.length) {
+          data.user_name = user[0].first_name + " " + user[0].last_name;
+          data.icon_url = user[0].icon_url;
+        }
         return data;
       },
       createPhotoPreview() {
@@ -361,7 +362,7 @@
             let editHtml = "";
             if (self.edit_acces) {
               editHtml = `
-              <a href="#" class="link icon-only" id="time-clock-reload-photo" ref="reloadPhoto">
+              <a href="#" class="link icon-only" id="time-sheets-reload-photo" ref="reloadPhoto">
                 <i class="icon f7-icons color-white">reload</i>
               </a>
             `;
@@ -383,11 +384,11 @@
           on: {
             open: () => {
               self.$f7
-                .$("#time-clock-reload-photo")
+                .$("#time-sheets-reload-photo")
                 .on("click", self.reloadPhoto);
             },
             close: () => {
-              self.$f7.$("#time-clock-reload-photo").off("click");
+              self.$f7.$("#time-sheets-reload-photo").off("click");
             }
           }
         });
@@ -437,31 +438,48 @@
     },
     mounted() {
       const self = this;
-      self.$api
-        .getInstalledAddonPermission("time_clock", "attendance_edit_access", {
-          with_filters: true
-        })
-        .then(v => {
-          self.edit_acces = self.checkPermision(v);
 
-          API.getAttendancesDetail(self.edit_id).then(data => {
-            self.detail_data = self.prepareAttendance(data);
-            if (typeof self.detail_data.image !== "undefined")
-              self.image_preview = self.detail_data.image.url;
-            self.loaded = true;
-            if (self.edit_acces) {
-              self.$nextTick(() => {
-                self.createCalendar();
-                self.createTimePicker(self.detail_data.timestamp);
-                self.createPhotoPreview();
-              });
-            } else {
-              self.$nextTick(() => {
-                self.createPhotoPreview();
-              });
-            }
-          });
+
+      if (+self.edit_id > 0) {
+        API.getAttendancesDetail(self.edit_id).then(data => {
+          self.detail_data = self.prepareAttendance(data);
+          if (typeof self.detail_data.image !== "undefined")
+            self.image_preview = self.detail_data.image.url;
+          self.loaded = true;
+          self.edit_acces = true;
+          if (self.edit_acces) {
+            self.$nextTick(() => {
+              self.createCalendar();
+              self.createTimePicker(self.detail_data.timestamp);
+              self.createPhotoPreview();
+            });
+          } else {
+            self.$nextTick(() => {
+              self.createPhotoPreview();
+            });
+          }
         });
+
+      } else {
+        self.loaded = true;
+        self.edit_acces = true;
+        self.detail_data = {
+          timestamp: null,
+          status: 'not_set',
+        };
+        if (self.edit_acces) {
+          self.$nextTick(() => {
+            self.createCalendar();
+            self.createTimePicker(new Date());
+            self.createPhotoPreview();
+          });
+        } else {
+          self.$nextTick(() => {
+            self.createPhotoPreview();
+          });
+        }
+      }
+
     },
     created() {
       const self = this;
@@ -473,6 +491,7 @@
         sheet_action_opened: false,
         new_action: null,
         edit_id: self.$f7route.params.attendanceId,
+        manager_timesheet_id: self.$f7route.params.managerTimesheetId,
         edit_acces: false,
         detail_data: null,
         loaded: false

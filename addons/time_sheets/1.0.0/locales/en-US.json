@@ -76,8 +76,11 @@
       "start": "Clock On",
       "stop": "Clock Off",
       "pause": "Start Break",
-      "resume": "End Break"
-    }
+      "resume": "End Break",
+      "not_set": "Not Set"
+    },
+    "delete_text": "Are you sure you want to delete this entry?",
+    "confirm_button": "Confirm"
   },
   "manager": {
     "title": "Manager",

@@ -349,6 +349,44 @@ const API = {
   },
 
 
+  updateManagerAttendance({id, data = {}} = {}) {
+    return api
+      .call({
+        endpoint: "workforce/attendances/" + id,
+        method: "PUT",
+        cache: false,
+        data
+      })
+      .then(data => {
+        return data;
+      });
+  },
+
+  createManagerAttendance({data = {}} = {}) {
+    return api
+      .call({
+        endpoint: "workforce/attendances/",
+        method: "POST",
+        data
+      })
+      .then(data => {
+        return data;
+      });
+  },
+
+  deleteManagerAttendance(id) {
+    return api
+      .call({
+        endpoint: "workforce/attendances/" + id,
+        method: "DELETE",
+        cache: false,
+      })
+      .then(data => {
+        return data;
+      });
+  },
+
+
   getUserId(self) {
     const userId = self.$f7route.query.actor_id;
     if (userId) {
