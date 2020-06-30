@@ -162,6 +162,7 @@
 <script>
   import API from "../../api";
   import addonAssetsUrl from '../../utils/addon-assets-url';
+  import sumArrayOfTimes from "../../utils/sum-array-of-times";
   import TimesheetService from "../../services/timesheet-service";
   import circleAvatar from "tommy-core/src/components/circle-avatar";
   import SelectMultipleIcon from "../../components/icons/select-multiple-icon";
@@ -360,8 +361,8 @@
       hoursTotal() {
         const self = this;
         const timesheetShifts = self.timesheetShifts;
-        const hours = timesheetShifts.reduce((totalHours, timesheetShift) => Math.trunc(totalHours) + Math.trunc(timesheetShift.work_hours), 0);
-        return parseFloat(hours).toFixed(2);
+        const times = items.map(timesheetShifts => timesheetShifts.work_hours);
+        return sumArrayOfTimes(times, self);
       },
 
       timesheets() {
