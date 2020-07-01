@@ -61,13 +61,49 @@ const API = {
       });
   },*/
 
-  getTimesheets({cache = false, otherOptions = {}} = {}) {
-    const endpoint = 'workforce/timesheets';
+  /**
+   * Used for a generic GET api call.
+   * @param endpoint
+   * @param cache
+   * @param otherOptions
+   * @returns {Promise<T>}
+   */
+  call({endpoint = '', cache = false, otherOptions = {}} = {}) {
+    if (endpoint === '') {
+      console.log(`%c Endpoint is not defined.`, 'color:white;background:red;font-weight:bold');
+      return;
+    }
+    let options = {
+      endpoint,
+      method: 'GET',
+      cache,
+      data: otherOptions,
+    }
+
+    return api
+      .call(options)
+      .then(data => {
+        return data;
+      });
+  },
+
+  getWorkforceSettings({cache = false, otherOptions = {}} = {}) {
+    const endpoint = 'workforce';
     return this.call({endpoint, cache, otherOptions});
   },
 
-  getTimesheetsShifts({cache = false, otherOptions = {}} = {}) {
-    const endpoint = 'workforce/timesheet_items';
+  updateWorkforceSettings(data) {
+    const endpoint = `workforce`;
+    return api
+      .call({
+        endpoint,
+        method: "PUT",
+        data,
+      });
+  },
+
+  getTimesheets({cache = false, otherOptions = {}} = {}) {
+    const endpoint = 'workforce/timesheets';
     return this.call({endpoint, cache, otherOptions});
   },
 
@@ -107,6 +143,12 @@ const API = {
       });
   },
 
+
+  getTimesheetsShifts({cache = false, otherOptions = {}} = {}) {
+    const endpoint = 'workforce/timesheet_items';
+    return this.call({endpoint, cache, otherOptions});
+  },
+
   updateTimesheetShift(id, data) {
     const endpoint = `workforce/timesheet_items/${id}`;
     return api
@@ -142,31 +184,7 @@ const API = {
       });
   },
 
-  /**
-   * Used for a generic GET api call.
-   * @param endpoint
-   * @param cache
-   * @param otherOptions
-   * @returns {Promise<T>}
-   */
-  call({endpoint = '', cache = false, otherOptions = {}} = {}) {
-    if (endpoint === '') {
-      console.log(`%c Endpoint is not defined.`, 'color:white;background:red;font-weight:bold');
-      return;
-    }
-    let options = {
-      endpoint,
-      method: 'GET',
-      cache,
-      data: otherOptions,
-    }
 
-    return api
-      .call(options)
-      .then(data => {
-        return data;
-      });
-  },
 
   getManagerTimesheets({cache = false, otherOptions = {}} = {}) {
     const endpoint = 'workforce/manager/timesheets';

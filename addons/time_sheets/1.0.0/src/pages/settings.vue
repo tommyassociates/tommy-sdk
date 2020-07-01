@@ -15,16 +15,16 @@
       <f7-list style="margin-bottom:0">
         <f7-list-item :title="$t('time_sheets.settings.time_period_label')">
           <time-period-select
-            v-model="settings.timePeriod"
+            v-model="settings.time_period"
             @change="onTimePeriodChange"
             @save="onTimePeriodSave">
           </time-period-select>
         </f7-list-item>
         <f7-list-item :title="$t('time_sheets.settings.week_start_label')">
           <day-select
-            v-model="settings.day"
-            @change="onDayChange"
-            @save="onDaySave">
+            v-model="settings.week_start"
+            @change="onWeekStartChange"
+            @save="onWeekStartSave">
           </day-select>
         </f7-list-item>
       </f7-list>
@@ -131,10 +131,15 @@
       //   self.permissions.push(permission);
       // });
 
-      self.$api.getInstalledAddonSetting('time_sheets', 'time_sheets').then(response => {
+      // self.$api.getInstalledAddonSetting('time_sheets', 'time_sheets').then(response => {
+      //   const self=this;
+      //   self.settings.day = response !== null && response.data && response.data.day ? response.data.day : 'mon';
+      //   self.settings.timePeriod = response !== null && response.data && response.data.timePeriod ? response.data.timePeriod : 'week';
+      // });
+
+      API.getWorkforceSettings().then(settings => {
         const self=this;
-        self.settings.day = response !== null && response.data && response.data.day ? response.data.day : 'mon';
-        self.settings.timePeriod = response !== null && response.data && response.data.timePeriod ? response.data.timePeriod : 'week';
+        self.settings = settings;
       });
 
       self.items = [
@@ -159,32 +164,20 @@
       onTimePeriodSave(value) {
         const self = this;
         console.log('search - date range save: ' + value);
-        self.settings.timePeriod = value;
-
-        const data = {
-          data: JSON.stringify(self.settings)
-        };
-
-        self.$api.updateInstalledAddonSetting('time_sheets', 'time_sheets', data);
-
+        self.settings.time_period = value;
+        API.updateWorkforceSettings(self.settings);
       },
 
-      onDayChange(value) {
+      onWeekStartChange(value) {
         const self = this;
         console.log('search - dat change: ' + value);
       },
 
-      onDaySave(value) {
+      onWeekStartSave(value) {
         const self = this;
         console.log('search - dat save: ' + value);
-        self.settings.day = value;
-
-        const data = {
-          data: JSON.stringify(self.settings)
-        };
-
-        self.$api.updateInstalledAddonSetting('time_sheets', 'time_sheets', data);
-
+        self.settings.week_start = value;
+        API.updateWorkforceSettings(self.settings);
       },
 
 
@@ -241,10 +234,9 @@
         permissions: [],
 
         settings: {
-          timePeriod: '',
-          day: '',
+          time_period: 'weekly',
+          week_start: 'monday',
         },
-
 
         //copied from broadcast.
         lists: null,
