@@ -374,7 +374,14 @@
           self.updateAll();
 
           self.$nextTick(() => {
-            self.createTimePeriodPicker(self.settings.week_start, self.settings.time_period);
+            const startDay = self.settings.week_start;
+            const duration = self.settings.time_period;
+            const [payrollPeriodStart] = self.settings.payroll_period;
+            self.createTimePeriodPicker({
+              startDay,
+              duration,
+              payrollPeriodStart,
+            });
           });
         })
 

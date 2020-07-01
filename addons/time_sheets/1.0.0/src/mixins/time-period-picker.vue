@@ -12,56 +12,26 @@
        *
        * @param startDay - monday, tueday, wednesday, thursday, friday, saturday, sunday
        * @param duration - weekly, fortnightly, monthly
+       * @param payrollPeriodStart - the date of the payroll period from the API.
        */
-      createTimePeriodPicker(startDay = 'monday', duration = 'weekly') {
+      createTimePeriodPicker({startDay = 'sunday', duration = 'weekly', payrollPeriodStart = ''}) {
         const self = this;
-        const maxItems = 200;
-        const dayOfWeekFormat = 'dddd';
+        const config = {
+          futureItems: 25,
+          pastItems: 25,
+          dayOfWeekFormat: 'dddd',
+        }
+
         let currentItem = 1;
-        let currentDate = self.$moment();
+        let currentDate = self.$moment(payrollPeriodStart);
         let displayValues = [];
         let values = [];
 
-        //find startDay
-        switch (duration.toUpperCase()) {
-          case 'WEEKLY':
-            while (currentDate.format(dayOfWeekFormat).toUpperCase() !== startDay.toUpperCase()) {
-              currentDate = currentDate.subtract('1', 'day');
-            }
-            break;
+        //find start date.
+        currentDate = currentDate.add(config.futureItems, self.getDurationValue(duration));
 
-          case 'FORTNIGHTLY':
-
-            //Get start day.
-            while (currentDate.format(dayOfWeekFormat).toUpperCase() !== startDay.toUpperCase()) {
-              currentDate = currentDate.subtract('1', 'day');
-            }
-
-            //Get the week number
-            const weekNumber = currentDate.week() - self.$moment(currentDate).startOf('month').week() + 1;
-
-            //Check if we need to subtract a week from the current date. We will if its an even weekNumber
-            const isOdd = x => x % 2 === 1;
-            if (!isOdd(weekNumber)) {
-              currentDate = currentDate.subtract('1', 'week');
-            }
-
-            console.log('weekNumber', weekNumber);
-
-            break;
-
-          case 'MONTHLY':
-            currentDate = currentDate.startOf('month');
-
-            break;
-
-          default:
-          //custom range
-          //TODO.
-        }
-
-
-        while (currentItem <= maxItems) {
+        const totalItems = +config.futureItems + +config.pastItems;
+        while (currentItem <= totalItems) {
           const startDate = self.$moment(currentDate);
           const endDate = self.getEndDate(duration, currentDate);
           switch (duration.toUpperCase()) {
@@ -92,7 +62,6 @@
           }
 
           currentItem++;
-
         }
 
 
@@ -107,18 +76,11 @@
               values,
               displayValues,
             },
-          ]
+          ],
+          value: [payrollPeriodStart],
         });
         self.timePeriodPickerInstance.on("close", () => {
           const self = this;
-          console.log('timePeriodPickerInstance', self.timePeriodPickerInstance.value);
-
-          // let date_new = new Date(self.detail_data.timestamp);
-          // date_new.setHours(Number(self.timePeriodPickerInstance.value[0]));
-          // date_new.setMinutes(Number(self.timePeriodPickerInstance.value[1]));
-          // date_new = date_new.toISOString();
-          // self.detail_data.timestamp = date_new;
-
           const selectedTimesheet = self.timesheetsData
             .find(timesheet => String(timesheet.start_date) === String(self.timePeriodPickerInstance.value));
 
@@ -138,9 +100,8 @@
               user_id: self.$root.account.user_id,
               status: 'unsubmitted',
             };
-            console.log('newTmesheetData', newTmesheetData);
+
             API.createTimesheet(newTmesheetData).then(timesheet => {
-              console.log('timesheet created', timesheet);
               const url = `/time-sheets/detail/${timesheet.id}`;
               self.$f7router.navigate(url);
               self.$events.$emit("time_sheets:timesheet_created", timesheet);
