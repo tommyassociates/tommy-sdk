@@ -359,16 +359,24 @@
         //   self.loaded.active = true;
         // });
 
-        self.$api.getInstalledAddonSetting('time_sheets', 'time_sheets').then(response => {
+        API.getWorkforceSettings().then(settings => {
           const self = this;
-          self.settings.day = response !== null && response.data && response.data.day ? response.data.day : 'mon';
-          self.settings.timePeriod = response !== null && response.data && response.data.timePeriod ? response.data.timePeriod : 'week';
+          self.settings = settings;
+
+          const allowedTimePeriods = ['weekly', 'fortnightly', 'monthly'];
+          const allowedWeekStarts = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+          if (!allowedTimePeriods.includes(self.settings.time_period)) {
+            self.settings.time_period = allowedTimePeriods[0];
+          }
+          if (!allowedWeekStarts.includes(self.settings.week_start)) {
+            self.settings.week_start = allowedWeekStarts[0];
+          }
           self.updateAll();
 
           self.$nextTick(() => {
-            self.createTimePeriodPicker(self.settings.day, self.settings.timePeriod);
+            self.createTimePeriodPicker(self.settings.week_start, self.settings.time_period);
           });
-        });
+        })
 
 
       });

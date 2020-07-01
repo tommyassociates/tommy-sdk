@@ -10,12 +10,13 @@
 
       /**
        *
-       * @param startDay - mon, tue, wed, thu, fri, sat, sun
-       * @param duration - week, fortnight, month
+       * @param startDay - monday, tueday, wednesday, thursday, friday, saturday, sunday
+       * @param duration - weekly, fortnightly, monthly
        */
-      createTimePeriodPicker(startDay = 'mon', duration = 'week') {
+      createTimePeriodPicker(startDay = 'monday', duration = 'weekly') {
         const self = this;
         const maxItems = 200;
+        const dayOfWeekFormat = 'dddd';
         let currentItem = 1;
         let currentDate = self.$moment();
         let displayValues = [];
@@ -23,16 +24,16 @@
 
         //find startDay
         switch (duration.toUpperCase()) {
-          case 'WEEK':
-            while (currentDate.format('ddd').toUpperCase() !== startDay.toUpperCase()) {
+          case 'WEEKLY':
+            while (currentDate.format(dayOfWeekFormat).toUpperCase() !== startDay.toUpperCase()) {
               currentDate = currentDate.subtract('1', 'day');
             }
             break;
 
-          case 'FORTNIGHT':
+          case 'FORTNIGHTLY':
 
             //Get start day.
-            while (currentDate.format('ddd').toUpperCase() !== startDay.toUpperCase()) {
+            while (currentDate.format(dayOfWeekFormat).toUpperCase() !== startDay.toUpperCase()) {
               currentDate = currentDate.subtract('1', 'day');
             }
 
@@ -49,7 +50,7 @@
 
             break;
 
-          case 'MONTH':
+          case 'MONTHLY':
             currentDate = currentDate.startOf('month');
 
             break;
@@ -64,14 +65,14 @@
           const startDate = self.$moment(currentDate);
           const endDate = self.getEndDate(duration, currentDate);
           switch (duration.toUpperCase()) {
-            case 'WEEK':
+            case 'WEEKLY':
               // const endDate = self.getEndDate(duration, currentDate);
               displayValues.push(`${startDate.format('DD MMM YY')} - ${endDate.format('DD MMM YY')}`);
               values.push(startDate.format('YYYY-MM-DD'));
-              currentDate = currentDate.subtract('1', duration);
+              currentDate = currentDate.subtract('1', self.getDurationValue(duration));
               break;
 
-            case 'FORTNIGHT':
+            case 'FORTNIGHTLY':
               //TODO.
               // const endDate = self.getEndDate(duration, currentDate);
               displayValues.push(`${startDate.format('DD MMM YY')} - ${endDate.format('DD MMM YY')}`);
@@ -79,10 +80,10 @@
               currentDate = currentDate.subtract('2', 'week');
               break;
 
-            case 'MONTH':
+            case 'MONTHLY':
               displayValues.push(`${startDate.format('MMM YY')}`);
               values.push(startDate.format('YYYY-MM-DD'));
-              currentDate = currentDate.subtract('1', duration);
+              currentDate = currentDate.subtract('1', self.getDurationValue(duration));
               break;
 
             default:
@@ -151,16 +152,20 @@
       getEndDate(duration, currentDate) {
         const self = this;
         switch (duration.toUpperCase()) {
-          case 'WEEK':
+          case 'WEEKLY':
             return self.$moment(currentDate).add('6', 'days');
 
-          case 'FORTNIGHT':
+          case 'FORTNIGHTLY':
             return self.$moment(currentDate).add('13', 'days');
             break;
 
-          case 'MONTH':
+          case 'MONTHLY':
             return self.$moment(currentDate).endOf('month');
         }
+      },
+
+      getDurationValue(duration) {
+        return duration.toLowerCase().replace('ly', '');
       },
     }
   };
