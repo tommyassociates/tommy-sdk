@@ -4,32 +4,27 @@
            @page:beforeout="onPageBeforeOut">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
-      <template v-if="isTeamMember">
+      <template v-if="!permissions.canViewOthers">
         <f7-nav-title>{{$t('time_sheets.index.title')}}</f7-nav-title>
-        <f7-nav-right class="time-sheets-navbar-links">
-          <f7-link href="/time-sheets/add/" icon-only>
-            <f7-icon f7="plus"/>
-          </f7-link>
-          <f7-link icon-only @click="addTimesheet">
-            <f7-icon f7="add"></f7-icon>
-          </f7-link>
-        </f7-nav-right>
       </template>
-      <template v-if="isTeamManager">
+      <template v-if="permissions.canViewOthers">
         <f7-nav-title>{{$t('time_sheets.index.manager_title')}}</f7-nav-title>
-        <f7-nav-right class="time-sheets-navbar-links">
-          <f7-link href="/time-sheets/settings/" icon-only>
-            <f7-icon f7="gear"/>
-          </f7-link>
-        </f7-nav-right>
       </template>
+      <f7-nav-right class="time-sheets-navbar-links">
+        <f7-link icon-only @click="addTimesheet" v-if="permissions.canCreate">
+          <f7-icon f7="add"></f7-icon>
+        </f7-link>
+        <f7-link href="/time-sheets/settings/" icon-only v-if="permissions.canViewOthers">
+          <f7-icon f7="gear"/>
+        </f7-link>
+      </f7-nav-right>
 
 
     </f7-navbar>
 
 
     <f7-page-content>
-      <template v-if="isTeamMember">
+      <template v-if="!permissions.canViewOthers">
         <!--Events -->
         <Events
           :data="formattedTimesheetsData"
@@ -37,7 +32,7 @@
           v-if="timesheetsData.length"
         />
       </template>
-      <template v-if="isTeamManager && loaded">
+      <template v-if="permissions.canViewOthers && loaded">
         <f7-list>
 
           <date-range-select
@@ -126,8 +121,8 @@
         managerTimesheetsShiftsData: [],
         loaded: false,
         settings: {
-          day: 'mon',
-          timePeriod: 'week',
+          day: 'sunday',
+          timePeriod: 'weekly',
         },
 
         // delayTimerSearch: null,
@@ -136,6 +131,12 @@
 
         searchTags: [],
         searchDateRange: null,
+
+        permissions: {
+          canCreate: false,
+          canEdit: false,
+          canViewOthers: false,
+        },
       };
     },
     components: {
@@ -173,9 +174,9 @@
         return self.$root.account.roles.includes('Team Member');
       },
 
-      isTeamManager() {
+      isTeamAdmin() {
         const self = this;
-        return self.$root.account.roles.includes('Team Manager');
+        return self.$root.account.roles.includes('Team Admin');
       },
 
       unsubmittedTimesheets() {
@@ -225,7 +226,7 @@
 
       updateAll() {
         const self = this;
-        if (self.isTeamMember) {
+        if (!self.permissions.canViewOthers) {
           API.getTimesheets().then(timesheets => {
             self.timesheetsData = timesheets;
             const otherOptions = {
@@ -236,7 +237,7 @@
               self.loaded = true;
             });
           });
-        } else if (self.isTeamManager) {
+        } else if (self.permissions.canViewOthers) {
           let otherOptions = {
             limit: 200,
           };
@@ -337,10 +338,34 @@
       return Promise.all([
         self.$api.getInstalledAddonPermission(
           "time_sheets",
-          "attendance_other_access",
+          "timesheets_edit_access",
           {with_filters: true}
-        )
-      ]).then(v => {
+        ),
+
+        self.$api.getInstalledAddonPermission(
+          "time_sheets",
+          "timesheets_create_access",
+          {with_filters: true}
+        ),
+
+        self.$api.getInstalledAddonPermission(
+          "time_sheets",
+          "timesheets_other_access",
+          {with_filters: true}
+        ),
+
+
+      ]).then(permissions => {
+
+        console.log('Permission data', permissions);
+
+        const canCreatePermission = permissions.find(permission => permission.name === 'timesheets_create_access');
+        const canEditPermission = permissions.find(permission => permission.name === 'timesheets_edit_access');
+        const canViewOthersPermission = permissions.find(permission => permission.name === 'timesheets_other_access');
+        self.permissions.canCreate = API.checkPermission(canCreatePermission);
+        self.permissions.canEdit = API.checkPermission(canEditPermission);
+        self.permissions.canViewOthers = API.checkPermission(canViewOthersPermission);
+
         // self.viewOthers = API.checkPermision(v[0], self);
         // API.getAttendances(null, false, self.viewOthers).then(data => {
         //   self.attendanceData = TimesheetService.prepareAttendances(data, self);

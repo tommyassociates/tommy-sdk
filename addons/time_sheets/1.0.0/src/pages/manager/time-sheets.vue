@@ -2,7 +2,7 @@
   <f7-page
     class="time-sheet-detail-page"
   >
-    <template v-if="isTeamManager">
+    <template v-if="permissions.canViewOthers">
       <f7-navbar>
         <tommy-nav-back></tommy-nav-back>
         <f7-nav-title>{{$t(`time_sheets.manager.${status}_label`)}}</f7-nav-title>
@@ -446,6 +446,26 @@
         self.searchTags = JSON.parse(localStorage.timesheetsSearchTags);
       }
 
+      return Promise.all([
+
+
+        self.$api.getInstalledAddonPermission(
+          "time_sheets",
+          "timesheets_other_access",
+          {with_filters: true}
+        ),
+
+
+      ]).then(permissions => {
+
+        const canViewOthersPermission = permissions.find(permission => permission.name === 'timesheets_other_access');
+        self.permissions.canViewOthers = API.checkPermission(canViewOthersPermission);
+
+        if (self.permissions.canViewOthers) {
+          self.updateAll();
+        }
+      });
+
 
       // self.$api
       //   .getInstalledAddonPermission("time_sheets", "attendance_edit_access", {
@@ -479,7 +499,7 @@
       //
 
 
-      self.updateAll();
+
 
 
     },
@@ -509,6 +529,12 @@
 
         searchTags: [],
         searchDateRange: null,
+
+        permissions: {
+          canCreate: false,
+          canEdit: false,
+          canViewOthers: false,
+        },
 
 
       };

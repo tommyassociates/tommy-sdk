@@ -15,7 +15,7 @@
         </f7-nav-right>
       </f7-navbar>
       <f7-toolbar v-if="loaded && canEditTimesheetShifts">
-        <f7-button @click="deleteClick()" class="button button--red-text">
+        <f7-button @click="deleteClick()" class="button button--red-text" v-if="permissions.canDelete">
           {{$t('time_sheets.timesheet_details.delete_button')}}
         </f7-button>
         <f7-button @click="submitForApprovalClick()" :class="submitForApprovalButtonClasses">
@@ -62,7 +62,7 @@
 
         <template v-if="timesheetShifts.length">
           <f7-list media-list class="time-sheet-list">
-            <template v-if="loaded && canEditTimesheetShifts">
+            <template v-if="loaded && canEditTimesheetShifts && permissions.canDelete">
               <f7-list-item
                 swipeout
                 chevron-center
@@ -173,7 +173,7 @@
       addonAssetsUrl,
       deleteTimesheet() {
         const self = this;
-        // if (!self.editAccess) return;
+        if (!self.permissions.canDelete) return;
         API.deleteTimesheet(self.timesheet.id, false).then((response) => {
           console.log('deleteTimesheet', response);
           self.$f7router.back();
@@ -581,7 +581,7 @@
 
       canEditTimesheetShifts() {
         const self = this;
-        return self.timesheet && self.timesheet.status === 'unsubmitted';
+        return self.timesheet && self.timesheet.status === 'unsubmitted' && self.permissions.canCreate;
       },
     },
     beforeDestroy() {
@@ -625,8 +625,23 @@
 
       //
 
+      return Promise.all([
+        self.$api.getInstalledAddonPermission(
+          "time_sheets",
+          "timesheets_shifts_create_access",
+          {with_filters: true}
+        ),
+      ]).then(permissions => {
 
-      self.updateAll();
+        console.log('Permission data', permissions);
+
+        const canCreatePermission = permissions.find(permission => permission.name === 'timesheets_shifts_create_access');
+        self.permissions.canCreate = API.checkPermission(canCreatePermission);
+        self.permissions.canDelete = API.checkPermission(canCreatePermission);
+
+
+        self.updateAll();
+      });
 
 
     },
@@ -654,6 +669,11 @@
         timesheetsData: [],
         timesheetsShiftsData: [],
         loaded: false,
+
+        permissions: {
+          canCreate: false,
+          canDelete: false,
+        },
       };
     }
   };

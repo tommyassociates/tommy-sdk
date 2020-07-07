@@ -311,20 +311,53 @@
 
       // });
 
-      API.getTimesheets().then(timesheets => {
-        self.timesheetsData = timesheets;
+      return Promise.all([
+        self.$api.getInstalledAddonPermission(
+          "time_sheets",
+          "timesheets_shifts_create_access",
+          {with_filters: true}
+        ),
+      ]).then(permissions => {
+
+        console.log('Permission data', permissions);
+
+        const canCreatePermission = permissions.find(permission => permission.name === 'timesheets_shifts_create_access');
+        self.permissions.canCreate = API.checkPermission(canCreatePermission);
+        self.permissions.canDelete = API.checkPermission(canCreatePermission);
+
+        API.getTimesheets().then(timesheets => {
+          self.timesheetsData = timesheets;
 
 
-        if (self.edit_id) {
-          const otherOptions = {
-            limit: 200,
-          };
-          API.getTimesheetsShifts({otherOptions}).then(timesheetsShifts => {
-            self.timesheetsShiftsData = timesheetsShifts;
+          if (self.edit_id) {
+            const otherOptions = {
+              limit: 200,
+            };
+            API.getTimesheetsShifts({otherOptions}).then(timesheetsShifts => {
+              self.timesheetsShiftsData = timesheetsShifts;
+              self.loaded = true;
+              self.editAccess = true;
+
+              self.timesheetShift = self.timesheetsShiftsData.find(timesheetShift => +timesheetShift.id === +self.edit_id);
+              self.timesheetShiftOriginal = {...self.timesheetShift};
+
+              self.$nextTick(() => {
+                self.createCalendar();
+                self.createWorkHoursTimePicker(self.timesheetShift.work_hours);
+                self.createBreakHoursTimePicker(self.timesheetShift.break_hours);
+              });
+            });
+          } else {
             self.loaded = true;
             self.editAccess = true;
-
-            self.timesheetShift = self.timesheetsShiftsData.find(timesheetShift => +timesheetShift.id === +self.edit_id);
+            self.timesheetShift = {
+              team_id: self.$root.account.team_id,
+              user_id: self.$root.account.user_id,
+              timesheet_id: self.timesheetId,
+              start_date: self.timesheet.start_date,
+              work_hours: '0.0',
+              break_hours: '0.0',
+            };
             self.timesheetShiftOriginal = {...self.timesheetShift};
 
             self.$nextTick(() => {
@@ -332,26 +365,8 @@
               self.createWorkHoursTimePicker(self.timesheetShift.work_hours);
               self.createBreakHoursTimePicker(self.timesheetShift.break_hours);
             });
-          });
-        } else {
-          self.loaded = true;
-          self.editAccess = true;
-          self.timesheetShift = {
-            team_id: self.$root.account.team_id,
-            user_id: self.$root.account.user_id,
-            timesheet_id: self.timesheetId,
-            start_date: self.timesheet.start_date,
-            work_hours: '0.0',
-            break_hours: '0.0',
-          };
-          self.timesheetShiftOriginal = {...self.timesheetShift};
-
-          self.$nextTick(() => {
-            self.createCalendar();
-            self.createWorkHoursTimePicker(self.timesheetShift.work_hours);
-            self.createBreakHoursTimePicker(self.timesheetShift.break_hours);
-          });
-        }
+          }
+        });
       });
 
 
@@ -372,6 +387,11 @@
         timesheetShiftChanged: false,
         timesheetShiftOriginal: {},
         timesheetShift: {},
+
+        permissions: {
+          canCreate: false,
+          canDelete: false,
+        },
       };
     }
   };

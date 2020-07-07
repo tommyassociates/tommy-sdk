@@ -446,12 +446,15 @@ const API = {
   //
   // }
 
-  checkPermision(permission, self) {
+  checkPermission(permission) {
+    console.log('permission', permission);
     let view = permission.filters.find(e => {
       if (e.context === "members") {
         if (e.user_id === this.actorId) return true;
       } else if (e.context === "roles") {
-        if (this.actor.roles.indexOf(e.name) > 0) return true;
+        console.log('roles', this.actor.roles);
+        console.log('roles - name', e.name);
+        if (this.actor.roles.includes(e.name)) return true;
       }
     });
     return typeof view !== "undefined";

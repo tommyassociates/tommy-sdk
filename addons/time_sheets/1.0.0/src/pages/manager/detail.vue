@@ -9,7 +9,8 @@
         <tommy-nav-back></tommy-nav-back>
         <f7-nav-title>{{$t('time_sheets.timesheet_details.title')}}</f7-nav-title>
         <f7-nav-right class="whs-navbar-links">
-          <f7-link icon-only :href="`/time-sheets/manager/time-sheets/attendance-detail/create/${edit_id}`">
+          <f7-link icon-only :href="`/time-sheets/manager/time-sheets/attendance-detail/create/${edit_id}`"
+                   v-if="permissions.canCreate">
             <f7-icon f7="add"/>
           </f7-link>
         </f7-nav-right>
@@ -19,7 +20,7 @@
           {{$t('time_sheets.timesheet_details.delete_button')}}
         </f7-button>
       </f7-toolbar>
-      <template v-if="loaded">
+      <template v-if="loaded && permissions.canEdit">
         <f7-list media-list>
           <f7-list-item
             :title="$t('time_sheets.timesheet_details.date_label')"
@@ -581,8 +582,31 @@
 
       //
 
+      return Promise.all([
 
-      self.updateAll();
+
+        self.$api.getInstalledAddonPermission(
+          "time_sheets",
+          "attendance_create_access",
+          {with_filters: true}
+        ),
+
+        self.$api.getInstalledAddonPermission(
+          "time_sheets",
+          "attendance_edit_access",
+          {with_filters: true}
+        ),
+
+
+      ]).then(permissions => {
+
+        const canEditPermission = permissions.find(permission => permission.name === 'attendance_edit_access');
+        const canCreatePermission = permissions.find(permission => permission.name === 'attendance_create_access');
+        self.permissions.canEdit = API.checkPermission(canEditPermission);
+        self.permissions.canCreate = API.checkPermission(canCreatePermission);
+
+        self.updateAll();
+      });
 
 
     },
@@ -615,6 +639,11 @@
         managerTimesheetsShiftsData: [],
         managerAttendancesData: [],
         loaded: false,
+
+        permissions: {
+          canCreate: false,
+          canEdit: false,
+        },
       };
     }
   };
