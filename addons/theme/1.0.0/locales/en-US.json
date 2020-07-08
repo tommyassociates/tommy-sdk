@@ -1,0 +1,13 @@
+{
+  "index": {
+    "title": "Theme",
+    "profile_icon": {
+      "title": "Profile icon",
+      "summary": "The icon shown for the team in the left menu and for the chats coming from the admin account."
+    },
+    "background_image": {
+      "title": "Background image",
+      "summary": "Displaying in the top of the left menu, also above user profile screens."
+    }
+  }
+}

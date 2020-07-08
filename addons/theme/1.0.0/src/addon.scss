@@ -1,0 +1,19 @@
+
+.col {
+  &--icon {
+    width: 90px !important;
+  }
+
+  &--icon-description {
+    width: calc(100% - 90px) !important;
+  }
+
+  &--bg-icon {
+    width: 120px !important;
+  }
+
+  &--bg-icon-description {
+    width: calc(100% - 120px) !important;
+  }
+}
+
