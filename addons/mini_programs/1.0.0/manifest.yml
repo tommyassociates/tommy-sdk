@@ -1,0 +1,40 @@
+---
+  title: Mini Programs
+  package: "mini_programs"
+  summary: "Manage which mini programs are available for your team. "
+  description: "Manage which mini programs are available for your team."
+  version: "1.0.0"
+  developer: "Tommy Labs GmbH"
+  homepage: "https://mytommy.com"
+  private: false
+  locales:
+    - en-US
+    - zh-CN
+  roles:
+    - Team Member
+    - Team Manager
+    - Team Admin
+  permissions:
+    addon_access:
+      title: "Allow Team Member Access"
+      hint: "Select Team Members who can access this Add-on"
+      default_roles:
+        - Team Manager
+        - Team Member
+        - Team Admin
+      operations:
+        - read
+  assets:
+    -
+      type: "stylesheet"
+      file: "build/addon.css"
+    -
+      type: "javascript"
+      file: "build/addon.js"
+  views:
+    index:
+      title: "Mini Programs"
+      index: true
+      path: "/mini_programs/"
+      actor_permission: addon_actor_access
+      type: "page"

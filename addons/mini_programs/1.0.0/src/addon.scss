@@ -1,0 +1,11 @@
+
+.col {
+  &--icon {
+    width: 76px !important;
+  }
+
+  &--icon-description {
+    width: calc(100% - 76px) !important;
+  }
+}
+
