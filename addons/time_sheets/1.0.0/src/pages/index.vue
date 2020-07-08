@@ -14,7 +14,7 @@
         <f7-link icon-only @click="addTimesheet" v-if="permissions.canCreate">
           <f7-icon f7="add"></f7-icon>
         </f7-link>
-        <f7-link href="/time-sheets/settings/" icon-only v-if="permissions.canViewOthers">
+        <f7-link href="/time-sheets/settings/" icon-only v-if="isTeamAdmin">
           <f7-icon f7="gear"/>
         </f7-link>
       </f7-nav-right>

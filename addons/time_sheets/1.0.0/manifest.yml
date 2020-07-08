@@ -25,8 +25,8 @@
       operations:
         - read
     attendance_other_access:
-      title: "Who can view other team members events"
-      hint: "Select team members who can view events created by others"
+      title: "Who can view other team members attendances"
+      hint: "Select team members who can view attendances created by others"
       resource_type: Workforce::Attendance
       default_roles:
         - Team Manager

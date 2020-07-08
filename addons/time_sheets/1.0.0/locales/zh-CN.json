@@ -112,9 +112,12 @@
     "title": "设定值",
     "time_period_label": "时间段",
     "week_start_label": "周开始",
-    "who_can_view_timesheets_title": "谁可以查看时间表",
-    "who_can_manage_items_title": "谁可以管理项目",
-    "who_can_manage_timesheets_title": "谁可以管理时间表"
+    "who_can_create_timesheets_title": "谁可以创建时间表",
+    "who_can_edit_timesheets_title": "谁可以编辑时间表",
+    "who_can_view_other_timesheets_title": "谁可以查看其他时间表",
+    "who_can_create_timesheets_shifts_title": "谁可以创建时间表班次",
+    "who_can_edit_attendances": "谁可以编辑考勤",
+    "who_can_view_other_attendances": "谁可以查看其他出勤"
   },
   "search": {
     "search_placeholder": "搜索位置，角色，标签，团队成员..",

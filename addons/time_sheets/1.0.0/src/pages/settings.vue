@@ -12,7 +12,7 @@
 
     <f7-page-content ref="pageContent">
 
-      <f7-list style="margin-bottom:0">
+      <f7-list>
         <f7-list-item :title="$t('time_sheets.settings.time_period_label')">
           <time-period-select
             v-model="settings.time_period"
@@ -29,63 +29,72 @@
         </f7-list-item>
       </f7-list>
 
-      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_view_timesheets_title')}}
+      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_create_timesheets_title')}}
       </f7-block-title>
-      <f7-list class="message-list">
-        <f7-list-item >
-          <search-cmp @clickOpened="togglePopup(true)"></search-cmp>
-        </f7-list-item>
-        <f7-list-item >
-          <tag-cmp
-            :name="seeUser.name"
-            @clearName="clearUser(true)"
-          ></tag-cmp>
-        </f7-list-item>
+      <f7-list>
+        <role-select
+          title=""
+          v-model="permissions.timesheets_create_access.filters"
+          @save="onWhoCanCreateTimesheetsSave"
+        ></role-select>
       </f7-list>
 
-
-      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_manage_items_title')}}
+      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_edit_timesheets_title')}}
       </f7-block-title>
-<!--      <f7-list class="message-list">-->
-<!--        <f7-list-item >-->
-<!--          <search-cmp @clickOpened="togglePopup(true)"></search-cmp>-->
-<!--        </f7-list-item>-->
-<!--        <f7-list-item >-->
-<!--          <tag-cmp-->
-<!--            :name="seeUser.name"-->
-<!--            @clearName="clearUser(true)"-->
-<!--          ></tag-cmp>-->
-<!--        </f7-list-item>-->
-<!--      </f7-list>-->
+      <f7-list>
+        <role-select
+          title=""
+          v-model="permissions.timesheets_edit_access.filters"
+          @save="onWhoCanEditTimesheetsSave"
+        ></role-select>
+      </f7-list>
 
-      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_manage_timesheets_title')}}
+      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_view_other_timesheets_title')}}
       </f7-block-title>
-<!--      <f7-list class="message-list">-->
-<!--        <f7-list-item >-->
-<!--          <search-cmp @clickOpened="togglePopup(true)"></search-cmp>-->
-<!--        </f7-list-item>-->
-<!--        <f7-list-item >-->
-<!--          <tag-cmp-->
-<!--            :name="seeUser.name"-->
-<!--            @clearName="clearUser(true)"-->
-<!--          ></tag-cmp>-->
-<!--        </f7-list-item>-->
-<!--      </f7-list>-->
+      <f7-list>
+        <role-select
+          title=""
+          v-model="permissions.timesheets_other_access.filters"
+          @save="onWhoCanViewOtherTimesheetsSave"
+        ></role-select>
+      </f7-list>
 
-      <permission-select title="test" addonPackage="time_sheets"></permission-select>
+      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_create_timesheets_shifts_title')}}
+      </f7-block-title>
+      <f7-list>
+        <role-select
+          title=""
+          v-model="permissions.timesheets_shifts_create_access.filters"
+          @save="onWhoCanCreateTimesheetsShiftsSave"
+        ></role-select>
+      </f7-list>
+
+      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_edit_attendances')}}
+      </f7-block-title>
+      <f7-list>
+        <role-select
+          title=""
+          v-model="permissions.attendance_edit_access.filters"
+          @save="onWhoCanEditAttendancesSave"
+        ></role-select>
+      </f7-list>
+
+      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_view_other_attendances')}}
+      </f7-block-title>
+      <f7-list>
+        <role-select
+          title=""
+          v-model="permissions.attendance_other_access.filters"
+          @save="onWhoCanViewOtherAttendancesSave"
+        ></role-select>
+      </f7-list>
 
 
 
     </f7-page-content>
 
-    <!-- Popup -->
-        <group-popup-cmp
-          :opened="customerPopupOpened"
-          @closed="customerPopupOpened = false"
-          :items="items"
-          @checkedGroup="checkedGroup"
-          :checkedId="checkedId"
-        ></group-popup-cmp>
+
+
 
 
   </f7-page>
@@ -93,26 +102,22 @@
 
 <script>
   import API from '../api';
-  import GroupPopupCmp from '../components/group-popup.vue';
-  import SearchCmp from '../components/search.vue';
-  import TagCmp from '../components/tag.vue';
 
   import timePeriodSelect from 'tommy_core/src/components/time-period-select.vue';
   import daySelect from 'tommy_core/src/components/day-select.vue';
 
   import permissionSelect from 'tommy_core/src/components/permission-select.vue';
+  import roleSelect from 'tommy-core/src/components/role-select';
 
   // import tagSelect from '../components/tag-select.vue';
 
   export default {
     name: "TimeSheetSettings",
     components: {
-      GroupPopupCmp,
-      SearchCmp,
-      TagCmp,
       timePeriodSelect,
       daySelect,
       permissionSelect,
+      roleSelect,
     },
     mounted() {
       const self = this;
@@ -137,21 +142,59 @@
       //   self.settings.timePeriod = response !== null && response.data && response.data.timePeriod ? response.data.timePeriod : 'week';
       // });
 
-      API.getWorkforceSettings().then(settings => {
-        const self=this;
-        self.settings = settings;
+
+      return Promise.all([
+
+        self.$api.getInstalledAddonPermission(
+          "time_sheets",
+          "timesheets_create_access",
+          {with_filters: true}
+        ),
+
+        self.$api.getInstalledAddonPermission(
+          "time_sheets",
+          "timesheets_edit_access",
+          {with_filters: true}
+        ),
+
+        self.$api.getInstalledAddonPermission(
+          "time_sheets",
+          "timesheets_other_access",
+          {with_filters: true}
+        ),
+
+        self.$api.getInstalledAddonPermission(
+          "time_sheets",
+          "timesheets_shifts_create_access",
+          {with_filters: true}
+        ),
+
+        self.$api.getInstalledAddonPermission(
+          "time_sheets",
+          "attendance_edit_access",
+          {with_filters: true}
+        ),
+
+        self.$api.getInstalledAddonPermission(
+          "time_sheets",
+          "attendance_other_access",
+          {with_filters: true}
+        ),
+
+
+
+      ]).then(permissions => {
+        console.log(permissions);
+
+        permissions.map(permission => {
+          self.permissions[permission.name] = permission;
+        });
       });
 
-      self.items = [
-        {
-          id: 1215,
-          name: 'elder',
-        },
-        {
-          id: 155,
-          name: 'manager',
-        },
-      ];
+      API.getWorkforceSettings().then(settings => {
+        const self = this;
+        self.settings = settings;
+      });
 
     },
     methods: {
@@ -181,62 +224,93 @@
       },
 
 
-      saveListPermission(permission) {
+
+
+
+
+
+      onWhoCanCreateTimesheetsSave() {
         const self = this;
-        tommy.api.updateInstalledAddonPermission('wallet_accounts', permission.name, {
-          resource_id: permission.resource_id,
+        const permissionName = 'timesheets_create_access';
+        const permission = self.permissions[permissionName];
+        self.$api.updateInstalledAddonPermission('time_sheets', permissionName, {
           with_filters: true,
           filters: JSON.stringify(permission.filters),
         });
       },
-      addListPermission(permission, tag) {
+
+
+      onWhoCanEditTimesheetsSave() {
         const self = this;
-        permission.filters.push(tag);
-        self.saveListPermission(permission);
-      },
-      removeListPermission(permission, tag) {
-        const self = this;
-        permission.filters.splice(permission.filters.indexOf(tag), 1);
-        self.saveListPermission(permission);
+        const permissionName = 'timesheets_edit_access';
+        const permission = self.permissions[permissionName];
+        self.$api.updateInstalledAddonPermission('time_sheets', permissionName, {
+          with_filters: true,
+          filters: JSON.stringify(permission.filters),
+        });
       },
 
 
-//copied from broadcast.
-      clearUser(isSee) {
-        const user = {
-          id: null,
-          name: null,
-        };
-        if (isSee) {
-          this.seeUser = user;
-        } else {
-          this.sendUser = user;
-        }
+      onWhoCanViewOtherTimesheetsSave() {
+        const self = this;
+        const permissionName = 'timesheets_other_access';
+        const permission = self.permissions[permissionName];
+        self.$api.updateInstalledAddonPermission('time_sheets', permissionName, {
+          with_filters: true,
+          filters: JSON.stringify(permission.filters),
+        });
       },
-      checkedGroup(id) {
-        const item = this.items.filter(i => i.id === id)[0];
-        if (this.isSee) {
-          this.seeUser = item;
-        } else {
-          this.sendUser = item;
-        }
-        this.checkedId = this.isSee ? this.seeUser.id : this.sendUser.id;
+
+
+      onWhoCanCreateTimesheetsShiftsSave() {
+        const self = this;
+        const permissionName = 'timesheets_shifts_create_access';
+        const permission = self.permissions[permissionName];
+        self.$api.updateInstalledAddonPermission('time_sheets', permissionName, {
+          with_filters: true,
+          filters: JSON.stringify(permission.filters),
+        });
       },
-      togglePopup(isSee) {
-        this.isSee = isSee;
-        this.checkedId = isSee ? this.seeUser.id : this.sendUser.id;
-        this.customerPopupOpened = true;
+
+      onWhoCanEditAttendancesSave() {
+        const self = this;
+        const permissionName = 'attendance_edit_access';
+        const permission = self.permissions[permissionName];
+        self.$api.updateInstalledAddonPermission('time_sheets', permissionName, {
+          with_filters: true,
+          filters: JSON.stringify(permission.filters),
+        });
+      },
+
+      onWhoCanViewOtherAttendancesSave() {
+        const self = this;
+        const permissionName = 'attendance_other_access';
+        const permission = self.permissions[permissionName];
+        self.$api.updateInstalledAddonPermission('time_sheets', permissionName, {
+          with_filters: true,
+          filters: JSON.stringify(permission.filters),
+        });
       },
     },
     data() {
       return {
         hasActorId: API.actorId,
-        permissions: [],
 
         settings: {
           time_period: 'weekly',
-          week_start: 'monday',
+          week_start: 'sunday',
         },
+
+        permissions: {
+          timesheets_create_access: [],
+          timesheets_edit_access: [],
+          timesheets_other_access: [],
+          timesheets_shifts_create_access: [],
+          attendance_edit_access: [],
+          attendance_other_access: [],
+        },
+
+        whoCanViewTimesheets: [],
 
         //copied from broadcast.
         lists: null,

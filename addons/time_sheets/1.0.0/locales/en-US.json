@@ -112,9 +112,12 @@
     "title": "Settings",
     "time_period_label": "Time Period",
     "week_start_label": "Week Start",
-    "who_can_view_timesheets_title": "Who can view timesheets",
-    "who_can_manage_items_title": "Who can manage items",
-    "who_can_manage_timesheets_title": "Who can manage timesheets"
+    "who_can_create_timesheets_title": "Who can create timesheets",
+    "who_can_edit_timesheets_title": "Who can edit timesheets",
+    "who_can_view_other_timesheets_title": "Who can view other timesheets",
+    "who_can_create_timesheets_shifts_title": "Who can create timesheets shifts",
+    "who_can_edit_attendances": "Who can edit attendances",
+    "who_can_view_other_attendances": "Who can view other attendances"
   },
   "search": {
     "search_placeholder": "Search Location, Role, Tag, Team Member...",
