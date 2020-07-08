@@ -138,12 +138,14 @@ const TimesheetService = {
 
           const attendanceDate = self.$moment(attendance.timestamp).format('ddd, D MMM YY');
           const startTime = self.$moment(attendance.timestamp).format('h:mma');
+          const hasImage = attendance.hasOwnProperty('image');
           const data = {
             id: attendance.id,
             status: attendance.status,
             hours: 10,
             attendanceDate,
             startTime,
+            hasImage,
           };
 
           formattedData.push(data);

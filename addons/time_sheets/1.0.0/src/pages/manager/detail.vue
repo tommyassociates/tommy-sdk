@@ -65,8 +65,8 @@
                 <div class="item-title__container">
                   <div class="item-title__title">{{ managerAttendance.status }}</div>
                   <div class="item-title__images-container">
-                    <div class="item-title__image-icon">
-                      <ImageIcon v-if="managerAttendance.image !== null"></ImageIcon>
+                    <div class="item-title__image-icon" :style="`${managerAttendance.hasImage?'color:white':''}`">
+                      <ImageIcon></ImageIcon>
                     </div>
                     <div class="item-title__location-icon">
                       <LocationIcon v-if="managerAttendance.latitude !== null && managerAttendance.longitude !== null"></LocationIcon>
@@ -461,7 +461,7 @@
             const otherOptions = {
               // date_range: '159093360,159343920',
               // date_range: `2020-05-01,2020-05-31`,
-              timesheet_item_id: self.edit_id,
+              timesheet_id: self.edit_id,
               limit: 200,
             };
             API.getManagerAttendances({otherOptions}).then(managerAttendances => {
