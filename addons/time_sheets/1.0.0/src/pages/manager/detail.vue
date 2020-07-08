@@ -66,10 +66,10 @@
                   <div class="item-title__title">{{ managerAttendance.status }}</div>
                   <div class="item-title__images-container">
                     <div class="item-title__image-icon">
-                      <ImageIcon></ImageIcon>
+                      <ImageIcon v-if="managerAttendance.image !== null"></ImageIcon>
                     </div>
                     <div class="item-title__location-icon">
-                      <LocationIcon></LocationIcon>
+                      <LocationIcon v-if="managerAttendance.latitude !== null && managerAttendance.longitude !== null"></LocationIcon>
                     </div>
                   </div>
                 </div>
