@@ -11,7 +11,8 @@
       <f7-row no-gap>
         <f7-col width="100">
           <f7-block strong inset>
-            <p>{{$t('mini_programs.index.introduction')}} <a :href="$t('mini_programs.index.visit_link.url')">
+            <p>{{$t('mini_programs.index.introduction')}} <a :href="$t('mini_programs.index.visit_link.url')"
+                                                             target="_blank">
               {{$t('mini_programs.index.visit_link.text')}}
             </a></p>
           </f7-block>
@@ -31,10 +32,12 @@
               </f7-row>
             </f7-block-header>
             <f7-row>
-              <div class="col col--icon">
+              <f7-col class="col--icon">
                 <img :src="addon.icon_url" width="60">
-              </div>
-              <div class="col col--icon-description">{{ addon.description }}</div>
+              </f7-col>
+              <f7-col class="col--icon-description">
+                {{ addon.description }}
+              </f7-col>
             </f7-row>
 
           </f7-block>
