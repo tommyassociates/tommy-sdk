@@ -88,7 +88,7 @@
         console.log('delete');
         API.uninstallAddon(pkg).then(() => {
           API.getAddons().then(addons => {
-            self.addons = addons;
+            self.addons = addons.filter(addon => addon.private === false);
           });
         });
       },
@@ -99,7 +99,7 @@
         };
         API.installAddon(pkg, data).then(() => {
           API.getAddons().then(addons => {
-            self.addons = addons;
+            self.addons = addons.filter(addon => addon.private === false);
           });
         });
       },
@@ -107,7 +107,7 @@
     mounted() {
       const self = this;
       API.getAddons().then(addons => {
-        self.addons = addons;
+        self.addons = addons.filter(addon => addon.private === false);
         self.loaded = true;
       });
     }
