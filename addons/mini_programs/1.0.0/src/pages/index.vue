@@ -69,14 +69,14 @@
             self.$t("mini_programs.index.uninstall_addon_confirmation_message"),
             self.$t("mini_programs.index.confirm_button"),
             self.$t("mini_programs.index.cancel_button"),
-            () => self.uninstallAddon(addon.package),
+            () => self.uninstallAddon(addon),
             () => self.cancelUninstall(addon),
             null,
             true,
             false
           );
         } else {
-          self.installAddon(addon.package);
+          self.installAddon(addon);
         }
       },
       cancelUninstall(addon) {
@@ -84,23 +84,19 @@
         console.log(addon);
         addon.installed = true;
       },
-      uninstallAddon(pkg) {
+      uninstallAddon(addon) {
         console.log('delete');
-        API.uninstallAddon(pkg).then(() => {
-          API.getAddons().then(addons => {
-            self.addons = addons.filter(addon => addon.private === false);
-          });
+        API.uninstallAddon(addon.package).then(() => {
+          addon.installed = false;
         });
       },
-      installAddon(pkg) {
+      installAddon(addon) {
         const self = this;
         const data = {
           token: self.$root.token,
         };
-        API.installAddon(pkg, data).then(() => {
-          API.getAddons().then(addons => {
-            self.addons = addons.filter(addon => addon.private === false);
-          });
+        API.installAddon(addon.package, data).then(() => {
+          addon.installed = true;
         });
       },
     },
