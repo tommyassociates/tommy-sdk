@@ -27,7 +27,8 @@
               <f7-row>
                 <f7-col width="80">{{ addon.title }}</f7-col>
                 <f7-col width="20" align="right">
-                  <f7-toggle :checked="addon.installed" @toggle:change="toggleAddon(addon)"></f7-toggle>
+                  <f7-toggle :checked="addon.installed" @toggle:change="toggleAddon(addon)"
+                             :ref="`toggle-${addon.id}`"></f7-toggle>
                 </f7-col>
               </f7-row>
             </f7-block-header>
@@ -80,8 +81,10 @@
         }
       },
       cancelUninstall(addon) {
-        console.log('candel delete');
-        console.log(addon);
+        // const self = this;
+        // const ref = `toggle-${addon.id}`;
+        // console.log(self.$refs[ref]);
+        // self.$refs[ref].checked = true;
         addon.installed = true;
       },
       uninstallAddon(addon) {
