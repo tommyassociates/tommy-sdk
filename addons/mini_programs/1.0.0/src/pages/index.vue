@@ -48,7 +48,7 @@
 </template>
 <script>
   import API from '../api';
-  import dialog from "../mixins/dialog.vue";
+  import dialog from 'tommy-core/src/mixins/dialog.vue';
 
   export default {
     components: {},
