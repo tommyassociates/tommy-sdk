@@ -1,8 +1,8 @@
 ---
   title: Theme
   package: "theme"
-  summary: "Theme"
-  description: "Theme"
+  summary: "Update the profile and background images"
+  description: "Update the profile and background images"
   version: "1.0.0"
   developer: "Tommy Labs GmbH"
   homepage: "https://mytommy.com"
