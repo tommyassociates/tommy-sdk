@@ -1,6 +1,7 @@
 <template>
-  <div class="free-trial">
-    <h2>{{$t('dashboard.index.subscription.free_trial.title')}} <span style="position:relative; transform: translateY(2px); display:inline-block;"><smileIcon></smileIcon></span>
+  <div class="free-trial" @click="freeTrialClick">
+    <h2>{{$t('dashboard.index.subscription.free_trial.title')}} <span
+      style="position:relative; transform: translateY(2px); display:inline-block;"><smileIcon></smileIcon></span>
     </h2>
     <p>{{$t('dashboard.index.subscription.free_trial.description')}}</p>
   </div>
@@ -13,6 +14,12 @@
     name: "free-trial",
     components: {
       smileIcon,
+    },
+    methods: {
+      freeTrialClick() {
+        const self = this;
+        self.$f7router.navigate('/subscriptions/')
+      }
     }
   }
 </script>

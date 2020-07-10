@@ -9,8 +9,14 @@
   }
 }
 
-.pb-8 {
-  padding-bottom: 8px;
+.team-members__row {
+  padding: 4px 0;
+  background: white;
+  transition-duration: 0.3s;
+  cursor: pointer;
+  &:hover {
+    background: darken(#fff, 10%);
+  }
 }
 
 .free-trial {
@@ -18,6 +24,11 @@
   color: white;
   border-radius: 10px;
   padding:16px;
+  cursor: pointer;
+  transition-duration: 0.3s;
+  &:hover {
+    background: darken(#2EC8A1, 10%);
+  }
   h2 {
     padding-top: 0;
     margin-top: 0;
@@ -53,6 +64,26 @@
     margin: 0;
     a{
       color:black;
+    }
+  }
+}
+
+.chart-legend {
+  .row {
+    padding-bottom: 10px;
+    padding-left: 16px;
+    .col {
+      &:first-child {
+        width: 26px !important;
+        span {
+          width: 20px;
+          height: 20px;
+          display: block;
+        }
+      }
+      &:last-child {
+        width: calc(100% - 26px) !important;
+      }
     }
   }
 }

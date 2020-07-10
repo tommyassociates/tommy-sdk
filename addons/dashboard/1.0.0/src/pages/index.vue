@@ -18,7 +18,7 @@
         </f7-col>
       </f7-row>
 
-      <f7-row no-gap>
+      <f7-row no-gap valign="flex-start">
         <f7-col width="100">
           <f7-block strong inset>
             <f7-block-header>{{$t('dashboard.index.team_members.title')}}</f7-block-header>
@@ -26,7 +26,7 @@
             <f7-row no-gap>
               <f7-col width="100" tablet-width="50">
 
-                <f7-row class="pb-8">
+                <f7-row class="team-members__row" @click="redirectToTeam('pending')">
                   <f7-col width="40">
                     {{$t('dashboard.index.team_members.pending_invites')}}
                   </f7-col>
@@ -34,7 +34,7 @@
                     {{teamMembers.pending}} {{$t('dashboard.index.team_members.people')}}
                   </f7-col>
                 </f7-row>
-                <f7-row class="pb-8">
+                <f7-row class="team-members__row" @click="redirectToTeam('active')">
                   <f7-col width="40">
                     {{$t('dashboard.index.team_members.active')}}
                   </f7-col>
@@ -42,7 +42,7 @@
                     {{teamMembers.active}} {{$t('dashboard.index.team_members.people')}}
                   </f7-col>
                 </f7-row>
-                <f7-row class="pb-8">
+                <f7-row class="team-members__row" @click="redirectToTeam('inactive')">
                   <f7-col width="40">
                     {{$t('dashboard.index.team_members.inactive')}}
                   </f7-col>
@@ -50,7 +50,7 @@
                     {{teamMembers.inactive}} {{$t('dashboard.index.team_members.people')}}
                   </f7-col>
                 </f7-row>
-                <f7-row class="pb-8">
+                <f7-row class="team-members__row" @click="redirectToTeam('archived')">
                   <f7-col width="40">
                     {{$t('dashboard.index.team_members.archived')}}
                   </f7-col>
@@ -61,8 +61,23 @@
 
               </f7-col>
               <f7-col width="100" tablet-width="50">
-                <div v-if="loaded" style="max-width: 300px;">
-                  <pie-chart :data="chartData" :options="chartOptions"></pie-chart>
+                <div v-if="loaded">
+                  <f7-row style="align-items:center">
+                    <f7-col>
+                      <div style="max-width: 300px;">
+                        <pie-chart :data="chartData" :options="chartOptions"></pie-chart>
+                      </div>
+                    </f7-col>
+                    <f7-col>
+                      <div class="chart-legend">
+                        <f7-row v-for="(item, index) in chartLegend"
+                                :key="'chart-legend-'+index">
+                          <f7-col><span :style="`background-color: ${item.color}`"></span></f7-col>
+                          <f7-col>{{item.label}}</f7-col>
+                        </f7-row>
+                      </div>
+                    </f7-col>
+                  </f7-row>
                 </div>
               </f7-col>
             </f7-row>
@@ -101,7 +116,7 @@
           hoverBackgroundColor: "red",
           hoverBorderWidth: "10px",
           legend: {
-            position: 'right',
+            display: false,
           },
           animations: {
             duration: 2000,
@@ -109,15 +124,31 @@
           layout: {
             padding: 0,
           }
-        }
+        },
+        chartLegend: [
+          {
+            color: '#2EC8A1',
+            label: 'Active',
+          },
+          {
+            color: '#F5A623',
+            label: 'Inactive',
+          }
+        ]
       };
     },
-    methods: {},
+    methods: {
+      redirectToTeam(status) {
+        const self = this;
+        self.$f7router.navigate(`'/team?filter=${filter}`);
+      }
+    },
     mounted() {
       const self = this;
       const total = +self.teamMembers.active + +self.teamMembers.inactive;
       const activePercentage = (+self.teamMembers.active * 100) / total;
       const inactivePercentage = (+self.teamMembers.inactive * 100) / total;
+      const backgroundColor = self.chartLegend.map(colour => colour.color);
 
       self.chartData = {
         hoverBackgroundColor: "red",
@@ -126,15 +157,14 @@
         datasets: [
           {
             label: "Data One",
-            backgroundColor: ["#2EC8A1", "#F5A623"],
+            backgroundColor,
             data: [activePercentage, inactivePercentage]
           }
         ]
       };
 
       self.loaded = true;
+    },
 
-
-    }
   };
 </script>
