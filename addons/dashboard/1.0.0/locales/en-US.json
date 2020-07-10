@@ -6,6 +6,10 @@
       "free_trial": {
         "title": "Free trial",
         "description": "Add your credit card before %s to renew automatically"
+      },
+      "tommy_plus": {
+        "title": "Tommy+",
+        "view_details": "View details"
       }
     },
     "team_members": {

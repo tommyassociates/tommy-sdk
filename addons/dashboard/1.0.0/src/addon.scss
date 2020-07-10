@@ -9,3 +9,50 @@
   }
 }
 
+.pb-8 {
+  padding-bottom: 8px;
+}
+
+.free-trial {
+  background: #2EC8A1;
+  color: white;
+  border-radius: 10px;
+  padding:16px;
+  h2 {
+    padding-top: 0;
+    margin-top: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+  }
+  p {
+    padding-bottom: 0;
+    margin-bottom: 0;
+    padding-top: 6px;
+    margin-top: 0;
+  }
+}
+
+.tommy-plus {
+  padding-bottom: 16px;
+  .row {
+    .col {
+      &:first-child {
+        width: 116px !important;
+      }
+      &:last-child {
+        width: calc(100% - 116px) !important;
+      }
+    }
+  }
+  h2 {
+    padding: 0;
+    margin: 0;
+  }
+  p{
+    padding: 6px 0 0 0;
+    margin: 0;
+    a{
+      color:black;
+    }
+  }
+}

@@ -1,9 +1,8 @@
 import Index from './pages/index.vue';
 
-
 const routes = [
   {
-    path: '/dashboard/',
+    path: '/subscriptions/',
     component: Index,
   },
 ];

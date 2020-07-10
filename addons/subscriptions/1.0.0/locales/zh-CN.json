@@ -1,0 +1,32 @@
+{
+  "index": {
+    "title": "付款方式",
+    "monthly_estimate": {
+      "title": "每月估算",
+      "description": "总用户数"
+    },
+    "billing": {
+      "title": "帐单地址",
+      "company_label": "公司",
+        "country_label": "国家",
+      "address_1_label": "地址1",
+      "address_2_label": "地址2"
+    },
+    "payment_method": {
+      "title": "付款方法",
+      "edit_button": "编辑",
+      "details_button": "细节"
+    },
+    "subscription_plan": {
+      "title": "认购计划",
+      "monthly_plan": {
+        "description": "您目前正在按月付费",
+        "switch_button": "切换至年度方案"
+      },
+      "annual_plan": {
+        "description": "您目前正在执行包年套餐",
+        "switch_button": "切换至月租方案"
+      }
+    }
+  }
+}

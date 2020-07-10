@@ -1,0 +1,32 @@
+{
+  "index": {
+    "title": "Payments",
+    "monthly_estimate": {
+      "title": "Monthly Estimate",
+      "description": "Total users on"
+    },
+    "billing": {
+      "title": "Billing address",
+      "company_label": "Company",
+      "country_label": "Country",
+      "address_1_label": "Address 1",
+      "address_2_label": "Address 2",
+    },
+    "payment_method": {
+      "title": "Payment method",
+      "edit_button": "Edit",
+      "details_button": "Details"
+    },
+    "subscription_plan": {
+      "title": "Subscription plan",
+      "monthly_plan": {
+        "description": "You are currently on a monthly plan",
+        "switch_button": "Switch to an annual plan"
+      },
+      "annual_plan": {
+        "description": "You are currently on an annual plan",
+        "switch_button": "Switch to a monthly plan"
+      }
+    }
+  }
+}
