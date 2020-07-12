@@ -21,7 +21,7 @@
 
                     <div class="">
                       <a href="#" @click="deleteIconImage" class="profile-image__delete-button" v-if="$root.team.icon_url !== ''"><delete-icon/></a>
-                      <circle-avatar :size="74" :url="$root.team.icon_url"></circle-avatar>
+                      <circle-avatar :size="74" :url="sanitizeImagePath($root.team.icon_url)"></circle-avatar>
                     </div>
                     <input type="file" id="photochangefile" ref="photochangefile"
                            @change="onPhotoChangeOnNonCordovaDevice()">
@@ -31,7 +31,7 @@
                 <a href="#" @click="deleteIconImage" class="profile-image__delete-button" v-if="$device.cordova && $root.team.icon_url !== ''"><delete-icon/></a>
                 <a id="change-profile-picture" class="item-link list-button" href="#" @click="changeProfilePicture"
                    v-if="$device.cordova">
-                  <circle-avatar :size="74" :url="$root.team.icon_url"></circle-avatar>
+                  <circle-avatar :size="74" :url="sanitizeImagePath($root.team.icon_url)"></circle-avatar>
                 </a>
 
 
@@ -67,6 +67,7 @@
   import photoChanger from '../utils/photo-changer';
   import deleteIcon from '../components/icons/delete-icon';
   import dialog from 'tommy-core/src/mixins/dialog.vue';
+  import sanitizeImagePath from 'tommy-core/src/utils/sanitize-image-path';
 
   export default {
     components: {
@@ -78,6 +79,7 @@
     },
     mixins: [dialog],
     methods: {
+      sanitizeImagePath,
       changeProfilePicture() {
         const self = this;
         if (!self.allowChangePicture) return;
@@ -87,7 +89,7 @@
           success(response) {
             if (response.icon_url) {
               if (self.$root.account.icon_url) {
-                self.$root.team.icon_url = response.icon_url;
+                self.$root.team.icon_url = sanitizeImagePath(response.icon_url);
               }
               self.$root.updateAccount();
             }
@@ -107,7 +109,7 @@
           success(response) {
             if (response.icon_url) {
               if (self.$root.account.icon_url) {
-                self.$root.team.icon_url = response.icon_url;
+                self.$root.team.icon_url = sanitizeImagePath(response.icon_url);
               }
               self.$root.updateAccount();
             }
