@@ -3,14 +3,17 @@
     "title": "主题",
     "profile_icon": {
       "title": "个人资料图标",
-      "summary": "在左侧菜单中为团队显示的图标以及来自管理员帐户的聊天图标。"
+      "summary": "左侧菜单中为团队显示的图标以及来自管理员帐户的聊天图标。",
+      "delete_confirmation_message": "您确定要删除团队资料图标吗？",
+      "cancel_button": "取消",
+      "confirm_button": "删除"
     },
     "background_image": {
       "title": "背景图像",
-      "summary": "显示在左侧菜单的顶部，也位于用户个人资料屏幕的上方。"
-    },
-    "uninstall_addon_confirmation_message": "您确定要卸载此迷你程序吗？这将删除迷你程序及其所有数据。",
-    "confirm_button": "卸载",
-    "cancel_button": "取消"
+      "summary": "显示在左侧菜单的顶部，也位于用户个人资料屏幕的上方。",
+      "delete_confirmation_message": "您确定要删除团队背景图片吗",
+      "cancel_button": "取消",
+      "confirm_button": "删除"
+    }
   }
 }

@@ -3,11 +3,17 @@
     "title": "Theme",
     "profile_icon": {
       "title": "Profile icon",
-      "summary": "The icon shown for the team in the left menu and for the chats coming from the admin account."
+      "summary": "The icon shown for the team in the left menu and for the chats coming from the admin account.",
+      "delete_confirmation_message": "Are you sure that you wish to delete the team profile icon?",
+      "cancel_button": "Cancel",
+      "confirm_button": "Delete"
     },
     "background_image": {
       "title": "Background image",
-      "summary": "Displaying in the top of the left menu, also above user profile screens."
+      "summary": "Displaying in the top of the left menu, also above user profile screens.",
+      "delete_confirmation_message": "Are you sure that you wish to delete the team background image?",
+      "cancel_button": "Cancel",
+      "confirm_button": "Delete"
     }
   }
 }

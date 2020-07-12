@@ -16,23 +16,23 @@
               <f7-col width="40" :class="'col--icon'">
 
 
-
                 <div v-if="!$device.cordova">
                   <div class="profile-image--with-file-input">
 
-                    <div class="profile-header-cover__photo-name-container ">
+                    <div class="">
+                      <a href="#" @click="deleteIconImage" class="profile-image__delete-button" v-if="$root.team.icon_url !== ''"><delete-icon/></a>
                       <circle-avatar :size="74" :url="$root.team.icon_url"></circle-avatar>
                     </div>
-                    <input type="file" id="photochangefile" ref="photochangefile" @change="onPhotoChangeOnNonCordovaDevice()">
+                    <input type="file" id="photochangefile" ref="photochangefile"
+                           @change="onPhotoChangeOnNonCordovaDevice()">
                   </div>
                 </div>
 
-
+                <a href="#" @click="deleteIconImage" class="profile-image__delete-button" v-if="$device.cordova && $root.team.icon_url !== ''"><delete-icon/></a>
                 <a id="change-profile-picture" class="item-link list-button" href="#" @click="changeProfilePicture"
                    v-if="$device.cordova">
                   <circle-avatar :size="74" :url="$root.team.icon_url"></circle-avatar>
                 </a>
-
 
 
               </f7-col>
@@ -62,17 +62,21 @@
   </f7-page>
 </template>
 <script>
+  import API from '../api';
   import circleAvatar from 'tommy-core/src/components/circle-avatar';
   import photoChanger from '../utils/photo-changer';
+  import deleteIcon from '../components/icons/delete-icon';
+  import dialog from 'tommy-core/src/mixins/dialog.vue';
 
   export default {
     components: {
-      circleAvatar
+      circleAvatar,
+      deleteIcon,
     },
     data() {
-      return {
-      };
+      return {};
     },
+    mixins: [dialog],
     methods: {
       changeProfilePicture() {
         const self = this;
@@ -110,7 +114,28 @@
           },
         });
         photoChanger.upload(self.$refs.photochangefile.files[0]);
-      }
+      },
+
+      deleteIconImage() {
+        const self = this;
+
+        self.confirmDialog(
+          false,
+          self.$t("theme.index.profile_icon.delete_confirmation_message"),
+          self.$t("theme.index.profile_icon.confirm_button"),
+          self.$t("theme.index.profile_icon.cancel_button"),
+          () => {
+            API.deleteIconImage().then(() => {
+              self.$root.team.icon_url = '';
+            });
+          },
+          null,
+          null,
+          true,
+          false
+        );
+      },
     },
+
   };
 </script>
