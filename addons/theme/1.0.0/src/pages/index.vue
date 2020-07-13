@@ -195,9 +195,9 @@
           url: 'team',
           f7: self.$f7,
           success(response) {
-            if (response.icon_url) {
-              if (self.$root.account.icon_url) {
-                self.$root.team.icon_url = sanitizeImagePath(response.icon_url);
+            if (response.background_url) {
+              if (self.$root.account.background_url) {
+                self.$root.team.background_url = sanitizeImagePath(response.background_url);
               }
               self.$root.updateAccount();
             }
@@ -215,7 +215,7 @@
           url: 'team',
           f7: self.$f7,
           success(response) {
-            if (response.icon_url) {
+            if (response.background_url) {
               if (self.$root.account.background_url) {
                 self.$root.team.background_url = sanitizeImagePath(response.background_url);
               }
