@@ -124,7 +124,6 @@
           backgroundImage: `url(${backgroundImage})`,
         };
 
-        console.log(styles);
         return styles;
       },
     },
