@@ -12,6 +12,18 @@ const API = {
         method: 'PUT',
         data: data,
       });
+  },
+
+  deleteBackground() {
+    const data = {
+      background_url: '',
+    };
+    return api
+      .call({
+        endpoint: 'team',
+        method: 'PUT',
+        data: data,
+      });
   }
 };
 

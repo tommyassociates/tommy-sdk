@@ -9,11 +9,11 @@
   }
 
   &--bg-icon {
-    width: 120px !important;
+    width: 176px !important;
   }
 
   &--bg-icon-description {
-    width: calc(100% - 120px) !important;
+    width: calc(100% - 176px) !important;
   }
 }
 .profile-image {
@@ -41,5 +41,43 @@
     &:hover {
       opacity: 0.7;
     }
+  }
+}
+
+
+
+
+.profile-background {
+  &--with-file-input {
+
+    //iphone
+    input[type=file] {
+      height: 60px;
+      width: 160px;
+      display: block;
+      position: relative;
+      opacity: 0;
+      margin-top: -60px;
+      cursor: pointer;
+    }
+  }
+  &__delete-button {
+    position: absolute;
+    padding: 5px;
+    border: none;
+    margin-left: 143px;
+    z-index: 10;
+    transform: translateY(-17px);
+    transition-duration: 0.3s;
+    &:hover {
+      opacity: 0.7;
+    }
+  }
+  &__preview {
+    height: 60px;
+    width: 160px;
+    display: block;
+    background-size: cover;
+    background-repeat: no-repeat;
   }
 }
