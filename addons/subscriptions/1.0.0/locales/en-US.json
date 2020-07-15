@@ -6,16 +6,41 @@
       "description": "Total users on"
     },
     "billing": {
-      "title": "Billing address",
-      "company_label": "Company",
-      "country_label": "Country",
-      "address_1_label": "Address 1",
-      "address_2_label": "Address 2"
+      "title": "Billing details",
+      "first_name": "First name",
+      "last_name": "Last name",
+      "company": "Company",
+      "country": "Country",
+      "address_line1": "Address 1",
+      "address_line2": "Address 2",
+      "city": "City",
+      "postcode": "Zip / Postal Code",
+      "state": "State",
+      "abn": "ABN",
+      "company_number": "Company number",
+      "company_number_description": "For Australian customers, GSI will be added to the final price.",
+      "update_billing_details_button": "Update billing details"
     },
     "payment_method": {
       "title": "Payment method",
       "edit_button": "Edit",
-      "details_button": "Details"
+      "details_button": "Details",
+      "update_credit_card_details_button": "Update card details"
+    },
+    "credit_card": {
+      "number": {
+        "label": "Credit card number",
+        "placeholder": "Credit card number"
+      },
+      "expiry": {
+        "label": "Expiration (MM/YY)",
+        "placeholder_month": "Month",
+        "placeholder_year": "Year"
+      },
+      "cvc": {
+        "label": "CVC",
+        "placeholder": "CVC"
+      }
     },
     "subscription_plan": {
       "title": "Subscription plan",
