@@ -19,7 +19,8 @@
       "abn": "ABN",
       "company_number": "Company number",
       "company_number_description": "For Australian customers, GSI will be added to the final price.",
-      "update_billing_details_button": "Update billing details"
+      "update_billing_details_button": "Update billing details",
+      "missing_payment_details": "We're missing your payment details. Please complete the payment details below or your {{teamName}} Team will be downgraded to the Free Forever Plan."
     },
     "payment_method": {
       "title": "Payment method",

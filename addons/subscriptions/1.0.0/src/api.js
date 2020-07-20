@@ -26,7 +26,7 @@ const API = {
         cache,
       };
       return api.call(Object.assign({
-        endpoint: 'my/subscriptions',
+        endpoint: 'me/subscriptions',
         method: 'GET',
       }, options));
     }
@@ -59,19 +59,30 @@ const API = {
         cache,
       };
       return api.call(Object.assign({
-        endpoint: 'my/billing',
+        endpoint: 'me/billing',
         method: 'GET',
       }, options));
     }
   },
 
   updateBillingInfo({data = {}} = {}) {
+    const options = {};
     return api.call(Object.assign({
-      endpoint: 'my/billing',
+      endpoint: 'me/billing',
       method: 'PUT',
       data,
     }, options));
-  }
+  },
+
+  getPayments({cache = false} = {}) {
+    const options = {
+      cache,
+    };
+    return api.call(Object.assign({
+      endpoint: 'me/payments',
+      method: 'GET',
+    }, options));
+  },
 };
 
 export default API;
