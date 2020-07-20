@@ -103,10 +103,10 @@
 <script>
   import API from '../api';
 
-  import timePeriodSelect from 'tommy_core/src/components/time-period-select.vue';
-  import daySelect from 'tommy_core/src/components/day-select.vue';
+  import timePeriodSelect from 'tommy-core/src/components/time-period-select.vue';
+  import daySelect from 'tommy-core/src/components/day-select.vue';
 
-  import permissionSelect from 'tommy_core/src/components/permission-select.vue';
+  import permissionSelect from 'tommy-core/src/components/permission-select.vue';
   import roleSelect from 'tommy-core/src/components/role-select';
 
   // import tagSelect from '../components/tag-select.vue';

@@ -57,7 +57,7 @@
   import AttendanceService from "../services/attendance-service";
 
   import Events from "../components/events.vue";
-  import dateRangeSelect from 'tommy_core/src/components/date-range-select.vue';
+  import dateRangeSelect from 'tommy-core/src/components/date-range-select.vue';
 
   export default {
     name: "TimeClockSearch",
