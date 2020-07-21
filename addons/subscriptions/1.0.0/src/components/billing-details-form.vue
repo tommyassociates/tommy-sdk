@@ -157,6 +157,9 @@
     props: {
       billingInfo: {
         type: Object,
+      },
+      update: {
+        type: Function,
       }
     },
 
@@ -164,7 +167,9 @@
       updateBillingDetails() {
         const self = this;
         const data = self.billingInfo;
-        API.updateBillingInfo({data});
+        API.updateBillingInfo({data}).then((billingInfo) => {
+          self.$emit('update', billingInfo);
+        });
       },
     }
   }

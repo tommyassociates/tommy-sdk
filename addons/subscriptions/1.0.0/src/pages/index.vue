@@ -18,7 +18,7 @@
 
             <f7-block strong inset>
               <f7-block-header>{{$t('subscriptions.index.billing.title')}}</f7-block-header>
-              <billing-details-form :billingInfo="billingInfo"></billing-details-form>
+              <billing-details-form :billingInfo="billingInfo" @update="onBillingInfoUpdate"></billing-details-form>
             </f7-block>
           </f7-col>
 
@@ -56,7 +56,7 @@
                     </template>
 
                     <template v-if="isEditingPaymentInfo">
-                      <credit-card-form :billingInfo="billingInfo"></credit-card-form>
+                      <credit-card-form :billingInfo="billingInfo" @update="onCreditCardUpdate"></credit-card-form>
                     </template>
 
 
@@ -140,7 +140,16 @@
             self.loaded = true;
           });
         });
+      },
 
+      onBillingInfoUpdate(billingInfo) {
+        const self = this;
+        self.billingInfo = billingInfo;
+      },
+
+      onCreditCardUpdate(billingInfo) {
+        const self = this;
+        self.billingInfo = billingInfo;
       },
 
 

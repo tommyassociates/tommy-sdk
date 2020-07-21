@@ -29,19 +29,8 @@
       "update_credit_card_details_button": "Update card details"
     },
     "credit_card": {
-      "number": {
-        "label": "Credit card number",
-        "placeholder": "Credit card number"
-      },
-      "expiry": {
-        "label": "Expiration (MM/YY)",
-        "placeholder_month": "Month",
-        "placeholder_year": "Year"
-      },
-      "cvc": {
-        "label": "CVC",
-        "placeholder": "CVC"
-      }
+      "label": "Credit or debit card",
+      "submit_button": "Submit payment"
     },
     "subscription_plan": {
       "title": "Subscription plan",

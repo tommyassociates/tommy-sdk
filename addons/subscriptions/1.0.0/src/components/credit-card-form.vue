@@ -1,8 +1,8 @@
 <template>
-  <form action="/charge" method="post" id="payment-form">
+  <form action="#" method="post" id="payment-form" @submit.prevent="paymentFormSubmit">
 
     <label for="card-element">
-      Credit or debit card
+      {{$t('subscriptions.index.credit_card.label')}}
     </label>
     <div id="card-element">
       <!-- a Stripe Element will be inserted here. -->
@@ -11,91 +11,17 @@
     <!-- Used to display form errors -->
     <div id="card-errors" role="alert"></div>
 
-
-    <input type="submit" class="submit" value="Submit Payment">
+    <div class="actions">
+      <input type="submit" class="tommy-button tommy-button--primary"
+             :value="$t('subscriptions.index.credit_card.submit_button')">
+    </div>
   </form>
 
-  <!--
-  <form action="">
-    <f7-row class="row--mb">
-      <f7-col>
-        <label for="card_last4"
-               class="label--mb">{{$t('subscriptions.index.credit_card.number.label')}}</label>
-        <f7-input input-id="card_last4"
-                  type="text"
-                  :placeholder="$t('subscriptions.index.credit_card.number.placeholder')"
-                  class="input--outlined"
-                  :value="billingInfo.card_last4"
-                  @input="billingInfo.card_last4 = $event.target.value;"></f7-input>
-      </f7-col>
-    </f7-row>
-
-    <f7-row>
-      <f7-col>
-        <label
-          for="card_expiry_month" class="label--mb">{{$t('subscriptions.index.credit_card.expiry.label')}}</label>
-      </f7-col>
-    </f7-row>
-    <f7-row class="row--mb">
-
-      <f7-col width="50">
-
-        <f7-input input-id="card_expiry_month"
-                  type="select"
-                  class="input--outlined">
-
-          <option value="">{{$t('subscriptions.index.credit_card.expiry.placeholder_month')}}</option>
-          <option v-for="(month) in ['01','02','03','04','05','06','07','08','09','10','11','12']"
-                  :value="month"
-                  :selected="month === billingInfo.card_exipiry_month">{{month}}
-          </option>
-        </f7-input>
-      </f7-col>
-      <f7-col width="50">
-
-        <f7-input input-id="card_expiry_year"
-                  type="select"
-                  class="input--outlined">
-
-          <option value="">{{$t('subscriptions.index.credit_card.expiry.placeholder_year')}}</option>
-          <option v-for="(year) in years"
-                  :value="year"
-                  :selected="year === billingInfo.card_exipiry_year">{{year}}
-          </option>
-        </f7-input>
-      </f7-col>
-    </f7-row>
-
-    <f7-row class="row--mb">
-
-      <f7-col width="50">
-
-        <label
-          for="card_cvc"
-          class="label--mb">{{$t('subscriptions.index.credit_card.cvc.label')}}</label>
-
-        <f7-input input-id="card_cvc"
-                  type="text"
-                  class="input--outlined"
-                  :placeholder="$t('subscriptions.index.credit_card.cvc.placeholder')"
-                  :value="billingInfo.card_cvc"
-                  @input="billingInfo.card_cvc = $event.target.value;">
-
-        </f7-input>
-      </f7-col>
-    </f7-row>
-
-    <f7-row>
-      <f7-col width="50">
-        <a href="#" class="tommy-button tommy-button--primary"
-           @click.prevent="updateCreditCardDetailsClick">{{$t('subscriptions.index.payment_method.update_credit_card_details_button')}}</a>
-      </f7-col>
-    </f7-row>
-  </form>-->
 </template>
 
 <script>
   import {injectStripe} from '../utils/inject-stripe';
+  import API from '../api';
 
   export default {
     name: "credit-card-form",
@@ -122,74 +48,75 @@
       }
     },
     methods: {
-      updateCreditCardDetailsClick() {
+      // updateCreditCardDetailsClick() {
+      //   const self = this;
+      //   Stripe.card.createToken($form, () => {
+      //     // Grab the form:
+      //     var $form = $('.payment-details form');
+      //
+      //     if (response.error) { // Problem!
+      //
+      //       // Show the errors on the form:
+      //       $form.find('.payment-errors').html("<div class='alert alert-danger'>" + response.error.message + "<div>");
+      //
+      //       // Re-enable submission
+      //       $form.find('.submit').prop('disabled', false);
+      //       this.loading = false;
+      //
+      //     } else { // Token was created!
+      //
+      //       // Get the token ID:
+      //       var token = response.id;
+      //       // console.log("this", this);
+      //       this.billing.token = token;
+      //
+      //       // Insert the token ID into the form so it gets submitted to the server:
+      //       $form.append($('<input type="hidden" name="stripeToken">').val(token));
+      //
+      //       // Submit the form:
+      //       // $form.get(0).submit();
+      //       var payload = {
+      //         card_last4: this.billing.card_last4,
+      //         card_exipiry_month: this.billing.card_exipiry_month,
+      //         card_exipiry_year: this.billing.card_exipiry_year,
+      //         stripe_token: this.billing.token,
+      //         first_name: this.$root.user.first_name,
+      //         last_name: this.$root.user.last_name,
+      //         country: this.$root.user.country,
+      //         address_line1: this.billing.address_line1,
+      //         city: this.billing.city,
+      //         state: this.billing.state,
+      //         postcode: this.billing.postcode
+      //       };
+      //
+      //       this.$http.put('https://api.mytommy.com/v1/account/billing', payload).then((response) => {
+      //         this.billing = response.body;
+      //         this.hasCreditCard = true;
+      //         this.initialHasCreditCard = true;
+      //         this.loading = false;
+      //
+      //         this.creditCard = {
+      //           card_brand: response.body.card_brand,
+      //           card_last4: response.body.card_last4,
+      //           card_exipiry_month: response.body.card_exipiry_month,
+      //           card_exipiry_year: response.body.card_exipiry_year
+      //         }
+      //
+      //         this.isEditingPaymentInfo = false;
+      //
+      //       }, (response) => {
+      //         this.loading = false;
+      //       });
+      //     }
+      //
+      //
+      //   });
+      // },
+
+      paymentFormSubmit() {
         const self = this;
-        Stripe.card.createToken($form, () => {
-          // Grab the form:
-          var $form = $('.payment-details form');
-
-          if (response.error) { // Problem!
-
-            // Show the errors on the form:
-            $form.find('.payment-errors').html("<div class='alert alert-danger'>" + response.error.message + "<div>");
-
-            // Re-enable submission
-            $form.find('.submit').prop('disabled', false);
-            this.loading = false;
-
-          } else { // Token was created!
-
-            // Get the token ID:
-            var token = response.id;
-            // console.log("this", this);
-            this.billing.token = token;
-
-            // Insert the token ID into the form so it gets submitted to the server:
-            $form.append($('<input type="hidden" name="stripeToken">').val(token));
-
-            // Submit the form:
-            // $form.get(0).submit();
-            var payload = {
-              card_last4: this.billing.card_last4,
-              card_exipiry_month: this.billing.card_exipiry_month,
-              card_exipiry_year: this.billing.card_exipiry_year,
-              stripe_token: this.billing.token,
-              first_name: this.$root.user.first_name,
-              last_name: this.$root.user.last_name,
-              country: this.$root.user.country,
-              address_line1: this.billing.address_line1,
-              city: this.billing.city,
-              state: this.billing.state,
-              postcode: this.billing.postcode
-            };
-
-            this.$http.put('https://api.mytommy.com/v1/account/billing', payload).then((response) => {
-              this.billing = response.body;
-              this.hasCreditCard = true;
-              this.initialHasCreditCard = true;
-              this.loading = false;
-
-              this.creditCard = {
-                card_brand: response.body.card_brand,
-                card_last4: response.body.card_last4,
-                card_exipiry_month: response.body.card_exipiry_month,
-                card_exipiry_year: response.body.card_exipiry_year
-              }
-
-              this.isEditingPaymentInfo = false;
-
-            }, (response) => {
-              this.loading = false;
-            });
-          }
-
-
-        });
-      },
-
-      creditCardSubmit() {
         const createToken = () => {
-          stripe.createToken(card).then(function(result) {
+          self.stripe.createToken(self.card).then((result) => {
             if (result.error) {
               // Inform the user if there was an error
               var errorElement = document.getElementById('card-errors');
@@ -211,45 +138,71 @@
           form.appendChild(hiddenInput);
 
           // Submit the form
-          form.submit();
+          // form.submit();
+
+          console.log('token', token);
+
+          const data = {
+            card_last4: token.card.last4,
+            card_expiry_month: token.card.exp_month,
+            card_expiry_year: token.card.exp_year,
+            stripe_token: token.id,
+            first_name: self.billingInfo.first_name,
+            last_name: self.billingInfo.last_name,
+            country: self.billingInfo.country,
+            address_line1: self.billingInfo.address_line1,
+            city: self.billingInfo.city,
+            state: self.billingInfo.state,
+            postcode: self.billingInfo.postcode,
+          }
+
+          API.updateBillingInfo({data}).then(billingInfo => {
+            self.$emit('update', billingInfo);
+          });
+
         }
 
         // Create a token when the form is submitted.
-        var form = document.getElementById('payment-form');
-        form.addEventListener('submit', function(e) {
-          e.preventDefault();
-          createToken();
-        });
+        // var form = document.getElementById('payment-form');
+        // form.addEventListener('submit', function (e) {
+        //   e.preventDefault();
+        //   createToken();
+        // });
+
+        createToken();
       }
     },
     mounted() {
       injectStripe().then(() => {
-        const stripe = Stripe('pk_test_e7zZmcCW40CdVJXV9roky5ik');
+        const self = this;
+        self.stripe = Stripe('pk_test_e7zZmcCW40CdVJXV9roky5ik');
         const style = {
           style: {
             base: {
-              iconColor: '#c4f0ff',
-              color: '#fff',
-              fontWeight: 500,
-              fontFamily: 'Roboto, Open Sans, Segoe UI, sans-serif',
-              fontSize: '16px',
+              iconColor: '#000',
+              color: '#000',
+              fontWeight: 400,
+              fontFamily: 'Arial, Open Sans, Segoe UI, sans-serif',
+              fontSize: '14.33px',
               fontSmoothing: 'antialiased',
               ':-webkit-autofill': {
-                color: '#fce883',
+                color: '#bbbbbbb',
               },
               '::placeholder': {
-                color: '#87BBFD',
+                color: '#bbbbbb',
               },
             },
             invalid: {
-              iconColor: '#FFC7EE',
-              color: '#FFC7EE',
+              iconColor: '#ff0000',
+              color: '#ff0000',
             },
           }
         };
-        const elements = stripe.elements(style);
-        const card = elements.create('card');
-        card.mount('#card-element');
+        self.elements = self.stripe.elements();
+        self.card = self.elements.create('card', style);
+        self.card.mount('#card-element');
+
+
       });
     },
   }

@@ -94,3 +94,33 @@ $color-secondary: #F5A623;
   font-size: 42px;
   line-height: 42px;
 }
+
+
+#card-element {
+  border: 1px solid #CCCCCC;
+  line-height: 50px;
+  padding: 10px 5px;
+  border-radius: 12px;
+  width: calc(100% - 10px);
+}
+
+#payment-form {
+  label {
+    padding-top: 16px;
+    padding-bottom: 16px;
+    display: block;
+  }
+
+  .actions {
+    padding-top: 16px;
+    display: block;
+  }
+}
+
+#card-errors {
+  color: red;
+  padding-top: 8px;
+  &:empty {
+    padding-top: 0;
+  }
+}
