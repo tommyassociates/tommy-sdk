@@ -144,6 +144,7 @@ import dialog from "../mixins/dialog.vue";
 import timePicker from "../mixins/time-picker.vue";
 import Blob from "../mixins/baseToBlob.vue";
 import Photo from '../components/photo.vue';
+import { mapState } from 'vuex';
 export default {
   name: "DetailActivity",
   mixins: [dialog, timePicker, Blob],
@@ -312,7 +313,7 @@ export default {
     },
     prepareAttendance(data) {
       const self = this;
-      const user = self.$root.teamMembers.filter(
+      const user = self.teamMembers.filter(
         member => member.user_id === data.user_id
       );
       data.user_name = user[0].first_name + " " + user[0].last_name;
@@ -414,6 +415,7 @@ export default {
     }
   },
   computed: {
+    ...mapState('teamMembers', ['teamMembers']),
     dateField() {
       const self = this;
       if (!self.detail_data) return null;
