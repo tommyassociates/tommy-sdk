@@ -166,6 +166,7 @@
   import TimesheetService from "../../services/timesheet-service";
   import circleAvatar from "tommy-core/src/components/circle-avatar";
   import SelectMultipleIcon from "../../components/icons/select-multiple-icon";
+  import { mapGetters } from 'vuex';
 
 
   export default {
@@ -347,6 +348,7 @@
 
     },
     computed: {
+      ...mapGetters('account', ['isTeamMember', 'isTeamManager']),
       dateField() {
         const self = this;
         if (!self.detail_data) return null;
@@ -370,15 +372,15 @@
         return self.managerTimesheetsData.filter(timesheet => timesheet.status === self.status);
       },
 
-      isTeamMember() {
-        const self = this;
-        return self.$root.account.roles.includes('Team Member');
-      },
-
-      isTeamManager() {
-        const self = this;
-        return self.$root.account.roles.includes('Team Manager');
-      },
+      // isTeamMember() {
+      //   const self = this;
+      //   return self.$root.account.roles.includes('Team Member');
+      // },
+      //
+      // isTeamManager() {
+      //   const self = this;
+      //   return self.$root.account.roles.includes('Team Manager');
+      // },
 
       formattedManagerTimesheetsData() {
         const self = this;

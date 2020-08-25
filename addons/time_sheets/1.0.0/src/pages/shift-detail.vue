@@ -104,6 +104,7 @@
   import workHoursTimePicker from "../mixins/work-hours-time-picker.vue";
   import breakHoursTimePicker from "../mixins/break-hours-time-picker.vue";
   import TimesheetService from "../services/timesheet-service";
+  import { mapState } from 'vuex';
 
 
   export default {
@@ -257,6 +258,7 @@
 
     },
     computed: {
+      ...mapState('account', ['account']),
       startDateFormatted() {
         const self = this;
         if (!self.timesheetShift.start_date) return null;
@@ -351,8 +353,8 @@
             self.loaded = true;
             self.editAccess = true;
             self.timesheetShift = {
-              team_id: self.$root.account.team_id,
-              user_id: self.$root.account.user_id,
+              team_id: self.account.team_id,
+              user_id: self.account.user_id,
               timesheet_id: self.timesheetId,
               start_date: self.timesheet.start_date,
               work_hours: '0.0',

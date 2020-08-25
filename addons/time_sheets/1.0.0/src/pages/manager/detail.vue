@@ -136,6 +136,8 @@
   import ImageIcon from '../../components/icons/image-icon';
   import LocationIcon from '../../components/icons/location-icon';
 
+  import { mapGetters, mapState } from 'vuex';
+
   export default {
     name: "TimesheetsManagerDetail",
     mixins: [dialog, timePicker],
@@ -334,7 +336,7 @@
       },
       prepareAttendance(data) {
         const self = this;
-        const user = self.$root.teamMembers.filter(
+        const user = self.teamMembers.filter(
           member => member.user_id === data.user_id
         );
         data.user_name = user[0].first_name + " " + user[0].last_name;
@@ -486,6 +488,8 @@
       },
     },
     computed: {
+      ...mapGetters('account', ['isTeamMember', 'isTeamManager']),
+      ...mapState('teamMembers', ['teamMembers']),
       dateField() {
         const self = this;
         if (!self.detail_data) return null;
@@ -520,15 +524,15 @@
         return TimesheetService.formattedManagerAttendancesData(self.managerAttendancesData, self.managerTimesheet.start_date, self.managerTimesheet.end_date, self);
       },
 
-      isTeamMember() {
-        const self = this;
-        return self.$root.account.roles.includes('Team Member');
-      },
-
-      isTeamManager() {
-        const self = this;
-        return self.$root.account.roles.includes('Team Manager');
-      },
+      // isTeamMember() {
+      //   const self = this;
+      //   return self.$root.account.roles.includes('Team Member');
+      // },
+      //
+      // isTeamManager() {
+      //   const self = this;
+      //   return self.$root.account.roles.includes('Team Manager');
+      // },
 
       canEditTimesheetShifts() {
         const self = this;

@@ -96,8 +96,8 @@
             const newTmesheetData = {
               start_date: startDate,
               end_date: endDate,
-              team_id: self.$root.account.team_id,
-              user_id: self.$root.account.user_id,
+              team_id: self.$store.state.account.account.team_id,
+              user_id: self.$store.state.account.account.user_id,
               status: 'unsubmitted',
             };
 
