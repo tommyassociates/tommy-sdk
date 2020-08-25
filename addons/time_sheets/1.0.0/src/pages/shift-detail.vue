@@ -254,8 +254,6 @@
         const self = this;
         self.timesheetShiftChanged = (JSON.stringify(self.timesheetShift) !== JSON.stringify(self.timesheetShiftOriginal));
       },
-
-
     },
     computed: {
       ...mapState('account', ['account']),

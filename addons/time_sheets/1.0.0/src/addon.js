@@ -9,7 +9,6 @@ import ManagerTimeSheets from './pages/manager/time-sheets.vue';
 import ManagerDetail from './pages/manager/detail.vue';
 import ManagerAttendanceDetail from './pages/manager/attendance-detail.vue';
 
-
 const routes = [
   {
     path: "/time-sheets/",
@@ -60,3 +59,4 @@ const routes = [
 ];
 
 export default routes;
+
