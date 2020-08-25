@@ -15,7 +15,7 @@ const AttendanceService = {
       //   member => member.user_id === e.user_id
       // );
 
-      const user = self.$store.teamMembers.teamMembers.find(
+      const user = self.$store.state.teamMembers.teamMembers.find(
         member => member.user_id === e.user_id
       );
       e.user_name = `${user.first_name} ${user.last_name}`;
@@ -38,7 +38,7 @@ const AttendanceService = {
     //   member => member.user_id === data.user_id
     // );
 
-    const user = self.$store.teamMembers.teamMembers.find(
+    const user = self.$store.state.teamMembers.teamMembers.find(
       member => member.user_id === data.user_id
     );
     data.user_name = `${user.first_name} ${user.last_name}`;
