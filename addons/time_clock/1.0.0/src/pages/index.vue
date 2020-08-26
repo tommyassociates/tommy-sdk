@@ -403,6 +403,11 @@
     mounted() {
       const self = this;
 
+      console.log('TIME_CLOCK - mounted');
+      console.log(self.$store);
+      console.log('TIME_CLOCK - actor');
+      console.log(self.actor);
+
 
       //self.getAttendancesActive();
       //self.getShiftActive();
