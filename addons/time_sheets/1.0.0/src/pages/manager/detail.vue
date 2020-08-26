@@ -524,15 +524,6 @@
         return TimesheetService.formattedManagerAttendancesData(self.managerAttendancesData, self.managerTimesheet.start_date, self.managerTimesheet.end_date, self);
       },
 
-      // isTeamMember() {
-      //   const self = this;
-      //   return self.$root.account.roles.includes('Team Member');
-      // },
-      //
-      // isTeamManager() {
-      //   const self = this;
-      //   return self.$root.account.roles.includes('Team Manager');
-      // },
 
       canEditTimesheetShifts() {
         const self = this;

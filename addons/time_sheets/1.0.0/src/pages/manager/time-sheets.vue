@@ -166,7 +166,7 @@
   import TimesheetService from "../../services/timesheet-service";
   import circleAvatar from "tommy-core/src/components/circle-avatar";
   import SelectMultipleIcon from "../../components/icons/select-multiple-icon";
-  import { mapGetters } from 'vuex';
+  // import { mapGetters } from 'vuex';
 
 
   export default {
@@ -348,7 +348,7 @@
 
     },
     computed: {
-      ...mapGetters('account', ['isTeamMember', 'isTeamManager']),
+      // ...mapGetters('account', ['isTeamMember', 'isTeamManager']),
       dateField() {
         const self = this;
         if (!self.detail_data) return null;

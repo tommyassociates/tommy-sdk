@@ -106,7 +106,7 @@
   import PermissionSelect from 'tommy-core/src/components/permission-select';
   import DateRangeSelect from 'tommy-core/src/components/date-range-select';
 
-  import { mapGetters } from 'vuex';
+  // import { mapGetters } from 'vuex';
 
   /*
   TODO: add shift empty page
@@ -164,7 +164,7 @@
 
     },
     computed: {
-      ...mapGetters('account', ['isTeamMember', 'isAdmin']),
+      //...mapGetters('account', ['isTeamMember', 'isAdmin']),
       formattedTimesheetsData() {
         const self = this;
         return TimesheetService.formatTimesheetsData(self.timesheetsData, self.timesheetsShiftsData, self);
@@ -177,10 +177,12 @@
       //   return self.$root.account.roles.includes('Team Member');
       // },
       //
-      // isTeamAdmin() {
-      //   const self = this;
-      //   return self.$root.account.roles.includes('Team Admin');
-      // },
+      isAdmin() {
+        const self = this;
+        return true;
+        //TODO
+        // return self.$root.account.roles.includes('Team Admin');
+      },
 
       unsubmittedTimesheets() {
         console.log('unsubmittedTimesheets');

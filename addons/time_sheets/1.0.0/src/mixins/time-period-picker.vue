@@ -1,5 +1,6 @@
 <script>
   import API from '../api';
+  import { mapState } from 'vuex';
 
   export default {
     methods: {
@@ -96,8 +97,8 @@
             const newTmesheetData = {
               start_date: startDate,
               end_date: endDate,
-              team_id: self.$store.state.account.account.team_id,
-              user_id: self.$store.state.account.account.user_id,
+              team_id: self.account.team_id,
+              user_id: self.account.user_id,
               status: 'unsubmitted',
             };
 
@@ -128,6 +129,9 @@
       getDurationValue(duration) {
         return duration.toLowerCase().replace('ly', '');
       },
-    }
+    },
+    computed: {
+      ...mapState('account', ['account']),
+    },
   };
 </script>
