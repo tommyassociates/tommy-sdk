@@ -5,52 +5,24 @@
       <f7-nav-title>{{$t('credentials.index.title')}}</f7-nav-title>
       <f7-nav-right></f7-nav-right>
     </f7-navbar>
-    <f7-list media-list class="list-custom">
+    <f7-list media-list class="list-custom credentials">
       <!-- <div>{{credentials}}</div> -->
       <f7-list-item
         title="Xero"
         text="Xero's online accounting software connects you to accountants & bookkeepers, your bank, & helps get you STP compliant."
       >
-        <a v-if="!credentials['xero_oauth2']" href="#" @click="connectAccount('xero_oauth2')" class="button button-round button-fill" slot="after">Connect</a>
-        <a v-else href="#" @click="disconnectAccount(credentials['xero_oauth2'])" class="button button-round button-fill color-green" slot="after">Disconnect</a>
+        <div class="segmented" slot="after">
+          <f7-button icon-material="help" href="/credentials/help/xero" small></f7-button>
+          <f7-button v-if="credentials['xero_oauth2']" icon-material="info" href="/credentials/audit-logs/Xero" small></f7-button>
+          <f7-button v-if="credentials['xero_oauth2']" @click="disconnectAccount(credentials['xero_oauth2'])" color="red" icon-material="link" fill small></f7-button>
+          <f7-button v-if="!credentials['xero_oauth2']" @click="connectAccount('xero_oauth2')" color="green" icon-material="link" fill small></f7-button>
+        </div>
+        <!-- <f7-button icon-material="settings" small></f7-button> -->
+        <!-- <a v-if="credentials['xero_oauth2']" href="#" @click="connectAccount('xero_oauth2')" class="button button-round button-fill">Settings</a>
+        <a v-if="!credentials['xero_oauth2']" href="#" @click="connectAccount('xero_oauth2')" class="button button-round button-fill">Connect</a>
+        <a v-else href="#" @click="disconnectAccount(credentials['xero_oauth2'])" class="button button-round button-fill color-green">Disconnect</a> -->
         <img slot="media" :src="`${$addonAssetsUrl}xero.png`">
       </f7-list-item>
-      <!-- link="#" -->
-      <!-- <div>zzz</div> -->
-      <!-- <f7-list-item
-        title="Xero Accounting"
-      ></f7-list-item> -->
-      <!-- :after="dateRange ? dateRange.join(' - ') : ''" -->
-      <!-- Credentials: Date Range Select -->
-      <!-- <li class="item-divider">Date Range Select</li>
-      <date-range-select
-        v-model="dateRange"
-        @change="onDateRangeChange"
-        @save="onSave"
-      ></date-range-select> -->
-
-      <!-- Credentials: Tag Select -->
-      <!-- <tag-select
-        title="Tag Select"
-        v-model="testTags"
-        @change="onTagsChange"
-        @save="onSave"
-      ></tag-select> -->
-      <!-- <f7-list-item
-        title="Selected Tags"
-        :after="testTags.map(x => x.name).join(', ')"
-      ></f7-list-item> -->
-
-      <!-- Credentials: Permission Select -->
-      <!-- <permission-select
-        title="Permission Select: Team Member Access"
-        permission-name="addon_access"
-        addon-name="credentials"
-      ></permission-select> -->
-      <!-- <f7-list-item
-        title="Selected Date Range"
-        :after="dateRange ? dateRange.join(' - ') : ''"
-      ></f7-list-item> -->
     </f7-list>
   </f7-page>
 </template>

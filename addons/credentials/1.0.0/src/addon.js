@@ -1,5 +1,6 @@
-import Index from './pages/index.vue';
-import OAuthCallback from './pages/index.vue';
+import Index from './pages/index.vue'
+const HelpXero = () => import('./pages/help-xero.vue')
+const AuditLogs = () => import('./pages/audit-logs.vue')
 
 const routes = [
   {
@@ -7,17 +8,13 @@ const routes = [
     name: 'credentials__index',
     component: Index,
   },
-  // {
-  //   path: '/credentials/auth/:provider',
-  //   name: 'credentials-oauth',
-  //   beforeEnter(to, from, next) {
-  //     window.location = `${process.env.API_URL}/v1/auth/${to.params.provider}`
-  //   }
-  // },
-  // {
-  //   path: '/credentials/oauth/:provider/callback',
-  //   name: 'credentials__oauth-callback',
-  //   component: OAuthCallback
-  // },
+  {
+    path: '/credentials/help/xero',
+    component: HelpXero,
+  },
+  {
+    path: '/credentials/audit-logs/:realm',
+    component: AuditLogs,
+  },
 ];
 export default routes;
