@@ -53,8 +53,10 @@ export default {
     };
   },
   computed: {
+    ...mapState('account', ['account']),
     ...mapState('accounts', ['accounts']),
     ...mapState('user', ['user']),
+    ...mapState('team', ['team']),
     ...mapState('teamMembers', ['teamMembers']),
   },
   methods: {
