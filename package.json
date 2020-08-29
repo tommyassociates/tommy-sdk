@@ -36,7 +36,8 @@
     "template7": "^1.4.2",
     "tommy-core": "*",
     "vue": "^2.6.11",
-    "vue-chartjs": "^3.5.0"
+    "vue-chartjs": "^3.5.0",
+    "vuex": "^3.5.1"
   },
   "devDependencies": {
     "@babel/core": "^7.2.2",
