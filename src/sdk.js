@@ -1,4 +1,4 @@
-import tommy, { app, events, addons } from 'tommy-core/src/tommy'; // eslint-disable-line
+import tommy, {app, events, addons} from 'tommy-core/src/tommy'; // eslint-disable-line
 import routes from './routes';
 import appComponent from './components/app.vue';
 import components from './components';
@@ -28,60 +28,60 @@ app.init({
     const actorId = localStorage.actorId ? parseInt(localStorage.actorId, 10) : null;
     const accounts = null;
     let token = localStorage.token;
-    let user = null;
-    let account = null;
-    let team = null;
-    let teamMembers = null;
-    let loggedIn = false;
-    if (token) {
-      if (localStorage.user) {
-        try {
-          user = JSON.parse(localStorage.user);
-        } catch (e) {
-          // no user
-        }
-      }
-      if (localStorage.account) {
-        try {
-          account = JSON.parse(localStorage.account);
-        } catch (e) {
-          // no user
-        }
-      }
-      if (localStorage.team) {
-        try {
-          team = JSON.parse(localStorage.team);
-        } catch (e) {
-          // no user
-        }
-      }
-      if (localStorage.teamMembers) {
-        try {
-          teamMembers = JSON.parse(localStorage.teamMembers);
-        } catch (e) {
-          // no user
-        }
-      }
-    }
-    if (token && user && account) {
-      loggedIn = true;
-    } else {
-      token = null;
-      user = null;
-      account = null;
-      team = null;
-      teamMembers = null;
-    }
+    // let user = null;
+    // let account = null;
+    // let team = null;
+    // let teamMembers = null;
+    // let loggedIn = false;
+    // if (token) {
+    //   if (localStorage.user) {
+    //     try {
+    //       user = JSON.parse(localStorage.user);
+    //     } catch (e) {
+    //       // no user
+    //     }
+    //   }
+    //   if (localStorage.account) {
+    //     try {
+    //       account = JSON.parse(localStorage.account);
+    //     } catch (e) {
+    //       // no user
+    //     }
+    //   }
+    //   if (localStorage.team) {
+    //     try {
+    //       team = JSON.parse(localStorage.team);
+    //     } catch (e) {
+    //       // no user
+    //     }
+    //   }
+    //   if (localStorage.teamMembers) {
+    //     try {
+    //       teamMembers = JSON.parse(localStorage.teamMembers);
+    //     } catch (e) {
+    //       // no user
+    //     }
+    //   }
+    // }
+    // if (token && user && account) {
+    //   loggedIn = true;
+    // } else {
+    //   token = null;
+    // user = null;
+    // account = null;
+    // team = null;
+    // teamMembers = null;
+    // }
 
     return {
       actorId,
       token,
-      user,
-      account,
-      accounts,
-      team,
-      teamMembers,
-      loggedIn,
+      // user,
+      // account,
+      // accounts,
+      // team,
+      // teamMembers,
+      // loggedIn,
       language,
       addons: [],
     };
@@ -91,18 +91,13 @@ app.init({
       const self = this;
       localStorage.setItem('serverUrl', SANDBOX_URL);
 
-      // Auth
-      self.$api
-        .call({
-          endpoint: 'sessions',
-          method: 'POST',
-          data: { api_key: API_KEY },
-        })
-        .then((response) => {
-          self.setUser(response, response.token);
-          self.updateAccount();
-          self.updateTeam();
-          self.updateTeamMembers();
+      //logout will just clear state.
+      // self.$store.dispatch('resetState').then(() => {
+
+
+        self.$store.dispatch('loginWithApiKey', API_KEY).then((token) => {
+          localStorage.token = token;
+          self.$root.token = token;
 
           events.$on('addonRoutesLoaded', (addon, addonRoutes) => {
             // NOTE: Do not load routes here in order to support HMR
@@ -114,7 +109,8 @@ app.init({
           });
 
           SDK_LOCAL_ADDONS.forEach(addon => {
-            self.$addons.initAddon(addon).catch(() => {});
+            self.$addons.initAddon(addon).catch(() => {
+            });
 
             // Load the addon routes programatically for HMR
             if (addon.assets) {
@@ -127,8 +123,8 @@ app.init({
 
                   // Load the default addon if specified
                   const loadAddon = (SDK_CONFIG.autoloadAddonPath &&
-                      SDK_CONFIG.autoloadAddonPath === addon.entry_path) ||
-                      window.location.href.indexOf(addon.entry_path) !== -1
+                    SDK_CONFIG.autoloadAddonPath === addon.entry_path) ||
+                    window.location.href.indexOf(addon.entry_path) !== -1
                   if (loadAddon) {
                     const entryUrl = this.addonUrl(addon)
                     console.log('loading initial addon', entryUrl)
@@ -137,10 +133,66 @@ app.init({
                 })
             }
           });
-        })
-        .catch((error) => {
+        }).catch((error) => {
           self.$f7.dialog.alert(`Cannot connect to sandbox server: ${SANDBOX_ENDPOINT}: ${error}`);
         });
+      // });
+
+      // Auth
+      // self.$api
+      //   .call({
+      //     endpoint: 'sessions',
+      //     method: 'POST',
+      //     data: { api_key: API_KEY },
+      //   })
+      //   .then((response) => {
+      //     console.log('sessions', response);
+
+      /*
+      self.setUser(response, response.token);
+      self.updateAccount();
+      self.updateTeam();
+      self.updateTeamMembers();
+
+      events.$on('addonRoutesLoaded', (addon, addonRoutes) => {
+        // NOTE: Do not load routes here in order to support HMR
+        // self.$f7.routes.push(...addonRoutes);
+        // self.$f7.views.main.routes.push(...addonRoutes);
+      });
+      events.$on('addonLoaded', (addon) => {
+        self.$root.addons.push(addon);
+      });
+
+      SDK_LOCAL_ADDONS.forEach(addon => {
+        self.$addons.initAddon(addon).catch(() => {});
+
+        // Load the addon routes programatically for HMR
+        if (addon.assets) {
+          import(`../addons/${addon.package}/${addon.version}/src/addon.scss`)
+          import(`../addons/${addon.package}/${addon.version}/src/addon.js`)
+            .then(m => {
+              const routes = m.default;
+              self.$f7.routes.push(...routes);
+              self.$f7.views.main.routes.push(...routes);
+
+              // Load the default addon if specified
+              const loadAddon = (SDK_CONFIG.autoloadAddonPath &&
+                  SDK_CONFIG.autoloadAddonPath === addon.entry_path) ||
+                  window.location.href.indexOf(addon.entry_path) !== -1
+              if (loadAddon) {
+                const entryUrl = this.addonUrl(addon)
+                console.log('loading initial addon', entryUrl)
+                self.$f7.views.main.router.navigate(entryUrl)
+              }
+            })
+        }
+      });
+
+       */
+      // })
+      // .catch((error) => {
+      //   self.$f7.dialog.alert(`Cannot connect to sandbox server: ${SANDBOX_ENDPOINT}: ${error}`);
+      // });
     },
     addonUrl(addon) {
       const self = this;
@@ -155,3 +207,8 @@ app.init({
 });
 
 export default tommy;
+
+
+
+
+
