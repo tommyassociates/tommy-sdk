@@ -11,18 +11,19 @@
         smart-select
         title="Current Account"
       >
-        <!-- {{ $root.account.id }} -->
-        <select :value="$root.account.id + ':' + $root.account.type" @change="changeAccount">
+        <!-- {{ account.id }} -->
+        <select :value="`${account.id}:${account.type}`" @change="changeAccount">
           <option
-            v-for="(account, index) in $root.accounts"
+            v-for="(account, index) in accounts"
             :key="index"
             :value="account.id + ':' + account.type"
-          >{{account.name}} ({{account.type}}: {{account.kind}})</option>
+          >{{ account.name }} ({{ account.type }}: {{ account.kind }})
+          </option>
         </select>
       </f7-list-item>
     </f7-list>
 
-    <template v-if="$root.team && $root.teamMembers">
+    <template v-if="team && teamMembers">
       <f7-block-title>Actor</f7-block-title>
       <f7-list>
         <f7-list-item
@@ -31,10 +32,11 @@
         >
           <select @change="changeActorId" :value="actorId">
             <option
-              v-for="(teamMember, index) in $root.teamMembers"
+              v-for="(teamMember, index) in teamMembers"
               :key="index"
               :value="teamMember.user_id"
-            >{{teamMember.first_name}} {{teamMember.last_name}} ({{teamMember.user_id}})</option>
+            >{{ teamMember.first_name }} {{ teamMember.last_name }} ({{ teamMember.user_id }})
+            </option>
           </select>
         </f7-list-item>
       </f7-list>
@@ -42,31 +44,46 @@
   </f7-page>
 </template>
 <script>
-  export default {
-    data() {
-      return {
-        actorId: this.$root.actorId || this.$root.user.id,
-      };
+import {mapState} from 'vuex';
+
+export default {
+  data() {
+    return {
+      actorId: null,
+    };
+  },
+  computed: {
+    ...mapState('account', ['account']),
+    ...mapState('accounts', ['accounts']),
+    ...mapState('user', ['user']),
+    ...mapState('team', ['team']),
+    ...mapState('teamMembers', ['teamMembers']),
+  },
+  methods: {
+    changeActorId(e) {
+      const self = this;
+      const actorId = parseInt(e.target.value, 10);
+      self.$root.setActorId(actorId);
     },
-    methods: {
-      changeActorId(e) {
-        const actorId = parseInt(e.target.value, 10);
-        this.$root.setActorId(actorId);
-      },
-      changeAccount(e) {
-        const data = e.target.value.split(':'),
-              accountId = parseInt(data[0], 10),
-              accountType = data[1];
-        let newAccount;
-        this.$root.accounts.forEach(account => {
-          console.log(accountId, accountType, account)
-          if (account.id === accountId && account.type === accountType)
-            newAccount = account;
-        });
-        if (!newAccount) return;
-        const { id, type, location_id } = newAccount; // eslint-disable-line
-        this.$root.changeAccount(id, type, location_id);
-      },
+    changeAccount(e) {
+      const self = this;
+      const data = e.target.value.split(':'),
+        accountId = parseInt(data[0], 10),
+        accountType = data[1];
+      let newAccount;
+      self.accounts.forEach(account => {
+        console.log(accountId, accountType, account)
+        if (account.id === accountId && account.type === accountType)
+          newAccount = account;
+      });
+      if (!newAccount) return;
+      const {id, type, location_id} = newAccount; // eslint-disable-line
+      self.$root.changeAccount(id, type, location_id);
     },
-  };
+  },
+  mounted() {
+    const self = this;
+    self.actorId = self.$root.actorId || self.user.id;
+  },
+};
 </script>
