@@ -2,15 +2,22 @@
   <f7-page class="time-clock-settings-page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{$t('time_clock.settings.title')}}</f7-nav-title>
+      <f7-nav-title>{{ $t('time_clock.settings.title') }}</f7-nav-title>
       <f7-nav-right>
-        <f7-link icon-only class="back">
-          <f7-icon f7="check" />
-        </f7-link>
+        <!--        <f7-link icon-only class="back">-->
+        <!--          <f7-icon f7="check" />-->
+        <!--        </f7-link>-->
       </f7-nav-right>
     </f7-navbar>
 
     <f7-page-content ref="pageContent">
+      <f7-block-title class="time-clock-divider">{{ $t('time_clock.settings.export_csv_title') }}</f7-block-title>
+      <f7-list>
+        <f7-list-item>
+          <a href="#" @click="exportCsv()">{{ $t('time_clock.settings.export_csv_button') }}</a>
+        </f7-list-item>
+      </f7-list>
+
       <!--
       <f7-block-title class="time-clock-divider">{{$t('time_clock.settings.required_title')}}</f7-block-title>
       <f7-list>
@@ -56,69 +63,80 @@
 </template>
 
 <script>
-  import API from '../api';
-  // import GroupPopupCmp from '../components/group-popup.vue';
-  // import SearchCmp from '../components/search.vue';
-  // import TagCmp from '../components/tag.vue';
+import API from '../api';
+import AttendanceService from "../services/attendance-service";
+// import GroupPopupCmp from '../components/group-popup.vue';
+// import SearchCmp from '../components/search.vue';
+// import TagCmp from '../components/tag.vue';
 
-  //import tagSelect from '../components/tag-select.vue';
+//import tagSelect from '../components/tag-select.vue';
 
-  export default {
-    name: "TimeClockSettings",
-    components: {
-      // GroupPopupCmp,
-      // SearchCmp,
-      // TagCmp,
-    },
-    mounted() {
+export default {
+  name: "TimeClockSettings",
+  components: {
+    // GroupPopupCmp,
+    // SearchCmp,
+    // TagCmp,
+  },
+  mounted() {
+    const self = this;
+    self.$api.getInstalledAddonPermission('wallet_accounts', 'wallet_accounts_transaction_create_access', {
+      resource_id: undefined,
+      with_filters: true,
+    }).then((permission) => {
+      permission.resource_id = undefined;
+      self.permissions.push(permission);
+    });
+    self.$api.getInstalledAddonPermission('wallet_accounts', 'wallet_accounts_transaction_edit_access', {
+      resource_id: undefined,
+      with_filters: true,
+    }).then((permission) => {
+      permission.resource_id = undefined;
+      self.permissions.push(permission);
+    });
+
+    // self.items = [
+    //   {
+    //     id: 1215,
+    //     name: 'elder',
+    //   },
+    //   {
+    //     id: 155,
+    //     name: 'manager',
+    //   },
+    // ];
+
+
+  },
+  methods: {
+    saveListPermission(permission) {
       const self = this;
-      self.$api.getInstalledAddonPermission('wallet_accounts', 'wallet_accounts_transaction_create_access', {
-        resource_id: undefined,
+      self.$api.updateInstalledAddonPermission('wallet_accounts', permission.name, {
+        resource_id: permission.resource_id,
         with_filters: true,
-      }).then((permission) => {
-        permission.resource_id = undefined;
-        self.permissions.push(permission);
+        filters: JSON.stringify(permission.filters),
       });
-      self.$api.getInstalledAddonPermission('wallet_accounts', 'wallet_accounts_transaction_edit_access', {
-        resource_id: undefined,
-        with_filters: true,
-      }).then((permission) => {
-        permission.resource_id = undefined;
-        self.permissions.push(permission);
-      });
-
-      // self.items = [
-      //   {
-      //     id: 1215,
-      //     name: 'elder',
-      //   },
-      //   {
-      //     id: 155,
-      //     name: 'manager',
-      //   },
-      // ];
-
-
     },
-    methods: {
-      saveListPermission(permission) {
-        const self = this;
-        self.$api.updateInstalledAddonPermission('wallet_accounts', permission.name, {
-          resource_id: permission.resource_id,
-          with_filters: true,
-          filters: JSON.stringify(permission.filters),
-        });
-      },
-      addListPermission(permission, tag) {
-        const self = this;
-        permission.filters.push(tag);
-        self.saveListPermission(permission);
-      },
-      removeListPermission(permission, tag) {
-        const self = this;
-        permission.filters.splice(permission.filters.indexOf(tag), 1);
-        self.saveListPermission(permission);
-      },
+    addListPermission(permission, tag) {
+      const self = this;
+      permission.filters.push(tag);
+      self.saveListPermission(permission);
+    },
+    removeListPermission(permission, tag) {
+      const self = this;
+      permission.filters.splice(permission.filters.indexOf(tag), 1);
+      self.saveListPermission(permission);
+    },
+
+    exportCsv() {
+      const self = this;
+      const otherOptions = {
+        limit: 200,
+      };
+      API.getAttendances({otherOptions}).then(data => {
+        self.attendanceData = data;
+      });
+    },
 
 
 //copied from broadcast.
@@ -147,27 +165,30 @@
 //         this.checkedId = isSee ? this.seeUser.id : this.sendUser.id;
 //         this.customerPopupOpened = true;
 //       },
-    },
-    data() {
-      return {
-        hasActorId: API.actorId,
-        permissions: [],
+  },
+  data() {
+    return {
+      hasActorId: API.actorId,
+      permissions: [],
 
-        //copied from broadcast.
-        // lists: null,
-        // customerPopupOpened: false,
-        // items: null,
-        // seeUser: {
-        //   id: null,
-        //   name: null,
-        // },
-        // sendUser: {
-        //   id: null,
-        //   name: null,
-        // },
-        // isSee: null,
-        // checkedId: null,
-      };
-    }
-  };
+      attendanceData: [],
+      csvHeaders: [],
+
+      //copied from broadcast.
+      // lists: null,
+      // customerPopupOpened: false,
+      // items: null,
+      // seeUser: {
+      //   id: null,
+      //   name: null,
+      // },
+      // sendUser: {
+      //   id: null,
+      //   name: null,
+      // },
+      // isSee: null,
+      // checkedId: null,
+    };
+  }
+};
 </script>
