@@ -14,7 +14,7 @@
         <f7-link icon-only @click="addTimesheet" v-if="permissions.canCreate">
           <f7-icon f7="add"></f7-icon>
         </f7-link>
-        <f7-link href="/time-sheets/settings/" icon-only v-if="isTeamAdmin">
+        <f7-link href="/time-sheets/settings/" icon-only v-if="isAdmin">
           <f7-icon f7="gear"/>
         </f7-link>
       </f7-nav-right>
@@ -106,6 +106,8 @@
   import PermissionSelect from 'tommy-core/src/components/permission-select';
   import DateRangeSelect from 'tommy-core/src/components/date-range-select';
 
+  // import { mapGetters } from 'vuex';
+
   /*
   TODO: add shift empty page
 
@@ -162,21 +164,24 @@
 
     },
     computed: {
+      //...mapGetters('account', ['isTeamMember', 'isAdmin']),
       formattedTimesheetsData() {
         const self = this;
         return TimesheetService.formatTimesheetsData(self.timesheetsData, self.timesheetsShiftsData, self);
       },
 
-      isTeamMember() {
+      // isTeamMember() {
+      //   const self = this;
+      //   console.log('isteam member');
+      //   console.log(self.$root.account.roles);
+      //   return self.$root.account.roles.includes('Team Member');
+      // },
+      //
+      isAdmin() {
         const self = this;
-        console.log('isteam member');
-        console.log(self.$root.account.roles);
-        return self.$root.account.roles.includes('Team Member');
-      },
-
-      isTeamAdmin() {
-        const self = this;
-        return self.$root.account.roles.includes('Team Admin');
+        return true;
+        //TODO
+        // return self.$root.account.roles.includes('Team Admin');
       },
 
       unsubmittedTimesheets() {

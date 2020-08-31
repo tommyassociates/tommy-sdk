@@ -5,6 +5,8 @@ import Search from "./pages/search.vue";
 import SelectPicker from "./pages/select-picker.vue";
 import MapPage from "./pages/map.vue";
 
+console.log('TIME_CLOCK addon');
+
 const routes = [
   {
     path: "/time-clock/",

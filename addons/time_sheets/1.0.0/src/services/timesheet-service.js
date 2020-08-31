@@ -93,7 +93,8 @@ const TimesheetService = {
       .filter(managerTimesheet => managerTimesheet.status === status)
       .forEach(managerTimesheet => {
 
-        const teamMember = self.$root.teamMembers.find(teamMember => +teamMember.id === +managerTimesheet.user_id);
+        // const teamMember = self.$root.teamMembers.find(teamMember => +teamMember.id === +managerTimesheet.user_id);
+        const teamMember = self.$store.state.teamMembers.teamMembers.find(teamMember => +teamMember.id === +managerTimesheet.user_id);
         const title = teamMember ? String(`${teamMember.first_name} ${teamMember.last_name}`).trim() : 'TO';
         const timesheetsShifts = managerTimesheetsShiftsData
           .filter(timesheetShift => timesheetShift.timesheet_id === +managerTimesheet.id);

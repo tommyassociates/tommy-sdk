@@ -162,6 +162,7 @@
   import hoursMinutesBadge from '../components/hours-minutes-badge.vue';
   import TimesheetService from "../services/timesheet-service";
   import sumArrayOfTimes from "../utils/sum-array-of-times";
+  import { mapState, mapGetters } from 'vuex';
 
   export default {
     name: "TimesheetDetail",
@@ -394,7 +395,7 @@
       },
       prepareAttendance(data) {
         const self = this;
-        const user = self.$root.teamMembers.filter(
+        const user = self.teamMembers.filter(
           member => member.user_id === data.user_id
         );
         data.user_name = user[0].first_name + " " + user[0].last_name;
@@ -516,6 +517,8 @@
       },
     },
     computed: {
+      ...mapState('teamMembers', ['teamMembers']),
+      ...mapGetters('account', ['isTeamManager', 'isTeamMember']),
       dateField() {
         const self = this;
         if (!self.detail_data) return null;
@@ -569,15 +572,15 @@
         }
       },
 
-      isTeamMember() {
-        const self = this;
-        return self.$root.account.roles.includes('Team Member');
-      },
-
-      isTeamManager() {
-        const self = this;
-        return self.$root.account.roles.includes('Team Manager');
-      },
+      // isTeamMember() {
+      //   const self = this;
+      //   return self.$root.account.roles.includes('Team Member');
+      // },
+      //
+      // isTeamManager() {
+      //   const self = this;
+      //   return self.$root.account.roles.includes('Team Manager');
+      // },
 
       canEditTimesheetShifts() {
         const self = this;
