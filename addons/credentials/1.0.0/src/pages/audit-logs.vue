@@ -39,7 +39,7 @@
       logMessage(log) {
         let msg = log.message
         if (log.error) {
-          msg + ': ' + log.error
+          msg += ': ' + log.error
         }
         return msg
       },

@@ -1,6 +1,8 @@
 import Index from './pages/index.vue'
-const HelpXero = () => import('./pages/help-xero.vue')
-const AuditLogs = () => import('./pages/audit-logs.vue')
+import HelpXero from './pages/help-xero.vue'
+import AuditLogs from './pages/audit-logs.vue'
+// const HelpXero = () => import('./pages/help-xero.vue')
+// const AuditLogs = () => import('./pages/audit-logs.vue')
 
 const routes = [
   {
