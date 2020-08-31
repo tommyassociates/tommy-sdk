@@ -245,7 +245,7 @@
 
           const data = {
             status: 'denied',
-            timesheets_ids: timesheetIds,
+            timesheet_ids: timesheetIds,
           };
           API.updateManagerTimesheetsBulk(data).then(response => {
             self.$events.$emit("time_sheets:timesheet_edited");
@@ -266,7 +266,7 @@
 
           const data = {
             status: 'approved',
-            timesheets_ids: timesheetIds,
+            timesheet_ids: timesheetIds,
           };
 
           console.log(data);

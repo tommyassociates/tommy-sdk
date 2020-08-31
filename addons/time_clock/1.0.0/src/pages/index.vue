@@ -10,9 +10,9 @@
         <f7-link href="/time-clock/search/" icon-only>
           <f7-icon f7="search"/>
         </f7-link>
-        <!--<f7-link href="/time-clock/settings/" icon-only>
+        <f7-link href="/time-clock/settings/" icon-only>
           <f7-icon f7="gear"/>
-        </f7-link>-->
+        </f7-link>
       </f7-nav-right>
     </f7-navbar>
 
@@ -95,7 +95,8 @@
 
   import ActiveAvatar from "../components/circle-avatar.vue";
   import Events from "../components/events.vue";
-  import Photo from 'tommy-core/src/components/photo.vue';
+  // import Photo from 'tommy-core/src/components/photo.vue';
+  import Photo from '../components/photo.vue';
   import Geo from "../components/geo.vue";
   import Blob from "../mixins/baseToBlob.vue";
 
@@ -378,10 +379,13 @@
       calculateDuration() {
         const self = this;
         if (self.activeData !== null) {
-          const startTime = self.$moment(self.loaded.timestamp);
-          const endTime = self.$moment(new Date());
-          const duration = self.$moment.duration(endTime.diff(startTime));
-          self.loaded.duration = duration.asHours();
+          console.log('self.loaded.timestamp', self.loaded.timestamp);
+          if (self.loaded.timestamp !== false) {
+            const startTime = self.$moment(self.loaded.timestamp);
+            const endTime = self.$moment(new Date());
+            const duration = self.$moment.duration(endTime.diff(startTime));
+            self.loaded.duration = duration.asHours();
+          }
         }
       },
 
@@ -404,10 +408,9 @@
       const self = this;
 
       console.log('TIME_CLOCK - mounted');
-      console.log(self.$store);
-      console.log('TIME_CLOCK - actor');
-      console.log(self.actor);
-
+      // console.log(self.$store);
+      // console.log('TIME_CLOCK - actor');
+      // console.log(self.actor);
 
       //self.getAttendancesActive();
       //self.getShiftActive();
@@ -417,6 +420,7 @@
       }, 1000); //1minute
 
 
+      console.log('TIMECLOCK - mounted');
       return Promise.all([
         self.$api.getInstalledAddonPermission(
           "time_clock",
@@ -424,19 +428,27 @@
           {with_filters: true}
         )
       ]).then(v => {
+        console.log('TIMECLOCK - mounted - promise then');
         self.viewOthers = API.checkPermision(v[0], self);
         const otherOptions = {
           others: self.viewOthers,
         };
+        console.log('TIMECLOCK - mounted promise then other options', JSON.stringify(otherOptions));
         API.getAttendances({otherOptions}).then(data => {
+          console.log('TIMECLOCK - mounted promise get attendances');
+          // console.log('TIMECLOCK - mounted promise get attendances - data', JSON.stringify(data));
           self.attendanceData = AttendanceService.prepareAttendances(data, self);
           //self.formattedAttendanceData = TimesheetService.splitAttendanceIntoDays(self.attendanceData, self);
           self.loaded.attendance = true;
           self.loaded.first = true;
+          console.log('TIMECLOCK - mounted promise get attendances - before update status');
           self.updateStatus();
+          console.log('TIMECLOCK - mounted promise get attendances - before calculateDuration');
           self.calculateDuration();
+          console.log('TIMECLOCK - mounted promise get attendances - after calculateDuration');
         });
         API.getAttendancesActive({otherOptions}).then(data => {
+          console.log('TIMECLOCK - mounted promise get active attendances');
           self.activeData = AttendanceService.prepareAttendance(data, self);
           if (self.activeData !== null) {
             // self.formattedActiveData = TimesheetService.formatAttendanceActive(self.activeData, self);
@@ -446,7 +458,7 @@
         });
       });
 
-      API.getTest().then(data => console.log("TCL: mounted -> TEST", data));
+      // API.getTest().then(data => console.log("TCL: mounted -> TEST", data));
 
 
     },

@@ -30,7 +30,9 @@
     "who_can_edit_title": "Who Can Edit Time Clocking",
     "who_can_clock_manually_title": "Who Can Manually Clock On/Off",
     "who_can_clock_title": "Who Can Clock On/Off",
-    "who_can_break_title": "Who Can Start/Stop Breaks"
+    "who_can_break_title": "Who Can Start/Stop Breaks",
+    "export_csv_title": "Export CSV",
+    "export_csv_button": "Export CSV data"
   },
   "search": {
     "title": "Time Clock Search",
