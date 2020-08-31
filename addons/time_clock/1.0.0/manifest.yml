@@ -27,20 +27,20 @@
     attendance_other_access:
       title: "Who Can View Other Team Members Events"
       hint: "Select Team Members who can view events created by others"
-      resource_type: WorkforceAttendance
+      resource_type: Workforce::Attendance
       default_roles:
         - Team Manager
         - Team Admin
       operations:
-        - read 
+        - read
     attendance_edit_access:
       title: "Who Can edit attendances"
       hint: "Select Team Members who can edit attendances"
-      resource_type: WorkforceAttendance
+      resource_type: Workforce::Attendance
       default_roles:
         - Team Admin
       operations:
-        - update 
+        - update
   assets:
     -
       type: "stylesheet"
