@@ -4,6 +4,7 @@ import Detail from "./pages/detail.vue";
 import Search from "./pages/search.vue";
 import SelectPicker from "./pages/select-picker.vue";
 import MapPage from "./pages/map.vue";
+import TakePhoto from './pages/take-photo';
 
 console.log('TIME_CLOCK addon');
 
@@ -31,6 +32,10 @@ const routes = [
   {
     path: "/time-clock/map/",
     component: MapPage,
+  },
+  {
+    path: "/time-clock/take-photo/",
+    component: TakePhoto,
   },
 ];
 

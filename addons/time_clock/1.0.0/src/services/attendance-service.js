@@ -67,7 +67,7 @@ const AttendanceService = {
    * @returns {*}
    */
   splitAttendanceIntoDays(data = [], self) {
-    console.log('TIMECLOCK - splitAttendanceIntoDays');
+    // console.log('TIMECLOCK - splitAttendanceIntoDays');
 
     //format the data.
     const today = self.$moment(new Date()).format('YYYY-MM-DD');
@@ -75,7 +75,7 @@ const AttendanceService = {
 
     const days = data.reduce((days, attendance) => {
       const dateTimestamp = attendance.timestamp; //.split('T')[0];
-      console.log('TIMECLOCK - splitAttendanceIntoDays - dateTimestamp', dateTimestamp);
+      // console.log('TIMECLOCK - splitAttendanceIntoDays - dateTimestamp', dateTimestamp);
       const date = self.$moment(dateTimestamp).format('YYYY-MM-DD');
       if (!days[date]) {
 
