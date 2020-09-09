@@ -29,7 +29,7 @@
 
     </f7-toolbar>
     <f7-page-content>
-      <
+
       <h1 class="time-clock-take-photo__time">{{ timeDisplay }}</h1>
       <h2 class="time-clock-take-photo__date">{{ dayDisplay }}</h2>
       <Geo ref="geo" :dialog="false"/>

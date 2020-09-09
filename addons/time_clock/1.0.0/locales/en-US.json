@@ -31,8 +31,8 @@
     "who_can_clock_manually_title": "Who Can Manually Clock On/Off",
     "who_can_clock_title": "Who Can Clock On/Off",
     "who_can_break_title": "Who Can Start/Stop Breaks",
-    "export_csv_title": "Export CSV",
-    "export_csv_button": "Export CSV data"
+    "lock_mini_program_title": "Lock time clock mini program",
+    "lock_mini_program_toggle": "Time clock locked?"
   },
   "search": {
     "title": "Time Clock Search",

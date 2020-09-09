@@ -31,8 +31,8 @@
     "who_can_clock_manually_title": "谁可以手动打卡",
     "who_can_clock_title": "谁可以上下班打卡",
     "who_can_break_title": "谁可以开始/结束休息",
-    "export_csv_title": "导出CSV",
-    "export_csv_button": "导出CSV数据"
+    "lock_mini_program_title": "锁时钟迷你程序",
+    "lock_mini_program_toggle": "时钟锁定了吗？"
   },
   "search": {
     "title": "打卡搜索",
