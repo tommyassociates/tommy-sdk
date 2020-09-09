@@ -84,12 +84,20 @@ app.init({
       // loggedIn,
       language,
       addons: [],
+      miniProgramLocked:{
+        isLocked: false,
+        miniProgram: '',
+      },
     };
   },
   methods: {
     mounted() {
       const self = this;
       localStorage.setItem('serverUrl', SANDBOX_URL);
+
+      if (localStorage.miniProgramLocked) {
+        self.$root.miniProgramLocked = JSON.parse(localStorage.miniProgramLocked);
+      }
 
       //logout will just clear state.
       // self.$store.dispatch('resetState').then(() => {
