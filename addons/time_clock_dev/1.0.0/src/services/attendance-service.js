@@ -1,3 +1,5 @@
+import addonConfig from "../config";
+
 const AttendanceService = {
   test: undefined,
 
@@ -69,6 +71,7 @@ const AttendanceService = {
   splitAttendanceIntoDays(data = [], self) {
     // console.log('TIMECLOCK - splitAttendanceIntoDays');
 
+
     //format the data.
     const today = self.$moment(new Date()).format('YYYY-MM-DD');
     const yesterday = self.$moment(today).subtract(1, 'day').format('YYYY-MM-DD');
@@ -82,9 +85,9 @@ const AttendanceService = {
         //work out title.
         let title = '';
         if (self.$moment(dateTimestamp).format('YYYY-MM-DD') === today) {
-          title = self.$t('time_clock.index.today_title');
+          title = self.$t(`${addonConfig.package}.index.today_title`);
         } else if (self.$moment(dateTimestamp).format('YYYY-MM-DD') === yesterday) {
-          title = self.$t('time_clock.index.yesterday_title');
+          title = self.$t(`${addonConfig.package}.index.yesterday_title`);
         } else {
           title = self.$moment(dateTimestamp).format('ddd Do MMM, YYYY');
         }
@@ -108,7 +111,7 @@ const AttendanceService = {
    * @returns {{[p: string]: {title: *, attendances: [*]}, active: {title: *, attendances: [*]}}}
    */
   formatAttendanceActive(data = [], self) {
-    const title = self.$t('time_clock.index.active_title');
+    const title = self.$t(`${addonConfig.package}.index.active_title`);
     return {
       ['active']: {
         title,

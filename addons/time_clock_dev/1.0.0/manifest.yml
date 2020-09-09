@@ -1,5 +1,5 @@
 ---
-  title: "Time Clock"
+  title: "Time Clock (DEV)"
   package: "time_clock_dev"
   summary: "Manage your time."
   description: "Manage your time."
@@ -50,8 +50,8 @@
       file: "build/addon.js"
   views:
     index:
-      title: "Time Clock"
+      title: "Time Clock (DEV)"
       type: "page"
       index: true
-      path: "/time-clock/"
+      path: "/time-clock-dev/"
       actor_permission: addon_actor_access

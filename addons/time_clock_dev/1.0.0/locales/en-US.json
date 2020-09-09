@@ -69,5 +69,8 @@
     "cancel_button": "Cancel",
     "confirm_button": "Confirm",
     "done_button": "Done"
+  },
+  "take_photo": {
+    "title": "Take photo"
   }
 }

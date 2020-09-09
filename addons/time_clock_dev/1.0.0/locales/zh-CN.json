@@ -69,5 +69,8 @@
     "cancel_button": "取消",
     "confirm_button": "确认",
     "done_button": "完成"
+  },
+  "take_photo": {
+    "title": "拍照"
   }
 }

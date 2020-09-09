@@ -2,7 +2,7 @@
   <f7-page class="time-clock-take-photo" :page-content="false">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
-      <f7-nav-title>{{ $t('time_clock.index.title') }}</f7-nav-title>
+      <f7-nav-title>{{ $t(`${addonConfig.package}.take_photo.title`) }}</f7-nav-title>
     </f7-navbar>
 
     <!-- v-if="attendances_enable && loaded.first" -->
@@ -16,7 +16,7 @@
         v-if="!clock_on"
         @click="clockOnClick"
         class="time-clock-toolbar-button clock-on"
-      >{{ $t('time_clock.index.clock_on_button') }}
+      >{{ $t(`${addonConfig.package}.index.clock_on_button`) }}
       </f7-button>
       <f7-button
         raised
@@ -24,7 +24,7 @@
         v-if="clock_on"
         @click="clockOffClick"
         class="time-clock-toolbar-button clock-off"
-      >{{ $t('time_clock.index.clock_off_button') }} {{ formatDuration() }}
+      >{{ $t(`${addonConfig.package}.index.clock_off_button`) }} {{ formatDuration() }}
       </f7-button>
 
     </f7-toolbar>
@@ -39,7 +39,7 @@
 
 <script>
 
-
+import addonConfig from "../config";
 import API from "../api";
 import AttendanceService from "../services/attendance-service";
 
@@ -55,6 +55,7 @@ export default {
   data() {
     const self = this;
     return {
+      addonConfig,
       timeDisplay: self.$moment().format('h:mm:ss A'),
       dayDisplay: self.$moment().format('dddd, Do MMMM'),
       clock_on: false,

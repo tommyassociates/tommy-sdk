@@ -2,7 +2,7 @@
   <f7-page class="time-clock-settings-page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{ $t('time_clock.settings.title') }}</f7-nav-title>
+      <f7-nav-title>{{ $t(`${addonConfig.package}.settings.title`) }}</f7-nav-title>
       <f7-nav-right>
         <!--        <f7-link icon-only class="back">-->
         <!--          <f7-icon f7="check" />-->
@@ -12,11 +12,11 @@
 
     <f7-page-content ref="pageContent">
       <template v-if="canLockMiniProgram">
-        <f7-block-title class="time-clock-divider">{{ $t('time_clock.settings.lock_mini_program_title') }}
+        <f7-block-title class="time-clock-divider">{{ $t(`${addonConfig.package}.settings.lock_mini_program_title`) }}
         </f7-block-title>
         <f7-list>
           <f7-list-item>
-            <span>{{ $t('time_clock.settings.lock_mini_program_toggle') }}</span>
+            <span>{{ $t(`${addonConfig.package}.settings.lock_mini_program_toggle`) }}</span>
             <f7-toggle :checked="$root.miniProgramLocked.isLocked"
                        @toggle:change="toggleIsMiniProgramLocked"></f7-toggle>
           </f7-list-item>
@@ -68,6 +68,7 @@
 </template>
 
 <script>
+import addonConfig from "../config";
 import API from '../api';
 import {mapGetters} from 'vuex';
 import AttendanceService from "../services/attendance-service";
@@ -139,7 +140,7 @@ export default {
 
     toggleIsMiniProgramLocked(isLocked) {
       const self = this;
-      const name = 'time_clock_dev';
+      const name = self.addonConfig.package;
       const uuid = window.device && window.device.uuid ? window.device.uuid : '';
 
 
@@ -192,6 +193,7 @@ export default {
   },
   data() {
     return {
+      addonConfig,
       hasActorId: API.actorId,
       permissions: [],
 

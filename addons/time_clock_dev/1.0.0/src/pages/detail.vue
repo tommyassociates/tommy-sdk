@@ -6,7 +6,7 @@
   >
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{$t('time_clock.event_details.title')}}</f7-nav-title>
+      <f7-nav-title>{{$t(`${addonConfig.package}.event_details.title`)}}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
         <f7-link icon-only @click="editAttendance" v-if="edit_acces">
           <f7-icon f7="check" />
@@ -14,11 +14,11 @@
       </f7-nav-right>
     </f7-navbar>
     <f7-toolbar v-if="edit_acces">
-      <f7-button @click="deleteClick()">{{$t('time_clock.event_details.delete_button')}}</f7-button>
+      <f7-button @click="deleteClick()">{{$t(`${addonConfig.package}.event_details.delete_button`)}}</f7-button>
     </f7-toolbar>
     <f7-list media-list v-if="loaded">
       <f7-list-item
-        :title="$t('time_clock.event_details.time_label')"
+        :title="$t(`${addonConfig.package}.event_details.time_label`)"
         :link="edit_acces"
         @click.native="openTimePickerDetail()"
       >
@@ -27,13 +27,13 @@
         </div>
       </f7-list-item>
       <f7-list-item
-        :title="$t('time_clock.event_details.date_label')"
+        :title="$t(`${addonConfig.package}.event_details.date_label`)"
         :link="edit_acces"
         @click.native="openCalendar()"
         :after="dateField"
       ></f7-list-item>
       <f7-list-item
-        :title="$t('time_clock.event_details.who_label')"
+        :title="$t(`${addonConfig.package}.event_details.who_label`)"
         :link="edit_acces"
         @click.native="openSelector()"
       >
@@ -43,13 +43,13 @@
         </div>
       </f7-list-item>
       <f7-list-item
-        :title="$t('time_clock.event_details.where_label')"
+        :title="$t(`${addonConfig.package}.event_details.where_label`)"
         :link="true"
         :after="detail_data.address"
         @click.native="openMapPage"
       ></f7-list-item>
       <f7-list-item
-        :title="$t('time_clock.event_details.photo_label')"
+        :title="$t(`${addonConfig.package}.event_details.photo_label`)"
         :link="true"
         @click.native="openPhoto()"
         v-if="detail_data.status === 'start' || detail_data.status === 'stop'"
@@ -59,10 +59,10 @@
         </div>
       </f7-list-item>
       <f7-list-item
-        :title="$t('time_clock.event_details.action_label')"
+        :title="$t(`${addonConfig.package}.event_details.action_label`)"
         :link="edit_acces"
         sheet-open=".time-clock-action-sheet"
-        :after="$t('time_clock.index.clock_event_options.'+detail_data.status)"
+        :after="$t(`${addonConfig.package}.index.clock_event_options.${detail_data.status}`)"
         @click="sheet_action_opened = true"
       ></f7-list-item>
     </f7-list>
@@ -92,10 +92,10 @@
             sheet-close
             class="cancel"
             @click="clearAction"
-          >{{$t('time_clock.event_details.cancel_button')}}</f7-link>
+          >{{$t(`${addonConfig.package}.event_details.cancel_button`)}}</f7-link>
         </div>
         <div class="right">
-          <f7-link sheet-close @click="setAction">{{$t('time_clock.event_details.done_button')}}</f7-link>
+          <f7-link sheet-close @click="setAction">{{$t(`${addonConfig.package}.event_details.done_button`)}}</f7-link>
         </div>
       </f7-toolbar>
       <f7-page-content>
@@ -103,7 +103,7 @@
           <f7-list-item
             radio
             :checked="detail_data.status === 'start'"
-            :title="$t('time_clock.index.clock_event_options.start')"
+            :title="$t(`${addonConfig.package}.index.clock_event_options.start`)"
             name="time-clock-detail-action"
             @change="changeAction('start')"
             value="start"
@@ -111,7 +111,7 @@
           <f7-list-item
             radio
             :checked="detail_data.status === 'stop'"
-            :title="$t('time_clock.index.clock_event_options.stop')"
+            :title="$t(`${addonConfig.package}.index.clock_event_options.stop`)"
             name="time-clock-detail-action"
             @change="changeAction('stop')"
             value="stop"
@@ -119,7 +119,7 @@
           <f7-list-item
             radio
             :checked="detail_data.status === 'pause'"
-            :title="$t('time_clock.index.clock_event_options.pause')"
+            :title="$t(`${addonConfig.package}.index.clock_event_options.pause`)"
             name="time-clock-detail-action"
             @change="changeAction('pause')"
             value="pause"
@@ -127,7 +127,7 @@
           <f7-list-item
             radio
             :checked="detail_data.status === 'resume'"
-            :title="$t('time_clock.index.clock_event_options.resume')"
+            :title="$t(`${addonConfig.package}.index.clock_event_options.resume`)"
             name="time-clock-detail-action"
             @change="changeAction('resume')"
             value="resume"
@@ -139,6 +139,7 @@
   </f7-page>
 </template>
 <script>
+import addonConfig from "../config";
 import API from "../api";
 import dialog from "../mixins/dialog.vue";
 import timePicker from "../mixins/time-picker.vue";
@@ -201,7 +202,7 @@ export default {
       self.$f7router.navigate("/time-clock/select-picker/", {
         props: {
           selected: self.detail_data.user_id,
-          pageTitle: self.$t("time_clock.event_details.who_label"),
+          pageTitle: self.$t(`${addonConfig.package}.event_details.who_label`),
           multiply: false,
           getData: self.getDataUser,
           type: "team",
@@ -253,7 +254,7 @@ export default {
 
       API.editAttendance(self.detail_data.id, form).then(() => {
         self.$f7router.back();
-        self.$events.$emit("time_clock:attedance_edit", self.detail_data);
+        self.$events.$emit(`${addonConfig.package}:attedance_edit`, self.detail_data);
       });
     },
     deleteAttendance() {
@@ -261,16 +262,16 @@ export default {
       if (!self.edit_acces) return;
       API.deleteAttendance(self.detail_data.id).then(() => {
         self.$f7router.back();
-        self.$events.$emit("time_clock:attedance_delete", self.detail_data);
+        self.$events.$emit(`${addonConfig.package}:attedance_delete`, self.detail_data);
       });
     },
     deleteClick() {
       const self = this;
       self.confirmDialog(
         false,
-        self.$t("time_clock.event_details.delete_text"),
-        self.$t("time_clock.event_details.confirm_button"),
-        self.$t("time_clock.event_details.cancel_button"),
+        self.$t(`${addonConfig.package}.event_details.delete_text`),
+        self.$t(`${addonConfig.package}.event_details.confirm_button`),
+        self.$t(`${addonConfig.package}.event_details.cancel_button`),
         self.deleteAttendance,
         false,
         null,
@@ -429,7 +430,7 @@ export default {
   mounted() {
     const self = this;
     self.$api
-      .getInstalledAddonPermission("time_clock", "attendance_edit_access", {
+      .getInstalledAddonPermission(addonConfig.package, "attendance_edit_access", {
         with_filters: true
       })
       .then(v => {
@@ -460,6 +461,7 @@ export default {
   data() {
     const self = this;
     return {
+      addonConfig,
       image_preview: null,
       sheet_action_opened: false,
       new_action: null,

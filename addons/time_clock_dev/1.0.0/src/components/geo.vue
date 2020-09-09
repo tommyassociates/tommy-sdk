@@ -1,5 +1,6 @@
 <template></template>
 <script>
+import addonConfig from "../config";
 export default {
   name: "Geo",
   props: {
@@ -18,7 +19,7 @@ export default {
 
       if (self.dialog)
         self.dialogProgress = self.$f7.dialog.progress(
-          self.$t("time_clock.index.geo_loading")
+          self.$t(`${addonConfig.package}.index.geo_loading`)
         );
       navigator.geolocation.getCurrentPosition(self.onSuccess, self.onError, {
         maximumAge: 600000,
@@ -31,7 +32,7 @@ export default {
 
       if (self.dialog)
         self.dialogProgress = self.$f7.dialog.progress(
-          self.$t("time_clock.index.geo_loading")
+          self.$t(`${addonConfig.package}.index.geo_loading`)
         );
 
       return new Promise((resolve, reject) => {
@@ -101,6 +102,7 @@ export default {
   data() {
     const self = this;
     return {
+      addonConfig,
       isCordova: self.$f7.device.cordova
     };
   }

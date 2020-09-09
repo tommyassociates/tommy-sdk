@@ -1,40 +1,41 @@
+import addonConfig from "./config";
 import Index from "./pages/index.vue";
 import Settings from "./pages/settings.vue";
 import Detail from "./pages/detail.vue";
 import Search from "./pages/search.vue";
 import SelectPicker from "./pages/select-picker.vue";
-import MapPage from "./pages/map.vue";
+// import MapPage from "./pages/map.vue";
 import TakePhoto from './pages/take-photo';
 
 console.log('TIME_CLOCK addon');
 
 const routes = [
   {
-    path: "/time-clock/",
+    path: `${addonConfig.baseUrl}`,
     component: Index,
   },
   {
-    path: "/time-clock/settings/",
+    path: `${addonConfig.baseUrl}settings/`,
     component: Settings,
   },
   {
-    path: "/time-clock/detail/:id",
+    path: `${addonConfig.baseUrl}detail/:id`,
     component: Detail,
   },
   {
-    path: "/time-clock/search/",
+    path: `${addonConfig.baseUrl}search/`,
     component: Search,
   },
   {
-    path: "/time-clock/select-picker/",
+    path: `${addonConfig.baseUrl}select-picker/`,
     component: SelectPicker,
   },
+  // {
+  //   path: `${addonConfig.baseUrl}map/`,
+  //   component: MapPage,
+  // },
   {
-    path: "/time-clock/map/",
-    component: MapPage,
-  },
-  {
-    path: "/time-clock/take-photo/",
+    path: `${addonConfig.baseUrl}take-photo/`,
     component: TakePhoto,
   },
 ];
