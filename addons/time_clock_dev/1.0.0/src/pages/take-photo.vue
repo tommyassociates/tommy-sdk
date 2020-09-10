@@ -82,10 +82,10 @@ export default {
     if (window.cordova) {
       CameraPreview.startCamera({
         x: 50,
-        y: 170,
+        y: 185,
         width: 220,
         height: 220,
-        toBack: true,
+        toBack: false,
         previewDrag: false,
         tapPhoto: true
       });
