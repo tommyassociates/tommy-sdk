@@ -11,17 +11,19 @@
     </f7-navbar>
 
     <f7-page-content ref="pageContent">
+
       <template v-if="canLockMiniProgram">
         <f7-block-title class="time-clock-divider">{{ $t(`${addonConfig.package}.settings.lock_mini_program_title`) }}
         </f7-block-title>
         <f7-list>
           <f7-list-item>
             <span>{{ $t(`${addonConfig.package}.settings.lock_mini_program_toggle`) }}</span>
-            <f7-toggle :checked="$root.miniProgramLocked.isLocked"
+            <f7-toggle :checked="settings.miniProgram.isLocked"
                        @toggle:change="toggleIsMiniProgramLocked"></f7-toggle>
           </f7-list-item>
         </f7-list>
       </template>
+
 
       <!--
       <f7-block-title class="time-clock-divider">{{$t('time_clock.settings.required_title')}}</f7-block-title>
@@ -70,6 +72,8 @@
 <script>
 import addonConfig from "../config";
 import API from '../api';
+import config from 'tommy-core/src/tommy';
+
 import {mapGetters} from 'vuex';
 import AttendanceService from "../services/attendance-service";
 // import GroupPopupCmp from '../components/group-popup.vue';
@@ -86,24 +90,31 @@ export default {
     // TagCmp,
   },
   computed: {
-    ...mapGetters('account', ['canLockMiniProgram']),
+    // ...mapGetters('account', ['canLockMiniProgram']),
+    canLockMiniProgram() {
+      return true;
+    }
+  },
+  created() {
+    console.log('SETTINGS - created');
   },
   mounted() {
     const self = this;
-    self.$api.getInstalledAddonPermission('wallet_accounts', 'wallet_accounts_transaction_create_access', {
-      resource_id: undefined,
-      with_filters: true,
-    }).then((permission) => {
-      permission.resource_id = undefined;
-      self.permissions.push(permission);
-    });
-    self.$api.getInstalledAddonPermission('wallet_accounts', 'wallet_accounts_transaction_edit_access', {
-      resource_id: undefined,
-      with_filters: true,
-    }).then((permission) => {
-      permission.resource_id = undefined;
-      self.permissions.push(permission);
-    });
+    console.log('SETTINGS - mounted');
+    // self.$api.getInstalledAddonPermission('wallet_accounts', 'wallet_accounts_transaction_create_access', {
+    //   resource_id: undefined,
+    //   with_filters: true,
+    // }).then((permission) => {
+    //   permission.resource_id = undefined;
+    //   self.permissions.push(permission);
+    // });
+    // self.$api.getInstalledAddonPermission('wallet_accounts', 'wallet_accounts_transaction_edit_access', {
+    //   resource_id: undefined,
+    //   with_filters: true,
+    // }).then((permission) => {
+    //   permission.resource_id = undefined;
+    //   self.permissions.push(permission);
+    // });
 
     // self.items = [
     //   {
@@ -119,48 +130,128 @@ export default {
 
   },
   methods: {
-    saveListPermission(permission) {
-      const self = this;
-      self.$api.updateInstalledAddonPermission('wallet_accounts', permission.name, {
-        resource_id: permission.resource_id,
-        with_filters: true,
-        filters: JSON.stringify(permission.filters),
-      });
-    },
-    addListPermission(permission, tag) {
-      const self = this;
-      permission.filters.push(tag);
-      self.saveListPermission(permission);
-    },
-    removeListPermission(permission, tag) {
-      const self = this;
-      permission.filters.splice(permission.filters.indexOf(tag), 1);
-      self.saveListPermission(permission);
-    },
+    // saveListPermission(permission) {
+    //   const self = this;
+    //   self.$api.updateInstalledAddonPermission('wallet_accounts', permission.name, {
+    //     resource_id: permission.resource_id,
+    //     with_filters: true,
+    //     filters: JSON.stringify(permission.filters),
+    //   });
+    // },
+    // addListPermission(permission, tag) {
+    //   const self = this;
+    //   permission.filters.push(tag);
+    //   self.saveListPermission(permission);
+    // },
+    // removeListPermission(permission, tag) {
+    //   const self = this;
+    //   permission.filters.splice(permission.filters.indexOf(tag), 1);
+    //   self.saveListPermission(permission);
+    // },
 
     toggleIsMiniProgramLocked(isLocked) {
+      // console.log('SETTINGS - toggleIsMiniProgramLocked', isLocked);
       const self = this;
       const name = self.addonConfig.package;
       const uuid = window.device && window.device.uuid ? window.device.uuid : '';
+      const platform = window.device && window.device.platform ? String(window.device.platform).toLowerCase() : '';
+      const environment = config.env || 'development';
 
 
+      self.$api.getDevices({cache: false}).then(devices => {
+        // const deviceToken = devices.find(device => device.uuid === uuid).map(device => device.token);
+        const deviceToken = devices.find(device => device.uuid === uuid);
 
-      const payload = {
-        name,
-        uuid,
-        locked: isLocked,
-        platform: String(window.device.platform).toLowerCase(),
+        console.log('devices', JSON.stringify(devices));
 
-      };
+        console.log('uuid', uuid);
+        console.log('deviceToken', JSON.stringify(deviceToken));
 
-      self.$api.updateDevice(payload).then(() => {
-        self.$root.miniProgramLocked.isLocked = isLocked;
-        if (isLocked) {
-          self.$root.miniProgramLocked.miniProgram = name;
+        const payload = {
+          locked: isLocked,
+          uuid,
+          platform,
+          environment,
+        };
+
+        payload.name = isLocked ? name : '';
+
+        console.log('toggleIsMiniProgramLocked: payload', JSON.stringify(payload));
+
+        if (deviceToken) {
+          console.log('before unregisterDevice: ', deviceToken.id);
+          self.$api.unregisterDevice(deviceToken.id).then(() => {
+            console.log('before updateDevice');
+            self.$api.updateDevice(payload).then((response) => {
+              payload.token = deviceToken.token;
+              console.log('toggleIsMiniProgramLocked: payload', JSON.stringify(payload));
+              console.log(JSON.stringify(response));
+              self.$root.miniProgramLocked.isLocked = payload.locked;
+              self.$root.miniProgramLocked.miniProgram = payload.name;
+              localStorage.miniProgramLocked = JSON.stringify(self.$root.miniProgramLocked);
+
+              if (isLocked) {
+                self.$f7router.navigate(`${addonConfig.baseUrl}locked/enter-code`);
+              }
+            }).catch((error) => {
+              console.log('update device error');
+              console.log(JSON.stringify(error));
+            });
+          });
+        } else {
+          const randomString = (length) => [ ...Array(length) ].map(() => (~~(Math.random() * 36)).toString(36)).join('');
+          const token = randomString(21);
+          payload.token = token;
+          self.$api.updateDevice(payload).then((response) => {
+            console.log(JSON.stringify(response));
+            self.$root.miniProgramLocked.isLocked = payload.locked;
+            self.$root.miniProgramLocked.miniProgram = payload.name;
+            localStorage.miniProgramLocked = JSON.stringify(self.$root.miniProgramLocked);
+
+            if (isLocked) {
+              self.$f7router.navigate(`${addonConfig.baseUrl}locked/enter-code`);
+            }
+          }).catch((error) => {
+            console.log(JSON.stringify(error));
+          });
         }
-        localStorage.miniProgramLocked = JSON.stringify(self.$root.miniProgramLocked);
+        // new Promise((resolve) => {
+        //   console.log('deviceToken', deviceToken);
+        //   if (deviceToken) {
+        //     self.$api.unregisterDevice(deviceToken).then(() => resolve());
+        //   } else {
+        //     resolve();
+        //   }
+        // }).then(() => {
+        //   const payload = {
+        //     locked: isLocked,
+        //     uuid,
+        //     platform,
+        //     environment,
+        //   };
+        //
+        //   payload.name = isLocked ? name : '';
+        //
+        //   console.log('toggleIsMiniProgramLocked: payload', JSON.stringify(payload));
+        //
+        //   self.$api.updateDevice(payload).then((response) => {
+        //     console.log(JSON.stringify(response));
+        //     self.$root.miniProgramLocked.isLocked = payload.locked;
+        //     self.$root.miniProgramLocked.miniProgram = payload.name;
+        //     localStorage.miniProgramLocked = JSON.stringify(self.$root.miniProgramLocked);
+        //
+        //     if (isLocked) {
+        //       self.$f7router.navigate(`${addonConfig.baseUrl}locked/enter-code`);
+        //     }
+        //   }).catch((error) => {
+        //     console.log(JSON.stringify(error));
+        //   });
+        // }).catch((error) => {
+        //   console.log(JSON.stringify(error));
+        // });
+      }).catch((error) => {
+        console.log(JSON.stringify(error));
       });
-
     },
 
 
@@ -197,8 +288,12 @@ export default {
       hasActorId: API.actorId,
       permissions: [],
 
-      attendanceData: [],
-      csvHeaders: [],
+      settings: {
+        miniProgram: {
+          isLocked: false,
+          miniProgram: '',
+        },
+      },
 
       //copied from broadcast.
       // lists: null,
@@ -218,5 +313,3 @@ export default {
   }
 };
 </script>
-
-

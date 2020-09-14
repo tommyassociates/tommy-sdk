@@ -40,6 +40,7 @@
 <script>
 
 import addonConfig from "../config";
+import config from 'tommy-core/src/tommy';
 import API from "../api";
 import AttendanceService from "../services/attendance-service";
 
@@ -89,6 +90,7 @@ export default {
         previewDrag: false,
         tapPhoto: true
       });
+      CameraPreview.show();
     }
 
     const otherOptions = {
@@ -161,41 +163,43 @@ export default {
       const self = this;
       console.log('TIME CLOCK: clockOnClick');
 
+      if (window.cordova) {
+        self.$f7.preloader.show()
+        self.$refs.geo.takeGeoAsync().then(cords => {
+          // self.$refs.photo.takePhotoAsync().then(photo => {
 
-      self.$f7.preloader.show()
-      self.$refs.geo.takeGeoAsync().then(cords => {
-        // self.$refs.photo.takePhotoAsync().then(photo => {
+          console.log('TAKE_PHOTO: ', JSON.stringify(cords));
+          CameraPreview.takePicture({width: 1024, height: 1024, quality: 80}, function (base64PictureData) {
+            console.log('TAKE_PHOTO: CameraPreview.takePicture ', JSON.stringify(base64PictureData));
+            // CameraPreview.stopCamera();
+            CameraPreview.hide();
+            console.log('TAKE_PHOTO: After  CameraPreview.stopCamera();');
 
-        console.log('TAKE_PHOTO: ', JSON.stringify(cords));
-        CameraPreview.takePicture({width:1024, height:1024, quality: 80}, function(base64PictureData) {
-          console.log('TAKE_PHOTO: CameraPreview.takePicture ', JSON.stringify(base64PictureData));
-          CameraPreview.stopCamera();
-          console.log('TAKE_PHOTO: After  CameraPreview.stopCamera();');
+            const form = new FormData();
+            form.append("event_id", API.shifts_active_id);
+            form.append("latitude", cords.latitude);
+            form.append("longitude", cords.longitude);
+            form.append("accuracy", cords.accuracy);
+            form.append("status", "start");
+            form.append("address", cords.name);
+            form.append(
+              "image",
+              self.dataURLToBlob(base64PictureData),
+              `attendance_stop.jpg`
+            );
 
-          const form = new FormData();
-          form.append("event_id", API.shifts_active_id);
-          form.append("latitude", cords.latitude);
-          form.append("longitude", cords.longitude);
-          form.append("accuracy", cords.accuracy);
-          form.append("status", "start");
-          form.append("address", cords.name);
-          form.append(
-            "image",
-            self.dataURLToBlob(base64PictureData),
-            `attendance_stop.jpg`
-          );
+            self.loaded.duration = 0;
 
-          self.loaded.duration = 0;
-
-          API.setAttendances(form).then(() => {
-            self.clock_on = false;
-            self.$f7.preloader.hide()
-            self.$f7router.navigate('/time-clock/');
+            API.setAttendances(form).then(() => {
+              self.clock_on = false;
+              self.$f7.preloader.hide()
+              self.$f7router.navigate(addonConfig.baseUrl);
+            });
+          }).catch(() => {
+            self.$f7.preloader.hide();
           });
-        }).catch(() => {
-          self.$f7.preloader.hide();
         });
-      });
+      }
 
 
       // self.$f7.preloader.show()
@@ -229,45 +233,54 @@ export default {
 
       console.log('TIME CLOCK: clockOffClick');
 
+      if (window.cordova) {
 
 
+        self.$f7.preloader.show()
+        self.$refs.geo.takeGeoAsync().then(cords => {
+          // self.$refs.photo.takePhotoAsync().then(photo => {
 
-      self.$f7.preloader.show()
-      self.$refs.geo.takeGeoAsync().then(cords => {
-        // self.$refs.photo.takePhotoAsync().then(photo => {
+          console.log('TAKE_PHOTO: ', JSON.stringify(cords));
+          CameraPreview.takePicture({width: 1024, height: 1024, quality: 80}, function (base64PictureData) {
+            console.log('TAKE_PHOTO: CameraPreview.takePicture ', JSON.stringify(base64PictureData));
+            // CameraPreview.stopCamera();
+            // CameraPreview.hide();
+            console.log('TAKE_PHOTO: After  CameraPreview.stopCamera();');
 
-        console.log('TAKE_PHOTO: ', JSON.stringify(cords));
-        CameraPreview.takePicture({width:1024, height:1024, quality: 80}, function(base64PictureData) {
-          console.log('TAKE_PHOTO: CameraPreview.takePicture ', JSON.stringify(base64PictureData));
-          CameraPreview.stopCamera();
-          console.log('TAKE_PHOTO: After  CameraPreview.stopCamera();');
+            const form = new FormData();
+            form.append("event_id", API.shifts_active_id);
+            form.append("latitude", cords.latitude);
+            form.append("longitude", cords.longitude);
+            form.append("accuracy", cords.accuracy);
+            form.append("status", "stop");
+            form.append("address", cords.name);
+            form.append(
+              "image",
+              self.dataURLToBlob(base64PictureData),
+              `attendance_stop.jpg`
+            );
 
-          const form = new FormData();
-          form.append("event_id", API.shifts_active_id);
-          form.append("latitude", cords.latitude);
-          form.append("longitude", cords.longitude);
-          form.append("accuracy", cords.accuracy);
-          form.append("status", "stop");
-          form.append("address", cords.name);
-          form.append(
-            "image",
-            self.dataURLToBlob(base64PictureData),
-            `attendance_stop.jpg`
-          );
+            self.loaded.duration = 0;
 
-          self.loaded.duration = 0;
-
-          API.setAttendances(form).then(() => {
-            self.clock_on = false;
-            self.$f7.preloader.hide()
-            self.$f7router.navigate('/time-clock/');
+            API.setAttendances(form).then(() => {
+              self.clock_on = false;
+              self.$f7.preloader.hide()
+              self.$f7router.navigate(addonConfig.baseUrl);
+            });
+          }).catch(() => {
+            self.$f7.preloader.hide();
           });
-        }).catch(() => {
-          self.$f7.preloader.hide();
         });
-      });
+      }
     },
-  }
+  },
+  destroyed() {
+    const self = this;
+    if (window.cordova) {
+      // CameraPreview.stopCamera();
+      CameraPreview.hide();
+    }
+  },
 }
 </script>
 
