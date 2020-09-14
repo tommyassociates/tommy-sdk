@@ -20,7 +20,7 @@ const AttendanceService = {
 
       console.log('TIMECLOCK - prepareAttendances - after data check. data - e', JSON.stringify(e));
 
-      const user = self.$store.state.teamMembers.teamMembers.find(
+      const user = self.$root.teamMembers.find(
         member => member.user_id === e.user_id
       );
       console.log('TIMECLOCK - prepareAttendances - after data check. data - user', JSON.stringify(user));
@@ -49,7 +49,7 @@ const AttendanceService = {
     //   member => member.user_id === data.user_id
     // );
 
-    const user = self.$store.state.teamMembers.teamMembers.find(
+    const user = self.$root.teamMembers.find(
       member => member.user_id === data.user_id
     );
     data.user_name = `${user.first_name} ${user.last_name}`;

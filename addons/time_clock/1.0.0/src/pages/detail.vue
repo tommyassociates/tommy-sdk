@@ -313,7 +313,7 @@ export default {
     },
     prepareAttendance(data) {
       const self = this;
-      const user = self.$store.state.teamMembers.teamMembers.filter(
+      const user = self.$root.teamMembers.filter(
         member => member.user_id === data.user_id
       );
       data.user_name = user[0].first_name + " " + user[0].last_name;

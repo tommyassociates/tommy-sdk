@@ -166,7 +166,7 @@ const API = {
       return Number(userId);
     } else {
       // return Number(self.$root.account.user_id);
-      return Number(self.$store.state.account.account.user_id);
+      return Number(self.$root.account.user_id);
     }
   },
   getActor(self) {
@@ -176,13 +176,13 @@ const API = {
       //   user => user.user_id === parseInt(self.userId, 10)
       // )[0];
 
-      return self.$store.state.teamMembers.teamMembers.filter(
+      return self.$root.teamMembers.filter(
         user => user.user_id === parseInt(self.userId, 10)
       )[0];
 
     } else {
       // return self.$root.account;
-      return self.$store.state.account.account;
+      return self.$root.account;
     }
   },
 

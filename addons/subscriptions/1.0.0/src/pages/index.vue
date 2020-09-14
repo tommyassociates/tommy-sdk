@@ -26,9 +26,8 @@
             <f7-block strong inset>
               <f7-block-header>{{$t('subscriptions.index.payment_method.title')}}</f7-block-header>
 
-              <div class="alert alert-danger" v-if="!initialHasCreditCard">
+              <div class="alert alert-danger" v-if="!initialHasCreditCard && $root.team">
                 {{ $t('subscriptions.index.billing.missing_payment_details', {teamName: $root.team.name}) }}
-
                 <credit-card-form :billingInfo="billingInfo"></credit-card-form>
               </div>
 
@@ -43,7 +42,6 @@
                       <p>{{billingInfo.card_brand}} ending in {{billingInfo.card_last4}}<br>
                         {{billingInfo.card_exipiry_month}}/{{billingInfo.card_exipiry_year}}<br>
                         {{billingInfo.first_name}} {{billingInfo.last_name}}</p>
-
                       <f7-row>
                         <f7-col width="50">
                           <a href="#" class="tommy-button tommy-button--primary"
@@ -54,18 +52,13 @@
                         </f7-col>
                       </f7-row>
                     </template>
-
                     <template v-if="isEditingPaymentInfo">
                       <credit-card-form :billingInfo="billingInfo" @update="onCreditCardUpdate"></credit-card-form>
                     </template>
-
-
                   </f7-col>
 
                 </f7-row>
               </template>
-
-
             </f7-block>
 
             <f7-block strong inset>
@@ -73,15 +66,12 @@
               <p>{{$t('subscriptions.index.monthly_estimate.description')}}</p>
             </f7-block>
           </f7-col>
-
-
         </f7-row>
       </template>
     </f7-page-content>
   </f7-page>
 </template>
 <script>
-
   import API from "../api";
   import addonAssetsUrl from '../utils/addon-assets-url';
   import billingDetailsForm from '../components/billing-details-form';
@@ -91,6 +81,7 @@
   export default {
     data() {
       const self = this;
+
       const name = self.$root.account.contact_name
         .trim()
         .replace(/\s\s+/g, ' ');
@@ -103,7 +94,6 @@
         const [, ...surnameArray] = namesArray;
         lastName = surnameArray.join(' ');
       }
-
 
       return {
         loaded: false,
