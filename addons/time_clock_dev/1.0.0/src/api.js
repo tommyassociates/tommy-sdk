@@ -218,6 +218,36 @@ const API = {
     });
     return typeof view !== "undefined";
   },
+
+  resetPin() {
+    return api
+      .call({
+        endpoint: "team/members/reset_pin",
+        method: "GET",
+        cache: false,
+      })
+      .then(data => {
+        return data;
+      });
+  },
+
+  verifyPin(pin) {
+    const data = {
+      pin,
+    };
+
+    return api
+      .call({
+        endpoint: "team/members/verify_pin",
+        method: "POST",
+        cache: false,
+        data,
+      })
+      .then(data => {
+        return data;
+      });
+  },
+
 };
 
 

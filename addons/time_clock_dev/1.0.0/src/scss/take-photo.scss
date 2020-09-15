@@ -4,11 +4,19 @@
     font-size: 36px;
     margin-bottom: 3px;
   }
+
   &__date {
     text-align: center;
     font-size: 18px;
     margin-top: 0;
   }
+
+  &__description {
+    text-align: center;
+    font-size: 16px;
+    padding-top: 16px;
+  }
+
 
   //&__mask {
   //  position: absolute;

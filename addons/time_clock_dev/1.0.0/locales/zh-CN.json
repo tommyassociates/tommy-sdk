@@ -74,7 +74,8 @@
     "title": "拍照"
   },
   "locked": {
-    "enter_code": {
+    "enter_pin": {
+      "title": "输入密码",
       "description": "请输入您的密码",
       "keypad": {
         "one": "一",
@@ -85,7 +86,8 @@
         "six": "六",
         "seven": "七",
         "eight": "八",
-        "nine": "九"
+        "nine": "九",
+        "zero": "〇"
       }
     }
   }

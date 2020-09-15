@@ -13,6 +13,10 @@
         <f7-link :href="`${addonConfig.baseUrl}settings/`" icon-only>
           <f7-icon f7="gear"/>
         </f7-link>
+
+        <f7-link :href="`${addonConfig.baseUrl}locked/enter-code/`">
+          PC.
+        </f7-link>
       </f7-nav-right>
     </f7-navbar>
 
@@ -137,6 +141,10 @@ export default {
     API.actor = API.getActor(self);
     self.$events.$on(`${self.addonConfig.package}:attedance_edit`, self.updateAll);
     self.$events.$on(`${self.addonConfig.package}:attedance_delete`, self.updateAll);
+
+    if (self.$root.miniProgramLocked.isLocked === true && self.$root.miniProgramLocked.miniProgram === self.addonConfig.package) {
+      self.$f7router.navigate(`${self.addonConfig.baseUrl}locked/enter-code`);
+    }
   },
   computed: {
     pageContentStyle() {

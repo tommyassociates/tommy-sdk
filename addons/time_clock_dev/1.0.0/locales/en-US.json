@@ -74,7 +74,8 @@
     "title": "Take photo"
   },
   "locked": {
-    "enter_code": {
+    "enter_pin": {
+      "title": "Enter pin",
       "description": "Please enter your pin",
       "keypad": {
         "one": "1",
@@ -85,7 +86,8 @@
         "six": "6",
         "seven": "7",
         "eight": "8",
-        "nine": "9"
+        "nine": "9",
+        "zero": "0"
       }
     }
   }

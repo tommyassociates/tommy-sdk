@@ -7,7 +7,7 @@ import SelectPicker from "./pages/select-picker.vue";
 // import MapPage from "./pages/map.vue";
 import TakePhoto from './pages/take-photo';
 
-import LockedEnterCode from './pages/locked/enter-code';
+import LockedEnterCode from './pages/locked/enter-pin';
 
 console.log('TIME_CLOCK addon');
 
