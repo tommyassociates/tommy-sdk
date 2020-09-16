@@ -39,7 +39,7 @@
 
 <script>
 
-import addonConfig from "../config";
+import addonConfig from "../addonConfig";
 import config from 'tommy-core/src/tommy';
 import API from "../api";
 import AttendanceService from "../services/attendance-service";

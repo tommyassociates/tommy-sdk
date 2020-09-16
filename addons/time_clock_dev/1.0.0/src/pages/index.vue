@@ -14,7 +14,7 @@
           <f7-icon f7="gear"/>
         </f7-link>
 
-        <f7-link :href="`${addonConfig.baseUrl}locked/enter-code/`">
+        <f7-link :href="`${addonConfig.baseUrl}locked/enter-pin/`">
           PC.
         </f7-link>
       </f7-nav-right>
@@ -93,7 +93,7 @@
   </f7-page>
 </template>
 <script>
-import addonConfig from "../config";
+import addonConfig from "../addonConfig";
 import API from "../api";
 import AttendanceService from "../services/attendance-service";
 
@@ -142,9 +142,9 @@ export default {
     self.$events.$on(`${self.addonConfig.package}:attedance_edit`, self.updateAll);
     self.$events.$on(`${self.addonConfig.package}:attedance_delete`, self.updateAll);
 
-    if (self.$root.miniProgramLocked.isLocked === true && self.$root.miniProgramLocked.miniProgram === self.addonConfig.package) {
-      self.$f7router.navigate(`${self.addonConfig.baseUrl}locked/enter-code`);
-    }
+    // if (self.$root.miniProgramLocked.isLocked === true && self.$root.miniProgramLocked.miniProgram === self.addonConfig.package) {
+    //   self.$f7router.navigate(`${self.addonConfig.baseUrl}locked/enter-pin`);
+    // }
   },
   computed: {
     pageContentStyle() {

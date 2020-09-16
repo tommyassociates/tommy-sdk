@@ -1,6 +1,6 @@
 <template></template>
 <script>
-import addonConfig from "../config";
+import addonConfig from "../addonConfig";
 export default {
   name: "Geo",
   props: {

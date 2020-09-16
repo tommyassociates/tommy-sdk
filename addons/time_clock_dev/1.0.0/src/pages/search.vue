@@ -59,7 +59,7 @@
   </f7-page>
 </template>
 <script>
-import addonConfig from "../config";
+import addonConfig from "../addonConfig";
 import API from "../api";
 import AttendanceService from "../services/attendance-service";
 

@@ -139,7 +139,7 @@
   </f7-page>
 </template>
 <script>
-import addonConfig from "../config";
+import addonConfig from "../addonConfig";
 import API from "../api";
 import dialog from "../mixins/dialog.vue";
 import timePicker from "../mixins/time-picker.vue";

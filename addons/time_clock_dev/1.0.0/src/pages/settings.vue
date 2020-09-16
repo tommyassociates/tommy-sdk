@@ -70,7 +70,7 @@
 </template>
 
 <script>
-import addonConfig from "../config";
+import addonConfig from "../addonConfig";
 import API from '../api';
 import config from 'tommy-core/src/tommy';
 
@@ -191,7 +191,7 @@ export default {
               localStorage.miniProgramLocked = JSON.stringify(self.$root.miniProgramLocked);
 
               if (isLocked) {
-                self.$f7router.navigate(`${addonConfig.baseUrl}locked/enter-code`);
+                self.$f7router.navigate(`${addonConfig.baseUrl}locked/enter-pin`);
               }
             }).catch((error) => {
               console.log('update device error');
@@ -209,7 +209,7 @@ export default {
             localStorage.miniProgramLocked = JSON.stringify(self.$root.miniProgramLocked);
 
             if (isLocked) {
-              self.$f7router.navigate(`${addonConfig.baseUrl}locked/enter-code`);
+              self.$f7router.navigate(`${addonConfig.baseUrl}locked/enter-pin`);
             }
           }).catch((error) => {
             console.log(JSON.stringify(error));
@@ -241,7 +241,7 @@ export default {
         //     localStorage.miniProgramLocked = JSON.stringify(self.$root.miniProgramLocked);
         //
         //     if (isLocked) {
-        //       self.$f7router.navigate(`${addonConfig.baseUrl}locked/enter-code`);
+        //       self.$f7router.navigate(`${addonConfig.baseUrl}locked/enter-pin`);
         //     }
         //   }).catch((error) => {
         //     console.log(JSON.stringify(error));

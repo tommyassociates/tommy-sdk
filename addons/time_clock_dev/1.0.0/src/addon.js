@@ -1,4 +1,4 @@
-import addonConfig from "./config";
+import addonConfig from "./addonConfig";
 import Index from "./pages/index.vue";
 import Settings from "./pages/settings.vue";
 import Detail from "./pages/detail.vue";
@@ -7,7 +7,7 @@ import SelectPicker from "./pages/select-picker.vue";
 // import MapPage from "./pages/map.vue";
 import TakePhoto from './pages/take-photo';
 
-import LockedEnterCode from './pages/locked/enter-pin';
+import LockedEnterPin from './pages/locked/enter-pin';
 
 console.log('TIME_CLOCK addon');
 
@@ -42,8 +42,8 @@ const routes = [
   },
 
   {
-    path: `${addonConfig.baseUrl}locked/enter-code/`,
-    component: LockedEnterCode,
+    path: `${addonConfig.baseUrl}locked/enter-pin/`,
+    component: LockedEnterPin,
   },
 ];
 

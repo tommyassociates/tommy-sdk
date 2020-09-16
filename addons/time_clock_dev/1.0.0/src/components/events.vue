@@ -51,7 +51,7 @@
 </template>
 
 <script>
-import addonConfig from "../config";
+import addonConfig from "../addonConfig";
 
 export default {
   nane: "Events",

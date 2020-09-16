@@ -1,7 +1,6 @@
 <template>
   <f7-page class="time-clock-settings-page">
     <f7-navbar>
-      <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{ $t(`${addonConfig.package}.locked.enter_pin.title`) }}</f7-nav-title>
       <f7-nav-right>
         <!--        <f7-link icon-only class="back">-->
@@ -135,7 +134,7 @@
 </template>
 
 <script>
-import addonConfig from "../../config";
+import addonConfig from "../../addonConfig";
 import API from "../../api";
 import backspaceIcon from '../../components/icons/backspace-icon';
 
