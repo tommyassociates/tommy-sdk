@@ -88,6 +88,7 @@
         :loaded="loaded.attendance"
         v-if="loaded.attendance"
       />
+      <Photo ref="photo" direction="front"/>
       <Geo ref="geo" :dialog="false"/>
     </f7-page-content>
   </f7-page>
@@ -99,7 +100,7 @@ import AttendanceService from "../services/attendance-service";
 
 import ActiveAvatar from "../components/circle-avatar.vue";
 import Events from "../components/events.vue";
-// import Photo from 'tommy-core/src/components/photo.vue';
+import Photo from 'tommy-core/src/components/photo.vue';
 import Geo from "../components/geo.vue";
 import Blob from "../mixins/baseToBlob.vue";
 
@@ -132,6 +133,7 @@ export default {
   components: {
     ActiveAvatar,
     Events,
+    Photo,
     Geo
   },
   mixins: [Blob],
@@ -188,54 +190,71 @@ export default {
       const self = this;
       console.log('TIME CLOCK: clockOnClick');
 
-      if (window.cordova) {
-        self.$f7router.navigate(`${self.addonConfig.baseUrl}take-photo/`);
-      } else {
+      // if (window.cordova) {
+      //   self.$f7router.navigate(`${self.addonConfig.baseUrl}take-photo/`);
+      // } else {
         self.$f7.preloader.show()
         self.$refs.geo.takeGeoAsync().then(cords => {
-          const form = new FormData();
-          form.append("event_id", API.shifts_active_id);
-          form.append("latitude", cords.latitude);
-          form.append("longitude", cords.longitude);
-          form.append("accuracy", cords.accuracy);
-          form.append("status", "start");
-          form.append("address", cords.name);
+          self.$refs.photo.takePhotoAsync().then(photo => {
+            const form = new FormData();
+            form.append("event_id", API.shifts_active_id);
+            form.append("latitude", cords.latitude);
+            form.append("longitude", cords.longitude);
+            form.append("accuracy", cords.accuracy);
+            form.append("status", "start");
+            form.append("address", cords.name);
+            form.append(
+              "image",
+              self.dataURLToBlob(photo),
+              `attendance_start.jpg`
+            );
 
-          API.setAttendances(form).then(() => {
-            self.updateAll();
-            self.clock_on = true;
-            self.$f7.preloader.hide()
+            API.setAttendances(form).then(() => {
+              self.updateAll();
+              self.clock_on = true;
+              self.$f7.preloader.hide()
+            });
+          }).catch(() => {
+            self.$f7.preloader.hide();
           });
         });
-      }
+      // }
     },
     clockOffClick() {
       const self = this;
 
       console.log('TIME CLOCK: clockOffClick');
-      if (window.cordova) {
-        self.$f7router.navigate(`${self.addonConfig.baseUrl}take-photo/`);
-      } else {
+      // if (window.cordova) {
+      //   self.$f7router.navigate(`${self.addonConfig.baseUrl}take-photo/`);
+      // } else {
         self.$f7.preloader.show()
         self.$refs.geo.takeGeoAsync().then(cords => {
-          const form = new FormData();
-          form.append("event_id", API.shifts_active_id);
-          form.append("latitude", cords.latitude);
-          form.append("longitude", cords.longitude);
-          form.append("accuracy", cords.accuracy);
-          form.append("status", "stop");
-          form.append("address", cords.name);
+          self.$refs.photo.takePhotoAsync().then(photo => {
+            const form = new FormData();
+            form.append("event_id", API.shifts_active_id);
+            form.append("latitude", cords.latitude);
+            form.append("longitude", cords.longitude);
+            form.append("accuracy", cords.accuracy);
+            form.append("status", "stop");
+            form.append("address", cords.name);
+            form.append(
+              "image",
+              self.dataURLToBlob(photo),
+              `attendance_stop.jpg`
+            );
 
+            self.loaded.duration = 0;
 
-          self.loaded.duration = 0;
-
-          API.setAttendances(form).then(() => {
-            self.updateAll();
-            self.clock_on = false;
-            self.$f7.preloader.hide()
-          });
+            API.setAttendances(form).then(() => {
+              self.updateAll();
+              self.clock_on = false;
+              self.$f7.preloader.hide()
+            });
+          })
+        }).catch(() => {
+          self.$f7.preloader.hide();
         });
-      }
+      // }
     },
     breakOnClick() {
       const self = this;
