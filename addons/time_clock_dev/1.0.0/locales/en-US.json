@@ -88,7 +88,8 @@
         "eight": "8",
         "nine": "9",
         "zero": "0"
-      }
+      },
+      "button": "Continue"
     },
     "unlock_device": {
       "title": "Unlock device",

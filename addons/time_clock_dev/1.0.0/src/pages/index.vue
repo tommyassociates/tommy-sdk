@@ -14,9 +14,6 @@
           <f7-icon f7="gear"/>
         </f7-link>
 
-        <f7-link :href="`${addonConfig.baseUrl}locked/enter-pin/`">
-          PC.
-        </f7-link>
       </f7-nav-right>
     </f7-navbar>
 

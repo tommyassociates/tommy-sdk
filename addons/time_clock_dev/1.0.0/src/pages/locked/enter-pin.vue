@@ -16,20 +16,10 @@
       <f7-button
         raised
         fill
-        v-if="!clock_on"
-        @click="clockOnClick"
+        @click="continueClick"
         class="time-clock-toolbar-button clock-on"
         :disabled="!submitPinValid"
-      >{{ $t(`${addonConfig.package}.index.clock_on_button`) }}
-      </f7-button>
-      <f7-button
-        raised
-        fill
-        v-if="clock_on"
-        @click="clockOffClick"
-        class="time-clock-toolbar-button clock-off"
-        :disabled="!submitPinValid"
-      >{{ $t(`${addonConfig.package}.index.clock_off_button`) }} {{ formatDuration() }}
+      >{{ $t(`${addonConfig.package}.locked.enter_pin.button`) }}
       </f7-button>
 
     </f7-toolbar>
@@ -204,11 +194,17 @@ export default {
       }
     },
 
-    clockOnClick() {
+    continueClick() {
       const self = this;
 
+      console.log('continue click');
+
       API.verifyPin(self.pin.toString()).then((response) => {
-        console.log(response);
+        console.log('continue click - verify pin');
+        console.log(JSON.stringify(response));
+      }).catch((error) => {
+        self.$root.notify(error.message);
+        self.deletePinNumber();
       });
 
       // console.log('TIME CLOCK: clockOnClick');
@@ -278,51 +274,7 @@ export default {
       //   });
       // });
     },
-    clockOffClick() {
-      const self = this;
 
-      console.log('TIME CLOCK: clockOffClick');
-
-      if (window.cordova) {
-
-
-        self.$f7.preloader.show()
-        self.$refs.geo.takeGeoAsync().then(cords => {
-          // self.$refs.photo.takePhotoAsync().then(photo => {
-
-          console.log('TAKE_PHOTO: ', JSON.stringify(cords));
-          CameraPreview.takePicture({width: 1024, height: 1024, quality: 80}, function (base64PictureData) {
-            console.log('TAKE_PHOTO: CameraPreview.takePicture ', JSON.stringify(base64PictureData));
-            // CameraPreview.stopCamera();
-            // CameraPreview.hide();
-            console.log('TAKE_PHOTO: After  CameraPreview.stopCamera();');
-
-            const form = new FormData();
-            form.append("event_id", API.shifts_active_id);
-            form.append("latitude", cords.latitude);
-            form.append("longitude", cords.longitude);
-            form.append("accuracy", cords.accuracy);
-            form.append("status", "stop");
-            form.append("address", cords.name);
-            form.append(
-              "image",
-              self.dataURLToBlob(base64PictureData),
-              `attendance_stop.jpg`
-            );
-
-            self.loaded.duration = 0;
-
-            API.setAttendances(form).then(() => {
-              self.clock_on = false;
-              self.$f7.preloader.hide()
-              self.$f7router.navigate(addonConfig.baseUrl);
-            });
-          }).catch(() => {
-            self.$f7.preloader.hide();
-          });
-        });
-      }
-    },
   },
   data() {
     const self = this;
@@ -332,7 +284,6 @@ export default {
       dayDisplay: self.$moment().format('dddd, Do MMMM'),
       pin: [],
       pinPreview: [],
-      clock_on: false,
     };
   }
 };
