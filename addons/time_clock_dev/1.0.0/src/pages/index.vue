@@ -189,11 +189,9 @@ export default {
     clockOnClick() {
       const self = this;
       console.log('TIME CLOCK: clockOnClick');
+      self.$f7.preloader.show()
+      if (window.cordova) {
 
-      // if (window.cordova) {
-      //   self.$f7router.navigate(`${self.addonConfig.baseUrl}take-photo/`);
-      // } else {
-        self.$f7.preloader.show()
         self.$refs.geo.takeGeoAsync().then(cords => {
           self.$refs.photo.takePhotoAsync().then(photo => {
             const form = new FormData();
@@ -218,16 +216,30 @@ export default {
             self.$f7.preloader.hide();
           });
         });
-      // }
+      } else {
+        self.$refs.geo.takeGeoAsync().then(cords => {
+          const form = new FormData();
+          form.append("event_id", API.shifts_active_id);
+          form.append("latitude", cords.latitude);
+          form.append("longitude", cords.longitude);
+          form.append("accuracy", cords.accuracy);
+          form.append("status", "start");
+          form.append("address", cords.name);
+
+          API.setAttendances(form).then(() => {
+            self.updateAll();
+            self.clock_on = true;
+            self.$f7.preloader.hide()
+          });
+        });
+      }
     },
     clockOffClick() {
       const self = this;
 
       console.log('TIME CLOCK: clockOffClick');
-      // if (window.cordova) {
-      //   self.$f7router.navigate(`${self.addonConfig.baseUrl}take-photo/`);
-      // } else {
-        self.$f7.preloader.show()
+      self.$f7.preloader.show()
+      if (window.cordova) {
         self.$refs.geo.takeGeoAsync().then(cords => {
           self.$refs.photo.takePhotoAsync().then(photo => {
             const form = new FormData();
@@ -254,7 +266,26 @@ export default {
         }).catch(() => {
           self.$f7.preloader.hide();
         });
-      // }
+      } else {
+        self.$refs.geo.takeGeoAsync().then(cords => {
+
+          const form = new FormData();
+          form.append("event_id", API.shifts_active_id);
+          form.append("latitude", cords.latitude);
+          form.append("longitude", cords.longitude);
+          form.append("accuracy", cords.accuracy);
+          form.append("status", "stop");
+          form.append("address", cords.name);
+
+          self.loaded.duration = 0;
+
+          API.setAttendances(form).then(() => {
+            self.updateAll();
+            self.clock_on = false;
+            self.$f7.preloader.hide()
+          });
+        })
+      }
     },
     breakOnClick() {
       const self = this;
