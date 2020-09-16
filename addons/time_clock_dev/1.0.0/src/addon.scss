@@ -20,16 +20,17 @@
 
 
 .time-clock-main-page {
-    color: $tommy-dark;
+  color: $tommy-dark;
 }
 
-.time-clock-active{
-    background: #fff;
+.time-clock-active {
+  background: #fff;
 }
 
 .ios {
   .toolbar.time-clock-main-toolbar {
     background: white;
+
     .toolbar-inner {
       padding: 0 12px;
       display: flex;
@@ -77,128 +78,150 @@
     }
   }
 }
+
 .time-clock-detail-page,
-.time-clock-map-page{
-    color: #333333;
-    .toolbar{
-        background-color: #fff;
-        height: 50px;
-        .toolbar-inner{
-            justify-content: center;
-        }
-        .button{
-            height: 30px;
-            font-size: 20px;
-            border: none;
-            color: #E64545;
-        }
-    }
-    .list.media-list{
-        .item-content{
-            height: 65px;
-        }
-        .item-title{
-            font-size: 18px;
-            color: #999999;
-            line-height: 44px;
-        }
-        .item-after, input{
-            font-size: 16px;
-            text-align: right;
-            color: #333333;
-            line-height: 44px;
-        }
-        .image{
-            display: block;
-            width: 40px;
-            height: 40px;
-            margin-left: 12px;
-            background-color: #eee;
-            background-size: 100% auto;
-            background-position: center;
-            background-repeat: no-repeat;
-        }
-        .after-container{
-            display: flex;
-        }
-    }
-    .map-container{
-        width: 100%;
-        height: 100%;
-        display: block;
-    }
-}
-.time-clock-action-sheet{
-    .list{
-        margin: 0 !important;
-    }
-    .item-content{
-        height: 50px;
-    }
-    .item-title{
-        font-size: 18px;
-        color: #333333;
-    }
-    .toolbar{
-        height: 50px !important;
-        background-color: #fff !important;
-    }
-    .toolbar-inner{
-        font-size: 18px;
-        padding: 0 15px !important;
-    }
-    .cancel{
-        color: #999;
-    }
-}
-.time-clock-search-page{
-    .not-found{
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #333;
-        font-size: 22px;
-    }
-}
-.time-clock-range-page{
-    .list{
-        margin: 0 !important;
+.time-clock-map-page {
+  color: #333333;
+
+  .toolbar {
+    background-color: #fff;
+    height: 50px;
+
+    .toolbar-inner {
+      justify-content: center;
     }
 
-    .item-content{
-        height: 50px;
+    .button {
+      height: 30px;
+      font-size: 20px;
+      border: none;
+      color: #E64545;
     }
-    .item-title{
-        font-size: 18px;
-        color: #333333;
+  }
+
+  .list.media-list {
+    .item-content {
+      height: 65px;
     }
-    .item-after{
-        font-size: 16px !important;
-        color: #999 !important;
+
+    .item-title {
+      font-size: 18px;
+      color: #999999;
+      line-height: 44px;
     }
-    .custom{
-        margin-top: 12px !important;
+
+    .item-after, input {
+      font-size: 16px;
+      text-align: right;
+      color: #333333;
+      line-height: 44px;
     }
+
+    .image {
+      display: block;
+      width: 40px;
+      height: 40px;
+      margin-left: 12px;
+      background-color: #eee;
+      background-size: 100% auto;
+      background-position: center;
+      background-repeat: no-repeat;
+    }
+
+    .after-container {
+      display: flex;
+    }
+  }
+
+  .map-container {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
 }
-.form-radio input[type="radio"]:checked~i,
-label.label-radio input[type="checkbox"]:checked~.item-inner,
-label.label-radio input[type="radio"]:checked~.item-inner {
+
+.time-clock-action-sheet {
+  .list {
+    margin: 0 !important;
+  }
+
+  .item-content {
+    height: 50px;
+  }
+
+  .item-title {
+    font-size: 18px;
+    color: #333333;
+  }
+
+  .toolbar {
+    height: 50px !important;
+    background-color: #fff !important;
+  }
+
+  .toolbar-inner {
+    font-size: 18px;
+    padding: 0 15px !important;
+  }
+
+  .cancel {
+    color: #999;
+  }
+}
+
+.time-clock-search-page {
+  .not-found {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #333;
+    font-size: 22px;
+  }
+}
+
+.time-clock-range-page {
+  .list {
+    margin: 0 !important;
+  }
+
+  .item-content {
+    height: 50px;
+  }
+
+  .item-title {
+    font-size: 18px;
+    color: #333333;
+  }
+
+  .item-after {
+    font-size: 16px !important;
+    color: #999 !important;
+  }
+
+  .custom {
+    margin-top: 12px !important;
+  }
+}
+
+.form-radio input[type="radio"]:checked ~ i,
+label.label-radio input[type="checkbox"]:checked ~ .item-inner,
+label.label-radio input[type="radio"]:checked ~ .item-inner {
   @include encoded-svg-background("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 10'><polygon fill='${orange}' points='11.6,0 4.4,7.2 1.4,4.2 0,5.6 4.4,10 4.4,10 4.4,10 13,1.4 '/></svg>");
 }
 
-.time-clock-settings-page{
+.time-clock-settings-page {
 
 }
 
 @import "./scss/searchbar.scss";
 
-#time-clock-map-conainer{
-    display: block;
-    width: 100%;
-    height: 100%;
+#time-clock-map-conainer {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
-// @import "../../../../node_modules/leaflet/dist/leaflet";
 
+// @import "../../../../node_modules/leaflet/dist/leaflet";
 
 
 //Copied from broadcast
@@ -228,7 +251,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
       .item {
         width: 100%;
 
-        >p {
+        > p {
           margin: 0;
           overflow: hidden;
           white-space: nowrap;
@@ -236,9 +259,11 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
           width: auto;
           line-height: 28px;
 
-          &.item-message {}
+          &.item-message {
+          }
 
-          &.item.item {}
+          &.item.item {
+          }
         }
 
       }
@@ -255,7 +280,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
     font-size: 20px;
   }
 
-  .message-textarea{
+  .message-textarea {
     width: calc(100% - 32px);
     background: #fff;
     padding: 16px;
@@ -273,7 +298,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
       align-items: center;
       width: 100%;
 
-      p.icon{
+      p.icon {
         width: 60px;
         display: flex;
         justify-content: center;
@@ -288,7 +313,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
       border: 1px solid #ff4500;
       border-radius: 10px;
 
-      >.tag {
+      > .tag {
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -300,14 +325,14 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
         font-size: 20px;
         width: 80px;
 
-        .tag1{
+        .tag1 {
           font-size: 36px;
           line-height: 36px;
           font-weight: 700;
         }
       }
 
-      >.title {
+      > .title {
         background: #fff7f4;
         display: flex;
         flex-direction: row;
@@ -315,7 +340,8 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
         border-top-right-radius: 10px;
         border-bottom-right-radius: 10px;
         padding: 0px 16px;
-        .name{
+
+        .name {
           flex: 1;
           line-height: 40px;
         }
@@ -347,7 +373,7 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
       border: 1px solid #ff4500;
       border-radius: 10px;
 
-      >.tag {
+      > .tag {
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -359,14 +385,14 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
         font-size: 20px;
         width: 80px;
 
-        .tag1{
+        .tag1 {
           font-size: 36px;
           line-height: 36px;
           font-weight: 700;
         }
       }
 
-      >.title {
+      > .title {
         background: #fff7f4;
         display: flex;
         flex-direction: row;
@@ -374,7 +400,8 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
         border-top-right-radius: 10px;
         border-bottom-right-radius: 10px;
         padding: 0px 16px;
-        .name{
+
+        .name {
           flex: 1;
         }
       }
@@ -399,15 +426,16 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
 }
 
 
-
 //TODO move to core.
 .ios {
   .navbar {
     width: 100%;
+
     i {
       color: #333;
     }
   }
+
   .block-title {
     margin-top: 0px;
     margin-bottom: 0px;
@@ -416,4 +444,31 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
     border-top: 1px solid #f1f1f1;
     border-bottom: 1px solid #f1f1f1;
   }
+}
+
+
+.time-clock__numeric-button {
+  color: white;
+  background: $tommy-theme-color;
+  border: 1px solid $tommy-theme-color;
+  width: 64px;
+  height: 64px;
+  font-weight: 400;
+  font-size: 34px;
+  padding: 0;
+
+  &--small-text {
+    font-size: 14px;
+  }
+
+  svg {
+    width: 35px;
+  }
+}
+
+.time-clock__entered-code {
+  font-size: 31px;
+  max-width: 210px;
+  margin: 0 auto;
+  padding-top: 32px;
 }

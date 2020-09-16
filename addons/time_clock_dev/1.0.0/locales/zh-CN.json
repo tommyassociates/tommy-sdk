@@ -15,12 +15,12 @@
     "clock_off_button": "下班打卡",
     "break_on_button": "开始休息",
     "break_off_button": "结束休息",
-    "geo_loading": "Geolocation loading",
-    "geo": "Geolocation",
-    "photo": "Photo",
-    "sending": "Sending",
-    "no_activity": "No Activity",
-    "no_attendances": "No Attendances"
+    "geo_loading": "地理位置加载",
+    "geo": "地理位置",
+    "photo": "照片",
+    "sending": "正在发送",
+    "no_activity": "没有活动",
+    "no_attendances": "没有出席"
   },
   "settings": {
     "title": "设置",
@@ -40,10 +40,10 @@
     "notset_label": "未设置",
     "active_label": "激活",
     "date_options": ["今天", "昨天"],
-    "search_placeholder": "Search Member, Role, Location…",
+    "search_placeholder": "搜索成员，角色，位置…",
     "search_disable_button": "取消",
-    "results_divider": "Search Result",
-    "not_found": "Not found"
+    "results_divider": "搜索结果",
+    "not_found": "未找到"
   },
   "date_range": {
     "title": "日期区间",
@@ -65,9 +65,38 @@
     "photo_label": "照片",
     "action_label": "行动",
     "delete_button": "删除",
-    "delete_text": "Are you sure you want to delete this entry?",
+    "delete_text": "您确定要删除该条目吗？",
     "cancel_button": "取消",
     "confirm_button": "确认",
     "done_button": "完成"
+  },
+  "take_photo": {
+    "title": "拍照"
+  },
+  "locked": {
+    "enter_pin": {
+      "title": "输入密码",
+      "description": "请输入您的密码",
+      "keypad": {
+        "one": "一",
+        "two": "二",
+        "three": "三",
+        "four": "四",
+        "five": "五",
+        "six": "六",
+        "seven": "七",
+        "eight": "八",
+        "nine": "九",
+        "zero": "〇"
+      },
+      "button": "继续"
+    },
+    "unlock_device": {
+      "title": "解锁装置",
+      "enter_password_title": "输入您的帐户详细信息以解锁设备",
+      "email_or_phone_field_placeholder_text": "电子邮件或电话号码",
+      "password_field_placeholder_text": "输入密码",
+      "button_text": "解锁装置"
+    }
   }
 }
