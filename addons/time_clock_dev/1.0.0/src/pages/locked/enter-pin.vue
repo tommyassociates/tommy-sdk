@@ -34,9 +34,9 @@
 
     </f7-toolbar>
 
-    <f7-page-content ref="pageContent">
+    <f7-page-content ref="pageContent" style="padding-top:10px;">
 
-      <f7-block>
+      <f7-block style="margin-top:0px;">
         <h1 class="time-clock-take-photo__time">{{ timeDisplay }}</h1>
         <h2 class="time-clock-take-photo__date">{{ dayDisplay }}</h2>
         <h3 class="time-clock-take-photo__description">{{

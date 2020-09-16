@@ -451,10 +451,11 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
   color: white;
   background: $tommy-theme-color;
   border: 1px solid $tommy-theme-color;
-  width: 60px;
-  height: 60px;
+  width: 64px;
+  height: 64px;
   font-weight: 400;
   font-size: 34px;
+  padding: 0;
 
   &--small-text {
     font-size: 14px;
