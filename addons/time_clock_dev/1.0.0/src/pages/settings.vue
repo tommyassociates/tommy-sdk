@@ -153,8 +153,14 @@ export default {
       // console.log('SETTINGS - toggleIsMiniProgramLocked', isLocked);
       const self = this;
       const name = self.addonConfig.package;
-      const uuid = window.device && window.device.uuid ? window.device.uuid : '';
-      const platform = window.device && window.device.platform ? String(window.device.platform).toLowerCase() : '';
+
+      //TODO : Remove debug.
+      const uuid = 'MAC---79278561-E311-42E6-BB0E-B5168E6D54E1';
+      const platform = 'mac';
+
+      // const uuid = window.device && window.device.uuid ? window.device.uuid : '';
+      // const platform = window.device && window.device.platform ? String(window.device.platform).toLowerCase() : '';
+
       const environment = config.env || 'development';
 
 
@@ -190,9 +196,9 @@ export default {
               self.$root.miniProgramLocked.miniProgram = payload.name;
               localStorage.miniProgramLocked = JSON.stringify(self.$root.miniProgramLocked);
 
-              if (isLocked) {
-                self.$f7router.navigate(`${addonConfig.baseUrl}locked/enter-pin`);
-              }
+              console.log('before redirect 1');
+              console.log(`${addonConfig.baseUrl}locked/enter-pin`);
+              self.$f7router.navigate(`${addonConfig.baseUrl}locked/enter-pin/`);
             }).catch((error) => {
               console.log('update device error');
               console.log(JSON.stringify(error));
@@ -208,9 +214,9 @@ export default {
             self.$root.miniProgramLocked.miniProgram = payload.name;
             localStorage.miniProgramLocked = JSON.stringify(self.$root.miniProgramLocked);
 
-            if (isLocked) {
-              self.$f7router.navigate(`${addonConfig.baseUrl}locked/enter-pin`);
-            }
+            console.log('before redirect 2');
+            console.log(`${addonConfig.baseUrl}locked/enter-pin`);
+            self.$f7router.navigate(`${addonConfig.baseUrl}locked/enter-pin/`);
           }).catch((error) => {
             console.log(JSON.stringify(error));
           });
