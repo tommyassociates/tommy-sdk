@@ -89,6 +89,13 @@
         "nine": "九",
         "zero": "〇"
       }
+    },
+    "unlock_device": {
+      "title": "解锁装置",
+      "enter_password_title": "输入您的帐户详细信息以解锁设备",
+      "email_or_phone_field_placeholder_text": "电子邮件或电话号码",
+      "password_field_placeholder_text": "输入密码",
+      "button_text": "解锁装置"
     }
   }
 }
