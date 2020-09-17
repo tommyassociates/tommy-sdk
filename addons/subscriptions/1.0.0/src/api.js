@@ -48,8 +48,8 @@ const API = {
           company_number: '1234123',
           card_brand: 'Visa',
           card_last4: '1221',
-          card_exipiry_month: '05',
-          card_exipiry_year: '2021',
+          card_expiry_month: '05',
+          card_expiry_year: '2021',
           card_cvc: '123',
         };
         resolve(data);

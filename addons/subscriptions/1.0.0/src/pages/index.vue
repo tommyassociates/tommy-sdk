@@ -12,7 +12,7 @@
           <f7-col width="100" tablet-width="50">
             <f7-block strong inset>
               <f7-block-header>{{$t('subscriptions.index.monthly_estimate.title')}}</f7-block-header>
-              <p>{{$t('subscriptions.index.monthly_estimate.description')}}</p>
+              <p>{{$t('subscriptions.index.monthly_estimate.description')}} {{formatDate(new Date(), 'MMMM Do, YYYY')}}</p>
               <p class="text-color-red text-large">{{totalAmount}}</p>
             </f7-block>
 
@@ -26,33 +26,34 @@
             <f7-block strong inset>
               <f7-block-header>{{$t('subscriptions.index.payment_method.title')}}</f7-block-header>
 
-              <div class="alert alert-danger" v-if="!initialHasCreditCard && $root.team">
-                {{ $t('subscriptions.index.billing.missing_payment_details', {teamName: $root.team.name}) }}
-                <credit-card-form :billingInfo="billingInfo"></credit-card-form>
+              <div class="alert alert-danger" v-if="!hasCreditCard && $root.team">
+                {{ $t('subscriptions.index.billing.missing_payment_details', {teamName: $root.team.name, trialExpiry: formatDate(billingInfo.trial_exipre_at, 'MMMM Do, YYYY')}) }}
+                <credit-card-form :billingInfo="billingInfo" @update="onCreditCardUpdate"></credit-card-form>
               </div>
 
-              <template v-if="initialHasCreditCard">
+              <!-- {{ billingInfo }} -->
+              <template v-if="hasCreditCard">
                 <f7-row class="row--mb">
-                  <f7-col class="col--credit-card-icon">
+                  <f7-col v-if="!showCreditCardForm" class="col--credit-card-icon">
                     <img :src="`${addonAssetsUrl()}/images/account/${billingInfo.card_brand}.png`"
                          :alt="billingInfo.card_brand">
                   </f7-col>
                   <f7-col class="col--credit-card-details">
-                    <template v-if="!isEditingPaymentInfo">
+                    <template v-if="!showCreditCardForm">
                       <p>{{billingInfo.card_brand}} ending in {{billingInfo.card_last4}}<br>
-                        {{billingInfo.card_exipiry_month}}/{{billingInfo.card_exipiry_year}}<br>
+                        {{billingInfo.card_expiry_month}}/{{billingInfo.card_expiry_year}}<br>
                         {{billingInfo.first_name}} {{billingInfo.last_name}}</p>
                       <f7-row>
                         <f7-col width="50">
                           <a href="#" class="tommy-button tommy-button--primary"
                              @click.prevent="editCreditCardDetailsClick">{{$t('subscriptions.index.payment_method.edit_button')}}</a>
                         </f7-col>
-                        <f7-col width="50">
+                        <!-- <f7-col width="50">
                           <a href="#" class="tommy-button tommy-button--secondary">{{$t('subscriptions.index.payment_method.details_button')}}</a>
-                        </f7-col>
+                        </f7-col> -->
                       </f7-row>
                     </template>
-                    <template v-if="isEditingPaymentInfo">
+                    <template v-else>
                       <credit-card-form :billingInfo="billingInfo" @update="onCreditCardUpdate"></credit-card-form>
                     </template>
                   </f7-col>
@@ -63,7 +64,7 @@
 
             <f7-block strong inset>
               <f7-block-header>{{$t('subscriptions.index.subscription_plan.title')}}</f7-block-header>
-              <p>{{$t('subscriptions.index.monthly_estimate.description')}}</p>
+              <p>{{$t('subscriptions.index.subscription_plan.monthly_plan.description')}}</p>
             </f7-block>
           </f7-col>
         </f7-row>
@@ -76,6 +77,8 @@
   import addonAssetsUrl from '../utils/addon-assets-url';
   import billingDetailsForm from '../components/billing-details-form';
   import creditCardForm from '../components/credit-card-form';
+  import formatDate from 'tommy-core/src/utils/format-date';
+  import {formatMoney} from 'tommy-core/src/utils/format-number';
 
 
   export default {
@@ -102,8 +105,7 @@
           last_name: lastName,
         },
         subscriptions: [],
-        isEditingPaymentInfo: false,
-        initialHasCreditCard: false,
+        isEditingCreditCard: false
       };
     },
     components: {
@@ -112,12 +114,21 @@
     },
     computed: {
       totalAmount() {
-        const self = this;
-        const amount = self.subscriptions.reduce((total, subscription) => Math.trunc(total) + Math.trunc(subscription.amount_cents), 0);
-        return amount;
+        return formatMoney(this.subscriptions.reduce((total, subscription) => Math.trunc(total) + Math.trunc(subscription.total_cents / 100.0), 0));
       },
+      // estimatedAmount() {
+      //   return formatMoney(this.$root.teamMembers.length)
+      // },
+      hasCreditCard() {
+        return this.billingInfo.customer_ref
+      },
+      showCreditCardForm() {
+        return !this.hasCreditCard || this.isEditingCreditCard
+      }
     },
     methods: {
+      formatDate,
+      // formatMoney,
       addonAssetsUrl,
       updateAll() {
         const self = this;
@@ -126,29 +137,24 @@
           const newBillingInfo = {...self.billingInfo, ...billingInfo};
           self.billingInfo = newBillingInfo;
           API.getSubscriptions({demoData}).then(subscriptions => {
+            console.log('loaded subscription', subscriptions)
             self.subscriptions = subscriptions;
             self.loaded = true;
           });
         });
       },
-
       onBillingInfoUpdate(billingInfo) {
         const self = this;
         self.billingInfo = billingInfo;
       },
-
       onCreditCardUpdate(billingInfo) {
         const self = this;
         self.billingInfo = billingInfo;
       },
-
-
       editCreditCardDetailsClick() {
         const self = this;
-        self.isEditingPaymentInfo = !self.isEditingPaymentInfo;
+        self.isEditingCreditCard = !self.isEditingCreditCard;
       },
-
-
     },
     mounted() {
       const self = this;

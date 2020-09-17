@@ -168,13 +168,11 @@
         const self = this;
         const data = self.billingInfo;
         API.updateBillingInfo({data}).then((billingInfo) => {
+          self.$app.notify('Details updated successfully');
           self.$emit('update', billingInfo);
+          // self.$parent.billingInfo = billingInfo
         });
       },
     }
   }
 </script>
-
-<style scoped>
-
-</style>
