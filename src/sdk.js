@@ -67,10 +67,10 @@ app.init({
       loggedIn = true;
     } else {
       token = null;
-    user = null;
-    account = null;
-    team = null;
-    teamMembers = null;
+      user = null;
+      account = null;
+      team = null;
+      teamMembers = null;
     }
 
     return {
