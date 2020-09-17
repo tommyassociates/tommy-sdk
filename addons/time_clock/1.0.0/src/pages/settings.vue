@@ -11,12 +11,17 @@
     </f7-navbar>
 
     <f7-page-content ref="pageContent">
-      <f7-block-title class="time-clock-divider">{{ $t('time_clock.settings.export_csv_title') }}</f7-block-title>
-      <f7-list>
-        <f7-list-item>
-          <a href="#" @click="exportCsv()">{{ $t('time_clock.settings.export_csv_button') }}</a>
-        </f7-list-item>
-      </f7-list>
+      <template v-if="canLockMiniProgram">
+        <f7-block-title class="time-clock-divider">{{ $t('time_clock.settings.lock_mini_program_title') }}
+        </f7-block-title>
+        <f7-list>
+          <f7-list-item>
+            <span>{{ $t('time_clock.settings.lock_mini_program_toggle') }}</span>
+            <f7-toggle :checked="$root.miniProgramLocked.isLocked"
+                       @toggle:change="toggleIsMiniProgramLocked"></f7-toggle>
+          </f7-list-item>
+        </f7-list>
+      </template>
 
       <!--
       <f7-block-title class="time-clock-divider">{{$t('time_clock.settings.required_title')}}</f7-block-title>
@@ -64,6 +69,7 @@
 
 <script>
 import API from '../api';
+import {mapGetters} from 'vuex';
 import AttendanceService from "../services/attendance-service";
 // import GroupPopupCmp from '../components/group-popup.vue';
 // import SearchCmp from '../components/search.vue';
@@ -77,6 +83,9 @@ export default {
     // GroupPopupCmp,
     // SearchCmp,
     // TagCmp,
+  },
+  computed: {
+    ...mapGetters('account', ['canLockMiniProgram']),
   },
   mounted() {
     const self = this;
@@ -128,14 +137,29 @@ export default {
       self.saveListPermission(permission);
     },
 
-    exportCsv() {
+    toggleIsMiniProgramLocked(isLocked) {
       const self = this;
-      const otherOptions = {
-        limit: 200,
+      const name = 'time_clock';
+      const uuid = window.device && window.device.uuid ? window.device.uuid : '';
+
+
+
+      const payload = {
+        name,
+        uuid,
+        locked: isLocked,
+        platform: String(window.device.platform).toLowerCase(),
+
       };
-      API.getAttendances({otherOptions}).then(data => {
-        self.attendanceData = data;
+
+      self.$api.updateDevice(payload).then(() => {
+        self.$root.miniProgramLocked.isLocked = isLocked;
+        if (isLocked) {
+          self.$root.miniProgramLocked.miniProgram = name;
+        }
+        localStorage.miniProgramLocked = JSON.stringify(self.$root.miniProgramLocked);
       });
+
     },
 
 
@@ -192,3 +216,5 @@ export default {
   }
 };
 </script>
+
+

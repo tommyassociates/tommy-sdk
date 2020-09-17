@@ -2,17 +2,18 @@
   <f7-page class="time-clock-main-page" :page-content="false" ptr @ptr:refresh="onPtrRefresh">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
-      <f7-nav-title>{{ $t('time_clock.index.title') }}</f7-nav-title>
+      <f7-nav-title>{{ $t(`${addonConfig.package}.index.title`) }}</f7-nav-title>
       <f7-nav-right class="time-clock-navbar-links">
-        <f7-link href="/time-clock/add/" icon-only>
+        <f7-link :href="`${addonConfig.baseUrl}add/`" icon-only>
           <f7-icon f7="plus"/>
         </f7-link>
-        <f7-link href="/time-clock/search/" icon-only>
+        <f7-link :href="`${addonConfig.baseUrl}search/`" icon-only>
           <f7-icon f7="search"/>
         </f7-link>
-        <f7-link href="/time-clock/settings/" icon-only>
+        <f7-link :href="`${addonConfig.baseUrl}settings/`" icon-only>
           <f7-icon f7="gear"/>
         </f7-link>
+
       </f7-nav-right>
     </f7-navbar>
 
@@ -27,7 +28,7 @@
         v-if="!clock_on && !break_on"
         @click="clockOnClick"
         class="time-clock-toolbar-button clock-on"
-      >{{ $t('time_clock.index.clock_on_button') }}
+      >{{ $t(`${addonConfig.package}.index.clock_on_button`) }}
       </f7-button>
       <f7-button
         raised
@@ -35,7 +36,7 @@
         v-if="clock_on && !break_on"
         @click="clockOffClick"
         class="time-clock-toolbar-button clock-off"
-      >{{ $t('time_clock.index.clock_off_button') }} {{ formatDuration() }}
+      >{{ $t(`${addonConfig.package}.index.clock_off_button`) }} {{ formatDuration() }}
       </f7-button>
       <f7-button
         raised
@@ -43,7 +44,7 @@
         v-if="clock_on && !break_on"
         @click="breakOnClick"
         class="time-clock-toolbar-button break-on"
-      >{{ $t('time_clock.index.break_on_button') }}
+      >{{ $t(`${addonConfig.package}.index.break_on_button`) }}
       </f7-button>
       <f7-button
         raised
@@ -51,7 +52,7 @@
         v-if="break_on"
         @click="breakOffClick"
         class="time-clock-toolbar-button break-off"
-      >{{ $t('time_clock.index.break_off_button') }} {{ formatDuration() }}
+      >{{ $t(`${addonConfig.package}.index.break_off_button`) }} {{ formatDuration() }}
       </f7-button>
     </f7-toolbar>
     <f7-page-content :style="pageContentStyle">
@@ -84,17 +85,19 @@
         :loaded="loaded.attendance"
         v-if="loaded.attendance"
       />
+      <Photo ref="photo" direction="front"/>
       <Geo ref="geo" :dialog="false"/>
     </f7-page-content>
   </f7-page>
 </template>
 <script>
+import addonConfig from "../addonConfig";
 import API from "../api";
 import AttendanceService from "../services/attendance-service";
 
 import ActiveAvatar from "../components/circle-avatar.vue";
 import Events from "../components/events.vue";
-// import Photo from 'tommy-core/src/components/photo.vue';
+import Photo from 'tommy-core/src/components/photo.vue';
 import Geo from "../components/geo.vue";
 import Blob from "../mixins/baseToBlob.vue";
 
@@ -108,6 +111,7 @@ export default {
   data() {
     const self = this;
     return {
+      addonConfig,
       viewOthers: false,
       clock_on: false,
       break_on: false,
@@ -126,6 +130,7 @@ export default {
   components: {
     ActiveAvatar,
     Events,
+    Photo,
     Geo
   },
   mixins: [Blob],
@@ -133,8 +138,12 @@ export default {
     const self = this;
     API.actorId = API.getUserId(self);
     API.actor = API.getActor(self);
-    self.$events.$on("time_clock:attedance_edit", self.updateAll);
-    self.$events.$on("time_clock:attedance_delete", self.updateAll);
+    self.$events.$on(`${self.addonConfig.package}:attedance_edit`, self.updateAll);
+    self.$events.$on(`${self.addonConfig.package}:attedance_delete`, self.updateAll);
+
+    // if (self.$root.miniProgramLocked.isLocked === true && self.$root.miniProgramLocked.miniProgram === self.addonConfig.package) {
+    //   self.$f7router.navigate(`${self.addonConfig.baseUrl}locked/enter-pin`);
+    // }
   },
   computed: {
     pageContentStyle() {
@@ -171,14 +180,40 @@ export default {
     },
   },
   methods: {
+    // addonConfig() {
+    //   return addonConfig;
+    // },
     clockOnClick() {
       const self = this;
       console.log('TIME CLOCK: clockOnClick');
-
+      self.$f7.preloader.show()
       if (window.cordova) {
-        self.$f7router.navigate('/time-clock/take-photo/');
+
+        self.$refs.geo.takeGeoAsync().then(cords => {
+          self.$refs.photo.takePhotoAsync().then(photo => {
+            const form = new FormData();
+            form.append("event_id", API.shifts_active_id);
+            form.append("latitude", cords.latitude);
+            form.append("longitude", cords.longitude);
+            form.append("accuracy", cords.accuracy);
+            form.append("status", "start");
+            form.append("address", cords.name);
+            form.append(
+              "image",
+              self.dataURLToBlob(photo),
+              `attendance_start.jpg`
+            );
+
+            API.setAttendances(form).then(() => {
+              self.updateAll();
+              self.clock_on = true;
+              self.$f7.preloader.hide()
+            });
+          }).catch(() => {
+            self.$f7.preloader.hide();
+          });
+        });
       } else {
-        self.$f7.preloader.show()
         self.$refs.geo.takeGeoAsync().then(cords => {
           const form = new FormData();
           form.append("event_id", API.shifts_active_id);
@@ -200,29 +235,54 @@ export default {
       const self = this;
 
       console.log('TIME CLOCK: clockOffClick');
-
-      self.$f7router.navigate('/time-clock/take-photo/');
-
-
       self.$f7.preloader.show()
-      self.$refs.geo.takeGeoAsync().then(cords => {
-        const form = new FormData();
-        form.append("event_id", API.shifts_active_id);
-        form.append("latitude", cords.latitude);
-        form.append("longitude", cords.longitude);
-        form.append("accuracy", cords.accuracy);
-        form.append("status", "stop");
-        form.append("address", cords.name);
+      if (window.cordova) {
+        self.$refs.geo.takeGeoAsync().then(cords => {
+          self.$refs.photo.takePhotoAsync().then(photo => {
+            const form = new FormData();
+            form.append("event_id", API.shifts_active_id);
+            form.append("latitude", cords.latitude);
+            form.append("longitude", cords.longitude);
+            form.append("accuracy", cords.accuracy);
+            form.append("status", "stop");
+            form.append("address", cords.name);
+            form.append(
+              "image",
+              self.dataURLToBlob(photo),
+              `attendance_stop.jpg`
+            );
 
+            self.loaded.duration = 0;
 
-        self.loaded.duration = 0;
-
-        API.setAttendances(form).then(() => {
-          self.updateAll();
-          self.clock_on = false;
-          self.$f7.preloader.hide()
+            API.setAttendances(form).then(() => {
+              self.updateAll();
+              self.clock_on = false;
+              self.$f7.preloader.hide()
+            });
+          })
+        }).catch(() => {
+          self.$f7.preloader.hide();
         });
-      });
+      } else {
+        self.$refs.geo.takeGeoAsync().then(cords => {
+
+          const form = new FormData();
+          form.append("event_id", API.shifts_active_id);
+          form.append("latitude", cords.latitude);
+          form.append("longitude", cords.longitude);
+          form.append("accuracy", cords.accuracy);
+          form.append("status", "stop");
+          form.append("address", cords.name);
+
+          self.loaded.duration = 0;
+
+          API.setAttendances(form).then(() => {
+            self.updateAll();
+            self.clock_on = false;
+            self.$f7.preloader.hide()
+          });
+        })
+      }
     },
     breakOnClick() {
       const self = this;
@@ -392,8 +452,8 @@ export default {
   },
   beforeDestroy() {
     const self = this;
-    self.$events.$off("time_clock:attedance_edit", self.updateAll);
-    self.$events.$off("time_clock:attedance_delete", self.updateAll);
+    self.$events.$off(`${self.addonConfig.package}:attedance_edit`, self.updateAll);
+    self.$events.$off(`${self.addonConfig.package}:attedance_delete`, self.updateAll);
     clearInterval(self.loaded.interval);
   },
   mounted() {
@@ -415,7 +475,7 @@ export default {
     console.log('TIMECLOCK - mounted');
     return Promise.all([
       self.$api.getInstalledAddonPermission(
-        "time_clock",
+        self.addonConfig.package,
         "attendance_other_access",
         {with_filters: true}
       )
@@ -451,7 +511,6 @@ export default {
     });
 
     // API.getTest().then(data => console.log("TCL: mounted -> TEST", data));
-
 
   },
 
