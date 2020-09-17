@@ -159,6 +159,7 @@
     mounted() {
       const self = this;
       self.updateAll();
+      // alert(process.env.NODE_ENV)
     },
   };
 </script>

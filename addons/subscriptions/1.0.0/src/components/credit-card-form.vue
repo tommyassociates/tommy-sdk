@@ -50,7 +50,10 @@
     mounted() {
       injectStripe().then(() => {
         const self = this;
-        self.stripe = Stripe('pk_test_e7zZmcCW40CdVJXV9roky5ik');
+        const stripeKey = process.env.NODE_ENV === 'production' ?
+            'pk_live_itlNkXwiG4eNNv1tkWTJIiou' :
+            'pk_test_e7zZmcCW40CdVJXV9roky5ik'
+        self.stripe = Stripe(stripeKey);
         const style = {
           style: {
             base: {
@@ -76,14 +79,7 @@
         self.elements = self.stripe.elements();
         self.card = self.elements.create('card', style);
         self.card.mount('#card-element');
-
-
       });
-
-      // setInterval(() => {
-      //     this.$emit('update', {});
-      //     this.$emit('reset', {});
-      // }, 1000)
     },
     methods: {
       // updateCreditCardDetailsClick() {
