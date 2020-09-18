@@ -13,9 +13,13 @@
         <f7-list>
           <f7-list-item>
             <span>{{ $t(`${addonConfig.package}.settings.lock_mini_program_toggle`) }}</span>
-            <f7-toggle @toggle:change="toggleIsMiniProgramLocked" :checked="settings.miniProgramLocked.isLocked"></f7-toggle>
+            <f7-toggle @toggle:change="toggleIsMiniProgramLocked"
+                       :checked="settings.miniProgramLocked.isLocked"></f7-toggle>
           </f7-list-item>
         </f7-list>
+      </template>
+      <template v-else>
+        {{ $t(`${addonConfig.package}.settings.lock_mini_program_no_access`) }}
       </template>
     </f7-page-content>
   </f7-page>
@@ -26,7 +30,7 @@ import addonConfig from "../addonConfig";
 import API from '../api';
 import config from 'tommy-core/src/tommy';
 
-import {mapGetters} from 'vuex';
+import { mapGetters } from 'vuex';
 
 export default {
   name: "TimeClockSettings",
@@ -36,9 +40,10 @@ export default {
     // TagCmp,
   },
   computed: {
-    // ...mapGetters('account', ['canLockMiniProgram']),
+    ...mapGetters('account', ['isAdmin', 'isTeamManager']),
     canLockMiniProgram() {
-      return true;
+      const self = this;
+      return self.isAdmin || self.isTeamManager;
     }
   },
   methods: {

@@ -10,7 +10,7 @@
         <f7-link :href="`${addonConfig.baseUrl}search/`" icon-only>
           <f7-icon f7="search"/>
         </f7-link>
-        <f7-link :href="`${addonConfig.baseUrl}settings/`" icon-only>
+        <f7-link :href="`${addonConfig.baseUrl}settings/`" icon-only v-if="canLockMiniProgram">
           <f7-icon f7="gear"/>
         </f7-link>
 
@@ -101,6 +101,7 @@ import Photo from 'tommy-core/src/components/photo.vue';
 import Geo from "../components/geo.vue";
 import Blob from "../mixins/baseToBlob.vue";
 
+import { mapGetters } from 'vuex';
 
 /*
 TODO: add shift empty page
@@ -146,6 +147,11 @@ export default {
     // }
   },
   computed: {
+    ...mapGetters('account', ['isAdmin', 'isTeamManager']),
+    canLockMiniProgram() {
+      const self = this;
+      return self.isAdmin || self.isTeamManager;
+    },
     pageContentStyle() {
       const self = this;
       if (self.clock_on && !self.break_on) {
