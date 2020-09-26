@@ -1,5 +1,5 @@
 <template>
-  <f7-page id="example__index">
+  <f7-page id="dashboard__index">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{$t('dashboard.index.title')}}</f7-nav-title>
@@ -13,7 +13,8 @@
           <f7-block strong inset>
             <f7-block-header>{{$t('dashboard.index.subscription.title')}}</f7-block-header>
             <tommy-plus></tommy-plus>
-            <free-trial></free-trial>
+            <free-trial :billing-info="billingInfo"></free-trial>
+            <!-- <free-trial v-if="!hasCreditCard" :billing-info="billingInfo"></free-trial> -->
           </f7-block>
         </f7-col>
       </f7-row>
@@ -31,7 +32,7 @@
                     {{$t('dashboard.index.team_members.pending_invites')}}
                   </f7-col>
                   <f7-col width="60">
-                    {{teamMembers.pending}} {{$t('dashboard.index.team_members.people')}}
+                    {{pendingCount}} {{$t('dashboard.index.team_members.people')}}
                   </f7-col>
                 </f7-row>
                 <f7-row class="team-members__row" @click="redirectToTeam('active')">
@@ -39,7 +40,7 @@
                     {{$t('dashboard.index.team_members.active')}}
                   </f7-col>
                   <f7-col width="60">
-                    {{teamMembers.active}} {{$t('dashboard.index.team_members.people')}}
+                    {{activeCount}} {{$t('dashboard.index.team_members.people')}}
                   </f7-col>
                 </f7-row>
                 <f7-row class="team-members__row" @click="redirectToTeam('inactive')">
@@ -47,7 +48,7 @@
                     {{$t('dashboard.index.team_members.inactive')}}
                   </f7-col>
                   <f7-col width="60">
-                    {{teamMembers.inactive}} {{$t('dashboard.index.team_members.people')}}
+                    {{inactiveCount}} {{$t('dashboard.index.team_members.people')}}
                   </f7-col>
                 </f7-row>
                 <f7-row class="team-members__row" @click="redirectToTeam('archived')">
@@ -55,7 +56,7 @@
                     {{$t('dashboard.index.team_members.archived')}}
                   </f7-col>
                   <f7-col width="60">
-                    {{teamMembers.archived}} {{$t('dashboard.index.team_members.people')}}
+                    {{archivedCount}} {{$t('dashboard.index.team_members.people')}}
                   </f7-col>
                 </f7-row>
 
@@ -92,24 +93,25 @@
 <script>
   import API from '../api';
   import PieChart from "../components/PieChart.js";
-  import freeTrial from '../components/free-trial';
-  import tommyPlus from '../components/tommy-plus';
+  import FreeTrial from '../components/free-trial';
+  import TommyPlus from '../components/tommy-plus';
 
   export default {
     components: {
       PieChart,
-      freeTrial,
-      tommyPlus,
+      FreeTrial,
+      TommyPlus,
     },
     data() {
       return {
         loaded: false,
-        teamMembers: {
-          pending: 10,
-          active: 200,
-          inactive: 50,
-          archived: 45,
-        },
+        billingInfo: {},
+        // teamMembers: {
+        //   pending: 10,
+        //   active: 200,
+        //   inactive: 50,
+        //   archived: 45,
+        // },
         chartData: null,
         chartOptions: {
           borderWidth: "10px",
@@ -137,20 +139,46 @@
         ]
       };
     },
+    computed: {
+      pendingCount() {
+        return this.$root.teamMembers.filter(x => x.status === 'pending').length
+      },
+      activeCount() {
+        return this.$root.teamMembers.filter(x => x.status === 'active').length
+      },
+      inactiveCount() {
+        return this.$root.teamMembers.filter(x => x.status === 'inactive').length
+      },
+      archivedCount() {
+        return this.$root.teamMembers.filter(x => x.status === 'archived').length
+      },
+      hasCreditCard() {
+        return this.billingInfo.customer_ref
+      },
+    },
     methods: {
-      redirectToTeam(status) {
-        const self = this;
-        self.$f7router.navigate(`'/team?filter=${filter}`);
-      }
+      redirectToTeam(filter) {
+        this.$f7router.navigate(`'/team?filter=${filter}`);
+      },
+      loadBillingInfo() {
+        API.getBillingInfo({with_subscriptions: true}).then(billingInfo => {
+          // const newBillingInfo = {...this.billingInfo, ...billingInfo};
+          this.billingInfo = billingInfo;
+          // this.subscriptions = billingInfo.subscriptions;
+          this.loaded = true;
+        });
+      },
     },
     mounted() {
-      const self = this;
-      const total = +self.teamMembers.active + +self.teamMembers.inactive;
-      const activePercentage = (+self.teamMembers.active * 100) / total;
-      const inactivePercentage = (+self.teamMembers.inactive * 100) / total;
-      const backgroundColor = self.chartLegend.map(colour => colour.color);
+      // console.log(this.$root.teamMembers)
+      this.loadBillingInfo()
 
-      self.chartData = {
+      const total = +this.activeCount + +this.inactiveCount;
+      const activePercentage = (+this.activeCount * 100) / total;
+      const inactivePercentage = (+this.inactiveCount * 100) / total;
+      const backgroundColor = this.chartLegend.map(colour => colour.color);
+
+      this.chartData = {
         hoverBackgroundColor: "red",
         hoverBorderWidth: 10,
         labels: ["Active", "Inactive"],
@@ -163,7 +191,7 @@
         ]
       };
 
-      self.loaded = true;
+      // this.loaded = true;
     },
 
   };

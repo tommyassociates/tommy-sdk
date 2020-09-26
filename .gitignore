@@ -45,6 +45,7 @@ src/fonts
 bak/
 archives/*.zip
 config*
+.bak
 
 # Editors
 .idea

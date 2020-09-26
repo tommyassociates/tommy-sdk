@@ -5,7 +5,7 @@
       "title": "Subscription",
       "free_trial": {
         "title": "Free trial",
-        "description": "Add your credit card before %s to renew automatically"
+        "description": "Add your credit card before {{trialExpiry}} to renew automatically"
       },
       "tommy_plus": {
         "title": "Tommy+",
@@ -16,8 +16,8 @@
       "title": "Team Members",
       "pending_invites": "Pending invites",
       "active": "Active",
-      "inactive": "inactive",
-      "archived": "archived",
+      "inactive": "Inactive",
+      "archived": "Archived",
       "people": "people"
     }
   }

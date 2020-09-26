@@ -1,5 +1,5 @@
 <template>
-  <f7-page id="example__index">
+  <f7-page id="subscriptions__index">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{$t('subscriptions.index.title')}}</f7-nav-title>
@@ -13,7 +13,7 @@
             <f7-block strong inset>
               <f7-block-header>{{$t('subscriptions.index.monthly_estimate.title')}}</f7-block-header>
               <p>{{$t('subscriptions.index.monthly_estimate.description')}} {{formatDate(new Date(), 'MMMM Do, YYYY')}}</p>
-              <p class="text-color-red text-large">{{totalAmount}}</p>
+              <p class="text-color-red subscription-total">{{totalAmount}}</p>
             </f7-block>
 
             <f7-block strong inset>
@@ -62,9 +62,33 @@
               </template>
             </f7-block>
 
-            <f7-block strong inset>
+            <!-- <f7-block strong inset>
               <f7-block-header>{{$t('subscriptions.index.subscription_plan.title')}}</f7-block-header>
               <p>{{$t('subscriptions.index.subscription_plan.monthly_plan.description')}}</p>
+            </f7-block> -->
+
+            <f7-block class="payment-history" strong inset>
+              <f7-block-header>
+                <f7-row>
+                  <f7-col width="80">{{$t('subscriptions.index.payment_history.title')}}</f7-col>
+                  <f7-col width="20" class="text-align-right">
+                    <f7-link href="/subscriptions/payments/" icon-f7="ellipsis_vertical"></f7-link>
+                  </f7-col>
+                </f7-row>
+              </f7-block-header>
+              <f7-list v-if="payments.length" class="no-margin" no-hairlines>
+                <f7-list-item
+                  v-for="(payment, index) in payments" :key="index"
+                  :header="formatDate(payment.created_at, 'D/M/YY hh:mm')"
+                  :title="formatMoney(payment.amount_cents / 100.0)"
+                >
+                  <f7-link slot="after-title" href="#" icon-f7="tray_arrow_down" icon-size="20"></f7-link>
+                  <!-- <div slot="after-title">After Title</div> media-list -->
+                  <!-- :after="formatMoney(payment.amount_cents / 100.0)" -->
+                <!-- :text="formatMoney(payment.total_cents / 100.0)" -->
+                </f7-list-item>
+              </f7-list>
+              <p v-else>{{$t('subscriptions.index.payment_history.no_data')}}</p>
             </f7-block>
           </f7-col>
         </f7-row>
@@ -105,6 +129,7 @@
           last_name: lastName,
         },
         subscriptions: [],
+        payments: [],
         isEditingCreditCard: false
       };
     },
@@ -128,19 +153,26 @@
     },
     methods: {
       formatDate,
-      // formatMoney,
+      formatMoney,
       addonAssetsUrl,
       updateAll() {
         const self = this;
-        const demoData = false;
-        API.getBillingInfo({demoData}).then(billingInfo => {
+        API.getBillingInfo({with_subscriptions: true}).then(billingInfo => {
           const newBillingInfo = {...self.billingInfo, ...billingInfo};
           self.billingInfo = newBillingInfo;
-          API.getSubscriptions({demoData}).then(subscriptions => {
-            console.log('loaded subscription', subscriptions)
-            self.subscriptions = subscriptions;
-            self.loaded = true;
+          self.subscriptions = billingInfo.subscriptions;
+          self.loaded = true;
+
+          API.getPayments().then(payments => {
+            console.log('loaded payments', payments)
+            self.payments = payments;
           });
+
+          // API.getSubscriptions({demoData}).then(subscriptions => {
+          //   console.log('loaded subscription', subscriptions)
+          //   self.subscriptions = subscriptions;
+          //   self.loaded = true;
+          // });
         });
       },
       onBillingInfoUpdate(billingInfo) {

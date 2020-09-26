@@ -54,31 +54,6 @@
             // items.forEach(x => this.$set(this.credentials, x.provider, x))
             console.log('loaded audit logs', this.items)
           })
-      },
-      connectAccount(provider) {
-        if (confirm("Are you sure?")) {
-          this.$api.call({
-              endpoint: 'credentials',
-              method: 'POST',
-              data: { provider }
-            })
-            .then(cred => {
-              console.log('created credential', cred)
-              window.location = `${config.serverUrl}/v1/credentials/${cred.id}/connect?token=${localStorage.token}&redirect_url=${location.href}`
-            })
-        }
-      },
-      disconnectAccount(cred) {
-        if (confirm("Are you sure?")) {
-          this.$api.call({
-              endpoint: `credentials/${cred.id}`,
-              method: 'DELETE'
-            })
-            .then(cred => {
-              console.log('deleted credential', cred)
-              this.$delete(this.credentials, cred.provider)
-            })
-        }
       }
     },
   }
