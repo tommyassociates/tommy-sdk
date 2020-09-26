@@ -30,61 +30,61 @@ app.init({
     let token = localStorage.token;
     let user = null;
     let account = null;
-    let team = null;
-    let teamMembers = null;
+    // let team = null;
+    // let teamMembers = null;
     let loggedIn = false;
     if (token) {
-      if (localStorage.user) {
-        try {
-          user = JSON.parse(localStorage.user);
-        } catch (e) {
-          // no user
-        }
-      }
-      if (localStorage.account) {
-        try {
-          account = JSON.parse(localStorage.account);
-        } catch (e) {
-          // no user
-        }
-      }
-      if (localStorage.team) {
-        try {
-          team = JSON.parse(localStorage.team);
-        } catch (e) {
-          // no user
-        }
-      }
-      if (localStorage.teamMembers) {
-        try {
-          teamMembers = JSON.parse(localStorage.teamMembers);
-        } catch (e) {
-          // no user
-        }
-      }
+      // if (localStorage.user) {
+      //   try {
+      //     user = JSON.parse(localStorage.user);
+      //   } catch (e) {
+      //     // no user
+      //   }
+      // }
+      // if (localStorage.account) {
+      //   try {
+      //     account = JSON.parse(localStorage.account);
+      //   } catch (e) {
+      //     // no user
+      //   }
+      // }
+      // if (localStorage.team) {
+      //   try {
+      //     team = JSON.parse(localStorage.team);
+      //   } catch (e) {
+      //     // no user
+      //   }
+      // }
+      // if (localStorage.teamMembers) {
+      //   try {
+      //     teamMembers = JSON.parse(localStorage.teamMembers);
+      //   } catch (e) {
+      //     // no user
+      //   }
+      // }
     }
     if (token && user && account) {
       loggedIn = true;
     } else {
       token = null;
-      user = null;
-      account = null;
-      team = null;
-      teamMembers = null;
+      // user = null;
+      // account = null;
+      // team = null;
+      // teamMembers = null;
     }
 
     return {
       actorId,
       token,
-      user,
-      account,
-      accounts,
-      team,
-      teamMembers,
+      // user,
+      // account,
+      // accounts,
+      // team,
+      // teamMembers,
       loggedIn,
       language,
       addons: [],
-      miniProgramLocked:{
+      miniProgramLocked: {
         isLocked: false,
         miniProgram: '',
       },
@@ -214,4 +214,4 @@ app.init({
   },
 });
 
-export default tommy;
+// export default tommy;
