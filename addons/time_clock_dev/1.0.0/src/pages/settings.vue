@@ -115,7 +115,10 @@ export default {
 
   },
   data() {
-    const miniProgramLocked = JSON.parse(localStorage.miniProgramLocked);
+    const miniProgramLocked = localStorage.miniProgramLocked
+      ? JSON.parse(localStorage.miniProgramLocked)
+      : { isLocked: false, miniProgram: ''};
+    // console.log('miniProgramLocked', JSON.stringify(miniProgramLocked));
     return {
       addonConfig,
       hasActorId: API.actorId,

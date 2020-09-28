@@ -71,9 +71,6 @@
     "confirm_button": "确认",
     "done_button": "完成"
   },
-  "take_photo": {
-    "title": "拍照"
-  },
   "locked": {
     "enter_pin": {
       "title": "输入密码",
@@ -98,6 +95,14 @@
       "email_or_phone_field_placeholder_text": "电子邮件或电话号码",
       "password_field_placeholder_text": "输入密码",
       "button_text": "解锁装置"
+    },
+    "take_photo": {
+      "title": "拍照",
+      "clock_on_button": "上班打卡",
+      "clock_off_button": "下班打卡",
+      "break_on_button": "开始休息",
+      "break_off_button": "结束休息",
+      "geo_loading": "地理位置加载"
     }
   }
 }

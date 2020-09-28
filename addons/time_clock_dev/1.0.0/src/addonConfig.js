@@ -1,5 +1,5 @@
 const addonConfig = {
-  baseUrl: '/time-clock-dev/',
+  baseUrl: '/time_clock_dev/',
   package: 'time_clock_dev',
 };
 

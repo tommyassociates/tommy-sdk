@@ -128,6 +128,8 @@ import addonConfig from "../../addonConfig";
 import API from "../../api";
 import backspaceIcon from '../../components/icons/backspace-icon';
 
+import { mapState } from 'vuex';
+
 export default {
   name: "TimeclockLockedEnterPin",
   components: {
@@ -137,6 +139,7 @@ export default {
 
   },
   computed: {
+    ...mapState('account', ['account']),
     toolbarStyle() {
       const self = this;
       return {
@@ -150,6 +153,8 @@ export default {
   },
   mounted() {
     const self = this;
+
+    // console.log('enter pin MOUNTED');
 
     setInterval(function () {
       // console.log('TimeClockTakePhoto timeout');
@@ -197,11 +202,14 @@ export default {
     continueClick() {
       const self = this;
 
-      console.log('continue click');
+      // console.log('continue click');
 
-      API.verifyPin(self.pin.toString()).then((response) => {
-        console.log('continue click - verify pin');
-        console.log(JSON.stringify(response));
+      API.verifyPin(self.pin.join('')).then((user) => {
+        // console.log('continue click - verify pin');
+        // console.log(JSON.stringify(user));
+        const redirect = `${addonConfig.baseUrl}locked/take-photo/?actor_id=${self.account.user_id}&user_id=${user.user_id}`;
+        // console.log('redirect', redirect);
+        self.$f7router.navigate(redirect);
       }).catch((error) => {
         self.$root.notify(error.message);
         self.deletePinNumber();

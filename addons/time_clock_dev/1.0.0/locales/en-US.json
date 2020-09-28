@@ -71,9 +71,6 @@
     "confirm_button": "Confirm",
     "done_button": "Done"
   },
-  "take_photo": {
-    "title": "Take photo"
-  },
   "locked": {
     "enter_pin": {
       "title": "Enter pin",
@@ -98,6 +95,14 @@
       "email_or_phone_field_placeholder_text": "Email or phone number",
       "password_field_placeholder_text": "Enter password",
       "button_text": "Unlock device"
+    },
+    "take_photo": {
+      "title": "Take photo",
+      "clock_on_button": "Clock On",
+      "clock_off_button": "Clock Off",
+      "break_on_button": "Start Break",
+      "break_off_button": "End Break",
+      "geo_loading": "Geolocation loading"
     }
   }
 }

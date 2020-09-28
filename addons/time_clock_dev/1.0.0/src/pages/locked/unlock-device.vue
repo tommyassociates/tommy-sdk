@@ -86,16 +86,16 @@ export default {
 
     unlockDevice() {
       const self = this;
-      console.log(self.emailOrPhone);
-      console.log(self.password);
+      // console.log(self.emailOrPhone);
+      // console.log(self.password);
 
       const options = {
         skipAuth: true,
       };
       self.$api.login(self.emailOrPhone, self.password, options).then((response) => {
-        console.log(JSON.stringify(response));
-        console.log(response.token);
-        console.log(self.$root.token);
+        // console.log(JSON.stringify(response));
+        // console.log(response.token);
+        // console.log(self.$root.token);
         if (response.token === self.$root.token) {
 
 

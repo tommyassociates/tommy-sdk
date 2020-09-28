@@ -10,9 +10,9 @@ const AttendanceService = {
    * @returns {*}
    */
   prepareAttendances(data, self) {
-    console.log('TIMECLOCK - prepareAttendances');
+    // console.log('TIMECLOCK - prepareAttendances');
     if (data === null) return null;
-    console.log('TIMECLOCK - prepareAttendances - after data check.');
+    // console.log('TIMECLOCK - prepareAttendances - after data check.');
 
 
     data.forEach(e => {
@@ -20,17 +20,17 @@ const AttendanceService = {
       //   member => member.user_id === e.user_id
       // );
 
-      console.log('TIMECLOCK - prepareAttendances - after data check. data - e', JSON.stringify(e));
+      // console.log('TIMECLOCK - prepareAttendances - after data check. data - e', JSON.stringify(e));
 
       const user = self.$store.state.teamMembers.teamMembers.find(
         member => member.user_id === e.user_id
       );
-      console.log('TIMECLOCK - prepareAttendances - after data check. data - user', JSON.stringify(user));
+      // console.log('TIMECLOCK - prepareAttendances - after data check. data - user', JSON.stringify(user));
       if (user) {
         e.user_name = `${user.first_name} ${user.last_name}`;
         e.icon_url = e.image ? e.image.url : user.icon_url;
       } else {
-        console.log('TIMECLOCK - prepareAttendances - after data check. data - user not found.');
+        // console.log('TIMECLOCK - prepareAttendances - after data check. data - user not found.');
       }
     });
     return data;
@@ -43,9 +43,9 @@ const AttendanceService = {
    * @returns {*[]}
    */
   prepareAttendance(data, self) {
-    console.log('TIMECLOCK - prepareAttendance');
+    // console.log('TIMECLOCK - prepareAttendance');
     if (data === null) return null;
-    console.log('TIMECLOCK - prepareAttendance - after data check.');
+    // console.log('TIMECLOCK - prepareAttendance - after data check.');
 
     // const user = self.$root.teamMembers.find(
     //   member => member.user_id === data.user_id

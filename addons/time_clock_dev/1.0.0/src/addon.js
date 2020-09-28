@@ -5,12 +5,12 @@ import Detail from "./pages/detail.vue";
 import Search from "./pages/search.vue";
 import SelectPicker from "./pages/select-picker.vue";
 // import MapPage from "./pages/map.vue";
-import TakePhoto from './pages/take-photo';
+import TakePhoto from './pages/locked/take-photo';
 
 import LockedEnterPin from './pages/locked/enter-pin';
 import LockedUnlockDevice from './pages/locked/unlock-device';
 
-console.log('TIME_CLOCK addon');
+// console.log('TIME_CLOCK addon');
 
 const routes = [
   {
@@ -38,7 +38,7 @@ const routes = [
   //   component: MapPage,
   // },
   {
-    path: `${addonConfig.baseUrl}take-photo/`,
+    path: `${addonConfig.baseUrl}locked/take-photo/`,
     component: TakePhoto,
   },
 

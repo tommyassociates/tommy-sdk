@@ -71,21 +71,30 @@ const API = {
         return data;
       });
   },
-  getAttendances({cache = false, others = false, otherOptions = {}} = {}) {
+  getAttendances({cache = false, others = false, otherOptions = {}, isManager = false} = {}) {
     let options = {
-      endpoint: "workforce/attendances",
+      endpoint: `workforce/${isManager ? 'manager/' : ''}attendances`,
       method: "GET",
       with_permission_to: true,
       with_filters: true,
       cache: cache,
     }
+
+    // console.log('--- getAttendances options', window.cordova?JSON.stringify(options):options);
+    // console.log('--- getAttendances otherOptions', window.cordova?JSON.stringify(otherOptions):otherOptions);
     // if (!others) options.endpoint = options.endpoint + '&user_id='+ API.actorId;
 
     if (!others) {
       otherOptions.user_id = API.actorId;
     }
 
+    // otherOptions.actor_id = API.actorId;
+    // otherOptions.user_id = 32373;
+
     options.data = otherOptions;
+
+    // console.log('TEST-OPTIONS', otherOptions);
+    // console.log('TEST-OPTIONS', options);
 
     return api
       .call(options)
@@ -93,9 +102,9 @@ const API = {
         return data;
       });
   },
-  getAttendancesActive({cache = false, others = false, otherOptions = {}} = {}) {
+  getAttendancesActive({cache = false, others = false, otherOptions = {}, isManager = false} = {}) {
     let options = {
-      endpoint: "workforce/attendances/active",
+      endpoint: `workforce/${isManager ? 'manager/' : ''}attendances/active`,
       method: "GET",
       cache: cache,
     }
@@ -146,10 +155,14 @@ const API = {
         return data;
       });
   },
-  setAttendances(data) {
+  setAttendances(data, isManager = false) {
+    const endpoint = `workforce/${isManager ? 'manager/' : ''}attendances`;
+
+    // console.log('endpoint: ', endpoint);
+    // console.log('data', window.cordova?JSON.stringify(data):data);
     return api
       .call({
-        endpoint: "workforce/attendances",
+        endpoint,
         method: "POST",
         cache: false,
         data,
@@ -184,6 +197,11 @@ const API = {
       // return self.$root.account;
       return self.$store.state.account.account;
     }
+  },
+
+  clearActor(self) {
+    this.actor = undefined;
+    this.actorId = undefined;
   },
 
   // eventsSearch(data) {
@@ -232,16 +250,11 @@ const API = {
   },
 
   verifyPin(pin) {
-    const data = {
-      pin,
-    };
-
     return api
       .call({
-        endpoint: "team/members/verify_pin",
+        endpoint: `team/members/verify_pin?pin=${pin}`,
         method: "POST",
         cache: false,
-        data,
       })
       .then(data => {
         return data;

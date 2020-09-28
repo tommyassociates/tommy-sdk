@@ -142,12 +142,12 @@ export default {
 
     onDateRangeChange(value) {
       const self = this;
-      console.log('search - date range change: ' + value);
+      // console.log('search - date range change: ' + value);
     },
 
     onDateRangeSave(value) {
       const self = this;
-      console.log('search - date range save: ' + value);
+      // console.log('search - date range save: ' + value);
 
       //self.dateRange = value;
 
@@ -162,7 +162,7 @@ export default {
       };
       if (self.dateRange) {
         otherOptions.date_range = self.dateRange;
-        console.log('daterange', self.dateRange);
+        // console.log('daterange', self.dateRange);
       }
       if (self.search) {
         otherOptions.search = encodeURIComponent(self.search);
