@@ -14,8 +14,6 @@
 
             <f7-row>
               <f7-col width="40" :class="'col--icon'">
-
-
                 <div v-if="!$device.cordova">
                   <div class="profile-image--with-file-input">
 
@@ -24,7 +22,7 @@
                          v-if="$root.team.icon_url !== ''">
                         <delete-icon/>
                       </a>
-                      <circle-avatar :size="74" :url="sanitizeImagePath($root.team.icon_url)"></circle-avatar>
+                      <circle-avatar :size="74" :url="$root.team.icon_url"></circle-avatar>
                     </div>
                     <input type="file" id="photochangefile" ref="photochangefile"
                            @change="onPhotoChangeOnNonCordovaDevice()">
@@ -37,7 +35,7 @@
                 </a>
                 <a id="change-profile-picture" class="item-link list-button" href="#" @click="changeProfilePicture"
                    v-if="$device.cordova">
-                  <circle-avatar :size="74" :url="sanitizeImagePath($root.team.icon_url)"></circle-avatar>
+                  <circle-avatar :size="74" :url="$root.team.icon_url"></circle-avatar>
                 </a>
 
 
@@ -97,11 +95,8 @@
   import API from '../api';
   import circleAvatar from 'tommy-core/src/components/circle-avatar';
   import photoChanger from '../utils/photo-changer';
-  import backgroundChanger from '../utils/background-changer';
   import deleteIcon from '../components/icons/delete-icon';
   import dialog from 'tommy-core/src/mixins/dialog.vue';
-  import sanitizeImagePath from 'tommy-core/src/utils/sanitize-image-path';
-  import addonAssetsUrl from '../utils/addon-assets-url';
 
   export default {
     components: {
@@ -116,9 +111,8 @@
       profileBackgroundPreviewStyles() {
         const self = this;
         const backgroundImage = self.$root.team.background_url
-          ? sanitizeImagePath(self.$root.team.background_url)
-          : `${addonAssetsUrl()}MenuBackgroundWithShadow.png`;
-        console.log(backgroundImage);
+          ? self.$root.team.background_url
+          : `${self.$addonAssetUrl}MenuBackgroundWithShadow.png`;
 
         const styles = {
           backgroundImage: `url(${backgroundImage})`,
@@ -128,8 +122,6 @@
       },
     },
     methods: {
-      sanitizeImagePath,
-      addonAssetsUrl,
       changeProfilePicture() {
         const self = this;
         photoChanger.init({
@@ -137,10 +129,10 @@
           f7: self.$f7,
           success(response) {
             if (response.icon_url) {
-              if (self.$root.account.icon_url) {
-                self.$root.team.icon_url = sanitizeImagePath(response.icon_url);
-              }
-              self.$root.updateAccount();
+              // if (self.$root.account.icon_url) {
+                self.$root.team.icon_url = response.icon_url;
+              // }
+              // self.$root.updateAccount();
             }
           },
         });
@@ -157,10 +149,10 @@
           f7: self.$f7,
           success(response) {
             if (response.icon_url) {
-              if (self.$root.account.icon_url) {
-                self.$root.team.icon_url = sanitizeImagePath(response.icon_url);
-              }
-              self.$root.updateAccount();
+              // if (self.$root.account.icon_url) {
+                self.$root.team.icon_url = response.icon_url;
+              // }
+              // self.$root.updateAccount();
             }
           },
         });
@@ -190,19 +182,19 @@
 
       changeProfileBackground() {
         const self = this;
-        backgroundChanger.init({
+        photoChanger.init({
           url: 'team',
           f7: self.$f7,
           success(response) {
             if (response.background_url) {
-              if (self.$root.account.background_url) {
-                self.$root.team.background_url = sanitizeImagePath(response.background_url);
-              }
-              self.$root.updateAccount();
+              // if (self.$root.account.background_url) {
+                self.$root.team.background_url = response.background_url;
+              // }
+              // self.$root.updateAccount();
             }
           },
         });
-        backgroundChanger.openMenu();
+        photoChanger.openMenu();
       },
 
       /**
@@ -210,19 +202,25 @@
        */
       onBackgroundChangeOnNonCordovaDevice() {
         const self = this;
-        backgroundChanger.init({
+        photoChanger.init({
           url: 'team',
           f7: self.$f7,
+          param: 'background',
+          filename: 'backgroundimage.jpg',
           success(response) {
+            console.log('onPhotoChangeOnNonCordovaDevice response', response);
+
             if (response.background_url) {
-              if (self.$root.account.background_url) {
-                self.$root.team.background_url = sanitizeImagePath(response.background_url);
-              }
-              self.$root.updateAccount();
+              // if (self.$root.account.background_url) {
+                self.$root.team.background_url = response.background_url;
+              // }
+              // self.$root.updateAccount();
             }
           },
         });
-        backgroundChanger.upload(self.$refs.photochangefile.files[0]);
+        console.log('onPhotoChangeOnNonCordovaDevice', self.$refs.photobackgrondfile, self.$refs.photobackgrondfile.files);
+
+        photoChanger.upload(self.$refs.photobackgrondfile.files[0]);
       },
 
       deleteBackground() {

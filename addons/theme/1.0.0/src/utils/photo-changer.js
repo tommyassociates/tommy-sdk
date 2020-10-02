@@ -7,6 +7,12 @@ const photoChanger = {
     if (!settings.url) {
       throw new Error('"url" endpoint param must be provided');
     }
+    if (!settings.filename) {
+      settings.filename = 'profilephoto.jpg'
+    }
+    if (!settings.param) {
+      settings.param = 'photo'
+    }
     if (settings.f7) photoChanger.f7 = settings.f7;
     photoChanger.settings = settings;
   },
@@ -112,10 +118,10 @@ const photoChanger = {
     if (photoChanger.settings.error) { photoChanger.settings.error(); }
   },
 
-  upload(photo) {
+  upload(blob) {
     photoChanger.f7.preloader.show();
     const form = new FormData();
-    form.append('photo', photo, 'profilephoto.jpg');
+    form.append(photoChanger.settings.param, blob, photoChanger.settings.filename);
     api
       .call({
         endpoint: photoChanger.settings.url,
