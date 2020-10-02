@@ -1,6 +1,5 @@
 import addonConfig from "./addonConfig";
 import Index from "./pages/index.vue";
-import Settings from "./pages/settings.vue";
 import Detail from "./pages/detail.vue";
 import Search from "./pages/search.vue";
 import SelectPicker from "./pages/select-picker.vue";
@@ -15,10 +14,6 @@ const routes = [
   {
     path: `${addonConfig.baseUrl}`,
     component: Index,
-  },
-  {
-    path: `${addonConfig.baseUrl}settings/`,
-    component: Settings,
   },
   {
     path: `${addonConfig.baseUrl}detail/:id`,
