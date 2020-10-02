@@ -7,8 +7,7 @@ import SelectPicker from "./pages/select-picker.vue";
 // import MapPage from "./pages/map.vue";
 import TakePhoto from './pages/locked/take-photo';
 
-import LockedEnterPin from './pages/locked/enter-pin';
-import LockedUnlockDevice from './pages/locked/unlock-device';
+
 
 // console.log('TIME_CLOCK addon');
 
@@ -42,14 +41,7 @@ const routes = [
     component: TakePhoto,
   },
 
-  {
-    path: `${addonConfig.baseUrl}locked/enter-pin/`,
-    component: LockedEnterPin,
-  },
-  {
-    path: `${addonConfig.baseUrl}locked/unlock-device/`,
-    component: LockedUnlockDevice,
-  },
+
 ];
 
 export default routes;
