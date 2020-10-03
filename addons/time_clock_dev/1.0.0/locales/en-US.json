@@ -72,30 +72,6 @@
     "done_button": "Done"
   },
   "locked": {
-    "enter_pin": {
-      "title": "Enter pin",
-      "description": "Please enter your pin",
-      "keypad": {
-        "one": "1",
-        "two": "2",
-        "three": "3",
-        "four": "4",
-        "five": "5",
-        "six": "6",
-        "seven": "7",
-        "eight": "8",
-        "nine": "9",
-        "zero": "0"
-      },
-      "button": "Continue"
-    },
-    "unlock_device": {
-      "title": "Unlock device",
-      "enter_password_title": "Enter your account details to unlock device",
-      "email_or_phone_field_placeholder_text": "Email or phone number",
-      "password_field_placeholder_text": "Enter password",
-      "button_text": "Unlock device"
-    },
     "take_photo": {
       "title": "Take photo",
       "clock_on_button": "Clock On",
@@ -103,6 +79,9 @@
       "break_on_button": "Start Break",
       "break_off_button": "End Break",
       "geo_loading": "Geolocation loading"
+    },
+    "confirmation": {
+      "title": "Confirmation"
     }
   }
 }

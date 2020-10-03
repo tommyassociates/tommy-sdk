@@ -197,7 +197,7 @@ export default {
               self.clock_on = true;
               self.$f7.preloader.hide();
 
-              const redirect = '/locked/enter-pin/';
+              const redirect = `${addonConfig.baseUrl}locked/confirmation/`;
               self.$f7router.navigate(redirect);
 
             });
@@ -222,7 +222,7 @@ export default {
             self.clock_on = true;
             self.$f7.preloader.hide();
 
-            const redirect = '/locked/enter-pin/';
+            const redirect = `${addonConfig.baseUrl}locked/confirmation/`;
             self.$f7router.navigate(redirect);
           });
         });
@@ -258,7 +258,7 @@ export default {
               self.clock_on = false;
               self.$f7.preloader.hide();
 
-              const redirect = '/locked/enter-pin/';
+              const redirect = `${addonConfig.baseUrl}locked/confirmation/`;
               self.$f7router.navigate(redirect);
             });
           })
@@ -285,7 +285,7 @@ export default {
             self.clock_on = false;
             self.$f7.preloader.hide();
 
-            const redirect = '/locked/enter-pin/';
+            const redirect = `${addonConfig.baseUrl}locked/confirmation/`;
             self.$f7router.navigate(redirect);
           });
         })
@@ -312,7 +312,7 @@ export default {
           self.updateAttendances();
           self.break_on = true;
 
-          const redirect = '/locked/enter-pin/';
+          const redirect = `${addonConfig.baseUrl}locked/confirmation/`;
           self.$f7router.navigate(redirect);
         });
       });
@@ -339,7 +339,7 @@ export default {
           self.updateAttendances();
           self.break_on = false;
 
-          const redirect = '/locked/enter-pin/';
+          const redirect = `${addonConfig.baseUrl}locked/confirmation/`;
           self.$f7router.navigate(redirect);
         });
       });
