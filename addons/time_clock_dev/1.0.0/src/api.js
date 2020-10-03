@@ -172,7 +172,6 @@ const API = {
       });
   },
 
-
   getUserId(self) {
     const userId = self.$f7route.query.actor_id;
     if (userId) {
@@ -204,28 +203,6 @@ const API = {
     this.actorId = undefined;
   },
 
-  // eventsSearch(data) {
-  //   //return generateTest(3);
-  //
-  //   let options = {
-  //     endpoint: "workforce/attendances",
-  //     method: "GET",
-  //     with_permission_to: true,
-  //     with_filters: true,
-  //     cache: cache,
-  //     data,
-  //   }
-  //   if (!others) options.endpoint = options.endpoint + '?user_id='+ API.actorId;
-  //   return api
-  //     .call(options)
-  //     .then(data => {
-  //       return data;
-  //     });
-  //
-  //
-  //
-  // }
-
   checkPermision(permission, self) {
     let view = permission.filters.find(e => {
       if (e.context === "members") {
@@ -236,31 +213,6 @@ const API = {
     });
     return typeof view !== "undefined";
   },
-
-  resetPin() {
-    return api
-      .call({
-        endpoint: "team/members/reset_pin",
-        method: "GET",
-        cache: false,
-      })
-      .then(data => {
-        return data;
-      });
-  },
-
-  verifyPin(pin) {
-    return api
-      .call({
-        endpoint: `team/members/verify_pin?pin=${pin}`,
-        method: "POST",
-        cache: false,
-      })
-      .then(data => {
-        return data;
-      });
-  },
-
 };
 
 
