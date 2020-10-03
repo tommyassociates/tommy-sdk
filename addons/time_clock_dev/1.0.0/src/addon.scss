@@ -16,7 +16,6 @@
 @import "./scss/select-list.scss";
 @import "./scss/searchbar.scss";
 @import "./scss/preloader.scss";
-@import './scss/take-photo';
 
 
 .time-clock-main-page {
@@ -447,28 +446,3 @@ $svg: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 12' fill='#{$colo
 }
 
 
-.time-clock__numeric-button {
-  color: white;
-  background: $tommy-theme-color;
-  border: 1px solid $tommy-theme-color;
-  width: 64px;
-  height: 64px;
-  font-weight: 400;
-  font-size: 34px;
-  padding: 0;
-
-  &--small-text {
-    font-size: 14px;
-  }
-
-  svg {
-    width: 35px;
-  }
-}
-
-.time-clock__entered-code {
-  font-size: 31px;
-  max-width: 210px;
-  margin: 0 auto;
-  padding-top: 32px;
-}

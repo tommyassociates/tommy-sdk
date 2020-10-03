@@ -20,7 +20,7 @@ export default {
     }
   },
   mounted() {
-    console.log('SDK - PHOTO mounted');
+    // console.log('SDK - PHOTO mounted');
   },
   methods: {
     takePhoto() {
@@ -36,7 +36,7 @@ export default {
       }
     },
     takePhotoAsync() {
-      console.log('takePhotoAsync');
+      // console.log('takePhotoAsync');
       const self = this;
       const photoPromise = new Promise((resolve, reject) => {
         self.resolvePromise = resolve;

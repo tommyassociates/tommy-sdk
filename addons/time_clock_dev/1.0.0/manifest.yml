@@ -53,5 +53,5 @@
       title: "Time Clock (DEV)"
       type: "page"
       index: true
-      path: "/time-clock-dev/"
+      path: "/time_clock_dev/"
       actor_permission: addon_actor_access

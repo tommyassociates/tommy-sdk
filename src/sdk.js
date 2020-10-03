@@ -87,6 +87,7 @@ app.init({
       miniProgramLocked: {
         isLocked: false,
         miniProgram: '',
+        showLockableAddons: false,
       },
     };
   },
