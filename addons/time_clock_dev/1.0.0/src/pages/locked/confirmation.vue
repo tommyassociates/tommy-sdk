@@ -3,21 +3,14 @@
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{ $t(`${addonConfig.package}.locked.confirmation.title`) }}</f7-nav-title>
-
-
     </f7-navbar>
 
-    <!-- v-if="attendances_enable && loaded.first" -->
-
-
     <f7-page-content>
-
-
-      <div class="text-align-center" style="padding: 40px;">
-        <checkmark-animation></checkmark-animation>
+      <div class="text-align-center" style="padding:0px;">
+        <div style="position:absolute; top: 50%; transform: translateY(-50%)">
+          <checkmark-animation></checkmark-animation>
+        </div>
       </div>
-
-
     </f7-page-content>
   </f7-page>
 </template>
