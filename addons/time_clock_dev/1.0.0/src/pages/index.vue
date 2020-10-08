@@ -289,7 +289,12 @@ export default {
             API.setAttendances(form).then(() => {
               this.updateAll();
               this.clock_on = true;
-              this.$f7.preloader.hide()
+              this.$f7.preloader.hide();
+
+              if (this.isLocked) {
+                const redirect = `${addonConfig.baseUrl}confirmation/`;
+                this.$f7router.navigate(redirect);
+              }
             });
           }).catch(() => {
             this.$f7.preloader.hide();
@@ -312,7 +317,12 @@ export default {
           API.setAttendances(form).then(() => {
             this.updateAll();
             this.clock_on = true;
-            this.$f7.preloader.hide()
+            this.$f7.preloader.hide();
+
+            if (this.isLocked) {
+              const redirect = `${addonConfig.baseUrl}confirmation/`;
+              this.$f7router.navigate(redirect);
+            }
           });
         });
       }
@@ -346,7 +356,12 @@ export default {
             API.setAttendances(form).then(() => {
               this.updateAll();
               this.clock_on = false;
-              this.$f7.preloader.hide()
+              this.$f7.preloader.hide();
+
+              if (this.isLocked) {
+                const redirect = `${addonConfig.baseUrl}confirmation/`;
+                this.$f7router.navigate(redirect);
+              }
             });
           })
         }).catch(() => {
@@ -372,7 +387,12 @@ export default {
           API.setAttendances(form).then(() => {
             this.updateAll();
             this.clock_on = false;
-            this.$f7.preloader.hide()
+            this.$f7.preloader.hide();
+
+            if (this.isLocked) {
+              const redirect = `${addonConfig.baseUrl}confirmation/`;
+              this.$f7router.navigate(redirect);
+            }
           });
         })
       }
