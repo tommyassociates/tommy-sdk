@@ -204,7 +204,6 @@ export default {
   mixins: [Blob],
   created() {
 
-    // TODO : Come back here .
     API.actorId = API.getUserId(this);
     API.actor = API.getActor(this);
 

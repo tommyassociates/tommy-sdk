@@ -7,7 +7,7 @@
 
     <f7-page-content>
       <div class="text-align-center" style="padding:0px;">
-        <div style="position:absolute; top: 50%; transform: translateY(-50%)">
+        <div style="position:absolute; top: 50%; transform: translateY(-50%); width: 100%; align-items: center;">
           <checkmark-animation></checkmark-animation>
         </div>
       </div>
