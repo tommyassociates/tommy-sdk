@@ -145,71 +145,52 @@ import dialog from "../mixins/dialog.vue";
 import timePicker from "../mixins/time-picker.vue";
 import Blob from "../mixins/baseToBlob.vue";
 import Photo from '../components/photo.vue';
-// import { mapState } from 'vuex';
+
 export default {
   name: "DetailActivity",
   mixins: [dialog, timePicker, Blob],
   components: { Photo },
   methods: {
     changeAction(val) {
-      const self = this;
-      self.detail_data.status = val;
+      this.detail_data.status = val;
     },
     setAction() {
-      const self = this;
-      if (self.new_action !== null)
-        self.detail_data.event = String(self.new_action);
+      if (this.new_action !== null)
+        this.detail_data.event = String(this.new_action);
     },
     clearAction() {
-      const self = this;
-      self.new_action = null;
+      this.new_action = null;
     },
     getPhotoCamera(photo) {
-      const self = this;
+
     },
     openMapPage() {
-      const self = this;
-      const url = `https://www.google.com/maps/place/${self.detail_data.latitude}+${self.detail_data.longitude}`;
-
+      const url = `https://www.google.com/maps/place/${this.detail_data.latitude}+${this.detail_data.longitude}`;
       window.open(url, '_system', 'location=yes,hidden=yes,beforeload=yes');
-
-      // self.$f7router.navigate("/time-clock/map/", {
-      //   props: {
-      //     edit: self.edit_acces,
-      //     latitude: self.detail_data.latitude,
-      //     longitude: self.detail_data.longitude,
-      //     accuracy: self.detail_data.accuracy,
-      //     address: self.detail_data.address,
-      //     callback: self.editCoordinates
-      //   }
-      // });
     },
     editCoordinates(latitude, longitude, accuracy, address) {
-      const self = this;
-      self.detail_data.latitude = latitude;
-      self.detail_data.longitude = longitude;
-      self.detail_data.accuracy = accuracy;
-      self.detail_data.address = address;
+      this.detail_data.latitude = latitude;
+      this.detail_data.longitude = longitude;
+      this.detail_data.accuracy = accuracy;
+      this.detail_data.address = address;
     },
     openPhoto() {
-      const self = this;
-      self.$refs.actionSheet.close();
-      self.photoPreview.open();
+      this.$refs.actionSheet.close();
+      this.photoPreview.open();
     },
     openSelector() {
-      const self = this;
-      if (!self.edit_acces) return;
-      self.$f7router.navigate("/time-clock/select-picker/", {
+      if (!this.edit_acces) return;
+      this.$f7router.navigate("/time-clock/select-picker/", {
         props: {
-          selected: self.detail_data.user_id,
-          pageTitle: self.$t(`${addonConfig.package}.event_details.who_label`),
+          selected: this.detail_data.user_id,
+          pageTitle: this.$t(`${addonConfig.package}.event_details.who_label`),
           multiply: false,
-          getData: self.getDataUser,
+          getData: this.getDataUser,
           type: "team",
           saveChange(user) {
-            self.detail_data.user_id = user.user_id;
-            self.detail_data.user_name = user.first_name + " " + user.last_name;
-            self.detail_data.icon_url = user.icon_url;
+            this.detail_data.user_id = user.user_id;
+            this.detail_data.user_name = user.first_name + " " + user.last_name;
+            this.detail_data.icon_url = user.icon_url;
           }
         }
       });
@@ -225,54 +206,51 @@ export default {
       });
     },
     editAttendance() {
-      const self = this;
-      if (!self.edit_acces) return;
+      if (!this.edit_acces) return;
       const form = new FormData();
 
       if (
-        self.detail_data.status === "pause" ||
-        self.detail_data.status === "resume"
+        this.detail_data.status === "pause" ||
+        this.detail_data.status === "resume"
       ) {
         form.append("image", null);
       } else {
         form.append(
           "image",
-          self.dataURLToBlob(self.image_preview),
-          `attendance_${self.detail_data.id}.jpg`
+          this.dataURLToBlob(this.image_preview),
+          `attendance_${this.detail_data.id}.jpg`
         );
       }
 
-      form.append("address", self.detail_data.address);
-      form.append("latitude", self.detail_data.latitude);
-      form.append("longitude", self.detail_data.longitude);
-      form.append("accuracy", self.detail_data.accuracy);
-      form.append("event_id", self.detail_data.event_id);
-      form.append("status", self.detail_data.status);
-      form.append("team_id", self.detail_data.team_id);
-      form.append("user_id", self.detail_data.user_id);
-      form.append("timestamp", self.detail_data.timestamp);
+      form.append("address", this.detail_data.address);
+      form.append("latitude", this.detail_data.latitude);
+      form.append("longitude", this.detail_data.longitude);
+      form.append("accuracy", this.detail_data.accuracy);
+      form.append("event_id", this.detail_data.event_id);
+      form.append("status", this.detail_data.status);
+      form.append("team_id", this.detail_data.team_id);
+      form.append("user_id", this.detail_data.user_id);
+      form.append("timestamp", this.detail_data.timestamp);
 
-      API.editAttendance(self.detail_data.id, form).then(() => {
-        self.$f7router.back();
-        self.$events.$emit(`${addonConfig.package}:attedance_edit`, self.detail_data);
+      API.editAttendance(this.detail_data.id, form).then(() => {
+        this.$f7router.back();
+        this.$events.$emit(`${addonConfig.package}:attedance_edit`, this.detail_data);
       });
     },
     deleteAttendance() {
-      const self = this;
-      if (!self.edit_acces) return;
-      API.deleteAttendance(self.detail_data.id).then(() => {
-        self.$f7router.back();
-        self.$events.$emit(`${addonConfig.package}:attedance_delete`, self.detail_data);
+      if (!this.edit_acces) return;
+      API.deleteAttendance(this.detail_data.id).then(() => {
+        this.$f7router.back();
+        this.$events.$emit(`${addonConfig.package}:attedance_delete`, this.detail_data);
       });
     },
     deleteClick() {
-      const self = this;
-      self.confirmDialog(
+      this.confirmDialog(
         false,
-        self.$t(`${addonConfig.package}.event_details.delete_text`),
-        self.$t(`${addonConfig.package}.event_details.confirm_button`),
-        self.$t(`${addonConfig.package}.event_details.cancel_button`),
-        self.deleteAttendance,
+        this.$t(`${addonConfig.package}.event_details.delete_text`),
+        this.$t(`${addonConfig.package}.event_details.confirm_button`),
+        this.$t(`${addonConfig.package}.event_details.cancel_button`),
+        this.deleteAttendance,
         false,
         null,
         true,
@@ -280,41 +258,36 @@ export default {
       );
     },
     openCalendar() {
-      const self = this;
-      if (self.edit_acces) self.calendarInstance.open();
+      if (this.edit_acces) this.calendarInstance.open();
     },
     createCalendar() {
-      const self = this;
-      let date = new Date(self.detail_data.timestamp);
-      self.calendarInstance = self.$f7.calendar.create({
+      let date = new Date(this.detail_data.timestamp);
+      this.calendarInstance = this.$f7.calendar.create({
         value: [date],
         openIn: "customModal",
         backdrop: true,
         closeOnSelect: true,
         on: {
           change(cal, val) {
-            const date = new Date(self.detail_data.timestamp);
+            const date = new Date(this.detail_data.timestamp);
             const date_new = new Date(val[0]);
             date.setFullYear(date_new.getFullYear());
             date.setMonth(date_new.getMonth());
             date.setDate(date_new.getDate());
-            self.detail_data.timestamp = date.toISOString();
+            this.detail_data.timestamp = date.toISOString();
           }
         }
       });
     },
     onPageBeforeOut() {
-      const self = this;
-      self.$refs.actionSheet.close();
+      this.$refs.actionSheet.close();
     },
     onPageBeforeRemove() {
-      const self = this;
-      self.$refs.actionSheet.$destroy();
-      if (self.calendarInstance) self.calendarInstance.destroy();
+      this.$refs.actionSheet.$destroy();
+      if (this.calendarInstance) this.calendarInstance.destroy();
     },
     prepareAttendance(data) {
-      const self = this;
-      const user = self.$store.state.teamMembers.teamMembers.filter(
+      const user = this.$store.state.teamMembers.teamMembers.filter(
         member => member.user_id === data.user_id
       );
       data.user_name = user[0].first_name + " " + user[0].last_name;
@@ -322,11 +295,10 @@ export default {
       return data;
     },
     createPhotoPreview() {
-      const self = this;
-      self.photoPreview = self.$f7.photoBrowser.create({
+      this.photoPreview = this.$f7.photoBrowser.create({
         photos: [
           {
-            url: self.image_preview
+            url: this.image_preview
           }
         ],
         theme: "dark",
@@ -351,7 +323,7 @@ export default {
         },
         renderNavbar() {
           let editHtml = "";
-          if (self.edit_acces) {
+          if (this.edit_acces) {
             editHtml = `
               <a href="#" class="link icon-only" id="time-clock-reload-photo" ref="reloadPhoto">
                 <i class="icon f7-icons color-white">reload</i>
@@ -374,25 +346,24 @@ export default {
         },
         on: {
           open: () => {
-            self.$f7
+            this.$f7
               .$("#time-clock-reload-photo")
-              .on("click", self.reloadPhoto);
+              .on("click", this.reloadPhoto);
           },
           close: () => {
-            self.$f7.$("#time-clock-reload-photo").off("click");
+            this.$f7.$("#time-clock-reload-photo").off("click");
           }
         }
       });
     },
     reloadPhoto() {
-      const self = this;
-      self.$refs.photo.takePhotoAsync().then(photo => {
-        self.image_preview = photo;
-        self.photoPreview.swiper.removeSlide(0);
-        self.photoPreview.swiper.appendSlide(
+      this.$refs.photo.takePhotoAsync().then(photo => {
+        this.image_preview = photo;
+        this.photoPreview.swiper.removeSlide(0);
+        this.photoPreview.swiper.appendSlide(
           `<div class="photo-browser-slide swiper-slide swiper-slide-active" data-swiper-slide-index="0"><span class="swiper-zoom-container"><img src="${photo}" ></span></div>`
         );
-        self.photoPreview.params.photos = [
+        this.photoPreview.params.photos = [
           {
             url: photo
           }
@@ -400,7 +371,6 @@ export default {
       });
     },
     checkPermision(p) {
-      const self = this;
       let view = p.filters.find(e => {
         if (e.context === "members") {
           if (e.user_id === API.actorId) return true;
@@ -411,61 +381,53 @@ export default {
       return typeof view !== "undefined";
     },
     openTimePickerDetail() {
-      const self = this;
-      if (self.edit_acces) self.openTimePicker();
+      if (this.edit_acces) this.openTimePicker();
     }
   },
   computed: {
     dateField() {
-      const self = this;
-      if (!self.detail_data) return null;
-      return self.$moment(self.detail_data.timestamp).format("DD MMM YYYY");
+      if (!this.detail_data) return null;
+      return this.$moment(this.detail_data.timestamp).format("DD MMM YYYY");
     },
     timeField() {
-      const self = this;
-      if (!self.detail_data) return null;
-      return self.$moment(self.detail_data.timestamp).format("H:mm");
+      if (!this.detail_data) return null;
+      return this.$moment(this.detail_data.timestamp).format("H:mm");
     }
   },
   mounted() {
-    const self = this;
-    self.$api
+    this.$api
       .getInstalledAddonPermission(addonConfig.package, "attendance_edit_access", {
         with_filters: true
       })
       .then(v => {
-        self.edit_acces = self.checkPermision(v);
+        this.edit_acces = this.checkPermision(v);
 
-        API.getAttendancesDetail(self.edit_id).then(data => {
-          self.detail_data = self.prepareAttendance(data);
-          if (typeof self.detail_data.image !== "undefined")
-            self.image_preview = self.detail_data.image.url;
-          self.loaded = true;
-          if (self.edit_acces) {
-            self.$nextTick(() => {
-              self.createCalendar();
-              self.createTimePicker(self.detail_data.timestamp);
-              self.createPhotoPreview();
+        API.getAttendancesDetail(this.edit_id).then(data => {
+          this.detail_data = this.prepareAttendance(data);
+          if (typeof this.detail_data.image !== "undefined")
+            this.image_preview = this.detail_data.image.url;
+          this.loaded = true;
+          if (this.edit_acces) {
+            this.$nextTick(() => {
+              this.createCalendar();
+              this.createTimePicker(this.detail_data.timestamp);
+              this.createPhotoPreview();
             });
           } else {
-            self.$nextTick(() => {
-              self.createPhotoPreview();
+            this.$nextTick(() => {
+              this.createPhotoPreview();
             });
           }
         });
       });
   },
-  created() {
-    const self = this;
-  },
   data() {
-    const self = this;
     return {
       addonConfig,
       image_preview: null,
       sheet_action_opened: false,
       new_action: null,
-      edit_id: self.$f7route.params.id,
+      edit_id: this.$f7route.params.id,
       edit_acces: false,
       detail_data: null,
       loaded: false

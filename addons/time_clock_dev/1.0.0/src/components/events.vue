@@ -70,15 +70,9 @@ export default {
     }
   },
   data() {
-    const self = this;
     return {
       addonConfig,
     };
-  },
-  mounted() {
-    const self = this;
-
-
   },
 };
 </script>

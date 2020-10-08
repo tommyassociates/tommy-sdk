@@ -47,16 +47,14 @@ export default {
   },
   methods: {
     clickMore() {
-      const self = this;
-      self.more_clicked = true;
+      this.more_clicked = true;
     },
     goSearch(val) {
-      const self = this;
-      self.$f7router.navigate('/time-clock/search/', {
+      this.$f7router.navigate('/time-clock/search/', {
         props: {
           start_search: val
         }
-      })
+      });
     }
   },
   data() {

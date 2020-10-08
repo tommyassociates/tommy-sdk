@@ -10,27 +10,15 @@ const AttendanceService = {
    * @returns {*}
    */
   prepareAttendances(data, self) {
-    // console.log('TIMECLOCK - prepareAttendances');
     if (data === null) return null;
-    // console.log('TIMECLOCK - prepareAttendances - after data check.');
-
 
     data.forEach(e => {
-      // const user = self.$root.teamMembers.find(
-      //   member => member.user_id === e.user_id
-      // );
-
-      // console.log('TIMECLOCK - prepareAttendances - after data check. data - e', JSON.stringify(e));
-
       const user = self.$store.state.teamMembers.teamMembers.find(
         member => member.user_id === e.user_id
       );
-      // console.log('TIMECLOCK - prepareAttendances - after data check. data - user', JSON.stringify(user));
       if (user) {
         e.user_name = `${user.first_name} ${user.last_name}`;
         e.icon_url = e.image ? e.image.url : user.icon_url;
-      } else {
-        // console.log('TIMECLOCK - prepareAttendances - after data check. data - user not found.');
       }
     });
     return data;
@@ -43,13 +31,7 @@ const AttendanceService = {
    * @returns {*[]}
    */
   prepareAttendance(data, self) {
-    // console.log('TIMECLOCK - prepareAttendance');
     if (data === null) return null;
-    // console.log('TIMECLOCK - prepareAttendance - after data check.');
-
-    // const user = self.$root.teamMembers.find(
-    //   member => member.user_id === data.user_id
-    // );
 
     const user = self.$store.state.teamMembers.teamMembers.find(
       member => member.user_id === data.user_id
@@ -57,8 +39,6 @@ const AttendanceService = {
     data.user_name = `${user.first_name} ${user.last_name}`;
     data.icon_url = data.image ? data.image.url : user.icon_url;
     return data;
-
-
   },
 
   /**
@@ -69,9 +49,6 @@ const AttendanceService = {
    * @returns {*}
    */
   splitAttendanceIntoDays(data = [], self) {
-    // console.log('TIMECLOCK - splitAttendanceIntoDays');
-
-
     //format the data.
     const today = self.$moment(new Date()).format('YYYY-MM-DD');
     const yesterday = self.$moment(today).subtract(1, 'day').format('YYYY-MM-DD');
