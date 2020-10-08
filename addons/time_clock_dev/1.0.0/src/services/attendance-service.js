@@ -1,8 +1,6 @@
 import addonConfig from "../addonConfig";
 
 const AttendanceService = {
-  test: undefined,
-
   /**
    * Appends user information to the attendances.
    * @param data
@@ -97,6 +95,5 @@ const AttendanceService = {
     };
   },
 };
-
 
 export default AttendanceService;
