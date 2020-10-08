@@ -285,7 +285,8 @@ export default {
               `attendance_start.jpg`
             );
 
-            API.setAttendances(form).then(() => {
+            const isManager = this.isLocked;
+            API.setAttendances(form, isManager).then(() => {
               this.updateAll();
               this.clock_on = true;
               this.$f7.preloader.hide();
@@ -313,7 +314,8 @@ export default {
           form.append("status", "start");
           form.append("address", cords.name);
 
-          API.setAttendances(form).then(() => {
+          const isManager = this.isLocked;
+          API.setAttendances(form, isManager).then(() => {
             this.updateAll();
             this.clock_on = true;
             this.$f7.preloader.hide();
@@ -351,8 +353,8 @@ export default {
             );
 
             this.loaded.duration = 0;
-
-            API.setAttendances(form).then(() => {
+            const isManager = this.isLocked;
+            API.setAttendances(form, isManager).then(() => {
               this.updateAll();
               this.clock_on = false;
               this.$f7.preloader.hide();
@@ -382,8 +384,8 @@ export default {
           form.append("address", cords.name);
 
           this.loaded.duration = 0;
-
-          API.setAttendances(form).then(() => {
+          const isManager = this.isLocked;
+          API.setAttendances(form, isManager).then(() => {
             this.updateAll();
             this.clock_on = false;
             this.$f7.preloader.hide();
@@ -414,8 +416,8 @@ export default {
 
         this.loaded.duration = 0;
         this.loaded.timestamp = this.$moment(new Date()).format();
-
-        API.setAttendances(params).then(() => {
+        const isManager = this.isLocked;
+        API.setAttendances(params, isManager).then(() => {
           this.updateAttendances();
           this.break_on = true;
 
@@ -445,8 +447,8 @@ export default {
         this.loaded.duration = 0;
         //set back to the attendance timestamp
         this.loaded.timestamp = this.$moment(this.activeData.timestamp).format();
-
-        API.setAttendances(params).then(() => {
+        const isManager = this.isLocked;
+        API.setAttendances(params, isManager).then(() => {
           this.updateAttendances();
           this.break_on = false;
 
