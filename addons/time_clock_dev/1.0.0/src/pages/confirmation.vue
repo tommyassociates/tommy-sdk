@@ -15,7 +15,7 @@
   </f7-page>
 </template>
 <script>
-import addonConfig from "../../addonConfig";
+import addonConfig from "../addonConfig";
 import checkmarkAnimation from 'tommy-core/src/components/animations/checkmark-animation.vue';
 
 export default {
