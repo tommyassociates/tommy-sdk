@@ -86,6 +86,7 @@ app.init({
       addons: [],
       miniProgramLocked: {
         isLocked: false,
+        isLockedScreen: false,
         miniProgram: '',
         showLockableAddons: false,
       },
