@@ -5,7 +5,7 @@
       <f7-nav-title>{{ $t(`${addonConfig.package}.settings.title`) }}</f7-nav-title>
     </f7-navbar>
     <f7-page-content>
-      <lock-addon :addon="String(addonConfig.package)"></lock-addon>
+      <lock-addon :package="String(addonConfig.package)"></lock-addon>
     </f7-page-content>
   </f7-page>
 </template>
@@ -30,5 +30,4 @@ export default {
 <style scoped>
 
 </style>
-
 
