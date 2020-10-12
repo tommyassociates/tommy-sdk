@@ -11,7 +11,10 @@ const AttendanceService = {
     if (data === null) return null;
 
     data.forEach(e => {
-      const user = self.$store.state.teamMembers.teamMembers.find(
+      // const user = self.$store.state.teamMembers.teamMembers.find(
+      //   member => member.user_id === e.user_id
+      // );
+      const user = self.$root.teamMembers.find(
         member => member.user_id === e.user_id
       );
       if (user) {
@@ -31,7 +34,10 @@ const AttendanceService = {
   prepareAttendance(data, self) {
     if (data === null) return null;
 
-    const user = self.$store.state.teamMembers.teamMembers.find(
+    // const user = self.$store.state.teamMembers.teamMembers.find(
+    //   member => member.user_id === data.user_id
+    // );
+    const user = self.$root.teamMembers.find(
       member => member.user_id === data.user_id
     );
     data.user_name = `${user.first_name} ${user.last_name}`;

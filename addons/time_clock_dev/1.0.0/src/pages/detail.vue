@@ -287,7 +287,10 @@ export default {
       if (this.calendarInstance) this.calendarInstance.destroy();
     },
     prepareAttendance(data) {
-      const user = this.$store.state.teamMembers.teamMembers.filter(
+      // const user = this.$store.state.teamMembers.teamMembers.filter(
+      //   member => member.user_id === data.user_id
+      // );
+      const user = this.$root.teamMembers.filter(
         member => member.user_id === data.user_id
       );
       data.user_name = user[0].first_name + " " + user[0].last_name;
