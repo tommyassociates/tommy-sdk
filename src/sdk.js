@@ -87,8 +87,10 @@ app.init({
       miniProgramLocked: {
         isLocked: false,
         isLockedScreen: false,
+        isUnlockScreen: false,
+        isOtherLockedMiniProgramsScreen: false,
+        isShowMenu: false,
         miniProgram: '',
-        showLockableAddons: false,
       },
     };
   },
