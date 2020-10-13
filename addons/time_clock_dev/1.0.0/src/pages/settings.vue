@@ -24,13 +24,9 @@
 
 <script>
 import addonConfig from "../addonConfig";
-import lockAddon from 'tommy-core/src/components/lock-addon.vue';
 
 export default {
   name: "settings",
-  components: {
-    lockAddon,
-  },
   data() {
     return {
       addonConfig,
