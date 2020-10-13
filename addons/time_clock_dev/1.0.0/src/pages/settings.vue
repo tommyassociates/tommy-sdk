@@ -11,7 +11,6 @@
       <f7-list>
         <f7-list-item :title="$t('label.lock_addon', 'Lock mini program')"
                       :footer="$t('label.lock_addon_description', 'Lock this mini program so that team members can interact with it by entering a pin code.')"
-                      @click="lockAddonClick()"
                       :link="`tommy://lock?addon=${addonConfig.package}&showmenu=true`">
 
         </f7-list-item>
