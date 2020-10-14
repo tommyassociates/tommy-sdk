@@ -6,6 +6,7 @@ import selectPicker from "./pages/select-picker.vue";
 // import MapPage from "./pages/map.vue";
 // import takePhoto from './pages/locked/take-photo';
 import confirmation from './pages/confirmation';
+import settings from './pages/settings';
 
 
 
@@ -40,8 +41,13 @@ const routes = [
     path: `${addonConfig.baseUrl}confirmation/`,
     component: confirmation,
   },
+  {
+    path: `${addonConfig.baseUrl}settings/`,
+    component: settings,
+  },
 
 
 ];
 
 export default routes;
+
