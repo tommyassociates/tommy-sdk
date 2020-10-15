@@ -257,7 +257,8 @@ export default {
     },
 
     isLocked() {
-      return this.$root.miniProgramLocked.isLocked && this.$root.miniProgramLocked.miniProgram === addonConfig.package;
+      return this.$store.state.miniProgramLocked.isLocked
+        && this.$store.state.miniProgramLocked.miniProgram === addonConfig.package;
     },
   },
   methods: {
