@@ -615,7 +615,7 @@ export default {
         };
         // console.log('TIMECLOCK - mounted promise then other options', JSON.stringify(otherOptions));
         API.getAttendances({otherOptions}).then(data => {
-          console.log('TIMECLOCK - mounted promise get attendances');
+          // console.log('TIMECLOCK - mounted promise get attendances');
           // console.log('TIMECLOCK - mounted promise get attendances - data', JSON.stringify(data));
           this.attendanceData = AttendanceService.prepareAttendances(data, this);
           //this.formattedAttendanceData = TimesheetService.splitAttendanceIntoDays(this.attendanceData, this);
