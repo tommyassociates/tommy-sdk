@@ -210,10 +210,6 @@ export default {
     API.actorId = API.getUserId(this);
     API.actor = API.getActor(this);
 
-    if (!this.isLocked) {
-      this.$events.$on(`${this.addonConfig.package}:attedance_edit`, this.updateAll);
-      this.$events.$on(`${this.addonConfig.package}:attedance_delete`, this.updateAll);
-    }
 
     // if (this.$root.miniProgramLocked.isLocked === true && this.$root.miniProgramLocked.miniProgram === this.addonConfig.package) {
     //   this.$f7router.navigate(`${this.addonConfig.baseUrl}locked/enter-pin`);
@@ -597,6 +593,9 @@ export default {
       });
     } else {
 
+      this.$events.$on(`${this.addonConfig.package}:attedance_edit`, this.updateAll);
+      this.$events.$on(`${this.addonConfig.package}:attedance_delete`, this.updateAll);
+
       this.loaded.interval = setInterval(() => {
         this.calculateDuration();
       }, 1000);
@@ -646,3 +645,4 @@ export default {
 <style lang="scss">
 
 </style>
+
