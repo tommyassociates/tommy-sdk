@@ -15,6 +15,7 @@ const webpackConfig = require('./build/webpack.config')
 
 const app = express()
 const compiler = webpack(webpackConfig)
+const fs = require('fs')
 
 
 // Middleware
@@ -59,8 +60,11 @@ app.post('/addon/buildAll', async (req, res) => {
   for (let x in addons) {
     const pkg = addons[x].package
     const version = addons[x].version
-    await addonBuilder(pkg, version)
-    await addonArchiver(pkg, version)
+    const srcpath = helpers.getLocalAddonFilePath(pkg, version, 'src/addon.js')
+    if (fs.existsSync(srcpath)) {
+      await addonBuilder(pkg, version)
+      await addonArchiver(pkg, version)
+    }
   }
 
   // .forEach(async (addon) => {
