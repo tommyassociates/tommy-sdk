@@ -1,95 +1,96 @@
 @import '~tommy-core/src/scss/variables';
 
-// $color-primary: #2EC8A1;
-// $color-secondary: #F5A623;
+$color-primary: #2EC8A1;
+$color-secondary: #F5A623;
 
 #subscriptions__index {
-  // .col {
-  //   &--icon {
-  //     width: 90px !important;
-  //   }
-  //
-  //   &--icon-description {
-  //     width: calc(100% - 90px) !important;
-  //   }
-  //
-  //   &--bg-icon {
-  //     width: 120px !important;
-  //   }
-  //
-  //   &--bg-icon-description {
-  //     width: calc(100% - 120px) !important;
-  //   }
-  //
-  //   &--credit-card-icon {
-  //     width: 74px !important;
-  //   }
-  //
-  //   &--credit-card-details {
-  //     width: calc(100% - 74px) !important;
-  //   }
-  // }
-  //
-  // .row {
-  //   &--valign-center {
-  //     align-items: center;
-  //   }
-  //   &--mb {
-  //     margin-bottom: 16px;
-  //   }
-  // }
-  //
-  // .label {
-  //   &--mb {
-  //     margin-bottom: 4px;
-  //     display: block;
-  //   }
-  // }
-  //
-  // .input--outlined {
-  //   width: 100%;
-  //
-  //   &.item-input-wrap {
-  //     margin: {
-  //       top: 0;
-  //       bottom: 0;
-  //     }
-  //   }
-  //
-  //   input, select {
-  //     border: 1px solid #CCCCCC;
-  //     height: 40px;
-  //     line-height: 50px;
-  //     padding-left: 5px;
-  //     padding-right: 5px;
-  //     border-radius: 12px;
-  //     width: 100%;
-  //   }
-  // }
-  //
-  // .tommy-button {
-  //   color: white !important;
-  //   padding: 12px 24px;
-  //   border-radius: 10px;
-  //   text-align: center;
-  //   display: inline-block;
-  //
-  //   &--primary {
-  //     color: white;
-  //     background: $color-primary;
-  //     border: 1px solid $color-primary;
-  //   }
-  //
-  //   &--secondary {
-  //     color: white;
-  //     background: $color-secondary;
-  //     border: 1px solid $color-secondary;
-  //   }
-  //
-  //   &--full-width {
-  //     display:block;
-  //   }
-  // }
+
+  .col {
+    &--icon {
+      width: 90px !important;
+    }
+
+    &--icon-description {
+      width: calc(100% - 90px) !important;
+    }
+
+    &--bg-icon {
+      width: 120px !important;
+    }
+
+    &--bg-icon-description {
+      width: calc(100% - 120px) !important;
+    }
+
+    &--credit-card-icon {
+      width: 74px !important;
+    }
+
+    &--credit-card-details {
+      width: calc(100% - 74px) !important;
+    }
+  }
+
+  .row {
+    &--valign-center {
+      align-items: center;
+    }
+    &--mb {
+      margin-bottom: 16px;
+    }
+  }
+
+  .label {
+    &--mb {
+      margin-bottom: 4px;
+      display: block;
+    }
+  }
+
+  .input--outlined {
+    width: 100%;
+
+    &.item-input-wrap {
+      margin: {
+        top: 0;
+        bottom: 0;
+      }
+    }
+
+    input, select {
+      border: 1px solid #CCCCCC;
+      height: 40px;
+      line-height: 50px;
+      padding-left: 5px;
+      padding-right: 5px;
+      border-radius: 12px;
+      width: 100%;
+    }
+  }
+
+  .tommy-button {
+    color: white !important;
+    padding: 12px 24px;
+    border-radius: 10px;
+    text-align: center;
+    display: inline-block;
+
+    &--primary {
+      color: white;
+      background: $color-primary;
+      border: 1px solid $color-primary;
+    }
+
+    &--secondary {
+      color: white;
+      background: $color-secondary;
+      border: 1px solid $color-secondary;
+    }
+
+    &--full-width {
+      display:block;
+    }
+  }
 
   .subscription-total {
     font-size: 42px;

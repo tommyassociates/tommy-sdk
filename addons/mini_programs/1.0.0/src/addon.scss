@@ -1,11 +1,12 @@
-
-.col {
-  &--icon {
-    width: 76px !important;
-  }
-
-  &--icon-description {
-    width: calc(100% - 76px) !important;
-  }
-}
-
+// Must be scoped
+//
+// .col {
+//   &--icon {
+//     width: 76px !important;
+//   }
+//
+//   &--icon-description {
+//     width: calc(100% - 76px) !important;
+//   }
+// }
+//

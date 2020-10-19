@@ -1,4 +1,7 @@
-import { i18n, api } from 'tommy-core/src/tommy'; // '../tommy/tommy';
+// import { i18n, api } from 'tommy-core/src/tommy'; // '../tommy/tommy';
+const tommy = window.tommy;
+const i18n = window.tommy.i18n;
+const api = window.tommy.api;
 
 let fileSelector;
 const photoChanger = {

@@ -50,7 +50,6 @@
         <f7-col width="100" tablet-width="50">
           <f7-block strong inset>
             <f7-block-header>{{$t('theme.index.background_image.title')}}</f7-block-header>
-
             <f7-row>
               <f7-col width="40" :class="'col--bg-icon'">
 
@@ -112,7 +111,7 @@
         const self = this;
         const backgroundImage = self.$root.team.background_url
           ? self.$root.team.background_url
-          : `${self.$addonAssetUrl}MenuBackgroundWithShadow.png`;
+          : `${self.$addonAssetsUrl}MenuBackgroundWithShadow.png`;
 
         const styles = {
           backgroundImage: `url(${backgroundImage})`,
