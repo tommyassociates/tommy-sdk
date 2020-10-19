@@ -15,12 +15,12 @@
     "clock_off_button": "下班打卡",
     "break_on_button": "开始休息",
     "break_off_button": "结束休息",
-    "geo_loading": "Geolocation loading",
-    "geo": "Geolocation",
-    "photo": "Photo",
-    "sending": "Sending",
-    "no_activity": "No Activity",
-    "no_attendances": "No Attendances"
+    "geo_loading": "地理位置加载",
+    "geo": "地理位置",
+    "photo": "照片",
+    "sending": "正在发送",
+    "no_activity": "没有活动",
+    "no_attendances": "没有出席"
   },
   "settings": {
     "title": "设置",
@@ -32,7 +32,8 @@
     "who_can_clock_title": "谁可以上下班打卡",
     "who_can_break_title": "谁可以开始/结束休息",
     "lock_mini_program_title": "锁时钟迷你程序",
-    "lock_mini_program_toggle": "时钟锁定了吗？"
+    "lock_mini_program_toggle": "时钟锁定了吗？",
+    "lock_mini_program_no_access": "您无权查看此页面"
   },
   "search": {
     "title": "打卡搜索",
@@ -40,10 +41,10 @@
     "notset_label": "未设置",
     "active_label": "激活",
     "date_options": ["今天", "昨天"],
-    "search_placeholder": "Search Member, Role, Location…",
+    "search_placeholder": "搜索成员，角色，位置…",
     "search_disable_button": "取消",
-    "results_divider": "Search Result",
-    "not_found": "Not found"
+    "results_divider": "搜索结果",
+    "not_found": "未找到"
   },
   "date_range": {
     "title": "日期区间",
@@ -65,9 +66,22 @@
     "photo_label": "照片",
     "action_label": "行动",
     "delete_button": "删除",
-    "delete_text": "Are you sure you want to delete this entry?",
+    "delete_text": "您确定要删除该条目吗？",
     "cancel_button": "取消",
     "confirm_button": "确认",
     "done_button": "完成"
+  },
+  "locked": {
+    "take_photo": {
+      "title": "拍照",
+      "clock_on_button": "上班打卡",
+      "clock_off_button": "下班打卡",
+      "break_on_button": "开始休息",
+      "break_off_button": "结束休息",
+      "geo_loading": "地理位置加载"
+    },
+    "confirmation": {
+      "title": "确认书"
+    }
   }
 }

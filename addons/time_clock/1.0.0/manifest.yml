@@ -55,3 +55,4 @@
       index: true
       path: "/time_clock/"
       actor_permission: addon_actor_access
+      lockable: true

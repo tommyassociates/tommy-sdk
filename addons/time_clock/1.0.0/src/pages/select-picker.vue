@@ -24,7 +24,6 @@
   </f7-page>
 </template>
 <script>
-import API from "../api";
 import SelectList from "../components/select-list.vue";
 
 export default {
@@ -41,30 +40,26 @@ export default {
     "select-list": SelectList
   },
   mounted() {
-    const self = this;
-    self.getData(this);
+    this.getData(this);
   },
   methods: {
     createSearchbar() {
-      const self = this;
-      self.$nextTick(() => {
-        const searchbar = self.$f7.searchbar.create({
+      this.$nextTick(() => {
+        const searchbar = this.$f7.searchbar.create({
           el: ".searchbar",
-          searchContainer: "#time-clock-select-" + self.type,
+          searchContainer: "#time-clock-select-" + this.type,
           searchIn: ".item-title"
         });
       });
     },
     selectChanget(e) {
-      const self = this;
-      self.changet = true;
-      self.changet_data = e;
-      //self.onChange(e.target, e.checked);
+      this.changet = true;
+      this.changet_data = e;
+      //this.onChange(e.target, e.checked);
     },
     saveSelected(){
-      const self = this;
-      self.saveChange(self.changet_data.target);
-      self.$f7router.back();
+      this.saveChange(this.changet_data.target);
+      this.$f7router.back();
     }
   },
   data() {

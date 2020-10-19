@@ -2,11 +2,9 @@
 export default {
   methods: {
     openTimePicker(){
-        const self = this;
-        self.timePickerInstance.open();
+        this.timePickerInstance.open();
     },
     createTimePicker(target) {
-      const self = this;
       const date = new Date(target);
       const hoursArr = [];
       const minutesArr = [];
@@ -17,7 +15,7 @@ export default {
         minutesArr.push(i);
       }
 
-      self.timePickerInstance = self.$f7.picker.create({
+      this.timePickerInstance = this.$f7.picker.create({
         inputEl: '#timePicker',
         toolbar: true,
         rotateEffect: false,
@@ -45,13 +43,12 @@ export default {
           }
         ]
       });
-      self.timePickerInstance.on("close", () => {
-        const self = this;
-        let date_new = new Date(self.detail_data.timestamp);
-        date_new.setHours(Number(self.timePickerInstance.value[0]));
-        date_new.setMinutes(Number(self.timePickerInstance.value[1]));
+      this.timePickerInstance.on("close", () => {
+        let date_new = new Date(this.detail_data.timestamp);
+        date_new.setHours(Number(this.timePickerInstance.value[0]));
+        date_new.setMinutes(Number(this.timePickerInstance.value[1]));
         date_new = date_new.toISOString();
-        self.detail_data.timestamp = date_new;
+        this.detail_data.timestamp = date_new;
       });
     }
   }

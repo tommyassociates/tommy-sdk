@@ -33,7 +33,7 @@ export default {
       self.callback(self.new_latitude, self.new_longitude, self.new_accuracy, self.new_address);
     },
     onMapClick(e) {
-      console.log("TCL: onMapClick -> e", e);
+      // console.log("TCL: onMapClick -> e", e);
       const self = this;
       self.edited = true;
       if (self.circle) self.circle.remove();
