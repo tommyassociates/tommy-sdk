@@ -1,42 +1,53 @@
-import Index from "./pages/index.vue";
-import Settings from "./pages/settings.vue";
-import Detail from "./pages/detail.vue";
-import Search from "./pages/search.vue";
-import SelectPicker from "./pages/select-picker.vue";
-import MapPage from "./pages/map.vue";
-import TakePhoto from './pages/take-photo';
+import addonConfig from "./addonConfig";
+import index from "./pages/index.vue";
+import detail from "./pages/detail.vue";
+import search from "./pages/search.vue";
+import selectPicker from "./pages/select-picker.vue";
+// import MapPage from "./pages/map.vue";
+// import takePhoto from './pages/locked/take-photo';
+import confirmation from './pages/confirmation';
+import settings from './pages/settings';
 
-console.log('TIME_CLOCK addon');
+
+
+// console.log('TIME_CLOCK addon');
 
 const routes = [
   {
-    path: "/time-clock/",
-    component: Index,
+    path: `${addonConfig.baseUrl}`,
+    component: index,
   },
   {
-    path: "/time-clock/settings/",
-    component: Settings,
+    path: `${addonConfig.baseUrl}detail/:id`,
+    component: detail,
   },
   {
-    path: "/time-clock/detail/:id",
-    component: Detail,
+    path: `${addonConfig.baseUrl}search/`,
+    component: search,
   },
   {
-    path: "/time-clock/search/",
-    component: Search,
+    path: `${addonConfig.baseUrl}select-picker/`,
+    component: selectPicker,
+  },
+  // {
+  //   path: `${addonConfig.baseUrl}map/`,
+  //   component: MapPage,
+  // },
+  // {
+  //   path: `${addonConfig.baseUrl}locked/take-photo/`,
+  //   component: takePhoto,
+  // },
+  {
+    path: `${addonConfig.baseUrl}confirmation/`,
+    component: confirmation,
   },
   {
-    path: "/time-clock/select-picker/",
-    component: SelectPicker,
+    path: `${addonConfig.baseUrl}settings/`,
+    component: settings,
   },
-  {
-    path: "/time-clock/map/",
-    component: MapPage,
-  },
-  {
-    path: "/time-clock/take-photo/",
-    component: TakePhoto,
-  },
+
+
 ];
 
 export default routes;
+

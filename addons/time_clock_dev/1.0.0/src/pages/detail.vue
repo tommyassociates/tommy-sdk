@@ -6,15 +6,15 @@
   >
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
-      <f7-nav-title>{{$t(`${addonConfig.package}.event_details.title`)}}</f7-nav-title>
+      <f7-nav-title>{{ $t(`${addonConfig.package}.event_details.title`) }}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
         <f7-link icon-only @click="editAttendance" v-if="edit_acces">
-          <f7-icon f7="check" />
+          <f7-icon f7="check"/>
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
     <f7-toolbar v-if="edit_acces">
-      <f7-button @click="deleteClick()">{{$t(`${addonConfig.package}.event_details.delete_button`)}}</f7-button>
+      <f7-button @click="deleteClick()">{{ $t(`${addonConfig.package}.event_details.delete_button`) }}</f7-button>
     </f7-toolbar>
     <f7-list media-list v-if="loaded">
       <f7-list-item
@@ -23,7 +23,7 @@
         @click.native="openTimePickerDetail()"
       >
         <div slot="after">
-          <input type="text" id="timePicker" readonly :value="timeField" />
+          <input type="text" id="timePicker" readonly :value="timeField"/>
         </div>
       </f7-list-item>
       <f7-list-item
@@ -38,7 +38,7 @@
         @click.native="openSelector()"
       >
         <div slot="after" class="after-container">
-          <div class="name">{{detail_data.user_name}}</div>
+          <div class="name">{{ detail_data.user_name }}</div>
           <div class="image" :style="{backgroundImage : 'url('+detail_data.icon_url+')'}"></div>
         </div>
       </f7-list-item>
@@ -92,10 +92,11 @@
             sheet-close
             class="cancel"
             @click="clearAction"
-          >{{$t(`${addonConfig.package}.event_details.cancel_button`)}}</f7-link>
+          >{{ $t(`${addonConfig.package}.event_details.cancel_button`) }}
+          </f7-link>
         </div>
         <div class="right">
-          <f7-link sheet-close @click="setAction">{{$t(`${addonConfig.package}.event_details.done_button`)}}</f7-link>
+          <f7-link sheet-close @click="setAction">{{ $t(`${addonConfig.package}.event_details.done_button`) }}</f7-link>
         </div>
       </f7-toolbar>
       <f7-page-content>
@@ -135,7 +136,7 @@
         </f7-list>
       </f7-page-content>
     </f7-sheet>
-    <Photo ref="photo" direction="front" v-if="edit_acces" />
+    <Photo ref="photo" direction="front" v-if="edit_acces"/>
   </f7-page>
 </template>
 <script>
@@ -149,7 +150,7 @@ import Photo from '../components/photo.vue';
 export default {
   name: "DetailActivity",
   mixins: [dialog, timePicker, Blob],
-  components: { Photo },
+  components: {Photo},
   methods: {
     changeAction(val) {
       this.detail_data.status = val;
@@ -196,7 +197,7 @@ export default {
       });
     },
     getDataUser(self) {
-      self.$api.getCurrentTeamMembers({ cache: true }).then(tagItems => {
+      self.$api.getCurrentTeamMembers({cache: true}).then(tagItems => {
         tagItems.forEach((item, index) => {
           item.context = "members";
         });
@@ -268,7 +269,7 @@ export default {
         backdrop: true,
         closeOnSelect: true,
         on: {
-          change(cal, val) {
+          change: (cal, val) => {
             const date = new Date(this.detail_data.timestamp);
             const date_new = new Date(val[0]);
             date.setFullYear(date_new.getFullYear());

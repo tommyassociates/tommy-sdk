@@ -3,7 +3,7 @@
            @page:beforeout="pageBeforeOut">
     <f7-navbar>
       <tommy-nav-back force></tommy-nav-back>
-      <f7-nav-title>{{ $t('time_clock.search.title') }}</f7-nav-title>
+      <f7-nav-title>{{ $t(`${addonConfig.package}.search.title`) }}</f7-nav-title>
 
       <f7-nav-right class="time-clock-navbar-links">
         <f7-link href="#" icon-only @click.prevent="csvExport()">
@@ -23,11 +23,11 @@
         <f7-icon slot="media" icon="demo-list-icon"></f7-icon>
         <f7-searchbar
           class="time-clock-searchbar"
-          :placeholder="$t('time_clock.search.search_placeholder')"
+          :placeholder="$t(`${addonConfig.package}.search.search_placeholder`)"
           customSearch
           :backdrop="false"
           disableButton
-          :disable-button-text="$t('time_clock.search.search_disable_button')"
+          :disable-button-text="$t(`${addonConfig.package}.search.search_disable_button`)"
           :value="search"
           @input="onSearchbarSearch($event.target.value)"
           @searchbar:clear="onSearchbarClear"
@@ -53,12 +53,13 @@
           :loaded="loaded.attendance"
         />
       </template>
-      <div class="not-found" v-if="attendanceData.length === 0"><p>{{ $t('time_clock.search.not_found') }}</p></div>
+      <div class="not-found" v-if="attendanceData.length === 0"><p>{{ $t(`${addonConfig.package}.search.not_found`) }}</p></div>
 
     </f7-page-content>
   </f7-page>
 </template>
 <script>
+import addonConfig from "../addonConfig";
 import API from "../api";
 import AttendanceService from "../services/attendance-service";
 
@@ -82,6 +83,7 @@ export default {
   data() {
     const self = this;
     return {
+      addonConfig,
       dateRange: '',
       delayTimerSearch: null,
       search: null,
@@ -140,12 +142,12 @@ export default {
 
     onDateRangeChange(value) {
       const self = this;
-      console.log('search - date range change: ' + value);
+      // console.log('search - date range change: ' + value);
     },
 
     onDateRangeSave(value) {
       const self = this;
-      console.log('search - date range save: ' + value);
+      // console.log('search - date range save: ' + value);
 
       //self.dateRange = value;
 
@@ -160,7 +162,7 @@ export default {
       };
       if (self.dateRange) {
         otherOptions.date_range = self.dateRange;
-        console.log('daterange', self.dateRange);
+        // console.log('daterange', self.dateRange);
       }
       if (self.search) {
         otherOptions.search = encodeURIComponent(self.search);
@@ -205,7 +207,7 @@ export default {
 
     return Promise.all([
       self.$api.getInstalledAddonPermission(
-        "time_clock",
+        self.addonConfig.package,
         "attendance_other_access",
         {with_filters: true}
       )

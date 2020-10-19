@@ -58,13 +58,8 @@ export default {
   },
   methods:{
     toggleItem(item, checked){
-      self = this;
-      self.$emit('change', {target: item, checked: checked});
+      this.$emit('change', {target: item, checked: checked});
     }
   },
-  data() {
-    return {
-    };
-  }
 };
 </script>

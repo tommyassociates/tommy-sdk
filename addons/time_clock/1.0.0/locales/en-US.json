@@ -32,7 +32,8 @@
     "who_can_clock_title": "Who Can Clock On/Off",
     "who_can_break_title": "Who Can Start/Stop Breaks",
     "lock_mini_program_title": "Lock time clock mini program",
-    "lock_mini_program_toggle": "Time clock locked?"
+    "lock_mini_program_toggle": "Time clock locked?",
+    "lock_mini_program_no_access": "You do not have permission to view this page"
   },
   "search": {
     "title": "Time Clock Search",
@@ -69,5 +70,18 @@
     "cancel_button": "Cancel",
     "confirm_button": "Confirm",
     "done_button": "Done"
+  },
+  "locked": {
+    "take_photo": {
+      "title": "Take photo",
+      "clock_on_button": "Clock On",
+      "clock_off_button": "Clock Off",
+      "break_on_button": "Start Break",
+      "break_off_button": "End Break",
+      "geo_loading": "Geolocation loading"
+    },
+    "confirmation": {
+      "title": "Confirmation"
+    }
   }
 }

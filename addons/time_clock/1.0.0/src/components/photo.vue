@@ -19,35 +19,28 @@ export default {
       default: "BACK"
     }
   },
-  mounted() {
-    console.log('SDK - PHOTO mounted');
-  },
   methods: {
     takePhoto() {
-      const self = this;
-      if (self.isCordova) {
-        self.openCamera();
-        window.addEventListener("focus", self.CordovaCameraCheck, false);
+      if (this.isCordova) {
+        this.openCamera();
+        window.addEventListener("focus", this.CordovaCameraCheck, false);
 
       } else {
         //wath the file form
-        window.addEventListener("focus", self.FileCameraCheck, false);
-        self.$refs.inputFileCamera.click();
+        window.addEventListener("focus", this.FileCameraCheck, false);
+        this.$refs.inputFileCamera.click();
       }
     },
     takePhotoAsync() {
-      console.log('takePhotoAsync');
-      const self = this;
       const photoPromise = new Promise((resolve, reject) => {
-        self.resolvePromise = resolve;
-        self.rejectPromise = reject;
+        this.resolvePromise = resolve;
+        this.rejectPromise = reject;
       });
-      self.takePhoto();
+      this.takePhoto();
       return photoPromise;
     },
     openCamera() {
-      const self = this;
-      var srcType = Camera.PictureSourceType.CAMERA;
+      const srcType = Camera.PictureSourceType.CAMERA;
       const options = {
         quality: 85,
         targetHeight: 1080,
@@ -61,68 +54,65 @@ export default {
         saveToPhotoAlbum: false
       };
       options.cameraDirection =
-        Camera.Direction[String(self.direction).toUpperCase()];
+        Camera.Direction[String(this.direction).toUpperCase()];
       navigator.camera.getPicture(
         //cameraSuccess
         image => {
-          self.photo_taken = true;
-          self.$emit("photo:send", image);
-          if (typeof self.resolvePromise === "function") self.resolvePromise(image);
+          this.photo_taken = true;
+          this.$emit("photo:send", image);
+          if (typeof this.resolvePromise === "function") this.resolvePromise(image);
           navigator.camera.cleanup();
         },
         //cameraError
         error => {
-          self.$app.notify("Unable to obtain picture: " + error, "app");
+          this.$app.notify("Unable to obtain picture: " + error, "app");
           console.debug("Unable to obtain picture: " + error, "app");
-          if (typeof self.rejectPromise === "function") self.rejectPromise(error);
+          if (typeof this.rejectPromise === "function") this.rejectPromise(error);
           navigator.camera.cleanup();
         },
         options
       );
     },
     onFileCameraChange(e) {
-      const self = this;
       const files = e.target.files;
       if (!files.length) return;
       for (let i = 0; i < files.length; i += 1) {
         const file = files[i];
         const reader = new FileReader();
         reader.onload = () => {
-          self.photo_taken = true;
-          self.resizeImageCamera(reader.result).then(data => {
-            self.$emit("photo:send", data);
-            if (typeof self.resolvePromise === "function")
-              self.resolvePromise(data);
+          this.photo_taken = true;
+          this.resizeImageCamera(reader.result).then(data => {
+            this.$emit("photo:send", data);
+            if (typeof this.resolvePromise === "function")
+              this.resolvePromise(data);
           });
         };
 
         reader.onError = error => {
-          self.$emit("photo:error", error);
-          if (typeof self.rejectPromise === "function")
-            self.rejectPromise(error);
+          this.$emit("photo:error", error);
+          if (typeof this.rejectPromise === "function")
+            this.rejectPromise(error);
         };
         reader.readAsDataURL(file);
       }
     },
     FileCameraCheck(e) {
-      const self = this;
       setTimeout(() => {
-        if (self.$refs.inputFileCamera.files.length === 0) {
-          self.$emit("photo:error", "Photo not taken");
-          window.removeEventListener("focus", self.FileCameraCheck, false);
-          if (typeof self.rejectPromise === "function")
-            self.rejectPromise("Photo not taken");
+        if (this.$refs.inputFileCamera.files.length === 0) {
+          this.$emit("photo:error", "Photo not taken");
+          window.removeEventListener("focus", this.FileCameraCheck, false);
+          if (typeof this.rejectPromise === "function")
+            this.rejectPromise("Photo not taken");
         }
       }, 300);
     },
     CordovaCameraCheck(e) {
-      const self = this;
       setTimeout(() => {
         if (photo_taken === false) {
-          self.$emit("photo:error", "Photo not taken");
-          window.removeEventListener("focus", self.CordovaCameraCheck, false);
-          if (typeof self.rejectPromise === "function")
-            self.rejectPromise("Photo not taken");
+          this.$emit("photo:error", "Photo not taken");
+          window.removeEventListener("focus", this.CordovaCameraCheck, false);
+          if (typeof this.rejectPromise === "function")
+            this.rejectPromise("Photo not taken");
         }
       }, 300);
     },
@@ -212,10 +202,9 @@ export default {
     }
   },
   data() {
-    const self = this;
     return {
       photo_taken: false,
-      isCordova: self.$f7.device.cordova
+      isCordova: this.$f7.device.cordova
     };
   }
 };

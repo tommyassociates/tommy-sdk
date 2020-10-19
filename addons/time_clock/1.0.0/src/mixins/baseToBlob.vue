@@ -2,7 +2,7 @@
 export default {
   methods: {
     dataURLToBlob(dataURL) {
-      console.log('dataURLToBlob');
+      // console.log('dataURLToBlob');
       // console.log(dataURL);
       const BASE64_MARKER = ";base64,";
       if (dataURL.indexOf(BASE64_MARKER) === -1) {

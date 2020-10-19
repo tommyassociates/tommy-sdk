@@ -210,10 +210,6 @@ export default {
     API.actorId = API.getUserId(this);
     API.actor = API.getActor(this);
 
-    if (!this.isLocked) {
-      this.$events.$on(`${this.addonConfig.package}:attedance_edit`, this.updateAll);
-      this.$events.$on(`${this.addonConfig.package}:attedance_delete`, this.updateAll);
-    }
 
     // if (this.$root.miniProgramLocked.isLocked === true && this.$root.miniProgramLocked.miniProgram === this.addonConfig.package) {
     //   this.$f7router.navigate(`${this.addonConfig.baseUrl}locked/enter-pin`);
@@ -257,7 +253,8 @@ export default {
     },
 
     isLocked() {
-      return this.$root.miniProgramLocked.isLocked && this.$root.miniProgramLocked.miniProgram === addonConfig.package;
+      return this.$store.state.miniProgramLocked.isLocked
+        && this.$store.state.miniProgramLocked.miniProgram === addonConfig.package;
     },
   },
   methods: {
@@ -596,6 +593,9 @@ export default {
       });
     } else {
 
+      this.$events.$on(`${this.addonConfig.package}:attedance_edit`, this.updateAll);
+      this.$events.$on(`${this.addonConfig.package}:attedance_delete`, this.updateAll);
+
       this.loaded.interval = setInterval(() => {
         this.calculateDuration();
       }, 1000);
@@ -614,7 +614,7 @@ export default {
         };
         // console.log('TIMECLOCK - mounted promise then other options', JSON.stringify(otherOptions));
         API.getAttendances({otherOptions}).then(data => {
-          console.log('TIMECLOCK - mounted promise get attendances');
+          // console.log('TIMECLOCK - mounted promise get attendances');
           // console.log('TIMECLOCK - mounted promise get attendances - data', JSON.stringify(data));
           this.attendanceData = AttendanceService.prepareAttendances(data, this);
           //this.formattedAttendanceData = TimesheetService.splitAttendanceIntoDays(this.attendanceData, this);
@@ -645,3 +645,4 @@ export default {
 <style lang="scss">
 
 </style>
+

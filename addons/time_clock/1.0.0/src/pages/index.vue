@@ -1,103 +1,176 @@
 <template>
-  <f7-page class="time-clock-main-page" :page-content="false" ptr @ptr:refresh="onPtrRefresh">
-    <f7-navbar>
-      <tommy-nav-menu></tommy-nav-menu>
-      <f7-nav-title>{{ $t('time_clock.index.title') }}</f7-nav-title>
-      <f7-nav-right class="time-clock-navbar-links">
-        <f7-link href="/time-clock/add/" icon-only>
-          <f7-icon f7="plus"/>
-        </f7-link>
-        <f7-link href="/time-clock/search/" icon-only>
-          <f7-icon f7="search"/>
-        </f7-link>
-        <f7-link href="/time-clock/settings/" icon-only>
-          <f7-icon f7="gear"/>
-        </f7-link>
-      </f7-nav-right>
-    </f7-navbar>
+  <div>
+    <template v-if="isLocked">
+      <f7-page class="time-clock-main-page" :page-content="false">
+        <f7-navbar>
+          <tommy-nav-menu></tommy-nav-menu>
+          <f7-nav-title>{{ $t(`${addonConfig.package}.locked.take_photo.title`) }}</f7-nav-title>
+        </f7-navbar>
 
-    <!-- v-if="attendances_enable && loaded.first" -->
-    <f7-toolbar
-      :style="toolbarStyle"
-      class="time-clock-main-toolbar"
-    >
-      <f7-button
-        raised
-        fill
-        v-if="!clock_on && !break_on"
-        @click="clockOnClick"
-        class="time-clock-toolbar-button clock-on"
-      >{{ $t('time_clock.index.clock_on_button') }}
-      </f7-button>
-      <f7-button
-        raised
-        fill
-        v-if="clock_on && !break_on"
-        @click="clockOffClick"
-        class="time-clock-toolbar-button clock-off"
-      >{{ $t('time_clock.index.clock_off_button') }} {{ formatDuration() }}
-      </f7-button>
-      <f7-button
-        raised
-        fill
-        v-if="clock_on && !break_on"
-        @click="breakOnClick"
-        class="time-clock-toolbar-button break-on"
-      >{{ $t('time_clock.index.break_on_button') }}
-      </f7-button>
-      <f7-button
-        raised
-        fill
-        v-if="break_on"
-        @click="breakOffClick"
-        class="time-clock-toolbar-button break-off"
-      >{{ $t('time_clock.index.break_off_button') }} {{ formatDuration() }}
-      </f7-button>
-    </f7-toolbar>
-    <f7-page-content :style="pageContentStyle">
-
-      <!--Active -->
-      <div class="time-clock-active" v-if="!viewOthers && activeData !== null">
-        <!--<f7-list media-list class="time-clock-list" v-if="formattedActiveData">-->
-        <Events
-          :data="formattedActiveData"
-          :skeleton="1"
-          :loaded="loaded.active"
-        />
-        <!-- </f7-list>-->
-      </div>
+        <!-- v-if="attendances_enable && loaded.first" -->
+        <f7-toolbar
+          :style="toolbarStyle"
+          class="time-clock-main-toolbar"
+        >
+          <f7-button
+            raised
+            fill
+            v-if="!clock_on && !break_on"
+            @click="clockOnClick"
+            class="time-clock-toolbar-button clock-on"
+          >{{ $t(`${addonConfig.package}.locked.take_photo.clock_on_button`) }}
+          </f7-button>
+          <f7-button
+            raised
+            fill
+            v-if="clock_on && !break_on"
+            @click="clockOffClick"
+            class="time-clock-toolbar-button clock-off"
+          >{{ $t(`${addonConfig.package}.locked.take_photo.clock_off_button`) }} {{ formatDuration() }}
+          </f7-button>
+          <f7-button
+            raised
+            fill
+            v-if="clock_on && !break_on"
+            @click="breakOnClick"
+            class="time-clock-toolbar-button break-on"
+          >{{ $t(`${addonConfig.package}.locked.take_photo.break_on_button`) }}
+          </f7-button>
+          <f7-button
+            raised
+            fill
+            v-if="break_on"
+            @click="breakOffClick"
+            class="time-clock-toolbar-button break-off"
+          >{{ $t(`${addonConfig.package}.locked.take_photo.break_off_button`) }} {{ formatDuration() }}
+          </f7-button>
+        </f7-toolbar>
+        <f7-page-content :style="pageContentStyle">
 
 
-      <div class="time-clock-active" v-if="viewOthers && activeData !== null">
-        <div class="time-clock-avatars-container">
-          <Active-avatar
-            :data="formattedActiveData"
-            :loaded="loaded.active"
+          <div class="text-align-center" style="padding: 40px;">
+            <circle-avatar :size="100" :displayImage="true" :data="previewUser"></circle-avatar>
+          </div>
+
+          <!--Events -->
+          <Events
+            :data="formattedAttendanceData"
+            :loaded="loaded.attendance"
+            v-if="loaded.attendance"
           />
-        </div>
-      </div>
+          <Photo ref="photo" direction="front"/>
+          <Geo ref="geo" :dialog="false"/>
+        </f7-page-content>
+      </f7-page>
+    </template>
+    <template v-else>
+      <f7-page class="time-clock-main-page" :page-content="false" ptr @ptr:refresh="onPtrRefresh">
+        <f7-navbar>
+          <tommy-nav-menu></tommy-nav-menu>
+          <f7-nav-title>{{ $t(`${addonConfig.package}.index.title`) }}</f7-nav-title>
+          <f7-nav-right class="time-clock-navbar-links">
+            <f7-link :href="`${addonConfig.baseUrl}add/`" icon-only>
+              <f7-icon f7="plus"/>
+            </f7-link>
+            <f7-link :href="`${addonConfig.baseUrl}search/`" icon-only>
+              <f7-icon f7="search"/>
+            </f7-link>
+            <f7-link :href="`${addonConfig.baseUrl}settings/`" icon-only v-if="isTeamManager || isAdmin">
+              <f7-icon f7="gear"/>
+            </f7-link>
+
+          </f7-nav-right>
+        </f7-navbar>
+
+        <!-- v-if="attendances_enable && loaded.first" -->
+        <f7-toolbar
+          :style="toolbarStyle"
+          class="time-clock-main-toolbar"
+        >
+          <f7-button
+            raised
+            fill
+            v-if="!clock_on && !break_on"
+            @click="clockOnClick"
+            class="time-clock-toolbar-button clock-on"
+          >{{ $t(`${addonConfig.package}.index.clock_on_button`) }}
+          </f7-button>
+          <f7-button
+            raised
+            fill
+            v-if="clock_on && !break_on"
+            @click="clockOffClick"
+            class="time-clock-toolbar-button clock-off"
+          >{{ $t(`${addonConfig.package}.index.clock_off_button`) }} {{ formatDuration() }}
+          </f7-button>
+          <f7-button
+            raised
+            fill
+            v-if="clock_on && !break_on"
+            @click="breakOnClick"
+            class="time-clock-toolbar-button break-on"
+          >{{ $t(`${addonConfig.package}.index.break_on_button`) }}
+          </f7-button>
+          <f7-button
+            raised
+            fill
+            v-if="break_on"
+            @click="breakOffClick"
+            class="time-clock-toolbar-button break-off"
+          >{{ $t(`${addonConfig.package}.index.break_off_button`) }} {{ formatDuration() }}
+          </f7-button>
+        </f7-toolbar>
+        <f7-page-content :style="pageContentStyle">
 
 
-      <!--Events -->
-      <Events
-        :data="formattedAttendanceData"
-        :loaded="loaded.attendance"
-        v-if="loaded.attendance"
-      />
-      <Geo ref="geo" :dialog="false"/>
-    </f7-page-content>
-  </f7-page>
+          <!--Active -->
+          <div class="time-clock-active" v-if="!viewOthers && activeData !== null">
+            <!--<f7-list media-list class="time-clock-list" v-if="formattedActiveData">-->
+            <Events
+              :data="formattedActiveData"
+              :skeleton="1"
+              :loaded="loaded.active"
+            />
+            <!-- </f7-list>-->
+          </div>
+
+
+          <div class="time-clock-active" v-if="viewOthers && activeData !== null">
+            <div class="time-clock-avatars-container">
+              <Active-avatar
+                :data="formattedActiveData"
+                :loaded="loaded.active"
+              />
+            </div>
+          </div>
+
+
+          <!--Events -->
+          <Events
+            :data="formattedAttendanceData"
+            :loaded="loaded.attendance"
+            v-if="loaded.attendance"
+          />
+          <Photo ref="photo" direction="front"/>
+          <Geo ref="geo" :dialog="false"/>
+        </f7-page-content>
+      </f7-page>
+    </template>
+  </div>
 </template>
 <script>
+import addonConfig from "../addonConfig";
 import API from "../api";
 import AttendanceService from "../services/attendance-service";
 
 import ActiveAvatar from "../components/circle-avatar.vue";
 import Events from "../components/events.vue";
-// import Photo from 'tommy-core/src/components/photo.vue';
+import Photo from 'tommy-core/src/components/photo.vue';
+import CircleAvatar from 'tommy-core/src/components/circle-avatar';
 import Geo from "../components/geo.vue";
 import Blob from "../mixins/baseToBlob.vue";
 
+import {mapGetters, mapState} from 'vuex';
 
 /*
 TODO: add shift empty page
@@ -106,13 +179,14 @@ TODO: add shift empty page
 export default {
   name: "TimeClock",
   data() {
-    const self = this;
     return {
+      addonConfig,
       viewOthers: false,
       clock_on: false,
       break_on: false,
       activeData: [],
       attendanceData: [],
+      userId: this.$f7route.query.user_id,
       loaded: {
         first: false,
         active: false,
@@ -120,26 +194,33 @@ export default {
         duration: 0,
         timestamp: false,
         interval: false
-      }
+      },
     };
   },
   components: {
     ActiveAvatar,
     Events,
-    Geo
+    Photo,
+    Geo,
+    CircleAvatar
   },
   mixins: [Blob],
   created() {
-    const self = this;
-    API.actorId = API.getUserId(self);
-    API.actor = API.getActor(self);
-    self.$events.$on("time_clock:attedance_edit", self.updateAll);
-    self.$events.$on("time_clock:attedance_delete", self.updateAll);
+
+    API.actorId = API.getUserId(this);
+    API.actor = API.getActor(this);
+
+
+    // if (this.$root.miniProgramLocked.isLocked === true && this.$root.miniProgramLocked.miniProgram === this.addonConfig.package) {
+    //   this.$f7router.navigate(`${this.addonConfig.baseUrl}locked/enter-pin`);
+    // }
   },
   computed: {
+    ...mapGetters('teamMembers', ['teamMember']),
+    ...mapState('teamMembers', ['teamMembers']),
+    ...mapGetters('account', ['isTeamManager', 'isAdmin']),
     pageContentStyle() {
-      const self = this;
-      if (self.clock_on && !self.break_on) {
+      if (this.clock_on && !this.break_on) {
         return {
           paddingBottom: "136px"
         };
@@ -150,8 +231,7 @@ export default {
       }
     },
     toolbarStyle() {
-      const self = this;
-      if (self.clock_on && !self.break_on) {
+      if (this.clock_on && !this.break_on) {
         return {
           height: "136px"
         };
@@ -162,25 +242,72 @@ export default {
       }
     },
     formattedAttendanceData() {
-      const self = this;
-      return AttendanceService.splitAttendanceIntoDays(self.attendanceData, self);
+      return AttendanceService.splitAttendanceIntoDays(this.attendanceData, this);
     },
     formattedActiveData() {
-      const self = this;
-      return AttendanceService.formatAttendanceActive(self.activeData, self);
+      return AttendanceService.formatAttendanceActive(this.activeData, this);
+    },
+
+    previewUser() {
+      return this.teamMember(this.userId);
+    },
+
+    isLocked() {
+      return this.$store.state.miniProgramLocked.isLocked
+        && this.$store.state.miniProgramLocked.miniProgram === addonConfig.package;
     },
   },
   methods: {
+    // addonConfig() {
+    //   return addonConfig;
+    // },
     clockOnClick() {
-      const self = this;
-      console.log('TIME CLOCK: clockOnClick');
 
+      // console.log('TIME CLOCK: clockOnClick');
+      this.$f7.preloader.show()
       if (window.cordova) {
-        self.$f7router.navigate('/time-clock/take-photo/');
+
+        this.$refs.geo.takeGeoAsync().then(cords => {
+          this.$refs.photo.takePhotoAsync().then(photo => {
+            const form = new FormData();
+            if (this.isLocked) {
+              form.append('user_id', this.userId);
+              form.append('actor_id', API.actorId);
+            }
+            form.append("event_id", API.shifts_active_id);
+            form.append("latitude", cords.latitude);
+            form.append("longitude", cords.longitude);
+            form.append("accuracy", cords.accuracy);
+            form.append("status", "start");
+            form.append("address", cords.name);
+            form.append(
+              "image",
+              this.dataURLToBlob(photo),
+              `attendance_start.jpg`
+            );
+
+            const isManager = this.isLocked;
+            API.setAttendances(form, isManager).then(() => {
+              this.updateAll();
+              this.clock_on = true;
+              this.$f7.preloader.hide();
+
+              if (this.isLocked) {
+                const redirect = `${addonConfig.baseUrl}confirmation/`;
+                this.$f7router.navigate(redirect);
+              }
+            });
+          }).catch(() => {
+            this.$f7.preloader.hide();
+          });
+        });
       } else {
-        self.$f7.preloader.show()
-        self.$refs.geo.takeGeoAsync().then(cords => {
+        this.$refs.geo.takeGeoAsync().then(cords => {
           const form = new FormData();
+          if (this.isLocked) {
+            form.append('user_id', this.userId);
+            form.append('actor_id', API.actorId);
+          }
           form.append("event_id", API.shifts_active_id);
           form.append("latitude", cords.latitude);
           form.append("longitude", cords.longitude);
@@ -188,45 +315,92 @@ export default {
           form.append("status", "start");
           form.append("address", cords.name);
 
-          API.setAttendances(form).then(() => {
-            self.updateAll();
-            self.clock_on = true;
-            self.$f7.preloader.hide()
+          const isManager = this.isLocked;
+          API.setAttendances(form, isManager).then(() => {
+            this.updateAll();
+            this.clock_on = true;
+            this.$f7.preloader.hide();
+
+            if (this.isLocked) {
+              const redirect = `${addonConfig.baseUrl}confirmation/`;
+              this.$f7router.navigate(redirect);
+            }
           });
         });
       }
     },
     clockOffClick() {
-      const self = this;
 
-      console.log('TIME CLOCK: clockOffClick');
+      // console.log('TIME CLOCK: clockOffClick');
+      this.$f7.preloader.show()
+      if (window.cordova) {
+        this.$refs.geo.takeGeoAsync().then(cords => {
+          this.$refs.photo.takePhotoAsync().then(photo => {
+            const form = new FormData();
+            if (this.isLocked) {
+              form.append('user_id', this.userId);
+              form.append('actor_id', API.actorId);
+            }
+            form.append("event_id", API.shifts_active_id);
+            form.append("latitude", cords.latitude);
+            form.append("longitude", cords.longitude);
+            form.append("accuracy", cords.accuracy);
+            form.append("status", "stop");
+            form.append("address", cords.name);
+            form.append(
+              "image",
+              this.dataURLToBlob(photo),
+              `attendance_stop.jpg`
+            );
 
-      self.$f7router.navigate('/time-clock/take-photo/');
+            this.loaded.duration = 0;
+            const isManager = this.isLocked;
+            API.setAttendances(form, isManager).then(() => {
+              this.updateAll();
+              this.clock_on = false;
+              this.$f7.preloader.hide();
 
-
-      self.$f7.preloader.show()
-      self.$refs.geo.takeGeoAsync().then(cords => {
-        const form = new FormData();
-        form.append("event_id", API.shifts_active_id);
-        form.append("latitude", cords.latitude);
-        form.append("longitude", cords.longitude);
-        form.append("accuracy", cords.accuracy);
-        form.append("status", "stop");
-        form.append("address", cords.name);
-
-
-        self.loaded.duration = 0;
-
-        API.setAttendances(form).then(() => {
-          self.updateAll();
-          self.clock_on = false;
-          self.$f7.preloader.hide()
+              if (this.isLocked) {
+                const redirect = `${addonConfig.baseUrl}confirmation/`;
+                this.$f7router.navigate(redirect);
+              }
+            });
+          })
+        }).catch(() => {
+          this.$f7.preloader.hide();
         });
-      });
+      } else {
+        this.$refs.geo.takeGeoAsync().then(cords => {
+
+          const form = new FormData();
+          if (this.isLocked) {
+            form.append('user_id', this.userId);
+            form.append('actor_id', API.actorId);
+          }
+          form.append("event_id", API.shifts_active_id);
+          form.append("latitude", cords.latitude);
+          form.append("longitude", cords.longitude);
+          form.append("accuracy", cords.accuracy);
+          form.append("status", "stop");
+          form.append("address", cords.name);
+
+          this.loaded.duration = 0;
+          const isManager = this.isLocked;
+          API.setAttendances(form, isManager).then(() => {
+            this.updateAll();
+            this.clock_on = false;
+            this.$f7.preloader.hide();
+
+            if (this.isLocked) {
+              const redirect = `${addonConfig.baseUrl}confirmation/`;
+              this.$f7router.navigate(redirect);
+            }
+          });
+        })
+      }
     },
     breakOnClick() {
-      const self = this;
-      self.$refs.geo.takeGeoAsync().then(cords => {
+      this.$refs.geo.takeGeoAsync().then(cords => {
         const params = {
           event_id: API.shifts_active_id,
           latitude: cords.latitude,
@@ -236,18 +410,27 @@ export default {
           address: cords.name
         };
 
-        self.loaded.duration = 0;
-        self.loaded.timestamp = self.$moment(new Date()).format();
+        if (this.isLocked) {
+          params.user_id = this.userId;
+          params.actor_id = API.actorId;
+        }
 
-        API.setAttendances(params).then(() => {
-          self.updateAttendances();
-          self.break_on = true;
+        this.loaded.duration = 0;
+        this.loaded.timestamp = this.$moment(new Date()).format();
+        const isManager = this.isLocked;
+        API.setAttendances(params, isManager).then(() => {
+          this.updateAttendances();
+          this.break_on = true;
+
+          if (this.isLocked) {
+            const redirect = `${addonConfig.baseUrl}confirmation/`;
+            this.$f7router.navigate(redirect);
+          }
         });
       });
     },
     breakOffClick() {
-      const self = this;
-      self.$refs.geo.takeGeoAsync().then(cords => {
+      this.$refs.geo.takeGeoAsync().then(cords => {
         const params = {
           event_id: API.shifts_active_id,
           latitude: cords.latitude,
@@ -257,202 +440,203 @@ export default {
           address: cords.name
         };
 
-        self.loaded.duration = 0;
-        //set back to the attendance timestamp
-        self.loaded.timestamp = self.$moment(self.activeData.timestamp).format();
+        if (this.isLocked) {
+          params.user_id = this.userId;
+          params.actor_id = API.actorId;
+        }
 
-        API.setAttendances(params).then(() => {
-          self.updateAttendances();
-          self.break_on = false;
+        this.loaded.duration = 0;
+        //set back to the attendance timestamp
+        this.loaded.timestamp = this.$moment(this.activeData.timestamp).format();
+        const isManager = this.isLocked;
+        API.setAttendances(params, isManager).then(() => {
+          this.updateAttendances();
+          this.break_on = false;
+
+          if (this.isLocked) {
+            const redirect = `${addonConfig.baseUrl}confirmation/`;
+            this.$f7router.navigate(redirect);
+          }
         });
       });
     },
 
-    // getShiftActive() {
-    //   const self = this;
-    //   API.getShiftActive().then(data => {
-    //     if (data.length > 0) {
-    //       API.shifts_active_id = data[0].id;
-    //       self.shifts_enable = true;
-    //     } else {
-    //       //self.shifts_enable = false;
-    //     }
-    //   });
-    // },
-    // getAttendancesActive() {
-    //   console.log('getAttendancesActive 1');
-    //   const self = this;
-    //   API.getAttendancesActive().then(data => {
-    //     console.log('getAttendancesActive 2');
-    //     console.log(data);
-    //     if (data.id > 0) {
-    //       API.attendances_active_id = data.id;
-    //       self.attendances_enable = true;
-    //     } else {
-    //       //self.shifts_enable = false;
-    //     }
-    //   });
-    // },
-
-
     updateAll() {
-      const self = this;
-      return self.updateAttendances().then(() => {
-        return self.updateAttendancesActive();
+      return this.updateAttendances().then(() => {
+        return this.updateAttendancesActive();
       });
 
     },
     updateAttendances() {
-      const self = this;
-      self.loaded.attendance = false;
+      this.loaded.attendance = false;
       const otherOptions = {
-        others: self.viewOthers,
+        others: this.viewOthers,
       };
       return API.getAttendances({otherOptions}).then(data => {
-        self.attendanceData = AttendanceService.prepareAttendances(data, self);
-        self.loaded.attendance = true;
-        self.updateStatus();
+        this.attendanceData = AttendanceService.prepareAttendances(data, this);
+        this.loaded.attendance = true;
+        this.updateStatus();
       });
     },
     updateAttendancesActive() {
-      const self = this;
-      self.loaded.active = false;
+      this.loaded.active = false;
       const otherOptions = {
-        others: self.viewOthers,
+        others: this.viewOthers,
       };
       return API.getAttendancesActive({otherOptions}).then(data => {
-        self.activeData = AttendanceService.prepareAttendance(data, self);
-        if (self.activeData !== null) {
-          self.loaded.timestamp = self.activeData.timestamp;
+        this.activeData = AttendanceService.prepareAttendance(data, this);
+        if (this.activeData !== null) {
+          this.loaded.timestamp = this.activeData.timestamp;
         }
-        //self.formattedActiveData = TimesheetService.formatAttendanceActive(self.activeData, self);
-        self.loaded.active = true;
+        //this.formattedActiveData = TimesheetService.formatAttendanceActive(this.activeData, this);
+        this.loaded.active = true;
       });
     },
 
     updateStatus() {
-      const self = this;
-      const last_user_attedance = self.attendanceData.find(e => {
-        if ((e.user_id = API.actorId)) return true;
-      });
+      let last_user_attedance = null;
+      if (this.isLocked) {
+        [last_user_attedance] = this.attendanceData;
+      } else {
+        last_user_attedance = this.attendanceData.find(e => {
+          if ((e.user_id = API.actorId)) return true;
+        });
+      }
       if (last_user_attedance) {
         switch (last_user_attedance.status) {
           case "start":
-            self.clock_on = true;
-            self.break_on = false;
+            this.clock_on = true;
+            this.break_on = false;
             break;
           case "stop":
-            self.clock_on = false;
-            self.break_on = false;
+            this.clock_on = false;
+            this.break_on = false;
             break;
           case "pause":
-            self.clock_on = true;
-            self.break_on = true;
+            this.clock_on = true;
+            this.break_on = true;
             break;
           case "resume":
-            self.clock_on = true;
-            self.break_on = false;
+            this.clock_on = true;
+            this.break_on = false;
             break;
           default:
-            self.clock_on = false;
-            self.break_on = false;
+            this.clock_on = false;
+            this.break_on = false;
         }
       } else {
-        self.clock_on = false;
-        self.break_on = false;
+        this.clock_on = false;
+        this.break_on = false;
       }
     },
     formatDuration() {
-      const self = this;
-      if (self.activeData !== null) {
-        return self.$moment.utc(self.$moment.duration(self.loaded.duration, "hours").asMilliseconds()).format("H:mm:ss");
+      if (this.activeData !== null) {
+        return this.$moment.utc(this.$moment.duration(this.loaded.duration, "hours").asMilliseconds()).format("H:mm:ss");
       }
     },
     calculateDuration() {
-      const self = this;
-      if (self.activeData !== null) {
-        console.log('self.loaded.timestamp', self.loaded.timestamp);
-        if (self.loaded.timestamp !== false) {
-          const startTime = self.$moment(self.loaded.timestamp);
-          const endTime = self.$moment(new Date());
-          const duration = self.$moment.duration(endTime.diff(startTime));
-          self.loaded.duration = duration.asHours();
+      if (this.activeData !== null) {
+        // console.log('this.loaded.timestamp', this.loaded.timestamp);
+        if (this.loaded.timestamp !== false) {
+          const startTime = this.$moment(this.loaded.timestamp);
+          const endTime = this.$moment(new Date());
+          const duration = this.$moment.duration(endTime.diff(startTime));
+          this.loaded.duration = duration.asHours();
         }
       }
     },
 
     onPtrRefresh(e) {
       const done = e.detail;
-      const self = this;
-      self.updateAll()
+      this.updateAll()
         .then(() => {
           done();
         });
     },
   },
   beforeDestroy() {
-    const self = this;
-    self.$events.$off("time_clock:attedance_edit", self.updateAll);
-    self.$events.$off("time_clock:attedance_delete", self.updateAll);
-    clearInterval(self.loaded.interval);
+    if (!this.isLocked) {
+      this.$events.$off(`${this.addonConfig.package}:attedance_edit`, this.updateAll);
+      this.$events.$off(`${this.addonConfig.package}:attedance_delete`, this.updateAll);
+    }
+    clearInterval(this.loaded.interval);
   },
   mounted() {
-    const self = this;
 
-    console.log('TIME_CLOCK - mounted');
-    // console.log(self.$store);
-    // console.log('TIME_CLOCK - actor');
-    // console.log(self.actor);
+    if (this.isLocked) {
+      this.viewOthers = true;
 
-    //self.getAttendancesActive();
-    //self.getShiftActive();
-
-    self.loaded.interval = setInterval(() => {
-      self.calculateDuration();
-    }, 1000); //1minute
-
-
-    console.log('TIMECLOCK - mounted');
-    return Promise.all([
-      self.$api.getInstalledAddonPermission(
-        "time_clock",
-        "attendance_other_access",
-        {with_filters: true}
-      )
-    ]).then(v => {
-      console.log('TIMECLOCK - mounted - promise then');
-      self.viewOthers = API.checkPermision(v[0], self);
       const otherOptions = {
-        others: self.viewOthers,
+        limit: 1,
+        user_id: this.userId,
       };
-      console.log('TIMECLOCK - mounted promise then other options', JSON.stringify(otherOptions));
-      API.getAttendances({otherOptions}).then(data => {
-        console.log('TIMECLOCK - mounted promise get attendances');
-        // console.log('TIMECLOCK - mounted promise get attendances - data', JSON.stringify(data));
-        self.attendanceData = AttendanceService.prepareAttendances(data, self);
-        //self.formattedAttendanceData = TimesheetService.splitAttendanceIntoDays(self.attendanceData, self);
-        self.loaded.attendance = true;
-        self.loaded.first = true;
-        console.log('TIMECLOCK - mounted promise get attendances - before update status');
-        self.updateStatus();
-        console.log('TIMECLOCK - mounted promise get attendances - before calculateDuration');
-        self.calculateDuration();
-        console.log('TIMECLOCK - mounted promise get attendances - after calculateDuration');
-      });
-      API.getAttendancesActive({otherOptions}).then(data => {
-        console.log('TIMECLOCK - mounted promise get active attendances');
-        self.activeData = AttendanceService.prepareAttendance(data, self);
-        if (self.activeData !== null) {
-          // self.formattedActiveData = TimesheetService.formatAttendanceActive(self.activeData, self);
-          self.loaded.timestamp = self.activeData.timestamp;
+      const isManager = true;
+
+      API.getAttendances({otherOptions, isManager, others: this.viewOthers}).then(data => {
+        this.attendanceData = AttendanceService.prepareAttendances(data, this);
+        //this.formattedAttendanceData = TimesheetService.splitAttendanceIntoDays(this.attendanceData, this);
+        this.loaded.attendance = true;
+        this.loaded.first = true;
+
+        if (this.attendanceData && this.attendanceData.length === 1) {
+          if (['start', 'pause', 'resume'].includes(this.attendanceData[0].status)) {
+            this.loaded.timestamp = this.attendanceData[0].timestamp;
+          }
+
+          this.loaded.interval = setInterval(() => {
+            this.calculateDuration();
+          }, 1000); //1minute
+          this.calculateDuration();
         }
-        self.loaded.active = true;
+        this.updateStatus();
+
       });
-    });
+    } else {
 
-    // API.getTest().then(data => console.log("TCL: mounted -> TEST", data));
+      this.$events.$on(`${this.addonConfig.package}:attedance_edit`, this.updateAll);
+      this.$events.$on(`${this.addonConfig.package}:attedance_delete`, this.updateAll);
 
+      this.loaded.interval = setInterval(() => {
+        this.calculateDuration();
+      }, 1000);
 
+      return Promise.all([
+        this.$api.getInstalledAddonPermission(
+          this.addonConfig.package,
+          "attendance_other_access",
+          {with_filters: true}
+        )
+      ]).then(v => {
+        // console.log('TIMECLOCK - mounted - promise then');
+        this.viewOthers = API.checkPermision(v[0], this);
+        const otherOptions = {
+          others: this.viewOthers,
+        };
+        // console.log('TIMECLOCK - mounted promise then other options', JSON.stringify(otherOptions));
+        API.getAttendances({otherOptions}).then(data => {
+          // console.log('TIMECLOCK - mounted promise get attendances');
+          // console.log('TIMECLOCK - mounted promise get attendances - data', JSON.stringify(data));
+          this.attendanceData = AttendanceService.prepareAttendances(data, this);
+          //this.formattedAttendanceData = TimesheetService.splitAttendanceIntoDays(this.attendanceData, this);
+          this.loaded.attendance = true;
+          this.loaded.first = true;
+          // console.log('TIMECLOCK - mounted promise get attendances - before update status');
+          this.updateStatus();
+          // console.log('TIMECLOCK - mounted promise get attendances - before calculateDuration');
+          this.calculateDuration();
+          // console.log('TIMECLOCK - mounted promise get attendances - after calculateDuration');
+        });
+        API.getAttendancesActive({otherOptions}).then(data => {
+          // console.log('TIMECLOCK - mounted promise get active attendances');
+          this.activeData = AttendanceService.prepareAttendance(data, this);
+          if (this.activeData !== null) {
+            // this.formattedActiveData = TimesheetService.formatAttendanceActive(this.activeData, this);
+            this.loaded.timestamp = this.activeData.timestamp;
+          }
+          this.loaded.active = true;
+        });
+      });
+    }
   },
 
 };
@@ -461,6 +645,4 @@ export default {
 <style lang="scss">
 
 </style>
-
-
 
