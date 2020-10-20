@@ -50,7 +50,7 @@ export default {
       this.more_clicked = true;
     },
     goSearch(val) {
-      this.$f7router.navigate('/time-clock/search/', {
+      this.$f7router.navigate(`${addonConfig.baseUrl}search/`, {
         props: {
           start_search: val
         }
