@@ -75,7 +75,7 @@
           <f7-link :href="`${addonConfig.baseUrl}search/`" icon-only>
             <f7-icon f7="search"/>
           </f7-link>
-          <f7-link :href="`${addonConfig.baseUrl}settings/`" icon-only v-if="isTeamManager || isAdmin">
+          <f7-link :href="`${addonConfig.baseUrl}settings/`" icon-only>
             <f7-icon f7="gear"/>
           </f7-link>
 
@@ -217,7 +217,6 @@ export default {
   computed: {
     ...mapGetters('teamMembers', ['teamMember']),
     ...mapState('teamMembers', ['teamMembers']),
-    ...mapGetters('account', ['isTeamManager', 'isAdmin']),
     pageContentStyle() {
       if (this.clock_on && !this.break_on) {
         return {
