@@ -183,13 +183,12 @@ export default {
 
     csvExport() {
       const self = this;
-      const timestampFormat = 'dddd, MMMM Do YYYY, h:mm:ss a';
       let csvContent = "data:text/csv;charset=utf-8,";
       const csvColumnHeaders = '"Person","Action","Address","Latitude","Longitude","Image","Timestamp"' + "\n";
 
       csvContent += csvColumnHeaders;
       self.attendanceData.forEach(item => {
-        csvContent += `"${item.user_name}","${item.status}","${item.address}","${item.latitude}","${item.longitude}","${item.icon_url}","${self.$moment(item.timestamp).format(timestampFormat)}"` + "\n";
+        csvContent += `"${item.user_name}","${item.status}","${item.address}","${item.latitude}","${item.longitude}","${item.icon_url}","${item.timestamp}"` + "\n";
       });
 
       const data = encodeURI(csvContent);
