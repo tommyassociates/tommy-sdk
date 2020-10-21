@@ -210,18 +210,20 @@ export default {
       if (!this.edit_access) return;
       const form = new FormData();
 
-      // if (
-      //   this.detail_data.status === "pause" ||
-      //   this.detail_data.status === "resume"
-      // ) {
-      //   form.append("image", null);
-      // } else {
-      //   form.append(
-      //     "image",
-      //     this.dataURLToBlob(this.image_preview),
-      //     `attendance_${this.detail_data.id}.jpg`
-      //   );
-      // }
+      if (
+        this.detail_data.status === "pause" ||
+        this.detail_data.status === "resume"
+      ) {
+        form.append("image", null);
+      } else {
+        if (this.image_preview.startsWith('data:image')) {
+          form.append(
+            "image",
+            this.dataURLToBlob(this.image_preview),
+            `attendance_${this.detail_data.id}.jpg`
+          );
+        }
+      }
 
       form.append("address", this.detail_data.address);
       form.append("latitude", this.detail_data.latitude);
@@ -325,7 +327,7 @@ export default {
             enabled: false
           }
         },
-        renderNavbar() {
+        renderNavbar: () => {
           let editHtml = "";
           if (this.edit_access) {
             editHtml = `
