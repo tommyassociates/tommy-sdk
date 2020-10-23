@@ -21,7 +21,7 @@
   </f7-page>
 </template>
 <script>
-  import config from 'tommy-core/src/config'
+  // import config from 'tommy-core/src/config'
   import formatDate from 'tommy-core/src/utils/format-date';
 
   export default {

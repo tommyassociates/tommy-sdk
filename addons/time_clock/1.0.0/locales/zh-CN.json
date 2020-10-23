@@ -33,7 +33,11 @@
     "who_can_break_title": "谁可以开始/结束休息",
     "lock_mini_program_title": "锁时钟迷你程序",
     "lock_mini_program_toggle": "时钟锁定了吗？",
-    "lock_mini_program_no_access": "您无权查看此页面"
+    "lock_mini_program_no_access": "您无权查看此页面",
+    "pin_code_help": {
+      "title": "PIN码",
+      "description": "要查看或重置您的PIN码，请转到已登录您帐户的设备上的帐户>安全性> PIN码。"
+    }
   },
   "search": {
     "title": "打卡搜索",

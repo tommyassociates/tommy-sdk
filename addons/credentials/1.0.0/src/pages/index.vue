@@ -27,7 +27,7 @@
   </f7-page>
 </template>
 <script>
-  import config from 'tommy-core/src/config'
+  // import config from 'tommy-core/src/config'
 
   export default {
     data() {
@@ -59,7 +59,7 @@
             })
             .then(cred => {
               console.log('created credential', cred)
-              window.location = `${config.serverUrl}/v1/credentials/${cred.id}/connect?token=${localStorage.token}&redirect_url=${location.href}`
+              window.location = `${window.tommy.config.serverUrl}/v1/credentials/${cred.id}/connect?token=${localStorage.token}&redirect_url=${location.href}`
             })
         }
       },

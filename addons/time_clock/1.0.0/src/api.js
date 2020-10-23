@@ -135,7 +135,7 @@ const API = {
   editAttendance(id, data) {
     return api
       .call({
-        endpoint: "workforce/attendances/" + id,
+        endpoint: "workforce/manager/attendances/" + id,
         method: "PUT",
         cache: false,
         data

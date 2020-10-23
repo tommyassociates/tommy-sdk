@@ -8,18 +8,18 @@
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{ $t(`${addonConfig.package}.event_details.title`) }}</f7-nav-title>
       <f7-nav-right class="whs-navbar-links">
-        <f7-link icon-only @click="editAttendance" v-if="edit_acces">
+        <f7-link icon-only @click="editAttendance" v-if="edit_access">
           <f7-icon f7="check"/>
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
-    <f7-toolbar v-if="edit_acces">
+    <f7-toolbar v-if="edit_access">
       <f7-button @click="deleteClick()">{{ $t(`${addonConfig.package}.event_details.delete_button`) }}</f7-button>
     </f7-toolbar>
     <f7-list media-list v-if="loaded">
       <f7-list-item
         :title="$t(`${addonConfig.package}.event_details.time_label`)"
-        :link="edit_acces"
+        :link="edit_access"
         @click.native="openTimePickerDetail()"
       >
         <div slot="after">
@@ -28,13 +28,13 @@
       </f7-list-item>
       <f7-list-item
         :title="$t(`${addonConfig.package}.event_details.date_label`)"
-        :link="edit_acces"
+        :link="edit_access"
         @click.native="openCalendar()"
         :after="dateField"
       ></f7-list-item>
       <f7-list-item
         :title="$t(`${addonConfig.package}.event_details.who_label`)"
-        :link="edit_acces"
+        :link="edit_access"
         @click.native="openSelector()"
       >
         <div slot="after" class="after-container">
@@ -60,7 +60,7 @@
       </f7-list-item>
       <f7-list-item
         :title="$t(`${addonConfig.package}.event_details.action_label`)"
-        :link="edit_acces"
+        :link="edit_access"
         sheet-open=".time-clock__action-sheet"
         :after="$t(`${addonConfig.package}.index.clock_event_options.${detail_data.status}`)"
         @click="sheet_action_opened = true"
@@ -100,7 +100,7 @@
         </div>
       </f7-toolbar>
       <f7-page-content>
-        <f7-list v-if="edit_acces && loaded">
+        <f7-list v-if="edit_access && loaded">
           <f7-list-item
             radio
             :checked="detail_data.status === 'start'"
@@ -136,7 +136,7 @@
         </f7-list>
       </f7-page-content>
     </f7-sheet>
-    <Photo ref="photo" direction="front" v-if="edit_acces"/>
+    <Photo ref="photo" direction="front" v-if="edit_access"/>
   </f7-page>
 </template>
 <script>
@@ -180,8 +180,8 @@ export default {
       this.photoPreview.open();
     },
     openSelector() {
-      if (!this.edit_acces) return;
-      this.$f7router.navigate("/time-clock/select-picker/", {
+      if (!this.edit_access) return;
+      this.$f7router.navigate(`${addonConfig.baseUrl}select-picker/`, {
         props: {
           selected: this.detail_data.user_id,
           pageTitle: this.$t(`${addonConfig.package}.event_details.who_label`),
@@ -207,7 +207,7 @@ export default {
       });
     },
     editAttendance() {
-      if (!this.edit_acces) return;
+      if (!this.edit_access) return;
       const form = new FormData();
 
       if (
@@ -216,11 +216,13 @@ export default {
       ) {
         form.append("image", null);
       } else {
-        form.append(
-          "image",
-          this.dataURLToBlob(this.image_preview),
-          `attendance_${this.detail_data.id}.jpg`
-        );
+        if (this.image_preview.startsWith('data:image')) {
+          form.append(
+            "image",
+            this.dataURLToBlob(this.image_preview),
+            `attendance_${this.detail_data.id}.jpg`
+          );
+        }
       }
 
       form.append("address", this.detail_data.address);
@@ -239,7 +241,7 @@ export default {
       });
     },
     deleteAttendance() {
-      if (!this.edit_acces) return;
+      if (!this.edit_access) return;
       API.deleteAttendance(this.detail_data.id).then(() => {
         this.$f7router.back();
         this.$events.$emit(`${addonConfig.package}:attedance_delete`, this.detail_data);
@@ -259,7 +261,7 @@ export default {
       );
     },
     openCalendar() {
-      if (this.edit_acces) this.calendarInstance.open();
+      if (this.edit_access) this.calendarInstance.open();
     },
     createCalendar() {
       let date = new Date(this.detail_data.timestamp);
@@ -325,9 +327,9 @@ export default {
             enabled: false
           }
         },
-        renderNavbar() {
+        renderNavbar: () => {
           let editHtml = "";
-          if (this.edit_acces) {
+          if (this.edit_access) {
             editHtml = `
               <a href="#" class="link icon-only" id="time-clock__reload-photo" ref="reloadPhoto">
                 <i class="icon f7-icons color-white">reload</i>
@@ -385,7 +387,7 @@ export default {
       return typeof view !== "undefined";
     },
     openTimePickerDetail() {
-      if (this.edit_acces) this.openTimePicker();
+      if (this.edit_access) this.openTimePicker();
     }
   },
   computed: {
@@ -404,14 +406,14 @@ export default {
         with_filters: true
       })
       .then(v => {
-        this.edit_acces = this.checkPermision(v);
+        this.edit_access = this.checkPermision(v);
 
         API.getAttendancesDetail(this.edit_id).then(data => {
           this.detail_data = this.prepareAttendance(data);
           if (typeof this.detail_data.image !== "undefined")
             this.image_preview = this.detail_data.image.url;
           this.loaded = true;
-          if (this.edit_acces) {
+          if (this.edit_access) {
             this.$nextTick(() => {
               this.createCalendar();
               this.createTimePicker(this.detail_data.timestamp);
@@ -432,7 +434,7 @@ export default {
       sheet_action_opened: false,
       new_action: null,
       edit_id: this.$f7route.params.id,
-      edit_acces: false,
+      edit_access: false,
       detail_data: null,
       loaded: false
     };

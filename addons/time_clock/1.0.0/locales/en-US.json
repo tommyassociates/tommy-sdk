@@ -33,7 +33,11 @@
     "who_can_break_title": "Who Can Start/Stop Breaks",
     "lock_mini_program_title": "Lock time clock mini program",
     "lock_mini_program_toggle": "Time clock locked?",
-    "lock_mini_program_no_access": "You do not have permission to view this page"
+    "lock_mini_program_no_access": "You do not have permission to view this page",
+    "pin_code_help": {
+      "title": "Pin code",
+      "description": "To view or reset your PIN, please go to Account > Security > Pin on a device that is logged into your account."
+    }
   },
   "search": {
     "title": "Time Clock Search",

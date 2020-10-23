@@ -1,162 +1,161 @@
 <template>
-  <div>
+  <f7-page class="time-clock__main-page" :page-content="false" :ptr="!isLocked" @ptr:refresh="onPtrRefresh">
+
     <template v-if="isLocked">
-      <f7-page class="time-clock__main-page" :page-content="false">
-        <f7-navbar>
-          <tommy-nav-menu></tommy-nav-menu>
-          <f7-nav-title>{{ $t(`${addonConfig.package}.locked.take_photo.title`) }}</f7-nav-title>
-        </f7-navbar>
 
-        <!-- v-if="attendances_enable && loaded.first" -->
-        <f7-toolbar
-          :style="toolbarStyle"
-          class="time-clock__main-toolbar"
-        >
-          <f7-button
-            raised
-            fill
-            v-if="!clock_on && !break_on"
-            @click="clockOnClick"
-            class="time-clock__toolbar-button clock-on"
-          >{{ $t(`${addonConfig.package}.locked.take_photo.clock_on_button`) }}
-          </f7-button>
-          <f7-button
-            raised
-            fill
-            v-if="clock_on && !break_on"
-            @click="clockOffClick"
-            class="time-clock__toolbar-button clock-off"
-          >{{ $t(`${addonConfig.package}.locked.take_photo.clock_off_button`) }} {{ formatDuration() }}
-          </f7-button>
-          <f7-button
-            raised
-            fill
-            v-if="clock_on && !break_on"
-            @click="breakOnClick"
-            class="time-clock__toolbar-button break-on"
-          >{{ $t(`${addonConfig.package}.locked.take_photo.break_on_button`) }}
-          </f7-button>
-          <f7-button
-            raised
-            fill
-            v-if="break_on"
-            @click="breakOffClick"
-            class="time-clock__toolbar-button break-off"
-          >{{ $t(`${addonConfig.package}.locked.take_photo.break_off_button`) }} {{ formatDuration() }}
-          </f7-button>
-        </f7-toolbar>
-        <f7-page-content :style="pageContentStyle">
+      <f7-navbar>
+        <tommy-nav-menu></tommy-nav-menu>
+        <f7-nav-title>{{ $t(`${addonConfig.package}.locked.take_photo.title`) }}</f7-nav-title>
+      </f7-navbar>
+
+      <!-- v-if="attendances_enable && loaded.first" -->
+      <f7-toolbar
+        :style="toolbarStyle"
+        class="time-clock__main-toolbar"
+      >
+        <f7-button
+          raised
+          fill
+          v-if="!clock_on && !break_on"
+          @click="clockOnClick"
+          class="time-clock__toolbar-button clock-on"
+        >{{ $t(`${addonConfig.package}.locked.take_photo.clock_on_button`) }}
+        </f7-button>
+        <f7-button
+          raised
+          fill
+          v-if="clock_on && !break_on"
+          @click="clockOffClick"
+          class="time-clock__toolbar-button clock-off"
+        >{{ $t(`${addonConfig.package}.locked.take_photo.clock_off_button`) }} {{ formatDuration() }}
+        </f7-button>
+        <f7-button
+          raised
+          fill
+          v-if="clock_on && !break_on"
+          @click="breakOnClick"
+          class="time-clock__toolbar-button break-on"
+        >{{ $t(`${addonConfig.package}.locked.take_photo.break_on_button`) }}
+        </f7-button>
+        <f7-button
+          raised
+          fill
+          v-if="break_on"
+          @click="breakOffClick"
+          class="time-clock__toolbar-button break-off"
+        >{{ $t(`${addonConfig.package}.locked.take_photo.break_off_button`) }} {{ formatDuration() }}
+        </f7-button>
+      </f7-toolbar>
+      <f7-page-content :style="pageContentStyle">
 
 
-          <div class="text-align-center" style="padding: 40px;">
-            <circle-avatar :size="100" :displayImage="true" :data="previewUser"></circle-avatar>
-          </div>
+        <div class="text-align-center" style="padding: 40px;">
+          <circle-avatar :size="100" :displayImage="true" :data="previewUser"></circle-avatar>
+        </div>
 
-          <!--Events -->
-          <Events
-            :data="formattedAttendanceData"
-            :loaded="loaded.attendance"
-            v-if="loaded.attendance"
-          />
-          <Photo ref="photo" direction="front"/>
-          <Geo ref="geo" :dialog="false"/>
-        </f7-page-content>
-      </f7-page>
+        <!--Events -->
+        <Events
+          :data="formattedAttendanceData"
+          :loaded="loaded.attendance"
+          v-if="loaded.attendance"
+        />
+        <Photo ref="photo" direction="front"/>
+        <Geo ref="geo" :dialog="false"/>
+      </f7-page-content>
     </template>
     <template v-else>
-      <f7-page class="time-clock__main-page" :page-content="false" ptr @ptr:refresh="onPtrRefresh">
-        <f7-navbar>
-          <tommy-nav-menu></tommy-nav-menu>
-          <f7-nav-title>{{ $t(`${addonConfig.package}.index.title`) }}</f7-nav-title>
-          <f7-nav-right class="time-clock__navbar-links">
-            <f7-link :href="`${addonConfig.baseUrl}add/`" icon-only>
-              <f7-icon f7="plus"/>
-            </f7-link>
-            <f7-link :href="`${addonConfig.baseUrl}search/`" icon-only>
-              <f7-icon f7="search"/>
-            </f7-link>
-            <f7-link :href="`${addonConfig.baseUrl}settings/`" icon-only v-if="isTeamManager || isAdmin">
-              <f7-icon f7="gear"/>
-            </f7-link>
 
-          </f7-nav-right>
-        </f7-navbar>
+      <f7-navbar>
+        <tommy-nav-menu></tommy-nav-menu>
+        <f7-nav-title>{{ $t(`${addonConfig.package}.index.title`) }}</f7-nav-title>
+        <f7-nav-right class="time-clock__navbar-links">
+          <f7-link :href="`${addonConfig.baseUrl}add/`" icon-only>
+            <f7-icon f7="plus"/>
+          </f7-link>
+          <f7-link :href="`${addonConfig.baseUrl}search/`" icon-only>
+            <f7-icon f7="search"/>
+          </f7-link>
+          <f7-link :href="`${addonConfig.baseUrl}settings/`" icon-only>
+            <f7-icon f7="gear"/>
+          </f7-link>
 
-        <!-- v-if="attendances_enable && loaded.first" -->
-        <f7-toolbar
-          :style="toolbarStyle"
-          class="time-clock__main-toolbar"
-        >
-          <f7-button
-            raised
-            fill
-            v-if="!clock_on && !break_on"
-            @click="clockOnClick"
-            class="time-clock__toolbar-button clock-on"
-          >{{ $t(`${addonConfig.package}.index.clock_on_button`) }}
-          </f7-button>
-          <f7-button
-            raised
-            fill
-            v-if="clock_on && !break_on"
-            @click="clockOffClick"
-            class="time-clock__toolbar-button clock-off"
-          >{{ $t(`${addonConfig.package}.index.clock_off_button`) }} {{ formatDuration() }}
-          </f7-button>
-          <f7-button
-            raised
-            fill
-            v-if="clock_on && !break_on"
-            @click="breakOnClick"
-            class="time-clock__toolbar-button break-on"
-          >{{ $t(`${addonConfig.package}.index.break_on_button`) }}
-          </f7-button>
-          <f7-button
-            raised
-            fill
-            v-if="break_on"
-            @click="breakOffClick"
-            class="time-clock__toolbar-button break-off"
-          >{{ $t(`${addonConfig.package}.index.break_off_button`) }} {{ formatDuration() }}
-          </f7-button>
-        </f7-toolbar>
-        <f7-page-content :style="pageContentStyle">
+        </f7-nav-right>
+      </f7-navbar>
+
+      <!-- v-if="attendances_enable && loaded.first" -->
+      <f7-toolbar
+        :style="toolbarStyle"
+        class="time-clock__main-toolbar"
+      >
+        <f7-button
+          raised
+          fill
+          v-if="!clock_on && !break_on"
+          @click="clockOnClick"
+          class="time-clock__toolbar-button clock-on"
+        >{{ $t(`${addonConfig.package}.index.clock_on_button`) }}
+        </f7-button>
+        <f7-button
+          raised
+          fill
+          v-if="clock_on && !break_on"
+          @click="clockOffClick"
+          class="time-clock__toolbar-button clock-off"
+        >{{ $t(`${addonConfig.package}.index.clock_off_button`) }} {{ formatDuration() }}
+        </f7-button>
+        <f7-button
+          raised
+          fill
+          v-if="clock_on && !break_on"
+          @click="breakOnClick"
+          class="time-clock__toolbar-button break-on"
+        >{{ $t(`${addonConfig.package}.index.break_on_button`) }}
+        </f7-button>
+        <f7-button
+          raised
+          fill
+          v-if="break_on"
+          @click="breakOffClick"
+          class="time-clock__toolbar-button break-off"
+        >{{ $t(`${addonConfig.package}.index.break_off_button`) }} {{ formatDuration() }}
+        </f7-button>
+      </f7-toolbar>
+      <f7-page-content :style="pageContentStyle">
 
 
-          <!--Active -->
-          <div class="time-clock__active" v-if="!viewOthers && activeData !== null">
-            <!--<f7-list media-list class="time-clock__list" v-if="formattedActiveData">-->
-            <Events
+        <!--Active -->
+        <div class="time-clock__active" v-if="!viewOthers && activeData !== null">
+          <!--<f7-list media-list class="time-clock__list" v-if="formattedActiveData">-->
+          <Events
+            :data="formattedActiveData"
+            :skeleton="1"
+            :loaded="loaded.active"
+          />
+          <!-- </f7-list>-->
+        </div>
+
+
+        <div class="time-clock__active" v-if="viewOthers && activeData !== null">
+          <div class="time-clock__avatars-container">
+            <Active-avatar
               :data="formattedActiveData"
-              :skeleton="1"
               :loaded="loaded.active"
             />
-            <!-- </f7-list>-->
           </div>
+        </div>
 
 
-          <div class="time-clock__active" v-if="viewOthers && activeData !== null">
-            <div class="time-clock__avatars-container">
-              <Active-avatar
-                :data="formattedActiveData"
-                :loaded="loaded.active"
-              />
-            </div>
-          </div>
-
-
-          <!--Events -->
-          <Events
-            :data="formattedAttendanceData"
-            :loaded="loaded.attendance"
-            v-if="loaded.attendance"
-          />
-          <Photo ref="photo" direction="front"/>
-          <Geo ref="geo" :dialog="false"/>
-        </f7-page-content>
-      </f7-page>
+        <!--Events -->
+        <Events
+          :data="formattedAttendanceData"
+          :loaded="loaded.attendance"
+          v-if="loaded.attendance"
+        />
+        <Photo ref="photo" direction="front"/>
+        <Geo ref="geo" :dialog="false"/>
+      </f7-page-content>
     </template>
-  </div>
+  </f7-page>
 </template>
 <script>
 import addonConfig from "../addonConfig";
@@ -218,7 +217,6 @@ export default {
   computed: {
     ...mapGetters('teamMembers', ['teamMember']),
     ...mapState('teamMembers', ['teamMembers']),
-    ...mapGetters('account', ['isTeamManager', 'isAdmin']),
     pageContentStyle() {
       if (this.clock_on && !this.break_on) {
         return {
@@ -548,10 +546,14 @@ export default {
 
     onPtrRefresh(e) {
       const done = e.detail;
-      this.updateAll()
-        .then(() => {
-          done();
-        });
+      if (!this.isLocked) {
+        this.updateAll()
+          .then(() => {
+            done();
+          });
+      } else {
+        done();
+      }
     },
   },
   beforeDestroy() {
@@ -645,4 +647,3 @@ export default {
 <style lang="scss">
 
 </style>
-

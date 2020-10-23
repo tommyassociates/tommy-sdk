@@ -183,7 +183,7 @@ export default {
 
     csvExport() {
       const self = this;
-      const timestampFormat = 'dddd, MMMM Do YYYY, h:mm:ss a';
+      const timestampFormat = 'DD/MM/YYYY HH:mm';
       let csvContent = "data:text/csv;charset=utf-8,";
       const csvColumnHeaders = '"Person","Action","Address","Latitude","Longitude","Image","Timestamp"' + "\n";
 
@@ -220,3 +220,5 @@ export default {
   }
 };
 </script>
+
+
