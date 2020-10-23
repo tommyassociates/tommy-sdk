@@ -1,12 +1,12 @@
 <template>
   <div class="main-list-container">
     <template v-if="loaded">
-      <f7-list class="time-clock-select-list searchbar-found" media-list v-if="Object.keys(data).length > 0 " :id="'time-clock-select-'+type">
+      <f7-list class="time-clock__select-list searchbar-found" media-list v-if="Object.keys(data).length > 0 " :id="'time-clock__select-'+type">
         <f7-list-item
           v-for="(item, index) in data"
           :checkbox="multiply"
           :radio="!multiply"
-          name="time-clock-select-list-item"
+          name="time-clock__select-list-item"
           :checked ="selected == item.user_id"
           :title="item.name || item.first_name+' '+ item.last_name"
           :key="type+'_'+index"
@@ -14,7 +14,7 @@
         >
           <div
             slot="media"
-            class="time-clock-item-image"
+            class="time-clock__item-image"
             :style="[item.icon_url ? {'background-image': `url(${item.icon_url})`}: '']"
           ></div>
         </f7-list-item>
@@ -22,14 +22,14 @@
     </template>
     <template v-if="!loaded">
       <div style="background: #fff;">
-        <f7-list class="time-clock-list time-clock-select-list skeleton-text skeleton-effect-blink" media-list>
+        <f7-list class="time-clock__list time-clock__select-list skeleton-text skeleton-effect-blink" media-list>
           <f7-list-item
             v-for="(index) in skeleton_count"
             :key="'skeleton'+type+'_'+index"
           >
             <div class="item-title" style="color: #ccc !important">_______________</div>
-            <div slot="media" class="time-clock-item-image"></div>
-            <div class="time-clock-item-row">_______________</div>
+            <div slot="media" class="time-clock__item-image"></div>
+            <div class="time-clock__item-row">_______________</div>
           </f7-list-item>
         </f7-list>
       </div>

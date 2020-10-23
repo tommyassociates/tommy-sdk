@@ -1,5 +1,5 @@
 <template>
-  <f7-page id="invoicing__settings" data-name="invoicing__settings" class="invoicing-page">
+  <f7-page id="invoicing__settings" data-name="invoicing__settings" class="invoicing__page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('invoicing.settings.title', 'Settings')}}</f7-nav-title>

@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 <template>
-  <f7-page id="invoicing__index" name="invoicing__index" class="invoicing-page">
+  <f7-page id="invoicing__index" name="invoicing__index" class="invoicing__page">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{pageTitle}}</f7-nav-title>
@@ -55,7 +55,7 @@
                 v-for="(order, index) in list.orders"
                 :key="index"
                 :data-url="`/invoicing/order-details/${order.id}/`"
-                class="card invoicing-order-card"
+                class="card invoicing__order-card"
               >
                 <div class="card-header">
                   <span

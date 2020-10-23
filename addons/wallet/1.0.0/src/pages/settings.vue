@@ -5,7 +5,7 @@
       <f7-nav-title>{{$t('wallet.settings.title', 'Settings')}}</f7-nav-title>
     </f7-navbar>
 
-    <f7-list class="wallet-settings-list">
+    <f7-list class="wallet__settings-list">
       <f7-list-item
         :title="`${$t('wallet.settings.balance_label', 'Show Balance')}`"
       >

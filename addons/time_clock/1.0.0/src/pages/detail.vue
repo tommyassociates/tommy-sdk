@@ -1,6 +1,6 @@
 <template>
   <f7-page
-    class="time-clock-detail-page"
+    class="time-clock__detail-page"
     @page:beforeremove="onPageBeforeRemove"
     @page:beforeout="onPageBeforeOut"
   >
@@ -61,7 +61,7 @@
       <f7-list-item
         :title="$t(`${addonConfig.package}.event_details.action_label`)"
         :link="edit_acces"
-        sheet-open=".time-clock-action-sheet"
+        sheet-open=".time-clock__action-sheet"
         :after="$t(`${addonConfig.package}.index.clock_event_options.${detail_data.status}`)"
         @click="sheet_action_opened = true"
       ></f7-list-item>
@@ -85,7 +85,7 @@
       <f7-list-item title="__________" after="________"></f7-list-item>
     </f7-list>
 
-    <f7-sheet class="time-clock-action-sheet" ref="actionSheet">
+    <f7-sheet class="time-clock__action-sheet" ref="actionSheet">
       <f7-toolbar>
         <div class="left">
           <f7-link
@@ -105,7 +105,7 @@
             radio
             :checked="detail_data.status === 'start'"
             :title="$t(`${addonConfig.package}.index.clock_event_options.start`)"
-            name="time-clock-detail-action"
+            name="time-clock__detail-action"
             @change="changeAction('start')"
             value="start"
           />
@@ -113,7 +113,7 @@
             radio
             :checked="detail_data.status === 'stop'"
             :title="$t(`${addonConfig.package}.index.clock_event_options.stop`)"
-            name="time-clock-detail-action"
+            name="time-clock__detail-action"
             @change="changeAction('stop')"
             value="stop"
           />
@@ -121,7 +121,7 @@
             radio
             :checked="detail_data.status === 'pause'"
             :title="$t(`${addonConfig.package}.index.clock_event_options.pause`)"
-            name="time-clock-detail-action"
+            name="time-clock__detail-action"
             @change="changeAction('pause')"
             value="pause"
           />
@@ -129,7 +129,7 @@
             radio
             :checked="detail_data.status === 'resume'"
             :title="$t(`${addonConfig.package}.index.clock_event_options.resume`)"
-            name="time-clock-detail-action"
+            name="time-clock__detail-action"
             @change="changeAction('resume')"
             value="resume"
           />
@@ -329,7 +329,7 @@ export default {
           let editHtml = "";
           if (this.edit_acces) {
             editHtml = `
-              <a href="#" class="link icon-only" id="time-clock-reload-photo" ref="reloadPhoto">
+              <a href="#" class="link icon-only" id="time-clock__reload-photo" ref="reloadPhoto">
                 <i class="icon f7-icons color-white">reload</i>
               </a>
             `;
@@ -351,11 +351,11 @@ export default {
         on: {
           open: () => {
             this.$f7
-              .$("#time-clock-reload-photo")
+              .$("#time-clock__reload-photo")
               .on("click", this.reloadPhoto);
           },
           close: () => {
-            this.$f7.$("#time-clock-reload-photo").off("click");
+            this.$f7.$("#time-clock__reload-photo").off("click");
           }
         }
       });

@@ -1,12 +1,12 @@
 <template>
-  <f7-page class="time-clock-search-page" :page-content="false" @page:beforein="pageBeforeIn"
+  <f7-page class="time-sheets__search-page time-sheets__page" :page-content="false" @page:beforein="pageBeforeIn"
            @page:beforeout="pageBeforeOut">
     <f7-navbar>
       <tommy-nav-back force></tommy-nav-back>
       <f7-nav-title>{{$t('time_sheets.search.title')}}</f7-nav-title>
     </f7-navbar>
     <f7-page-content ref="pageContent">
-      <f7-list class="time-clock-searchbar-list">
+      <f7-list class="time-sheets__searchbar-list">
 
         <date-range-select
           v-model="dateRange"
@@ -16,7 +16,7 @@
 
         <f7-icon slot="media" icon="demo-list-icon"></f7-icon>
         <f7-searchbar
-          class="time-clock-searchbar"
+          class="time-sheets__searchbar"
           :placeholder="$t('time_sheets.search.search_placeholder')"
           customSearch
           :backdrop="false"
@@ -32,7 +32,7 @@
       </f7-list>
 
       <template v-if="isSearch">
-        <div class="time-clock-active" v-if="viewOthers && activeData !== null">
+        <div class="time-sheets__active" v-if="viewOthers && activeData !== null">
           <Events
             :data="formattedActiveData"
             :skeleton="1"

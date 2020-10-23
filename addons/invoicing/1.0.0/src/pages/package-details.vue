@@ -1,5 +1,5 @@
 <template>
-  <f7-page id="invoicing__item-details" data-name="invoicing__item-details" class="invoicing-page">
+  <f7-page id="invoicing__item-details" data-name="invoicing__item-details" class="invoicing__page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{pageTitle}}</f7-nav-title>
@@ -65,17 +65,17 @@
       <!-- Photo -->
       <f7-list-item divider :title="$t('invoicing.item.photo_label', 'Photo')"></f7-list-item>
       <li>
-        <div class="invoicing-product-photo-container">
+        <div class="invoicing__product-photo-container">
           <div
             v-if="item.image_url || imagePreview"
-            class="invoicing-product-photo"
+            class="invoicing__product-photo"
           >
             <img :src="item.image_url || imagePreview">
             <f7-link icon-f7="close_round_fill" @click="deleteImage"></f7-link>
           </div>
           <label
             v-else
-            class="invoicing-product-photo-add"
+            class="invoicing__product-photo-add"
           >
             <input type="file" @change="onFileChange">
             <f7-icon f7="add"></f7-icon>
@@ -97,20 +97,20 @@
 
       <!-- Items -->
       <f7-list-item divider :title="$t('invoicing.package.items_label')"></f7-list-item>
-      <li class="invoicing-order-items" v-if="products">
-        <div class="invoicing-order-add-box" @click="productsOpened = true">
+      <li class="invoicing__order-items" v-if="products">
+        <div class="invoicing__order-add-box" @click="productsOpened = true">
           <f7-icon f7="add"></f7-icon>
-          <div class="invoicing-order-add-box-placeholder">{{$t('invoicing.package.add_item_label')}}</div>
+          <div class="invoicing__order-add-box-placeholder">{{$t('invoicing.package.add_item_label')}}</div>
         </div>
-        <div class="invoicing-order-item"
+        <div class="invoicing__order-item"
           v-for="(product, index) in item.package_products_attributes"
           :key="index"
           v-if="!product._destroy"
         >
-          <div class="invoicing-order-item-name">{{productName(product.vendor_product_id)}}</div>
-          <div class="invoicing-order-item-selector">
+          <div class="invoicing__order-item-name">{{productName(product.vendor_product_id)}}</div>
+          <div class="invoicing__order-item-selector">
             <f7-link icon-f7="delete_round" @click="decreaseProduct(index)"></f7-link>
-            <div class="invoicing-order-item-qty">{{product.quantity}}</div>
+            <div class="invoicing__order-item-qty">{{product.quantity}}</div>
             <f7-link icon-f7="add_round_fill" @click="increaseProduct(index)"></f7-link>
           </div>
         </div>
@@ -144,15 +144,15 @@
 
     <f7-popup :opened="productsOpened" @popup:closed="productsOpened = false" v-if="products">
       <f7-view :init="false">
-        <f7-page class="invoicing-page">
+        <f7-page class="invoicing__page">
           <f7-navbar>
             <f7-nav-right>
               <f7-link popup-close icon-f7="close"></f7-link>
             </f7-nav-right>
             <f7-nav-title>{{$t('invoicing.package.add_item_label')}}</f7-nav-title>
           </f7-navbar>
-          <f7-searchbar search-container=".invoicing-package-details-products" :disable-button="false"></f7-searchbar>
-          <f7-list class="list-custom invoicing-order-details-products invoicing-package-details-products">
+          <f7-searchbar search-container=".invoicing__package-details-products" :disable-button="false"></f7-searchbar>
+          <f7-list class="list-custom invoicing__order-details-products invoicing__package-details-products">
             <f7-list-item
               v-for="product in products"
               :key="product.id"

@@ -1,5 +1,5 @@
 $red: #FF4500;
-.ios .myprogress-progressbar {
+.ios .myprogress__progressbar {
   height: 14px;
   border: 2px solid #CCCCCC;
   box-sizing: border-box;
@@ -11,21 +11,21 @@ $red: #FF4500;
     background: $red;
   }
 }
-.ios .page.myprogress-home-page {
+.ios .page.myprogress__home-page {
   background: #fff;
 }
-.myprogress-progress {
+.myprogress__progress {
   text-align: right;
   margin: 5px 12px 20px;
   font-size: 18px;
   color: #333;
 }
-.myprogress-list {
+.myprogress__list {
   font-size: 28px;
   color: #333;
   line-height: 1.2;
 }
-.myprogress-list-item {
+.myprogress__list-item {
   padding-top: 15px;
   padding-bottom: 15px;
   display: flex;
@@ -46,30 +46,30 @@ $red: #FF4500;
     display: none;
   }
 }
-.myprogress-item-content {
+.myprogress__item-content {
   flex-shrink: 10;
   margin-left: 5px;
   margin-right: 10px;
   width: 100%;
   min-width: 0;
 }
-.myprogress-item-label {
+.myprogress__item-label {
   cursor: pointer;
 }
-.myprogress-item-data {
+.myprogress__item-data {
   font-size: 22px;
 }
-.myprogress-item-number {
+.myprogress__item-number {
   width: 40px;
   flex-shrink: 0;
   text-align: right;
   flex-shrink: 0;
 }
-.myprogress-item-checkbox {
+.myprogress__item-checkbox {
   margin-left: auto;
   flex-shrink: 0;
 }
-.myprogress-checkbox {
+.myprogress__checkbox {
   width: 24px;
   height: 24px;
   cursor: pointer;
@@ -101,7 +101,7 @@ $red: #FF4500;
     background-size: contain;
   }
 }
-.myprogress-button {
+.myprogress__button {
   margin-top: 5px;
   height: 50px;
   border-radius: 6px;
@@ -119,27 +119,27 @@ $red: #FF4500;
     background: darken($red, 5%);
   }
 }
-.myprogress-pending-label {
+.myprogress__pending-label {
   color: $red;
   font-size: 18px;
 }
-.myprogress-upload-intro,
-.myprogress-upload-text {
+.myprogress__upload-intro,
+.myprogress__upload-text {
   margin: 24px 24px;
   font-size: 24px;
   text-align: center;
   min-height: 120px;
 }
-.myprogress-upload-text {
+.myprogress__upload-text {
   font-weight: 500;
   min-height: 0;
 }
-.myprogress-upload-reminder-label {
+.myprogress__upload-reminder-label {
   text-align: center;
   color: $red;
   font-size: 20px;
 }
-.myprogress-upload-reminder-image {
+.myprogress__upload-reminder-image {
   margin-left: 30px;
   margin-right: 30px;
   text-align: center;
@@ -151,16 +151,16 @@ $red: #FF4500;
     height: auto;
   }
 }
-.myprogress-upload-reminder-text {
+.myprogress__upload-reminder-text {
   margin-top: 10px;
   text-align: center;
   margin-left: 30px;
   margin-right: 30px;
 }
-.ios .page.myprogress-upload {
+.ios .page.myprogress__upload {
   background: #fff;
 }
-.myprogress-upload-button {
+.myprogress__upload-button {
   position: absolute;
   left: 0;
   bottom: 0;
@@ -188,13 +188,13 @@ $red: #FF4500;
     padding-bottom: 70px;
   }
 }
-.myprogress-upload .swiper-container {
+.myprogress__upload .swiper-container {
   height: 320px;
   width: 100%;
   margin-top: -10px;
 }
-label.myprogress-upload-camera,
-.myprogress-thank-you {
+label.myprogress__upload-camera,
+.myprogress__thank-you {
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -249,7 +249,7 @@ label.myprogress-upload-camera,
     }
   }
 }
-.myprogress-thank-you {
+.myprogress__thank-you {
   background: #fff;
   cursor: auto;
   color: #333;
@@ -257,10 +257,10 @@ label.myprogress-upload-camera,
     background-image: url(../assets/icon-check.svg);
   }
 }
-.ios .page.myprogress-address-page {
+.ios .page.myprogress__address-page {
   background: #F1F1F1;
 }
-.myprogress-address-card {
+.myprogress__address-card {
   background: #fff;
   margin: 20px 12px;
   border-radius: 4px;
@@ -311,10 +311,10 @@ label.myprogress-upload-camera,
     }
   }
 }
-.myprogress-item-uploads {
+.myprogress__item-uploads {
   margin: 5px 0 10px;
   display: flex;
-  .myprogress-item-upload {
+  .myprogress__item-upload {
     width: 80px;
     height: 80px;
     cursor: pointer;
@@ -325,12 +325,12 @@ label.myprogress-upload-camera,
     background-repeat: no-repeat;
     position: relative;
     box-shadow: 0px 0px 0px 1px rgba(0,0,0,0.1) inset;
-    + .myprogress-item-upload {
+    + .myprogress__item-upload {
       margin-left: 10px;
     }
   }
 }
-.myprogress-item-delete {
+.myprogress__item-delete {
   position: absolute;
   width: 20px;
   height: 20px;
@@ -350,15 +350,15 @@ label.myprogress-upload-camera,
     line-height: 16px;
   }
 }
-.myprogress-address-radios-label {
+.myprogress__address-radios-label {
   font-size: 18px;
 }
-.myprogress-address-radios {
+.myprogress__address-radios {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   margin-bottom: 20px;
-  .myprogress-address-radio {
+  .myprogress__address-radio {
     border-radius: 4px;
     width: calc(50% - 10px);
     height: 40px;
@@ -378,15 +378,15 @@ label.myprogress-upload-camera,
     }
   }
 }
-.ios .page.myprogress-contract-page {
+.ios .page.myprogress__contract-page {
   background: #fff;
 }
-.myprogress-contract-title {
+.myprogress__contract-title {
   margin: 20px;
   font-size: 20px;
   text-align: center;
 }
-.myprogress-contract-text {
+.myprogress__contract-text {
   font-size: 14px;
   margin: 20px;
 }

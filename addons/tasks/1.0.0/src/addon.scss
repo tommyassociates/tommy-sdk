@@ -11,7 +11,7 @@
 //   background-image: url("data:image/svg+xml;charset=utf-8,#{$svg}");
 // }
 
-.page.tasks-page {
+.page.tasks__page {
   .item-input-full-width {
     width: 100%;
   } // body { font-family: "Helvetica Neue" }
@@ -66,14 +66,14 @@
       height: 80%;
     }
   }
-  .tasks-list {
+  .tasks__list {
     display: flex;
     flex-direction: column;
     background: #F8F8F8;
     color: #4a4a4a;
     box-shadow: 0 0 1px 0 rgba(0, 0, 0, 0.30);
     border-radius: 3px;
-    >.tasks-list-content {
+    >.tasks__list-content {
       overflow: auto;
       z-index: 1;
       flex: 1;
@@ -120,7 +120,7 @@
         color: #999;
       }
     }
-    >.tasks-list-header {
+    >.tasks__list-header {
       display: flex;
       padding: 0 8px;
       height: 44px;
@@ -131,7 +131,7 @@
         display: block
       }
     }
-    >.tasks-list-footer {
+    >.tasks__list-footer {
       .card-add {
         display: flex;
         padding: 0 8px;
@@ -197,10 +197,10 @@
       z-index: 2;
     }
     &.hasScroll {
-      >.tasks-list-header {
+      >.tasks__list-header {
         box-shadow: 0 1px 4px 0 rgba(0, 0, 0, .2);
       }
-      >.tasks-list-footer {
+      >.tasks__list-footer {
         box-shadow: 0 -1px 4px 0 rgba(0, 0, 0, .2);
       }
     }
@@ -722,7 +722,7 @@
     width: 100%;
   }
 }
-.tasks-participats-select {
+.tasks__participats-select {
 
 }
 

@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="invoicing-feedback">
+  <f7-page class="invoicing__feedback">
     <f7-navbar>
       <f7-nav-left v-if="saved">
         <f7-link @click="closeFeedback" icon-f7="close"></f7-link>
@@ -9,39 +9,39 @@
       </f7-nav-left>
       <f7-nav-title>{{navTitle}}</f7-nav-title>
     </f7-navbar>
-    <div slot="fixed" class="invoicing-feedback-buttons" v-if="step === 'step-1'">
-      <a class="invoicing-feedback-button-no" @click="setStep('step-1-2')">{{t('button_no')}}</a>
-      <a class="invoicing-feedback-button-yes" @click="setStep('step-2')">{{t('button_yes')}}</a>
+    <div slot="fixed" class="invoicing__feedback-buttons" v-if="step === 'step-1'">
+      <a class="invoicing__feedback-button-no" @click="setStep('step-1-2')">{{t('button_no')}}</a>
+      <a class="invoicing__feedback-button-yes" @click="setStep('step-2')">{{t('button_yes')}}</a>
     </div>
-    <div slot="fixed" class="invoicing-feedback-buttons" v-if="step === 'step-1-2'">
-      <a class="invoicing-feedback-button-submit" @click="setStep('step-2')">{{t('button_submit')}}</a>
+    <div slot="fixed" class="invoicing__feedback-buttons" v-if="step === 'step-1-2'">
+      <a class="invoicing__feedback-button-submit" @click="setStep('step-2')">{{t('button_submit')}}</a>
     </div>
-    <div slot="fixed" class="invoicing-feedback-buttons" v-if="step === 'step-2'">
-      <a class="invoicing-feedback-button-submit" @click="setStep('step-3')">{{t('button_start')}}</a>
+    <div slot="fixed" class="invoicing__feedback-buttons" v-if="step === 'step-2'">
+      <a class="invoicing__feedback-button-submit" @click="setStep('step-3')">{{t('button_start')}}</a>
     </div>
-    <div slot="fixed" class="invoicing-feedback-buttons" v-if="step === 'step-3'">
-      <a class="invoicing-feedback-button-submit" @click="setStep('question-1')">{{t('button_next')}}</a>
+    <div slot="fixed" class="invoicing__feedback-buttons" v-if="step === 'step-3'">
+      <a class="invoicing__feedback-button-submit" @click="setStep('question-1')">{{t('button_next')}}</a>
     </div>
-    <div slot="fixed" class="invoicing-feedback-buttons" v-if="step === 'question-1'">
-      <a class="invoicing-feedback-button-no" @click="setStep('question-2', 'no')">{{t('button_no')}}</a>
-      <a class="invoicing-feedback-button-yes" @click="setStep('question-2', 'yes')">{{t('button_yes')}}</a>
+    <div slot="fixed" class="invoicing__feedback-buttons" v-if="step === 'question-1'">
+      <a class="invoicing__feedback-button-no" @click="setStep('question-2', 'no')">{{t('button_no')}}</a>
+      <a class="invoicing__feedback-button-yes" @click="setStep('question-2', 'yes')">{{t('button_yes')}}</a>
     </div>
-    <div slot="fixed" class="invoicing-feedback-buttons" v-if="step === 'question-2'">
-      <a class="invoicing-feedback-button-no" @click="setStep('question-3', 'no')">{{t('button_no')}}</a>
-      <a class="invoicing-feedback-button-yes" @click="setStep('question-3', 'yes')">{{t('button_yes')}}</a>
+    <div slot="fixed" class="invoicing__feedback-buttons" v-if="step === 'question-2'">
+      <a class="invoicing__feedback-button-no" @click="setStep('question-3', 'no')">{{t('button_no')}}</a>
+      <a class="invoicing__feedback-button-yes" @click="setStep('question-3', 'yes')">{{t('button_yes')}}</a>
     </div>
-    <div slot="fixed" class="invoicing-feedback-buttons" v-if="step === 'question-3'">
-      <a class="invoicing-feedback-button-no" @click="setStep('step-4', 'no')">{{t('button_no')}}</a>
-      <a class="invoicing-feedback-button-yes" @click="setStep('step-4', 'yes')">{{t('button_yes')}}</a>
+    <div slot="fixed" class="invoicing__feedback-buttons" v-if="step === 'question-3'">
+      <a class="invoicing__feedback-button-no" @click="setStep('step-4', 'no')">{{t('button_no')}}</a>
+      <a class="invoicing__feedback-button-yes" @click="setStep('step-4', 'yes')">{{t('button_yes')}}</a>
     </div>
 
     <template v-if="step === 'step-1'">
-      <div class="invoicing-feedback-confirm-title">{{t('time_confirm_title')}}</div>
-      <div class="invoicing-feedback-confirm-time" v-if="orderDuration">{{durationFormatted}} {{t('hours')}}</div>
+      <div class="invoicing__feedback-confirm-title">{{t('time_confirm_title')}}</div>
+      <div class="invoicing__feedback-confirm-time" v-if="orderDuration">{{durationFormatted}} {{t('hours')}}</div>
     </template>
     <template v-if="step === 'step-1-2'">
-      <div class="invoicing-feedback-confirm-title">{{t('time_select_title')}}</div>
-      <div class="invoicing-feedback-confirm-text" v-html="t('time_select_text')"></div>
+      <div class="invoicing__feedback-confirm-title">{{t('time_select_title')}}</div>
+      <div class="invoicing__feedback-confirm-text" v-html="t('time_select_text')"></div>
       <f7-list>
         <f7-list-input
           :label="t('time_select_start')"
@@ -58,26 +58,26 @@
       </f7-list>
     </template>
     <template v-if="step === 'step-2'">
-      <div class="invoicing-feedback-question-text" v-html="t('feedback_start_text')"></div>
+      <div class="invoicing__feedback-question-text" v-html="t('feedback_start_text')"></div>
     </template>
     <template v-if="step === 'step-3'">
-      <div class="invoicing-feedback-question-text" v-html="t('feedback_info_text')"></div>
+      <div class="invoicing__feedback-question-text" v-html="t('feedback_info_text')"></div>
     </template>
     <template v-if="step === 'question-1'">
-      <div class="invoicing-feedback-question-text" v-html="t('feedback_question_1')"></div>
+      <div class="invoicing__feedback-question-text" v-html="t('feedback_question_1')"></div>
     </template>
     <template v-if="step === 'question-2'">
-      <div class="invoicing-feedback-question-text" v-html="t('feedback_question_2')"></div>
+      <div class="invoicing__feedback-question-text" v-html="t('feedback_question_2')"></div>
     </template>
     <template v-if="step === 'question-3'">
-      <div class="invoicing-feedback-question-text" v-html="t('feedback_question_3')"></div>
+      <div class="invoicing__feedback-question-text" v-html="t('feedback_question_3')"></div>
     </template>
     <template v-if="step === 'step-4'">
-      <div class="invoicing-feedback-end-image">
+      <div class="invoicing__feedback-end-image">
         <img :src="`${$addonAssetsUrl}/feedback-image.svg`" />
       </div>
-      <div class="invoicing-feedback-end-title">{{t('feedback_end_title')}}</div>
-      <div class="invoicing-feedback-end-text" v-html="t('feedback_end_text')"></div>
+      <div class="invoicing__feedback-end-title">{{t('feedback_end_title')}}</div>
+      <div class="invoicing__feedback-end-text" v-html="t('feedback_end_text')"></div>
     </template>
   </f7-page>
 </template>

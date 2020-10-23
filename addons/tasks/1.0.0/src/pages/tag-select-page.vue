@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="tasks-page">
+  <f7-page class="tasks__page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{pageTitle}}</f7-nav-title>
@@ -11,7 +11,7 @@
       </f7-subnavbar>
     </f7-navbar>
 
-    <f7-list id="list-edit-tag-select" class="no-margin no-hairlines tasks-tag-select-tags-list">
+    <f7-list id="list-edit-tag-select" class="no-margin no-hairlines tasks__tag-select-tags-list">
       <f7-list-item
         v-for="(tag, index) in teamTags"
         :key="index"

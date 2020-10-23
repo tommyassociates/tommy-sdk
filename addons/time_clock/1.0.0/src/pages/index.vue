@@ -1,7 +1,7 @@
 <template>
   <div>
     <template v-if="isLocked">
-      <f7-page class="time-clock-main-page" :page-content="false">
+      <f7-page class="time-clock__main-page" :page-content="false">
         <f7-navbar>
           <tommy-nav-menu></tommy-nav-menu>
           <f7-nav-title>{{ $t(`${addonConfig.package}.locked.take_photo.title`) }}</f7-nav-title>
@@ -10,14 +10,14 @@
         <!-- v-if="attendances_enable && loaded.first" -->
         <f7-toolbar
           :style="toolbarStyle"
-          class="time-clock-main-toolbar"
+          class="time-clock__main-toolbar"
         >
           <f7-button
             raised
             fill
             v-if="!clock_on && !break_on"
             @click="clockOnClick"
-            class="time-clock-toolbar-button clock-on"
+            class="time-clock__toolbar-button clock-on"
           >{{ $t(`${addonConfig.package}.locked.take_photo.clock_on_button`) }}
           </f7-button>
           <f7-button
@@ -25,7 +25,7 @@
             fill
             v-if="clock_on && !break_on"
             @click="clockOffClick"
-            class="time-clock-toolbar-button clock-off"
+            class="time-clock__toolbar-button clock-off"
           >{{ $t(`${addonConfig.package}.locked.take_photo.clock_off_button`) }} {{ formatDuration() }}
           </f7-button>
           <f7-button
@@ -33,7 +33,7 @@
             fill
             v-if="clock_on && !break_on"
             @click="breakOnClick"
-            class="time-clock-toolbar-button break-on"
+            class="time-clock__toolbar-button break-on"
           >{{ $t(`${addonConfig.package}.locked.take_photo.break_on_button`) }}
           </f7-button>
           <f7-button
@@ -41,7 +41,7 @@
             fill
             v-if="break_on"
             @click="breakOffClick"
-            class="time-clock-toolbar-button break-off"
+            class="time-clock__toolbar-button break-off"
           >{{ $t(`${addonConfig.package}.locked.take_photo.break_off_button`) }} {{ formatDuration() }}
           </f7-button>
         </f7-toolbar>
@@ -64,11 +64,11 @@
       </f7-page>
     </template>
     <template v-else>
-      <f7-page class="time-clock-main-page" :page-content="false" ptr @ptr:refresh="onPtrRefresh">
+      <f7-page class="time-clock__main-page" :page-content="false" ptr @ptr:refresh="onPtrRefresh">
         <f7-navbar>
           <tommy-nav-menu></tommy-nav-menu>
           <f7-nav-title>{{ $t(`${addonConfig.package}.index.title`) }}</f7-nav-title>
-          <f7-nav-right class="time-clock-navbar-links">
+          <f7-nav-right class="time-clock__navbar-links">
             <f7-link :href="`${addonConfig.baseUrl}add/`" icon-only>
               <f7-icon f7="plus"/>
             </f7-link>
@@ -85,14 +85,14 @@
         <!-- v-if="attendances_enable && loaded.first" -->
         <f7-toolbar
           :style="toolbarStyle"
-          class="time-clock-main-toolbar"
+          class="time-clock__main-toolbar"
         >
           <f7-button
             raised
             fill
             v-if="!clock_on && !break_on"
             @click="clockOnClick"
-            class="time-clock-toolbar-button clock-on"
+            class="time-clock__toolbar-button clock-on"
           >{{ $t(`${addonConfig.package}.index.clock_on_button`) }}
           </f7-button>
           <f7-button
@@ -100,7 +100,7 @@
             fill
             v-if="clock_on && !break_on"
             @click="clockOffClick"
-            class="time-clock-toolbar-button clock-off"
+            class="time-clock__toolbar-button clock-off"
           >{{ $t(`${addonConfig.package}.index.clock_off_button`) }} {{ formatDuration() }}
           </f7-button>
           <f7-button
@@ -108,7 +108,7 @@
             fill
             v-if="clock_on && !break_on"
             @click="breakOnClick"
-            class="time-clock-toolbar-button break-on"
+            class="time-clock__toolbar-button break-on"
           >{{ $t(`${addonConfig.package}.index.break_on_button`) }}
           </f7-button>
           <f7-button
@@ -116,7 +116,7 @@
             fill
             v-if="break_on"
             @click="breakOffClick"
-            class="time-clock-toolbar-button break-off"
+            class="time-clock__toolbar-button break-off"
           >{{ $t(`${addonConfig.package}.index.break_off_button`) }} {{ formatDuration() }}
           </f7-button>
         </f7-toolbar>
@@ -124,8 +124,8 @@
 
 
           <!--Active -->
-          <div class="time-clock-active" v-if="!viewOthers && activeData !== null">
-            <!--<f7-list media-list class="time-clock-list" v-if="formattedActiveData">-->
+          <div class="time-clock__active" v-if="!viewOthers && activeData !== null">
+            <!--<f7-list media-list class="time-clock__list" v-if="formattedActiveData">-->
             <Events
               :data="formattedActiveData"
               :skeleton="1"
@@ -135,8 +135,8 @@
           </div>
 
 
-          <div class="time-clock-active" v-if="viewOthers && activeData !== null">
-            <div class="time-clock-avatars-container">
+          <div class="time-clock__active" v-if="viewOthers && activeData !== null">
+            <div class="time-clock__avatars-container">
               <Active-avatar
                 :data="formattedActiveData"
                 :loaded="loaded.active"

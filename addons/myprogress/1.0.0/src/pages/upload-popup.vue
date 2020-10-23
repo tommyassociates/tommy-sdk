@@ -1,7 +1,7 @@
 <template>
   <f7-popup :opened="opened" @popup:closed="onClosed">
     <f7-view :init="false">
-      <f7-page class="myprogress-upload">
+      <f7-page class="myprogress__upload">
         <f7-navbar>
           <!-- <f7-nav-left>
             <a class="link icon-only" @click="stepBack" v-if="step !== 'step-1'"><i class="material-icons md-36">keyboard_arrow_left</i></a>
@@ -11,39 +11,39 @@
             <f7-link popup-close icon-f7="close"></f7-link>
           </f7-nav-right>
         </f7-navbar>
-        <div class="myprogress-upload-button"
+        <div class="myprogress__upload-button"
           v-if="step === 'step-1'"
           slot="fixed"
           @click="setStep('step-2')"
         >{{$t('myprogress.upload.button_upload')}}</div>
 
-        <div class="myprogress-upload-button"
+        <div class="myprogress__upload-button"
           v-if="step === 'step-2'"
           slot="fixed"
           :class="{disabled: uploading || files.length < (multipleUpload ? 2 : 1)}"
           @click="setStep('step-3')"
         >{{$t('myprogress.upload.button_submit')}}</div>
 
-        <div class="myprogress-upload-button popup-close"
+        <div class="myprogress__upload-button popup-close"
           v-if="step === 'step-3'"
           slot="fixed"
         >{{$t('myprogress.upload.button_next')}}</div>
 
         <template v-if="step === 'step-1'">
-          <div class="myprogress-upload-intro" v-html="intro.replace(/\n/g, '<br>')"></div>
-          <div class="myprogress-upload-reminder-label">{{$t('myprogress.upload.reminder_label')}}:</div>
-          <div class="myprogress-upload-reminder-image">
+          <div class="myprogress__upload-intro" v-html="intro.replace(/\n/g, '<br>')"></div>
+          <div class="myprogress__upload-reminder-label">{{$t('myprogress.upload.reminder_label')}}:</div>
+          <div class="myprogress__upload-reminder-image">
             <img :src="reminderImageSrc" >
           </div>
-          <div class="myprogress-upload-reminder-text">{{reminder}}</div>
+          <div class="myprogress__upload-reminder-text">{{reminder}}</div>
         </template>
 
         <template v-if="step === 'step-2'">
-          <div class="myprogress-upload-text">{{uploadText}}</div>
+          <div class="myprogress__upload-text">{{uploadText}}</div>
           <f7-swiper ref="swiper" v-if="multipleUpload" :params="{speed: 500}">
             <f7-swiper-slide>
               <label
-                class="myprogress-upload-camera"
+                class="myprogress__upload-camera"
                 :class="{
                   'has-uploads': !!files[0],
                 }"
@@ -60,7 +60,7 @@
             </f7-swiper-slide>
             <f7-swiper-slide>
               <label
-                class="myprogress-upload-camera"
+                class="myprogress__upload-camera"
                 :class="{
                   'has-uploads': !!files[1],
                 }"
@@ -78,7 +78,7 @@
           </f7-swiper>
           <label
             v-else
-            class="myprogress-upload-camera"
+            class="myprogress__upload-camera"
             :class="{
               'has-uploads': files.length > 0,
             }"
@@ -94,8 +94,8 @@
           </label>
         </template>
         <template v-if="step === 'step-3'">
-          <div class="myprogress-upload-text">{{uploadText}}</div>
-          <div class="myprogress-thank-you">
+          <div class="myprogress__upload-text">{{uploadText}}</div>
+          <div class="myprogress__thank-you">
             <i></i>
             <span>{{$t('myprogress.upload.thank_you_label')}}</span>
           </div>

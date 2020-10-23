@@ -1,6 +1,6 @@
 <template>
   <f7-page
-    class="time-sheet-detail-page"
+    class="time-sheets__detail-page time-sheets__page"
     @page:beforeremove="onPageBeforeRemove"
     @page:beforeout="onPageBeforeOut"
   >
@@ -40,7 +40,7 @@
           </f7-list-item>
         </f7-list>
 
-        <f7-block-title class="time-clock-divider">{{ $t('time_sheets.timesheet_details_attendance.timeline_title') }}
+        <f7-block-title class="time-sheets__divider">{{ $t('time_sheets.timesheet_details_attendance.timeline_title') }}
         </f7-block-title>
 
         <template v-if="managerAttendances.length">
@@ -375,7 +375,7 @@
             let editHtml = "";
             if (self.editAccess) {
               editHtml = `
-              <a href="#" class="link icon-only" id="time-clock-reload-photo" ref="reloadPhoto">
+              <a href="#" class="link icon-only" id="time-sheets__reload-photo" ref="reloadPhoto">
                 <i class="icon f7-icons color-white">reload</i>
               </a>
             `;
@@ -397,11 +397,11 @@
           on: {
             open: () => {
               self.$f7
-                .$("#time-clock-reload-photo")
+                .$("#time-sheets__reload-photo")
                 .on("click", self.reloadPhoto);
             },
             close: () => {
-              self.$f7.$("#time-clock-reload-photo").off("click");
+              self.$f7.$("#time-sheets__reload-photo").off("click");
             }
           }
         });

@@ -1,4 +1,4 @@
-.searchbar.time-clock-searchbar {
+.searchbar.time-clock__searchbar {
   border: none;
   height: 50px !important;
   input[type="search"] {
@@ -53,7 +53,7 @@
     }
   }
 }
-.time-clock-searchbar-list {
+.time-clock__searchbar-list {
     margin: 0 !important;
     .item-content{
         height: 50px;

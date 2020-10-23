@@ -47,7 +47,7 @@ export default {
       this.$nextTick(() => {
         const searchbar = this.$f7.searchbar.create({
           el: ".searchbar",
-          searchContainer: "#time-clock-select-" + this.type,
+          searchContainer: "#time-clock__select-" + this.type,
           searchIn: ".item-title"
         });
       });

@@ -1,7 +1,7 @@
 <template>
   <f7-popup @popup:close="onPopupClose">
     <f7-view :init="false">
-      <f7-page id="tasks__task" name="tasks__task" class="tasks-page">
+      <f7-page id="tasks__task" name="tasks__task" class="tasks__page">
         <f7-navbar noBorder class="text-color-white">
           <tommy-nav-back></tommy-nav-back>
           <f7-nav-title text-color="white">{{taskName}}</f7-nav-title>

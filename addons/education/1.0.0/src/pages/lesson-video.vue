@@ -1,12 +1,12 @@
 <template>
-  <f7-page class="education-page education-lesson-video-page">
+  <f7-page class="education__page education__lesson-video-page">
     <f7-navbar>
       <f7-nav-left>
         <a href="#" @click="exit" class="link icon-only"><i class="material-icons md-36">keyboard_arrow_left</i></a>
       </f7-nav-left>
       <f7-nav-title>{{lesson.pageName}}</f7-nav-title>
     </f7-navbar>
-    <a href="#" v-if="showContinueButton && nextLesson" @click="openNextLesson()" class="education-toolbar-button" slot="fixed">{{$t('education.continue_button')}}</a>
+    <a href="#" v-if="showContinueButton && nextLesson" @click="openNextLesson()" class="education__toolbar-button" slot="fixed">{{$t('education.continue_button')}}</a>
     <video
       v-if="lesson.video || lesson.videoUrl"
       :src="lesson.videoUrl ? lesson.videoUrl : `${$addonAssetsUrl}courses-videos/${lesson.video}`"

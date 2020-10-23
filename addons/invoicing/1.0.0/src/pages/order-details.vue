@@ -1,7 +1,7 @@
 <template>
   <f7-popup ref="popup">
     <f7-view :ios-dynamic-navbar="false">
-      <f7-page name="invoicing__order-details" id="invoicing__order-details" class="invoicing-page">
+      <f7-page name="invoicing__order-details" id="invoicing__order-details" class="invoicing__page">
         <f7-navbar>
           <!-- <tommy-nav-back></tommy-nav-back> -->
           <f7-nav-left>
@@ -66,7 +66,7 @@
                 <tommy-circle-avatar :data="orderAssignee" slot="media"></tommy-circle-avatar>
                 <select name="assignee" @change="onAssigneeChange">
                   <option v-for="(teamMember,index) in $root.teamMembers" :key="`teamMember-${index}-${teamMember.id}`"
-                    :value="teamMember.user_id" data-option-class="invoicing-smart-select-option"
+                    :value="teamMember.user_id" data-option-class="invoicing__smart-select-option"
                     :data-option-image="teamMember.icon_url" :selected="order.user_id === teamMember.user_id">
                     {{teamMember.first_name || ''}} {{teamMember.last_name || ''}}</option>
                 </select>
@@ -85,11 +85,11 @@
                 <tommy-circle-avatar :data="orderUser" slot="media"></tommy-circle-avatar>
                 <select name="customer" @change="onCustomerChange">
                   <option v-for="(contact, index) in contacts" :key="`contact-${index}-${contact.friend_id}`"
-                    :value="contact.friend_id" data-option-class="invoicing-smart-select-option"
+                    :value="contact.friend_id" data-option-class="invoicing__smart-select-option"
                     :data-option-image="contact.icon_url" :selected="order.user_id === contact.friend_id">
                     {{contact.first_name || ''}} {{contact.last_name || ''}}</option>
                   <option v-for="(teamMember,index) in $root.teamMembers" :key="`teamMember-${index}-${teamMember.id}`"
-                    :value="teamMember.user_id" data-option-class="invoicing-smart-select-option"
+                    :value="teamMember.user_id" data-option-class="invoicing__smart-select-option"
                     :data-option-image="teamMember.icon_url" :selected="order.user_id === teamMember.user_id">
                     {{teamMember.first_name || ''}} {{teamMember.last_name || ''}}</option>
                 </select>
@@ -103,79 +103,79 @@
 
             <!-- Items -->
             <f7-list-item divider :title="$t('invoicing.order_details.items')"></f7-list-item>
-            <li class="invoicing-order-items" v-if="products && packages">
-              <div class="invoicing-order-add-box" @click="productsOpened = true">
+            <li class="invoicing__order-items" v-if="products && packages">
+              <div class="invoicing__order-add-box" @click="productsOpened = true">
                 <f7-icon f7="add"></f7-icon>
-                <div class="invoicing-order-add-box-placeholder">{{$t('invoicing.order_details.add_item_label')}}</div>
+                <div class="invoicing__order-add-box-placeholder">{{$t('invoicing.order_details.add_item_label')}}</div>
               </div>
-              <div class="invoicing-order-item" v-for="(product, index) in order.vendor_order_items"
+              <div class="invoicing__order-item" v-for="(product, index) in order.vendor_order_items"
                 :key="`${product.orderable_id}-${index}`" v-if="!product._destroy">
-                <div class="invoicing-order-item-name">{{productName(product.orderable_id, product.orderable_type)}}
+                <div class="invoicing__order-item-name">{{productName(product.orderable_id, product.orderable_type)}}
                 </div>
-                <div class="invoicing-order-item-details">
-                  <div class="invoicing-order-item-price">{{productPrice(product.orderable_id, product.orderable_type)}}
+                <div class="invoicing__order-item-details">
+                  <div class="invoicing__order-item-price">{{productPrice(product.orderable_id, product.orderable_type)}}
                   </div>
-                  <div class="invoicing-order-item-selector">
+                  <div class="invoicing__order-item-selector">
                     <f7-link icon-f7="delete_round" @click="decreaseOrderItem(index)"></f7-link>
-                    <div class="invoicing-order-item-qty">{{product.quantity}}</div>
+                    <div class="invoicing__order-item-qty">{{product.quantity}}</div>
                     <f7-link icon-f7="add_round_fill" @click="increaseOrderItem(index)"></f7-link>
                   </div>
                 </div>
               </div>
-              <div class="invoicing-order-total" v-if="orderItemsTotal">
-                <div class="invoicing-order-total-row">
-                  <div class="invoicing-order-total-label">{{$t('invoicing.order_details.total')}}</div>
-                  <div class="invoicing-order-total-value">{{orderItemsTotal}}</div>
+              <div class="invoicing__order-total" v-if="orderItemsTotal">
+                <div class="invoicing__order-total-row">
+                  <div class="invoicing__order-total-label">{{$t('invoicing.order_details.total')}}</div>
+                  <div class="invoicing__order-total-value">{{orderItemsTotal}}</div>
                 </div>
               </div>
             </li>
 
             <!-- Promotions -->
             <f7-list-item divider :title="$t('invoicing.order_details.promotions')"></f7-list-item>
-            <li class="invoicing-order-items" v-if="promotions">
-              <div class="invoicing-order-add-box" @click="promotionsOpened = true">
+            <li class="invoicing__order-items" v-if="promotions">
+              <div class="invoicing__order-add-box" @click="promotionsOpened = true">
                 <f7-icon f7="add"></f7-icon>
-                <div class="invoicing-order-add-box-placeholder">{{$t('invoicing.order_details.add_promotion_label')}}
+                <div class="invoicing__order-add-box-placeholder">{{$t('invoicing.order_details.add_promotion_label')}}
                 </div>
               </div>
               <!-- v-if="order.vendor_coupon_id" -->
-              <div class="invoicing-order-item" v-for="coupon_id in order.vendor_coupon_ids">
-                <div class="invoicing-order-item-name">{{promotionName(coupon_id)}}</div>
-                <div class="invoicing-order-item-details">
-                  <div class="invoicing-order-item-price">-{{promotionDiscount(coupon_id)}}</div>
-                  <div class="invoicing-order-item-selector">
+              <div class="invoicing__order-item" v-for="coupon_id in order.vendor_coupon_ids">
+                <div class="invoicing__order-item-name">{{promotionName(coupon_id)}}</div>
+                <div class="invoicing__order-item-details">
+                  <div class="invoicing__order-item-price">-{{promotionDiscount(coupon_id)}}</div>
+                  <div class="invoicing__order-item-selector">
                     <f7-link icon-f7="delete_round" @click="deleteOrderPromotion(coupon_id)"></f7-link>
                   </div>
                 </div>
               </div>
-              <div class="invoicing-order-total" v-if="orderDiscountTotal">
-                <div class="invoicing-order-total-row">
-                  <div class="invoicing-order-total-label">{{$t('invoicing.order_details.total')}}</div>
-                  <div class="invoicing-order-total-value">-{{orderDiscountTotal}}</div>
+              <div class="invoicing__order-total" v-if="orderDiscountTotal">
+                <div class="invoicing__order-total-row">
+                  <div class="invoicing__order-total-label">{{$t('invoicing.order_details.total')}}</div>
+                  <div class="invoicing__order-total-value">-{{orderDiscountTotal}}</div>
                 </div>
               </div>
             </li>
 
             <!-- Payment -->
             <f7-list-item divider :title="$t('invoicing.order_details.payment')"></f7-list-item>
-            <li class="invoicing-order-items" v-if="products && packages && promotions">
-              <div class="invoicing-order-total">
-                <div class="invoicing-order-total-row" v-if="orderItemsTotal">
-                  <div class="invoicing-order-total-label">{{$t('invoicing.order_details.items')}}</div>
-                  <div class="invoicing-order-total-value">{{orderItemsTotal}}</div>
+            <li class="invoicing__order-items" v-if="products && packages && promotions">
+              <div class="invoicing__order-total">
+                <div class="invoicing__order-total-row" v-if="orderItemsTotal">
+                  <div class="invoicing__order-total-label">{{$t('invoicing.order_details.items')}}</div>
+                  <div class="invoicing__order-total-value">{{orderItemsTotal}}</div>
                 </div>
-                <div class="invoicing-order-total-row" v-if="orderDiscountTotal">
-                  <div class="invoicing-order-total-label">{{$t('invoicing.order_details.promotions')}}</div>
-                  <div class="invoicing-order-total-value">-{{orderDiscountTotal}}</div>
+                <div class="invoicing__order-total-row" v-if="orderDiscountTotal">
+                  <div class="invoicing__order-total-label">{{$t('invoicing.order_details.promotions')}}</div>
+                  <div class="invoicing__order-total-value">-{{orderDiscountTotal}}</div>
                 </div>
-                <div class="invoicing-order-total-row" v-if="order.data.payment_method">
-                  <div class="invoicing-order-total-label">{{$t('invoicing.order_details.via_label')}}</div>
-                  <div class="invoicing-order-total-value">
+                <div class="invoicing__order-total-row" v-if="order.data.payment_method">
+                  <div class="invoicing__order-total-label">{{$t('invoicing.order_details.via_label')}}</div>
+                  <div class="invoicing__order-total-value">
                     {{$t(`invoicing.order_details.via_${order.data.payment_method}`)}}</div>
                 </div>
-                <div class="invoicing-order-total-row invoicing-order-final-row">
-                  <div class="invoicing-order-total-label">{{$t('invoicing.order_details.total')}}</div>
-                  <div class="invoicing-order-total-value">{{orderTotal}}</div>
+                <div class="invoicing__order-total-row invoicing__order-final-row">
+                  <div class="invoicing__order-total-label">{{$t('invoicing.order_details.total')}}</div>
+                  <div class="invoicing__order-total-value">{{orderTotal}}</div>
                 </div>
               </div>
             </li>
@@ -221,15 +221,15 @@
 
           <f7-popup :opened="productsOpened" @popup:closed="productsOpened = false" v-if="products && packages">
             <f7-view :init="false">
-              <f7-page class="invoicing-page">
+              <f7-page class="invoicing__page">
                 <f7-navbar>
                   <f7-nav-right>
                     <f7-link @click="productsOpened = false" icon-f7="close"></f7-link>
                   </f7-nav-right>
                   <f7-nav-title>{{$t('invoicing.order_details.add_item_label')}}</f7-nav-title>
                 </f7-navbar>
-                <f7-searchbar search-container=".invoicing-order-details-items" :disable-button="false"></f7-searchbar>
-                <f7-list class="list-custom invoicing-order-details-products invoicing-order-details-items">
+                <f7-searchbar search-container=".invoicing__order-details-items" :disable-button="false"></f7-searchbar>
+                <f7-list class="list-custom invoicing__order-details-products invoicing__order-details-items">
                   <f7-list-item divider :title="$t('invoicing.order_details.packages')"></f7-list-item>
                   <f7-list-item v-for="pkg in packages" :key="`package-${pkg.id}`" link :title="pkg.name"
                     :after="`¥${pkg.price}`" @click="addOrderItem(pkg, 'Vendor::Package')"></f7-list-item>
@@ -250,9 +250,9 @@
                   </f7-nav-right>
                   <f7-nav-title>{{$t('invoicing.order_details.add_promotion_label')}}</f7-nav-title>
                 </f7-navbar>
-                <f7-searchbar search-container=".invoicing-order-details-promotions" :disable-button="false">
+                <f7-searchbar search-container=".invoicing__order-details-promotions" :disable-button="false">
                 </f7-searchbar>
-                <f7-list class="list-custom invoicing-order-details-products invoicing-order-details-promotions">
+                <f7-list class="list-custom invoicing__order-details-products invoicing__order-details-promotions">
                   <f7-list-item v-for="promotion in promotions" :key="promotion.id" link :title="promotion.name"
                     :after="`- ¥${promotion.kind !== 'percentage' ? promotion.amount : promotion.amount * order.total}`"
                     @click="addOrderPromotion(promotion)"></f7-list-item>

@@ -1,30 +1,30 @@
 /* eslint-disable no-console */
 <template>
-  <f7-page class="education-page education-home-page">
+  <f7-page class="education__page education__home-page">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{$t('education.index.title')}}</f7-nav-title>
     </f7-navbar>
 
     <template v-if="fragment">
-      <a href="#" v-if="!currentCourse.locked" @click="openCourse(currentCourse)" class="education-toolbar-button"
+      <a href="#" v-if="!currentCourse.locked" @click="openCourse(currentCourse)" class="education__toolbar-button"
         slot="fixed">{{$t('education.continue_button')}}</a>
 
-      <f7-swiper class="education-swiper" :params="{slidesPerView: 'auto', touchMoveStopPropagation: false}">
-        <f7-swiper-slide v-for="(course, index) in courses" :key="index" class="education-swiper-slide" :class="{
-            'education-swiper-slide-active': currentCourseId === course.id,
-            'education-swiper-slide-locked': course.locked
+      <f7-swiper class="education__swiper" :params="{slidesPerView: 'auto', touchMoveStopPropagation: false}">
+        <f7-swiper-slide v-for="(course, index) in courses" :key="index" class="education__swiper-slide" :class="{
+            'education__swiper-slide-active': currentCourseId === course.id,
+            'education__swiper-slide-locked': course.locked
           }">
-          <div class="education-swiper-slide-icon" @click="currentCourseId = course.id">
+          <div class="education__swiper-slide-icon" @click="currentCourseId = course.id">
             <img :src="`${$addonAssetsUrl}courses-icons/${course.icon}`">
           </div>
-          <div class="education-swiper-slide-name">{{course.indexName}}</div>
+          <div class="education__swiper-slide-name">{{course.indexName}}</div>
         </f7-swiper-slide>
       </f7-swiper>
 
-      <div class="education-course-content">
-        <div class="education-course-content-name">{{currentCourse.indexName}}</div>
-        <div class="education-course-content-description" v-html="currentCourse.indexDescription"></div>
+      <div class="education__course-content">
+        <div class="education__course-content-name">{{currentCourse.indexName}}</div>
+        <div class="education__course-content-description" v-html="currentCourse.indexDescription"></div>
       </div>
       <f7-list class="no-margin-top no-hairline-top">
         <f7-list-item :title="t('price_label')"

@@ -1,6 +1,6 @@
 <template>
   <f7-page
-    class="time-sheet-detail-page"
+    class="time-sheets__detail-page time-sheets__page"
   >
     <template v-if="permissions.canViewOthers">
       <f7-navbar>
@@ -28,7 +28,7 @@
 
         <template v-if="formattedManagerTimesheetsData.length">
           <template v-if="isMultipleSelected">
-            <f7-list media-list class="time-sheet-list">
+            <f7-list media-list class="time-sheets__list">
               <f7-list-item
                 checkbox
                 checkbox-icon="start"
@@ -69,7 +69,7 @@
 
           <template v-else>
             <template v-if="canUpdateTimesheetStatus">
-              <f7-list media-list class="time-sheet-list">
+              <f7-list media-list class="time-sheets__list">
                 <f7-list-item
                   swipeout
                   v-for="(timesheet, index) in formattedManagerTimesheetsData"
@@ -100,7 +100,7 @@
               </f7-list>
             </template>
             <template v-else>
-              <f7-list media-list class="time-sheet-list">
+              <f7-list media-list class="time-sheets__list">
                 <f7-list-item
                   v-for="(timesheet, index) in formattedManagerTimesheetsData"
                   :key="'timesheet_'+index"

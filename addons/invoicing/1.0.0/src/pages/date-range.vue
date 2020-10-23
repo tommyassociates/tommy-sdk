@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="invoicing-page" name="invoicing__date-range-select" id="invoicing__date-range-select">
+  <f7-page class="invoicing__page" name="invoicing__date-range-select" id="invoicing__date-range-select">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('invoicing.common.date_range', 'Date Range')}}</f7-nav-title>
@@ -152,4 +152,3 @@
     },
   };
 </script>
-

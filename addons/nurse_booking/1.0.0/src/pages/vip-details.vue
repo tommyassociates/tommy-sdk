@@ -69,11 +69,11 @@
     methods: {
       onPageBeforeIn() {
         // const self = this;
-        // self.$f7router.view.$navbarEl.addClass('nurse-booking-vip-navbar');
+        // self.$f7router.view.$navbarEl.addClass('nurse-booking__vip-navbar');
       },
       onPageBeforeOut() {
         // const self = this;
-        // self.$f7router.view.$navbarEl.removeClass('nurse-booking-vip-navbar');
+        // self.$f7router.view.$navbarEl.removeClass('nurse-booking__vip-navbar');
       },
     },
   };

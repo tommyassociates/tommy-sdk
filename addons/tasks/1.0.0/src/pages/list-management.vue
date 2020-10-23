@@ -1,5 +1,5 @@
 <template>
-  <f7-page name="tasks__list-management" id="tasks__list-management" class="tasks-page">
+  <f7-page name="tasks__list-management" id="tasks__list-management" class="tasks__page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('tasks.list-management.title', 'List Management')}}</f7-nav-title>

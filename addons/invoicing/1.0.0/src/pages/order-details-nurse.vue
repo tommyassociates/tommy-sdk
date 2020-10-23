@@ -8,7 +8,7 @@
         @feedbackComplete="onFeedbackComplete"
         @close="onFeedbackClose"
       />
-      <f7-page v-if="!isFeedback" name="invoicing__order-details" id="invoicing__order-details" class="invoicing-page">
+      <f7-page v-if="!isFeedback" name="invoicing__order-details" id="invoicing__order-details" class="invoicing__page">
         <f7-navbar>
           <f7-nav-left>
             <f7-link popup-close icon-f7="close"></f7-link>
@@ -19,13 +19,13 @@
           </f7-nav-right>
         </f7-navbar>
         <div
-          class="invoicing-toolbar-button"
+          class="invoicing__toolbar-button"
           slot="fixed"
           v-if="order && showStartButton"
           @click="startOrder"
         >{{$t('invoicing.order_details.start_button')}}</div>
         <div
-          class="invoicing-toolbar-button"
+          class="invoicing__toolbar-button"
           slot="fixed"
           v-if="order && showFinishButton"
           @click="finishOrder"
@@ -83,13 +83,13 @@
 
             <!-- Items -->
             <f7-list-item divider :title="$t('invoicing.order_details.items')"></f7-list-item>
-            <li class="invoicing-order-items" v-if="products && packages">
-              <div class="invoicing-order-item"
+            <li class="invoicing__order-items" v-if="products && packages">
+              <div class="invoicing__order-item"
                 v-for="(product, index) in order.vendor_order_items"
                 :key="`${product.orderable_id}-${index}`"
                 v-if="!product._destroy"
               >
-                <div class="invoicing-order-item-name">{{productName(product.orderable_id, product.orderable_type)}}</div>
+                <div class="invoicing__order-item-name">{{productName(product.orderable_id, product.orderable_type)}}</div>
               </div>
             </li>
           </f7-list>

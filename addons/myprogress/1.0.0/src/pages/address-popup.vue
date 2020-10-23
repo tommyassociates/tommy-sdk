@@ -1,21 +1,21 @@
 <template>
   <f7-popup :opened="opened" @popup:closed="onClosed">
     <f7-view :init="false">
-      <f7-page class="myprogress-upload myprogress-address-page">
+      <f7-page class="myprogress__upload myprogress__address-page">
         <f7-navbar>
           <f7-nav-title>{{$t('myprogress.upload.address_title')}}</f7-nav-title>
           <f7-nav-right>
             <f7-link popup-close icon-f7="close"></f7-link>
           </f7-nav-right>
         </f7-navbar>
-        <div class="myprogress-upload-button"
+        <div class="myprogress__upload-button"
           v-if="step === 'step-1'"
           slot="fixed"
           @click="setStep('step-2')"
         >{{$t('myprogress.upload.button_continue')}}</div>
 
         <template v-if="step === 'step-1'">
-          <div class="myprogress-upload-intro">
+          <div class="myprogress__upload-intro">
             <p>
               <img :src="`${$addonAssetsUrl}/icon-address.svg`">
             </p>
@@ -24,7 +24,7 @@
         </template>
 
         <template v-if="step === 'step-2'">
-          <div class="myprogress-address-card">
+          <div class="myprogress__address-card">
             <input
               @input="city = $event.target.value"
               :value="city"
@@ -37,25 +37,25 @@
               :placeholder="$t('myprogress.upload.address_address_placeholder')"
             ></textarea>
 
-            <p class="myprogress-address-radios-label">{{$t('myprogress.upload.address_choose_size')}}</p>
-            <div class="myprogress-address-radios">
+            <p class="myprogress__address-radios-label">{{$t('myprogress.upload.address_choose_size')}}</p>
+            <div class="myprogress__address-radios">
               <div
-                class="myprogress-address-radio"
+                class="myprogress__address-radio"
                 :class="{checked: size === 'm'}"
                 @click="size = 'm'"
               >{{$t('myprogress.upload.address_size_m')}}</div>
               <div
-                class="myprogress-address-radio"
+                class="myprogress__address-radio"
                 :class="{checked: size === 'l'}"
                 @click="size = 'l'"
               >{{$t('myprogress.upload.address_size_l')}}</div>
               <div
-                class="myprogress-address-radio"
+                class="myprogress__address-radio"
                 :class="{checked: size === 'xl'}"
                 @click="size = 'xl'"
               >{{$t('myprogress.upload.address_size_xl')}}</div>
               <div
-                class="myprogress-address-radio"
+                class="myprogress__address-radio"
                 :class="{checked: size === 'xxl'}"
                 @click="size = 'xxl'"
               >{{$t('myprogress.upload.address_size_xxl')}}</div>

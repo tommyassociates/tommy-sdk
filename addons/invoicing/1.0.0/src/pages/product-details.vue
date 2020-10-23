@@ -1,5 +1,5 @@
 <template>
-  <f7-page id="invoicing__item-details" data-name="invoicing__item-details" class="invoicing-page">
+  <f7-page id="invoicing__item-details" data-name="invoicing__item-details" class="invoicing__page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{pageTitle}}</f7-nav-title>
@@ -57,17 +57,17 @@
       <!-- Photo -->
       <f7-list-item divider :title="$t('invoicing.item.photo_label', 'Photo')"></f7-list-item>
       <li>
-        <div class="invoicing-product-photo-container">
+        <div class="invoicing__product-photo-container">
           <div
             v-if="item.image_url || imagePreview"
-            class="invoicing-product-photo"
+            class="invoicing__product-photo"
           >
             <img :src="item.image_url || imagePreview">
             <f7-link icon-f7="close_round_fill" @click="deleteImage"></f7-link>
           </div>
           <label
             v-else
-            class="invoicing-product-photo-add"
+            class="invoicing__product-photo-add"
           >
             <input type="file" @change="onFileChange">
             <f7-icon f7="add"></f7-icon>

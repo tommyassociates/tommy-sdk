@@ -67,7 +67,7 @@
   export default {
     beforeDestroy() {
       const self = this;
-      self.$f7router.view.$navbarEl.removeClass('nurse-booking-index-navbar');
+      self.$f7router.view.$navbarEl.removeClass('nurse-booking__index-navbar');
     },
     mounted() {
       const self = this;
@@ -80,11 +80,11 @@
     methods: {
       onPageBeforeIn() {
         const self = this;
-        self.$f7router.view.$navbarEl.addClass('nurse-booking-index-navbar');
+        self.$f7router.view.$navbarEl.addClass('nurse-booking__index-navbar');
       },
       onPageBeforeOut() {
         const self = this;
-        self.$f7router.view.$navbarEl.removeClass('nurse-booking-index-navbar');
+        self.$f7router.view.$navbarEl.removeClass('nurse-booking__index-navbar');
       },
     },
   };

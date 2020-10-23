@@ -1,5 +1,5 @@
 <template>
-  <f7-page id="example__index">
+  <f7-page id="theme__index">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{$t('theme.index.title')}}</f7-nav-title>

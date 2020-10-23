@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="time-clock-settings-page">
+  <f7-page class="time-sheets__settings-page time-sheets__page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('time_sheets.settings.title')}}</f7-nav-title>
@@ -29,7 +29,7 @@
         </f7-list-item>
       </f7-list>
 
-      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_create_timesheets_title')}}
+      <f7-block-title class="time-sheets__divider">{{$t('time_sheets.settings.who_can_create_timesheets_title')}}
       </f7-block-title>
       <f7-list>
         <role-select
@@ -39,7 +39,7 @@
         ></role-select>
       </f7-list>
 
-      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_edit_timesheets_title')}}
+      <f7-block-title class="time-sheets__divider">{{$t('time_sheets.settings.who_can_edit_timesheets_title')}}
       </f7-block-title>
       <f7-list>
         <role-select
@@ -49,7 +49,7 @@
         ></role-select>
       </f7-list>
 
-      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_view_other_timesheets_title')}}
+      <f7-block-title class="time-sheets__divider">{{$t('time_sheets.settings.who_can_view_other_timesheets_title')}}
       </f7-block-title>
       <f7-list>
         <role-select
@@ -59,7 +59,7 @@
         ></role-select>
       </f7-list>
 
-      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_create_timesheets_shifts_title')}}
+      <f7-block-title class="time-sheets__divider">{{$t('time_sheets.settings.who_can_create_timesheets_shifts_title')}}
       </f7-block-title>
       <f7-list>
         <role-select
@@ -69,7 +69,7 @@
         ></role-select>
       </f7-list>
 
-      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_edit_attendances')}}
+      <f7-block-title class="time-sheets__divider">{{$t('time_sheets.settings.who_can_edit_attendances')}}
       </f7-block-title>
       <f7-list>
         <role-select
@@ -79,7 +79,7 @@
         ></role-select>
       </f7-list>
 
-      <f7-block-title class="time-clock-divider">{{$t('time_sheets.settings.who_can_view_other_attendances')}}
+      <f7-block-title class="time-sheets__divider">{{$t('time_sheets.settings.who_can_view_other_attendances')}}
       </f7-block-title>
       <f7-list>
         <role-select

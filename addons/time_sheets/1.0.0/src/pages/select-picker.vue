@@ -1,5 +1,5 @@
 <template>
-  <f7-page>
+  <f7-page class="time-sheets__page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{pageTitle}}</f7-nav-title>
@@ -50,7 +50,7 @@ export default {
       self.$nextTick(() => {
         const searchbar = self.$f7.searchbar.create({
           el: ".searchbar",
-          searchContainer: "#time-clock-select-" + self.type,
+          searchContainer: "#time-sheets__select-" + self.type,
           searchIn: ".item-title"
         });
       });

@@ -1,19 +1,19 @@
 <template>
-  <f7-page class="education-page education-lesson-quiz-page">
+  <f7-page class="education__page education__lesson-quiz-page">
     <f7-navbar>
       <tommy-nav-back />
       <f7-nav-title>{{lesson.pageName}}</f7-nav-title>
     </f7-navbar>
-    <a href="#" @click="checkAnswer" v-if="!answer || (answer && !wrong)" class="education-toolbar-button" :class="{'education-toolbar-button-disabled': !answer}" slot="fixed">{{$t('education.next_button')}}</a>
-    <a href="#" @click="openPreviousLesson" v-if="answer && wrong" class="education-toolbar-button" slot="fixed">{{$t('education.back_button')}}</a>
-    <div class="education-progressbar">
+    <a href="#" @click="checkAnswer" v-if="!answer || (answer && !wrong)" class="education__toolbar-button" :class="{'education__toolbar-button-disabled': !answer}" slot="fixed">{{$t('education.next_button')}}</a>
+    <a href="#" @click="openPreviousLesson" v-if="answer && wrong" class="education__toolbar-button" slot="fixed">{{$t('education.back_button')}}</a>
+    <div class="education__progressbar">
       <span :style="`width: ${(current + 1) / total * 100}%`"></span>
     </div>
-    <div class="education-progressbar-label">{{current + 1}}/{{total}}</div>
-    <div class="education-lesson-quiz-description" v-if="lesson.pageDescription" v-html="lesson.pageDescription"></div>
+    <div class="education__progressbar-label">{{current + 1}}/{{total}}</div>
+    <div class="education__lesson-quiz-description" v-if="lesson.pageDescription" v-html="lesson.pageDescription"></div>
 
-    <div class="education-lesson-quiz-question" v-html="questionHtml"></div>
-    <div class="education-lesson-quiz-options" v-if="!wrong">
+    <div class="education__lesson-quiz-question" v-html="questionHtml"></div>
+    <div class="education__lesson-quiz-options" v-if="!wrong">
       <span
         v-for="(option, index) in question.options"
         :key="index"
@@ -21,7 +21,7 @@
         @click="answer = option"
       >{{option}}</span>
     </div>
-    <div class="education-lesson-quiz-wrong" v-if="wrong">
+    <div class="education__lesson-quiz-wrong" v-if="wrong">
       <i></i>
       <div v-html="question.wrongText"></div>
     </div>

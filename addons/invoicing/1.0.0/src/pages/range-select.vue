@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="invoicing-page" name="invoicing__range-select" id="invoicing__range-select">
+  <f7-page class="invoicing__page" name="invoicing__range-select" id="invoicing__range-select">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{pageTitle}}</f7-nav-title>

@@ -1,6 +1,6 @@
 <template>
   <f7-page
-    class="time-sheet-detail-page"
+    class="time-sheets__detail-page time-sheets__page"
     @page:beforeremove="onPageBeforeRemove"
     @page:beforeout="onPageBeforeOut"
   >
@@ -57,11 +57,11 @@
           </f7-list-item>
         </f7-list>
 
-        <f7-block-title class="time-clock-divider">{{ $t('time_sheets.timesheet_details.items_title') }}
+        <f7-block-title class="time-sheets__divider">{{ $t('time_sheets.timesheet_details.items_title') }}
         </f7-block-title>
 
         <template v-if="timesheetShifts.length">
-          <f7-list media-list class="time-sheet-list">
+          <f7-list media-list class="time-sheets__list">
             <template v-if="loaded && canEditTimesheetShifts && permissions.canDelete">
               <f7-list-item
                 swipeout
@@ -132,7 +132,7 @@
         <f7-list-item title="__________" after="________"></f7-list-item>
       </f7-list>
 
-      <f7-sheet class="time-clock-action-sheet" ref="actionSheet">
+      <f7-sheet class="time-sheets__action-sheet" ref="actionSheet">
         <f7-toolbar>
           <div class="left">
             <f7-link
@@ -434,7 +434,7 @@
             let editHtml = "";
             if (self.editAccess) {
               editHtml = `
-              <a href="#" class="link icon-only" id="time-clock-reload-photo" ref="reloadPhoto">
+              <a href="#" class="link icon-only" id="time-sheets__reload-photo" ref="reloadPhoto">
                 <i class="icon f7-icons color-white">reload</i>
               </a>
             `;
@@ -456,11 +456,11 @@
           on: {
             open: () => {
               self.$f7
-                .$("#time-clock-reload-photo")
+                .$("#time-sheets__reload-photo")
                 .on("click", self.reloadPhoto);
             },
             close: () => {
-              self.$f7.$("#time-clock-reload-photo").off("click");
+              self.$f7.$("#time-sheets__reload-photo").off("click");
             }
           }
         });

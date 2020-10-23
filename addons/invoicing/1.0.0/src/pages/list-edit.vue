@@ -1,5 +1,5 @@
 <template>
-  <f7-page name="invoicing__list-edit" id="invoicing__list-edit" class="invoicing-page">
+  <f7-page name="invoicing__list-edit" id="invoicing__list-edit" class="invoicing__page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('invoicing.list_edit.title', 'Edit List')}}</f7-nav-title>
@@ -87,7 +87,7 @@
             v-for="(teamMember) in $root.teamMembers"
             :key="teamMember.id"
             :value="teamMember.user_id"
-            data-option-class="invoicing-smart-select-option"
+            data-option-class="invoicing__smart-select-option"
             :data-option-image="teamMember.icon_url"
             :selected="list.data.assignee.indexOf(teamMember.user_id) >= 0"
           >{{teamMember.first_name || ''}} {{teamMember.last_name || ''}}</option>
@@ -101,7 +101,7 @@
             v-for="(contact, contactIndex) in contacts"
             :key="`${contactIndex}-${contact.id}-${contact.friend_id}`"
             :value="contact.friend_id"
-            data-option-class="invoicing-smart-select-option"
+            data-option-class="invoicing__smart-select-option"
             :data-option-image="contact.icon_url"
             :selected="list.data.customer.indexOf(contact.friend_id) >= 0"
           >{{contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`}}</option>

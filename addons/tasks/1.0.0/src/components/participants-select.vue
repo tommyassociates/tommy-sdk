@@ -1,5 +1,5 @@
 <template>
-  <div class="tag-select tasks-tag-select tasks-participats-select">
+  <div class="tag-select tasks__tag-select tasks__participats-select">
     <f7-list media-list class="list-custom participants top-0">
       <f7-list-item :title="$t('tasks.task.participants', 'Participants')" divider></f7-list-item>
       <li class="item-content">
@@ -20,7 +20,7 @@
       </li>
     </f7-list>
     <f7-popover id="task-participants-popover" target=".tag-select .item.tag-search" v-if="teamTags" :opened="popoverOpened" @popover:closed="popoverOpened = false">
-      <f7-list class="no-margin tasks-tag-select-tags-list" no-hairlines>
+      <f7-list class="no-margin tasks__tag-select-tags-list" no-hairlines>
         <f7-list-item
           v-for="(tag, index) in teamTags"
           :key="index"
@@ -48,7 +48,7 @@
           search-container="#task-participants-sheet .list"
           search-in=".item-title"
         ></f7-searchbar>
-        <f7-list class="no-margin tasks-tag-select-tags-list" no-hairlines>
+        <f7-list class="no-margin tasks__tag-select-tags-list" no-hairlines>
           <f7-list-item
             v-for="(tag, index) in teamTags"
             :key="index"

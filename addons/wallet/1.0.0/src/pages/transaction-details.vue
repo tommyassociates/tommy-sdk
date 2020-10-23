@@ -6,21 +6,21 @@
     </f7-navbar>
 
     <template v-if="transaction">
-      <div class="wallet-transaction-header">
-        <div class="wallet-transaction-header-wrap">
-          <div class="wallet-transaction-icon">
+      <div class="wallet__transaction-header">
+        <div class="wallet__transaction-header-wrap">
+          <div class="wallet__transaction-icon">
             <img v-if="transaction.icon_url" :src="transaction.icon_url">
-            <i v-else class="wallet-transaction-icon-placeholder"></i>
+            <i v-else class="wallet__transaction-icon-placeholder"></i>
           </div>
-          <div class="wallet-transaction-payment-info">
-            <div class="wallet-transaction-payment-name">{{transaction.payee_name}}</div>
-            <div class="wallet-transaction-payment-amount">{{formatTransactionAmount(transaction)}}</div>
+          <div class="wallet__transaction-payment-info">
+            <div class="wallet__transaction-payment-name">{{transaction.payee_name}}</div>
+            <div class="wallet__transaction-payment-amount">{{formatTransactionAmount(transaction)}}</div>
           </div>
         </div>
-        <div class="wallet-transaction-status">{{formatTransactionStatus($t(`wallet.transaction_status.${transaction.status.toLowerCase()}`, transaction.status))}}</div>
+        <div class="wallet__transaction-status">{{formatTransactionStatus($t(`wallet.transaction_status.${transaction.status.toLowerCase()}`, transaction.status))}}</div>
       </div>
 
-      <f7-list class="wallet-transaction-details-list" no-hairlines>
+      <f7-list class="wallet__transaction-details-list" no-hairlines>
         <f7-list-item
           v-if="transaction.card_name"
           :title="$t('wallet.transaction_details.payment_label', 'Payment')"

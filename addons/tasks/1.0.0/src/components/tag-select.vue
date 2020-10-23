@@ -1,5 +1,5 @@
 <template>
-  <div class="tag-select tasks-tag-select tasks-list-tags-select">
+  <div class="tag-select tasks__tag-select tasks__list-tags-select">
     <ul>
       <li class="item-divider">{{$t(`tasks.permissions.${data.name}.title`)}}</li>
       <li>

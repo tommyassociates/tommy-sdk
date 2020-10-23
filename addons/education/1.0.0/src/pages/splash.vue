@@ -1,23 +1,22 @@
 <template>
-  <f7-page class="education-page education-splash-page" @page:beforein="onBeforeIn" @page:beforeout="onBeforeOut">
+  <f7-page class="education__page education__splash-page" @page:beforein="onBeforeIn" @page:beforeout="onBeforeOut">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{$t('education.splash.title')}}</f7-nav-title>
     </f7-navbar>
-    <a href="/education/index/" class="education-toolbar-button" slot="fixed">{{$t('education.continue_button')}}</a>
-    <div class="education-splash-text">{{$t('education.splash.text')}}</div>
+    <a href="/education/index/" class="education__toolbar-button" slot="fixed">{{$t('education.continue_button')}}</a>
+    <div class="education__splash-text">{{$t('education.splash.text')}}</div>
   </f7-page>
 </template>
 <script>
   export default {
     methods: {
       onBeforeIn(e, page) {
-        page.$navbarEl.closest('.navbar').addClass('education-splash-navbar')
+        page.$navbarEl.closest('.navbar').addClass('education__splash-navbar')
       },
       onBeforeOut(e, page) {
-        page.$navbarEl.closest('.navbar').removeClass('education-splash-navbar')
+        page.$navbarEl.closest('.navbar').removeClass('education__splash-navbar')
       },
     },
   };
 </script>
-

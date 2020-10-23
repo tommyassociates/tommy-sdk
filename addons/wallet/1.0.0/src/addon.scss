@@ -1,7 +1,7 @@
-.navbar.wallet-index-navbar {
+.navbar.wallet__index-navbar {
   background-color: #555;
 }
-.wallet-index-navbar-inner {
+.wallet__index-navbar-inner {
   .title {
     color: #fff !important;
   }
@@ -15,13 +15,13 @@
     min-width: 44px;
   }
 }
-.wallet-tabs-links {
+.wallet__tabs-links {
   background: #555;
   display: flex;
   height: 132px;
   color: #fff;
   text-align: center;
-  .wallet-tab-link-wrap {
+  .wallet__tab-link-wrap {
     width: 100%;
     flex-shrink: 1;
     min-width: 0;
@@ -40,13 +40,13 @@
     }
   }
 
-  .wallet-tab-link-label {
+  .wallet__tab-link-label {
     display: block;
     font-size: 16px;
     margin-top: 4px;
     margin-left: 0 !important;
   }
-  i.wallet-tab-link-icon {
+  i.wallet__tab-link-icon {
     width: 55px;
     height: 50px;
     display: block;
@@ -55,29 +55,29 @@
     margin-left: auto;
     margin-right: auto;
   }
-  i.wallet-tab-link-icon-wallet {
+  i.wallet__tab-link-icon-wallet {
     background-image: url(../assets/icon-wallet-outline.svg);
   }
-  a.tab-link-active i.wallet-tab-link-icon-wallet {
+  a.tab-link-active i.wallet__tab-link-icon-wallet {
     background-image: url(../assets/icon-wallet-fill.svg);
   }
-  i.wallet-tab-link-icon-balance {
+  i.wallet__tab-link-icon-balance {
     background-image: url(../assets/icon-balance-outline.svg);
   }
-  a.tab-link-active i.wallet-tab-link-icon-balance {
+  a.tab-link-active i.wallet__tab-link-icon-balance {
     background-image: url(../assets/icon-balance-fill.svg);
   }
-  i.wallet-tab-link-icon-transactions {
+  i.wallet__tab-link-icon-transactions {
     background-image: url(../assets/icon-transactions-outline.svg);
   }
-  a.tab-link-active i.wallet-tab-link-icon-transactions {
+  a.tab-link-active i.wallet__tab-link-icon-transactions {
     background-image: url(../assets/icon-transactions-fill.svg);
   }
-  .wallet-balance-value {
+  .wallet__balance-value {
     font-size: 14px;
   }
 }
-.wallet-tabs {
+.wallet__tabs {
   .block-title {
     margin-top: 10px;
     font-size: 14px;
@@ -86,11 +86,11 @@
   }
 }
 // Settings List
-.list.wallet-settings-list {
+.list.wallet__settings-list {
   margin: 0;
 }
 // Transactions List + Accounts List
-.ios .list.wallet-list {
+.ios .list.wallet__list {
   color: #333;
   margin: 0;
   .item-media {
@@ -102,7 +102,7 @@
       border: none;
       outline: 0;
     }
-    .wallet-icon-placeholder {
+    .wallet__icon-placeholder {
       width: 58px;
       height: 58px;
       border-radius: 4px;
@@ -138,16 +138,16 @@
 }
 
 // Transaction Details Page
-.wallet-transaction-header {
+.wallet__transaction-header {
   background: #fff;
   padding: 20px 20px 10px;
   border-bottom: 1px solid #eee;
-  .wallet-transaction-header-wrap {
+  .wallet__transaction-header-wrap {
     display: flex;
     justify-content: center;
     align-items: flex-start;
   }
-  .wallet-transaction-icon {
+  .wallet__transaction-icon {
     flex-shrink: 0;
     margin-right: 20px;
     img {
@@ -155,7 +155,7 @@
       height: 58px;
       border-radius: 4px;
     }
-    i.wallet-transaction-icon-placeholder {
+    i.wallet__transaction-icon-placeholder {
       width: 58px;
       height: 58px;
       border-radius: 4px;
@@ -163,28 +163,28 @@
       display: block;
     }
   }
-  .wallet-transaction-payment-info {
+  .wallet__transaction-payment-info {
     flex-shrink: 10;
     min-width: 0;
     color: #333;
   }
-  .wallet-transaction-payment-name {
+  .wallet__transaction-payment-name {
     font-size: 18px;
     line-height: 1;
   }
-  .wallet-transaction-payment-amount {
+  .wallet__transaction-payment-amount {
     font-size: 36px;
     font-weight: 300;
     line-height: 1.2;
   }
-  .wallet-transaction-status {
+  .wallet__transaction-status {
     color: #999;
     text-align: center;
     font-size: 16px;
     margin-top: 10px;
   }
 }
-.list.wallet-transaction-details-list {
+.list.wallet__transaction-details-list {
   margin: 0;
   ul {
     background: #fff;
@@ -198,7 +198,7 @@
     color: #999;
   }
 }
-.wallet-transactions-empty-message {
+.wallet__transactions-empty-message {
   text-align: center;
   font-size: 18px;
   color: #999;
@@ -213,4 +213,3 @@
     display: none;
   }
 }
-

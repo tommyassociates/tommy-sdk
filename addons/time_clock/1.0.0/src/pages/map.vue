@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="time-clock-map-page">
+  <f7-page class="time-clock__map-page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('time_clock.event_details.where_label')}}</f7-nav-title>
@@ -9,7 +9,7 @@
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
-    <div id="time-clock-map-conainer"></div>
+    <div id="time-clock__map-conainer"></div>
   </f7-page>
 </template>
 
@@ -90,7 +90,7 @@ export default {
   },
   mounted() {
     const self = this;
-    self.map = L.map("time-clock-map-conainer").setView(
+    self.map = L.map("time-clock__map-conainer").setView(
       [self.new_latitude, self.new_longitude],
       16
     );

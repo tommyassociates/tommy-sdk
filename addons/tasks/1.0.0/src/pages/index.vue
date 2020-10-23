@@ -1,5 +1,5 @@
 <template>
-  <f7-page id="tasks__index" name="tasks__index" class="tasks-page">
+  <f7-page id="tasks__index" name="tasks__index" class="tasks__page">
     <f7-navbar>
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{pageTitle}}</f7-nav-title>
@@ -27,8 +27,8 @@
         v-for="list in orderedLists"
         :key="list.id"
       >
-        <div class="tasks-list" :data-id="list.id" :class="{'hasScroll': listWithScroll[list.id]}">
-          <div class="tasks-list-header">
+        <div class="tasks__list" :data-id="list.id" :class="{'hasScroll': listWithScroll[list.id]}">
+          <div class="tasks__list-header">
             <div>{{list.name}}</div>
             <div v-if="canEditList(list)">
               <a :data-url="`/tasks/list-edit/${list.id}/`">
@@ -39,7 +39,7 @@
               </a>
             </div>
           </div>
-          <div class="tasks-list-content">
+          <div class="tasks__list-content">
             <template v-if="list.tasks && list.tasks.length">
               <a v-for="(task, index) in list.tasks" :key="index" :data-url="`/tasks/task/${task.id}/`" class="card task-card" :class="isTaskDone(task) ? 'color-gray done' : ''">
                 <div class="card-content card-content-padding">
@@ -67,7 +67,7 @@
               </a>
             </template>
           </div>
-          <div class="tasks-list-footer" v-if="list.data.show_fast_add">
+          <div class="tasks__list-footer" v-if="list.data.show_fast_add">
             <div class="in" v-if="!fastAddEnabled[list.id]">
               <div class="card-add" @click="$set(fastAddEnabled, list.id, true)">{{$t('tasks.index.add-task', 'Add task')}}</div>
             </div>
@@ -144,7 +144,7 @@
       listHasScroll(list) {
         const self = this;
         if (!list.tasks || list.tasks.length === 0) return false;
-        const listContentEl = self.$$(`.tasks-list[data-id="${list.id}"] .tasks-list-content`)[0];
+        const listContentEl = self.$$(`.tasks__list[data-id="${list.id}"] .tasks__list-content`)[0];
         if (!listContentEl) return false;
         return listContentEl.scrollHeight > listContentEl.offsetHeight;
       },

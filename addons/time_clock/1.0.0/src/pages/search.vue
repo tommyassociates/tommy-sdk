@@ -1,18 +1,18 @@
 <template>
-  <f7-page class="time-clock-search-page" :page-content="false" @page:beforein="pageBeforeIn"
+  <f7-page class="time-clock__search-page" :page-content="false" @page:beforein="pageBeforeIn"
            @page:beforeout="pageBeforeOut">
     <f7-navbar>
       <tommy-nav-back force></tommy-nav-back>
       <f7-nav-title>{{ $t(`${addonConfig.package}.search.title`) }}</f7-nav-title>
 
-      <f7-nav-right class="time-clock-navbar-links">
+      <f7-nav-right class="time-clock__navbar-links">
         <f7-link href="#" icon-only @click.prevent="csvExport()">
           <export-icon></export-icon>
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
     <f7-page-content ref="pageContent">
-      <f7-list class="time-clock-searchbar-list">
+      <f7-list class="time-clock__searchbar-list">
 
         <date-range-select
           v-model="dateRange"
@@ -22,7 +22,7 @@
 
         <f7-icon slot="media" icon="demo-list-icon"></f7-icon>
         <f7-searchbar
-          class="time-clock-searchbar"
+          class="time-clock__searchbar"
           :placeholder="$t(`${addonConfig.package}.search.search_placeholder`)"
           customSearch
           :backdrop="false"
@@ -38,7 +38,7 @@
       </f7-list>
 
       <template v-if="isSearch">
-        <div class="time-clock-active" v-if="viewOthers && activeData !== null">
+        <div class="time-clock__active" v-if="viewOthers && activeData !== null">
           <Events
             :data="formattedActiveData"
             :skeleton="1"

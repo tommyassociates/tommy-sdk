@@ -1,6 +1,6 @@
 <template>
   <f7-page
-    class="time-sheet-detail-page "
+    class="time-sheets__detail-page time-sheets__page"
     @page:beforeremove="onPageBeforeRemove"
     @page:beforeout="onPageBeforeOut"
   >
@@ -44,7 +44,7 @@
       </f7-list>
 
 
-      <f7-block-title class="time-clock-divider">{{ $t('time_sheets.timesheet_details_shift.role_title') }}
+      <f7-block-title class="time-sheets__divider">{{ $t('time_sheets.timesheet_details_shift.role_title') }}
       </f7-block-title>
 
       <f7-list media-list class="topset list-with-fields inline-labels">
@@ -57,7 +57,7 @@
       </f7-list>
 
 
-      <f7-block-title class="time-clock-divider">{{ $t('time_sheets.timesheet_details_shift.location_title') }}
+      <f7-block-title class="time-sheets__divider">{{ $t('time_sheets.timesheet_details_shift.location_title') }}
       </f7-block-title>
       <f7-list media-list class="topset list-with-fields inline-labels">
         <f7-list-item :title="$t('time_sheets.timesheet_details_shift.location_label')">

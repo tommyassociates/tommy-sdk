@@ -1,6 +1,6 @@
 <template>
   <f7-page
-    class="time-sheets-detail-page"
+    class="time-sheets__detail-page time-sheets__page"
     @page:beforeremove="onPageBeforeRemove"
     @page:beforeout="onPageBeforeOut"
   >
@@ -61,7 +61,7 @@
       <f7-list-item
         :title="$t('time_sheets.timesheet_attendance_detail.action_label')"
         :link="edit_acces"
-        sheet-open=".time-sheets-action-sheet"
+        sheet-open=".time-sheets__action-sheet"
         :after="$t('time_sheets.timesheet_attendance_detail.clock_event_options.'+detail_data.status)"
         @click="sheet_action_opened = true"
       ></f7-list-item>
@@ -85,7 +85,7 @@
       <f7-list-item title="__________" after="________"></f7-list-item>
     </f7-list>
 
-    <f7-sheet class="time-sheets-action-sheet" ref="actionSheet">
+    <f7-sheet class="time-sheets__action-sheet" ref="actionSheet">
       <f7-toolbar>
         <div class="left">
           <f7-link
@@ -106,7 +106,7 @@
             radio
             :checked="detail_data.status === 'start'"
             :title="$t('time_sheets.timesheet_attendance_detail.clock_event_options.start')"
-            name="time-sheets-detail-action"
+            name="time-sheets__detail-action"
             @change="changeAction('start')"
             value="start"
           />
@@ -114,7 +114,7 @@
             radio
             :checked="detail_data.status === 'stop'"
             :title="$t('time_sheets.timesheet_attendance_detail.clock_event_options.stop')"
-            name="time-sheets-detail-action"
+            name="time-sheets__detail-action"
             @change="changeAction('stop')"
             value="stop"
           />
@@ -122,7 +122,7 @@
             radio
             :checked="detail_data.status === 'pause'"
             :title="$t('time_sheets.timesheet_attendance_detail.clock_event_options.pause')"
-            name="time-sheets-detail-action"
+            name="time-sheets__detail-action"
             @change="changeAction('pause')"
             value="pause"
           />
@@ -130,7 +130,7 @@
             radio
             :checked="detail_data.status === 'resume'"
             :title="$t('time_sheets.timesheet_attendance_detail.clock_event_options.resume')"
-            name="time-sheets-detail-action"
+            name="time-sheets__detail-action"
             @change="changeAction('resume')"
             value="resume"
           />
@@ -363,7 +363,7 @@
             let editHtml = "";
             if (self.edit_acces) {
               editHtml = `
-              <a href="#" class="link icon-only" id="time-sheets-reload-photo" ref="reloadPhoto">
+              <a href="#" class="link icon-only" id="time-sheets__reload-photo" ref="reloadPhoto">
                 <i class="icon f7-icons color-white">reload</i>
               </a>
             `;
@@ -385,11 +385,11 @@
           on: {
             open: () => {
               self.$f7
-                .$("#time-sheets-reload-photo")
+                .$("#time-sheets__reload-photo")
                 .on("click", self.reloadPhoto);
             },
             close: () => {
-              self.$f7.$("#time-sheets-reload-photo").off("click");
+              self.$f7.$("#time-sheets__reload-photo").off("click");
             }
           }
         });

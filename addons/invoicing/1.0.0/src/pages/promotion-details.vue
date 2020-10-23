@@ -1,5 +1,5 @@
 <template>
-  <f7-page id="invoicing__promotion-details" data-name="invoicing__promotion-details" class="invoicing-page">
+  <f7-page id="invoicing__promotion-details" data-name="invoicing__promotion-details" class="invoicing__page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{pageTitle}}</f7-nav-title>
@@ -30,7 +30,7 @@
       <!-- Date -->
       <f7-list-item divider :title="$t('invoicing.promotion.expires_label', 'Description')"></f7-list-item>
       <f7-list-input
-        class="invoicing-valid-to-input"
+        class="invoicing__valid-to-input"
         :title="$t('invoicing.order_details.due_date')"
         type="text"
         readonly
@@ -75,7 +75,7 @@
         v-if="item.kind === 'percentage'"
       >
         <f7-range
-          class="invoicing-range-slider"
+          class="invoicing__range-slider"
           :value="item.amount"
           :min="0"
           :max="1"
@@ -84,7 +84,7 @@
           label
           @range:changed="(v) => setAmount(v)"
         />
-        <div class="invoicing-range-slider-value">{{Math.floor(item.amount * 100)}}%</div>
+        <div class="invoicing__range-slider-value">{{Math.floor(item.amount * 100)}}%</div>
       </f7-list-item>
 
       <!-- Category -->
@@ -142,16 +142,16 @@
     <!-- Customer Popup -->
     <f7-popup :opened="customerPopupOpened" @popup:closed="customerPopupOpened = false" v-if="item">
       <f7-view :init="false">
-        <f7-page class="invoicing-page">
+        <f7-page class="invoicing__page">
           <f7-navbar>
             <f7-nav-title>{{$t('invoicing.promotion.customer_label')}}</f7-nav-title>
             <f7-nav-right>
               <f7-link popup-close icon-f7="close"></f7-link>
             </f7-nav-right>
           </f7-navbar>
-          <f7-searchbar search-container=".invoicing-promotion-customers-list"></f7-searchbar>
+          <f7-searchbar search-container=".invoicing__promotion-customers-list"></f7-searchbar>
           <f7-list
-            class="invoicing-promotion-customers-list"
+            class="invoicing__promotion-customers-list"
             virtual-list
             :virtual-list-params="{
               items: contactsSorted,
@@ -182,15 +182,15 @@
     <!-- Item Popup -->
     <f7-popup :opened="itemsPopupOpened" @popup:closed="itemsPopupOpened = false" v-if="item && products && packages">
       <f7-view :init="false">
-        <f7-page class="invoicing-page">
+        <f7-page class="invoicing__page">
           <f7-navbar>
             <f7-nav-title>{{$t('invoicing.promotion.item_label')}}</f7-nav-title>
             <f7-nav-right>
               <f7-link popup-close icon-f7="close"></f7-link>
             </f7-nav-right>
           </f7-navbar>
-          <f7-searchbar search-container=".invoicing-promotion-items-list" :disable-button="false"></f7-searchbar>
-          <f7-list class="invoicing-promotion-items-list">
+          <f7-searchbar search-container=".invoicing__promotion-items-list" :disable-button="false"></f7-searchbar>
+          <f7-list class="invoicing__promotion-items-list">
             <f7-list-item v-if="products.length" divider :title="$t('invoicing.item_service_management.items_tab')" />
             <f7-list-item
               v-for="product in products"

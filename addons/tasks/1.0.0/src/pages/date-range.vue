@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="tasks-page" name="tasks__date-range-select" id="tasks__date-range-select">
+  <f7-page class="tasks__page" name="tasks__date-range-select" id="tasks__date-range-select">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('tasks.common.date_range', 'Date Range')}}</f7-nav-title>

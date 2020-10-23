@@ -4,9 +4,9 @@
          :key="'days_'+index"
          :title="index">
 
-      <f7-block-title class="time-clock-divider">{{ days.title }}</f7-block-title>
+      <f7-block-title class="time-clock__divider">{{ days.title }}</f7-block-title>
 
-      <div class="time-clock-circle-avatar" v-if="loaded">
+      <div class="time-clock__circle-avatar" v-if="loaded">
         <div v-for="(attendance, index) in days.attendances" :key="'avatar_'+index" class="container"
              v-show="index <=2 || more_clicked"
              @click="goSearch(item.name)">
@@ -21,7 +21,7 @@
           <div class="no-activity">{{ $t(`${addonConfig.package}.index.no_activity`) }}</div>
         </div>
 
-        <div class="time-clock-circle-avatar skeleton-text skeleton-effect-blink" v-if="!loaded">
+        <div class="time-clock__circle-avatar skeleton-text skeleton-effect-blink" v-if="!loaded">
           <div v-for="(index) in 4" :key="'avatar_skeleton_'+index" class="container">
             <div class="image skeleton-element"></div>
             <div class="name">______</div>

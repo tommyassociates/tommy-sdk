@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="invoicing-page">
+  <f7-page class="invoicing__page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{pageTitle}}</f7-nav-title>

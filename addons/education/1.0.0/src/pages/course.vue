@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="education-page education-course-page">
+  <f7-page class="education__page education__course-page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{course.pageName}}</f7-nav-title>
@@ -7,14 +7,14 @@
 
     <f7-block no-hairlines strong class="no-margin" v-html="course.pageDescription"></f7-block>
 
-    <a href="#" v-if="!courseCompleted && !courseStarted" @click="openFirstLesson()" class="education-toolbar-button" slot="fixed">{{$t('education.start_button')}}</a>
+    <a href="#" v-if="!courseCompleted && !courseStarted" @click="openFirstLesson()" class="education__toolbar-button" slot="fixed">{{$t('education.start_button')}}</a>
 
-    <a href="#" v-if="!courseCompleted && courseStarted" @click="openNextLesson()" class="education-toolbar-button" slot="fixed">{{$t('education.resume_button')}}</a>
+    <a href="#" v-if="!courseCompleted && courseStarted" @click="openNextLesson()" class="education__toolbar-button" slot="fixed">{{$t('education.resume_button')}}</a>
 
     <f7-list no-hairlines media-list class="no-margin">
       <f7-list-item v-if="courseCompleted" divider :title="t('certificates_label')" />
       <f7-list-item v-if="courseCompleted" :title="t('certificate_of_completion')">
-        <i class="icon education-reward-icon" slot="media"></i>
+        <i class="icon education__reward-icon" slot="media"></i>
       </f7-list-item>
       <f7-list-item divider :title="t('courses_label')" />
       <li
@@ -29,7 +29,7 @@
           <div class="item-title-row">
             <div class="item-title">{{lesson.indexName}}</div>
             <div class="item-after">
-              <div class="education-checkbox">
+              <div class="education__checkbox">
                 <input type="checkbox" :checked="lessonCompleted(lesson.id)" disabled>
                 <i class="icon"></i>
               </div>

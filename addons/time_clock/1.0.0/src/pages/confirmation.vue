@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="time-clock-main-page" :page-content="false">
+  <f7-page class="time-clock__main-page" :page-content="false">
     <f7-navbar>
       <f7-nav-title>{{ $t(`${addonConfig.package}.locked.confirmation.title`) }}</f7-nav-title>
     </f7-navbar>

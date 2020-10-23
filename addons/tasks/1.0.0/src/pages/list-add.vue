@@ -1,5 +1,5 @@
 <template>
-  <f7-page name="tasks__list-add" id="tasks__list-add" class="tasks-page">
+  <f7-page name="tasks__list-add" id="tasks__list-add" class="tasks__page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('tasks.list-add.title', 'Add List')}}</f7-nav-title>

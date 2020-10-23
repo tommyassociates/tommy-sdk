@@ -1,5 +1,5 @@
 <template>
-  <f7-page class="time-clock-main-page" :page-content="false"
+  <f7-page class="time-sheets__main-page time-sheets__page" :page-content="false"
            @page:beforeremove="onPageBeforeRemove"
            @page:beforeout="onPageBeforeOut">
     <f7-navbar>
@@ -10,7 +10,7 @@
       <template v-if="permissions.canViewOthers">
         <f7-nav-title>{{$t('time_sheets.index.manager_title')}}</f7-nav-title>
       </template>
-      <f7-nav-right class="time-sheets-navbar-links">
+      <f7-nav-right class="time-sheets__navbar-links">
         <f7-link icon-only @click="addTimesheet" v-if="permissions.canCreate">
           <f7-icon f7="add"></f7-icon>
         </f7-link>

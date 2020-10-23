@@ -1,5 +1,5 @@
 <template>
-  <f7-page name="invoicing__item-service-management" id="invoicing__item-service-management" class="invoicing-page">
+  <f7-page name="invoicing__item-service-management" id="invoicing__item-service-management" class="invoicing__page">
     <f7-navbar>
       <tommy-nav-back></tommy-nav-back>
       <f7-nav-title>{{$t('invoicing.item_service_management.title', 'Items / Service')}}</f7-nav-title>
@@ -12,8 +12,8 @@
       <f7-link @click="activeTab = 'packages'" :class="{active: activeTab === 'packages'}">{{$t('invoicing.item_service_management.packages_tab')}}</f7-link>
     </div>
     <div class="item-service-tab" v-show="activeTab === 'items'">
-      <f7-searchbar search-container=".invoicing-list-items" :backdrop="false" v-if="items && items.length" :disable-button="false" :placeholder="$t('invoicing.item_service_management.search_items')"></f7-searchbar>
-      <f7-list class="list-custom invoicing-list-items" no-hairlines v-if="items && items.length">
+      <f7-searchbar search-container=".invoicing__list-items" :backdrop="false" v-if="items && items.length" :disable-button="false" :placeholder="$t('invoicing.item_service_management.search_items')"></f7-searchbar>
+      <f7-list class="list-custom invoicing__list-items" no-hairlines v-if="items && items.length">
         <f7-list-item
           v-for="item in orderedProducts"
           :key="item.id"
@@ -23,8 +23,8 @@
       </f7-list>
     </div>
     <div class="item-service-tab" v-show="activeTab === 'packages'">
-      <f7-searchbar search-container=".invoicing-list-packages" :backdrop="false" v-if="packages && packages.length" :disable-button="false" :placeholder="$t('invoicing.item_service_management.search_packages')"></f7-searchbar>
-      <f7-list class="list-custom invoicing-list-packages" no-hairlines v-if="packages && packages.length">
+      <f7-searchbar search-container=".invoicing__list-packages" :backdrop="false" v-if="packages && packages.length" :disable-button="false" :placeholder="$t('invoicing.item_service_management.search_packages')"></f7-searchbar>
+      <f7-list class="list-custom invoicing__list-packages" no-hairlines v-if="packages && packages.length">
         <f7-list-item
           v-for="item in orderedPackages"
           :key="item.id"

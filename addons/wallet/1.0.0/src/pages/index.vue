@@ -1,6 +1,6 @@
 <template>
   <f7-page name="wallet__index" id="wallet__index" @page:beforein="onPageBeforeIn" @page:beforeout="onPageBeforeOut">
-    <f7-navbar innerClass="wallet-index-navbar-inner">
+    <f7-navbar innerClass="wallet__index-navbar-inner">
       <tommy-nav-menu></tommy-nav-menu>
       <f7-nav-title>{{$t('wallet.index.title', 'Tommy Wallet')}}</f7-nav-title>
       <f7-nav-right>
@@ -8,40 +8,40 @@
       </f7-nav-right>
     </f7-navbar>
 
-    <div class="wallet-tabs-links">
-      <div class="wallet-tab-link-wrap">
-        <f7-link tab-link="#wallet-tab-wallets" tab-link-active>
-          <i class="wallet-tab-link-icon wallet-tab-link-icon-wallet"></i>
-          <div class="wallet-tab-link-label">{{$t('wallet.index.tab_link_wallets', 'Wallets')}}</div>
+    <div class="wallet__tabs-links">
+      <div class="wallet__tab-link-wrap">
+        <f7-link tab-link="#wallet__tab-wallets" tab-link-active>
+          <i class="wallet__tab-link-icon wallet__tab-link-icon-wallet"></i>
+          <div class="wallet__tab-link-label">{{$t('wallet.index.tab_link_wallets', 'Wallets')}}</div>
         </f7-link>
       </div>
-      <div class="wallet-tab-link-wrap">
+      <div class="wallet__tab-link-wrap">
         <f7-link tab-link noLinkClass>
-          <i class="wallet-tab-link-icon wallet-tab-link-icon-balance"></i>
-          <div class="wallet-tab-link-label">{{$t('wallet.index.tab_link_balance', 'Balance')}}</div>
-          <div class="wallet-balance-value" v-if="balance">{{balance}}</div>
+          <i class="wallet__tab-link-icon wallet__tab-link-icon-balance"></i>
+          <div class="wallet__tab-link-label">{{$t('wallet.index.tab_link_balance', 'Balance')}}</div>
+          <div class="wallet__balance-value" v-if="balance">{{balance}}</div>
         </f7-link>
       </div>
-      <div class="wallet-tab-link-wrap">
-        <f7-link tab-link="#wallet-tab-transactions">
-          <i class="wallet-tab-link-icon wallet-tab-link-icon-transactions"></i>
-          <div class="wallet-tab-link-label">{{$t('wallet.index.tab_link_transactions', 'Transactions')}}</div>
+      <div class="wallet__tab-link-wrap">
+        <f7-link tab-link="#wallet__tab-transactions">
+          <i class="wallet__tab-link-icon wallet__tab-link-icon-transactions"></i>
+          <div class="wallet__tab-link-label">{{$t('wallet.index.tab_link_transactions', 'Transactions')}}</div>
         </f7-link>
       </div>
     </div>
-    <f7-tabs class="wallet-tabs">
+    <f7-tabs class="wallet__tabs">
 
       <!-- WALLETS -->
-      <f7-tab tab-active id="wallet-tab-wallets">
+      <f7-tab tab-active id="wallet__tab-wallets">
         <f7-block-title v-if="wallets && wallets.length">{{$t('wallet.index.tab_wallets_title', 'Wallets')}}</f7-block-title>
-        <f7-list media-list no-hairlines no-chevron class="wallet-list wallets-list" v-if="wallets && wallets.length">
+        <f7-list media-list no-hairlines no-chevron class="wallet__list wallets-list" v-if="wallets && wallets.length">
           <f7-list-item
             v-for="(wallet, index) in wallets"
             :key="index"
             :link="`/wallet/card/${wallet.id}/?name=${wallet.name}`"
           >
             <img v-if="wallet.icon_url" slot="media" :src="wallet.icon_url">
-            <i v-else slot="media" class="wallet-icon-placeholder"></i>
+            <i v-else slot="media" class="wallet__icon-placeholder"></i>
             <div class="item-details" slot="inner-start">
               <div class="item-title-row">
                 <div class="item-title">{{wallet.name}}</div>
@@ -66,16 +66,16 @@
       </f7-tab>
 
       <!-- HISTORY -->
-      <f7-tab id="wallet-tab-balance"></f7-tab>
+      <f7-tab id="wallet__tab-balance"></f7-tab>
 
       <!-- TRANSACTIONS -->
-      <f7-tab id="wallet-tab-transactions" @tab:show="() => { if (transactions) getTransactions() }">
+      <f7-tab id="wallet__tab-transactions" @tab:show="() => { if (transactions) getTransactions() }">
         <template v-if="transactions && transactions.length">
           <f7-block-title>{{$t('wallet.index.tab_transactions_title', 'Transactions')}}</f7-block-title>
           <wallet-transaction-list :transactions="transactions"></wallet-transaction-list>
         </template>
         <template v-if="transactions && !transactions.length">
-          <div class="wallet-transactions-empty-message">
+          <div class="wallet__transactions-empty-message">
             <img :src="`${$addonAssetsUrl}empty-transactions.svg`">
             <div>{{$t('wallet.index.no_transactions_message', 'Sorry. You do not have any transactions history yet.')}}</div>
           </div>
@@ -109,7 +109,7 @@
     },
     beforeDestroy() {
       const self = this;
-      self.$f7router.view.$navbarEl.removeClass('wallet-index-navbar');
+      self.$f7router.view.$navbarEl.removeClass('wallet__index-navbar');
     },
     methods: {
       currencyMap,
@@ -153,7 +153,7 @@
       },
       onPageBeforeIn(e, page) {
         const self = this;
-        self.$f7router.view.$navbarEl.addClass('wallet-index-navbar');
+        self.$f7router.view.$navbarEl.addClass('wallet__index-navbar');
         if (page.from === 'previous') {
           self.getWallets();
           self.getBalance();
@@ -162,7 +162,7 @@
       },
       onPageBeforeOut() {
         const self = this;
-        self.$f7router.view.$navbarEl.removeClass('wallet-index-navbar');
+        self.$f7router.view.$navbarEl.removeClass('wallet__index-navbar');
       },
     },
   };

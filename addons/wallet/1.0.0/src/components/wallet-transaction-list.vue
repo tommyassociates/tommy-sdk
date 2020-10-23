@@ -1,12 +1,12 @@
 <template>
-  <f7-list media-list no-hairlines no-chevron class="wallet-list transaction-list">
+  <f7-list media-list no-hairlines no-chevron class="wallet__list transaction-list">
     <f7-list-item
       v-for="(transaction, index) in transactions"
       :key="index"
       :link="`/wallet/transaction/${transaction.id}/`"
     >
       <img v-if="transaction.icon_url" slot="media" :src="transaction.icon_url">
-      <i v-else slot="media" class="wallet-icon-placeholder"></i>
+      <i v-else slot="media" class="wallet__icon-placeholder"></i>
       <div class="item-details" slot="inner-start">
         <div class="item-title-row">
           <div class="item-title">{{transaction.payee_name}}</div>
