@@ -126,8 +126,9 @@ app.init({
 
             // Load the addon routes programatically for HMR
             if (addon.assets) {
-              import(`../addons/${addon.package}/${addon.version}/src/addon.scss`)
-              import(`../addons/${addon.package}/${addon.version}/src/addon.js`)
+              console.log(`../${addon.dir_prefix}/${addon.package}/${addon.version}/src/addon.js`)
+              import(`@addon/${addon.package}/${addon.version}/src/addon.scss`)
+              import(`@addon/${addon.package}/${addon.version}/src/addon.js`)
                 .then(m => {
                   const routes = m.default;
                   self.$f7.routes.push(...routes);

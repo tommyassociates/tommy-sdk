@@ -30,8 +30,9 @@ module.exports = {
   resolve: {
     extensions: ['.js', '.vue', '.json'],
     alias: {
-      'vue$': 'vue/dist/vue.esm.js',
+      'vue$': resolvePath('node_modules/vue/dist/vue.esm.js'),
       '@': resolvePath('src'),
+      '@addon': resolvePath('../tommy-sdk-private/addons'),
     },
     // modules: [
     //   resolvePath('node_modules/tommy_core/src'),

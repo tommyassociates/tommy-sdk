@@ -8,7 +8,9 @@ const url = require('url')
 // const url = require('url')
 // const addonBuilder = require('./addon-builder')
 
-const port = 8080;
+const port = 8080
+const publicDir = 'addons'
+const privateDir = '../tommy-sdk-private/addons'
 
 function resolvePath() {
   let args = Array.prototype.slice.call(arguments)
@@ -116,15 +118,33 @@ function getSdkUrl() {
 
 function readLocalAddonVersions() {
   const addons = {};
-  const packages = getFilteredFiles(resolvePath('addons'))
+
+  // Add public packages
+  const packages = getFilteredFiles(resolvePath(publicDir))
   for (let i = 0; i < packages.length; i += 1) {
-    addons[packages[i]] = getFilteredFiles(resolvePath('addons', packages[i]))
+    addons[packages[i]] = getFilteredFiles(resolvePath(publicDir, packages[i]))
   }
+
+  // Add private packages
+  const privPackages = getFilteredFiles(resolvePath(privateDir))
+  for (let i = 0; i < privPackages.length; i += 1) {
+    addons[privPackages[i]] = getFilteredFiles(resolvePath(privateDir, privPackages[i]))
+  }
+
+  // throw privPackages
   return addons;
 }
 
+function isPrivateAddon(pkg) {
+  return fs.existsSync(resolvePath(privateDir, pkg))
+}
+
 function getLocalAddonFilePath(pkg, version, file) {
-  return resolvePath('addons', pkg, version, file)
+  if (isPrivateAddon(pkg)) {
+    return resolvePath(privateDir, pkg, version, file)
+  } else {
+    return resolvePath(publicDir, pkg, version, file)
+  }
 }
 
 function readLocalAddon(pkg, version) {
@@ -133,6 +153,7 @@ function readLocalAddon(pkg, version) {
   addon.url = url.resolve(getSdkUrl(), base)
   addon.icon_url = url.resolve(addon.url, 'icon.png') // path + '/icon.png'
   addon.file_base_url = url.resolve(getSdkUrl(), base)
+  addon.dir_prefix = isPrivateAddon(pkg) ? privateDir : publicDir;
   addon.local = true;
 
   if (addon.assets) {
