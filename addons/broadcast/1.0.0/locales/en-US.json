@@ -1,0 +1,51 @@
+{
+  "board-settings": {
+    "title": "Settings"
+  },
+  "index": {
+    "title": "Broadcast",
+    "subtitle": "Send individual messages to many team members at once.",
+    "list_message": "Message",
+    "send": "SEND",
+    "noListTxt": "No existing Messages. Click + to send your first message"
+  },
+  "message": {
+    "title": "New Message",
+    "no_message": "Message content cannot be empty",
+    "tag": "people group" 
+  },
+  "setting": {
+    "title": "Setting"
+  },
+  "title": "Broadcast",
+  "summary": "Manage your projects & tasks with ease.",
+  "description": "Manage your projects & tasks with ease.",
+  "developer": "Tommy Labs GmbH",
+  "permissions": {
+    "filter_tasks": {
+      "title": "Filter Tasks",
+      "hint": "Select which tasks will appear on the list"
+    },
+    "task_list_read_access": {
+      "title": "Who Can See List",
+      "hint": "Select who can view this list"
+    },
+    "task_list_edit_access": {
+      "title": "Who Can Edit List",
+      "hint": "Select who can edit this list"
+    },
+    "task_create_access": {
+      "title": "Who Can Create Tasks",
+      "hint": "Select who can create tasks"
+    },
+    "task_edit_access": {
+      "title": "Who Can Edit Tasks",
+      "hint": "Select who can edit tasks"
+    }
+  },
+  "views": {
+    "index": {
+      "title": "Broadcast"
+    }
+  }
+}

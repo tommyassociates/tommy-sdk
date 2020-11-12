@@ -65,51 +65,6 @@ function getSdkVariables() {
     SANDBOX_ENDPOINT: JSON.stringify(getConfig().apiSandboxEndpoint + '/v1/')
   }
 }
-//
-//
-// function createAddon(action, pkg, version, archivePath, callback) {
-//   const urls = [];
-//   if (getConfig() && getConfig().apiEndpoint) {
-//     urls.push(`${getConfig().apiEndpoint}/v1/addons/${action}?api_key=${getConfig().apiKey}`)
-//   }
-//   if (getCnConfig() && getCnConfig().apiEndpoint) {
-//     urls.push(`${getCnConfig().apiEndpoint}/v1/addons/${action}?api_key=${getCnConfig().apiKey}`)
-//   }
-//
-//   const promises = []
-//   promises.push(addonBuilder(pkg, version))
-//   promises.push(...urls.map(url => new Promise((resolve, reject) => {
-//     console.log('uploading to ', url)
-//     request.post({
-//       url,
-//       formData: {
-//         package: pkg,
-//         version,
-//         archive: fs.createReadStream(archivePath),
-//       },
-//     }, (err, httpResponse, body) => {
-//       if (!err && httpResponse.statusCode === 201) {
-//         console.log('uploaded to ', url)
-//         resolve(JSON.parse(body))
-//       } else {
-//         console.log('error uploading to ', url)
-//         let errMessage;
-//         try {
-//           errMessage = JSON.parse(body)
-//         } catch (e) {}
-//         reject(errMessage || err)
-//       }
-//     })
-//   })))
-//
-//   Promise.all(promises)
-//     .then((jsons) => {
-//       callback(null, jsons)
-//     })
-//     .catch((errs) => {
-//       callback('Upload failed', errs)
-//     })
-// }
 
 function getSdkUrl() {
   return `http://localhost:${port}`;

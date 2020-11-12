@@ -1,0 +1,118 @@
+---
+  title: Example
+  package: "example"
+  summary: "Example addon for reusable core components."
+  description: "Example addon for reusable core components."
+  version: "1.0.0"
+  developer: "Tommy Labs GmbH"
+  homepage: "https://mytommy.com"
+  private: false
+  locales:
+    - en-US
+    - zh-CN
+  roles:
+    - Team Member
+    - Team Manager
+    - Team Admin
+  permissions:
+    addon_access:
+      title: "Allow Team Member Access"
+      hint: "Select Team Members who can access this Add-on"
+      default_roles:
+        - Team Manager
+        - Team Member
+        - Team Admin
+      operations:
+        - read
+    # addon_actor_access:
+    #   title: "Who Can View Other Team Members' Availabilities"
+    #   hint: "Select who can view availabilities on behalf of other users"
+    #   resource_type: Fragment
+    #   resource_kind: Availability
+    #   default_roles:
+    #     - Team Manager
+    #     - Team Admin
+    #   operations:
+    #     - read
+  # activities:
+  #   lock_example:
+  #     title: "Lock example"
+  #     description: "Lock example for a roster time slot."
+  #     execute: "Activity::LockAvailability"
+  #     parameters:
+  #       assignee_id:
+  #         title: "Assignee ID"
+  #         type: "integer"
+  #         required: true
+  #       assignee_team_id:
+  #         title: "Assignee Team ID"
+  #         type: "integer"
+  #         required: true
+  #       start_at:
+  #         title: "Start time"
+  #         type: "time"
+  #         required: true
+  #       end_at:
+  #         title: "End time"
+  #         type: "time"
+  #         required: true
+  #   unlock_example:
+  #     title: "Unlock example"
+  #     description: "Unlock example for a roster time slot."
+  #     execute: "Activity::UnlockAvailability"
+  #     parameters:
+  #       assignee_id:
+  #         title: "Assignee ID"
+  #         type: "integer"
+  #         required: true
+  #       assignee_team_id:
+  #         title: "Assignee Team ID"
+  #         type: "integer"
+  #         required: true
+  #       start_at:
+  #         title: "Start time"
+  #         type: "time"
+  #         required: true
+  #       end_at:
+  #         title: "End time"
+  #         type: "time"
+  #         required: true
+  # actions:
+  #   example_lock_on_booking_created:
+  #     title: "Lock example on booking created"
+  #     summary: "Update and lock example when a new booking is created."
+  #     trigger:
+  #       package: bookings
+  #       name: booking_created
+  #     activity:
+  #       package: example
+  #       name: lock_example
+  #     options:
+  #       target_user_parameter: assignee_id
+  #     default: true
+  #   example_unlock_on_booking_canceled:
+  #     title: "Lock example on booking canceled"
+  #     summary: "Update and lock example when an existing booking is canceled."
+  #     trigger:
+  #       package: bookings
+  #       name: booking_canceled
+  #     activity:
+  #       package: example
+  #       name: unlock_example
+  #     options:
+  #       target_user_parameter: assignee_id
+  #     default: true
+  assets:
+    -
+      type: "stylesheet"
+      file: "build/addon.css"
+    -
+      type: "javascript"
+      file: "build/addon.js"
+  views:
+    index:
+      title: Example
+      index: true
+      path: "/example/"
+      actor_permission: addon_actor_access
+      type: "page"

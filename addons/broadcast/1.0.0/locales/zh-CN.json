@@ -1,0 +1,50 @@
+{
+  "board-settings": {
+    "title": "设置"
+  },
+  "index": {
+    "title": "广播",
+    "subtitle": "一次向多个团队成员发送单个消息。",
+    "list_message": "消息列表",
+    "send": "推送时间",
+    "noListTxt": "没有消息，请点击+号新增消息"
+  },
+  "message": {
+    "title": "新消息",
+    "no_message": "消息内容不能为空"
+  },
+  "setting": {
+    "title": "设置"
+  },
+  "title": "广播",
+  "summary": "轻松管理你的项目&任务",
+  "description": "轻松管理你的项目&任务",
+  "developer": "托秘网络有限公司",
+  "permissions": {
+    "filter_tasks": {
+      "title": "过滤任务",
+      "hint": "选择列表中显示的任务 "
+    },
+    "task_list_read_access": {
+      "title": "查看列表权限",
+      "hint": "选择谁可以查看列表"
+    },
+    "task_list_edit_access": {
+      "title": "编辑列表权限",
+      "hint": "选择谁可以编辑列表"
+    },
+    "task_create_access": {
+      "title": "创建任务权限",
+      "hint": "选择谁可以创建任务"
+    },
+    "task_edit_access": {
+      "title": "编辑任务权限",
+      "hint": "选择谁可以编辑任务"
+    }
+  },
+  "views": {
+    "index": {
+      "title": "任务"
+    }
+  }
+}
