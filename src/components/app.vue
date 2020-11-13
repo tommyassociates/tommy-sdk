@@ -6,8 +6,14 @@
           <f7-navbar title="Navigation"></f7-navbar>
           <f7-list>
             <f7-list-item
-              link="/"
+              link="/addons/"
               title="Addons"
+              reload-all
+              panel-close
+            ></f7-list-item>
+            <f7-list-item
+              link="/views/"
+              title="Views"
               reload-all
               panel-close
             ></f7-list-item>
