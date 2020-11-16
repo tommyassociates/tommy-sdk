@@ -24,8 +24,12 @@ function archivePath(pkg, version) {
 }
 
 function getFilteredFiles(dir, pkg) {
-  let files = fs.readdirSync(dir, pkg)
-  files = files.filter(junk.not)
+  let files = []
+  try {
+    files = fs.readdirSync(dir, pkg)
+    files = files.filter(junk.not)
+  } catch {
+  }
   return files;
 }
 
