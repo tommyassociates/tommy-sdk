@@ -8,7 +8,9 @@ const url = require('url')
 // const url = require('url')
 // const addonBuilder = require('./addon-builder')
 
-const port = 8080;
+const port = 8080
+const publicDir = 'addons'
+const privateDir = '../tommy-sdk-private/addons'
 
 function resolvePath() {
   let args = Array.prototype.slice.call(arguments)
@@ -22,8 +24,12 @@ function archivePath(pkg, version) {
 }
 
 function getFilteredFiles(dir, pkg) {
-  let files = fs.readdirSync(dir, pkg)
-  files = files.filter(junk.not)
+  let files = []
+  try {
+    files = fs.readdirSync(dir, pkg)
+    files = files.filter(junk.not)
+  } catch {
+  }
   return files;
 }
 
@@ -63,51 +69,6 @@ function getSdkVariables() {
     SANDBOX_ENDPOINT: JSON.stringify(getConfig().apiSandboxEndpoint + '/v1/')
   }
 }
-//
-//
-// function createAddon(action, pkg, version, archivePath, callback) {
-//   const urls = [];
-//   if (getConfig() && getConfig().apiEndpoint) {
-//     urls.push(`${getConfig().apiEndpoint}/v1/addons/${action}?api_key=${getConfig().apiKey}`)
-//   }
-//   if (getCnConfig() && getCnConfig().apiEndpoint) {
-//     urls.push(`${getCnConfig().apiEndpoint}/v1/addons/${action}?api_key=${getCnConfig().apiKey}`)
-//   }
-//
-//   const promises = []
-//   promises.push(addonBuilder(pkg, version))
-//   promises.push(...urls.map(url => new Promise((resolve, reject) => {
-//     console.log('uploading to ', url)
-//     request.post({
-//       url,
-//       formData: {
-//         package: pkg,
-//         version,
-//         archive: fs.createReadStream(archivePath),
-//       },
-//     }, (err, httpResponse, body) => {
-//       if (!err && httpResponse.statusCode === 201) {
-//         console.log('uploaded to ', url)
-//         resolve(JSON.parse(body))
-//       } else {
-//         console.log('error uploading to ', url)
-//         let errMessage;
-//         try {
-//           errMessage = JSON.parse(body)
-//         } catch (e) {}
-//         reject(errMessage || err)
-//       }
-//     })
-//   })))
-//
-//   Promise.all(promises)
-//     .then((jsons) => {
-//       callback(null, jsons)
-//     })
-//     .catch((errs) => {
-//       callback('Upload failed', errs)
-//     })
-// }
 
 function getSdkUrl() {
   return `http://localhost:${port}`;
@@ -116,15 +77,33 @@ function getSdkUrl() {
 
 function readLocalAddonVersions() {
   const addons = {};
-  const packages = getFilteredFiles(resolvePath('addons'))
+
+  // Add public packages
+  const packages = getFilteredFiles(resolvePath(publicDir))
   for (let i = 0; i < packages.length; i += 1) {
-    addons[packages[i]] = getFilteredFiles(resolvePath('addons', packages[i]))
+    addons[packages[i]] = getFilteredFiles(resolvePath(publicDir, packages[i]))
   }
+
+  // Add private packages
+  const privPackages = getFilteredFiles(resolvePath(privateDir))
+  for (let i = 0; i < privPackages.length; i += 1) {
+    addons[privPackages[i]] = getFilteredFiles(resolvePath(privateDir, privPackages[i]))
+  }
+
+  // throw privPackages
   return addons;
 }
 
+function isPrivateAddon(pkg) {
+  return fs.existsSync(resolvePath(privateDir, pkg))
+}
+
 function getLocalAddonFilePath(pkg, version, file) {
-  return resolvePath('addons', pkg, version, file)
+  if (isPrivateAddon(pkg)) {
+    return resolvePath(privateDir, pkg, version, file)
+  } else {
+    return resolvePath(publicDir, pkg, version, file)
+  }
 }
 
 function readLocalAddon(pkg, version) {
@@ -133,6 +112,7 @@ function readLocalAddon(pkg, version) {
   addon.url = url.resolve(getSdkUrl(), base)
   addon.icon_url = url.resolve(addon.url, 'icon.png') // path + '/icon.png'
   addon.file_base_url = url.resolve(getSdkUrl(), base)
+  addon.dir_prefix = isPrivateAddon(pkg) ? privateDir : publicDir;
   addon.local = true;
 
   if (addon.assets) {

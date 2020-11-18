@@ -30,15 +30,18 @@ module.exports = {
   resolve: {
     extensions: ['.js', '.vue', '.json'],
     alias: {
-      'vue$': 'vue/dist/vue.esm.js',
+      'vue$': resolvePath('node_modules/vue/dist/vue.esm.js'),
       '@': resolvePath('src'),
+      '@addon': resolvePath('../tommy-sdk-private/addons'),
     },
-    // modules: [
-    //   resolvePath('node_modules/tommy_core/src'),
-    //   resolvePath('node_modules/tommy_core/src/scss'),
-    //   resolvePath('src'),
-    //   'node_modules'
-    // ]
+    modules: [
+      // resolvePath('node_modules/tommy_core/src'),
+      // resolvePath('node_modules/tommy_core/src/scss'),
+      resolvePath('src'),
+      resolvePath('node_modules'),
+      resolvePath('node_modules/tommy-core'),
+      // 'node_modules'
+    ]
   },
   module: {
     rules: [
@@ -47,12 +50,14 @@ module.exports = {
         use: 'babel-loader',
         include: [
           resolvePath('src'),
-          resolvePath('node_modules/tommy_core'),
-          resolvePath('node_modules/framework7'),
-          resolvePath('node_modules/framework7-vue'),
-          resolvePath('node_modules/template7'),
-          resolvePath('node_modules/dom7'),
-          resolvePath('node_modules/ssr-window'),
+          resolvePath('node_modules'),
+          resolvePath('node_modules/tommy-core'),
+          // resolvePath('node_modules/framework7'),
+          // resolvePath('node_modules/framework7-vue'),
+          // resolvePath('node_modules/template7'),
+          // resolvePath('node_modules/dom7'),
+          // resolvePath('node_modules/ssr-window'),
+          // resolvePath('node_modules/vuex'),
         ],
       },
       {
