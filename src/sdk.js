@@ -2,6 +2,7 @@ import tommy, {app, events, addons} from 'tommy-core/src/tommy'; // eslint-disab
 import routes from './routes';
 import appComponent from './components/app.vue';
 import components from './components';
+import Highcharts from 'highcharts';
 
 const language = localStorage.language || 'en-US';
 

@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="31" height="30" viewBox="0 0 31 30">
-  <g fill="none" fill-rule="evenodd">
-    <rect width="30" height="30"/>
-    <rect width="22" height="22" x="4" y="4" fill="#FC0" fill-rule="nonzero" rx="6"/>
-    <text fill="#FFF" font-family="HelveticaNeue-Bold, Helvetica Neue" font-size="16" font-weight="bold">
-      <tspan x="11" y="21">$</tspan>
-    </text>
-  </g>
-</svg>

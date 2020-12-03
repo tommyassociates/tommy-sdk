@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30">
-  <g fill="none" fill-rule="evenodd">
-    <rect width="30" height="30"/>
-    <rect width="22" height="22" x="4" y="4" fill="#00CE7D" fill-rule="nonzero" rx="6"/>
-    <text fill="#FFF" font-family="PingFangSC-Semibold, PingFang SC" font-size="16" font-weight="500">
-      <tspan x="7" y="21">%</tspan>
-    </text>
-  </g>
-</svg>
