@@ -1,2 +1,0 @@
-- list connected credentials API
-- list available accounts

@@ -1,1 +1,0 @@
-Translations in JS files
