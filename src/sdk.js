@@ -108,48 +108,50 @@ app.init({
       // self.$store.dispatch('resetState').then(() => {
 
 
-        self.$store.dispatch('loginWithApiKey', API_KEY).then((token) => {
-          localStorage.token = token;
-          self.$root.token = token;
+      self.$store.dispatch('loginWithApiKey', API_KEY).then((token) => {
+        localStorage.token = token;
+        self.$root.token = token;
 
-          events.$on('addonRoutesLoaded', (addon, addonRoutes) => {
-            // NOTE: Do not load routes here in order to support HMR
-            // self.$f7.routes.push(...addonRoutes);
-            // self.$f7.views.main.routes.push(...addonRoutes);
-          });
-          events.$on('addonLoaded', (addon) => {
-            self.$root.addons.push(addon);
-          });
-
-          SDK_LOCAL_ADDONS.forEach(addon => {
-            self.$addons.initAddon(addon).catch(() => {
-            });
-
-            // Load the addon routes programatically for HMR
-            if (addon.assets) {
-              console.log(`../${addon.dir_prefix}/${addon.package}/${addon.version}/src/addon.js`)
-              import(`@addon/${addon.package}/${addon.version}/src/addon.scss`)
-              import(`@addon/${addon.package}/${addon.version}/src/addon.js`)
-                .then(m => {
-                  const routes = m.default;
-                  self.$f7.routes.push(...routes);
-                  self.$f7.views.main.routes.push(...routes);
-
-                  // Load the default addon if specified
-                  const loadAddon = (SDK_CONFIG.autoloadAddonPath &&
-                    SDK_CONFIG.autoloadAddonPath === addon.entry_path) ||
-                    window.location.href.indexOf(addon.entry_path) !== -1
-                  if (loadAddon) {
-                    const entryUrl = this.addonUrl(addon)
-                    console.log('loading initial addon', entryUrl)
-                    self.$f7.views.main.router.navigate(entryUrl)
-                  }
-                })
-            }
-          });
-        }).catch((error) => {
-          self.$f7.dialog.alert(`Cannot connect to sandbox server: ${SANDBOX_ENDPOINT}: ${error}`);
+        events.$on('addonRoutesLoaded', (addon, addonRoutes) => {
+          // NOTE: Do not load routes here in order to support HMR
+          // self.$f7.routes.push(...addonRoutes);
+          // self.$f7.views.main.routes.push(...addonRoutes);
         });
+        events.$on('addonLoaded', (addon) => {
+          self.$root.addons.push(addon);
+        });
+
+        SDK_LOCAL_ADDONS.forEach(addon => {
+          self.$addons.initAddon(addon).catch(() => {
+          });
+
+          // Load the addon routes programatically for HMR
+          if (addon.assets) {
+            console.log(`../${addon.dir_prefix}/${addon.package}/${addon.version}/src/addon.js`)
+            import(`@addon/${addon.package}/${addon.version}/src/addon.scss`)
+            import(`@addon/${addon.package}/${addon.version}/src/addon.js`)
+              .then(m => {
+                const routes = m.default;
+                self.$f7.routes.push(...routes);
+                self.$f7.views.main.routes.push(...routes);
+
+                console.log(routes);
+
+                // Load the default addon if specified
+                const loadAddon = (SDK_CONFIG.autoloadAddonPath &&
+                  SDK_CONFIG.autoloadAddonPath === addon.entry_path) ||
+                  window.location.href.indexOf(addon.entry_path) !== -1
+                if (loadAddon) {
+                  const entryUrl = this.addonUrl(addon)
+                  console.log('loading initial addon', entryUrl)
+                  self.$f7.views.main.router.navigate(entryUrl)
+                }
+              })
+          }
+        });
+      }).catch((error) => {
+        self.$f7.dialog.alert(`Cannot connect to sandbox server: ${SANDBOX_ENDPOINT}: ${error}`);
+      });
       // });
 
       // Auth

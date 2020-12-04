@@ -1,4 +1,5 @@
 import coreRoutes from 'tommy-core/src/routes';
+import Home from './pages/home.vue';
 import Settings from './pages/settings.vue';
 import AddonDetails from './pages/addon-details.vue';
 import Addons from './pages/addons.vue';
@@ -9,7 +10,7 @@ import config from '../config.json';
 const routes = [
   {
     path: '/',
-    redirect: { name: config.starting_page },
+    component: Home,
   },
   {
     path: '/settings/',
