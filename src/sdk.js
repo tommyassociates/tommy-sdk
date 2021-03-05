@@ -127,7 +127,7 @@ app.init({
 
           // Load the addon routes programatically for HMR
           if (addon.assets) {
-            console.log(`../${addon.dir_prefix}/${addon.package}/${addon.version}/src/addon.js`)
+            // console.log(`../${addon.dir_prefix}/${addon.package}/${addon.version}/src/addon.js`)
             import(`@addon/${addon.package}/${addon.version}/src/addon.scss`)
             import(`@addon/${addon.package}/${addon.version}/src/addon.js`)
               .then(m => {
@@ -135,7 +135,7 @@ app.init({
                 self.$f7.routes.push(...routes);
                 self.$f7.views.main.routes.push(...routes);
 
-                console.log(routes);
+                // console.log(routes);
 
                 // Load the default addon if specified
                 const loadAddon = (SDK_CONFIG.autoloadAddonPath &&
@@ -143,7 +143,7 @@ app.init({
                   window.location.href.indexOf(addon.entry_path) !== -1
                 if (loadAddon) {
                   const entryUrl = this.addonUrl(addon)
-                  console.log('loading initial addon', entryUrl)
+                  // console.log('loading initial addon', entryUrl)
                   self.$f7.views.main.router.navigate(entryUrl)
                 }
               })
