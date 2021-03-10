@@ -1,6 +1,6 @@
 <template>
   <f7-popup :opened="popupOpened" @popup:closed="popupOpened = false">
-    <f7-view :init="true">
+    <f7-view :init="false">
       <f7-page>
         <f7-navbar>
           <f7-nav-title>{{$t('broadcast_message_tag', 'group')}}</f7-nav-title>

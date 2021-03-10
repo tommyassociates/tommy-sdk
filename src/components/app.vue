@@ -1,7 +1,7 @@
 <template>
   <f7-app v-bind="params">
-    <f7-panel left cover theme-dark v-model:opened="leftPanelOpened">
-      <f7-view :init="true">
+    <f7-panel left cover theme-dark :opened="leftPanelOpened">
+      <f7-view :init="false">
         <f7-page>
           <f7-navbar title="Navigation"></f7-navbar>
           <f7-list>
