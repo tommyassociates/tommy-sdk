@@ -93,9 +93,12 @@
 </template>
 <script>
   export default {
+    props: {
+      f7route: Object
+    },
     data() {
       const self = this;
-      const pkg = self.$f7route.params.package;
+      const pkg = self.f7route.params.package;
       const addon = self.$root.addons.filter(a => a.package === pkg)[0];
 
       return {

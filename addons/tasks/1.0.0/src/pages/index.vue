@@ -92,11 +92,14 @@
   import taskStatus from '../utils/task-status';
 
   export default {
+    props: {
+      f7route: Object
+    },
     data() {
       const self = this;
       return {
         lists: null,
-        actorId: self.$f7route.query.actor_id,
+        actorId: self.f7route.query.actor_id,
         fastAddEnabled: {},
         fastAddValue: {},
         listWithScroll: {},
