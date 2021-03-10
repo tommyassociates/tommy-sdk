@@ -107,7 +107,7 @@ function getLocalAddonFilePath(pkg, version, file) {
 }
 
 function readLocalAddon(pkg, version) {
-  const addon = yaml.safeLoad(fs.readFileSync(getLocalAddonFilePath(pkg, version, 'manifest.yml'), 'utf8'))
+  const addon = yaml.load(fs.readFileSync(getLocalAddonFilePath(pkg, version, 'manifest.yml'), 'utf8'))
   const base = `/addons/${addon.package}/versions/${addon.version}/files/`;
   addon.url = url.resolve(getSdkUrl(), base)
   addon.icon_url = url.resolve(addon.url, 'icon.png') // path + '/icon.png'

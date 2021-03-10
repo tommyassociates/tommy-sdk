@@ -85,7 +85,7 @@
         self.teamTags = tagItems;
       });
     },
-    beforeDestroy() {
+    beforeUnmount() {
       const self = this;
       self.$f7.sheet.close('#task-participants-sheet');
       self.sheetOpened = false;

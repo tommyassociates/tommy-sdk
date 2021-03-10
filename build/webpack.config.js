@@ -1,6 +1,6 @@
 const webpack = require('webpack');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
-const VueLoaderPlugin = require('vue-loader/lib/plugin');
+const { VueLoaderPlugin } = require('vue-loader')
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
@@ -30,7 +30,7 @@ module.exports = {
   resolve: {
     extensions: ['.js', '.vue', '.json'],
     alias: {
-      'vue$': resolvePath('node_modules/vue/dist/vue.esm.js'),
+      'vue': '@vue/runtime-dom',
       '@': resolvePath('src'),
       '@addon': resolvePath('../tommy-sdk-private/addons'),
     },
@@ -168,10 +168,12 @@ module.exports = {
     // new MiniCssExtractPlugin({
     //   filename: 'app.css'
     // }),
-    new CopyWebpackPlugin([{
-      from: resolvePath('static'),
-      to: resolvePath('www/static'),
-    }]),
+    new CopyWebpackPlugin({
+      patterns: [{
+        from: resolvePath('static'),
+        to: resolvePath('www/static'),
+      }]
+    }),
     new CleanWebpackPlugin({
       // dry: true,
       cleanOnceBeforeBuildPatterns: [resolvePath('*.hot-update.*')],

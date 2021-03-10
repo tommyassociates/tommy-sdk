@@ -88,7 +88,7 @@
         permissions: [],
       };
     },
-    beforeDestroy() {
+    beforeUnmount() {
       const self = this;
       self.$events.$off('tasks:setListDateRange', self.updateListDateRange);
     },

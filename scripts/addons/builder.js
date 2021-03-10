@@ -1,7 +1,5 @@
 const webpack = require('webpack')
-const VueLoaderPlugin = require('vue-loader/lib/plugin')
-const OptimizeCSSPlugin = require('optimize-css-assets-webpack-plugin')
-const UglifyJsPlugin = require('uglifyjs-webpack-plugin')
+const { VueLoaderPlugin } = require('vue-loader')
 const { CleanWebpackPlugin } = require('clean-webpack-plugin')
 // const CopyWebpackPlugin = require('copy-webpack-plugin')
 // const HtmlWebpackPlugin = require('html-webpack-plugin')
@@ -124,21 +122,6 @@ function createConfig(pkg, version) {
     },
     plugins: [
       new webpack.DefinePlugin(helpers.getSdkVariables()),
-      // new UglifyJsPlugin({
-      //   uglifyOptions: {
-      //     compress: {
-      //       // warnings: false
-      //     }
-      //   },
-      //   sourceMap: true,
-      //   parallel: true
-      // }),
-      // new OptimizeCSSPlugin({
-      //   cssProcessorOptions: {
-      //     safe: true,
-      //     map: { inline: false }
-      //   }
-      // }),
       // new webpack.HotModuleReplacementPlugin(),
       // new webpack.NamedModulesPlugin(),
       new VueLoaderPlugin(),

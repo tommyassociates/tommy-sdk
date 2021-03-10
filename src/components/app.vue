@@ -1,7 +1,7 @@
 <template>
-  <f7-app :params="params" :routes="routes">
-    <f7-panel left cover theme-dark>
-      <f7-view :init="false">
+  <f7-app v-bind="params">
+    <f7-panel left cover theme-dark v-model:opened="leftPanelOpened">
+      <f7-view :init="true">
         <f7-page>
           <f7-navbar title="Navigation"></f7-navbar>
           <f7-list>
@@ -34,17 +34,14 @@
 <script>
   export default {
     props: {
-      params: Object,
-      routes: Array,
+      params: Object
     },
+    data: () => ({
+      leftPanelOpened: false
+    }),
     methods: {
       toggleLeftPanel() {
-        const self = this;
-        if (self.$f7.panel.left.opened) {
-          self.$f7.panel.left.close();
-        } else {
-          self.$f7.panel.left.open();
-        }
+        this.leftPanelOpened = !this.leftPanelOpened
       },
     },
   };

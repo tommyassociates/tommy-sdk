@@ -175,7 +175,7 @@
         return '';
       },
     },
-    beforeDestroy() {
+    beforeUnmount() {
       const self = this;
       if (self.datePicker && self.datePicker.destroy) self.datePicker.destroy();
       if (self.statusPicker && self.statusPicker.destroy) self.statusPicker.destroy();

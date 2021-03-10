@@ -250,7 +250,7 @@
         }
       },
     },
-    beforeDestroy() {
+    beforeUnmount() {
       const self = this;
       self.destroyed = true;
       self.$events.$off('tasks:reloadListsTasks', self.reloadListsTasks);
