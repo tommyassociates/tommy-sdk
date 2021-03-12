@@ -46,14 +46,8 @@
         <f7-toggle slot="after" :checked="isCustomRange" @change="toggleCustomRange($event.target.checked)"></f7-toggle>
       </f7-list-item>
 
-      <f7-list-item v-show="isCustomRange">
-        <f7-label>{{$t('tasks.common.start_date', 'Start Date')}}</f7-label>
-        <f7-input type="text" ref="rangeStart"></f7-input>
-      </f7-list-item>
-      <f7-list-item v-show="isCustomRange">
-        <f7-label>{{$t('tasks.common.end_date', 'End Date')}}</f7-label>
-        <f7-input type="text" ref="rangeEnd"></f7-input>
-      </f7-list-item>
+      <f7-list-item v-show="isCustomRange" :label="$t('tasks.common.start_date', 'Start Date')" type="text" ref="rangeStart"></f7-list-item>
+      <f7-list-item v-show="isCustomRange" :label="$t('tasks.common.end_date', 'End Date')" type="text" ref="rangeEnd"></f7-list-item>
     </f7-list>
   </f7-page>
 </template>

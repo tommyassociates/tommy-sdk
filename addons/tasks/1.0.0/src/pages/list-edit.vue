@@ -9,10 +9,7 @@
     </f7-navbar>
 
     <f7-list v-if="list" class="list-custom">
-      <f7-list-item>
-        <f7-label>{{$t('tasks.list-edit.name', 'Name')}}</f7-label>
-        <f7-input type="text" :value="list.name" @input="onNameChange($event.target.value)"></f7-input>
-      </f7-list-item>
+      <f7-list-item :label="$t('tasks.list-edit.name', 'Name')" type="text" :value="list.name" @change="onNameChange($event.target.value)"></f7-list-item>
 
       <f7-list-item
         :title="$t('tasks.list-edit.show-fast-add-task', 'Show Fast Add Task')"
