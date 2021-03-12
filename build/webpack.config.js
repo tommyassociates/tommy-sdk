@@ -39,7 +39,6 @@ module.exports = {
       // resolvePath('node_modules/tommy_core/src/scss'),
       resolvePath('src'),
       resolvePath('node_modules'),
-      resolvePath('node_modules/tommy-core'),
       // 'node_modules'
     ]
   },
@@ -51,7 +50,6 @@ module.exports = {
         include: [
           resolvePath('src'),
           resolvePath('node_modules'),
-          resolvePath('node_modules/tommy-core'),
           // resolvePath('node_modules/framework7'),
           // resolvePath('node_modules/framework7-vue'),
           // resolvePath('node_modules/template7'),

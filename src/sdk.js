@@ -6,7 +6,7 @@ import Highcharts from 'highcharts';
 
 const language = localStorage.language || 'en-US';
 
-import AppStyles from './scss/sdk.scss';
+import './scss/sdk.scss';
 
 // console.log('SDK_LOCAL_ADDONS', SDK_LOCAL_ADDONS)
 // console.log('SDK_CONFIG', SDK_CONFIG)
