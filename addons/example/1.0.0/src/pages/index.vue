@@ -12,6 +12,7 @@
         v-model="dateRange"
         @change="onDateRangeChange"
         @save="onSave"
+        :f7router="f7router"
       ></date-range-select>
 
       <!-- Example: Tag Select -->
@@ -20,6 +21,7 @@
         v-model="testTags"
         @change="onTagsChange"
         @save="onSave"
+        :f7router="f7router"
       ></tag-select>
       <!-- <f7-list-item
         title="Selected Tags"
@@ -45,6 +47,9 @@
   import DateRangeSelect from 'tommy-core/src/components/date-range-select';
 
   export default {
+    props: {
+      f7router: Object
+    },
     components: {
       TagSelect,
       PermissionSelect,

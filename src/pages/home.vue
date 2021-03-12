@@ -44,10 +44,13 @@
 // import config from "../../config.json";
 
 export default {
+  props: {
+    f7router: Object
+  },
   mounted() {
     // Alternative implementation of default 'starting_page'
     // by re-routing to desired starting_page.
-    // this.$f7router.navigate({ name: config.starting_page })
+    // this.f7router.navigate({ name: config.starting_page })
   },
   methods: {
     addonUrl(addon) {

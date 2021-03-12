@@ -30,6 +30,7 @@
     props: {
       data: Object,
       listId: [String, Number],
+      f7router: Object
     },
     data() {
       return {
@@ -47,7 +48,7 @@
     methods: {
       openSelector() {
         const self = this;
-        self.$f7router.navigate(`/tasks/list-edit/${self.listId}/tag-select/`, {
+        self.f7router.navigate(`/tasks/list-edit/${self.listId}/tag-select/`, {
           props: {
             filters: self.data.filters,
             pageTitle: self.$t(`tasks.permissions.${self.data.name}.title`),

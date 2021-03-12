@@ -20,6 +20,9 @@
   import API from '../api';
 
   export default {
+    props: {
+      f7router: Object
+    },
     data() {
       return {
         saving: false,
@@ -43,7 +46,7 @@
           })
           .then(() => {
             self.$events.$emit('tasks:reloadLists');
-            self.$f7router.back(`/tasks/${API.actorId ? `?actor_id=${API.actorId}` : ''}`, { force: true });
+            self.f7router.back(`/tasks/${API.actorId ? `?actor_id=${API.actorId}` : ''}`, { force: true });
           });
       },
     },

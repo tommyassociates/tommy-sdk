@@ -63,6 +63,7 @@
   export default {
     props: {
       list: Object,
+      f7router: Object
     },
     data() {
       const self = this;
@@ -146,7 +147,7 @@
         newList.data.date_range = self.range;
         API.saveList(newList).then(() => {
           self.$events.$emit('tasks:setListDateRange', self.list.id, self.range);
-          self.$f7router.back();
+          self.f7router.back();
         });
       },
     },
