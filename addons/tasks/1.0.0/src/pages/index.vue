@@ -93,7 +93,8 @@
 
   export default {
     props: {
-      f7route: Object
+      f7route: Object,
+      f7router: Object
     },
     data() {
       const self = this;
@@ -140,7 +141,7 @@
         const self = this;
         const url = self.$$(e.target).closest('a').eq(0).attr('data-url');
         if (!url) return;
-        self.$f7router.navigate(url);
+        self.f7router.navigate(url);
       },
       taskStatus,
       humanTime,

@@ -45,6 +45,7 @@
         :key="index"
         :listId="list.id"
         :data="permission"
+        :f7router="f7router"
         @tagAdd="(tag) => addListPermission(permission, tag)"
         @tagRemove="(tag) => removeListPermission(permission, tag)"
       ></tag-select>
@@ -55,6 +56,7 @@
           name: 'filter_tasks',
           filters: list.filters,
         }"
+        :f7router="f7router"
         @tagAdd="addListFilter"
         @tagRemove="removeListFilter"
       ></tag-select>
@@ -75,6 +77,7 @@
   export default {
     components: {
       tagSelect,
+      f7router: Object
     },
     props: {
       listId: [String, Number],
@@ -142,7 +145,7 @@
       },
       showDateRange() {
         const self = this;
-        self.$f7router.navigate(`/tasks/list-edit/${self.list.id}/date-range/`, {
+        self.f7router.navigate(`/tasks/list-edit/${self.list.id}/date-range/`, {
           props: {
             list: self.list,
           },
@@ -155,7 +158,7 @@
         self.showSave = false;
         API.saveList(self.list).then(() => {
           self.$events.$emit('tasks:reloadLists');
-          self.$f7router.back();
+          self.f7router.back();
         });
       },
       deleteList() {
@@ -165,7 +168,7 @@
         self.showSave = false;
         API.deleteList(self.list.id).then(() => {
           self.$events.$emit('tasks:reloadLists');
-          self.$f7router.back();
+          self.f7router.back();
         });
       },
       addListFilter(tag) {

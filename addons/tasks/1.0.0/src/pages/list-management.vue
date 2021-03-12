@@ -30,6 +30,9 @@
   import API from '../api';
 
   export default {
+    props: {
+      f7router: Object
+    },
     data() {
       return {
         saving: false,
@@ -79,7 +82,7 @@
         });
         Promise.all(promises).then(() => {
           self.$events.$emit('tasks:reloadLists');
-          self.$f7router.back();
+          self.f7router.back();
         });
       },
     },

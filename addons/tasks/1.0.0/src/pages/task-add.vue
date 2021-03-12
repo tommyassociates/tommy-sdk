@@ -21,6 +21,9 @@
 
 
   export default {
+    props: {
+      f7router: Object
+    },
     data() {
       return {
         name: '',
@@ -54,7 +57,7 @@
         };
         API.saveTask(data).then(() => {
           self.$events.$emit('tasks:reloadListsTasks');
-          self.$f7router.back();
+          self.f7router.back();
         });
       },
     },
