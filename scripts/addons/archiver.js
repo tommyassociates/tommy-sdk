@@ -8,6 +8,8 @@ const helpers = require('../helpers')
 // }
 
 module.exports = function(pkg, version) { //, callback
+  const localAddonFilePath = helpers.getLocalAddonFilePath(pkg, version, '')
+
   const archivePath = helpers.archivePath(pkg, version)
   const outStream = fs.createWriteStream(archivePath)
   const archive = archiver('zip')
@@ -27,7 +29,7 @@ module.exports = function(pkg, version) { //, callback
     })
 
     archive.pipe(outStream)
-    archive.directory(helpers.resolvePath('addons', pkg, version), '/')
+    archive.directory(localAddonFilePath, '/')
     archive.finalize()
   })
 }

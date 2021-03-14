@@ -25,7 +25,7 @@ app.use(webpackDevMiddleware(compiler, {
   // noInfo: true,
   publicPath: webpackConfig.output.publicPath,
   headers: { "Access-Control-Allow-Origin": "*" },
-  stats: 'errors-only'
+  stats: 'errors-warnings'
   // stats: { colors: true } // 'errors-only'
 }))
 

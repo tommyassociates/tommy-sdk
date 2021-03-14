@@ -1,145 +1,98 @@
-const webpack = require('webpack')
-const { VueLoaderPlugin } = require('vue-loader')
-const { CleanWebpackPlugin } = require('clean-webpack-plugin')
-// const CopyWebpackPlugin = require('copy-webpack-plugin')
-// const HtmlWebpackPlugin = require('html-webpack-plugin')
-// const MiniCssExtractPlugin = require('mini-css-extract-plugin')
-// const entryPlus = require('webpack-entry-plus')
-
-var fs = require('fs')
-const glob = require('glob')
 const path = require('path')
+const webpack = require('webpack')
 const helpers = require('../helpers')
+
+const { VueLoaderPlugin } = require('vue-loader')
+const MiniCssExtractPlugin = require('mini-css-extract-plugin')
+const { CleanWebpackPlugin } = require('clean-webpack-plugin')
+const TerserPlugin = require('terser-webpack-plugin')
 
 function resolvePath(dir) {
   return path.join(__dirname, '..', '..', dir)
 }
 
-function jsOutputPath(file) {
-  return file
-          .replace(resolvePath('./'), '')
-          .replace('src/addon.js', 'build/addon')
+function resolveAddonPath(baseDir, ...dir) {
+  return path.join(baseDir, ...dir)
 }
 
-function cssOutputPath(file) {
-  return file
-          .replace(resolvePath('./'), '')
-          .replace('src/addon.scss', 'build/addon.css')
-}
-
-function createConfig(pkg, version) {
-  const jsEntry = `addons/${pkg}/${version}/build/addon`
-  const cssEntry = `addons/${pkg}/${version}/build/addon.css`
-
+function createConfig(pkg, version, localAddonFilePath) {
   return {
-    mode: 'production', // 'development'
+    mode: process.env.NODE_ENV,
     devtool: false,
+    optimization: {
+      minimize: process.env.NODE_ENV === 'production',
+      minimizer: process.env.NODE_ENV === 'production' ? [
+        new TerserPlugin({
+          extractComments: false
+        }),
+      ] : []
+    },
     entry: {
-      [jsEntry]: resolvePath(`addons/${pkg}/${version}/src/addon.js`),
-      [cssEntry]: resolvePath(`addons/${pkg}/${version}/src/addon.scss`),
+      addon: resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/src/addon.js`),
     },
     output: {
       filename: '[name].js',
-      path: resolvePath(''),
+      path: resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/build`),
       libraryTarget: 'var',
-      library: 'addon',
-      // iife: true,
-      // module: false,
-      // libraryTarget: 'commonjs',
-      // libraryExport: 'addon'
-      // publicPath: '/'
+      library: 'addon'
     },
     resolve: {
       extensions: ['.js', '.vue', '.json'],
       alias: {
-        'vue$': 'vue/dist/vue.esm.js',
-        '@': resolvePath('src'),
-      }
+        '@': resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/src`),
+      },
+      modules: [
+        resolvePath('node_modules')
+      ]
+    },
+    externals: {
+      // vuex: 'externalLibs.vuex'
     },
     module: {
       rules: [
         {
           test: /\.js$/,
-          use: 'babel-loader',
-          // include: [
-          //   resolvePath('addons'),
-          //   resolvePath('node_modules/tommy-core'),
-          //   resolvePath('node_modules/framework7'),
-          //   resolvePath('node_modules/framework7-vue'),
-          //   resolvePath('node_modules/template7'),
-          //   resolvePath('node_modules/dom7'),
-          //   resolvePath('node_modules/ssr-window'),
-          // ],
+          use: 'babel-loader'
         },
         {
           test: /\.vue$/,
           use: 'vue-loader',
         },
         {
-          test: /\.scss$/,
+          test: /\.(sa|sc|c)ss$/,
           use: [
-            {
-              loader: 'file-loader',
-              options: {
-                name: cssOutputPath
-                // name: '[path][name].css',
-              }
-            },
-            // {
-            //     loader: 'postcss-loader'
-            // },
+            MiniCssExtractPlugin.loader,
+            'css-loader',
             'sass-loader'
           ]
         },
-        // {
-        //   test: /\.scss$/,
-        //   use: [
-        //     {
-        //       loader: 'file-loader',
-        //       options: {
-        //         // name: 'dist/css/[name].css',
-        //         // name: '[path][name].css',
-        //         // name: '[name].css',
-        //         name: 'addons/availability/1.0.0/build/addon.css',
-        //       }
-        //     },
-        //     {
-        //         loader: 'extract-loader'
-        //     },
-        //     {
-        //         loader: 'css-loader?-url'
-        //         // loader: 'css-loader'
-        //     },
-        //     // {
-        //     //     loader: 'postcss-loader'
-        //     // },
-        //     {
-        //       loader: 'sass-loader'
-        //     }
-        //   ]
-        // }
+        {
+          test: /\.(png|jpe?g|gif|svg|eot|ttf|woff|woff2)$/i,
+          type: 'asset/resource'
+        }
       ]
     },
     plugins: [
       new webpack.DefinePlugin(helpers.getSdkVariables()),
-      // new webpack.HotModuleReplacementPlugin(),
-      // new webpack.NamedModulesPlugin(),
       new VueLoaderPlugin(),
-      // new webpack.HashedModuleIdsPlugin(),
-      // new webpack.optimize.ModuleConcatenationPlugin(),
+      new MiniCssExtractPlugin({
+        filename: '[name].css',
+      }),
       new CleanWebpackPlugin({
-        // dry: true,
-        cleanOnceBeforeBuildPatterns: [resolvePath(`addons/${pkg}/${version}/build/addon.*`)],
-        cleanAfterEveryBuildPatterns: [resolvePath(`addons/${pkg}/${version}/build/addon.css.js`)]
+        cleanOnceBeforeBuildPatterns: [resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/build/*.*`)],
+        dangerouslyAllowCleanPatternsOutsideProject: true,
+        dry: false // should be ok
       })
     ]
   }
 }
 
 module.exports = function(pkg, version) {
+  const localAddonFilePath = helpers.getLocalAddonFilePath('', '', '..') // ex. tommy-sdk-private
+
   return new Promise((resolve, reject) => {
-    console.error('addon building', pkg, version)
-    const config = createConfig(pkg, version)
+    console.error('addon building', pkg, version, 'in', process.env.NODE_ENV)
+    const config = createConfig(pkg, version, localAddonFilePath)
     const compiler = webpack(config)
     compiler.run((err, stats) => {
       if (err) {
@@ -160,49 +113,11 @@ module.exports = function(pkg, version) {
       }
 
       if (stats.hasWarnings()) {
-        console.warn('addon compile warning:', info.warnings)
+        console.warn('addon compile warning:', info.warnings.map(x => x.message))
       }
 
       console.log('addon compiled', pkg, version)
-
-      // FIX: Addons need to be exported as a global variable to support old
-      // builds, so we need to ensure the default module is exposed directly.
-      const outputFile = resolvePath(`addons/${pkg}/${version}/build/addon.js`)
-      fs.readFile(outputFile, 'utf8', function (err, data) {
-        if (err) {
-          return console.log(err)
-        }
-
-        const result = data.slice(0, -1) + '.default;'
-        fs.writeFile(outputFile, result, 'utf8', function (err) {
-           if (err) return console.log(err)
-           resolve(stats) // success
-        })
-      })
-
-      // resolve(stats)
+      resolve(stats)
     })
   })
 }
-
-
-
-// module.exports = {
-//   buildAddon
-// }
-
-// const addonVersions = helpers.readLocalAddonVersions()
-// const configs = []
-//
-// Object.keys(addonVersions).forEach((pkg) => {
-//   const versions = addonVersions[pkg];
-//   for (let i = 0; i < versions.length; i += 1) {
-//     configs.push(createConfig(pkg, versions[i]))
-//   }
-// })
-//
-// const compiler = webpack(configs)
-// const watching = compiler.watch({
-//   aggregateTimeout: 300,
-//   poll: undefined
-// }, (err, stats) => {})

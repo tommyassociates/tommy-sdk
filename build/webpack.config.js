@@ -1,21 +1,29 @@
 const webpack = require('webpack');
+const path = require('path');
+const helpers = require('../scripts/helpers');
+
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const { VueLoaderPlugin } = require('vue-loader')
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const TerserPlugin = require('terser-webpack-plugin')
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
-// const sdkServer = require('../sdk-server');
-const helpers = require('../scripts/helpers');
-
-const path = require('path');
 
 function resolvePath(dir) {
   return path.join(__dirname, '..', dir);
 }
 
-
 module.exports = {
-  mode: 'development',
+  mode: process.env.NODE_ENV,
+  devtool: process.env.NODE_ENV !== 'production' ? 'eval-cheap-source-map' : false,
+  optimization: {
+    minimize: process.env.NODE_ENV === 'production',
+    minimizer: process.env.NODE_ENV === 'production' ? [
+      new TerserPlugin({
+        extractComments: false
+      }),
+    ] : []
+  },
   entry: {
     sdk: [
       './src/sdk.js',
@@ -30,114 +38,37 @@ module.exports = {
   resolve: {
     extensions: ['.js', '.vue', '.json'],
     alias: {
-      'vue': '@vue/runtime-dom',
       '@': resolvePath('src'),
       '@addon': resolvePath('../tommy-sdk-private/addons'),
     },
     modules: [
-      // resolvePath('node_modules/tommy_core/src'),
-      // resolvePath('node_modules/tommy_core/src/scss'),
       resolvePath('src'),
       resolvePath('node_modules'),
-      // 'node_modules'
-    ]
+      resolvePath('node_modules/tommy-core/node_modules')
+      // TODO: investigate how this performs when using a npm published tommy-core
+    ],
   },
   module: {
     rules: [
       {
         test: /\.js$/,
         use: 'babel-loader',
-        include: [
-          resolvePath('src'),
-          resolvePath('node_modules'),
-          // resolvePath('node_modules/framework7'),
-          // resolvePath('node_modules/framework7-vue'),
-          // resolvePath('node_modules/template7'),
-          // resolvePath('node_modules/dom7'),
-          // resolvePath('node_modules/ssr-window'),
-          // resolvePath('node_modules/vuex'),
-        ],
       },
       {
         test: /\.vue$/,
         use: 'vue-loader',
       },
       {
-        test: /\.css$/,
+        test: /\.(sa|sc|c)ss$/,
         use: [
-          // MiniCssExtractPlugin.loader,
-          'style-loader',
+          MiniCssExtractPlugin.loader,
           'css-loader',
+          'sass-loader'
         ],
       },
       {
-        test: /\.(scss|sass)/,
-        use: [
-          // MiniCssExtractPlugin.loader,
-          'style-loader',
-          'css-loader',
-          'sass-loader'
-          // {
-          //   loader: 'resolve-url-loader'
-          // },
-          // {
-          //   loader: 'sass-loader',
-          //   // options: {
-          //   //   sassOptions: {
-          //   //     includePaths: [
-          //   //       resolvePath('node_modules/tommy_core/src/scss')
-          //   //     ]
-          //   //   }
-          //   // }
-          // }
-          // 'css-loader',
-          // 'less-loader',
-          // {
-          //   loader: MiniCssExtractPlugin.loader,
-          //   options: { publicPath: '/' }
-          // },
-          // { loader: 'css-loader' },
-          // { loader: 'sass-loader' }
-        ]
-      },
-      // {
-      //   test: /\.css$/,
-      //   use: [
-      //     MiniCssExtractPlugin.loader,
-      //     'css-loader',
-      //   ],
-      // },
-      // {
-      //   test: /\.styl(us)?$/,
-      //   use: [
-      //     MiniCssExtractPlugin.loader,
-      //     'css-loader',
-      //     'stylus-loader',
-      //   ],
-      // },
-      {
-        test: /\.(png|jpe?g|gif|svg)(\?.*)?$/,
-        loader: 'url-loader',
-        options: {
-          limit: 10000,
-          name: 'images/[name].[hash:7].[ext]'
-        }
-      },
-      // {
-      //   test: /\.(mp4|webm|ogg|mp3|wav|flac|aac)(\?.*)?$/,
-      //   loader: 'url-loader',
-      //   options: {
-      //     limit: 10000,
-      //     name: 'media/[name].[hash:7].[ext]'
-      //   }
-      // },
-      {
-        test: /\.(woff2?|eot|ttf|otf)(\?.*)?$/,
-        loader: 'url-loader',
-        options: {
-          limit: 10000,
-          name: 'fonts/[name].[hash:7].[ext]'
-        }
+        test: /\.(png|jpe?g|gif|svg|eot|ttf|woff|woff2)$/i,
+        type: 'asset/resource',
       }
     ]
   },
@@ -149,15 +80,11 @@ module.exports = {
     new HtmlWebpackPlugin({
       filename: './index.html',
       template: './src/index.html',
-      inject: true,
+      inject: true
     }),
-    // new MiniCssExtractPlugin({
-    //   publicPath: '/',
-    //   filename: '[name].css?[hash]'
-    // }),
-    // new MiniCssExtractPlugin({
-    //   filename: 'app.css'
-    // }),
+    new MiniCssExtractPlugin({
+      filename: 'css/sdk.css'
+    }),
     new CopyWebpackPlugin({
       patterns: [{
         from: resolvePath('static'),
