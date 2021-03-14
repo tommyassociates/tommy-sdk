@@ -7,6 +7,8 @@ import ListEditPage from './pages/list-edit.vue';
 import DateRangePage from './pages/date-range.vue';
 import TagSelectPage from './pages/tag-select-page.vue';
 
+import './addon.scss';
+
 const routes = [
   {
     path: '/tasks/',

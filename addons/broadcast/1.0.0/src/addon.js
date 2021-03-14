@@ -3,6 +3,8 @@ import Message from './pages/message.vue';
 import NewMessage from './pages/new-message.vue';
 import Setting from './pages/setting.vue';
 
+import './addon.scss';
+
 const routes = [
   {
     path: '/broadcast/',
