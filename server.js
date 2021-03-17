@@ -11,13 +11,14 @@ const addonBuilder = require('./scripts/addons/builder')
 const addonArchiver = require('./scripts/addons/archiver')
 const addonUploader = require('./scripts/addons/uploader')
 const helpers = require('./scripts/helpers')
-const webpackConfig = require('./build/webpack.config')
+
+const env = process.env.NODE_ENV || 'development'
+const webpackConfigFilename = env === 'development' ? 'dev' : 'prod'
+const webpackConfig = require(`./build/webpack.${webpackConfigFilename}.js`)
 
 const app = express()
 const compiler = webpack(webpackConfig)
 const fs = require('fs')
-
-const env = process.env.NODE_ENV || 'development'
 
 // Middleware
 // --------------------------

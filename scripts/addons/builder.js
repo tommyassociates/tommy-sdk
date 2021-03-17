@@ -15,18 +15,48 @@ function resolveAddonPath(baseDir, ...dir) {
   return path.join(baseDir, ...dir)
 }
 
+const env = process.env.NODE_ENV
+
+const optimizationConfig = {}
+if (env === 'production') {
+  optimizationConfig.minimize = true
+  optimizationConfig.minimizer = [
+    new TerserPlugin({
+      extractComments: false,
+      minify: (file, sourceMap) => {
+        const uglifyJsOptions = {
+          compress: {
+            inline: false
+          }
+        }
+
+        if (sourceMap) {
+          uglifyJsOptions.sourceMap = {
+            content: sourceMap
+          }
+        }
+
+        return require('uglify-js').minify(file, uglifyJsOptions)
+      }
+    }),
+  ]
+  optimizationConfig.splitChunks = {
+    cacheGroups: {
+      styles: {
+        name: 'styles',
+        type: 'css/mini-extract',
+        chunks: 'all',
+        enforce: true
+      },
+    },
+  }
+}
+
 function createConfig(pkg, version, localAddonFilePath) {
   return {
-    mode: process.env.NODE_ENV,
-    devtool: false,
-    optimization: {
-      minimize: process.env.NODE_ENV === 'production',
-      minimizer: process.env.NODE_ENV === 'production' ? [
-        new TerserPlugin({
-          extractComments: false
-        }),
-      ] : []
-    },
+    mode: env,
+    devtool: env === 'development' ? 'eval-cheap-source-map' : 'source-map',
+    optimization: optimizationConfig,
     entry: {
       addon: resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/src/addon.js`),
     },
@@ -42,7 +72,8 @@ function createConfig(pkg, version, localAddonFilePath) {
         '@': resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/src`),
       },
       modules: [
-        resolvePath('node_modules')
+        resolvePath('node_modules'),
+        // TODO: see if tommy-core needed
       ]
     },
     externals: {
@@ -68,7 +99,14 @@ function createConfig(pkg, version, localAddonFilePath) {
         },
         {
           test: /\.(png|jpe?g|gif|svg|eot|ttf|woff|woff2)$/i,
-          type: 'asset/resource'
+          use: [
+            {
+              loader: 'url-loader',
+              options: {
+                limit: 8192,
+              },
+            },
+          ]
         }
       ]
     },
@@ -91,7 +129,7 @@ module.exports = function(pkg, version) {
   const localAddonFilePath = helpers.getLocalAddonFilePath('', '', '..') // ex. tommy-sdk-private
 
   return new Promise((resolve, reject) => {
-    console.error('addon building', pkg, version, 'in', process.env.NODE_ENV)
+    console.error('addon building', pkg, version, 'in', env)
     const config = createConfig(pkg, version, localAddonFilePath)
     const compiler = webpack(config)
     compiler.run((err, stats) => {
