@@ -11,6 +11,14 @@ function resolvePath(dir) {
   return path.join(__dirname, '..', dir)
 }
 
+const coreSymLinkExists = (() => {
+  try {
+    return require('fs').statSync(resolvePath('node_modules/tommy-core')).isSymbolicLink()
+  } catch(e) {
+    return false
+  }
+})
+
 module.exports = {
   output: {
     filename: '[name].js',
@@ -21,7 +29,8 @@ module.exports = {
     extensions: ['.js', '.vue', '.json'],
     alias: {
       '@': resolvePath('src'),
-      '@addon': resolvePath('../tommy-sdk-private/addons')
+      '@addon': resolvePath('../tommy-sdk-private/addons'),
+      'tommy-core': coreSymLinkExists() ? 'tommy-core' : '@tommyassociates/tommy-core'
     },
     modules: [
       resolvePath('src'),
