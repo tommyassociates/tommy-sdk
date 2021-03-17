@@ -17,6 +17,7 @@ const app = express()
 const compiler = webpack(webpackConfig)
 const fs = require('fs')
 
+const env = process.env.NODE_ENV || 'development'
 
 // Middleware
 // --------------------------
@@ -29,7 +30,7 @@ app.use(webpackDevMiddleware(compiler, {
   // stats: { colors: true } // 'errors-only'
 }))
 
-app.use(webpackHotMiddleware(compiler))
+if (env === 'development') app.use(webpackHotMiddleware(compiler))
 
 
 // Routes
