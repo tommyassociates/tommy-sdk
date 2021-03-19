@@ -1,3 +1,4 @@
+import contactName from 'tommy-core/src/utils/contact-name';
 const tommy = window.tommy;
 const api = tommy.api;
 
@@ -69,7 +70,7 @@ const API = {
         if (!task.filters) task.filters = [];
         task.filters.push({
           context: 'members',
-          name: `${actor.first_name} ${actor.last_name}`,
+          name: contactName(actor),
           user_id: actor.user_id,
         });
       }
@@ -137,7 +138,7 @@ const API = {
       },
       filters: [{
         context: 'members',
-        name: `${user.first_name} ${user.last_name}`,
+        name: contactName(user),
         user_id: user.id,
       }],
     };
