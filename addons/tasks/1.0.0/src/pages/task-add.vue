@@ -18,7 +18,7 @@
 <script>
   import API from '../api';
   import taskStatuses from '../utils/task-statuses';
-
+  import contactName from 'tommy-core/src/utils/contact-name';
 
   export default {
     props: {
@@ -42,7 +42,7 @@
           status: taskStatuses[0],
           filters: [{
             context: 'members',
-            name: `${user.first_name} ${user.last_name}`,
+            name: contactName(user),
             user_id: user.id,
           }],
           data: {
