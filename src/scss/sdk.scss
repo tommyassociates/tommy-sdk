@@ -1,1 +1,11 @@
 @import '~tommy-core/src/tommy.scss';
+
+.yellow-button {
+  background: $tommy-yellow;
+  color: white !important;
+}
+
+.red-button {
+  background: $tommy-red;
+  color: white !important;
+}

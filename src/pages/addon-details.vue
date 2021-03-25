@@ -54,6 +54,7 @@
 							:disabled="addonData.deleting || addonData.updating"
 							fill
 							big
+							class="yellow-button"
 							@click="updateAddon"
 						>
 							{{
@@ -68,7 +69,7 @@
 							:disabled="addonData.deleting || addonData.updating"
 							fill
 							big
-							color="red"
+							class="red-button"
 							@click="deleteAddon"
 						>
 							{{
@@ -85,6 +86,7 @@
 							:disabled="addonData.uploading"
 							fill
 							big
+							class="red-button"
 							@click="uploadAddon"
 						>
 							{{
@@ -100,6 +102,7 @@
 						:disabled="addonData.uploading"
 						fill
 						big
+						class="yellow-button"
 						@click="uploadAddon"
 					>
 						{{
