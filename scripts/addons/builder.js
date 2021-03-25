@@ -30,12 +30,7 @@ if (env === 'production') {
           }
         }
 
-        if (sourceMap) {
-          uglifyJsOptions.sourceMap = {
-            content: sourceMap
-          }
-        }
-
+        if (sourceMap) uglifyJsOptions.sourceMap = { content: sourceMap }
         return require('uglify-js').minify(file, uglifyJsOptions)
       }
     }),
@@ -70,9 +65,11 @@ function createConfig(pkg, version, localAddonFilePath) {
       extensions: ['.js', '.vue', '.json'],
       alias: {
         '@': resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/src`),
+        'tommy-core': '@tommyassociates/tommy-core'
       },
       modules: [
         resolvePath('node_modules'),
+        resolvePath('node_modules/@tommyassociates/tommy-core/node_modules')
         // TODO: see if tommy-core needed
       ]
     },
@@ -104,6 +101,7 @@ function createConfig(pkg, version, localAddonFilePath) {
               loader: 'url-loader',
               options: {
                 limit: 8192,
+                name: '[path][name].[ext]',
               },
             },
           ]
@@ -114,7 +112,7 @@ function createConfig(pkg, version, localAddonFilePath) {
       new webpack.DefinePlugin(helpers.getSdkVariables()),
       new VueLoaderPlugin(),
       new MiniCssExtractPlugin({
-        filename: '[name].css',
+        filename: 'addon.css',
       }),
       new CleanWebpackPlugin({
         cleanOnceBeforeBuildPatterns: [resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/build/*.*`)],

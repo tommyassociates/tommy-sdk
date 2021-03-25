@@ -83,7 +83,7 @@
 				<template v-else>
 					<p>
 						<f7-button
-							:disabled="addonData.uploading"
+							:disabled="addonData.uploading || addonData.updating"
 							fill
 							big
 							class="red-button"
@@ -99,7 +99,7 @@
 				</template>
 				<p>
 					<f7-button
-						:disabled="addonData.uploading"
+						:disabled="addonData.uploading || addonData.updating"
 						fill
 						big
 						class="yellow-button"
