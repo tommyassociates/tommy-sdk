@@ -58,7 +58,7 @@ const getExternalLibs = (externalLibNames) => {
 function createConfig(pkg, version, localAddonFilePath) {
   return {
     mode: env,
-    devtool: env === 'development' ? 'eval-cheap-source-map' : 'source-map',
+    devtool: false, // env === 'development' ? 'eval-cheap-source-map' : 'source-map',
     optimization: optimizationConfig,
     entry: {
       addon: resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/src/addon.js`),
