@@ -82,7 +82,7 @@ function createConfig(pkg, version, localAddonFilePath) {
       ]
     },
     // set names of libs that need to be injected at runtime and therefore excluded from build
-    externals: getExternalLibs(['vue']),
+    externals: getExternalLibs(['vue', 'vuex']),
     module: {
       rules: [
         {
