@@ -2,7 +2,7 @@
   <f7-app v-bind="params">
     <template v-if="coreReady">
       <f7-panel left cover v-model:opened="leftPanelOpened">
-        <f7-view :init="true">
+        <f7-view :init="false">
           <f7-page>
             <f7-navbar title="Navigation"></f7-navbar>
             <f7-list>
