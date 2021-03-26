@@ -141,9 +141,6 @@ function readLocalAddon(pkg, version) {
     addon.views = views;
   }
 
-  addon.externalLibs = [
-    // { 'vuex': 'vuex' }
-  ]
   return addon;
 }
 

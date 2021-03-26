@@ -126,15 +126,9 @@ tommy.app.init({
         });
         
         SDK_LOCAL_ADDONS.forEach(addon => {
-          tommy.addons.prepareExternalLibs(addon)
-            .then((addon) => {
-              self.$addons.initAddon(addon)
-               .catch(() => {})
-            })
-            .catch((e) => {
-              console.error('prepareExternalLibs', addon.package, e)
-            })
-            
+          self.$addons.initAddon(addon)
+            .catch(() => {})
+
           // Load the addon routes programatically for HMR
           if (addon.assets) {
             // console.log(`../${addon.dir_prefix}/${addon.package}/${addon.version}/src/addon.js`)

@@ -47,6 +47,14 @@ if (env === 'production') {
   }
 }
 
+const getExternalLibs = (externalLibNames) => {
+  const externalLibs = {}
+  externalLibNames.forEach((externalLibName) => {
+    externalLibs[externalLibName] = `externalLibs.${externalLibName}`
+  })
+  return externalLibs
+}
+
 function createConfig(pkg, version, localAddonFilePath) {
   return {
     mode: env,
@@ -73,9 +81,8 @@ function createConfig(pkg, version, localAddonFilePath) {
         // TODO: see if tommy-core needed
       ]
     },
-    externals: {
-      // vuex: 'externalLibs.vuex'
-    },
+    // set names of libs that need to be injected at runtime and therefore excluded from build
+    externals: getExternalLibs(['vue']),
     module: {
       rules: [
         {
