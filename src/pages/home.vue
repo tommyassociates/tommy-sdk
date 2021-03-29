@@ -27,7 +27,7 @@
 		<f7-block-title> Views </f7-block-title>
 		<f7-list>
 			<f7-list-item
-				v-for="(addon, index) in $root.addons"
+				v-for="(addon, index) in addonsSorted"
 				:key="index"
 				:link="addonUrl(addon)"
 				:title="$t(`${addon.package}.title`, addon.title)"
@@ -61,5 +61,10 @@ export default {
 			return url;
 		},
 	},
+  computed: {
+	  addonsSorted() {
+	    return this.$root.addons.sort((a, b) => a.title.localeCompare(b.title));
+    }
+  }
 };
 </script>
