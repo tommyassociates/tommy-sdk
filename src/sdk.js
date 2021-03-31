@@ -8,6 +8,9 @@ const language = localStorage.language || 'en-US';
 
 import './scss/sdk.scss';
 
+import enUS from './locales/en-US';
+import zhCN from './locales/zh-CN';
+
 // console.log('SDK_LOCAL_ADDONS', SDK_LOCAL_ADDONS)
 // console.log('SDK_CONFIG', SDK_CONFIG)
 // console.log('SANDBOX_URL', SANDBOX_URL)
@@ -22,7 +25,10 @@ tommy.app.init({
   appComponent,
   routes,
   language,
-  locales: {},
+  locales: {
+    'en-US': enUS,
+    'zh-CN': zhCN,
+  },
   pushState: true,
   components,
   data() {
