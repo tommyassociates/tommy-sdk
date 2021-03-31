@@ -4,6 +4,7 @@ export default {
   },
   label: {
     ok: '完成',
-    cancel: '取消'
+    cancel: '取消',
+    save: '保存'
   }
 };

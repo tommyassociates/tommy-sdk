@@ -4,6 +4,7 @@ export default {
   },
   label: {
     ok: 'Ok',
-    cancel: 'Cancel'
+    cancel: 'Cancel',
+    save: 'Save'
   }
 };
