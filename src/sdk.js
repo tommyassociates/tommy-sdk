@@ -130,17 +130,23 @@ tommy.app.init({
           console.error('addonInitError', addon.package, ', added to addons list for rebuild')
           self.$root.addons.push(addon);
         });
-        
+
+        console.table(SDK_LOCAL_ADDONS);
+
         SDK_LOCAL_ADDONS.forEach(addon => {
+          console.log('addon', addon.title.toUpperCase());
           self.$addons.initAddon(addon)
             .catch(() => {})
 
           // Load the addon routes programatically for HMR
+          console.log('addon ' + addon.title.toUpperCase(), addon.assets);
           if (addon.assets) {
+            // console.log('addon - is assets. ', addon.title.toUpperCase());
             // console.log(`../${addon.dir_prefix}/${addon.package}/${addon.version}/src/addon.js`)
             import(`@addon/${addon.package}/${addon.version}/src/addon.scss`)
             import(`@addon/${addon.package}/${addon.version}/src/addon.js`)
               .then(m => {
+                // console.log('addon - is imported.. ', addon.title.toUpperCase());
                 const routes = m.default;
                 self.$f7.routes.push(...routes);
                 self.$f7.views.main.routes.push(...routes);
