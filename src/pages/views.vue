@@ -10,8 +10,7 @@
 		<!-- Main addons views list -->
 		<f7-block-title> Views </f7-block-title>
     <f7-list>
-      <template v-for="(addon, index) in addonsSorted"
-                :key="index">
+      <template v-for="(addon, index) in addonsSorted" :key="index">
         <template v-if="addon.entry_path">
           <f7-list-item
             :link="addonUrl(addon)"
@@ -38,5 +37,10 @@ export default {
 			return url;
 		},
 	},
+	computed: {
+		addonsSorted() {
+			return this.$root.addons.sort((a, b) => a.title.localeCompare(b.title));
+		}
+	}
 };
 </script>
