@@ -73,9 +73,6 @@ module.exports = {
   },
   plugins: [
     new DefinePlugin(helpers.getSdkVariables()),
-    new MiniCssExtractPlugin({
-      filename: '[name].css',
-    }),
     new VueLoaderPlugin(),
     new HtmlWebpackPlugin({
       filename: './index.html',
