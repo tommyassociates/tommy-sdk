@@ -9,19 +9,22 @@
 		</f7-navbar>
 		<!-- Main addons views list -->
 		<f7-block-title> Views </f7-block-title>
-		<f7-list>
-			<f7-list-item
-				v-for="(addon, index) in $root.addons"
-				:key="index"
-				:link="addonUrl(addon)"
-				:title="$t(`${addon.package}.title`, addon.title)"
-				:after="addon.version"
-			>
-				<template #media>
-					<img class="icon" width="29" :src="addon.icon_url" />
-				</template>
-			</f7-list-item>
-		</f7-list>
+    <f7-list>
+      <template v-for="(addon, index) in addonsSorted"
+                :key="index">
+        <template v-if="addon.entry_path">
+          <f7-list-item
+            :link="addonUrl(addon)"
+            :title="$t(`${addon.package}.title`, addon.title)"
+            :after="addon.version"
+          >
+            <template #media>
+              <img class="icon" width="29" :src="addon.icon_url"/>
+            </template>
+          </f7-list-item>
+        </template>
+      </template>
+    </f7-list>
 	</f7-page>
 </template>
 <script>
