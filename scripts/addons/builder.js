@@ -15,7 +15,7 @@ function resolveAddonPath(baseDir, ...dir) {
   return path.join(baseDir, ...dir)
 }
 
-const env = process.env.NODE_ENV
+const env = 'production' // process.env.NODE_ENV
 
 const optimizationConfig = {}
 if (env === 'production') {
