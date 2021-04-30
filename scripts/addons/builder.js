@@ -15,7 +15,7 @@ function resolveAddonPath(baseDir, ...dir) {
   return path.join(baseDir, ...dir)
 }
 
-const env = process.env.NODE_ENV
+const env = 'production' // process.env.NODE_ENV
 
 const optimizationConfig = {}
 if (env === 'production') {
@@ -64,6 +64,7 @@ function createConfig(pkg, version, localAddonFilePath) {
       addon: resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/src/addon.js`),
     },
     output: {
+      publicPath: '',
       filename: '[name].js',
       path: resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/build`),
       libraryTarget: 'var',

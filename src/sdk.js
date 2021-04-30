@@ -2,7 +2,6 @@ import tommy from 'tommy-core/src/tommy'; // eslint-disable-line
 import routes from './routes';
 import appComponent from './components/app.vue';
 import components from './components';
-import Highcharts from 'highcharts';
 
 const language = localStorage.language || 'en-US';
 
@@ -16,6 +15,31 @@ import zhCN from './locales/zh-CN';
 // console.log('SANDBOX_URL', SANDBOX_URL)
 // console.log('API_URL', API_URL)
 // console.log('API_KEY', API_KEY)
+
+const loadAddonLocales = (addon) => {
+  return new Promise((resolve) => {
+    if (!addon.locales || addon.locales.length === 0) return resolve()
+
+    const iterables = addon.locales.map(language => {
+      return import(`@addon/${addon.package}/${addon.version}/locales/${language}.json`)
+        .then((locales) => {
+          return {
+            [language]: {
+              [addon.package]: locales.default
+            }
+          }
+        })
+    })
+
+    Promise.all(iterables)
+      .then((locales) => {
+        locales.forEach((locale) => {
+          if (!locale) return
+          tommy.i18n.addLocales(locale)
+        })
+      })
+  })
+}
 
 if (!window.tommy)
   window.tommy = tommy
@@ -135,23 +159,21 @@ tommy.app.init({
 
         SDK_LOCAL_ADDONS.forEach(addon => {
           console.log('addon', addon.title.toUpperCase());
-          self.$addons.initAddon(addon)
-            .catch(() => {})
 
           // Load the addon routes programatically for HMR
-          console.log('addon ' + addon.title.toUpperCase(), addon.assets);
           if (addon.assets) {
-            // console.log('addon - is assets. ', addon.title.toUpperCase());
-            // console.log(`../${addon.dir_prefix}/${addon.package}/${addon.version}/src/addon.js`)
+            loadAddonLocales(addon);
             import(`@addon/${addon.package}/${addon.version}/src/addon.scss`)
             import(`@addon/${addon.package}/${addon.version}/src/addon.js`)
-              .then(m => {
-                // console.log('addon - is imported.. ', addon.title.toUpperCase());
-                const routes = m.default;
+              .then(addonScript => {
+                const routes = addonScript.default;
+
+                const addonIndexView = routes.length ? routes[0] : {};
+                addon.entry_path = addonIndexView.path;
+                self.$root.addons.push(addon);
+                
                 self.$f7.routes.push(...routes);
                 self.$f7.views.main.routes.push(...routes);
-
-                // console.log(routes);
 
                 // Load the default addon if specified
                 const loadAddon = (SDK_CONFIG.autoloadAddonPath &&
