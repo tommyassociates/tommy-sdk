@@ -64,6 +64,7 @@ function createConfig(pkg, version, localAddonFilePath) {
       addon: resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/src/addon.js`),
     },
     output: {
+      publicPath: '',
       filename: '[name].js',
       path: resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/build`),
       libraryTarget: 'var',
