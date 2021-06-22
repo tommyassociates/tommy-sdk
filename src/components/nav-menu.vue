@@ -1,8 +1,22 @@
 <template>
-  <f7-nav-left>
-    <a class="link icon-only panel-open" href="#"><i class="material-icons">menu</i></a>
+  <tommy-nav-back v-if="showBackButton || isActorParam" :native="true"></tommy-nav-back>
+  <f7-nav-left v-else>
+    <f7-link panel-open="left" icon-material="menu" icon-only></f7-link>
   </f7-nav-left>
 </template>
 <script>
-  export default {};
+export default {
+  props: {
+    f7route: Object,
+    showBackButton: {
+      type: Boolean,
+      default: false
+    },
+  },
+  computed: {
+    isActorParam() {
+      return this.f7route?.query?.actor_id;
+    },
+  },
+};
 </script>
