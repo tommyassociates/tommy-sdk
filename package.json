@@ -26,7 +26,7 @@
     "api"
   ],
   "dependencies": {
-    "@tommyassociates/tommy-core": "^0.3.0-beta.55",
+    "@tommyassociates/tommy-core": "^0.3.0-beta.56",
     "archiver": "^5.3.0",
     "express": "^4.17.1",
     "js-yaml": "^4.0.0",
