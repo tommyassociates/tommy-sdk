@@ -163,55 +163,7 @@
               >
             </g
             >
-            <metadata
-            >
-              <rdf:RDF
-              >
-                <cc:Work
-                >
-                  <dc:format
-                  >image/svg+xml
-                  </dc:format
-                  >
-                  <dc:type
-                    rdf:resource="http://purl.org/dc/dcmitype/StillImage"
-                  />
-                  <cc:license
-                    rdf:resource="http://creativecommons.org/licenses/publicdomain/"
-                  />
-                  <dc:publisher
-                  >
-                    <cc:Agent
-                      rdf:about="http://openclipart.org/"
-                    >
-                      <dc:title
-                      >Openclipart
-                      </dc:title
-                      >
-                    </cc:Agent
-                    >
-                  </dc:publisher
-                  >
-                </cc:Work
-                >
-                <cc:License
-                  rdf:about="http://creativecommons.org/licenses/publicdomain/"
-                >
-                  <cc:permits
-                    rdf:resource="http://creativecommons.org/ns#Reproduction"
-                  />
-                  <cc:permits
-                    rdf:resource="http://creativecommons.org/ns#Distribution"
-                  />
-                  <cc:permits
-                    rdf:resource="http://creativecommons.org/ns#DerivativeWorks"
-                  />
-                </cc:License
-                >
-              </rdf:RDF
-              >
-            </metadata
-            >
+
           </svg
           >
 
