@@ -1,5 +1,5 @@
 <template>
-  <tommy-nav-back v-if="showBackButton || isActorParam" :native="true"></tommy-nav-back>
+  <tommy-nav-back v-if="showBackButton || isActorParam" :native="true" :href="href"></tommy-nav-back>
   <f7-nav-left v-else>
     <f7-link panel-open="left" icon-material="menu" icon-only></f7-link>
   </f7-nav-left>
@@ -11,6 +11,10 @@ export default {
     showBackButton: {
       type: Boolean,
       default: false
+    },
+    href: {
+      type: String,
+      default: '#',
     },
   },
   computed: {
