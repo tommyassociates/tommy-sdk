@@ -186,21 +186,21 @@
               }}
             </f7-button>
           </p>
-          <p>
-            <f7-button
-              :disabled="addonData.deleting || addonData.updating"
-              fill
-              big
-              class="red-button"
-              @click="deleteAddon"
-            >
-              {{
-                addonData.deleting
-                  ? "Deleting..."
-                  : "Delete from Sandbox"
-              }}
-            </f7-button>
-          </p>
+<!--          <p>-->
+<!--            <f7-button-->
+<!--              :disabled="addonData.deleting || addonData.updating"-->
+<!--              fill-->
+<!--              big-->
+<!--              class="red-button"-->
+<!--              @click="deleteAddon"-->
+<!--            >-->
+<!--              {{-->
+<!--                addonData.deleting-->
+<!--                  ? "Deleting..."-->
+<!--                  : "Delete from Sandbox"-->
+<!--              }}-->
+<!--            </f7-button>-->
+<!--          </p>-->
         </template>
         <template v-else>
           <p>
