@@ -9,5 +9,3 @@ Tommy is working with a limited number of Alpha testing developers before the SD
 To get started building Tommy Mini Programs read the [Developers Guide](http://docs.mytommy.com/).
 
 © Copyright 2020-2021 Tommy Associates Pty Ltd. All rights reserved.
-
-
