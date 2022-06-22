@@ -139,21 +139,21 @@ tommy.app.init({
 
 
       self.$store.dispatch('loginWithApiKey', API_KEY).then((token) => {
-        localStorage.token = token;
-        self.$root.token = token;
+        // localStorage.token = token;
+        // self.$root.token = token;
 
-        tommy.events.$on('addonRoutesLoaded', (addon, addonRoutes) => {
-          // NOTE: Do not load routes here in order to support HMR
-          // self.$f7.routes.push(...addonRoutes);
-          // self.$f7.views.main.routes.push(...addonRoutes);
-        });
-        tommy.events.$on('addonLoaded', (addon) => {
-          self.$root.addons.push(addon);
-        });
-        tommy.events.$on('addonInitError', (addon) => {
-          console.error('addonInitError', addon.package, ', added to addons list for rebuild')
-          self.$root.addons.push(addon);
-        });
+        // tommy.events.$on('addonRoutesLoaded', (addon, addonRoutes) => {
+        //   // NOTE: Do not load routes here in order to support HMR
+        //   // self.$f7.routes.push(...addonRoutes);
+        //   // self.$f7.views.main.routes.push(...addonRoutes);
+        // });
+        // tommy.events.$on('addonLoaded', (addon) => {
+        //   self.$root.addons.push(addon);
+        // });
+        // tommy.events.$on('addonInitError', (addon) => {
+        //   console.error('addonInitError', addon.package, ', added to addons list for rebuild')
+        //   self.$root.addons.push(addon);
+        // });
 
         console.table(SDK_LOCAL_ADDONS);
 
@@ -171,7 +171,7 @@ tommy.app.init({
                 const addonIndexView = routes.length ? routes[0] : {};
                 addon.entry_path = addonIndexView.path;
                 self.$root.addons.push(addon);
-                
+
                 self.$f7.routes.push(...routes);
                 self.$f7.views.main.routes.push(...routes);
 

@@ -53,11 +53,9 @@ export default {
     };
   },
   computed: {
-    ...mapState('account', ['account']),
+    ...mapState(['account', 'user']),
     ...mapState('accounts', ['accounts']),
-    ...mapState('user', ['user']),
-    ...mapState('team', ['team']),
-    ...mapState('teamMembers', ['teamMembers']),
+    ...mapState('team', ['team', 'teamMembers']),
   },
   methods: {
     changeActorId(e) {
