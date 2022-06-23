@@ -64,24 +64,21 @@ export default {
       self.$root.setActorId(actorId);
     },
     changeAccount(e) {
-      const self = this;
       const data = e.target.value.split(':'),
         accountId = parseInt(data[0], 10),
         accountType = data[1];
       let newAccount;
-      self.accounts.forEach(account => {
+      this.accounts.forEach(account => {
         console.log(accountId, accountType, account)
         if (account.id === accountId && account.type === accountType)
           newAccount = account;
       });
       if (!newAccount) return;
-      const {id, type, location_id} = newAccount; // eslint-disable-line
-      self.$root.changeAccount(id, type, location_id);
+      this.$store.dispatch('changeAccount', newAccount);
     },
   },
   mounted() {
-    const self = this;
-    self.actorId = self.$root.actorId || self.user.id;
+    this.actorId = this.$root.actorId || this.user.id;
   },
 };
 </script>

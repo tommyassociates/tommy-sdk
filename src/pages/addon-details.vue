@@ -175,7 +175,7 @@
             <f7-button
               :disabled="addonData.deleting || addonData.updating"
               fill
-              big
+              large
               class="yellow-button"
               @click="updateAddon"
             >
@@ -207,7 +207,7 @@
             <f7-button
               :disabled="addonData.uploading || addonData.updating"
               fill
-              big
+              large
               class="red-button"
               @click="uploadAddon"
             >
@@ -223,8 +223,8 @@
           <f7-button
             :disabled="addonData.uploading || addonData.updating"
             fill
-            big
-            class="yellow-button"
+            large
+            class="red-button"
             @click="uploadAddon"
           >
             {{
