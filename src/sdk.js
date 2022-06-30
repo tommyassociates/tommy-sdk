@@ -138,7 +138,16 @@ tommy.app.init({
       // self.$store.dispatch('resetState').then(() => {
 
 
-      self.$store.dispatch('loginWithApiKey', API_KEY).then((token) => {
+      const payload = {
+        data: {
+          api_key: API_KEY
+        },
+        options: {
+          user: false,
+          addons: false,
+        }
+      };
+      self.$store.dispatch('login', payload).then((token) => {
         // localStorage.token = token;
         // self.$root.token = token;
 
