@@ -127,15 +127,14 @@ tommy.app.init({
   },
   methods: {
     mounted() {
-      const self = this;
       localStorage.setItem('serverUrl', SANDBOX_URL);
 
       if (localStorage.miniProgramLocked) {
-        self.$root.miniProgramLocked = JSON.parse(localStorage.miniProgramLocked);
+        this.$root.miniProgramLocked = JSON.parse(localStorage.miniProgramLocked);
       }
 
       //logout will just clear state.
-      // self.$store.dispatch('resetState').then(() => {
+      // this.$store.dispatch('resetState').then(() => {
 
 
       const payload = {
@@ -147,21 +146,21 @@ tommy.app.init({
           addons: false,
         }
       };
-      self.$store.dispatch('login', payload).then((token) => {
+      this.$store.dispatch('login', payload).then((token) => {
         // localStorage.token = token;
-        // self.$root.token = token;
+        // this.$root.token = token;
 
         // tommy.events.$on('addonRoutesLoaded', (addon, addonRoutes) => {
         //   // NOTE: Do not load routes here in order to support HMR
-        //   // self.$f7.routes.push(...addonRoutes);
-        //   // self.$f7.views.main.routes.push(...addonRoutes);
+        //   // this.$f7.routes.push(...addonRoutes);
+        //   // this.$f7.views.main.routes.push(...addonRoutes);
         // });
         // tommy.events.$on('addonLoaded', (addon) => {
-        //   self.$root.addons.push(addon);
+        //   this.$root.addons.push(addon);
         // });
         // tommy.events.$on('addonInitError', (addon) => {
         //   console.error('addonInitError', addon.package, ', added to addons list for rebuild')
-        //   self.$root.addons.push(addon);
+        //   this.$root.addons.push(addon);
         // });
 
         console.table(SDK_LOCAL_ADDONS);
@@ -179,36 +178,34 @@ tommy.app.init({
 
                 const addonIndexView = routes.length ? routes[0] : {};
                 addon.entry_path = addonIndexView.path;
-                self.$root.addons.push(addon);
+                this.$root.addons.push(addon);
 
-                self.$f7.routes.push(...routes);
-                self.$f7.views.main.routes.push(...routes);
+                this.$f7.routes.push(...routes);
+                this.$f7.views.main.routes.push(...routes);
 
                 // Load the default addon if specified
-                const loadAddon = (SDK_CONFIG.autoloadAddonPath &&
-                  SDK_CONFIG.autoloadAddonPath === addon.entry_path) ||
+                const loadAddon = (SDK_CONFIG.defaultAddonPath &&
+                  SDK_CONFIG.defaultAddonPath === addon.entry_path) ||
                   window.location.href.indexOf(addon.entry_path) !== -1
                 if (loadAddon) {
                   const entryUrl = this.addonUrl(addon)
                   // console.log('loading initial addon', entryUrl)
-                  self.$f7.views.main.router.navigate(entryUrl)
+                  this.$f7.views.main.router.navigate(entryUrl)
                 }
               })
           }
         });
       }).catch((error) => {
-        self.$f7.dialog.alert(`Cannot connect to sandbox server: ${SANDBOX_ENDPOINT}: ${error}`);
+        this.$f7.dialog.alert(`Cannot connect to sandbox server: ${SANDBOX_ENDPOINT}: ${error}`);
       });
     },
     addonUrl(addon) {
-      const self = this;
       let url = addon.entry_path;
-      if (self.$root.actorId) url += `?actor_id=${self.$root.actorId}`;
+      if (this.$root.actorId) url += `?actor_id=${this.$root.actorId}`;
       return url;
     },
   },
-  f7ready(f7) { // eslint-disable-line
-    const self = this; // eslint-disable-line
+  f7ready(f7) {
   },
 });
 

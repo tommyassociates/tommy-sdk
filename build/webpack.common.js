@@ -13,7 +13,7 @@ function resolvePath(dir) {
 
 const coreSymLinkExists = (() => {
   try {
-    return require('fs').statSync(resolvePath('node_modules/@tommyassociates/tommy-core')).isSymbolicLink()
+    return require('fs').statSync(resolvePath('node_modules/tommy-core')).isSymbolicLink()
   } catch(e) {
     return false
   }
@@ -30,12 +30,12 @@ module.exports = {
     alias: {
       '@': resolvePath('src'),
       '@addon': resolvePath('../tommy-sdk-private/addons'),
-      'tommy-core': '@tommyassociates/tommy-core'
+      'tommy-core': 'tommy-core'
     },
     modules: [
       resolvePath('src'),
       resolvePath('node_modules'),
-      resolvePath('node_modules/@tommyassociates/tommy-core/node_modules')
+      resolvePath('node_modules/tommy-core/node_modules')
       // TODO: investigate how this performs when using a npm published tommy-core
     ],
   },

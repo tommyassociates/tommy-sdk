@@ -214,12 +214,12 @@
               {{
                 addonData.uploading
                   ? "Uploading..."
-                  : "Upload to Sandbox"
+                  : "Upload Addon"
               }}
             </f7-button>
           </p>
         </template>
-        <p>
+        <!-- <p>
           <f7-button
             :disabled="addonData.uploading || addonData.updating"
             fill
@@ -230,10 +230,10 @@
             {{
               addonData.uploading
                 ? "Uploading..."
-                : "Upload to Sandbox"
+                : "Upload Addon"
             }}
           </f7-button>
-        </p>
+        </p> -->
       </f7-block>
     </div>
   </f7-page>

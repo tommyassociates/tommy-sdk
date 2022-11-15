@@ -74,11 +74,11 @@ function createConfig(pkg, version, localAddonFilePath) {
       extensions: ['.js', '.vue', '.json'],
       alias: {
         '@': resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/src`),
-        'tommy-core': '@tommyassociates/tommy-core'
+        'tommy-core': 'tommy-core'
       },
       modules: [
         resolvePath('node_modules'),
-        resolvePath('node_modules/@tommyassociates/tommy-core/node_modules')
+        resolvePath('node_modules/tommy-core/node_modules')
         // TODO: see if tommy-core needed
       ]
     },

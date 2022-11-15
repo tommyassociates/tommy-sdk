@@ -11,8 +11,8 @@
       type="text"
       label="Search"
       v-model:value="search"
-      style="margin: 20px; border:1px solid #999; padding: 8px;font-size:21px;"
     />
+    <!-- style="margin: 20px; border:1px solid #999; padding: 8px;font-size:21px;" -->
 		<!-- Main addons list -->
 		<f7-block-title> Addons </f7-block-title>
 		<f7-list media-list>
