@@ -83,7 +83,15 @@ function createConfig(pkg, version, localAddonFilePath) {
       ]
     },
     // set names of libs that need to be injected at runtime and therefore excluded from build
-    externals: getExternalLibs(['vue', 'vuex']),
+    // externals: getExternalLibs(['vue', 'vuex', 'vue-cal']),
+    // externals: ['vue', 'vuex', 'vue-cal', 'moment'],, 'moment'
+    // externalsType: 'commonjs',
+    externals: {
+      'vue': 'externalLibs.vue',
+      'vuex': 'externalLibs.vuex',
+      'vue-cal': 'externalLibs.vueCal',
+      'vue-chartjs': 'externalLibs.vueChartjs',
+    },
     module: {
       rules: [
         {
