@@ -12,3 +12,24 @@
   background: $tommy-red;
   color: white !important;
 }
+
+
+.panel-left {
+  display: block !important;
+  // .sidebar {
+  //   width: 100%;
+  // }
+
+  .drag-handle {
+    position: absolute;
+    right: -12px;
+    width: 14px;
+    top: 50%;
+    margin-top: -37px;
+    height: 74px;
+    background: url(i/DragHandle.svg);
+    // @media (min-width: $desktop-width) {
+    //   display: none;
+    // }
+  }
+}

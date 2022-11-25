@@ -1,7 +1,13 @@
 <template>
   <f7-app v-bind="params">
     <template v-if="coreReady">
-      <f7-panel left cover v-model:opened="leftPanelOpened">
+       <!-- -->
+      <f7-panel class="sidebar" left cover v-model:opened="leftPanelOpened">
+        <a
+          class="drag-handle"
+          href="#"
+          @click="toggleLeftPanel"
+        />
         <f7-view :init="false">
           <f7-page>
             <f7-navbar title="Navigation"></f7-navbar>

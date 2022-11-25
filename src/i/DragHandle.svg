@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="18px" height="74px" viewBox="0 0 18 74" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 64 (93537) - https://sketch.com -->
+    <title>Group 2</title>
+    <desc>Created with Sketch.</desc>
+    <defs>
+        <polygon id="path-1" points="0.5 0 13.5 0 13.5 70 0.5 70"></polygon>
+        <filter x="-19.2%" y="-5.0%" width="153.8%" height="110.0%" filterUnits="objectBoundingBox" id="filter-2">
+            <feOffset dx="1" dy="0" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
+            <feGaussianBlur stdDeviation="1" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.6 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
+        </filter>
+    </defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Group-2" transform="translate(1.000000, 2.000000)">
+            <g id="Rectangle-46">
+                <use fill="black" fill-opacity="1" filter="url(#filter-2)" xlink:href="#path-1"></use>
+                <use fill="#FF4500" fill-rule="evenodd" xlink:href="#path-1"></use>
+            </g>
+            <line x1="4.5" y1="4.5" x2="4.5" y2="19.5" id="Line-10" stroke="#FBE0CD" stroke-width="2" stroke-linecap="square"></line>
+            <line x1="4.5" y1="50.5" x2="4.5" y2="65.5" id="Line-10-Copy-2" stroke="#FBE0CD" stroke-width="2" stroke-linecap="square"></line>
+            <circle id="Oval-25" fill="#FBE0CD" cx="7.5" cy="26.5" r="2.5"></circle>
+            <circle id="Oval-25-Copy" fill="#FBE0CD" cx="7.5" cy="35.5" r="2.5"></circle>
+            <circle id="Oval-25-Copy-2" fill="#FBE0CD" cx="7.5" cy="44.5" r="2.5"></circle>
+            <line x1="9.5" y1="4.5" x2="9.5" y2="19.5" id="Line-10-Copy" stroke="#FBE0CD" stroke-width="2" stroke-linecap="square"></line>
+            <line x1="9.5" y1="50.5" x2="9.5" y2="65.5" id="Line-10-Copy-3" stroke="#FBE0CD" stroke-width="2" stroke-linecap="square"></line>
+        </g>
+    </g>
+</svg>
