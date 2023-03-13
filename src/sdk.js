@@ -186,12 +186,22 @@ tommy.app.init({
                 this.$f7.views.main.routes.push(...routes);
 
                 // Load the default addon if specified
+                // const loadAddon = (SDK_CONFIG.defaultAddonPath &&
+                //   SDK_CONFIG.defaultAddonPath === addon.entry_path) ||
+                //   window.location.href.indexOf(addon.entry_path) !== -1
+                // if (loadAddon) {
+                //   const entryUrl = this.addonUrl(addon)
+                //   // console.log('loading initial addon', entryUrl)
+                //   this.$f7.views.main.router.navigate(entryUrl)
+                // }
+
                 const loadAddon = (SDK_CONFIG.defaultAddonPath &&
-                  SDK_CONFIG.defaultAddonPath === addon.entry_path) ||
+                  SDK_CONFIG.defaultAddonPath.startsWith(addon.entry_path)) ||
                   window.location.href.indexOf(addon.entry_path) !== -1
+
                 if (loadAddon) {
-                  const entryUrl = this.addonUrl(addon)
-                  // console.log('loading initial addon', entryUrl)
+                  const entryUrl = this.addonUrl(addon, SDK_CONFIG.defaultAddonPath)
+                  console.log('loading initial addon', entryUrl)
                   this.$f7.views.main.router.navigate(entryUrl)
                 }
               })
@@ -201,8 +211,12 @@ tommy.app.init({
         this.$f7.dialog.alert(`Cannot connect to sandbox server: ${SANDBOX_ENDPOINT}: ${error}`);
       });
     },
-    addonUrl(addon) {
-      let url = addon.entry_path;
+    // addonUrl(addon) {
+    //   let url = addon.entry_path;
+    //   if (this.$root.actorId) url += `?actor_id=${this.$root.actorId}`;
+    //   return url;
+    // },
+    addonUrl(addon, url) {
       if (this.$root.actorId) url += `?actor_id=${this.$root.actorId}`;
       return url;
     },
