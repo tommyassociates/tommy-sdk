@@ -178,7 +178,9 @@ tommy.app.init({
 
                 const addonIndexView = routes.length ? routes[0] : {};
                 addon.entry_path = addonIndexView.path;
-                this.$root.addons.push(addon);
+                // this.$root.addons.push(addon);
+
+                this.$store.state.addons.addonInstalls.push(addon);
 
                 this.$f7.routes.push(...routes);
                 this.$f7.views.main.routes.push(...routes);

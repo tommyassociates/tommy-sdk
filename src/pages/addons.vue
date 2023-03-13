@@ -48,7 +48,7 @@ export default {
   },
   computed: {
     addonsSorted() {
-      let addons = this.$root.addons;
+      let addons = this.$store.state.addons.addonInstalls; //$root.addons;
       if (this.search) {
         addons = addons.filter((addon) => {
           const title = addon.title.toUpperCase();

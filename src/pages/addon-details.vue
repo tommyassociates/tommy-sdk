@@ -248,10 +248,11 @@ export default {
   data() {
     const self = this;
     const pkg = self.f7route.params.package;
-    const addon = self.$root.addons.filter((a) => a.package === pkg)[0];
+    // const addon = self.$root.addons.filter((a) => a.package === pkg)[0];
 
     return {
-      addon,
+      pkg,
+      // addon,
       addonData: {},
       remoteFetched: false,
     };
@@ -273,6 +274,9 @@ export default {
       });
   },
   computed: {
+    addon() {
+      return this.$store.getters['addons/addonByPackage'](this.pkg);
+    },
     isChinaServer() {
       return config.apiEndpoint === 'https://api.tuome.com.cn';
     },
