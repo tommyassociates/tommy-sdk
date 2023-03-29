@@ -15,7 +15,7 @@ function resolveAddonPath(baseDir, ...dir) {
   return path.join(baseDir, ...dir)
 }
 
-const env = 'production' // process.env.NODE_ENV
+const env = process.env.NODE_ENV || 'production'
 
 const optimizationConfig = {}
 if (env === 'production') {
@@ -45,6 +45,8 @@ if (env === 'production') {
       },
     },
   }
+} else {
+  optimizationConfig.minimize = false
 }
 
 const getExternalLibs = (externalLibNames) => {
@@ -58,7 +60,7 @@ const getExternalLibs = (externalLibNames) => {
 function createConfig(pkg, version, localAddonFilePath) {
   return {
     mode: env,
-    devtool: false, // env === 'development' ? 'eval-cheap-source-map' : 'source-map',
+    devtool: false, //env === 'development' ? 'source-map' :  // eval-cheap-source-map
     optimization: optimizationConfig,
     entry: {
       addon: resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/src/addon.js`),

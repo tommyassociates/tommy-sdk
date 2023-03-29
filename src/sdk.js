@@ -3,6 +3,8 @@ import routes from './routes';
 import appComponent from './components/app.vue';
 import components from './components';
 
+import { registerStoreModule, storeModuleIsRegistered } from 'tommy-core/src/utils/modules';
+
 const language = localStorage.language || 'en-US';
 
 import './scss/sdk.scss';
@@ -133,10 +135,6 @@ tommy.app.init({
         this.$root.miniProgramLocked = JSON.parse(localStorage.miniProgramLocked);
       }
 
-      //logout will just clear state.
-      // this.$store.dispatch('resetState').then(() => {
-
-
       const payload = {
         data: {
           api_key: API_KEY
@@ -147,22 +145,6 @@ tommy.app.init({
         }
       };
       this.$store.dispatch('login', payload).then((token) => {
-        // localStorage.token = token;
-        // this.$root.token = token;
-
-        // tommy.events.$on('addonRoutesLoaded', (addon, addonRoutes) => {
-        //   // NOTE: Do not load routes here in order to support HMR
-        //   // this.$f7.routes.push(...addonRoutes);
-        //   // this.$f7.views.main.routes.push(...addonRoutes);
-        // });
-        // tommy.events.$on('addonLoaded', (addon) => {
-        //   this.$root.addons.push(addon);
-        // });
-        // tommy.events.$on('addonInitError', (addon) => {
-        //   console.error('addonInitError', addon.package, ', added to addons list for rebuild')
-        //   this.$root.addons.push(addon);
-        // });
-
         console.table(SDK_LOCAL_ADDONS);
 
         SDK_LOCAL_ADDONS.forEach(addon => {
@@ -173,17 +155,26 @@ tommy.app.init({
             loadAddonLocales(addon);
             import(`@addon/${addon.package}/${addon.version}/src/addon.scss`)
             import(`@addon/${addon.package}/${addon.version}/src/addon.js`)
-              .then(addonScript => {
-                const routes = addonScript.default;
-
+              .then(addonModule => {
+                const isModule = !!addonModule.default.routes;
+                const routes = isModule ? addonModule.default.routes : addonModule.default;
                 const addonIndexView = routes.length ? routes[0] : {};
                 addon.entry_path = addonIndexView.path;
-                // this.$root.addons.push(addon);
 
                 this.$store.state.addons.addonInstalls.push(addon);
 
                 this.$f7.routes.push(...routes);
                 this.$f7.views.main.routes.push(...routes);
+
+                if (isModule) {
+                  const { name: moduleName, store: moduleStore } = addonModule.default;
+                  if (storeModuleIsRegistered(this.$store, moduleName)) {
+                    console.log('sdk: store module already registered', moduleName);
+                  } else {
+                    console.log('sdk: registering store module', moduleName, moduleStore);
+                    registerStoreModule(this.$store, moduleStore, moduleName);
+                  }
+                }
 
                 // Load the default addon if specified
                 // const loadAddon = (SDK_CONFIG.defaultAddonPath &&
