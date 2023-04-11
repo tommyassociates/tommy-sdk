@@ -17,7 +17,7 @@
             v-for="(account, index) in accounts"
             :key="index"
             :value="account.id + ':' + account.type"
-          >{{ account.name }} ({{ account.type }}: {{ account.kind }})
+          >{{ account.name }} ({{ account.type }}: {{ account.contact_name }})
           </option>
         </select>
       </f7-list-item>

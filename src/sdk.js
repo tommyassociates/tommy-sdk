@@ -166,15 +166,16 @@ tommy.app.init({
                 this.$f7.routes.push(...routes);
                 this.$f7.views.main.routes.push(...routes);
 
-                if (isModule) {
-                  const { name: moduleName, store: moduleStore } = addonModule.default;
-                  if (storeModuleIsRegistered(this.$store, moduleName)) {
-                    console.log('sdk: store module already registered', moduleName);
-                  } else {
-                    console.log('sdk: registering store module', moduleName, moduleStore);
-                    registerStoreModule(this.$store, moduleStore, moduleName);
-                  }
-                }
+                // FIXME: Cannot use registerModule with replaceState due to a vuex bug 
+                // if (isModule) {
+                //   const { name: moduleName, store: moduleStore } = addonModule.default;
+                //   if (storeModuleIsRegistered(this.$store, moduleName)) {
+                //     console.log('sdk: store module already registered', moduleName);
+                //   } else {
+                //     console.log('sdk: registering store module', moduleName, moduleStore);
+                //     registerStoreModule(this.$store, moduleStore, moduleName);
+                //   }
+                // }
 
                 // Load the default addon if specified
                 const loadAddon = (SDK_CONFIG.defaultAddonPath &&
