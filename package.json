@@ -76,7 +76,7 @@
     "webpack-merge": "^5.8.0"
   },
   "peerDependencies": {
-    "vue-cal": "^4.8.1"
+    "framework7": "^8.0.0"
   },
   "engines": {
     "node": ">= 6.0.0",
