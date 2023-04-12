@@ -1,11 +1,11 @@
-import coreRoutes from 'tommy-core/src/routes';
+// import coreRoutes from 'tommy-core/src/routes';
 import Home from './pages/home.vue';
 import Settings from './pages/settings.vue';
 import AddonDetails from './pages/addon-details.vue';
 import Addons from './pages/addons.vue';
 
 import Views from './pages/views.vue';
-import config from '../config.json';
+// import config from '../config.json';
 
 const routes = [
   {
@@ -30,7 +30,7 @@ const routes = [
     path: '/addon-details/:package/',
     component: AddonDetails,
   },
-  ...coreRoutes,
+  // ...coreRoutes,
 ];
 
 export default routes;
