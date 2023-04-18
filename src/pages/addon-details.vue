@@ -302,55 +302,104 @@ export default {
       self.addonData.uploading = true;
       const {package: pkg, version} = self.addon;
 
-      self.$request({
-        url: `/addon/sandbox/upload/${pkg}/${version}`,
+
+      self.$api.call({
+        endpoint: `addon/sandbox/upload/${pkg}/${version}`,
         method: "POST",
         dataType: "json",
-        success(data) {
-          self.addonData = data;
-          self.addonData.uploading = false;
-          self.$api.installAddon(pkg, {}, {});
-          self.$app.notify(
-            "Addon Uploaded",
-            "Your addon uploaded successfully"
-          );
-        },
-        error(xhr) {
-          self.addonData.status = null;
-          self.addonData.uploading = false;
-          self.$app.notify(
-            "Addon Upload Failed",
-            `Your addon uploaded failed: ${xhr.responseText}`
-          );
-        },
+        contentType: 'application/json',
+      }).then((data) => {
+        self.addonData = data;
+        self.addonData.uploading = false;
+        self.$api.installAddon(pkg, {}, {});
+        self.$app.notify(
+          "Addon Uploaded",
+          "Your addon uploaded successfully"
+        );
+      }).catch((xhr) => {
+        self.addonData.status = null;
+        self.addonData.uploading = false;
+        self.$app.notify(
+          "Addon Upload Failed",
+          `Your addon uploaded failed: ${xhr.responseText}`
+        );
       });
+
+      // self.$request({
+      //   url: `/addon/sandbox/upload/${pkg}/${version}`,
+      //   method: "POST",
+      //   dataType: "json",
+      //   success(data) {
+      //     self.addonData = data;
+      //     self.addonData.uploading = false;
+      //     self.$api.installAddon(pkg, {}, {});
+      //     self.$app.notify(
+      //       "Addon Uploaded",
+      //       "Your addon uploaded successfully"
+      //     );
+      //   },
+      //   error(xhr) {
+      //     self.addonData.status = null;
+      //     self.addonData.uploading = false;
+      //     self.$app.notify(
+      //       "Addon Upload Failed",
+      //       `Your addon uploaded failed: ${xhr.responseText}`
+      //     );
+      //   },
+      // });
     },
     updateAddon() {
       const self = this;
       self.addonData.status = "Updating...";
       self.addonData.updating = true;
       const {package: pkg, version} = self.addon;
-      self.$request({
-        url: `/addon/sandbox/upload/${pkg}/${version}`,
+
+
+      self.$api.call({
+        endpoint: `addon/sandbox/upload/${pkg}/${version}`,
         method: "POST",
         dataType: "json",
-        success(data) {
-          self.addonData = data;
-          self.addonData.updating = false;
-          self.$app.notify(
-            "Addon Updated",
-            "Your addon updated successfully"
-          );
-        },
-        error(xhr) {
-          self.addonData.status = null;
-          self.addonData.updating = false;
-          self.$app.notify(
-            "Addon Update Failed",
-            `Your addon update failed: ${xhr.responseText}`
-          );
-        },
+        contentType: 'application/json',
+      }).then((data) => {
+        self.addonData = data;
+        self.addonData.updating = false;
+        self.$app.notify(
+          "Addon Updated",
+          "Your addon updated successfully"
+        );
+      }).catch((xhr) => {
+        self.addonData.status = null;
+        self.addonData.updating = false;
+        self.$app.notify(
+          "Addon Update Failed",
+          `Your addon update failed: ${xhr.responseText}`
+        );
       });
+
+
+
+
+      // self.$request({
+      //   url: `/addon/sandbox/upload/${pkg}/${version}`,
+      //   method: "POST",
+      //   dataType: "json",
+      //   success(data) {
+      //     self.addonData = data;
+      //     self.addonData.updating = false;
+      //     self.$app.notify(
+      //       "Addon Updated",
+      //       "Your addon updated successfully"
+      //     );
+      //   },
+      //   error(xhr) {
+      //     self.addonData.status = null;
+      //     self.addonData.updating = false;
+      //     self.$app.notify(
+      //       "Addon Update Failed",
+      //       `Your addon update failed: ${xhr.responseText}`
+      //     );
+      //   },
+      // });
     },
     deleteAddon() {
       const self = this;
