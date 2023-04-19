@@ -1,4 +1,4 @@
-import tommy from 'tommy-core/src/tommy'; // eslint-disable-line
+import tommy, { app } from 'tommy-core/src/tommy'; // eslint-disable-line
 import routes from './routes';
 import appComponent from './components/app.vue';
 import components from './components';
@@ -46,7 +46,7 @@ const loadAddonLocales = (addon) => {
 if (!window.tommy)
   window.tommy = tommy
 
-tommy.app.init({
+app.init({
   appEl: '#tommy-sdk',
   appComponent,
   routes,
@@ -166,7 +166,7 @@ tommy.app.init({
                 this.$f7.routes.push(...routes);
                 this.$f7.views.main.routes.push(...routes);
 
-                // FIXME: Cannot use registerModule with replaceState due to a vuex bug 
+                // FIXME: Cannot use registerModule with replaceState due to a vuex bug
                 // if (isModule) {
                 //   const { name: moduleName, store: moduleStore } = addonModule.default;
                 //   if (storeModuleIsRegistered(this.$store, moduleName)) {

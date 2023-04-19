@@ -246,9 +246,8 @@ export default {
     f7route: Object,
   },
   data() {
-    const self = this;
-    const pkg = self.f7route.params.package;
-    // const addon = self.$root.addons.filter((a) => a.package === pkg)[0];
+    const pkg = this.f7route.params.package;
+    // const addon = this.$root.addons.filter((a) => a.package === pkg)[0];
 
     return {
       pkg,
@@ -259,18 +258,17 @@ export default {
   },
 
   mounted() {
-    const self = this;
-    const {addon} = self;
-    self.$api
+    const {addon} = this;
+    this.$api
       .getAddonVersion(addon.package, addon.version, {
         showErrorMessages: false,
       })
       .then((response) => {
-        self.remoteFetched = true;
-        self.addonData = response;
+        this.remoteFetched = true;
+        this.addonData = response;
       })
       .catch(() => {
-        self.remoteFetched = true;
+        this.remoteFetched = true;
       });
   },
   computed: {
@@ -286,8 +284,7 @@ export default {
   },
   methods: {
     addonStatus() {
-      const self = this;
-      const {status, deleting, uploading, updating} = self.addonData;
+      const {status, deleting, uploading, updating} = this.addonData;
       if (status) {
         if (deleting) return "Deleting...";
         if (updating) return "Updating...";
@@ -297,130 +294,78 @@ export default {
       return "Not installed";
     },
     uploadAddon() {
-      const self = this;
-      self.addonData.status = null;
-      self.addonData.uploading = true;
-      const {package: pkg, version} = self.addon;
+      this.addonData.status = null;
+      this.addonData.uploading = true;
+      const {package: pkg, version} = this.addon;
 
-
-      self.$api.call({
-        endpoint: `addon/sandbox/upload/${pkg}/${version}`,
+      this.$request.send({
+        url: `http://localhost:8080/addon/sandbox/upload/${pkg}/${version}`,
         method: "POST",
-        dataType: "json",
-        contentType: 'application/json',
+        responseType: "json"
       }).then((data) => {
-        self.addonData = data;
-        self.addonData.uploading = false;
-        self.$api.installAddon(pkg, {}, {});
-        self.$app.notify(
+        this.addonData = data;
+        this.addonData.uploading = false;
+        this.$api.installAddon(pkg, {}, {});
+        this.$app.notify(
           "Addon Uploaded",
           "Your addon uploaded successfully"
         );
       }).catch((xhr) => {
-        self.addonData.status = null;
-        self.addonData.uploading = false;
-        self.$app.notify(
+        this.addonData.status = null;
+        this.addonData.uploading = false;
+        this.$app.notify(
           "Addon Upload Failed",
           `Your addon uploaded failed: ${xhr.responseText}`
         );
       });
-
-      // self.$request({
-      //   url: `/addon/sandbox/upload/${pkg}/${version}`,
-      //   method: "POST",
-      //   dataType: "json",
-      //   success(data) {
-      //     self.addonData = data;
-      //     self.addonData.uploading = false;
-      //     self.$api.installAddon(pkg, {}, {});
-      //     self.$app.notify(
-      //       "Addon Uploaded",
-      //       "Your addon uploaded successfully"
-      //     );
-      //   },
-      //   error(xhr) {
-      //     self.addonData.status = null;
-      //     self.addonData.uploading = false;
-      //     self.$app.notify(
-      //       "Addon Upload Failed",
-      //       `Your addon uploaded failed: ${xhr.responseText}`
-      //     );
-      //   },
-      // });
     },
     updateAddon() {
-      const self = this;
-      self.addonData.status = "Updating...";
-      self.addonData.updating = true;
-      const {package: pkg, version} = self.addon;
+      this.addonData.status = "Updating...";
+      this.addonData.updating = true;
+      const {package: pkg, version} = this.addon;
 
+      console.log('updateAddon');
+      console.log('updateAddon', this.$request);
 
-      self.$api.call({
-        endpoint: `addon/sandbox/upload/${pkg}/${version}`,
+      this.$request.send({
+        url: `http://localhost:8080/addon/sandbox/upload/${pkg}/${version}`,
         method: "POST",
-        dataType: "json",
-        contentType: 'application/json',
+        responseType: "json"
       }).then((data) => {
-        self.addonData = data;
-        self.addonData.updating = false;
-        self.$app.notify(
+        this.addonData = data;
+        this.addonData.updating = false;
+        this.$app.notify(
           "Addon Updated",
           "Your addon updated successfully"
         );
       }).catch((xhr) => {
-        self.addonData.status = null;
-        self.addonData.updating = false;
-        self.$app.notify(
+        this.addonData.status = null;
+        this.addonData.updating = false;
+        this.$app.notify(
           "Addon Update Failed",
           `Your addon update failed: ${xhr.responseText}`
         );
       });
-
-
-
-
-      // self.$request({
-      //   url: `/addon/sandbox/upload/${pkg}/${version}`,
-      //   method: "POST",
-      //   dataType: "json",
-      //   success(data) {
-      //     self.addonData = data;
-      //     self.addonData.updating = false;
-      //     self.$app.notify(
-      //       "Addon Updated",
-      //       "Your addon updated successfully"
-      //     );
-      //   },
-      //   error(xhr) {
-      //     self.addonData.status = null;
-      //     self.addonData.updating = false;
-      //     self.$app.notify(
-      //       "Addon Update Failed",
-      //       `Your addon update failed: ${xhr.responseText}`
-      //     );
-      //   },
-      // });
     },
     deleteAddon() {
-      const self = this;
-      self.addonData.status = "Deleting...";
-      self.addonData.deleting = true;
-      const {package: pkg, version} = self.addon;
+      this.addonData.status = "Deleting...";
+      this.addonData.deleting = true;
+      const {package: pkg, version} = this.addon;
 
-      self.$api
+      this.$api
         .deleteAddon(pkg, version, {url: window.SANDBOX_ENDPOINT})
         .then(() => {
-          self.addonData.status = null;
-          self.addonData.deleting = false;
-          self.$app.notify(
+          this.addonData.status = null;
+          this.addonData.deleting = false;
+          this.$app.notify(
             "Addon Uninstalled",
             "Addon uninstalled successfully"
           );
         })
         .catch((err) => {
-          self.addonData.status = null;
-          self.addonData.deleting = false;
-          self.$app.notify(
+          this.addonData.status = null;
+          this.addonData.deleting = false;
+          this.$app.notify(
             "Addon Error",
             `Addon uninstall failed: ${err}`
           );
