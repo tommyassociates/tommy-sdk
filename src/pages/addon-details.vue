@@ -324,9 +324,6 @@ export default {
       this.addonData.updating = true;
       const {package: pkg, version} = this.addon;
 
-      console.log('updateAddon');
-      console.log('updateAddon', this.$request);
-
       this.$request.send({
         url: `http://localhost:8080/addon/sandbox/upload/${pkg}/${version}`,
         method: "POST",
