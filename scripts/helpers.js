@@ -89,7 +89,7 @@ function readLocalAddonFromManifestPath(path) {
 }
 
 function initAddon(addon) {
-  const base = `/addons/${addon.package}/${addon.environment || 'production'}/files/` ///${addon.version}
+  const base = `/addons/${addon.package}/${addon.environment || 'production'}/${addon.version}/files/`
   addon.url = url.resolve(getSdkUrl(), base)
   addon.icon_url = url.resolve(addon.url, 'icon.png') // path + '/icon.png'
   addon.file_base_url = url.resolve(getSdkUrl(), base)

@@ -307,7 +307,7 @@ export default {
       this.remoteAddon.uploading = true;
       const {package: pkg, environment, version} = this.addon;
 
-      request.send({
+      this.$request.send({
         url: `/addon/sandbox/upload/${pkg}/${environment}/${version}`,
         method: "POST",
         responseType: "json"
@@ -334,7 +334,7 @@ export default {
       this.remoteAddon.updating = true;
       const {package: pkg, environment, version} = this.addon;
 
-      request.send({
+      this.$request.send({
         url: `/addon/sandbox/upload/${pkg}/${environment}/${version}`,
         method: "POST",
         responseType: "json"
