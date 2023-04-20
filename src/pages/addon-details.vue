@@ -6,12 +6,14 @@
         {{ addon.title }}
       </f7-nav-title>
     </f7-navbar>
-    <f7-block-title> Details</f7-block-title>
+    <f7-block-title>Details</f7-block-title>
     <f7-list>
       <f7-list-item
         header="Name"
         :title="`${addon.title} (${addon.package})`"
       >
+      </f7-list-item>
+      <f7-list-item header="Environment" :title="addon.environment">
       </f7-list-item>
       <f7-list-item header="Version" :title="addon.version">
       </f7-list-item>
@@ -36,14 +38,14 @@
       </f7-list-item>
     </f7-list>
     <div id="addon-details-sandbox" v-if="remoteFetched">
-      <f7-block-title> Sandbox Testing</f7-block-title>
+      <f7-block-title>Sandbox Testing</f7-block-title>
       <f7-list>
         <f7-list-item header="Status" :title="addonStatus()">
         </f7-list-item>
         <f7-list-item
-          v-if="addonData.updated_at"
+          v-if="remoteAddon.updated_at"
           header="Updated At"
-          :title="addonData.updated_at"
+          :title="remoteAddon.updated_at"
         >
         </f7-list-item>
         <f7-list-item
@@ -51,7 +53,6 @@
           title="China"
           v-if="isChinaServer"
         >
-
           <svg style="max-width: 50px" version="1.1" xmlns="http://www.w3.org/2000/svg"
                xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
                viewBox="0 0 15000 10000" enable-background="new 0 0 15000 10000" xml:space="preserve">
@@ -170,17 +171,17 @@
         </f7-list-item>
       </f7-list>
       <f7-block>
-        <template v-if="addonData.status">
+        <template v-if="remoteAddon.status">
           <p>
             <f7-button
-              :disabled="addonData.deleting || addonData.updating"
+              :disabled="remoteAddon.deleting || remoteAddon.updating"
               fill
               large
               class="yellow-button"
               @click="updateAddon"
             >
               {{
-                addonData.updating
+                remoteAddon.updating
                   ? "Updating..."
                   : "Update on Sandbox"
               }}
@@ -188,14 +189,14 @@
           </p>
 <!--          <p>-->
 <!--            <f7-button-->
-<!--              :disabled="addonData.deleting || addonData.updating"-->
+<!--              :disabled="remoteAddon.deleting || remoteAddon.updating"-->
 <!--              fill-->
 <!--              big-->
 <!--              class="red-button"-->
 <!--              @click="deleteAddon"-->
 <!--            >-->
 <!--              {{-->
-<!--                addonData.deleting-->
+<!--                remoteAddon.deleting-->
 <!--                  ? "Deleting..."-->
 <!--                  : "Delete from Sandbox"-->
 <!--              }}-->
@@ -205,14 +206,14 @@
         <template v-else>
           <p>
             <f7-button
-              :disabled="addonData.uploading || addonData.updating"
+              :disabled="remoteAddon.uploading || remoteAddon.updating"
               fill
               large
               class="red-button"
               @click="uploadAddon"
             >
               {{
-                addonData.uploading
+                remoteAddon.uploading
                   ? "Uploading..."
                   : "Upload Addon"
               }}
@@ -221,14 +222,14 @@
         </template>
         <!-- <p>
           <f7-button
-            :disabled="addonData.uploading || addonData.updating"
+            :disabled="remoteAddon.uploading || remoteAddon.updating"
             fill
             large
             class="red-button"
             @click="uploadAddon"
           >
             {{
-              addonData.uploading
+              remoteAddon.uploading
                 ? "Uploading..."
                 : "Upload Addon"
             }}
@@ -240,42 +241,48 @@
 </template>
 <script>
 import config from '../../config.json';
+import request from 'tommy-core/src/request';
 
 export default {
   props: {
     f7route: Object,
+    pkg: {
+      required: true
+    },
+    environment: {
+      required: true
+    }
   },
   data() {
-    const self = this;
-    const pkg = self.f7route.params.package;
-    // const addon = self.$root.addons.filter((a) => a.package === pkg)[0];
+    // const this = this;
+    // const pkg = this.f7route.params.package;
+    // const addon = this.$root.addons.filter((a) => a.package === pkg)[0];
 
     return {
-      pkg,
+      // pkg,
       // addon,
-      addonData: {},
+      remoteAddon: {},
       remoteFetched: false,
     };
   },
 
   mounted() {
-    const self = this;
-    const {addon} = self;
-    self.$api
-      .getAddonVersion(addon.package, addon.version, {
+    const {addon} = this;
+    this.$api
+      .getAddonVersion(addon.package, addon.environment, {
         showErrorMessages: false,
       })
       .then((response) => {
-        self.remoteFetched = true;
-        self.addonData = response;
+        this.remoteFetched = true;
+        this.remoteAddon = response;
       })
       .catch(() => {
-        self.remoteFetched = true;
+        this.remoteFetched = true; // doesn't exist
       });
   },
   computed: {
     addon() {
-      return this.$store.getters['addons/addonByPackage'](this.pkg);
+      return this.$store.getters['addons/addonByPackage'](this.pkg, this.environment);
     },
     isChinaServer() {
       return config.apiEndpoint === 'https://api.tuome.com.cn';
@@ -285,9 +292,8 @@ export default {
     }
   },
   methods: {
-    addonStatus() {
-      const self = this;
-      const {status, deleting, uploading, updating} = self.addonData;
+    addonStatus() {  
+      const {status, deleting, uploading, updating} = this.remoteAddon;
       if (status) {
         if (deleting) return "Deleting...";
         if (updating) return "Updating...";
@@ -296,84 +302,81 @@ export default {
       if (uploading) return "Uploading...";
       return "Not installed";
     },
-    uploadAddon() {
-      const self = this;
-      self.addonData.status = null;
-      self.addonData.uploading = true;
-      const {package: pkg, version} = self.addon;
+    uploadAddon() {  
+      this.remoteAddon.status = null;
+      this.remoteAddon.uploading = true;
+      const {package: pkg, environment, version} = this.addon;
 
-      self.$request({
-        url: `/addon/sandbox/upload/${pkg}/${version}`,
+      request.send({
+        url: `/addon/sandbox/upload/${pkg}/${environment}/${version}`,
         method: "POST",
-        dataType: "json",
-        success(data) {
-          self.addonData = data;
-          self.addonData.uploading = false;
-          self.$api.installAddon(pkg, {}, {});
-          self.$app.notify(
-            "Addon Uploaded",
-            "Your addon uploaded successfully"
-          );
-        },
-        error(xhr) {
-          self.addonData.status = null;
-          self.addonData.uploading = false;
-          self.$app.notify(
-            "Addon Upload Failed",
-            `Your addon uploaded failed: ${xhr.responseText}`
-          );
-        },
+        responseType: "json"
+      }).then((data) => {
+        this.remoteAddon = data;
+        this.remoteAddon.uploading = false;
+        this.$api.installAddon(pkg, {}, {});
+        this.$app.notify(
+          "Addon Uploaded",
+          "Your addon uploaded successfully"
+        );
+      }).catch((err) => {
+        console.log('sdk: upload addon error:', err);
+        this.remoteAddon.status = null;
+        this.remoteAddon.uploading = false;
+        this.$app.notify(
+          "Addon Upload Failed",
+          err.message
+        );
       });
     },
     updateAddon() {
-      const self = this;
-      self.addonData.status = "Updating...";
-      self.addonData.updating = true;
-      const {package: pkg, version} = self.addon;
-      self.$request({
-        url: `/addon/sandbox/upload/${pkg}/${version}`,
+      this.remoteAddon.status = "Updating...";
+      this.remoteAddon.updating = true;
+      const {package: pkg, environment, version} = this.addon;
+
+      request.send({
+        url: `/addon/sandbox/upload/${pkg}/${environment}/${version}`,
         method: "POST",
-        dataType: "json",
-        success(data) {
-          self.addonData = data;
-          self.addonData.updating = false;
-          self.$app.notify(
-            "Addon Updated",
-            "Your addon updated successfully"
-          );
-        },
-        error(xhr) {
-          self.addonData.status = null;
-          self.addonData.updating = false;
-          self.$app.notify(
-            "Addon Update Failed",
-            `Your addon update failed: ${xhr.responseText}`
-          );
-        },
+        responseType: "json"
+      }).then((data) => {
+        this.remoteAddon = data;
+        this.remoteAddon.updating = false;
+        this.$api.installAddon(pkg, {}, {});
+        this.$app.notify(
+          "Addon Updated",
+          "Your addon updated successfully"
+        );
+      }).catch((err) => {
+        console.log('sdk: update addon error:', err);
+        this.remoteAddon.status = null;
+        this.remoteAddon.updating = false;
+        this.$app.notify(
+          "Addon Update Failed",
+          err.message
+        );
       });
     },
-    deleteAddon() {
-      const self = this;
-      self.addonData.status = "Deleting...";
-      self.addonData.deleting = true;
-      const {package: pkg, version} = self.addon;
+    deleteAddon() {  
+      this.remoteAddon.status = "Deleting...";
+      this.remoteAddon.deleting = true;
+      const {package: pkg, environment, version} = this.addon;
 
-      self.$api
-        .deleteAddon(pkg, version, {url: window.SANDBOX_ENDPOINT})
+      this.$api
+        .deleteAddon(pkg, environment, {url: window.SANDBOX_ENDPOINT})
         .then(() => {
-          self.addonData.status = null;
-          self.addonData.deleting = false;
-          self.$app.notify(
+          this.remoteAddon.status = null;
+          this.remoteAddon.deleting = false;
+          this.$app.notify(
             "Addon Uninstalled",
             "Addon uninstalled successfully"
           );
         })
         .catch((err) => {
-          self.addonData.status = null;
-          self.addonData.deleting = false;
-          self.$app.notify(
-            "Addon Error",
-            `Addon uninstall failed: ${err}`
+          this.remoteAddon.status = null;
+          this.remoteAddon.deleting = false;
+          this.$app.notify(
+            "Addon Delete Error",
+            err.message
           );
         });
     },

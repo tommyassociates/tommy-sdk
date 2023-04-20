@@ -1,8 +1,8 @@
 <template>
 	<f7-page>
 		<f7-navbar>
-			<tommy-nav-menu></tommy-nav-menu>
-			<f7-nav-title> Addons </f7-nav-title>
+			<tommy-nav-back action="menu" />
+			<f7-nav-title>Addons</f7-nav-title>
 			<f7-nav-right>
 				<f7-link href="/settings/" icon-material="settings"></f7-link>
 			</f7-nav-right>
@@ -11,21 +11,21 @@
       type="text"
       label="Search"
       v-model:value="search"
+      style="margin: 16px; border:1px solid #999; padding: 8px;font-size:21px;"
     />
-    <!-- style="margin: 20px; border:1px solid #999; padding: 8px;font-size:21px;" -->
 		<!-- Main addons list -->
-		<f7-block-title> Addons </f7-block-title>
+		<f7-block-title>Addons</f7-block-title>
 		<f7-list media-list>
 			<f7-list-item
 				v-for="(addon, index) in addonsSorted"
 				:key="index"
-				:link="`/addon-details/${addon.package}/`"
+				:link="`/addon-details/${addon.package}/${addon.environment}/`"
 				:title="addon.title"
-				:after="addon.version"
+				:after="`${addon.environment} (${addon.version})`"
 				:text="addon.summary"
 			>
 				<template #media>
-					<img class="icon" width="80" :src="addon.icon_url" />
+					<img class="icon" width="40" :src="addon.icon_url" />
 				</template>
 			</f7-list-item>
 		</f7-list>
@@ -48,7 +48,7 @@ export default {
   },
   computed: {
     addonsSorted() {
-      let addons = this.$store.state.addons.addonInstalls; //$root.addons;
+      let addons = this.$store.state.addons.addonInstalls;
       if (this.search) {
         addons = addons.filter((addon) => {
           const title = addon.title.toUpperCase();

@@ -57,25 +57,25 @@ const getExternalLibs = (externalLibNames) => {
   return externalLibs
 }
 
-function createConfig(pkg, version, localAddonFilePath) {
+function createConfig(pkg, environment, version, localAddonFilePath) {
   return {
     mode: env,
     devtool: false, //env === 'development' ? 'source-map' :  // eval-cheap-source-map
     optimization: optimizationConfig,
     entry: {
-      addon: resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/src/addon.js`),
+      addon: resolveAddonPath(localAddonFilePath, `addons/${pkg}/${environment}/src/addon.js`), ///${version}
     },
     output: {
       publicPath: '',
       filename: '[name].js',
-      path: resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/build`),
+      path: resolveAddonPath(localAddonFilePath, `addons/${pkg}/${environment}/build`), ///${version}
       libraryTarget: 'var',
       library: 'addon'
     },
     resolve: {
       extensions: ['.js', '.vue', '.json'],
       alias: {
-        '@': resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/src`),
+        '@': resolveAddonPath(localAddonFilePath, `addons/${pkg}/${environment}/src`), ///${version}
         'tommy-core': 'tommy-core'
       },
       modules: [
@@ -133,7 +133,7 @@ function createConfig(pkg, version, localAddonFilePath) {
         filename: 'addon.css',
       }),
       new CleanWebpackPlugin({
-        cleanOnceBeforeBuildPatterns: [resolveAddonPath(localAddonFilePath, `addons/${pkg}/${version}/build/*.*`)],
+        cleanOnceBeforeBuildPatterns: [resolveAddonPath(localAddonFilePath, `addons/${pkg}/${environment}/build/*.*`)], // /${version}
         dangerouslyAllowCleanPatternsOutsideProject: true,
         dry: false // should be ok
       })
@@ -141,16 +141,16 @@ function createConfig(pkg, version, localAddonFilePath) {
   }
 }
 
-module.exports = function(pkg, version) {
-  const localAddonFilePath = helpers.getLocalAddonFilePath('', '', '..') // ex. tommy-sdk-private
+module.exports = function(pkg, environment, version) {
+  const localAddonFilePath = helpers.getLocalAddonFilePath('', '', '', '..') // ex. tommy-sdk-private
 
   return new Promise((resolve, reject) => {
-    console.error('addon building', pkg, version, 'in', env)
-    const config = createConfig(pkg, version, localAddonFilePath)
+    console.error('addon building', pkg, environment, version, 'in', env)
+    const config = createConfig(pkg, environment, version, localAddonFilePath)
     const compiler = webpack(config)
     compiler.run((err, stats) => {
       if (err) {
-        console.error('addon compile failed', pkg, version)
+        console.error('addon compile failed', pkg, environment, version)
         console.error(err.stack || err)
         if (err.details) {
           console.error(err.details)
@@ -170,7 +170,7 @@ module.exports = function(pkg, version) {
         console.warn('addon compile warning:', info.warnings.map(x => x.message))
       }
 
-      console.log('addon compiled', pkg, version)
+      console.log('addon compiled', pkg, environment, version)
       resolve(stats)
     })
   })

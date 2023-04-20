@@ -3,7 +3,7 @@ import routes from './routes';
 import appComponent from './components/app.vue';
 import components from './components';
 
-import { registerStoreModule, storeModuleIsRegistered } from 'tommy-core/src/utils/modules';
+// import { registerStoreModule, storeModuleIsRegistered } from 'tommy-core/src/utils/modules';
 
 const language = localStorage.language || 'en-US';
 
@@ -18,12 +18,25 @@ import zhCN from './locales/zh-CN';
 // console.log('API_URL', API_URL)
 // console.log('API_KEY', API_KEY)
 
+
+// const buildImportPath = (addon, file) => {
+//   let s = `@addon/${addon.package}/`
+//   if (addon.environment) {
+//     s += `${addon.environment}/`
+//   }
+//   if (addon.version) {
+//     s += `${addon.version}/`
+//   }
+//   return s + file
+//   // `@addon/${addon.package}/src/addon.scss`
+// }
+
 const loadAddonLocales = (addon) => {
   return new Promise((resolve) => {
     if (!addon.locales || addon.locales.length === 0) return resolve()
 
     const iterables = addon.locales.map(language => {
-      return import(`@addon/${addon.package}/${addon.version}/locales/${language}.json`)
+      return import(`@addon/${addon.package}/${addon.environment}/locales/${language}.json`)
         .then((locales) => {
           return {
             [language]: {
@@ -31,6 +44,9 @@ const loadAddonLocales = (addon) => {
             }
           }
         })
+        .catch(err => {
+          console.log('addon: locale load failed', err, addon.title, language, addon);
+        });
     })
 
     Promise.all(iterables)
@@ -115,25 +131,25 @@ tommy.app.init({
       // team,
       // teamMembers,
       loggedIn,
-      language,
-      addons: [],
-      miniProgramLocked: {
-        isLocked: false,
-        isLockedScreen: false,
-        isUnlockScreen: false,
-        isOtherLockedMiniProgramsScreen: false,
-        isShowMenu: false,
-        miniProgram: '',
-      },
+      // language,
+      // addons: [],
+      // miniProgramLocked: {
+      //   isLocked: false,
+      //   isLockedScreen: false,
+      //   isUnlockScreen: false,
+      //   isOtherLockedMiniProgramsScreen: false,
+      //   isShowMenu: false,
+      //   miniProgram: '',
+      // },
     };
   },
   methods: {
     mounted() {
       localStorage.setItem('serverUrl', SANDBOX_URL);
 
-      if (localStorage.miniProgramLocked) {
-        this.$root.miniProgramLocked = JSON.parse(localStorage.miniProgramLocked);
-      }
+      // if (localStorage.miniProgramLocked) {
+      //   this.$root.miniProgramLocked = JSON.parse(localStorage.miniProgramLocked);
+      // }
 
       const payload = {
         data: {
@@ -148,20 +164,29 @@ tommy.app.init({
         console.table(SDK_LOCAL_ADDONS);
 
         SDK_LOCAL_ADDONS.forEach(addon => {
-          console.log('addon', addon.title.toUpperCase());
+          addon.environment = addon.environment || 'production';
+          // console.log('addon', addon.title, addon);
 
           // Load the addon routes programatically for HMR
           if (addon.assets) {
             loadAddonLocales(addon);
-            import(`@addon/${addon.package}/${addon.version}/src/addon.scss`)
-            import(`@addon/${addon.package}/${addon.version}/src/addon.js`)
+            // import(buildImportPath(addon, 'src/addon.scss'))
+            // import(buildImportPath(addon, 'src/addon.js')) 
+            import(`@addon/${addon.package}/${addon.environment}/src/addon.scss`)
+              .catch(err => {
+                console.log('addon: css load failed', err, addon.title, addon);
+              });
+            
+            import(`@addon/${addon.package}/${addon.environment}/src/addon.js`)
               .then(addonModule => {
                 const isModule = !!addonModule.default.routes;
                 const routes = isModule ? addonModule.default.routes : addonModule.default;
+
+                routes.forEach(x => x.path = `/${addon.environment}${x.path}`);
                 const addonIndexView = routes.length ? routes[0] : {};
                 addon.entry_path = addonIndexView.path;
 
-                this.$store.state.addons.addonInstalls.push(addon);
+                this.$store.state.addons.addonInstalls.push(addon);          
 
                 this.$f7.routes.push(...routes);
                 this.$f7.views.main.routes.push(...routes);
@@ -178,8 +203,8 @@ tommy.app.init({
                 // }
 
                 // Load the default addon if specified
-                const loadAddon = (SDK_CONFIG.defaultAddonPath &&
-                  SDK_CONFIG.defaultAddonPath === addon.entry_path) ||
+                const loadAddon = (SDK_CONFIG.defaultPath &&
+                  SDK_CONFIG.defaultPath === addon.entry_path) ||
                   window.location.href.indexOf(addon.entry_path) !== -1
                 if (loadAddon) {
                   const entryUrl = this.addonUrl(addon)
@@ -187,6 +212,9 @@ tommy.app.init({
                   this.$f7.views.main.router.navigate(entryUrl)
                 }
               })
+              .catch(err => {
+                console.log('addon: js load failed', err, addon.title, addon);
+              });
           }
         });
       }).catch((error) => {

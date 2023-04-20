@@ -3,6 +3,8 @@ const junk = require('junk')
 const yaml = require('js-yaml')
 const path = require('path')
 const url = require('url')
+const { globSync } = require('glob')
+
 // const archiver = require('archiver')
 // const request = require('request')
 // const url = require('url')
@@ -19,21 +21,11 @@ function resolvePath() {
   return path.join.apply(path.join, args)
 }
 
-function archivePath(pkg, version) {
-  return resolvePath('archives', `${pkg}-${version}.zip`)
+function archivePath(pkg, environment, version) {
+  return resolvePath('archives', `${pkg}-${environment}-${version}.zip`)
 }
 
-function getFilteredFiles(dir, pkg) {
-  let files = []
-  try {
-    files = fs.readdirSync(dir, pkg)
-    files = files.filter(junk.not)
-  } catch {
-  }
-  return files;
-}
-
-let config;
+let config
 function getConfig() {
   if (config)
     return config
@@ -46,11 +38,10 @@ function getConfig() {
   }
 }
 
-let configCn;
+let configCn
 function getCnConfig() {
   if (config)
     return config
-
   try {
     configCn = JSON.parse(fs.readFileSync(resolvePath('config-cn.json')), 'utf8')
     return configCn
@@ -71,49 +62,39 @@ function getSdkVariables() {
 }
 
 function getSdkUrl() {
-  return `http://localhost:${port}`;
-  // return `http://localhost:${app.get('port')}`;
-}
-
-function readLocalAddonVersions() {
-  const addons = {};
-
-  // Add public packages
-  const packages = getFilteredFiles(resolvePath(publicDir))
-  for (let i = 0; i < packages.length; i += 1) {
-    addons[packages[i]] = getFilteredFiles(resolvePath(publicDir, packages[i]))
-  }
-
-  // Add private packages
-  const privPackages = getFilteredFiles(resolvePath(privateDir))
-  for (let i = 0; i < privPackages.length; i += 1) {
-    addons[privPackages[i]] = getFilteredFiles(resolvePath(privateDir, privPackages[i]))
-  }
-
-  // throw privPackages
-  return addons;
+  return `http://localhost:${port}`
+  // return `http://localhost:${app.get('port')}`
 }
 
 function isPrivateAddon(pkg) {
   return fs.existsSync(resolvePath(privateDir, pkg))
 }
 
-function getLocalAddonFilePath(pkg, version, file) {
+function getLocalAddonFilePath(pkg, environment, version, file) {
   if (isPrivateAddon(pkg)) {
-    return resolvePath(privateDir, pkg, version, file)
+    return resolvePath(privateDir, pkg, environment, file) //, version
   } else {
-    return resolvePath(publicDir, pkg, version, file)
+    return resolvePath(publicDir, pkg, environment, file) //, version
   }
 }
 
-function readLocalAddon(pkg, version) {
-  const addon = yaml.load(fs.readFileSync(getLocalAddonFilePath(pkg, version, 'manifest.yml'), 'utf8'))
-  const base = `/addons/${addon.package}/versions/${addon.version}/files/`;
+function readLocalAddon(pkg, environment, version) {
+  const path = getLocalAddonFilePath(pkg, environment, version, 'manifest.yml')
+  return readLocalAddonFromManifestPath(path)
+}
+
+function readLocalAddonFromManifestPath(path) {
+  const addon = yaml.load(fs.readFileSync(path, 'utf8'))
+  return initAddon(addon)
+}
+
+function initAddon(addon) {
+  const base = `/addons/${addon.package}/${addon.environment || 'production'}/files/` ///${addon.version}
   addon.url = url.resolve(getSdkUrl(), base)
   addon.icon_url = url.resolve(addon.url, 'icon.png') // path + '/icon.png'
   addon.file_base_url = url.resolve(getSdkUrl(), base)
-  addon.dir_prefix = isPrivateAddon(pkg) ? privateDir : publicDir;
-  addon.local = true;
+  addon.dir_prefix = isPrivateAddon(addon.package) ? privateDir : publicDir
+  addon.local = true
 
   if (addon.assets) {
     addon.assets.forEach((asset) => {
@@ -122,15 +103,15 @@ function readLocalAddon(pkg, version) {
   }
 
   if (addon.views) {
-    const views = [];
+    const views = []
     Object.keys(addon.views).forEach((id) => {
-      const view = addon.views[id];
-      view.id = id;
+      const view = addon.views[id]
+      view.id = id
       if (view.url) view.url = url.resolve(addon.url, view.file)
-      view.local = true;
+      view.local = true
       if (view.assets) {
         for (let x = 0; x < view.assets.length; x += 1) {
-          const asset = view.assets[x];
+          const asset = view.assets[x]
           asset.url = url.resolve(addon.url, asset.file)
         }
       }
@@ -138,24 +119,21 @@ function readLocalAddon(pkg, version) {
     })
 
     // convert views to an array
-    addon.views = views;
+    addon.views = views
   }
 
-  return addon;
+  return addon
 }
 
 function readLocalAddons() {
-  const addons = [];
-  const data = readLocalAddonVersions()
-  Object.keys(data).forEach((pkg) => {
-    const versions = data[pkg];
-    for (let i = 0; i < versions.length; i += 1) {
-      const manifest = readLocalAddon(pkg, versions[i])
-      // console.log(manifest)
-      addons.push(manifest)
-    }
-  })
-  return addons;
+  const addons = []
+  const paths = globSync([
+    resolvePath(privateDir) + '/**/manifest.yml',
+    resolvePath(publicDir) + '/**/manifest.yml',
+  ])
+
+  paths.forEach((path) => addons.push(readLocalAddonFromManifestPath(path)))
+  return addons
 }
 
 
@@ -167,7 +145,7 @@ module.exports = {
   getCnConfig,
   getSdkVariables,
   getSdkUrl,
-  readLocalAddonVersions,
+  // readLocalAddonVersions,
   getLocalAddonFilePath,
   readLocalAddon,
   readLocalAddons

@@ -1,8 +1,8 @@
 <template>
 	<f7-page>
 		<f7-navbar>
-			<tommy-nav-menu></tommy-nav-menu>
-			<f7-nav-title> Views </f7-nav-title>
+			<tommy-nav-back action="menu" />
+			<f7-nav-title>Views</f7-nav-title>
 			<f7-nav-right>
 				<f7-link href="/settings/" icon-material="settings"></f7-link>
 			</f7-nav-right>
@@ -11,20 +11,20 @@
       type="text"
       label="Search"
       v-model:value="search"
-      style="margin: 20px; border:1px solid #999; padding: 8px;font-size:21px;"
+      style="margin: 16px; border:1px solid #999; padding: 8px;font-size:21px;"
     />
 		<!-- Main addons views list -->
-		<f7-block-title> Views </f7-block-title>
+		<f7-block-title>Views</f7-block-title>
     <f7-list>
       <template v-for="(addon, index) in addonsSorted" :key="index">
         <template v-if="addon.entry_path">
           <f7-list-item
             :link="addonUrl(addon)"
             :title="$t(`${addon.package}.title`, addon.title)"
-            :after="addon.version"
+            :after="`${addon.environment} (${addon.version})`"
           >
             <template #media>
-              <img class="icon" width="29" :src="addon.icon_url"/>
+              <img class="icon" width="25" :src="addon.icon_url"/>
             </template>
           </f7-list-item>
         </template>

@@ -7,10 +7,10 @@ const helpers = require('../helpers')
 //   return path.join(__dirname, '..', '..', dir)
 // }
 
-module.exports = function(pkg, version) { //, callback
-  const localAddonFilePath = helpers.getLocalAddonFilePath(pkg, version, '')
+module.exports = function(pkg, environment, version) { //, callback
+  const localAddonFilePath = helpers.getLocalAddonFilePath(pkg, environment, version, '')
 
-  const archivePath = helpers.archivePath(pkg, version)
+  const archivePath = helpers.archivePath(pkg, environment, version)
   const outStream = fs.createWriteStream(archivePath)
   const archive = archiver('zip')
 
@@ -24,7 +24,7 @@ module.exports = function(pkg, version) { //, callback
     archive.on('error', (err) => {
       // if (callback) { callback(err, null) }
       // callback = null;
-      console.error('addon archive failed', pkg, version)
+      console.error('addon archive failed', pkg, environment, version)
       reject(err)
     })
 

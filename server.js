@@ -1,8 +1,3 @@
-/* eslint no-console: off */
-/* eslint no-shadow: off */
-/* eslint no-empty: off */
-/* eslint no-param-reassign: off */
-
 const express = require('express')
 const webpack = require('webpack')
 const webpackDevMiddleware = require('webpack-dev-middleware')
@@ -11,6 +6,9 @@ const addonBuilder = require('./scripts/addons/builder')
 const addonArchiver = require('./scripts/addons/archiver')
 const addonUploader = require('./scripts/addons/uploader')
 const helpers = require('./scripts/helpers')
+
+
+// console.log(helpers.readLocalAddons())
 
 const env = process.env.NODE_ENV || 'development'
 const webpackConfigFilename = env === 'development' ? 'dev' : 'prod'
@@ -41,19 +39,26 @@ app.get('/addons', (req, res) => {
   res.send(helpers.readLocalAddons())
 })
 
-app.get('/addons/:package/:version', (req, res) => {
-  res.send(helpers.readLocalAddon(req.params.package, req.params.version))
-})
-
-app.get('/addons/:package/versions/:version/files/*', (req, res) => {
-  res.sendFile(helpers.getLocalAddonFilePath(req.params.package, req.params.version, req.params['0']))
-})
-
-app.post('/addon/build/:package/:version', async (req, res) => {
+app.get('/addons/:package/:environment/:version', (req, res) => {
   const pkg = req.params.package
+  const environment = req.params.environment || 'production'
   const version = req.params.version
-  await addonBuilder(pkg, version)
-  await addonArchiver(pkg, version)
+  res.send(helpers.readLocalAddon(package, environment, version))
+})
+
+app.get('/addons/:package/:environment/:version/files/*', (req, res) => {
+  const pkg = req.params.package
+  const environment = req.params.environment || 'production'
+  const version = req.params.version
+  res.sendFile(helpers.getLocalAddonFilePath(pkg, environment, version, req.params['0']))
+})
+
+app.post('/addon/build/:package/:environment/:version', async (req, res) => {
+  const pkg = req.params.package
+  const environment = req.params.environment || 'production'
+  const version = req.params.version
+  await addonBuilder(pkg, environment, version)
+  await addonArchiver(pkg, environment, version)
   res.sendStatus(200)
 })
 
@@ -61,27 +66,29 @@ app.post('/addon/buildAll', async (req, res) => {
   const addons = helpers.readLocalAddons()
   for (let x in addons) {
     const pkg = addons[x].package
+    const environment = addons[x].environment || 'production'
     const version = addons[x].version
-    const srcpath = helpers.getLocalAddonFilePath(pkg, version, 'src/addon.js')
+    const srcpath = helpers.getLocalAddonFilePath(pkg, environment, version, 'src/addon.js')
     if (fs.existsSync(srcpath)) {
-      await addonBuilder(pkg, version)
-      await addonArchiver(pkg, version)
+      await addonBuilder(pkg, environment, version)
+      await addonArchiver(pkg, environment, version)
     }
   }
 
   // .forEach(async (addon) => {
   //   const pkg = addon.package
   //   const version = addon.version
-  //   await addonBuilder(pkg, version)
-  //   await addonArchiver(pkg, version)
+  //   await addonBuilder(pkg, environment, version)
+  //   await addonArchiver(pkg, environment, version)
   // }
   res.sendStatus(200)
 })
 
-app.post('/addon/sandbox/upload/:package/:version', (req, res) => {
-  const pkg = req.params.package;
-  const version = req.params.version;
-  addonUploader('upload', pkg, version, (errs, jsons) => {
+app.post('/addon/sandbox/upload/:package/:environment/:version', (req, res) => {
+  const pkg = req.params.package
+  const environment = req.params.environment || 'production'
+  const version = req.params.version
+  addonUploader('upload', pkg, environment, version, (errs, jsons) => {
     if (errs) {
       res.status(500).send(errs[0] || errs[1])
     } else {
@@ -90,10 +97,11 @@ app.post('/addon/sandbox/upload/:package/:version', (req, res) => {
   })
 })
 
-app.post('/addon/sandbox/update/:package/:version', (req, res) => {
-  const pkg = req.params.package;
-  const version = req.params.version;
-  addonUploader('update', pkg, version, (err, json) => {
+app.post('/addon/sandbox/update/:package/:environment/:version', (req, res) => {
+  const pkg = req.params.package
+  const environment = req.params.environment || 'production'
+  const version = req.params.version
+  addonUploader('update', pkg, environment, version, (err, json) => {
     if (err) {
       res.status(500).send(err)
     } else {
@@ -102,10 +110,11 @@ app.post('/addon/sandbox/update/:package/:version', (req, res) => {
   })
 })
 
-app.post('/addon/store/submit/:package/:version', (req, res) => {
-  const pkg = req.params.package;
-  const version = req.params.version;
-  addonUploader('submit', pkg, version, (err, json) => {
+app.post('/addon/store/submit/:package/:environment/:version', (req, res) => {
+  const pkg = req.params.package
+  const environment = req.params.environment || 'production'
+  const version = req.params.version
+  addonUploader('submit', pkg, environment, version, (err, json) => {
     if (err) {
       res.status(500).send(err)
     } else {
