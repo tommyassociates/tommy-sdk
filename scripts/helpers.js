@@ -1,5 +1,4 @@
 const fs = require('fs')
-const junk = require('junk')
 const yaml = require('js-yaml')
 const path = require('path')
 const url = require('url')
