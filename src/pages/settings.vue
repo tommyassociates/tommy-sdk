@@ -74,7 +74,7 @@ export default {
           newAccount = account;
       });
       if (!newAccount) return;
-      this.$store.dispatch('changeAccount', newAccount);
+      this.$store.dispatch('changeAccount', { ...newAccount, ignoreAddons: true });
     },
   },
   mounted() {
