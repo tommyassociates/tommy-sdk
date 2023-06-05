@@ -151,6 +151,13 @@ tommy.app.init({
       //   this.$root.miniProgramLocked = JSON.parse(localStorage.miniProgramLocked);
       // }
 
+      //Change the account to the previous logged in account on refresh.
+      const previousAccount = {
+        id: localStorage.getItem('account_id'),
+        type: localStorage.getItem('account_type'),
+        ignoreAddons: true
+      }
+
       const payload = {
         data: {
           api_key: API_KEY
@@ -163,6 +170,10 @@ tommy.app.init({
       this.$store.dispatch('login', payload).then((token) => {
         console.table(SDK_LOCAL_ADDONS);
 
+        if (previousAccount.type !== 'user') {
+          this.$store.dispatch('changeAccount', previousAccount);
+        }
+
         SDK_LOCAL_ADDONS.forEach(addon => {
           addon.environment = addon.environment || 'production';
           // console.log('addon', addon.title, addon);
@@ -171,12 +182,12 @@ tommy.app.init({
           if (addon.assets) {
             loadAddonLocales(addon);
             // import(buildImportPath(addon, 'src/addon.scss'))
-            // import(buildImportPath(addon, 'src/addon.js')) 
+            // import(buildImportPath(addon, 'src/addon.js'))
             import(`@addon/${addon.package}/${addon.environment}/src/addon.scss`)
               .catch(err => {
                 console.log('addon: css load failed', err, addon.title, addon);
               });
-            
+
             import(`@addon/${addon.package}/${addon.environment}/src/addon.js`)
               .then(addonModule => {
                 const isModule = !!addonModule.default.routes;
@@ -186,12 +197,12 @@ tommy.app.init({
                 const addonIndexView = routes.length ? routes[0] : {};
                 addon.entry_path = addonIndexView.path;
 
-                this.$store.state.addons.addonInstalls.push(addon);          
+                this.$store.state.addons.addonInstalls.push(addon);
 
                 this.$f7.routes.push(...routes);
                 this.$f7.views.main.routes.push(...routes);
 
-                // FIXME: Cannot use registerModule with replaceState due to a vuex bug 
+                // FIXME: Cannot use registerModule with replaceState due to a vuex bug
                 // if (isModule) {
                 //   const { name: moduleName, store: moduleStore } = addonModule.default;
                 //   if (storeModuleIsRegistered(this.$store, moduleName)) {
