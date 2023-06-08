@@ -194,7 +194,6 @@ tommy.app.init({
             // (addon.dir_prefix.includes('tommy-sdk-private') ? 
             //   import(`../../tommy-sdk-private/addons/${addon.package}/${addon.environment}/src/addon.js`) :
             //   import(`../addons/${addon.package}/${addon.environment}/src/addon.js`))
-            // , 'src/addon.js'
             importAddon(addon)            
               .then(addonModule => {
                 console.log('sdk: addon loaded', addon.title, addon);
