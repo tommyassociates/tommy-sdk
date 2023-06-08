@@ -7,19 +7,13 @@ const addonArchiver = require('./archiver')
 
 
 module.exports = async function(action, pkg, environment, version, callback) {
-  const urls = [];
-  if (helpers.getConfig() && helpers.getConfig().apiEndpoint) {
-    urls.push(`${helpers.getConfig().apiEndpoint}/v1/addons/${action}?api_key=${helpers.getConfig().apiKey}`)
-  }
-  // NOTE: Disable CN endpoint
-  // if (helpers.getCnConfig() && helpers.getCnConfig().apiEndpoint) {
-  //   urls.push(`${helpers.getCnConfig().apiEndpoint}/v1/addons/${action}?api_key=${helpers.getCnConfig().apiKey}`)
-  // }
 
   await addonBuilder(pkg, environment, version)
   await addonArchiver(pkg, environment, version)
 
-  const archivePath = helpers.archivePath(pkg, environment, version)
+  const archivePath = helpers.archivePath(pkg, environment, version)  
+  const urls = [];
+  urls.push(`${process.env.TOMMY_API_URL}/v1/addons/${action}?api_key=${process.env.TOMMY_API_KEY}`)
   const promises = urls.map(url => new Promise((resolve, reject) => {
     console.log('uploading to ', url, archivePath)
     request.post({

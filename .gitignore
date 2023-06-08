@@ -44,8 +44,11 @@ www/
 src/fonts
 bak/
 archives/
+build/
 config*
 .bak
+.env
+.env*
 
 # Editors
 .idea

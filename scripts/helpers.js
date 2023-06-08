@@ -1,14 +1,8 @@
 const fs = require('fs')
-const junk = require('junk')
 const yaml = require('js-yaml')
 const path = require('path')
 const url = require('url')
 const { globSync } = require('glob')
-
-// const archiver = require('archiver')
-// const request = require('request')
-// const url = require('url')
-// const addonBuilder = require('./addon-builder')
 
 const port = 8080
 const publicDir = 'addons'
@@ -25,45 +19,8 @@ function archivePath(pkg, environment, version) {
   return resolvePath('archives', `${pkg}-${environment}-${version}.zip`)
 }
 
-let config
-function getConfig() {
-  if (config)
-    return config
-
-  try {
-    config = JSON.parse(fs.readFileSync(resolvePath('config.json')), 'utf8')
-    return config
-  } catch (e) {
-    throw new Error('Cannot load config.json: ' + e)
-  }
-}
-
-let configCn
-function getCnConfig() {
-  if (config)
-    return config
-  try {
-    configCn = JSON.parse(fs.readFileSync(resolvePath('config-cn.json')), 'utf8')
-    return configCn
-  } catch (e) {}
-}
-
-function getSdkVariables() {
-  return {
-    SDK_URL: JSON.stringify(getSdkUrl()),
-    SDK_CONFIG: JSON.stringify(getConfig()),
-    SDK_LOCAL_ADDONS: JSON.stringify(readLocalAddons()),
-    API_KEY: JSON.stringify(getConfig().apiKey),
-    API_URL: JSON.stringify(getConfig().apiEndpoint),
-    API_ENDPOINT: JSON.stringify(getConfig().apiEndpoint + '/v1/'),
-    SANDBOX_URL: JSON.stringify(getConfig().apiSandboxEndpoint),
-    SANDBOX_ENDPOINT: JSON.stringify(getConfig().apiSandboxEndpoint + '/v1/')
-  }
-}
-
 function getSdkUrl() {
   return `http://localhost:${port}`
-  // return `http://localhost:${app.get('port')}`
 }
 
 function isPrivateAddon(pkg) {
@@ -141,14 +98,8 @@ module.exports = {
   port,
   resolvePath,
   archivePath,
-  getConfig,
-  getCnConfig,
-  getSdkVariables,
   getSdkUrl,
-  // readLocalAddonVersions,
   getLocalAddonFilePath,
   readLocalAddon,
   readLocalAddons
-  // createAddon,
-  // createAddonArchive
 }

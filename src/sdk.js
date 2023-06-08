@@ -1,7 +1,7 @@
-import tommy from 'tommy-core/src/tommy'; // eslint-disable-line
-import routes from './routes';
+import tommy from 'tommy-core/src/tommy.js'; // eslint-disable-line
+import routes from './routes.js';
 import appComponent from './components/app.vue';
-import components from './components';
+// import components from './components.js';
 
 // import { registerStoreModule, storeModuleIsRegistered } from 'tommy-core/src/utils/modules';
 
@@ -12,11 +12,11 @@ import './scss/sdk.scss';
 import enUS from './locales/en-US';
 import zhCN from './locales/zh-CN';
 
-// console.log('SDK_LOCAL_ADDONS', SDK_LOCAL_ADDONS)
+// console.log('localAddons', localAddons)
 // console.log('SDK_CONFIG', SDK_CONFIG)
-// console.log('SANDBOX_URL', SANDBOX_URL)
+// console.log('import.meta.env.TOMMY_API_URL', import.meta.env.TOMMY_API_URL)
 // console.log('API_URL', API_URL)
-// console.log('API_KEY', API_KEY)
+// console.log('TOMMY_API_KEY', TOMMY_API_KEY)
 
 
 // const buildImportPath = (addon, file) => {
@@ -31,12 +31,19 @@ import zhCN from './locales/zh-CN';
 //   // `@addon/${addon.package}/src/addon.scss`
 // }
 
+const importAddon = (addon) => {
+  return (addon.dir_prefix.includes('tommy-sdk-private') ? 
+    import(`../../tommy-sdk-private/addons/${addon.package}/${addon.environment}/src/addon.js`) :
+    import(`../addons/${addon.package}/${addon.environment}/src/addon.js`))
+}
+
 const loadAddonLocales = (addon) => {
   return new Promise((resolve) => {
     if (!addon.locales || addon.locales.length === 0) return resolve()
 
     const iterables = addon.locales.map(language => {
-      return import(`@addon/${addon.package}/${addon.environment}/locales/${language}.json`)
+      // return import(`@addon/${addon.package}/${addon.environment}/locales/${language}.json`)
+      return import(`./addons/${addon.package}/${addon.environment}/locales/${language}.json`)
         .then((locales) => {
           return {
             [language]: {
@@ -45,7 +52,7 @@ const loadAddonLocales = (addon) => {
           }
         })
         .catch(err => {
-          console.log('addon: locale load failed', err, addon.title, language, addon);
+          // console.log('addon: locale load failed', err, addon.title, language, addon);
         });
     })
 
@@ -72,7 +79,7 @@ tommy.app.init({
     'zh-CN': zhCN,
   },
   pushState: true,
-  components,
+  // components,
   data() {
     const actorId = localStorage.actorId ? parseInt(localStorage.actorId, 10) : null;
     const accounts = null;
@@ -144,16 +151,18 @@ tommy.app.init({
     };
   },
   methods: {
-    mounted() {
-      localStorage.setItem('serverUrl', SANDBOX_URL);
-
-      // if (localStorage.miniProgramLocked) {
-      //   this.$root.miniProgramLocked = JSON.parse(localStorage.miniProgramLocked);
-      // }
+    async loadLocalAddons() {
+      return await this.$request.get('addons', { responseType: 'json' });
+    },
+    async mounted() {
+      console.log('sdk: mounted', import.meta.env);
+      localStorage.setItem('serverUrl', import.meta.env.TOMMY_API_URL);
+      const localAddons = await this.loadLocalAddons();
+      console.table(localAddons);
 
       const payload = {
         data: {
-          api_key: API_KEY
+          api_key: import.meta.env.TOMMY_API_KEY,
         },
         options: {
           user: false,
@@ -161,24 +170,34 @@ tommy.app.init({
         }
       };
       this.$store.dispatch('login', payload).then((token) => {
-        console.table(SDK_LOCAL_ADDONS);
-
-        SDK_LOCAL_ADDONS.forEach(addon => {
+        localAddons.forEach(addon => {
           addon.environment = addon.environment || 'production';
-          // console.log('addon', addon.title, addon);
 
           // Load the addon routes programatically for HMR
           if (addon.assets) {
             loadAddonLocales(addon);
             // import(buildImportPath(addon, 'src/addon.scss'))
             // import(buildImportPath(addon, 'src/addon.js')) 
-            import(`@addon/${addon.package}/${addon.environment}/src/addon.scss`)
-              .catch(err => {
-                console.log('addon: css load failed', err, addon.title, addon);
-              });
+            // import(`@addon/${addon.package}/${addon.environment}/src/addon.scss`)
+            // import(`../addons/${addon.package}/${addon.environment}/src/addon.scss`)
+            //   .catch(err => {
+            //     // console.log('addon: css load failed', err, addon.title, addon);
+            //   });
             
-            import(`@addon/${addon.package}/${addon.environment}/src/addon.js`)
+            // import(`@addon/${addon.package}/${addon.environment}/src/addon.js`)
+            // import(`../addons/${addon.package}/${addon.environment}/src/addon.js`)
+            // import(`@addon/${addon.package}/${addon.environment}/src/addon.js`)
+
+            // console.log('sdk: loading addon', `../${addon.dir_prefix}/${addon.package}/${addon.environment}/src/addon.js`);
+            // import(`../${addon.dir_prefix}/${addon.package}/${addon.environment}/src/addon.js`)
+            // import(addon.dir_prefix.includes('tommy-sdk-private') ? `../../tommy-sdk-private/addons/${addon.package}/${addon.environment}/src/addon.js` : `../addons/${addon.package}/${addon.environment}/src/addon.js`)
+            // (addon.dir_prefix.includes('tommy-sdk-private') ? 
+            //   import(`../../tommy-sdk-private/addons/${addon.package}/${addon.environment}/src/addon.js`) :
+            //   import(`../addons/${addon.package}/${addon.environment}/src/addon.js`))
+            // , 'src/addon.js'
+            importAddon(addon)            
               .then(addonModule => {
+                console.log('sdk: addon loaded', addon.title, addon);
                 const isModule = !!addonModule.default.routes;
                 const routes = isModule ? addonModule.default.routes : addonModule.default;
 
@@ -203,22 +222,22 @@ tommy.app.init({
                 // }
 
                 // Load the default addon if specified
-                const loadAddon = (SDK_CONFIG.defaultPath &&
-                  SDK_CONFIG.defaultPath === addon.entry_path) ||
-                  window.location.href.indexOf(addon.entry_path) !== -1
-                if (loadAddon) {
-                  const entryUrl = this.addonUrl(addon)
-                  // console.log('loading initial addon', entryUrl)
-                  this.$f7.views.main.router.navigate(entryUrl)
-                }
+                // const loadAddon = (SDK_CONFIG.defaultPath &&
+                //   SDK_CONFIG.defaultPath === addon.entry_path) ||
+                //   window.location.href.indexOf(addon.entry_path) !== -1
+                // if (loadAddon) {
+                //   const entryUrl = this.addonUrl(addon)
+                //   // console.log('loading initial addon', entryUrl)
+                //   this.$f7.views.main.router.navigate(entryUrl)
+                // }
               })
               .catch(err => {
-                console.log('addon: js load failed', err, addon.title, addon);
+                // console.log('addon: js load failed', err, addon.title, addon);
               });
           }
         });
       }).catch((error) => {
-        this.$f7.dialog.alert(`Cannot connect to sandbox server: ${SANDBOX_ENDPOINT}: ${error}`);
+        this.$f7.dialog.alert(`Cannot connect to sandbox server: ${import.meta.env.TOMMY_API_URL}: ${error}`);
       });
     },
     addonUrl(addon) {

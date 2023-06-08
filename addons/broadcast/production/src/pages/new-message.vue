@@ -46,7 +46,7 @@
   </f7-page>
 </template>
 <script>
-  import API from '../api';
+  import API from '../api.js';
   import GroupPopupCmp from '../components/group-popup.vue';
   import SearchCmp from '../components/search.vue';
   import TagCmp from '../components/tag.vue';
