@@ -126,10 +126,10 @@ tommy.app.init({
         }
       };
       this.$store.dispatch('login', payload).then((token) => {
+        if (previousAccount.type !== 'user') {
+          this.$store.dispatch('changeAccount', previousAccount);
+        }
         localAddons.forEach(addon => {
-          if (previousAccount.type !== 'user') {
-            this.$store.dispatch('changeAccount', previousAccount);
-          }
           addon.environment = addon.environment || 'production';
 
           // Load the addon routes programatically for HMR
