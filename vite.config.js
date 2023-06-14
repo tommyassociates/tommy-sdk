@@ -45,7 +45,14 @@ export default defineConfig(({ command, mode }) => {
     envPrefix: 'TOMMY_',
     // define: entries,
     server: {
-      port: 8080
+      port: 8080,
+      fs: {
+        allow: [
+          'addons',
+          'src',
+          'node_modules/@fontsource'
+        ],
+      },
     },
     resolve: {
       alias: [
@@ -54,9 +61,13 @@ export default defineConfig(({ command, mode }) => {
           replacement: path.resolve(__dirname, 'src')
         },
         {
-          find: '@addon',
-          replacement: path.resolve(__dirname, '../tommy-sdk-private/addons')
+          find: 'tommy-core',
+          replacement: path.resolve(__dirname, '../tommy-core')
         }
+        // {
+        //   find: '@addon',
+        //   replacement: path.resolve(__dirname, '../tommy-sdk-private/addons')
+        // }
         // '@addon': resolvePath('../tommy-sdk-private/addons'),
       ]
     },

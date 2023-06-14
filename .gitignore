@@ -53,7 +53,7 @@ src/fonts
 bak/
 archives/
 build/
-config*
+config.json.txt
 .bak
 .env
 .env*
