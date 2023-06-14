@@ -26,28 +26,21 @@
     "api"
   ],
   "dependencies": {
+    "@fontsource/inter": "^4.5.11",
     "@vitejs/plugin-vue": "^4.2.3",
     "archiver": "^5.3.1",
-    "chart.js": "^4.3.0",
     "cross-env": "^7.0.3",
     "express": "^4.18.2",
-    "framework7": "^8.0.5",
-    "framework7-vue": "^8.0.5",
     "glob": "^10.2.1",
     "js-yaml": "^4.0.0",
-    "moment": "^2.29.4",
     "ora": "^5.3.0",
     "request": "^2.88.2",
     "sass": "^1.62.1",
-    "tommy-core": "tommyassociates/tommy-core#vite",
+    "tommy-core": "link:../tommy-core",
     "vite": "^4.3.9",
     "vite-express": "^0.9.1",
     "vue": "^3.3.4",
-    "vue-chartjs": "^5.2.0",
-    "vue-country-flag-next": "^2.3.2",
-    "vue-multiselect": "^3.0.0-beta.1",
-    "vuex": "^4.0.2",
-    "vuex-persistedstate": "^4.1.0"
+    "vuex": "^4.0.2"
   },
   "engines": {
     "node": ">= 6.0.0",
