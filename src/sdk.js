@@ -86,68 +86,17 @@ tommy.app.init({
     let token = localStorage.token;
     let user = null;
     let account = null;
-    // let team = null;
-    // let teamMembers = null;
     let loggedIn = false;
-    if (token) {
-      // if (localStorage.user) {
-      //   try {
-      //     user = JSON.parse(localStorage.user);
-      //   } catch (e) {
-      //     // no user
-      //   }
-      // }
-      // if (localStorage.account) {
-      //   try {
-      //     account = JSON.parse(localStorage.account);
-      //   } catch (e) {
-      //     // no user
-      //   }
-      // }
-      // if (localStorage.team) {
-      //   try {
-      //     team = JSON.parse(localStorage.team);
-      //   } catch (e) {
-      //     // no user
-      //   }
-      // }
-      // if (localStorage.teamMembers) {
-      //   try {
-      //     teamMembers = JSON.parse(localStorage.teamMembers);
-      //   } catch (e) {
-      //     // no user
-      //   }
-      // }
-    }
     if (token && user && account) {
       loggedIn = true;
     } else {
       token = null;
-      // user = null;
-      // account = null;
-      // team = null;
-      // teamMembers = null;
     }
 
     return {
       actorId,
       token,
-      // user,
-      // account,
-      // accounts,
-      // team,
-      // teamMembers,
       loggedIn,
-      // language,
-      // addons: [],
-      // miniProgramLocked: {
-      //   isLocked: false,
-      //   isLockedScreen: false,
-      //   isUnlockScreen: false,
-      //   isOtherLockedMiniProgramsScreen: false,
-      //   isShowMenu: false,
-      //   miniProgram: '',
-      // },
     };
   },
   methods: {
@@ -160,6 +109,13 @@ tommy.app.init({
       const localAddons = await this.loadLocalAddons();
       console.table(localAddons);
 
+      // Change the account to the previous logged in account on refresh.
+      const previousAccount = {
+        id: localStorage.getItem('account_id'),
+        type: localStorage.getItem('account_type'),
+        ignoreAddons: true
+      }
+
       const payload = {
         data: {
           api_key: import.meta.env.TOMMY_API_KEY,
@@ -171,12 +127,16 @@ tommy.app.init({
       };
       this.$store.dispatch('login', payload).then((token) => {
         localAddons.forEach(addon => {
+          if (previousAccount.type !== 'user') {
+            this.$store.dispatch('changeAccount', previousAccount);
+          }
           addon.environment = addon.environment || 'production';
 
           // Load the addon routes programatically for HMR
           if (addon.assets) {
             loadAddonLocales(addon);
             // import(buildImportPath(addon, 'src/addon.scss'))
+
             // import(buildImportPath(addon, 'src/addon.js')) 
             // import(`@addon/${addon.package}/${addon.environment}/src/addon.scss`)
             // import(`../addons/${addon.package}/${addon.environment}/src/addon.scss`)
@@ -204,12 +164,12 @@ tommy.app.init({
                 const addonIndexView = routes.length ? routes[0] : {};
                 addon.entry_path = addonIndexView.path;
 
-                this.$store.state.addons.addonInstalls.push(addon);          
+                this.$store.state.addons.addonInstalls.push(addon);
 
                 this.$f7.routes.push(...routes);
                 this.$f7.views.main.routes.push(...routes);
 
-                // FIXME: Cannot use registerModule with replaceState due to a vuex bug 
+                // FIXME: Cannot use registerModule with replaceState due to a vuex bug
                 // if (isModule) {
                 //   const { name: moduleName, store: moduleStore } = addonModule.default;
                 //   if (storeModuleIsRegistered(this.$store, moduleName)) {

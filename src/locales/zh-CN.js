@@ -9,10 +9,14 @@ export default {
   },
   format: {
     date: {
-      default: 'YYYY-MM-DD',
+      default: 'YYYY/MM/DD',
       long: 'MMMM D, YYYY',
-      short: 'MMM D',
+      short: 'MMM D'
     },
-    time: 'h:mma',
-  }
+    time: {
+      default: 'h:mma',
+      long: 'h:mma',
+      hideZeroMinutes: 'ha'
+    },
+  },
 };
