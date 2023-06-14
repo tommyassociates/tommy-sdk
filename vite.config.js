@@ -1,6 +1,8 @@
 import { defineConfig, loadEnv } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import path from 'path';
+import { fileURLToPath } from 'node:url';
+
 import packageJson from './package.json';
 
 // import { ViteDevServer } from 'vite';
@@ -73,7 +75,19 @@ export default defineConfig(({ command, mode }) => {
     },
     build: {
       chunkSizeWarningLimit: 600,
-      cssCodeSplit: false
+      cssCodeSplit: false,
+      rollupOptions: {
+        external: [
+          'vuex',
+          fileURLToPath(
+            new URL(
+              'node_modules/vuex/dist/vuex.esm-bundler.js',
+              import.meta.url
+            )
+          ),
+          /node_modules/
+        ]
+      }
     }
   }
 });
