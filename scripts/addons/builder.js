@@ -1,12 +1,13 @@
 const path = require('path')
+const fs = require('fs')
 const { build } = require('vite')
 const helpers = require('../helpers')
 
-const env = process.env.NODE_ENV || 'production'
+// const env = process.env.NODE_ENV || 'production'
 
-module.exports = function(pkg, environment, version) {
+module.exports = async function(pkg, environment, version) {
   const localAddonFilePath = helpers.getLocalAddonFilePath(pkg, environment, version, '')
-  console.log('addon building', pkg, environment, version, 'in', env)
+  console.log('addon building', pkg, environment, version) // , 'in', env
 
   const entry = path.join(localAddonFilePath, 'src/addon.js')
   const outDir = path.join(localAddonFilePath, 'build')
@@ -14,28 +15,34 @@ module.exports = function(pkg, environment, version) {
   console.log('addon building: out dir', outDir)
 
   // https://vitejs.dev/guide/build.html#library-mode
-  return build({
+  const result = await build({
     build: {
       outDir,
       lib: {
         entry,
-        name: "addon",
-        fileName: "addon",
-        formats: ["cjs"],
+        name: 'addon',
+        fileName: 'addon',
+        formats: ['iife'],
       },
       emptyOutDir: true,
       rollupOptions: {
-        // external: ['vue'],
+        external: ['vue', 'vuex'],
         output: {
           assetFileNames: (chunkInfo) => {
             if (chunkInfo.name === 'style.css')
               return 'addon.css'
           },
-          // globals: {
-          //   vue: 'Vue',
-          // },
+          globals: {
+            vue: 'vue',
+            vuex: 'vuex',
+          },
         },
       },
     },
   })
+
+  // Rename to addon.js
+  // This may be possible via Vite but this was easier
+  fs.renameSync(outDir + '/addon.iife.js', outDir + '/addon.js')
+  return result
 }
