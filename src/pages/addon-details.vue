@@ -48,18 +48,6 @@
           :title="remoteAddon.updated_at"
         >
         </f7-list-item>
-        <!-- <f7-list-item
-          header="Server"
-          title="China"
-          v-if="isChinaServer"
-        >
-        </f7-list-item>
-        <f7-list-item
-          header="Server"
-          title="Tommy"
-          v-if="isIntlServer"
-        >
-        </f7-list-item> -->
       </f7-list>
       <f7-block>
         <template v-if="remoteAddon.status">
@@ -131,7 +119,6 @@
   </f7-page>
 </template>
 <script>
-import config from '../../config.json';
 
 export default {
   props: {
@@ -174,15 +161,9 @@ export default {
     addon() {
       return this.$store.getters['addons/addonByPackage'](this.pkg, this.environment);
     },
-    isChinaServer() {
-      return config.apiEndpoint === 'https://api.tuome.com.cn';
-    },
-    isIntlServer() {
-      return config.apiEndpoint === 'https://api.mytommy.com';
-    }
   },
   methods: {
-    addonStatus() {  
+    addonStatus() {
       const {status, deleting, uploading, updating} = this.remoteAddon;
       if (status) {
         if (deleting) return "Deleting...";
@@ -192,7 +173,7 @@ export default {
       if (uploading) return "Uploading...";
       return "Not installed";
     },
-    uploadAddon() {  
+    uploadAddon() {
       this.remoteAddon.status = null;
       this.remoteAddon.uploading = true;
       const {package: pkg, environment, version} = this.addon;
@@ -246,7 +227,7 @@ export default {
         );
       });
     },
-    deleteAddon() {  
+    deleteAddon() {
       this.remoteAddon.status = "Deleting...";
       this.remoteAddon.deleting = true;
       const {package: pkg, environment, version} = this.addon;
