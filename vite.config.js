@@ -54,10 +54,9 @@ export default defineConfig(({ command, mode }) => {
           replacement: path.resolve(__dirname, 'src')
         },
         {
-          find: '@addon',
-          replacement: path.resolve(__dirname, '../tommy-sdk-private/addons')
+          find: 'tommy-core',
+          replacement: path.resolve(__dirname, '../tommy-core')
         }
-        // '@addon': resolvePath('../tommy-sdk-private/addons'),
       ]
     },
     build: {
