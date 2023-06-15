@@ -26,7 +26,7 @@ module.exports = async function(pkg, environment, version) {
       },
       emptyOutDir: true,
       rollupOptions: {
-        external: ['vue', 'vuex'],
+        external: ['vue', 'vuex', 'vue-chartjs', 'chart.js', 'dush'],
         output: {
           assetFileNames: (chunkInfo) => {
             if (chunkInfo.name === 'style.css')
@@ -35,6 +35,9 @@ module.exports = async function(pkg, environment, version) {
           globals: {
             vue: 'vue',
             vuex: 'vuex',
+            'vue-chartjs': 'vue_chartjs',
+            'chart.js': 'chartjs',
+            dush: 'dush',
           },
         },
       },
