@@ -1,8 +1,7 @@
-import tommy from 'tommy-core/src/tommy.js'; // eslint-disable-line
+import tommy from 'tommy-core/src/tommy.js';
 import routes from './routes.js';
 import appComponent from './components/app.vue';
 // import components from './components.js';
-
 // import { registerStoreModule, storeModuleIsRegistered } from 'tommy-core/src/utils/modules';
 
 const language = localStorage.language || 'en-US';
@@ -12,24 +11,6 @@ import './scss/sdk.scss';
 import enUS from './locales/en-US';
 import zhCN from './locales/zh-CN';
 
-// console.log('localAddons', localAddons)
-// console.log('SDK_CONFIG', SDK_CONFIG)
-// console.log('import.meta.env.TOMMY_API_URL', import.meta.env.TOMMY_API_URL)
-// console.log('API_URL', API_URL)
-// console.log('TOMMY_API_KEY', TOMMY_API_KEY)
-
-
-// const buildImportPath = (addon, file) => {
-//   let s = `@addon/${addon.package}/`
-//   if (addon.environment) {
-//     s += `${addon.environment}/`
-//   }
-//   if (addon.version) {
-//     s += `${addon.version}/`
-//   }
-//   return s + file
-//   // `@addon/${addon.package}/src/addon.scss`
-// }
 
 const importAddon = (addon) => {
   return (addon.dir_prefix.includes('tommy-sdk-private') ? 
@@ -100,8 +81,8 @@ tommy.app.init({
     };
   },
   methods: {
-    async loadLocalAddons() {
-      return await this.$request.get('addons', { responseType: 'json' });
+    loadLocalAddons() {
+      return this.$request.get('addons', { responseType: 'json' });
     },
     async mounted() {
       console.log('sdk: mounted', import.meta.env);
@@ -131,29 +112,8 @@ tommy.app.init({
         }
         localAddons.forEach(addon => {
           addon.environment = addon.environment || 'production';
-
-          // Load the addon routes programatically for HMR
           if (addon.assets) {
             loadAddonLocales(addon);
-            // import(buildImportPath(addon, 'src/addon.scss'))
-
-            // import(buildImportPath(addon, 'src/addon.js')) 
-            // import(`@addon/${addon.package}/${addon.environment}/src/addon.scss`)
-            // import(`../addons/${addon.package}/${addon.environment}/src/addon.scss`)
-            //   .catch(err => {
-            //     // console.log('addon: css load failed', err, addon.title, addon);
-            //   });
-            
-            // import(`@addon/${addon.package}/${addon.environment}/src/addon.js`)
-            // import(`../addons/${addon.package}/${addon.environment}/src/addon.js`)
-            // import(`@addon/${addon.package}/${addon.environment}/src/addon.js`)
-
-            // console.log('sdk: loading addon', `../${addon.dir_prefix}/${addon.package}/${addon.environment}/src/addon.js`);
-            // import(`../${addon.dir_prefix}/${addon.package}/${addon.environment}/src/addon.js`)
-            // import(addon.dir_prefix.includes('tommy-sdk-private') ? `../../tommy-sdk-private/addons/${addon.package}/${addon.environment}/src/addon.js` : `../addons/${addon.package}/${addon.environment}/src/addon.js`)
-            // (addon.dir_prefix.includes('tommy-sdk-private') ? 
-            //   import(`../../tommy-sdk-private/addons/${addon.package}/${addon.environment}/src/addon.js`) :
-            //   import(`../addons/${addon.package}/${addon.environment}/src/addon.js`))
             importAddon(addon)            
               .then(addonModule => {
                 console.log('sdk: addon loaded', addon.title, addon);
@@ -191,7 +151,7 @@ tommy.app.init({
                 // }
               })
               .catch(err => {
-                // console.log('addon: js load failed', err, addon.title, addon);
+                console.log('addon: js load failed', err, addon.title, addon);
               });
           }
         });
@@ -208,5 +168,3 @@ tommy.app.init({
   f7ready(f7) {
   },
 });
-
-// export default tommy;
