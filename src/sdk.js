@@ -14,8 +14,8 @@ import zhCN from './locales/zh-CN';
 
 const importAddon = (addon) => {
   return (addon.dir_prefix.includes('tommy-sdk-private') ? 
-    import(`../../tommy-sdk-private/addons/${addon.package}/${addon.environment}/src/addon.js`) :
-    import(`../addons/${addon.package}/${addon.environment}/src/addon.js`))
+    import(`../../tommy-sdk-private/addons/${addon.package}/development/src/addon.js`) :
+    import(`../addons/${addon.package}/development/src/addon.js`))
 }
 
 const loadAddonLocales = (addon) => {
@@ -23,8 +23,8 @@ const loadAddonLocales = (addon) => {
     if (!addon.locales || addon.locales.length === 0) return resolve()
 
     const iterables = addon.locales.map(language => {
-      // return import(`@addon/${addon.package}/${addon.environment}/locales/${language}.json`)
-      return import(`./addons/${addon.package}/${addon.environment}/locales/${language}.json`)
+      // return import(`@addon/${addon.package}/development/locales/${language}.json`)
+      return import(`./addons/${addon.package}/development/locales/${language}.json`)
         .then((locales) => {
           return {
             [language]: {
@@ -115,7 +115,7 @@ tommy.app.init({
 
           // FIXME: Skip production addons for now - just work on development 
           // addons until we can fix internal environment specific routing
-          if (!addon.environment || addon.environment === 'production') return;
+          if (addon.url.indexOf('/development/') === -1) return;
 
           if (addon.assets) {
             loadAddonLocales(addon);
@@ -125,7 +125,7 @@ tommy.app.init({
                 const isModule = !!addonModule.default.routes;
                 const routes = isModule ? addonModule.default.routes : addonModule.default;
 
-                // routes.forEach(x => x.path = `/${addon.environment}${x.path}`);
+                // routes.forEach(x => x.path = `/development${x.path}`);
                 const addonIndexView = routes.length ? routes[0] : {};
                 addon.entry_path = addonIndexView.path;
 
