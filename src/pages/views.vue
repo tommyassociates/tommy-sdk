@@ -21,7 +21,7 @@
           <f7-list-item
             :link="addonUrl(addon)"
             :title="$t(`${addon.package}.title`, addon.title)"
-            :after="`${addon.environment} (${addon.version})`"
+            :after="addon.version"
           >
             <template #media>
               <img class="icon" width="25" :src="addon.icon_url"/>

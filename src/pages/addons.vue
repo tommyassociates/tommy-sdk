@@ -19,9 +19,9 @@
 			<f7-list-item
 				v-for="(addon, index) in addonsSorted"
 				:key="index"
-				:link="`/addon-details/${addon.package}/${addon.environment}/`"
+				:link="`/addon-details/${addon.package}/`"
 				:title="addon.title"
-				:after="`${addon.environment} (${addon.version})`"
+				:after="addon.version"
 				:text="addon.summary"
 			>
 				<template #media>

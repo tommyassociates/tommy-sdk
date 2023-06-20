@@ -111,7 +111,12 @@ tommy.app.init({
           this.$store.dispatch('changeAccount', previousAccount);
         }
         localAddons.forEach(addon => {
-          addon.environment = addon.environment || 'production';
+          // addon.environment = addon.environment || 'production';
+
+          // FIXME: Skip production addons for now - just work on development 
+          // addons until we can fix internal environment specific routing
+          if (!addon.environment || addon.environment === 'production') return;
+
           if (addon.assets) {
             loadAddonLocales(addon);
             importAddon(addon)            
@@ -120,7 +125,7 @@ tommy.app.init({
                 const isModule = !!addonModule.default.routes;
                 const routes = isModule ? addonModule.default.routes : addonModule.default;
 
-                routes.forEach(x => x.path = `/${addon.environment}${x.path}`);
+                // routes.forEach(x => x.path = `/${addon.environment}${x.path}`);
                 const addonIndexView = routes.length ? routes[0] : {};
                 addon.entry_path = addonIndexView.path;
 
@@ -141,14 +146,15 @@ tommy.app.init({
                 // }
 
                 // Load the default addon if specified
-                // const loadAddon = (SDK_CONFIG.defaultPath &&
-                //   SDK_CONFIG.defaultPath === addon.entry_path) ||
-                //   window.location.href.indexOf(addon.entry_path) !== -1
-                // if (loadAddon) {
-                //   const entryUrl = this.addonUrl(addon)
-                //   // console.log('loading initial addon', entryUrl)
-                //   this.$f7.views.main.router.navigate(entryUrl)
-                // }
+                // (SDK_CONFIG.defaultPath &&
+                  // SDK_CONFIG.defaultPath === addon.entry_path) ||
+                  // 
+                const loadAddon = window.location.href.indexOf(addon.entry_path) !== -1
+                if (loadAddon) {
+                  const entryUrl = this.addonUrl(addon)
+                  console.log('loading initial addon', entryUrl)
+                  this.$f7.views.main.router.navigate(entryUrl)
+                }
               })
               .catch(err => {
                 console.log('addon: js load failed', err, addon.title, addon);

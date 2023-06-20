@@ -27,7 +27,7 @@ const routes = [
     name: 'views',
   },
   {
-    path: '/addon-details/:pkg/:environment/',
+    path: '/addon-details/:pkg/',
     component: AddonDetails,
   },
   // ...coreRoutes,

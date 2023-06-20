@@ -13,8 +13,8 @@
         :title="`${addon.title} (${addon.package})`"
       >
       </f7-list-item>
-      <f7-list-item header="Environment" :title="addon.environment">
-      </f7-list-item>
+      <!-- <f7-list-item header="Environment" :title="addon.environment">
+      </f7-list-item> -->
       <f7-list-item header="Version" :title="addon.version">
       </f7-list-item>
       <f7-list-item header="Developer" :title="`${addon.developer}`">
@@ -36,11 +36,11 @@
       </f7-list-item>
       <f7-list-item v-if="addon.private" header="Private" title="Yes">
       </f7-list-item>
-    </f7-list>
+    <!-- </f7-list>
     <div id="addon-details-sandbox" v-if="remoteFetched">
       <f7-block-title>Sandbox Testing</f7-block-title>
-      <f7-list>
-        <f7-list-item header="Status" :title="addonStatus()">
+      <f7-list> -->
+        <f7-list-item header="Status" :title="addonStatus">
         </f7-list-item>
         <f7-list-item
           v-if="remoteAddon.updated_at"
@@ -49,6 +49,33 @@
         >
         </f7-list-item>
       </f7-list>
+    <!-- </div> -->
+
+    <div id="addon-upload">
+      <f7-block-title>Upload</f7-block-title>
+      <f7-list class="list-form mb-16" outset>
+        <div class="item-content item-input">
+          <div class="item-inner">
+            <div class="item-title item-label">
+              <!-- item-label -->
+              <!-- <div class="item-header"> -->
+                Environment
+              <!-- </div> -->
+            </div>
+            <div class="item-input-wrap">
+              <select
+                  class="input"
+                  :disabled="remoteAddon.uploading || remoteAddon.updating"
+                  v-model="environment"
+                  @change="remoteAddon.status = $event.target.value"
+              >
+                <option v-for="env in environments" :value="env">{{ env }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </f7-list>
+
       <f7-block>
         <template v-if="remoteAddon.status">
           <p>
@@ -126,9 +153,9 @@ export default {
     pkg: {
       required: true
     },
-    environment: {
-      required: true
-    }
+    // environment: {
+    //   required: true
+    // }
   },
   data() {
     // const this = this;
@@ -138,6 +165,8 @@ export default {
     return {
       // pkg,
       // addon,
+      environment: "development",
+      environments: ["development", "beta", "production"],
       remoteAddon: {},
       remoteFetched: false,
     };
@@ -146,7 +175,7 @@ export default {
   mounted() {
     // const {addon} = this;
     this.$api
-      .getAddonVersion(this.pkg, this.environment, {
+      .getAddonVersion(this.pkg, 'production', {
         showErrorMessages: false,
       })
       .then((response) => {
@@ -159,10 +188,8 @@ export default {
   },
   computed: {
     addon() {
-      return this.$store.getters['addons/addonByPackage'](this.pkg, this.environment);
+      return this.$store.getters['addons/addonByPackage'](this.pkg); //, this.environment
     },
-  },
-  methods: {
     addonStatus() {
       const {status, deleting, uploading, updating} = this.remoteAddon;
       if (status) {
@@ -173,10 +200,13 @@ export default {
       if (uploading) return "Uploading...";
       return "Not installed";
     },
+  },
+  methods: {
     uploadAddon() {
       this.remoteAddon.status = null;
       this.remoteAddon.uploading = true;
-      const {package: pkg, environment, version} = this.addon;
+      const { package: pkg, version } = this.addon;
+      const { environment } = this;
 
       this.$request.send({
         url: `/addon/sandbox/upload/${pkg}/${environment}/${version}`,
@@ -203,7 +233,8 @@ export default {
     updateAddon() {
       this.remoteAddon.status = "Updating...";
       this.remoteAddon.updating = true;
-      const {package: pkg, environment, version} = this.addon;
+      const { package: pkg, version } = this.addon;
+      const { environment } = this;
 
       this.$request.send({
         url: `/addon/sandbox/upload/${pkg}/${environment}/${version}`,
@@ -230,7 +261,8 @@ export default {
     deleteAddon() {
       this.remoteAddon.status = "Deleting...";
       this.remoteAddon.deleting = true;
-      const {package: pkg, environment, version} = this.addon;
+      const { package: pkg, version } = this.addon;
+      const { environment } = this;
 
       this.$api
         .deleteAddon(pkg, environment, {url: window.SANDBOX_ENDPOINT})
