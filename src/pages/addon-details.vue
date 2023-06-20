@@ -20,15 +20,13 @@
       <f7-list-item header="Developer" :title="`${addon.developer}`">
         <template #title v-if="addon.homepage">
 					<span>
-						(
 						<a
               :href="addon.homepage"
               class="external"
               target="_blank"
             >
-							{{ addon.homepage }}
+              ({{ addon.homepage }})
 						</a>
-						)
 					</span>
         </template>
       </f7-list-item>

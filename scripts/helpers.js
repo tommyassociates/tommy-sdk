@@ -40,8 +40,17 @@ function readLocalAddon(pkg, environment, version) {
   return readLocalAddonFromManifestPath(path)
 }
 
+function getEnvironmentFromPath(path) {
+  if (path.indexOf('/development/') !== -1) return 'development';
+  if (path.indexOf('/production/') !== -1) return 'production';
+  if (path.indexOf('/beta/') !== -1) return 'beta';
+
+  return 'production';
+}
+
 function readLocalAddonFromManifestPath(path) {
   const addon = yaml.load(fs.readFileSync(path, 'utf8'))
+  addon.environment = getEnvironmentFromPath(path)
   return initAddon(addon)
 }
 

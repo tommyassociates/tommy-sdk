@@ -60,7 +60,6 @@ tommy.app.init({
     'zh-CN': zhCN,
   },
   pushState: true,
-  // components,
   data() {
     const actorId = localStorage.actorId ? parseInt(localStorage.actorId, 10) : null;
     const accounts = null;
@@ -115,13 +114,13 @@ tommy.app.init({
 
           // FIXME: Skip production addons for now - just work on development 
           // addons until we can fix internal environment specific routing
+          console.log('sdk: addon loaded', addon.url);
           if (addon.url.indexOf('/development/') === -1) return;
 
           if (addon.assets) {
             loadAddonLocales(addon);
             importAddon(addon)            
               .then(addonModule => {
-                console.log('sdk: addon loaded', addon.title, addon);
                 const isModule = !!addonModule.default.routes;
                 const routes = isModule ? addonModule.default.routes : addonModule.default;
 
