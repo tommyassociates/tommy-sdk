@@ -26,7 +26,7 @@ module.exports = async function(pkg, environment, version) {
       },
       emptyOutDir: true,
       rollupOptions: {
-        external: ['vue', 'vuex', 'vue-chartjs', 'chart.js', 'moment', 'dush', 'spark-md5'],
+        external: ['vue', 'vuex', 'vue-chartjs', 'chart.js', 'moment', 'dush', 'spark-md5', 'framework7-vue'],
         output: {
           assetFileNames: (chunkInfo) => {
             if (chunkInfo.name === 'style.css')
@@ -39,7 +39,8 @@ module.exports = async function(pkg, environment, version) {
             'chart.js': 'chartjs',
             moment: 'moment',
             dush: 'dush',
-            'spark-md5': 'spark_md5'
+            'spark-md5': 'spark_md5',
+            'framework7-vue': 'framework7_vue'
           },
         },
       },
