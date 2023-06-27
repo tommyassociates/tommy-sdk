@@ -90,13 +90,14 @@ tommy.app.init({
       console.table(localAddons);
 
       // Change the account to the previous logged in account on refresh.
-      const previousAccount = {
-        id: localStorage.getItem('account_id'),
-        type: localStorage.getItem('account_type'),
-        ignoreAddons: true
-      }
+      // const previousAccount = {
+      //   id: localStorage.getItem('account_id'),
+      //   type: localStorage.getItem('account_type'),
+      //   ignoreAddons: true
+      // }
 
       const payload = {
+        resetState: false,
         data: {
           api_key: import.meta.env.TOMMY_API_KEY,
         },
@@ -106,9 +107,9 @@ tommy.app.init({
         }
       };
       this.$store.dispatch('login', payload).then((token) => {
-        if (previousAccount.type !== 'user') {
-          this.$store.dispatch('changeAccount', previousAccount);
-        }
+        // if (previousAccount.type !== 'user') {
+        //   this.$store.dispatch('changeAccount', previousAccount);
+        // }
         localAddons.forEach(addon => {
           // addon.environment = addon.environment || 'production';
 
