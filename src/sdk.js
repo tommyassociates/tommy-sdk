@@ -96,6 +96,7 @@ tommy.app.init({
       //   ignoreAddons: true
       // }
 
+
       const payload = {
         resetState: false,
         data: {
@@ -110,6 +111,7 @@ tommy.app.init({
         // if (previousAccount.type !== 'user') {
         //   this.$store.dispatch('changeAccount', previousAccount);
         // }
+        this.$store.state.addons.addonInstalls.length = 0;
         localAddons.forEach(addon => {
           // addon.environment = addon.environment || 'production';
 
