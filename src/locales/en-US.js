@@ -9,7 +9,7 @@ export default {
   },
   format: {
     date: {
-      default: 'YYYY/MM/DD',
+      default: 'D MMM, YYYY',
       long: 'MMMM D, YYYY',
       short: 'MMM D'
     },
