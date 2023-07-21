@@ -11,10 +11,11 @@ export default {
     date: {
       default: 'D MMM, YYYY',
       long: 'MMMM D, YYYY',
-      short: 'MMM D'
+      short: 'D MMM'
     },
     time: {
       default: 'h:mma',
+      short: 'h:mm',
       long: 'h:mma',
       hideZeroMinutes: 'ha'
     },
