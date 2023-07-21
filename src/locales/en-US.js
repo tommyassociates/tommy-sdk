@@ -15,6 +15,7 @@ export default {
     },
     time: {
       default: 'h:mma',
+      short: 'h:mm',
       long: 'h:mma',
       hideZeroMinutes: 'ha'
     },
