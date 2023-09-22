@@ -1,4 +1,4 @@
-import tommy from 'tommy-core/src/tommy.js';
+import tommy, {app} from 'tommy-core/src/tommy.js';
 import routes from './routes.js';
 import appComponent from './components/app.vue';
 // import components from './components.js';
@@ -13,7 +13,7 @@ import zhCN from './locales/zh-CN';
 
 
 const importAddon = (addon) => {
-  return (addon.dir_prefix.includes('tommy-sdk-private') ? 
+  return (addon.dir_prefix.includes('tommy-sdk-private') ?
     import(`../../tommy-sdk-private/addons/${addon.package}/development/src/addon.js`) :
     import(`../addons/${addon.package}/development/src/addon.js`))
 }
@@ -115,14 +115,14 @@ tommy.app.init({
         localAddons.forEach(addon => {
           // addon.environment = addon.environment || 'production';
 
-          // FIXME: Skip production addons for now - just work on development 
+          // FIXME: Skip production addons for now - just work on development
           // addons until we can fix internal environment specific routing
           console.log('sdk: addon loaded', addon.url);
           if (addon.url.indexOf('/development/') === -1) return;
 
           if (addon.assets) {
             loadAddonLocales(addon);
-            importAddon(addon)            
+            importAddon(addon)
               .then(addonModule => {
                 const isModule = !!addonModule.default.routes;
                 const routes = isModule ? addonModule.default.routes : addonModule.default;
@@ -150,7 +150,7 @@ tommy.app.init({
                 // Load the default addon if specified
                 // (SDK_CONFIG.defaultPath &&
                   // SDK_CONFIG.defaultPath === addon.entry_path) ||
-                  // 
+                  //
                 const loadAddon = window.location.href.indexOf(addon.entry_path) !== -1
                 if (loadAddon) {
                   const entryUrl = this.addonUrl(addon)
@@ -171,6 +171,15 @@ tommy.app.init({
       let url = addon.entry_path;
       if (this.$root.actorId) url += `?actor_id=${this.$root.actorId}`;
       return url;
+    },
+    toast(message) {
+      // const finishToast = this.$f7.toast.create({
+      //   text: text,
+      //   position: 'center',
+      //   closeTimeout: 2000
+      // });
+      // finishToast.open();
+      app.notify(message);
     },
   },
   f7ready(f7) {
