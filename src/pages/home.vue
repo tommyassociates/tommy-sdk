@@ -4,7 +4,9 @@
       <tommy-nav-back action="menu" />
       <f7-nav-title>Home</f7-nav-title>
       <f7-nav-right>
-        <f7-link href="/settings/" icon-material="settings"></f7-link>
+        <f7-link href="/settings/">
+          <i class="fa-icon fa-light fa-gear" />
+        </f7-link>
       </f7-nav-right>
     </f7-navbar>
     <!-- Main addons list -->

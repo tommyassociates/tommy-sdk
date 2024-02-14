@@ -1,7 +1,7 @@
 <template>
   <f7-page id="settings">
     <f7-navbar>
-      <tommy-nav-back href="/"></tommy-nav-back>
+      <tommy-nav-back href="/" :force="true"></tommy-nav-back>
       <f7-nav-title>Settings</f7-nav-title>
     </f7-navbar>
 
@@ -57,11 +57,14 @@ export default {
     ...mapState('accounts', ['accounts']),
     ...mapState('team', ['team', 'teamMembers']),
   },
+  created() {
+    this.actorId = localStorage.getItem('actorId');
+  },
   methods: {
     changeActorId(e) {
       const self = this;
       const actorId = parseInt(e.target.value, 10);
-      self.$root.setActorId(actorId);
+      localStorage.setItem('actorId', actorId);
     },
     changeAccount(e) {
       const data = e.target.value.split(':'),
