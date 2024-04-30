@@ -2,7 +2,11 @@
   <f7-page>
     <f7-navbar>
       <tommy-nav-back action="menu" />
-      <f7-nav-title>Home</f7-nav-title>
+      <f7-nav-title
+        title="Home"
+        :subtitle="isActor && actorName || undefined"
+        :class="isActor ? 'with-subtitle' : undefined"
+      />
       <f7-nav-right>
         <f7-link href="/settings/">
           <i class="fa-icon fa-light fa-gear" />
@@ -53,6 +57,7 @@
 <script>
 // Import config if dynamic re-routing needed from `mounted()`
 // import config from "../../config.json";
+import ActableMixin from 'tommy-core/src/mixins/actable.js';
 
 export default {
   props: {
@@ -63,6 +68,9 @@ export default {
       search: localStorage.tommy_addon_search,
     }
   },
+  mixins: [
+    ActableMixin,
+  ],
   mounted() {
     // Alternative implementation of default 'starting_page'
     // by re-routing to desired starting_page.

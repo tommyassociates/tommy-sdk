@@ -62,9 +62,7 @@ export default {
   },
   methods: {
     changeActorId(e) {
-      const self = this;
-      const actorId = parseInt(e.target.value, 10);
-      localStorage.setItem('actorId', actorId);
+      localStorage.setItem('actorId', parseInt(e.target.value, 10));
     },
     changeAccount(e) {
       const data = e.target.value.split(':'),
