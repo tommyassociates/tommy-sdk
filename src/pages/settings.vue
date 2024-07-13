@@ -31,6 +31,7 @@
           title="Current Actor"
         >
           <select @change="changeActorId" :value="actorId">
+            <option value="">No actor</option>
             <option
               v-for="(teamMember, index) in teamMembers"
               :key="index"

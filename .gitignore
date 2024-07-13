@@ -60,3 +60,5 @@ config.json.txt
 
 # Editors
 .idea
+
+redis-stable
