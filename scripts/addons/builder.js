@@ -5,6 +5,57 @@ const helpers = require('../helpers')
 
 // const env = process.env.NODE_ENV || 'production'
 
+// External dependencies that addons can import
+// These MUST match Tommy.provide() registry keys in tommy-core/src/addons.js
+const EXTERNAL_DEPS = [
+  'vue', 'vuex', 'vue-chartjs', 'chart.js', 'moment', 'dush',
+  'spark-md5', 'framework7-vue', 'jszip', 'html2pdf.js'
+];
+
+// Globals map for IIFE output - maps external dep names to variable names
+const GLOBALS = {
+  vue: 'vue',
+  vuex: 'vuex',
+  'vue-chartjs': 'vue_chartjs',
+  'chart.js': 'chartjs',
+  moment: 'moment',
+  dush: 'dush',
+  'spark-md5': 'spark_md5',
+  'framework7-vue': 'framework7_vue',
+  'jszip': 'jszip',
+  'html2pdf.js': 'html2pdf'
+};
+
+/**
+ * Rollup output plugin that wraps IIFE bundle in Tommy.register() format.
+ * This enables lazy dependency loading - addons only receive deps they declare.
+ * @param {string} addonId - The addon package name
+ */
+function tommyRegisterPlugin(addonId) {
+  return {
+    name: 'tommy-register',
+    generateBundle(options, bundle) {
+      for (const [key, chunk] of Object.entries(bundle)) {
+        if (chunk.type !== 'chunk' || !chunk.isEntry) continue;
+
+        // Use Object.keys(globals) to ensure all externals are available
+        // This is the safe fallback - per-addon detection via chunk.imports
+        // can be enabled once proven reliable for IIFE output
+        const globals = options.globals || {};
+        const deps = Object.keys(globals);
+        const params = deps.map(d => globals[d]);
+
+        // Wrap the IIFE content in Tommy.register()
+        // The addon ID is the first argument for race-safe keyed registration
+        chunk.code = `Tommy.register(${JSON.stringify(addonId)}, ${JSON.stringify(deps)}, function(${params.join(', ')}) {
+${chunk.code}
+return addon;
+});`;
+      }
+    }
+  };
+}
+
 module.exports = async function(pkg, environment, version) {
   const localAddonFilePath = helpers.getLocalAddonFilePath(pkg, environment, version, '')
   console.log('addon building', pkg, environment, version) // , 'in', env
@@ -26,23 +77,15 @@ module.exports = async function(pkg, environment, version) {
       },
       emptyOutDir: true,
       rollupOptions: {
-        external: ['vue', 'vuex', 'vue-chartjs', 'chart.js', 'moment', 'dush', 'spark-md5', 'framework7-vue'],
+        external: EXTERNAL_DEPS,
         output: {
           assetFileNames: (chunkInfo) => {
             if (chunkInfo.name === 'style.css')
               return 'addon.css'
           },
-          globals: {
-            vue: 'vue',
-            vuex: 'vuex',
-            'vue-chartjs': 'vue_chartjs',
-            'chart.js': 'chartjs',
-            moment: 'moment',
-            dush: 'dush',
-            'spark-md5': 'spark_md5',
-            'framework7-vue': 'framework7_vue'
-          },
+          globals: GLOBALS,
         },
+        plugins: [tommyRegisterPlugin(pkg)],
       },
     },
   })
