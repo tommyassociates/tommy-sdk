@@ -54,6 +54,7 @@ bak/
 archives/
 build/
 config.json.txt
+config*
 .bak
 .env
 .env*
