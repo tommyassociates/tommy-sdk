@@ -64,7 +64,7 @@ export default defineConfig(({ command, mode }) => {
         },
         {
           find: 'tommy-core',
-          replacement: path.resolve(__dirname, '../tommy-core')
+          replacement: path.resolve(__dirname, '../core')
         }
       ]
     },
