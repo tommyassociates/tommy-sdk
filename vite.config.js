@@ -45,6 +45,9 @@ export default defineConfig(({ command, mode }) => {
   return {
     plugins: [vue(), pluginWatchNodeModules(['tommy-core'])],
     envPrefix: 'TOMMY_',
+    define: {
+      'import.meta.env.SDK_PRIVATE_PATH': JSON.stringify(`/@fs${path.resolve(__dirname, '../sdk-private')}`),
+    },
     // define: entries,
     server: {
       port: 8080,
@@ -52,7 +55,8 @@ export default defineConfig(({ command, mode }) => {
         allow: [
           'addons',
           'src',
-          'node_modules/@fontsource'
+          'node_modules/@fontsource',
+          path.resolve(__dirname, '..'),
         ],
       },
     },
@@ -65,8 +69,19 @@ export default defineConfig(({ command, mode }) => {
         {
           find: 'tommy-core',
           replacement: path.resolve(__dirname, '../core')
+        },
+        {
+          find: 'tommy-sdk-private',
+          replacement: path.resolve(__dirname, '../sdk-private')
         }
       ]
+    },
+    css: {
+      preprocessorOptions: {
+        scss: {
+          additionalData: `@import "tommy-core/src/scss/_variables.scss"; @import "tommy-core/src/scss/_mixins.scss";`,
+        },
+      },
     },
     build: {
       chunkSizeWarningLimit: 600,

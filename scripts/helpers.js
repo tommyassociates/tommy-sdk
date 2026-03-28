@@ -6,7 +6,7 @@ const { globSync } = require('glob')
 
 const port = 8080
 const publicDir = 'addons'
-const privateDir = '../tommy-sdk-private/addons'
+const privateDir = '../sdk-private/addons'
 
 function resolvePath() {
   let args = Array.prototype.slice.call(arguments)

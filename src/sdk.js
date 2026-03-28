@@ -13,9 +13,9 @@ import zhCN from './locales/zh-CN';
 
 
 const importAddon = (addon) => {
-  return (addon.dir_prefix.includes('tommy-sdk-private') ?
-    import(`../../tommy-sdk-private/addons/${addon.package}/development/src/addon.js`) :
-    import(`../addons/${addon.package}/development/src/addon.js`))
+  return (addon.dir_prefix.includes('sdk-private') ?
+    import(/* @vite-ignore */ `${import.meta.env.SDK_PRIVATE_PATH}/addons/${addon.package}/development/src/addon.js`) :
+    import(/* @vite-ignore */ `../addons/${addon.package}/development/src/addon.js`))
 }
 
 const loadAddonLocales = (addon) => {
@@ -23,8 +23,10 @@ const loadAddonLocales = (addon) => {
     if (!addon.locales || addon.locales.length === 0) return resolve()
 
     const iterables = addon.locales.map(language => {
-      // return import(`@addon/${addon.package}/development/locales/${language}.json`)
-      return import(`./addons/${addon.package}/development/locales/${language}.json`)
+      const localePath = addon.dir_prefix.includes('sdk-private')
+        ? `${import.meta.env.SDK_PRIVATE_PATH}/addons/${addon.package}/development/locales/${language}.json`
+        : `../addons/${addon.package}/development/locales/${language}.json`;
+      return import(/* @vite-ignore */ localePath)
         .then((locales) => {
           return {
             [language]: {
