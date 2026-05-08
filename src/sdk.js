@@ -1,3 +1,4 @@
+import 'tommy-core/src/libs/moment-bootstrap.js';
 import tommy, {app} from 'tommy-core/src/tommy.js';
 import routes from './routes.js';
 import appComponent from './components/app.vue';
