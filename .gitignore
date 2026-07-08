@@ -63,3 +63,8 @@ config*
 .idea
 
 redis-stable
+eslint-report.json
+depcruise-report.json
+
+# M0: the CircleCI config must not be swallowed by the config* pattern above
+!.circleci/config.yml

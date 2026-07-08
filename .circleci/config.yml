@@ -1,0 +1,35 @@
+# M0 — MP-isolation coupling freeze (mp-platform-m0-coupling-detectors).
+# This repo had no CI before M0; this single job runs the isolation detectors
+# + the shared-dep drift check on every PR. NOTE (ops): the repo must be
+# activated as a CircleCI project (checkout key + access to clone siblings)
+# before this runs — tracked in the spec as an operator step.
+# Design: plans/refactor-plan/06-instrumentation/detectors-in-ci.md.
+version: 2.1
+orbs:
+  node: circleci/node@5.0.2
+jobs:
+  lint-isolation:
+    executor: node/default
+    steps:
+      - checkout
+      - run:
+          name: Clone tommy-app (sibling — drift check)
+          command: git clone --depth=1 git@github.com:tommyassociates/tommy-app.git ../app
+      - run:
+          name: Clone tommy-core (sibling — drift check)
+          command: git clone --depth=1 git@github.com:tommyassociates/tommy-core.git ../core
+      - node/install-packages:
+          pkg-manager: yarn-berry
+      - run:
+          name: Class A isolation rules (error severity, day-0 blocking)
+          command: yarn depcruise
+      - run:
+          name: Coupling freeze — block-on-increase vs committed baseline
+          command: yarn coupling:check
+      - run:
+          name: Shared-dependency version drift (blocking day 0)
+          command: node scripts/check-shared-dep-versions.js
+workflows:
+  test:
+    jobs:
+      - lint-isolation

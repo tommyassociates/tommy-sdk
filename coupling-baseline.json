@@ -1,0 +1,6 @@
+{
+  "eslint": {},
+  "depcruise": {
+    "no-orphans": 1
+  }
+}

@@ -14,7 +14,12 @@
     "build-prod": "cross-env NODE_ENV=production webpack -c ./build/webpack.prod.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "update:packages": "node scripts/wipe-dependencies.js && rm -rf node_modules && npm update --save-dev && npm update --save"
+    "update:packages": "node scripts/wipe-dependencies.js && rm -rf node_modules && npm update --save-dev && npm update --save",
+    "lint:isolation": "eslint --no-eslintrc -c .eslintrc.isolation.js \"addons/**/*.{js,vue}\" \"src/**/*.{js,vue}\" -f json -o eslint-report.json || true",
+    "depcruise": "depcruise --config dependency-cruiser.config.js --output-type err-long addons src",
+    "depcruise:report": "depcruise --config dependency-cruiser.config.js --output-type json addons src > depcruise-report.json || true",
+    "coupling:check": "yarn lint:isolation && yarn depcruise:report && node scripts/compare-to-baseline.js --check eslint-report.json depcruise-report.json coupling-baseline.json",
+    "coupling:baseline": "yarn lint:isolation && yarn depcruise:report && node scripts/compare-to-baseline.js --write eslint-report.json depcruise-report.json coupling-baseline.json"
   },
   "repository": {
     "type": "git",
@@ -39,11 +44,16 @@
     "tommy-core": "link:../tommy-core",
     "vite": "^4.3.9",
     "vite-express": "^0.9.1",
-    "vue": "^3.3.4",
+    "vue": "3.5.11",
     "vuex": "^4.0.2"
   },
   "engines": {
     "node": ">= 6.0.0",
     "npm": ">= 3.0.0"
+  },
+  "devDependencies": {
+    "dependency-cruiser": "^16.3.3",
+    "eslint": "^8.57.0",
+    "eslint-plugin-vue": "^9.26.0"
   }
 }
