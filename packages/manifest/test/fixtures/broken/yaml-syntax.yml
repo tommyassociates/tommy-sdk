@@ -1,0 +1,11 @@
+---
+# Layer 1 — malformed YAML (bad indentation on the marked line).
+manifestVersion: "1"
+id: broken-yaml
+version: 1.0.0
+name: Broken YAML
+category: comms
+publisher:
+  id: tommy-labs
+    name: Tommy Labs   # BREAK: over-indented -> YAML parse error
+  type: first_party

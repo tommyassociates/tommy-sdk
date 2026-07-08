@@ -1,0 +1,33 @@
+---
+# Layer 4 — cross-reference: action activity.computed names a functions: entry
+# that is not declared in this MP (there is no functions block at all).
+manifestVersion: "1"
+id: unresolved-computed
+version: 1.0.0
+name: Unresolved Computed
+category: comms
+description: An action whose computed function reference does not resolve.
+publisher:
+  id: tommy-labs
+  name: Tommy Labs
+  type: first_party
+triggers:
+  thing_happened:
+    description: Emitted when a thing happens.
+    emission: async
+    payloadSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+actions:
+  compute_on_thing:
+    title: Compute on thing
+    description: Runs a computed function when a thing happens.
+    trigger:
+      name: thing_happened
+    activity:
+      computed: ghost_function   # BREAK: no such functions: entry
+    enabledByDefault: true
+    required: false
+    userConfigurable: false

@@ -1,0 +1,48 @@
+---
+# Layer 4 — cross-reference: action references an undeclared activity.
+manifestVersion: "1"
+id: unresolved-activity
+version: 1.0.0
+name: Unresolved Activity
+category: comms
+description: An action wired to an activity that is not declared.
+publisher:
+  id: tommy-labs
+  name: Tommy Labs
+  type: first_party
+triggers:
+  thing_happened:
+    description: Emitted when a thing happens.
+    emission: async
+    payloadSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+activities:
+  record_thing:
+    description: Persist a thing.
+    sideEffect: local_write
+    idempotency: derived_from_input
+    offlineReplayable: false
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+    resultSchema:
+      type: object
+      properties:
+        thingId: { type: string }
+    authorizedCallers: []
+actions:
+  record_on_thing:
+    title: Record thing
+    description: When a thing happens, save it.
+    trigger:
+      name: thing_happened
+    activity:
+      name: ghost_activity   # BREAK: no such declared activity
+    enabledByDefault: true
+    required: true
+    userConfigurable: false

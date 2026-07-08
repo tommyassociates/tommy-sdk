@@ -1,0 +1,15 @@
+---
+# Layer 2 — schema: a scope that violates the verb:resource pattern.
+manifestVersion: "1"
+id: malformed-scope
+version: 1.0.0
+name: Malformed Scope
+category: comms
+description: A scope with an uppercase verb.
+publisher:
+  id: tommy-labs
+  name: Tommy Labs
+  type: first_party
+permissions:
+  scopes:
+    - READ:team_members   # BREAK: uppercase verb -> pattern violation

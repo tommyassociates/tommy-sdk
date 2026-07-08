@@ -1,0 +1,28 @@
+---
+# Layer 5 — semantic: offlineReplayable activity with idempotency 'none'.
+manifestVersion: "1"
+id: offline-replay
+version: 1.0.0
+name: Offline Replay
+category: comms
+description: An offline-replayable activity that lacks an idempotency strategy.
+publisher:
+  id: tommy-labs
+  name: Tommy Labs
+  type: first_party
+activities:
+  record_thing:
+    description: Persist a thing.
+    sideEffect: local_write
+    idempotency: none          # BREAK: none + offlineReplayable:true is invalid
+    offlineReplayable: true
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+    resultSchema:
+      type: object
+      properties:
+        thingId: { type: string }
+    authorizedCallers: []

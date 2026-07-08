@@ -1,0 +1,41 @@
+{
+  "name": "@tommy/manifest",
+  "version": "0.1.0",
+  "description": "Parse, validate, and type-generate Tommy Mini Program manifests. Ships the manifest JSON-Schema and the fixed permission catalogue.",
+  "license": "ISC",
+  "type": "module",
+  "bin": {
+    "tommy": "./bin/tommy.js"
+  },
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./schema": "./src/schema/manifest-schema.json",
+    "./catalogue": "./src/catalogue/permission-catalogue.json"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "scripts": {
+    "typegen": "node scripts/generate-types.mjs",
+    "prepack": "node scripts/generate-types.mjs",
+    "build": "node scripts/generate-types.mjs && tsc --noEmit -p tsconfig.json",
+    "check:schema-drift": "node scripts/check-schema-drift.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "yaml": "^2.5.1"
+  },
+  "devDependencies": {
+    "json-schema-to-typescript": "^15.0.3",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}

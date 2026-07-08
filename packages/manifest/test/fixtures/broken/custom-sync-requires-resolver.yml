@@ -1,0 +1,22 @@
+---
+# Layer 5 — semantic: localData custom syncStrategy without a resolver activity.
+manifestVersion: "1"
+id: custom-sync
+version: 1.0.0
+name: Custom Sync
+category: comms
+description: A custom-sync store missing its customResolverActivity.
+publisher:
+  id: tommy-labs
+  name: Tommy Labs
+  type: first_party
+localData:
+  things:
+    keyPath: id
+    syncStrategy: custom       # BREAK: custom requires customResolverActivity
+    recordSchema:
+      type: object
+      required: [id]
+      additionalProperties: false
+      properties:
+        id: { type: string }

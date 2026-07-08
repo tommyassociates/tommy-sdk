@@ -1,0 +1,13 @@
+---
+# Layer 2 — schema: additionalProperties:false rejects an unknown field.
+manifestVersion: "1"
+id: unknown-field
+version: 1.0.0
+name: Unknown Field
+category: comms
+description: Has a field the schema does not allow.
+publisher:
+  id: tommy-labs
+  name: Tommy Labs
+  type: first_party
+wibble: nope          # BREAK: unknown top-level field

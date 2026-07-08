@@ -1,0 +1,74 @@
+---
+# Compact valid manifest — the base the broken-fixture corpus derives from.
+manifestVersion: "1"
+id: mini-base
+version: 1.0.0
+name: Mini Base
+category: comms
+description: A compact valid manifest for the fixture corpus.
+publisher:
+  id: tommy-labs
+  name: Tommy Labs
+  type: first_party
+permissions:
+  scopes:
+    - read:team_members
+    - read:team_member_self
+triggers:
+  thing_happened:
+    description: Emitted when a thing happens.
+    emission: async
+    payloadSchema:
+      type: object
+      required: [id]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+conditions:
+  is_ready:
+    description: Whether the thing is ready.
+    latencyBudgetMs: 200
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+    returnSchema:
+      type: object
+      properties:
+        ready: { type: boolean }
+activities:
+  record_thing:
+    description: Persist a thing.
+    sideEffect: local_write
+    idempotency: derived_from_input
+    offlineReplayable: true
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+    resultSchema:
+      type: object
+      properties:
+        thingId: { type: string }
+    authorizedCallers: []
+actions:
+  record_on_thing:
+    title: Record thing
+    description: When a thing happens, save it.
+    trigger:
+      name: thing_happened
+    activity:
+      name: record_thing
+    enabledByDefault: true
+    required: true
+    userConfigurable: false
+panels:
+  - id: things-panel
+    name: Things
+    description: A panel of things.
+    surfaces: [dashboard]
+    size: { defaultW: 4, defaultH: 3 }
+    dataRequirements: [is_ready]
+    offline: cached_stale
