@@ -1,0 +1,71 @@
+{
+  "_comment": "Tommy Mini Program isolation ESLint config (legacy .eslintrc JSON format).",
+  "_usage": "Merge the `overrides` block into the addon repos' .eslintrc, or `extends` this file. The `overrides[].files` globs target addon source only — the shell/core are intentionally exempt. Land as `warn` (Phase 6 M0). Class A rules with zero existing violations flip to `error` immediately; the ~987-deep-import baseline stays `warn` + block-on-increase (see 06-instrumentation/detectors-in-ci.md) until its count reaches zero — do NOT flip it to `error` on a calendar date.",
+  "overrides": [
+    {
+      "_scope": "Addon source — tommy-sdk-private/addons/* and tommy-sdk/addons/* (legacy development/+production/ trees AND the migrated single-tree src/ layout)",
+      "files": [
+        "addons/*/development/src/**/*.{js,ts,vue}",
+        "addons/*/production/src/**/*.{js,ts,vue}",
+        "addons/*/src/**/*.{js,ts,vue}"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "warn",
+          {
+            "patterns": [
+              {
+                "group": ["**/addons/*/**", "*/addons/*"],
+                "message": "no-cross-addon-import (audit 1.1): Mini Programs must not import each other directly. Communicate via the Actions bus (tommy.actions.*). Inter-MP calls are manifest-mediated."
+              },
+              {
+                "group": [
+                  "tommy-core/src/*",
+                  "tommy-core/src/**",
+                  "../../../tommy-core/src/**"
+                ],
+                "message": "no-core-internal-import (audit 1.4): import only from the published '@tommy/sdk' entry point, never from tommy-core/src/* internals. Deep paths have no stability contract and break silently on rename."
+              },
+              {
+                "group": ["../../*", "../../../*", "../../../../*"],
+                "message": "no-escape-addon-root (audit 1.1/1.4): relative imports must not climb out of this addon's own src/ root."
+              }
+            ]
+          }
+        ],
+        "no-restricted-globals": [
+          "warn",
+          { "name": "tommy", "message": "no-ambient-tommy (audit 1.2): do not reach window.tommy. Use the injected SDK instance passed to the addon factory." },
+          { "name": "__store__", "message": "no-ambient-store (audit 1.2): window.__store__ is a dev-only global; addons must not touch the shell's Vuex store." }
+        ],
+        "no-restricted-properties": [
+          "warn",
+          { "object": "window", "property": "tommy", "message": "no-ambient-tommy (audit 1.2/1.5): window.tommy exposes the store, event bus and api ambiently. Use the scoped SDK surface." },
+          { "object": "window", "property": "i18n", "message": "no-ambient-i18n (audit 1.2): use the SDK-provided i18n, not the shared window.i18n singleton." },
+          { "object": "window", "property": "moment", "message": "no-ambient-moment (audit 1.2): import a local date library; window.moment is a shared mutable singleton." },
+          { "object": "localStorage", "property": "getItem", "message": "no-ambient-storage (audit 1.8): addons must not read localStorage directly (token/account_id/device_id leak ambiently). Use per-MP IndexedDB and the capability token from the handshake." },
+          { "object": "localStorage", "property": "setItem", "message": "no-ambient-storage (audit 1.8): addons must not write the shared localStorage. Use per-MP IndexedDB." }
+        ],
+        "no-restricted-syntax": [
+          "warn",
+          {
+            "selector": "CallExpression[callee.object.property.name='events'][callee.property.name=/^\\$?(emit|on|once)$/]",
+            "message": "no-shared-event-bus (audit 1.5): the dush events bus delivers synchronously across MP boundaries. Use tommy.actions.emit / tommy.actions.subscribe (async fan-out)."
+          },
+          {
+            "selector": "CallExpression[callee.object.name='document'][callee.property.name=/^(querySelector|querySelectorAll|getElementById)$/]",
+            "message": "no-global-dom-query (audit 1.3): addons share the DOM with the shell. Scope queries to the addon root (this.$el) — global selectors collide across MPs."
+          },
+          {
+            "selector": "MemberExpression[object.name='document'][property.name='body'] > .object",
+            "message": "no-document-body-mutation (audit 1.3): do not append to document.body. Render inside the addon's own subtree."
+          },
+          {
+            "selector": "CallExpression[callee.object.name='window'][callee.property.name='addEventListener']",
+            "message": "no-global-listener (audit 1.3): window-level listeners are un-namespaced and leak across MPs. Scope listeners to the addon root and remove them on unmount."
+          }
+        ]
+      }
+    }
+  ]
+}
