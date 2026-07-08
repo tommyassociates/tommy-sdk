@@ -5,6 +5,10 @@
   "homepage": "https://mytommy.com",
   "license": "ISC",
   "description": "SDK for building Tommy addons.",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "serve": "npm run dev",
     "build": "npm run build-prod",

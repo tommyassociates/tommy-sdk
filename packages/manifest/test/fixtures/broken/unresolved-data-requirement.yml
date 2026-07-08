@@ -1,0 +1,33 @@
+---
+# Layer 4 — cross-reference: panel needs data that resolves to nothing declared.
+manifestVersion: "1"
+id: unresolved-data-requirement
+version: 1.0.0
+name: Unresolved Data Requirement
+category: comms
+description: A panel whose dataRequirements do not resolve.
+publisher:
+  id: tommy-labs
+  name: Tommy Labs
+  type: first_party
+conditions:
+  is_ready:
+    description: Whether the thing is ready.
+    latencyBudgetMs: 200
+    inputSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }
+    returnSchema:
+      type: object
+      properties:
+        ready: { type: boolean }
+panels:
+  - id: things-panel
+    name: Things
+    description: A panel of things.
+    surfaces: [dashboard]
+    size: { defaultW: 4, defaultH: 3 }
+    dataRequirements: [ghost_condition]   # BREAK: no such declared condition
+    offline: cached_stale

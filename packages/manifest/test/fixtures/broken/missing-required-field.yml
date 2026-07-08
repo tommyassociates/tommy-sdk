@@ -1,0 +1,11 @@
+---
+# Layer 2 — schema: required top-level field `id` is absent.
+manifestVersion: "1"
+version: 1.0.0
+name: No Id
+category: comms
+description: Missing the required id field.
+publisher:            # BREAK: object is missing required 'id' sibling above
+  id: tommy-labs
+  name: Tommy Labs
+  type: first_party

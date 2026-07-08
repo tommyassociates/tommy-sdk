@@ -1,0 +1,16 @@
+---
+# Layer 3 — catalogue: a well-formed scope that is not a catalogue member.
+manifestVersion: "1"
+id: non-catalogue-scope
+version: 1.0.0
+name: Non-catalogue Scope
+category: comms
+description: Requests a scope outside the fixed catalogue.
+publisher:
+  id: tommy-labs
+  name: Tommy Labs
+  type: first_party
+permissions:
+  scopes:
+    - read:team_members
+    - write:payroll_export   # BREAK: valid format, not in catalogue

@@ -1,0 +1,21 @@
+---
+# Layer 5 — semantic: debounced trigger without a debounceMs.
+manifestVersion: "1"
+id: debounced-trigger
+version: 1.0.0
+name: Debounced Trigger
+category: comms
+description: A debounced trigger missing its debounceMs window.
+publisher:
+  id: tommy-labs
+  name: Tommy Labs
+  type: first_party
+triggers:
+  thing_happened:
+    description: Emitted when a thing happens.
+    emission: debounced        # BREAK: debounced requires debounceMs
+    payloadSchema:
+      type: object
+      additionalProperties: false
+      properties:
+        id: { type: string }

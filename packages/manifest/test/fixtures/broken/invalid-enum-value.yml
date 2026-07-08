@@ -1,0 +1,12 @@
+---
+# Layer 2 — schema: category is not a member of the fixed category enum.
+manifestVersion: "1"
+id: bad-category
+version: 1.0.0
+name: Bad Category
+category: teleportation   # BREAK: not in the category enum
+description: Uses a category outside the enum.
+publisher:
+  id: tommy-labs
+  name: Tommy Labs
+  type: first_party
