@@ -14,6 +14,46 @@
   color: white !important;
 }
 
+// Dark-mode token overrides.
+// Framework7 applies `html.dark` automatically, but tommy-core hard-codes
+// --tommy-surface (and the navbar/field backgrounds that derive from it) to
+// white with no dark override, leaving the navbar and native selects white.
+// Mirror the core surface/text/border/field tokens from app/src/scss/themes/dark.scss.
+html.dark {
+  // Tells iOS WebView to render the dark keyboard/native-control appearance
+  color-scheme: dark;
+
+  // Text
+  --tommy-text-black: #f0f0f0;
+  --tommy-text-dark: #e0e0e0;
+  --tommy-text-medium: #9a9bab;
+  --tommy-text-light: #6a6a6a;
+
+  // Surfaces (drives navbar bg + field bg)
+  --tommy-surface: #1c1c1e;
+  --tommy-bg-lightest: #2c2c2e;
+  --tommy-bg-lighter: #1c1c1e;
+  --tommy-bg-light: #3a3a3c;
+
+  // Borders
+  --tommy-border-color: #3a3a3c;
+
+  // Form inputs
+  --tommy-field-bg-color: var(--tommy-surface);
+  --tommy-field-focus-bg-color: var(--tommy-surface);
+  --tommy-field-disabled-bg-color: var(--tommy-surface);
+
+  // F7 bar overrides (supplement F7's built-in .dark rules)
+  --f7-page-bg-color: var(--tommy-bg-lighter);
+  --f7-navbar-bg-color: var(--tommy-surface);
+  --f7-toolbar-bg-color: var(--tommy-surface);
+  --f7-list-border-color: var(--tommy-border-color);
+
+  // List item hover — core hard-codes this to #fafafa (near-white) with no
+  // dark override, so hovering a list link flashes white. Use a dark surface.
+  --tommy-list-item-hover: var(--tommy-bg-light);
+}
+
 
 .panel-left {
   display: block !important;
