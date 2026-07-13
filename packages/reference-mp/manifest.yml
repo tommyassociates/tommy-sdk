@@ -1,0 +1,282 @@
+---
+# Reference Mini Program — manifest.yml
+#
+# The canonical, schema-valid v1 manifest. It exercises EVERY manifest
+# primitive exactly once. Heavily commented as teaching material — a third-party
+# or AI author copies this and edits. Validates against
+# 02-architecture/manifest-schema.json (run: `tommy manifest validate`).
+
+manifestVersion: "1"
+
+# --- Identity ----------------------------------------------------------------
+id: team-checkin                       # becomes the subdomain mp-team-checkin.mp.tommy.app
+version: 1.0.0                         # semver
+name: Team Check-in
+category: comms                         # fixed catalogue ($defs/category); required (C1) — powers Features browse + intake (W15)
+description: A quick daily check-in. Team members share how their day is going.
+icon: icon.png
+publisher:
+  id: tommy-labs
+  name: Tommy Labs GmbH
+  type: first_party                    # first_party | verified_third_party | unknown | ai_authored
+  homepage: https://mytommy.com
+locales:
+  - en-US                              # first entry is the fallback locale
+  - de-DE
+
+# --- Permissions -------------------------------------------------------------
+# Scopes MUST be members of the fixed permission catalogue (@tommy/manifest).
+# In production the effective set = requested ∩ approved ∩ device ∩ tenant-grant.
+# Note: emitting this MP's OWN declared triggers (checkin_posted below) needs no
+# scope; invoke:action_emit is only required to emit another MP's triggers.
+permissions:
+  scopes:
+    - read:team_members                # for the team-member picker (tommy.ui)
+    - read:team_member_self
+    - invoke:device_geolocation        # optional check-in location (tommy.device)
+  roles:                               # which tenant roles may open this MP
+    - Team Member
+    - Team Admin
+    - Location Manager
+
+# --- Network egress ----------------------------------------------------------
+network:
+  egress: []                           # default-deny: this MP calls nothing external
+
+# --- Triggers (events this MP emits) -----------------------------------------
+triggers:
+  checkin_posted:
+    description: Emitted when a team member saves a check-in.
+    emission: async                    # async fan-out (default)
+    contractVersion: 1.0.0             # 2.21: primitive-level semver (defaults to the MP version if omitted);
+                                       # a later version that narrows/removes this payload needs deprecations[]/removalPlan (C18)
+    payloadSchema:
+      type: object
+      required: [teamMemberId, status, at]
+      additionalProperties: false
+      properties:
+        teamMemberId: { type: string }
+        status: { enum: [great, ok, struggling] }
+        note: { type: string }
+        at: { type: string, format: date-time }
+
+# --- Conditions (pure queries other MPs may evaluate) ------------------------
+conditions:
+  has_checked_in_today:
+    description: Whether the given team member has already checked in today.
+    latencyBudgetMs: 200
+    cacheable: true
+    cacheTtlMs: 60000
+    inputSchema:
+      type: object
+      required: [teamMemberId]
+      additionalProperties: false
+      properties:
+        teamMemberId: { type: string }
+    returnSchema:
+      type: object
+      properties:
+        checkedIn: { type: boolean }
+
+# --- Activities (side-effecting operations) ----------------------------------
+activities:
+  record_checkin:
+    description: Persist a check-in.
+    sideEffect: local_write            # local_write | server_write | external_call
+    idempotency: derived_from_input    # safe for retry + offline replay
+    offlineReplayable: true            # queued offline, replayed FIFO on reconnect
+    retry:
+      maxAttempts: 3
+      backoff: exponential
+    inputSchema:
+      type: object
+      required: [teamMemberId, status, at]
+      additionalProperties: false
+      properties:
+        teamMemberId: { type: string }
+        status: { enum: [great, ok, struggling] }
+        note: { type: string }
+        at: { type: string, format: date-time }
+    resultSchema:
+      type: object
+      properties:
+        checkinId: { type: string }
+    authorizedCallers: []              # default-deny: same-MP + first-party only
+
+# --- Actions (declarative trigger -> activity wiring) ------------------------
+actions:
+  record_on_checkin:
+    title: Record check-in
+    description: When a check-in is posted, save it to local storage.
+    trigger:
+      name: checkin_posted             # mp: omitted => this MP's own trigger
+    activity:
+      name: record_checkin
+    optionsSchema:
+      type: object
+      properties:
+        notifyManager: { type: boolean }
+    optionsDefault:
+      notifyManager: false
+    enabledByDefault: true
+    required: true                     # the MP needs this Action to function
+    userConfigurable: false            # locked — the user cannot disable/edit it
+
+  # 2.22 teaching example — the declarative extensions in one wiring:
+  # E1 (parameterized condition input), E2 (transform pipe), E3 (template into
+  # options -> tenant/AI-tunable), E6 (service-read source). No code anywhere.
+  notify_manager_when_struggling:
+    title: Tell the manager when someone is struggling
+    description: When a check-in is posted with status "struggling", send the manager an in-app note.
+    trigger:
+      name: checkin_posted
+    conditions:
+      - ref: already_today                       # E1: local alias + mapped input
+        name: has_checked_in_today
+        input:
+          teamMemberId: { from: trigger, path: teamMemberId }
+    serviceReads:                                # E6: host reads as wiring sources (leased under tenant grants)
+      - ref: member
+        name: tommy.directory.resolve
+        input:
+          kind: { const: team_member }
+          id:   { from: trigger, path: teamMemberId }
+    activity:
+      mp: tommy.notifications                    # platform activity — ALWAYS-PRESENT for the dependency set
+      name: send_inapp_notification
+      inputMap:
+        to:   { from: option, path: managerId }
+        body: { from: option, path: template }   # the E3 template lives in options => tenant/AI-tunable
+    optionsSchema:
+      type: object
+      required: [managerId, template]
+      properties:
+        managerId: { type: string }
+        template:
+          type: string
+          description: Plain text; placeholders over this Action's declared sources.
+    optionsDefault:
+      managerId: ""
+      template: "{{member.displayName}} marked today as struggling ({{trigger.at | format('EEE h:mma')}})."
+    enabledByDefault: false                      # X6 — new opt-in behaviour ships off
+    required: false
+    userConfigurable: true
+
+  # 2.22 E7 teaching example — a declared interaction wired to the seeded
+  # tommy.ui.navigate (D20): "button click -> another page", zero code.
+  open_history_on_tap:
+    title: Open check-in history
+    description: Opens the full history page when the panel button is tapped.
+    trigger:
+      name: ui.open_history                      # auto-emitted by the declared interaction below
+    activity:
+      mp: tommy.ui
+      name: navigate
+      inputMap:
+        route: { const: /team-checkin/ }         # own manifest-declared route only (grant-free)
+    enabledByDefault: true
+    required: false
+    userConfigurable: true                       # a tenant can disable it; the button then hides (hideWhenUnwired)
+
+# --- Panels (one on each supported surface) ----------------------------------
+panels:
+  - id: today-checkins
+    name: Today's check-ins
+    description: A count and list of today's team check-ins.
+    surfaces: [dashboard]
+    size: { defaultW: 4, defaultH: 3, minW: 3, minH: 2 }
+    dataRequirements: [has_checked_in_today]
+    refresh: { policy: interval, intervalMs: 60000 }
+    rbac:
+      roles: [Team Admin, Location Manager]
+    offline: cached_stale              # renders from cache with a stale indicator
+    configSchema:
+      type: object
+      properties:
+        showNotes: { type: boolean }
+
+  - id: member-checkins
+    name: Recent check-ins
+    description: This team member's recent check-ins.
+    surfaces: [team_member_details]    # host passes teamMemberId in surfaceContext
+    size: { defaultW: 6, defaultH: 4 }
+    offline: cached_stale
+
+  - id: checkin-history
+    name: Check-in history
+    description: Full history plus the post-a-check-in form.
+    surfaces: [full_page]
+    size: { defaultW: 12, defaultH: 12 }
+    offline: needs_connection
+
+# --- Other UI contributions --------------------------------------------------
+contributions:
+  routes:
+    - id: index
+      path: /team-checkin/
+      name: Team Check-in
+      index: true
+
+  # 2.22 E7 (D20) — a declared interaction point: the SDK renders this button on
+  # the panel and emits the MP-owned trigger `team-checkin.ui.open_history` with
+  # ZERO code. Payload binds only from the declared view context. If no enabled
+  # Action consumes the trigger, the button does not render (hideWhenUnwired).
+  interactions:
+    - id: open_history
+      kind: button
+      surface: { panel: today-checkins }
+      label: { key: checkin.open_history }       # tommy.t locale key
+      icon: history
+      payload: {}                                # this one needs no context fields
+      hideWhenUnwired: true
+
+# --- Computed Action functions (2.22 §4) — NONE SHIPPED, shape shown ----------
+# The custom-code escape hatch (last rung of the ladder — C20 flags anything the
+# declarative grammar could express). Code lives in functions/ INSIDE this same
+# reviewed artifact and executes SERVER-SIDE in the Action Function Runtime.
+# This reference MP ships ZERO functions (everything above is configuration);
+# the commented block below is the canonical shape:
+#
+# functions:
+#   reconcile_checkin_streaks:
+#     entry: functions/reconcile-checkin-streaks.js
+#     runtime: afr-js@1
+#     description: Computes streak awards across check-in history (genuinely novel computation).
+#     resultSchema: { type: object }             # the intent envelope constraints
+#     timeoutMs: 2000
+#     memoryMb: 64
+#     reads:
+#       conditions: [has_checked_in_today]
+#       serviceReads: [tommy.directory.resolve]
+#     targets:
+#       activities: [record_checkin]
+# ...and the Action binds it as: `activity: { computed: reconcile_checkin_streaks }`
+
+# --- Local data (per-MP IndexedDB object stores) -----------------------------
+localData:
+  checkins:
+    keyPath: id
+    syncStrategy: last_write_wins      # server_authoritative | last_write_wins | custom
+    recordSchema:
+      type: object
+      required: [id, teamMemberId, status, at]
+      additionalProperties: false
+      properties:
+        id: { type: string }
+        teamMemberId: { type: string }
+        status: { enum: [great, ok, struggling] }
+        note: { type: string }
+        at: { type: string, format: date-time }
+    indexes:
+      - { name: by_member, keyPath: teamMemberId }
+      - { name: by_date, keyPath: at }
+
+# --- Review metadata ---------------------------------------------------------
+review:
+  declaredCapabilities:
+    - Posts and reads daily team check-ins, stored on-device and synced to Tommy.
+  thirdPartyScripts: []                # MUST be [] or an explicit SRI list
+  dataRetention:
+    claim: Check-ins are stored on the device and synced to Tommy; retained 90 days.
+    retainsPersonalData: true
+    maxRetentionDays: 90

@@ -1,0 +1,29 @@
+{
+  "name": "@tommy/reference-mp",
+  "version": "1.0.0",
+  "description": "Team Check-in — the reference Mini Program. Contract-complete: exercises every manifest primitive through @tommy/sdk alone.",
+  "license": "ISC",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src",
+    "manifest.yml"
+  ],
+  "scripts": {
+    "embed": "node scripts/embed-manifest.mjs",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@tommy/actions-runtime": "workspace:*",
+    "@tommy/manifest": "workspace:*",
+    "@tommy/offline-sync": "workspace:*",
+    "@tommy/panel-runtime": "workspace:*",
+    "@tommy/sdk": "workspace:*",
+    "jsdom": "^25.0.1",
+    "vitest": "^2.1.4",
+    "vue": "3.5.11"
+  }
+}
