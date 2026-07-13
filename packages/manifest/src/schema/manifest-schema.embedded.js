@@ -180,6 +180,10 @@ export default {
             "type": "array",
             "items": { "type": "string" }
           },
+          "permission": {
+            "description": "Tenant permission name gating the underlying domain write (the existing custom authorize! system, NOT a token scope). REQUIRED by tommy-api's fail-closed floor for any server_write activity backed by a registered server executor: the executor refuses a privileged write whose manifest declares no permission (InvokeExecutor hardening 2026-07-11; the v1.1 J1 fixtures carry 'timesheet_access').",
+            "type": "string"
+          },
           "contractVersion": { "$ref": "#/$defs/contractVersion" },
           "deprecated": { "$ref": "#/$defs/deprecatedMarker" }
         },

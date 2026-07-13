@@ -37,6 +37,29 @@ function dottedGet(obj, path) {
   return String(path).split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
 }
 
+/** Key-order-independent stringify (deterministic Action idempotency keys). */
+function stableStringify(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  return `{${Object.keys(value).sort().filter((k) => value[k] !== undefined).map((k) => `${JSON.stringify(k)}:${stableStringify(value[k])}`).join(',')}}`;
+}
+
+/**
+ * FNV-1a 32-bit over the stable form — the derived Action key must fit the
+ * frozen invoke-envelope's idempotencyKey maxLength (128); raw JSON does not.
+ * Same logical event ⇒ same hash; the server's (member, shift|day) upsert is
+ * the true duplicate guard, the key is the exactly-once ledger handle.
+ */
+function stableHash(value) {
+  const text = stableStringify(value);
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
 export function createBroker({
   capabilityService,
   recordBackend,
@@ -241,12 +264,21 @@ export function createBroker({
     if (!binding.inputMap) args = triggerPayload;
 
     const targetMp = binding.mp || mpId;
+    // An Action-dispatched client_key activity has no caller to supply the
+    // key — derive it DETERMINISTICALLY from (action, assembled args) so a
+    // replayed emission of the same logical event (offline drain, retry)
+    // carries the SAME key and the server's exactly-once ledger absorbs it.
+    const targetDef = mps.get(targetMp)?.manifest.activities?.[binding.name];
+    const derivedKey = targetDef?.idempotency === 'client_key'
+      ? `act-${mpId}-${actionId}-${stableHash(args)}`.slice(0, 128)
+      : undefined;
     return dispatchInvoke({
       sourceMpId: mpId,
       activity: qualify(targetMp, binding.name),
       args,
       tenantId,
       identity,
+      ...(derivedKey ? { idempotencyKey: derivedKey } : {}),
       chain: { ...chain, depth: chain.depth + 1, chainPath: [...chain.chainPath, `${mpId}:${actionId}`] },
       viaAction: actionId,
     });
@@ -462,7 +494,13 @@ export function createBroker({
         return `d-${JSON.stringify(envelope.args)}`;
       case 'natural_key': {
         const field = activityDef.naturalKeyField || 'id';
-        return `n-${dottedGet(envelope.args, field)}`;
+        const value = dottedGet(envelope.args, field);
+        // No such field ⇒ EVERY invocation would collide on 'n-undefined' and
+        // the second distinct write would replay the first's stored result
+        // (found at M3: set_mileage_status approve→reject swallowed). Fall
+        // back to whole-args derivation — identical retries still replay,
+        // distinct writes still apply.
+        return value !== undefined ? `n-${value}` : `n-${JSON.stringify(envelope.args)}`;
       }
       default:
         return undefined; // 'none' — forbidden with offlineReplayable (validator-enforced)
