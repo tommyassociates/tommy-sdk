@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runCli, typegenFromSource } from '../src/index.js';
+import { runCli, typegenFromSource } from '../src/node.js';
 
 const REF = fileURLToPath(new URL('./fixtures/reference-manifest.yml', import.meta.url));
 const BROKEN = fileURLToPath(new URL('./fixtures/broken/malformed-scope.yml', import.meta.url));

@@ -59,7 +59,6 @@ export interface CliIO {
 }
 
 export function validateManifest(source: string, opts?: ValidateOptions): ValidationResult;
-export function validateFile(path: string, opts?: ValidateOptions): ValidationResult;
 export function parseManifest(source: string): {
   doc: unknown;
   data: unknown;
@@ -70,6 +69,3 @@ export function loadSchema(): Record<string, unknown>;
 export function loadCatalogue(path?: string): Catalogue;
 export function searchCatalogue(catalogue: Catalogue, query?: CatalogueQuery): CatalogueEntry[];
 export function suggestScope(catalogue: Catalogue, unknown: string): string | null;
-export function typegenFromManifest(data: unknown): Promise<string>;
-export function typegenFromSource(source: string): Promise<string>;
-export function runCli(argv: string[], io?: CliIO): Promise<number>;

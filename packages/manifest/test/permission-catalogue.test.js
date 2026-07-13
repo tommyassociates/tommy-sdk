@@ -5,7 +5,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { validateFile, validateManifest, loadCatalogue, searchCatalogue, suggestScope } from '../src/index.js';
+import { validateManifest, loadCatalogue, searchCatalogue, suggestScope } from '../src/index.js';
+import { validateFile } from '../src/node.js';
 
 const catalogue = loadCatalogue();
 const SCOPE_RE = /^(read|write|invoke):[a-z][a-z0-9_]*$/;

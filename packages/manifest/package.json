@@ -14,6 +14,10 @@
       "types": "./src/index.d.ts",
       "import": "./src/index.js"
     },
+    "./node": {
+      "types": "./src/node.d.ts",
+      "import": "./src/node.js"
+    },
     "./schema": "./src/schema/manifest-schema.json",
     "./catalogue": "./src/catalogue/permission-catalogue.json"
   },

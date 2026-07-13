@@ -5,7 +5,7 @@
 
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { basename, join, dirname } from 'node:path';
-import { validateFile } from './validate.js';
+import { validateFile } from './validate-file.js';
 import { typegenFromSource } from './typegen.js';
 import { readFileSync } from 'node:fs';
 import { loadCatalogue, searchCatalogue } from './catalogue.js';

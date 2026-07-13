@@ -12,7 +12,6 @@
 //                     idempotency, debounced ⇒ debounceMs, custom sync ⇒
 //                     resolver), plus --strict-ai rules.
 
-import { readFileSync } from 'node:fs';
 import { parseManifest, locateLine, pointerToPath, pathToDisplay } from './parse.js';
 import { compileValidator } from './schema.js';
 import { loadCatalogue, suggestScope } from './catalogue.js';
@@ -320,10 +319,4 @@ export function validateManifest(source, opts = {}) {
   if (last.length > 0) return { ok: false, manifestId, errors: last };
 
   return { ok: true, manifestId, errors: [] };
-}
-
-/** Validate a manifest file by path. Throws (with .code='ENOENT') if unreadable. */
-export function validateFile(path, opts = {}) {
-  const source = readFileSync(path, 'utf8');
-  return validateManifest(source, opts);
 }

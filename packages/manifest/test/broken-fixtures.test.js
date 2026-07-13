@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { validateFile } from '../src/index.js';
+import { validateFile } from '../src/node.js';
 
 const BROKEN_DIR = fileURLToPath(new URL('./fixtures/broken/', import.meta.url));
 const fixtures = readdirSync(BROKEN_DIR).filter((f) => f.endsWith('.yml'));
