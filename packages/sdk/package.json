@@ -1,0 +1,22 @@
+{
+  "name": "@tommy/sdk",
+  "version": "0.1.0",
+  "description": "The Tommy Mini Program SDK — the only API an MP touches. One contract, two transport adapters (direct in-process at M1; postMessage sandboxed at M4).",
+  "license": "ISC",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/types.ts",
+  "exports": {
+    ".": "./src/index.js",
+    "./types": "./src/types.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.4"
+  }
+}

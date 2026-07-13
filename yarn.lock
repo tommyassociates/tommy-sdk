@@ -686,6 +686,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tommy/actions-runtime@workspace:*, @tommy/actions-runtime@workspace:packages/actions-runtime":
+  version: 0.0.0-use.local
+  resolution: "@tommy/actions-runtime@workspace:packages/actions-runtime"
+  dependencies:
+    "@tommy/sdk": "workspace:*"
+    ajv: ^8.17.1
+    ajv-formats: ^3.0.1
+    vitest: ^2.1.4
+  languageName: unknown
+  linkType: soft
+
 "@tommy/manifest@workspace:packages/manifest":
   version: 0.0.0-use.local
   resolution: "@tommy/manifest@workspace:packages/manifest"
@@ -698,6 +709,26 @@ __metadata:
     yaml: ^2.5.1
   bin:
     tommy: ./bin/tommy.js
+  languageName: unknown
+  linkType: soft
+
+"@tommy/offline-sync@workspace:packages/offline-sync":
+  version: 0.0.0-use.local
+  resolution: "@tommy/offline-sync@workspace:packages/offline-sync"
+  dependencies:
+    "@tommy/actions-runtime": "workspace:*"
+    "@tommy/sdk": "workspace:*"
+    ajv: ^8.17.1
+    ajv-formats: ^3.0.1
+    vitest: ^2.1.4
+  languageName: unknown
+  linkType: soft
+
+"@tommy/sdk@workspace:*, @tommy/sdk@workspace:packages/sdk":
+  version: 0.0.0-use.local
+  resolution: "@tommy/sdk@workspace:packages/sdk"
+  dependencies:
+    vitest: ^2.1.4
   languageName: unknown
   linkType: soft
 

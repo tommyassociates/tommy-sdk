@@ -1,0 +1,25 @@
+{
+  "name": "@tommy/actions-runtime",
+  "version": "0.1.0",
+  "description": "The Tommy MP host broker — trigger/condition/activity dispatch with default-deny authorisation, throttle profiles, loop/cascade caps, action-run records, and the offline trigger queue.",
+  "license": "ISC",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tommy/sdk": "workspace:*",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.4"
+  }
+}

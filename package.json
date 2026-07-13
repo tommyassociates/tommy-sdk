@@ -22,6 +22,7 @@
     "lint:isolation": "eslint --no-eslintrc -c .eslintrc.isolation.js \"addons/**/*.{js,vue}\" \"src/**/*.{js,vue}\" -f json -o eslint-report.json || true",
     "depcruise": "depcruise --config dependency-cruiser.config.js --output-type err-long addons src",
     "depcruise:report": "depcruise --config dependency-cruiser.config.js --output-type json addons src > depcruise-report.json || true",
+    "test:packages": "yarn workspace @tommy/manifest test && yarn workspace @tommy/sdk test && yarn workspace @tommy/actions-runtime test && yarn workspace @tommy/offline-sync test && node scripts/check-store-name-literals.mjs",
     "coupling:check": "yarn lint:isolation && yarn depcruise:report && node scripts/compare-to-baseline.js --check eslint-report.json depcruise-report.json coupling-baseline.json",
     "coupling:baseline": "yarn lint:isolation && yarn depcruise:report && node scripts/compare-to-baseline.js --write eslint-report.json depcruise-report.json coupling-baseline.json"
   },
