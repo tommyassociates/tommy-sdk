@@ -26,6 +26,7 @@
     "src"
   ],
   "scripts": {
+    "cli": "cd $PROJECT_CWD && node packages/manifest/bin/tommy.js manifest",
     "typegen": "node scripts/generate-types.mjs",
     "prepack": "node scripts/generate-types.mjs",
     "build": "node scripts/generate-types.mjs && tsc --noEmit -p tsconfig.json",

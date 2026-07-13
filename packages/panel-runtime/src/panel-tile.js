@@ -62,7 +62,15 @@ export const PanelTile = defineComponent({
       try {
         await Promise.race([Promise.resolve(props.def.load(props.ctx)), timeout]);
         if (!alive) return;
-        if (!shadowRoot) shadowRoot = mountEl.value.attachShadow({ mode: 'closed' });
+        if (!shadowRoot) {
+          shadowRoot = mountEl.value.attachShadow({ mode: 'closed' });
+          // DEV-ONLY escape hatch: closed shadow roots are unreachable from
+          // Playwright/devtools — expose the root on the mount element in dev
+          // builds so e2e can drive panel content. Absent in production.
+          try {
+            if (import.meta.env && import.meta.env.DEV) mountEl.value.__mpShadowRoot = shadowRoot;
+          } catch (_) { /* no import.meta.env outside vite */ }
+        }
         shadowRoot.replaceChildren();
         await props.def.render(shadowRoot, props.ctx);
         if (!alive) return;

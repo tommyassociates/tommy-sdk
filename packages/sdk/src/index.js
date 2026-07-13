@@ -39,8 +39,12 @@ function stubNamespace(name) {
  * @param {object} [opts.panels] PanelsApi from @tommy/panel-runtime (loader-injected)
  * @param {object} [opts.locales] this MP's bundled locale tables
  * @param {function} [opts.logSink] host log sink; defaults to console
+ * @param {object} [opts.namespaces] host-provided implementations for stub
+ *   namespaces (device, host, ui, lifecycle, …) — loader-injected per MP
+ *   (M2 host-capability surface). Unknown keys are rejected; anything not
+ *   provided stays a guard-throwing stub.
  */
-export function buildSdk({ adapter, init, data, panels, locales, logSink } = {}) {
+export function buildSdk({ adapter, init, data, panels, locales, logSink, namespaces } = {}) {
   if (!adapter) throw new Error('buildSdk: adapter required');
   if (!init) throw new Error('buildSdk: init required');
 
@@ -67,6 +71,13 @@ export function buildSdk({ adapter, init, data, panels, locales, logSink } = {})
     teardown: () => adapter.teardown(),
   };
   for (const name of STUB_NAMESPACES) sdk[name] = stubNamespace(name);
+
+  if (namespaces) {
+    for (const [name, impl] of Object.entries(namespaces)) {
+      if (!STUB_NAMESPACES.includes(name)) throw new Error(`buildSdk: unknown namespace '${name}'`);
+      if (impl) sdk[name] = guard(impl, name);
+    }
+  }
 
   return Object.freeze(guard(sdk, ''));
 }
