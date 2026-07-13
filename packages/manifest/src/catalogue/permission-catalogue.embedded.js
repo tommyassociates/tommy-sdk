@@ -1,0 +1,73 @@
+// GENERATED from permission-catalogue.json by scripts/embed-assets.mjs — do not hand-edit.
+// Embedded as a JS module so the package loads in BOTH node (the CLI)
+// and the browser/vite pipeline (the M1 in-process loader) without fs
+// or JSON import attributes.
+export default {
+  "_comment": "VENDORED FROM plans/refactor-plan/05-deliverables/02-manifest-tooling/permission-catalogue.sample.json — this copy is the runtime source of truth shipped inside @tommy/manifest (a pinned @tommy/manifest version = a pinned catalogue version). The catalogue is FIXED and versioned (Phase 3 Q2) — MPs may only request scopes that appear here; @tommy/manifest validate layer 3 rejects any non-member with the named rule 'permission-not-in-catalogue'. This is the M1 STARTER set (covers every scope the reference manifest uses); the EXHAUSTIVE production catalogue is a deliberate, reviewed Tommy authoring task before M4 (README:68, security-model.md §2) — NOT an M1 gate. Growing it: add entries here, bump catalogueVersion, review. Scope form: verb:resource (verb in read|write|invoke). sensitivity (low|medium|high) drives review attention; deviceCapabilityRequired is checked against the device by the production manifest strip.",
+  "catalogueVersion": "0.1.0-starter",
+  "categories": [
+    "team", "directory", "attendance", "timesheets", "scheduling", "leave", "clients",
+    "documents", "forms", "invoicing", "training", "comms", "files",
+    "device", "actions", "platform"
+  ],
+  "permissions": [
+    { "scope": "read:team_members", "category": "team", "title": "Read team members", "description": "View team member profiles in scope. Also required to use the team-member picker (tommy.ui).", "sensitivity": "medium" },
+    { "scope": "read:team_member_self", "category": "team", "title": "Read own profile", "description": "View the current user's own profile.", "sensitivity": "low" },
+    { "scope": "write:team_members", "category": "team", "title": "Edit team members", "description": "Modify team member profiles.", "sensitivity": "high" },
+
+    { "scope": "read:locations", "category": "directory", "title": "Read locations", "description": "View locations the user may see. Required for the location picker (tommy.ui) and directory reads. Results are filtered to the user's permitted locations.", "sensitivity": "low" },
+    { "scope": "read:roles", "category": "directory", "title": "Read roles", "description": "View team roles. Required for the role picker (tommy.ui) and directory reads.", "sensitivity": "low" },
+    { "scope": "read:skills", "category": "directory", "title": "Read skills", "description": "View skills. Required for the skill picker (tommy.ui) and directory reads.", "sensitivity": "low" },
+    { "scope": "read:tags", "category": "directory", "title": "Read tags", "description": "View tags. Required for the tag picker (tommy.ui) and directory reads.", "sensitivity": "low" },
+
+    { "scope": "read:attendance", "category": "attendance", "title": "Read attendance", "description": "View clock-in/out records.", "sensitivity": "medium" },
+    { "scope": "write:attendance", "category": "attendance", "title": "Record attendance", "description": "Create or edit attendance records.", "sensitivity": "high" },
+
+    { "scope": "read:timesheets", "category": "timesheets", "title": "Read timesheets", "description": "View timesheet data.", "sensitivity": "medium" },
+    { "scope": "write:timesheets", "category": "timesheets", "title": "Write timesheets", "description": "Create or edit timesheet entries.", "sensitivity": "high" },
+    { "scope": "invoke:timesheet_submit", "category": "timesheets", "title": "Submit timesheets", "description": "Submit a timesheet for approval.", "sensitivity": "high" },
+
+    { "scope": "read:shifts", "category": "scheduling", "title": "Read shifts", "description": "View the roster and shifts.", "sensitivity": "low" },
+    { "scope": "write:shifts", "category": "scheduling", "title": "Write shifts", "description": "Create or edit shifts.", "sensitivity": "high" },
+
+    { "scope": "read:leave", "category": "leave", "title": "Read leave", "description": "View leave requests and balances.", "sensitivity": "medium" },
+    { "scope": "write:leave", "category": "leave", "title": "Write leave", "description": "Create or edit leave requests.", "sensitivity": "medium" },
+
+    { "scope": "read:clients", "category": "clients", "title": "Read clients", "description": "View client records.", "sensitivity": "high" },
+    { "scope": "write:clients", "category": "clients", "title": "Write clients", "description": "Create or edit client records.", "sensitivity": "high" },
+
+    { "scope": "read:documents", "category": "documents", "title": "Read documents", "description": "View documents in scope.", "sensitivity": "medium" },
+    { "scope": "write:documents", "category": "documents", "title": "Write documents", "description": "Upload or edit documents.", "sensitivity": "high" },
+
+    { "scope": "read:forms", "category": "forms", "title": "Read forms", "description": "View form definitions and submissions.", "sensitivity": "medium" },
+    { "scope": "write:forms", "category": "forms", "title": "Write forms", "description": "Create forms or submit responses.", "sensitivity": "medium" },
+
+    { "scope": "read:invoices", "category": "invoicing", "title": "Read invoices", "description": "View invoices.", "sensitivity": "high" },
+    { "scope": "write:invoices", "category": "invoicing", "title": "Write invoices", "description": "Create or edit invoices.", "sensitivity": "high" },
+    { "scope": "invoke:accounting_sync", "category": "invoicing", "title": "Sync to accounting", "description": "Push data to a connected accounting integration (Xero/MYOB/QuickBooks/Reckon).", "sensitivity": "high" },
+
+    { "scope": "read:training", "category": "training", "title": "Read training", "description": "View training content and progress.", "sensitivity": "low" },
+    { "scope": "write:training_progress", "category": "training", "title": "Write training progress", "description": "Record training completion.", "sensitivity": "low" },
+
+    { "scope": "read:messages", "category": "comms", "title": "Read messages", "description": "View team messages.", "sensitivity": "high" },
+    { "scope": "write:messages", "category": "comms", "title": "Send messages", "description": "Send team messages.", "sensitivity": "high" },
+
+    { "scope": "read:files", "category": "files", "title": "Read files", "description": "Read files from the MP's own storage scope.", "sensitivity": "low" },
+    { "scope": "write:files", "category": "files", "title": "Write files", "description": "Write files to the MP's own storage scope.", "sensitivity": "low" },
+
+    { "scope": "invoke:device_camera", "category": "device", "title": "Use camera", "description": "Host-mediated photo capture via tommy.device.capturePhoto. The MP receives the photo, not a camera stream.", "sensitivity": "high", "deviceCapabilityRequired": "camera" },
+    { "scope": "invoke:device_scan", "category": "device", "title": "Scan codes", "description": "Host-mediated QR / barcode scan via tommy.device.scanCode.", "sensitivity": "high", "deviceCapabilityRequired": "camera" },
+    { "scope": "invoke:device_microphone", "category": "device", "title": "Use microphone", "description": "Host-mediated audio recording via tommy.device.recordAudio.", "sensitivity": "high", "deviceCapabilityRequired": "microphone" },
+    { "scope": "invoke:device_geolocation", "category": "device", "title": "Use location", "description": "Device geolocation — one-time (getLocation) or ongoing (watchLocation). Ongoing use shows a persistent host indicator.", "sensitivity": "high", "deviceCapabilityRequired": "geolocation" },
+    { "scope": "read:device_network", "category": "device", "title": "Read network status", "description": "Online/offline and connection type via tommy.device.network.", "sensitivity": "low" },
+    { "scope": "invoke:device_share", "category": "device", "title": "Share content", "description": "Open the native share sheet via tommy.device.share.", "sensitivity": "medium" },
+    { "scope": "invoke:device_save_image", "category": "device", "title": "Save image to gallery", "description": "Save an image to the device gallery via tommy.device.saveImage.", "sensitivity": "medium" },
+    { "scope": "invoke:device_notifications", "category": "device", "title": "Send notifications", "description": "Post local notifications.", "sensitivity": "medium", "deviceCapabilityRequired": "notifications" },
+    { "scope": "read:device_info", "category": "device", "title": "Read device info", "description": "Coarse device info (platform, OS version, model) via tommy.device.info.", "sensitivity": "low" },
+
+    { "scope": "invoke:action_emit", "category": "actions", "title": "Emit triggers", "description": "Emit triggers onto the Actions bus. Required only to emit triggers declared by OTHER MPs; emitting this MP's own manifest-declared triggers needs no scope.", "sensitivity": "medium" },
+    { "scope": "invoke:action_query", "category": "actions", "title": "Query conditions", "description": "Evaluate other MPs' conditions.", "sensitivity": "medium" },
+
+    { "scope": "read:tenant_profile", "category": "platform", "title": "Read tenant profile", "description": "View the tenant's display name and coarse role tags.", "sensitivity": "low" }
+  ]
+};

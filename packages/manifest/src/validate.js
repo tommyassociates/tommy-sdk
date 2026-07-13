@@ -250,7 +250,7 @@ function aiStrictErrors(doc, lineCounter, data) {
 /**
  * Validate a manifest source string.
  * @param {string} source
- * @param {{ cataloguePath?: string, strictAi?: boolean }} [opts]
+ * @param {{ catalogueOverride?: object, strictAi?: boolean }} [opts]
  * @returns {{ ok: boolean, manifestId: string|null, errors: Array }}
  */
 export function validateManifest(source, opts = {}) {
@@ -284,7 +284,7 @@ export function validateManifest(source, opts = {}) {
   if (shape.length > 0) return { ok: false, manifestId, errors: shape };
 
   // Layer 3 — Catalogue
-  const catalogue = loadCatalogue(opts.cataloguePath);
+  const catalogue = loadCatalogue(opts.catalogueOverride ?? opts.cataloguePath);
   const cat = [];
   (data.permissions?.scopes ?? []).forEach((scope, idx) => {
     if (!catalogue.scopes.has(scope)) {

@@ -3,16 +3,23 @@
 // validation layer 3 (README §Validation layers). A pinned @tommy/manifest
 // version pins the catalogue version.
 
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+// Embedded JS twin of the vendored JSON (scripts/embed-assets.mjs) — loads in
+// node AND the browser/vite pipeline; the JSON stays the drift-checked truth.
+import embeddedCatalogue from './catalogue/permission-catalogue.embedded.js';
 
-const BUNDLED_CATALOGUE = fileURLToPath(
-  new URL('./catalogue/permission-catalogue.json', import.meta.url),
-);
-
-/** Load a permission catalogue (defaults to the one bundled with this package). */
-export function loadCatalogue(path = BUNDLED_CATALOGUE) {
-  const raw = JSON.parse(readFileSync(path, 'utf8'));
+/**
+ * Load a permission catalogue. Defaults to the embedded one. An override must
+ * be a pre-parsed OBJECT (browser-safe); the CLI resolves --catalogue file
+ * paths to objects before calling in (keeping this module free of node
+ * builtins for the in-process loader).
+ */
+export function loadCatalogue(override) {
+  let raw = embeddedCatalogue;
+  if (override && typeof override === 'object') {
+    raw = override;
+  } else if (typeof override === 'string') {
+    throw new Error("loadCatalogue: pass a parsed catalogue object; the CLI resolves file paths (see cli.js readCatalogueOverride)");
+  }
   const permissions = raw.permissions ?? [];
   return {
     version: raw.catalogueVersion ?? 'unknown',

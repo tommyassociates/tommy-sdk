@@ -10,6 +10,11 @@ import { typegenFromSource } from './typegen.js';
 import { readFileSync } from 'node:fs';
 import { loadCatalogue, searchCatalogue } from './catalogue.js';
 
+/** CLI-only: resolve a --catalogue file path to the parsed object. */
+function readCatalogueOverride(path) {
+  return path ? JSON.parse(readFileSync(path, 'utf8')) : undefined;
+}
+
 const EXIT_OK = 0;
 const EXIT_FAIL = 1;
 const EXIT_USAGE = 2;
@@ -79,7 +84,7 @@ function cmdValidate(args, io) {
 
   let result;
   try {
-    result = validateFile(path, { cataloguePath: flags.catalogue, strictAi: flags['strict-ai'] });
+    result = validateFile(path, { catalogueOverride: readCatalogueOverride(flags.catalogue), strictAi: flags['strict-ai'] });
   } catch (e) {
     // Any filesystem error (ENOENT/EISDIR/EACCES/…) is a usage/IO failure (exit 2)
     // reported in the SAME { ok, manifestId, errors } shape as a validation result.
@@ -146,7 +151,7 @@ async function cmdTypegen(args, io) {
 
 function cmdCatalogue(args, io) {
   const { flags } = parseFlags(args, { search: 'string', category: 'string', json: 'boolean', catalogue: 'string' });
-  const catalogue = loadCatalogue(flags.catalogue);
+  const catalogue = loadCatalogue(readCatalogueOverride(flags.catalogue));
   const list = searchCatalogue(catalogue, { search: flags.search, category: flags.category });
   if (flags.json) {
     io.out(JSON.stringify({ catalogueVersion: catalogue.version, permissions: list }));
@@ -163,7 +168,7 @@ function cmdExplain(args, io) {
   const { flags, positional } = parseFlags(args, { catalogue: 'string' });
   const scope = positional[0];
   if (!scope) throw new UsageError('usage: tommy manifest explain <scope>');
-  const catalogue = loadCatalogue(flags.catalogue);
+  const catalogue = loadCatalogue(readCatalogueOverride(flags.catalogue));
   const p = catalogue.byScope.get(scope);
   if (!p) {
     io.err(`✖ '${scope}' is not in the permission catalogue (${catalogue.version}).`);
