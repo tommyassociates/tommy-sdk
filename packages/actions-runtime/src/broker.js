@@ -210,44 +210,14 @@ export function createBroker({
   async function runAction(tenantId, triggerPayload, wiredAction, chain, identity) {
     const { mpId, actionId, action, options } = wiredAction;
 
-    // Condition gates — all must pass; returns readable for inputMap 'condition' sources.
+    // Shared inputMap source resolver — base four (trigger/option/const/
+    // condition) + default EXECUTED; E2 (transform) / E3 (template) rejected.
+    // `conditionValues` grows as earlier condition gates resolve, so a later
+    // gate's E1 input may reference an earlier gate's return (DAG order).
     const conditionValues = {};
-    for (const gate of action.conditions || []) {
-      if (gate.input) {
-        throw err('InvalidPayload', `Action '${actionId}': parameterized condition input (E1) is not implemented at M1`, {
-          rule: 'not-implemented:2.22-E1', retryable: false,
-        });
-      }
-      const ref = gate.ref || gate.name;
-      const owner = gate.mp || mpId;
-      // eslint-disable-next-line no-await-in-loop
-      const value = await dispatchQuery({
-        sourceMpId: mpId,
-        condition: qualify(owner, gate.name),
-        args: {},
-        tenantId,
-        chain: { ...chain, depth: chain.depth + 1, chainPath: [...chain.chainPath, `${mpId}:${actionId}`] },
-        identity,
-      });
-      conditionValues[ref] = value;
-      if (!value) return { skipped: true, reason: `condition '${ref}' gated` };
-    }
-
-    // inputMap assembly — base four + default (harden round-1); E2-E7 rejected.
-    const binding = action.activity;
-    if (binding.select || action.forEach || action.serviceReads) {
-      throw err('InvalidPayload', `Action '${actionId}': select/forEach/serviceReads (E4/E5/E6) not implemented at M1`, {
-        rule: 'not-implemented:2.22-E4-E6', retryable: false,
-      });
-    }
-    let args = {};
-    for (const [field, source] of Object.entries(binding.inputMap || {})) {
-      if (source.transform) {
-        throw err('InvalidPayload', `Action '${actionId}': transform chains (E2) not implemented at M1`, { rule: 'not-implemented:2.22-E2', retryable: false });
-      }
-      if (source.template !== undefined) {
-        throw err('InvalidPayload', `Action '${actionId}': template sources (E3) not implemented at M1`, { rule: 'not-implemented:2.22-E3', retryable: false });
-      }
+    const resolveSource = (source) => {
+      if (source.transform) throw err('InvalidPayload', `Action '${actionId}': transform chains (E2) not implemented at M1`, { rule: 'not-implemented:2.22-E2', retryable: false });
+      if (source.template !== undefined) throw err('InvalidPayload', `Action '${actionId}': template sources (E3) not implemented at M1`, { rule: 'not-implemented:2.22-E3', retryable: false });
       let value;
       if ('const' in source) value = source.const;
       else if (M1_SOURCES.has(source.from)) {
@@ -259,7 +229,44 @@ export function createBroker({
         throw err('InvalidPayload', `Action '${actionId}': inputMap source '${source.from}' not implemented at M1`, { rule: `not-implemented:inputMap.${source.from}`, retryable: false });
       }
       if (value === undefined && 'default' in source) value = source.default;
-      args[field] = value;
+      return value;
+    };
+
+    // Condition gates — all must pass; returns readable for inputMap 'condition'
+    // sources. Per 2.22 E1 a gate may PARAMETERIZE its condition via `input`
+    // (assembled from the base-four sources); `args` remains valid for literals.
+    for (const gate of action.conditions || []) {
+      const ref = gate.ref || gate.name;
+      const owner = gate.mp || mpId;
+      let condArgs = {};
+      if (gate.input) {
+        for (const [field, source] of Object.entries(gate.input)) condArgs[field] = resolveSource(source);
+      } else if (gate.args) {
+        condArgs = gate.args;
+      }
+      // eslint-disable-next-line no-await-in-loop
+      const value = await dispatchQuery({
+        sourceMpId: mpId,
+        condition: qualify(owner, gate.name),
+        args: condArgs,
+        tenantId,
+        chain: { ...chain, depth: chain.depth + 1, chainPath: [...chain.chainPath, `${mpId}:${actionId}`] },
+        identity,
+      });
+      conditionValues[ref] = value;
+      if (!value) return { skipped: true, reason: `condition '${ref}' gated` };
+    }
+
+    // inputMap assembly — base four + default (harden round-1); E4-E7 rejected.
+    const binding = action.activity;
+    if (binding.select || action.forEach || action.serviceReads) {
+      throw err('InvalidPayload', `Action '${actionId}': select/forEach/serviceReads (E4/E5/E6) not implemented at M1`, {
+        rule: 'not-implemented:2.22-E4-E6', retryable: false,
+      });
+    }
+    let args = {};
+    for (const [field, source] of Object.entries(binding.inputMap || {})) {
+      args[field] = resolveSource(source);
     }
     if (!binding.inputMap) args = triggerPayload;
 

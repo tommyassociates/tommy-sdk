@@ -53,6 +53,7 @@ export default {
     { "scope": "write:training_progress", "category": "training", "title": "Write training progress", "description": "Record training completion.", "sensitivity": "low" },
 
     { "scope": "read:messages", "category": "comms", "title": "Read messages", "description": "View team messages.", "sensitivity": "high" },
+    { "scope": "read:messages_inbound", "category": "comms", "title": "Subscribe to inbound messages", "description": "Receive inbound message/read/typing/block triggers from Team Comms as they arrive. Default-deny — an MP granted this sees only ACL-filtered events for conversations its installer may see. The inbound-notification privacy gate.", "sensitivity": "high" },
     { "scope": "write:messages", "category": "comms", "title": "Send messages", "description": "Send team messages.", "sensitivity": "high" },
 
     { "scope": "read:files", "category": "files", "title": "Read files", "description": "Read files from the MP's own storage scope.", "sensitivity": "low" },
