@@ -4,9 +4,9 @@
 // or JSON import attributes.
 export default {
   "_comment": "VENDORED FROM plans/refactor-plan/05-deliverables/02-manifest-tooling/permission-catalogue.sample.json — this copy is the runtime source of truth shipped inside @tommy/manifest (a pinned @tommy/manifest version = a pinned catalogue version). The catalogue is FIXED and versioned (Phase 3 Q2) — MPs may only request scopes that appear here; @tommy/manifest validate layer 3 rejects any non-member with the named rule 'permission-not-in-catalogue'. This is the M1 STARTER set (covers every scope the reference manifest uses); the EXHAUSTIVE production catalogue is a deliberate, reviewed Tommy authoring task before M4 (README:68, security-model.md §2) — NOT an M1 gate. Growing it: add entries here, bump catalogueVersion, review. Scope form: verb:resource (verb in read|write|invoke). sensitivity (low|medium|high) drives review attention; deviceCapabilityRequired is checked against the device by the production manifest strip.",
-  "catalogueVersion": "0.1.0-starter",
+  "catalogueVersion": "0.2.0-starter",
   "categories": [
-    "team", "directory", "attendance", "timesheets", "scheduling", "leave", "clients",
+    "team", "directory", "attendance", "timesheets", "scheduling", "availability", "leave", "clients",
     "documents", "forms", "invoicing", "training", "comms", "files",
     "device", "actions", "platform"
   ],
@@ -29,6 +29,9 @@ export default {
 
     { "scope": "read:shifts", "category": "scheduling", "title": "Read shifts", "description": "View the roster and shifts.", "sensitivity": "low" },
     { "scope": "write:shifts", "category": "scheduling", "title": "Write shifts", "description": "Create or edit shifts.", "sensitivity": "high" },
+
+    { "scope": "read:availability", "category": "availability", "title": "Read availability", "description": "View preferred shifts, availability windows and regular hours.", "sensitivity": "medium" },
+    { "scope": "write:availability", "category": "availability", "title": "Write availability", "description": "Set preferred shifts, regular hours and lock/unlock availability windows.", "sensitivity": "medium" },
 
     { "scope": "read:leave", "category": "leave", "title": "Read leave", "description": "View leave requests and balances.", "sensitivity": "medium" },
     { "scope": "write:leave", "category": "leave", "title": "Write leave", "description": "Create or edit leave requests.", "sensitivity": "medium" },
