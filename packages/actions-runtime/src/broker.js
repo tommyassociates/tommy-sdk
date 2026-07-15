@@ -783,6 +783,33 @@ export function createBroker({
       return [...suppressionTally.entries()].map(([key, count]) => ({ key, count }));
     },
 
+    /**
+     * Registered-Action metadata for the Settings → Actions management UI
+     * (actions-runtime.md §10 / W4) — a READ projection of the registered
+     * manifests, keyed (mpId, actionId). The server `index_mp` payload carries
+     * the per-tenant STATE (enabled/required/options/availability/usage); this
+     * supplies the manifest-side DISPLAY metadata it omits (title/description/
+     * optionsSchema/optionsDefault — the Configure form's schema). Read-only;
+     * touches no state.
+     */
+    actionCatalog() {
+      const out = [];
+      for (const [mpId, entry] of mps) {
+        const actions = entry.manifest.actions || {};
+        for (const [actionId, action] of Object.entries(actions)) {
+          out.push({
+            mpId,
+            actionId,
+            title: action.title,
+            description: action.description,
+            optionsSchema: action.optionsSchema,
+            optionsDefault: action.optionsDefault,
+          });
+        }
+      }
+      return out;
+    },
+
     setOnline(value) { isOnline = !!value; },
     isOnline: () => isOnline,
     drainOfflineQueue,
