@@ -115,6 +115,35 @@ describe('panel host', () => {
     expect(() => api.register(healthyDef('not-declared'))).toThrow(/not declared in the manifest/);
   });
 
+  it('mpId scopes a surface to a single MP (per-MP surface host); absent = all MPs', async () => {
+    const tc = host.panelsApiFor('time-clock', { 'tc-main': { surfaces: ['full_page'] } });
+    tc.register(healthyDef('tc-main', 'time clock'));
+    const sched = host.panelsApiFor('scheduling', { 'sch-main': { surfaces: ['full_page'] } });
+    sched.register(healthyDef('sch-main', 'scheduling'));
+
+    // Scoped: only the Time Clock panel mounts.
+    const scoped = host.mountSurface(el, { surface: 'full_page', mpId: 'time-clock' });
+    await flush();
+    expect(scoped.panelCount).toBe(1);
+    expect(el.querySelector('[data-panel-id="tc-main"]')).toBeTruthy();
+    expect(el.querySelector('[data-panel-id="sch-main"]')).toBeFalsy();
+    host.unmountSurface('full_page');
+
+    // Unscoped: every MP's full_page panel mounts (regression).
+    const all = host.mountSurface(el, { surface: 'full_page' });
+    await flush();
+    expect(all.panelCount).toBe(2);
+    expect(el.querySelector('[data-panel-id="tc-main"]')).toBeTruthy();
+    expect(el.querySelector('[data-panel-id="sch-main"]')).toBeTruthy();
+  });
+
+  it('host.layoutFor({ mpId }) groups only the scoped MP', () => {
+    host.panelsApiFor('time-clock', { 'tc-main': { surfaces: ['full_page'] } }).register(healthyDef('tc-main'));
+    host.panelsApiFor('scheduling', { 'sch-main': { surfaces: ['full_page'] } }).register(healthyDef('sch-main'));
+    const groups = host.layoutFor('full_page', [], { mpId: 'time-clock' });
+    expect(groups.map((g) => g.mpId)).toEqual(['time-clock']);
+  });
+
   it('unmountSurface calls panel unmount hooks (teardown-and-cold-boot at M1)', async () => {
     const api = host.panelsApiFor('time-clock', manifestPanels);
     const def = healthyDef('my-week');

@@ -48,15 +48,20 @@ export function createPanelHost({ onEvent } = {}) {
       };
     },
 
-    /** Panels visible on a surface for the current viewer, grouped by MP. */
-    layoutFor(surface, viewerRoles) {
+    /**
+     * Panels visible on a surface for the current viewer, grouped by MP.
+     * `opts.mpId` scopes the result to a single MP (a per-MP surface host,
+     * e.g. the Time Clock full-page page); omit it to render every MP.
+     */
+    layoutFor(surface, viewerRoles, { mpId } = {}) {
       const out = [];
-      for (const [mpId, manifestPanels] of declarations) {
-        const defs = registrations.get(mpId) || new Map();
+      for (const [id, manifestPanels] of declarations) {
+        if (mpId && id !== mpId) continue;
+        const defs = registrations.get(id) || new Map();
         const visible = layoutFor(manifestPanels, surface, viewerRoles)
           .filter((panelId) => defs.has(panelId))
           .map((panelId) => defs.get(panelId));
-        if (visible.length) out.push({ mpId, defs: visible });
+        if (visible.length) out.push({ mpId: id, defs: visible });
       }
       return out;
     },
@@ -64,10 +69,12 @@ export function createPanelHost({ onEvent } = {}) {
     /**
      * Mount every visible panel for `surface` into the host element.
      * The skeleton paints with the grid; each tile reveals progressively.
+     * `mpId` scopes the mount to a single MP (filtered BEFORE the panel
+     * budget, so a scoped surface is never truncated by another MP).
      */
-    mountSurface(el, { surface, viewerRoles = [], ctxFor }) {
+    mountSurface(el, { surface, viewerRoles = [], ctxFor, mpId }) {
       this.unmountSurface(surface);
-      const groups = this.layoutFor(surface, viewerRoles);
+      const groups = this.layoutFor(surface, viewerRoles, { mpId });
       const tiles = groups.flatMap(({ mpId, defs }) => defs.map((def) => ({ mpId, def })));
       if (tiles.length > SURFACE_PANEL_BUDGET) {
         // Advisory budget: log through the hook, render the budgeted slice.
