@@ -11,7 +11,7 @@
  * — a broken panel is a fallback tile, siblings keep running) and reported
  * through the budget-hook event stream.
  */
-import { defineComponent, h, ref, onMounted, onBeforeUnmount } from 'vue';
+import { defineComponent, h, ref, onMounted, onBeforeUnmount, onErrorCaptured } from 'vue';
 
 export const LOAD_TIMEOUT_MS = 5000;
 export const MAX_CONSECUTIVE_FAILURES = 3;
@@ -199,12 +199,6 @@ export const PanelTile = defineComponent({
     loadTimeoutMs: { type: Number, default: LOAD_TIMEOUT_MS },
     onEvent: { type: Function, default: null }, // budget hooks: (event) => void
   },
-  // Vue-child errors (an MP panel that mounts Vue into its shadow root can
-  // still bubble here) are contained to this tile.
-  errorCaptured(err) {
-    this.fail(err);
-    return false;
-  },
   setup(props, { expose }) {
     const status = ref('loading'); // loading | ready | error | reload_addon
     const failures = ref(0);
@@ -235,8 +229,22 @@ export const PanelTile = defineComponent({
         timer = setTimeout(() => reject(new Error(`panel '${props.def.id}' load exceeded ${props.loadTimeoutMs}ms`)), props.loadTimeoutMs);
       });
       try {
-        await Promise.race([Promise.resolve(props.def.load(props.ctx)), timeout]);
+        // Optional prefetch — both paths may declare load(). The component path
+        // usually fetches inside the component's setup() via `tommy` instead.
+        if (props.def.load) {
+          await Promise.race([Promise.resolve(props.def.load(props.ctx)), timeout]);
+        }
         if (!alive) return;
+        if (props.def.component) {
+          // Component path: mount a Vue/F7 component declaratively into the
+          // LIGHT-DOM content node (the render fn renders it once ready). No
+          // shadow root (F7's global CSS can't cross a closed shadow boundary),
+          // no def.render. Render errors are contained by onErrorCaptured below.
+          status.value = 'ready';
+          failures.value = 0;
+          emitEvent('panel-ready', { durationMs: Date.now() - startedAt });
+          return;
+        }
         if (!shadowRoot) {
           shadowRoot = mountEl.value.attachShadow({ mode: 'closed' });
           // DEV-ONLY escape hatch: closed shadow roots are unreachable from
@@ -273,13 +281,25 @@ export const PanelTile = defineComponent({
       alive = false;
       try { if (props.def.unmount) props.def.unmount(); } catch (_) { /* contained */ }
     });
+    // The tile IS the error boundary: a component-path child (or a Vue-in-shadow
+    // render-path MP) that throws during render/setup/lifecycle is contained
+    // here — the tile enters its error/retry state, siblings keep running.
+    onErrorCaptured((err) => {
+      if (alive) fail(err);
+      return false;
+    });
 
     expose({ retry, fail });
 
     return () => h('div', { class: ['mp-panel-tile', `mp-panel-tile--${status.value}`], 'data-panel-id': props.def.id }, [
-      // The MP's shadow-root mount point is ALWAYS present (render targets it);
-      // skeleton/fallback overlays it while not ready.
-      h('div', { class: 'mp-panel-tile__content', ref: mountEl, style: status.value === 'ready' ? undefined : { display: 'none' } }),
+      // Component path: the registered Vue/F7 component mounts as a light-DOM
+      // child once ready (only then — so a re-throw can't reopen after fail()).
+      // Plain-DOM path: the shadow-root mount point is ALWAYS present (render
+      // targets it); skeleton/fallback overlays it while not ready.
+      props.def.component
+        ? h('div', { class: 'mp-panel-tile__content', style: status.value === 'ready' ? undefined : { display: 'none' } },
+          status.value === 'ready' ? [h(props.def.component, { tommy: props.ctx && props.ctx.tommy, ctx: props.ctx })] : [])
+        : h('div', { class: 'mp-panel-tile__content', ref: mountEl, style: status.value === 'ready' ? undefined : { display: 'none' } }),
       status.value === 'loading'
         ? h('div', { class: 'mp-panel-tile__skeleton', 'aria-busy': 'true' }, [h('div', { class: 'mp-panel-skeleton-bar' }), h('div', { class: 'mp-panel-skeleton-bar' })])
         : null,

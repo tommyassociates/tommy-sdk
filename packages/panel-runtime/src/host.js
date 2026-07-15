@@ -16,7 +16,16 @@ import { layoutFor, normalizePanels } from './layout.js';
 export const SURFACE_PANEL_BUDGET = 24;
 export const SURFACE_MP_BUDGET = 12;
 
-export function createPanelHost({ onEvent } = {}) {
+/**
+ * @param {object} [opts]
+ * @param {function} [opts.onEvent] budget/telemetry hook
+ * @param {function} [opts.installComponentRuntime] host-supplied installer run
+ *   on every surface `createApp` — installs Framework7Vue + registerComponents
+ *   + provides `$f7`/store so a component-path tile's `f7-*` globals resolve.
+ *   panel-runtime stays framework7-agnostic (layering): the app/core supplies
+ *   this; without it, only the plain-DOM `render` path works.
+ */
+export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
   const registrations = new Map(); // mpId -> Map<panelId, def>
   const declarations = new Map();  // mpId -> manifest.panels declaration
   const mounted = new Map();       // surfaceKey -> { app, el }
@@ -26,7 +35,7 @@ export function createPanelHost({ onEvent } = {}) {
      * The PanelsApi for one MP instance — injected as `tommy.panels`.
      * register() only accepts ids the manifest DECLARES (contract-first).
      */
-    panelsApiFor(mpId, manifestPanelsRaw = {}) {
+    panelsApiFor(mpId, manifestPanelsRaw = {}, { firstParty = false } = {}) {
       const manifestPanels = Object.fromEntries(normalizePanels(manifestPanelsRaw));
       declarations.set(mpId, manifestPanels);
       const defs = registrations.get(mpId) || new Map();
@@ -36,6 +45,21 @@ export function createPanelHost({ onEvent } = {}) {
           if (!def || !def.id) throw new Error('tommy.panels.register: def.id required');
           if (!manifestPanels[def.id]) {
             throw new Error(`tommy.panels.register: panel '${def.id}' is not declared in the manifest`);
+          }
+          // component XOR render — a panel is authored EITHER as a Vue/F7
+          // component (light DOM, shared runtime) OR as a plain-DOM render(root)
+          // (shadow-isolated). Exactly one; never both, never neither.
+          const hasComponent = Boolean(def.component);
+          const hasRender = typeof def.render === 'function';
+          if (hasComponent === hasRender) {
+            throw new Error(`tommy.panels.register: panel '${def.id}' must provide exactly one of 'component' or 'render'`);
+          }
+          // The `component` path mounts in LIGHT DOM sharing the host runtime
+          // (drops shadow isolation), so it is FIRST-PARTY ONLY until the M4
+          // untrusted-review pipeline exists. Untrusted MPs stay on the
+          // shadow-isolated `render` path.
+          if (hasComponent && !firstParty) {
+            throw new Error(`tommy.panels.register: panel '${def.id}' — the 'component' path is first-party only (untrusted MPs must use 'render')`);
           }
           defs.set(def.id, def);
         },
@@ -91,6 +115,12 @@ export function createPanelHost({ onEvent } = {}) {
             onEvent,
           }))),
       });
+      // Install the host F7 runtime (Framework7Vue + registerComponents + $f7)
+      // onto the surface app so component-path tiles resolve `f7-*` globals.
+      // Contained: a broken installer must not take down the whole surface.
+      if (installComponentRuntime) {
+        try { installComponentRuntime(app); } catch (e) { if (onEvent) onEvent({ type: 'surface-runtime-install-failed', surface, message: String(e && e.message), at: Date.now() }); }
+      }
       app.mount(el);
       mounted.set(surface, { app, el });
       return { panelCount: tiles.length };
