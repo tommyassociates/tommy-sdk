@@ -87,7 +87,7 @@ export function register(tommy) {
       this.records = (await allCheckins()).filter((r) => todayKey(r.at) === today);
     },
     render(root, ctx) {
-      renderList(root, this.records, { title: tommy.t('checkin.today', "Today's check-ins"), showNotes: ctx.config?.showNotes !== false });
+      renderList(root, this.records, { title: tommy.t('checkin.today', "Today's Check-ins"), showNotes: ctx.config?.showNotes !== false });
     },
   });
 
@@ -100,7 +100,7 @@ export function register(tommy) {
       this.records = (await allCheckins()).filter((r) => r.teamMemberId === memberId).slice(-10);
     },
     render(root) {
-      renderList(root, this.records, { title: tommy.t('checkin.recent', 'Recent check-ins') });
+      renderList(root, this.records, { title: tommy.t('checkin.recent', 'Recent Check-ins') });
     },
   });
 
@@ -113,7 +113,7 @@ export function register(tommy) {
       this.records = await allCheckins();
     },
     render(root) {
-      renderList(root, this.records, { title: tommy.t('checkin.history', 'Check-in history') });
+      renderList(root, this.records, { title: tommy.t('checkin.history', 'Check-in History') });
       const button = document.createElement('button');
       button.className = 'checkin-post';
       button.textContent = tommy.t('checkin.post', 'Check in: OK');
@@ -143,9 +143,9 @@ export async function postCheckin(tommy, { status, note } = {}) {
 
 export const locales = {
   en: {
-    'checkin.today': "Today's check-ins",
-    'checkin.recent': 'Recent check-ins',
-    'checkin.history': 'Check-in history',
+    'checkin.today': "Today's Check-ins",
+    'checkin.recent': 'Recent Check-ins',
+    'checkin.history': 'Check-in History',
     'checkin.post': 'Check in: OK',
     'checkin.open_history': 'History',
   },
