@@ -51,6 +51,7 @@ export default {
 
     { "scope": "read:training", "category": "training", "title": "Read training", "description": "View training content and progress.", "sensitivity": "low" },
     { "scope": "write:training_progress", "category": "training", "title": "Write training progress", "description": "Record training completion.", "sensitivity": "low" },
+    { "scope": "write:training", "category": "training", "title": "Manage training content", "description": "Create, edit or delete training videos and their watch-requirement definitions (video-kind DocumentType + the Video asset). Distinct from write:training_progress, which only records that a worker watched a video.", "sensitivity": "medium" },
 
     { "scope": "read:messages", "category": "comms", "title": "Read messages", "description": "View team messages.", "sensitivity": "high" },
     { "scope": "read:messages_inbound", "category": "comms", "title": "Subscribe to inbound messages", "description": "Receive inbound message/read/typing/block triggers from Team Comms as they arrive. Default-deny — an MP granted this sees only ACL-filtered events for conversations its installer may see. The inbound-notification privacy gate.", "sensitivity": "high" },
