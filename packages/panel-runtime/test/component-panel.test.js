@@ -170,7 +170,7 @@ describe('component panel path', () => {
     await flush();
     expect(el.querySelector('.tracked')).toBeTruthy();
 
-    host.unmountSurface('dashboard');
+    host.unmountSurface(el);
     expect(unmountSpy).toHaveBeenCalledTimes(1);
     expect(el.querySelector('.tracked')).toBeNull();
   });

@@ -28,7 +28,13 @@ export const SURFACE_MP_BUDGET = 12;
 export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
   const registrations = new Map(); // mpId -> Map<panelId, def>
   const declarations = new Map();  // mpId -> manifest.panels declaration
-  const mounted = new Map();       // surfaceKey -> { app, el }
+  // Keyed by the host ELEMENT, not the surface name: one MP surface (e.g.
+  // `full_page`) can be mounted into MORE THAN ONE element at once — the
+  // canonical master-detail routes mount the same MP's `full_page` panel into
+  // both the master page (`/calendar/`) and the detail page (`/calendar/overview/`)
+  // simultaneously. Keying by surface would tear the first down when the second
+  // mounts (blanking the master pane).
+  const mounted = new Map();       // el -> { app, el, surface }
 
   return {
     /**
@@ -97,7 +103,9 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
      * budget, so a scoped surface is never truncated by another MP).
      */
     mountSurface(el, { surface, viewerRoles = [], ctxFor, mpId }) {
-      this.unmountSurface(surface);
+      // Idempotent per element: re-mounting into the same element replaces its
+      // app (never touches another element hosting the same surface name).
+      this.unmountSurface(el);
       const groups = this.layoutFor(surface, viewerRoles, { mpId });
       const tiles = groups.flatMap(({ mpId, defs }) => defs.map((def) => ({ mpId, def })));
       if (tiles.length > SURFACE_PANEL_BUDGET) {
@@ -122,15 +130,16 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
         try { installComponentRuntime(app); } catch (e) { if (onEvent) onEvent({ type: 'surface-runtime-install-failed', surface, message: String(e && e.message), at: Date.now() }); }
       }
       app.mount(el);
-      mounted.set(surface, { app, el });
+      mounted.set(el, { app, el, surface });
       return { panelCount: tiles.length };
     },
 
-    unmountSurface(surface) {
-      const entry = mounted.get(surface);
+    /** Unmount the app hosted in `el` (the host element the surface mounted into). */
+    unmountSurface(el) {
+      const entry = mounted.get(el);
       if (entry) {
         entry.app.unmount();
-        mounted.delete(surface);
+        mounted.delete(el);
       }
     },
 

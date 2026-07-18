@@ -127,7 +127,7 @@ describe('panel host', () => {
     expect(scoped.panelCount).toBe(1);
     expect(el.querySelector('[data-panel-id="tc-main"]')).toBeTruthy();
     expect(el.querySelector('[data-panel-id="sch-main"]')).toBeFalsy();
-    host.unmountSurface('full_page');
+    host.unmountSurface(el);
 
     // Unscoped: every MP's full_page panel mounts (regression).
     const all = host.mountSurface(el, { surface: 'full_page' });
@@ -150,7 +150,7 @@ describe('panel host', () => {
     api.register(def);
     host.mountSurface(el, { surface: 'dashboard' });
     await flush();
-    host.unmountSurface('dashboard');
+    host.unmountSurface(el);
     expect(def.unmount).toHaveBeenCalled();
   });
 });
