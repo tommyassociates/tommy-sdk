@@ -411,9 +411,24 @@ offline?: ("cached_stale" | "needs_connection")
 contributions?: {
 routes?: {
 id: string
+/**
+ * Canonical route path. May carry :params (e.g. /care-plans/:id/details/).
+ */
 path: string
 name: string
 index?: boolean
+/**
+ * Marks a master route of a master-detail pair (host emits F7 master:true + detailRoutes).
+ */
+master?: boolean
+/**
+ * Marks a detail route paired to a master via masterId.
+ */
+detail?: boolean
+/**
+ * On a detail route: the id of the master route it belongs to.
+ */
+masterId?: string
 }[]
 modals?: NamedContribution[]
 settingsPages?: NamedContribution[]

@@ -437,9 +437,12 @@
             "required": ["id", "path", "name"],
             "properties": {
               "id": { "type": "string" },
-              "path": { "type": "string", "pattern": "^/[a-z0-9/-]*$" },
+              "path": { "type": "string", "pattern": "^/[a-zA-Z0-9/:_-]*$", "description": "Canonical route path. May carry :params (e.g. /care-plans/:id/details/)." },
               "name": { "type": "string" },
-              "index": { "type": "boolean", "default": false }
+              "index": { "type": "boolean", "default": false },
+              "master": { "type": "boolean", "default": false, "description": "Marks a master route of a master-detail pair (host emits F7 master:true + detailRoutes)." },
+              "detail": { "type": "boolean", "default": false, "description": "Marks a detail route paired to a master via masterId." },
+              "masterId": { "type": "string", "description": "On a detail route: the id of the master route it belongs to." }
             }
           }
         },
