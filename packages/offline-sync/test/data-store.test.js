@@ -76,6 +76,55 @@ describe('tommy.data stores', () => {
     expect(data.syncState('entries')).toEqual({ lastSyncedAt: null, pending: 0, online: true });
   });
 
+  it('readWhere returns predicate-matching records with meta stamps stripped', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData });
+    const store = data.store('entries');
+    await store.put({ id: 'a', shiftId: 's-1', hours: 2 });
+    await store.put({ id: 'b', shiftId: 's-2', hours: 9 });
+
+    const low = await store.readWhere((r) => r.hours < 5);
+    expect(low).toEqual([{ id: 'a', shiftId: 's-1', hours: 2 }]); // no _rev/_dirty/_updatedAt
+    expect(await store.readWhere((r) => r.hours > 100)).toEqual([]);
+    expect((await store.readWhere()).length).toBe(2); // no predicate = all
+  });
+
+  it('windowCache.read paints from cache; sync fetches, reconciles, and returns fresh rows', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData });
+    const store = data.store('entries');
+    // Seed one in-scope row so read() has something to paint instantly.
+    await store.put({ id: 'a', shiftId: 's-1', hours: 1 }); await store.markSynced('a');
+
+    let fetchArg = null;
+    const cache = data.windowCache('entries', {
+      fetch: (win) => { fetchArg = win; return [{ ref: 'a', hours: 5 }, { ref: 'c', hours: 6 }]; },
+      toRecord: (dto) => ({ id: dto.ref, shiftId: `s-${dto.ref}`, hours: dto.hours }),
+      scopeOf: (win) => (row) => row.hours >= win.min && row.hours <= win.max,
+      keyOf: (dto) => dto.ref,
+    });
+
+    const win = { min: 0, max: 8 };
+    expect(await cache.read(win)).toEqual([{ id: 'a', shiftId: 's-1', hours: 1 }]); // instant
+
+    const fresh = await cache.sync(win);
+    expect(fetchArg).toEqual(win); // fetch got the window
+    expect(fresh.map((r) => r.id).sort()).toEqual(['a', 'c']); // reconciled cache read
+    expect((await store.get('a')).hours).toBe(5); // upserted
+    expect((await store.get('a'))._dirty).toBe(false); // server-authoritative
+  });
+
+  it('windowCache.sync keeps the cache intact when fetch throws (SWR paint holds)', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData });
+    const store = data.store('entries');
+    await store.put({ id: 'a', shiftId: 's-1', hours: 2 }); await store.markSynced('a');
+
+    const cache = data.windowCache('entries', {
+      fetch: () => { throw new Error('offline'); },
+      scopeOf: () => () => true,
+    });
+    const rows = await cache.sync({});
+    expect(rows).toEqual([{ id: 'a', shiftId: 's-1', hours: 2 }]); // unchanged, not blanked
+  });
+
   it('reconcile upserts fresh rows as synced, prunes in-scope drops, keeps out-of-scope + dirty rows', async () => {
     const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData });
     const store = data.store('entries');

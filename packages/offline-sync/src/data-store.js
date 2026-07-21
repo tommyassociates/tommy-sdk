@@ -88,6 +88,12 @@ export function createDataStore({ name, keyPath = 'id', recordSchema, backend = 
 
   const keyOf = (record) => record[keyPath];
 
+  /** Drop the sync-metadata stamps (_rev/_dirty/_updatedAt/_dedupeKey) so a read
+   *  returns clean, re-put-safe domain rows. */
+  const stripMeta = (record) => Object.fromEntries(
+    Object.entries(record).filter(([key]) => !key.startsWith('_')),
+  );
+
   async function snapshot() { return backend.getAll(); }
 
   function trackedQuery(records, touched) {
@@ -121,6 +127,11 @@ export function createDataStore({ name, keyPath = 'id', recordSchema, backend = 
     },
     async getAll() {
       return snapshot();
+    },
+    /** Cache-read half of SWR: the stored records matching `predicate(record)`,
+     *  meta stamps stripped (clean domain rows). Sorting is the caller's job. */
+    async readWhere(predicate = () => true) {
+      return (await snapshot()).filter(predicate).map(stripMeta);
     },
     async put(record, { dedupeKey } = {}) {
       if (validate && !validate(record)) {

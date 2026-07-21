@@ -68,6 +68,51 @@ export function createDataManager({ capabilityToken, mpId, localData = {}, backe
       if (!store) throw new Error(`tommy.data.store('${name}'): store not declared in manifest.localData`);
       return store;
     },
+    /**
+     * DataApi.windowCache — the reusable "instant data" (SWR) combinator every
+     * windowed MP grid/list wants: `read(window)` paints from the cache
+     * immediately; `sync(window)` fetches, reconciles the fresh rows into the
+     * cache (upsert + prune-in-scope + keep-dirty, via DataStore.reconcile), and
+     * returns the reconciled cache read. An MP supplies only its domain bits —
+     * `fetch(window) → DTO[]`, `toRecord(dto, prev) → record`, `scopeOf(window)
+     * → (row) → bool`, and optional `keyOf(dto)` (enables `prev` lookup for
+     * rich-field preservation across a thin DTO). A failed `fetch` is swallowed
+     * so the SWR paint holds (cache left intact).
+     */
+    windowCache(storeName, {
+      fetch, toRecord = (dto) => dto, scopeOf, keyOf,
+    } = {}) {
+      const store = stores.get(storeName);
+      if (!store) throw new Error(`tommy.data.windowCache('${storeName}'): store not declared in manifest.localData`);
+      const keyPath = localData[storeName]?.keyPath || 'id';
+      const scopeFor = (window) => (scopeOf ? scopeOf(window) : () => true);
+      return {
+        read: (window) => store.readWhere(scopeFor(window)),
+        async sync(window) {
+          const scope = scopeFor(window);
+          let dtos = null;
+          try {
+            dtos = typeof fetch === 'function' ? await fetch(window) : null;
+          } catch (_) {
+            dtos = null; // offline / fetch failed — keep the cache, paint holds
+          }
+          if (Array.isArray(dtos)) {
+            let prevByKey = null;
+            if (keyOf) {
+              const existing = await store.getAll();
+              prevByKey = new Map(existing.map((row) => [String(row[keyPath]), row]));
+            }
+            const records = dtos.map(
+              (dto) => toRecord(dto, prevByKey ? prevByKey.get(String(keyOf(dto))) : undefined),
+            );
+            try {
+              await store.reconcile(records, { scope });
+            } catch (_) { /* store error — keep the cache intact */ }
+          }
+          return store.readWhere(scope);
+        },
+      };
+    },
     /** DataApi.syncState — SWR UX inputs (offline-sync.md §6). */
     syncState(storeName) {
       const meta = syncMeta.get(storeName);
