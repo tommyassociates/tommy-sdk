@@ -28,6 +28,59 @@ export function createMemoryStoreBackend() {
   };
 }
 
+/** The runtime's Web Storage (localStorage), or null when there is none
+ *  (node, or access throws in a sandboxed/locked-down context). */
+function webStorage() {
+  try {
+    return (typeof globalThis !== 'undefined' && globalThis.localStorage) || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/** Whether this runtime can persist a store across a reload (has Web Storage). */
+export function hasWebStorage() {
+  return !!webStorage();
+}
+
+/**
+ * A localStorage-backed store backend — the same async contract as
+ * createMemoryStoreBackend, but the whole store PERSISTS across a shell reload
+ * under a stable `mp-store:{dbName}:{storeName}` key. Sized for small
+ * client-owned stores (manifest `syncStrategy: last_write_wins`, e.g. an MP's
+ * `settings`): the whole store is a single JSON blob. Reads/writes degrade to
+ * empty (never throw) when storage is absent, corrupt, or over quota.
+ */
+export function createLocalStorageBackend(dbName, storeName) {
+  const storeKey = `mp-store:${dbName}:${storeName}`;
+  function load() {
+    const store = webStorage();
+    if (!store) return new Map();
+    try {
+      const raw = store.getItem(storeKey);
+      return raw ? new Map(Object.entries(JSON.parse(raw))) : new Map();
+    } catch (_) {
+      return new Map(); // corrupt/unavailable — behave as empty, never throw
+    }
+  }
+  function save(map) {
+    const store = webStorage();
+    if (!store) return;
+    try {
+      store.setItem(storeKey, JSON.stringify(Object.fromEntries(map)));
+    } catch (_) {
+      /* quota / disabled — degrade to in-memory-until-reload */
+    }
+  }
+  return {
+    async get(key) { return load().get(String(key)); },
+    async getAll() { return [...load().values()]; },
+    async put(key, record) { const map = load(); map.set(String(key), record); save(map); },
+    async delete(key) { const map = load(); map.delete(String(key)); save(map); },
+    keys() { return [...load().keys()]; },
+  };
+}
+
 export function createDataStore({ name, keyPath = 'id', recordSchema, backend = createMemoryStoreBackend(), now = () => Date.now() }) {
   const validate = recordSchema ? ajv.compile(recordSchema) : null;
   const wholeStoreSubscribers = new Set();

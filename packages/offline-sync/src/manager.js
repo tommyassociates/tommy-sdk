@@ -13,7 +13,24 @@
  * them from M1's fabric work onward).
  */
 import { databaseName } from './names.js';
-import { createDataStore, createMemoryStoreBackend } from './data-store.js';
+import {
+  createDataStore, createMemoryStoreBackend, createLocalStorageBackend, hasWebStorage,
+} from './data-store.js';
+
+/**
+ * Default backend for a store when the host injects no `backendFactory`:
+ * client-owned stores (manifest `syncStrategy: last_write_wins`, e.g. an MP's
+ * view `settings`) PERSIST across a shell reload when the runtime has Web
+ * Storage; everything else (server-authoritative caches) stays in memory —
+ * re-seeded from the server on mount, so it must not accumulate stale rows
+ * across sessions. In node (no localStorage) every store falls back to memory.
+ */
+function defaultBackend(dbName, storeName, syncStrategy) {
+  if (syncStrategy === 'last_write_wins' && hasWebStorage()) {
+    return createLocalStorageBackend(dbName, storeName);
+  }
+  return createMemoryStoreBackend();
+}
 
 /**
  * @param {object} opts
@@ -30,7 +47,9 @@ export function createDataManager({ capabilityToken, mpId, localData = {}, backe
   const syncMeta = new Map(); // storeName -> { lastSyncedAt, pending, online }
 
   for (const [storeName, decl] of Object.entries(localData)) {
-    const backend = backendFactory ? backendFactory(dbName, storeName) : createMemoryStoreBackend();
+    const backend = backendFactory
+      ? backendFactory(dbName, storeName)
+      : defaultBackend(dbName, storeName, decl.syncStrategy);
     stores.set(storeName, createDataStore({
       name: storeName,
       keyPath: decl.keyPath || 'id',
