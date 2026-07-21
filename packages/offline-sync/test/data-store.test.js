@@ -75,4 +75,27 @@ describe('tommy.data stores', () => {
     const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData });
     expect(data.syncState('entries')).toEqual({ lastSyncedAt: null, pending: 0, online: true });
   });
+
+  it('reconcile upserts fresh rows as synced, prunes in-scope drops, keeps out-of-scope + dirty rows', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData });
+    const store = data.store('entries');
+    // Seed: a1/a2 are synced in-scope rows; b1 is out of scope; d1 is a dirty
+    // (unsynced/optimistic) in-scope row.
+    await store.put({ id: 'a1', shiftId: 's-1', hours: 1 }); await store.markSynced('a1');
+    await store.put({ id: 'a2', shiftId: 's-2', hours: 2 }); await store.markSynced('a2');
+    await store.put({ id: 'b1', shiftId: 's-9', hours: 9 }); await store.markSynced('b1');
+    await store.put({ id: 'd1', shiftId: 's-4', hours: 4 }); // left dirty
+
+    // Server returns only a1 (re-timed) for the in-scope set (hours < 8 = "in scope").
+    const scope = (row) => row.hours < 8;
+    const result = await store.reconcile([{ id: 'a1', shiftId: 's-1', hours: 5 }], { scope });
+
+    expect(result).toEqual({ upserted: 1, pruned: 1 }); // a2 pruned
+    const a1 = await store.get('a1');
+    expect(a1.hours).toBe(5); // upserted
+    expect(a1._dirty).toBe(false); // marked synced (server-authoritative)
+    expect(await store.get('a2')).toBeUndefined(); // in-scope, dropped by server
+    expect((await store.get('b1')).hours).toBe(9); // out of scope — untouched
+    expect((await store.get('d1'))._dirty).toBe(true); // dirty optimistic — never pruned
+  });
 });

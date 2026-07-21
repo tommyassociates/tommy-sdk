@@ -115,7 +115,7 @@ export function createDataStore({ name, keyPath = 'id', recordSchema, backend = 
     }
   }
 
-  return {
+  const api = {
     async get(key) {
       return backend.get(key);
     },
@@ -150,6 +150,37 @@ export function createDataStore({ name, keyPath = 'id', recordSchema, backend = 
       const record = await backend.get(key);
       if (record) await backend.put(key, { ...record, _dirty: false });
     },
+    /**
+     * SWR reconcile — merge a fresh AUTHORITATIVE set of records into the store,
+     * the read-through pattern every windowed MP grid needs: upsert each record
+     * and mark it synced (it came from the server, not a local edit), then prune
+     * rows the fresh set dropped. Two invariants baked in so each MP can't get
+     * them subtly wrong: locally-dirty (unsynced/optimistic) rows are NEVER
+     * pruned, and only rows matching `scope` are prune-candidates (e.g. "in this
+     * window") — omit `scope` for a whole-store authoritative replace. Returns
+     * `{ upserted, pruned }`.
+     */
+    async reconcile(records = [], { scope } = {}) {
+      const existing = await backend.getAll();
+      const incoming = new Set();
+      for (const record of records) {
+        // eslint-disable-next-line no-await-in-loop
+        const key = await api.put(record);
+        // eslint-disable-next-line no-await-in-loop
+        await api.markSynced(key);
+        incoming.add(String(key));
+      }
+      let pruned = 0;
+      for (const row of existing) {
+        const key = keyOf(row);
+        if (incoming.has(String(key)) || row._dirty) continue; // kept: fresh or optimistic
+        if (scope && !scope(row)) continue; // out of the reconcile scope
+        // eslint-disable-next-line no-await-in-loop
+        await api.delete(key);
+        pruned += 1;
+      }
+      return { upserted: incoming.size, pruned };
+    },
     subscribe(handler) {
       wholeStoreSubscribers.add(handler);
       return () => wholeStoreSubscribers.delete(handler);
@@ -166,4 +197,5 @@ export function createDataStore({ name, keyPath = 'id', recordSchema, backend = 
       return () => selectorSubscribers.delete(sub);
     },
   };
+  return api;
 }
