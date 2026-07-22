@@ -125,6 +125,55 @@ describe('tommy.data stores', () => {
     expect(rows).toEqual([{ id: 'a', shiftId: 's-1', hours: 2 }]); // unchanged, not blanked
   });
 
+  it('liveQuery.subscribe paints warm data immediately, then on every store change', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData });
+    const store = data.store('entries');
+    await store.put({ id: 'a', shiftId: 's-1', hours: 1 }); await store.markSynced('a');
+
+    const q = data.liveQuery('entries', { scope: (r) => r.hours < 8 });
+    const paints = [];
+    const off = q.subscribe((rows) => paints.push(rows.map((r) => `${r.id}:${r.hours}`)));
+    await new Promise((resolve) => { setTimeout(resolve, 5); });
+    // instant first paint from the warm cache
+    expect(paints[0]).toEqual(['a:1']);
+
+    // a store change re-fires the subscriber with the fresh scope read
+    await store.put({ id: 'b', shiftId: 's-2', hours: 3 }); await store.markSynced('b');
+    await new Promise((resolve) => { setTimeout(resolve, 5); });
+    expect(paints[paints.length - 1].sort()).toEqual(['a:1', 'b:3']);
+
+    // unsubscribe stops further paints
+    off();
+    const before = paints.length;
+    await store.put({ id: 'c', shiftId: 's-3', hours: 4 });
+    await new Promise((resolve) => { setTimeout(resolve, 5); });
+    expect(paints.length).toBe(before);
+  });
+
+  it('liveQuery.revalidate fetches, reconciles into the store, and notifies subscribers', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData });
+    const store = data.store('entries');
+    await store.put({ id: 'a', shiftId: 's-1', hours: 1 }); await store.markSynced('a');
+
+    const q = data.liveQuery('entries', {
+      scope: (r) => r.hours < 8,
+      fetch: () => [{ ref: 'a', hours: 5 }, { ref: 'c', hours: 6 }],
+      toRecord: (dto) => ({ id: dto.ref, shiftId: `s-${dto.ref}`, hours: dto.hours }),
+      keyOf: (dto) => dto.ref,
+    });
+    const paints = [];
+    q.subscribe((rows) => paints.push(rows.map((r) => r.id).sort()));
+    await new Promise((resolve) => { setTimeout(resolve, 5); });
+    expect(paints[0]).toEqual(['a']); // warm
+
+    const fresh = await q.revalidate({});
+    expect(fresh.map((r) => r.id).sort()).toEqual(['a', 'c']);
+    expect((await store.get('a')).hours).toBe(5); // upserted
+    await new Promise((resolve) => { setTimeout(resolve, 5); });
+    // subscriber saw the reconciled set (fired via reconcile's notify)
+    expect(paints[paints.length - 1]).toEqual(['a', 'c']);
+  });
+
   it('reconcile upserts fresh rows as synced, prunes in-scope drops, keeps out-of-scope + dirty rows', async () => {
     const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData });
     const store = data.store('entries');

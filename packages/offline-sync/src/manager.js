@@ -60,6 +60,35 @@ export function createDataManager({ capabilityToken, mpId, localData = {}, backe
     syncMeta.set(storeName, { lastSyncedAt: null, pending: 0, online: true, strategy: decl.syncStrategy || 'server_authoritative' });
   }
 
+  // Shared fetch→reconcile step behind both windowCache.sync and
+  // liveQuery.revalidate: fetch the fresh DTOs for `window`, map through
+  // `toRecord` (with a `prev` lookup when `keyOf` is supplied, for rich-field
+  // preservation across a thin DTO), and reconcile them into the store under
+  // `scope`. A failed fetch is swallowed so the SWR paint holds (cache intact).
+  // Returns the reconciled, scope-filtered cache read.
+  async function fetchAndReconcile(store, keyPath, { fetch, toRecord, keyOf }, scope, window) {
+    let dtos = null;
+    try {
+      dtos = typeof fetch === 'function' ? await fetch(window) : null;
+    } catch (_) {
+      dtos = null; // offline / fetch failed — keep the cache, paint holds
+    }
+    if (Array.isArray(dtos)) {
+      let prevByKey = null;
+      if (keyOf) {
+        const existing = await store.getAll();
+        prevByKey = new Map(existing.map((row) => [String(row[keyPath]), row]));
+      }
+      const records = dtos.map(
+        (dto) => toRecord(dto, prevByKey ? prevByKey.get(String(keyOf(dto))) : undefined),
+      );
+      try {
+        await store.reconcile(records, { scope });
+      } catch (_) { /* store error — keep the cache intact */ }
+    }
+    return store.readWhere(scope);
+  }
+
   return {
     databaseName: dbName,
     /** DataApi.store — only manifest-declared stores exist. */
@@ -88,29 +117,50 @@ export function createDataManager({ capabilityToken, mpId, localData = {}, backe
       const scopeFor = (window) => (scopeOf ? scopeOf(window) : () => true);
       return {
         read: (window) => store.readWhere(scopeFor(window)),
-        async sync(window) {
-          const scope = scopeFor(window);
-          let dtos = null;
-          try {
-            dtos = typeof fetch === 'function' ? await fetch(window) : null;
-          } catch (_) {
-            dtos = null; // offline / fetch failed — keep the cache, paint holds
-          }
-          if (Array.isArray(dtos)) {
-            let prevByKey = null;
-            if (keyOf) {
-              const existing = await store.getAll();
-              prevByKey = new Map(existing.map((row) => [String(row[keyPath]), row]));
-            }
-            const records = dtos.map(
-              (dto) => toRecord(dto, prevByKey ? prevByKey.get(String(keyOf(dto))) : undefined),
-            );
-            try {
-              await store.reconcile(records, { scope });
-            } catch (_) { /* store error — keep the cache intact */ }
-          }
-          return store.readWhere(scope);
+        sync: (window) => fetchAndReconcile(store, keyPath, { fetch, toRecord, keyOf }, scopeFor(window), window),
+      };
+    },
+    /**
+     * DataApi.liveQuery — windowCache fused with the store's reactivity: the
+     * single "instant + reactive" handle a surface (list OR detail) wants. It
+     * unifies the three moving parts that MPs otherwise wire by hand:
+     *   - `subscribe(handler)` — fires the handler IMMEDIATELY with the warm,
+     *     scope-filtered cache read (instant first paint), then again on EVERY
+     *     store change (our own revalidate, a form popup's optimistic write, any
+     *     reconcile elsewhere). Returns an unsubscribe fn. The store is the
+     *     source of truth; the handler is a projection.
+     *   - `revalidate(window)` — fetch → reconcile into the store (which notifies
+     *     → subscribers repaint). Same SWR semantics as windowCache.sync.
+     *   - `read(window)` — a one-shot scope-filtered cache read.
+     * `scope` is a plain row predicate `(row) => bool` (omit for whole-store) —
+     * e.g. `r => r.kind === 'care_plan'` for a list, `r => r.carePlanId === id`
+     * for a detail. subscribe uses the whole-store notify then re-filters by
+     * scope: simple and correct (a change outside the scope re-runs the handler
+     * to the same result — harmless). `fetch`/`toRecord`/`keyOf` are as windowCache.
+     */
+    liveQuery(storeName, {
+      scope, fetch, toRecord = (dto) => dto, keyOf,
+    } = {}) {
+      const store = stores.get(storeName);
+      if (!store) throw new Error(`tommy.data.liveQuery('${storeName}'): store not declared in manifest.localData`);
+      const keyPath = localData[storeName]?.keyPath || 'id';
+      const predicate = typeof scope === 'function' ? scope : () => true;
+      return {
+        store,
+        read: () => store.readWhere(predicate),
+        subscribe(handler) {
+          let live = true;
+          const emit = () => {
+            if (!live) return;
+            store.readWhere(predicate)
+              .then((rows) => { if (live) handler(rows); })
+              .catch(() => { /* subscriber read error — skip this emit */ });
+          };
+          const off = store.subscribe(() => emit());
+          emit(); // instant first paint from the warm cache
+          return () => { live = false; off(); };
         },
+        revalidate: (window) => fetchAndReconcile(store, keyPath, { fetch, toRecord, keyOf }, predicate, window),
       };
     },
     /** DataApi.syncState — SWR UX inputs (offline-sync.md §6). */
