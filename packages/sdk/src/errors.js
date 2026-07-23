@@ -74,6 +74,13 @@ export function guard(ns, nsName) {
   return new Proxy(ns, {
     get(target, prop) {
       if (typeof prop === 'symbol' || prop in target) return target[prop];
+      // Framework introspection markers (Vue reactivity probes `__v_isRef` /
+      // `__v_isReactive` / `__v_raw` / `__v_isShallow` …, `__vue__`, etc.) pass
+      // through as `undefined` — no SDK member is dunder-prefixed. This lets the
+      // `tommy` proxy be handed to Vue as a component prop/ctx (the panel-runtime
+      // contract) without a benign reactivity/warning-trace probe throwing and
+      // taking the whole panel down. (project_mp_tommy_proxy_not_reactive.)
+      if (typeof prop === 'string' && prop.startsWith('__')) return undefined;
       // Promise-interop probes (then/catch) and inspection internals pass through.
       if (['then', 'catch', 'finally', 'toJSON', 'constructor', 'valueOf', 'toString', 'inspect'].includes(prop)) return undefined;
       const known = Object.keys(target);

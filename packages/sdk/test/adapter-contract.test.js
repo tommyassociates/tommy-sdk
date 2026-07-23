@@ -230,6 +230,20 @@ describe('adapter contract (parameterised — direct adapter at M1)', () => {
     expect(() => world.sdk.panels.subscribe()).toThrow(/tommy\.panels\.subscribe does not exist/);
   });
 
+  it('tolerates framework introspection markers so the proxy is Vue-prop-safe', () => {
+    // Vue hands panels the `tommy` proxy as a component prop/ctx and probes it
+    // during reactivity + warning-trace formatting (`isRef(tommy)` reads
+    // `tommy.__v_isRef`). Those dunder markers must return undefined, NOT throw —
+    // else a benign Vue warning crashes the whole panel (the leave-main navbar
+    // regression; project_mp_tommy_proxy_not_reactive).
+    for (const marker of ['__v_isRef', '__v_isReactive', '__v_isReadonly', '__v_isShallow', '__v_raw', '__v_skip', '__vue__']) {
+      expect(() => world.sdk[marker]).not.toThrow();
+      expect(world.sdk[marker]).toBeUndefined();
+    }
+    // A real typo (no dunder prefix) still throws its helpful error.
+    expect(() => world.sdk.emitt).toThrow(TommySDKError);
+  });
+
   it('t() is bound to the MP bundle locales with {{var}} interpolation', () => {
     expect(world.sdk.t('greet', 'fallback', { name: 'Dana' })).toBe('Hi Dana');
     expect(world.sdk.t('missing.key', 'the fallback')).toBe('the fallback');
