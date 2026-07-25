@@ -24,8 +24,12 @@ const nextRpcId = (instanceId) => `rpc-${instanceId}-${(rpcSeq += 1)}`;
  *     teardown(instanceId) } — all enforcement lives THERE, never here.
  * @param {object} opts.init the MpInit payload the loader hands over
  * @param {number} [opts.rpcTimeoutMs]
+ * @param {function} [opts.getCapabilityToken] host-supplied async provider that
+ *   returns the CURRENT capability token, re-minting it when it nears expiry
+ *   (capability tokens carry a short TTL — security-model §3). Omitted in tests
+ *   and legacy callers, which fall back to the frozen `init.capabilityToken`.
  */
-export function createDirectAdapter({ broker, init, rpcTimeoutMs = DEFAULT_RPC_TIMEOUT_MS }) {
+export function createDirectAdapter({ broker, init, rpcTimeoutMs = DEFAULT_RPC_TIMEOUT_MS, getCapabilityToken }) {
   if (!broker) throw new Error('createDirectAdapter: broker required');
   if (!init) throw new Error('createDirectAdapter: init required');
 
@@ -45,10 +49,15 @@ export function createDirectAdapter({ broker, init, rpcTimeoutMs = DEFAULT_RPC_T
 
   async function rpc(envelope) {
     const rpcId = envelope.rpcId || nextRpcId(init.instanceId);
+    // Re-mint a token that has aged past its TTL BEFORE it is stamped on the
+    // envelope; the broker (and the server on every server_write) rejects an
+    // expired token, so a panel left open past the ≤15-min TTL would otherwise
+    // fail its next invoke with 'capability token expired'.
+    const capabilityToken = getCapabilityToken ? await getCapabilityToken() : init.capabilityToken;
     const env = {
       ...envelope,
       rpcId,
-      capabilityToken: init.capabilityToken,
+      capabilityToken,
       sourceMpId: init.mpId,
       instanceId: init.instanceId,
     };
