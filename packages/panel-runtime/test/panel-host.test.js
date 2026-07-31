@@ -144,6 +144,37 @@ describe('panel host', () => {
     expect(groups.map((g) => g.mpId)).toEqual(['time-clock']);
   });
 
+  it('panelId scopes a surface to a SINGLE panel (per-panel canonical route); absent = all panels', async () => {
+    // One MP with three full_page panels (the Partner MP shape).
+    const partner = host.panelsApiFor('partner', {
+      'partner-dashboard': { surfaces: ['full_page'] },
+      'partner-managed-teams': { surfaces: ['full_page'] },
+      'partner-referrals': { surfaces: ['full_page'] },
+    });
+    partner.register(healthyDef('partner-dashboard', 'dash'));
+    partner.register(healthyDef('partner-managed-teams', 'teams'));
+    partner.register(healthyDef('partner-referrals', 'refs'));
+
+    // Scoped to one panel: only partner-managed-teams mounts.
+    const scoped = host.mountSurface(el, { surface: 'full_page', mpId: 'partner', panelId: 'partner-managed-teams' });
+    await flush();
+    expect(scoped.panelCount).toBe(1);
+    expect(el.querySelector('[data-panel-id="partner-managed-teams"]')).toBeTruthy();
+    expect(el.querySelector('[data-panel-id="partner-dashboard"]')).toBeFalsy();
+    expect(el.querySelector('[data-panel-id="partner-referrals"]')).toBeFalsy();
+    host.unmountSurface(el);
+
+    // Absent panelId: all three mount (additive — prior behaviour preserved).
+    const all = host.mountSurface(el, { surface: 'full_page', mpId: 'partner' });
+    await flush();
+    expect(all.panelCount).toBe(3);
+
+    // host.layoutFor honours panelId too.
+    const groups = host.layoutFor('full_page', [], { mpId: 'partner', panelId: 'partner-dashboard' });
+    expect(groups).toHaveLength(1);
+    expect(groups[0].defs.map((d) => d.id)).toEqual(['partner-dashboard']);
+  });
+
   it('unmountSurface calls panel unmount hooks (teardown-and-cold-boot at M1)', async () => {
     const api = host.panelsApiFor('time-clock', manifestPanels);
     const def = healthyDef('my-week');

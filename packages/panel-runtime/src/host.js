@@ -82,15 +82,20 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
      * Panels visible on a surface for the current viewer, grouped by MP.
      * `opts.mpId` scopes the result to a single MP (a per-MP surface host,
      * e.g. the Time Clock full-page page); omit it to render every MP.
+     * `opts.panelId` scopes further to a SINGLE panel (a per-panel canonical
+     * route, e.g. the Partner MP's `/dashboard/partner/` mounting only
+     * `partner-dashboard`); omit it to render every panel of the surface. Both
+     * are purely additive — absent → the prior "render all" behaviour.
      */
-    layoutFor(surface, viewerRoles, { mpId } = {}) {
+    layoutFor(surface, viewerRoles, { mpId, panelId } = {}) {
       const out = [];
       for (const [id, manifestPanels] of declarations) {
         if (mpId && id !== mpId) continue;
         const defs = registrations.get(id) || new Map();
         const visible = layoutFor(manifestPanels, surface, viewerRoles)
-          .filter((panelId) => defs.has(panelId))
-          .map((panelId) => defs.get(panelId));
+          .filter((pid) => defs.has(pid))
+          .filter((pid) => !panelId || pid === panelId)
+          .map((pid) => defs.get(pid));
         if (visible.length) out.push({ mpId: id, defs: visible });
       }
       return out;
@@ -102,11 +107,11 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
      * `mpId` scopes the mount to a single MP (filtered BEFORE the panel
      * budget, so a scoped surface is never truncated by another MP).
      */
-    mountSurface(el, { surface, viewerRoles = [], ctxFor, mpId }) {
+    mountSurface(el, { surface, viewerRoles = [], ctxFor, mpId, panelId }) {
       // Idempotent per element: re-mounting into the same element replaces its
       // app (never touches another element hosting the same surface name).
       this.unmountSurface(el);
-      const groups = this.layoutFor(surface, viewerRoles, { mpId });
+      const groups = this.layoutFor(surface, viewerRoles, { mpId, panelId });
       const tiles = groups.flatMap(({ mpId, defs }) => defs.map((def) => ({ mpId, def })));
       if (tiles.length > SURFACE_PANEL_BUDGET) {
         // Advisory budget: log through the hook, render the budgeted slice.
