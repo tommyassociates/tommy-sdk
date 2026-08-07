@@ -139,6 +139,12 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
       return { panelCount: tiles.length };
     },
 
+    /** Whether THIS host already has an app mounted into `el` (the loader uses
+     *  this to skip re-mounting a surface it painted incrementally during boot). */
+    isSurfaceMounted(el) {
+      return mounted.has(el);
+    },
+
     /** Unmount the app hosted in `el` (the host element the surface mounted into). */
     unmountSurface(el) {
       const entry = mounted.get(el);
