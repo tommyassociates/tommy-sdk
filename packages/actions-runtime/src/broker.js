@@ -92,6 +92,7 @@ export function createBroker({
   const suppressionTally = new Map(); // `${tenantId}:${trigger}:${day}` -> count
   const debouncePending = new Map();  // `${trigger}:${emitterMpId}` -> {timer, resolvers}
   const invokeChains = new Map();     // sourceMpId -> tail promise (FIFO per source MP)
+  const executingChains = new Map();  // sourceMpId -> depth of handler execution ON that chain (F6)
   const txnSteps = new Map();         // txnId -> [{activity, args, idempotencyKey}]
   const chainBudget = new Map();      // rootRunId -> total run count
   const buckets = new Map();          // `${mpId}:${kind}` -> {tokens, updatedAt}
@@ -533,8 +534,26 @@ export function createBroker({
     return { rpcId: record.runId, status: 'succeeded', result };
   }
 
+  /**
+   * F6 — re-entrancy. The chain for `mpId` is "executing" for exactly as long
+   * as one of its dispatches is inside an activity handler/executor. A nested
+   * invoke can only be issued from THERE (handler code calling
+   * `tommy.actions.invoke` again), so an invoke that arrives while its own
+   * chain is executing is a descendant of the dispatch holding the chain —
+   * queueing it behind that dispatch is a guaranteed deadlock. It runs INLINE
+   * on the running chain instead, which is also the correct ordering: the
+   * ancestor is, by construction, still ahead of it.
+   */
+  function enterExecution(mpId) { executingChains.set(mpId, (executingChains.get(mpId) || 0) + 1); }
+  function exitExecution(mpId) {
+    const depth = (executingChains.get(mpId) || 0) - 1;
+    if (depth > 0) executingChains.set(mpId, depth); else executingChains.delete(mpId);
+  }
+
   async function dispatchInvoke(envelope) {
     const sourceMpId = envelope.sourceMpId;
+    // Re-entrant (nested) dispatch: run inline, never behind our own ancestor.
+    if (executingChains.has(sourceMpId)) return dispatchInvokeInner(envelope);
     // FIFO per source MP (§3.3): chain this dispatch after the previous one.
     const tail = invokeChains.get(sourceMpId) || Promise.resolve();
     const run = tail.catch(() => {}).then(() => dispatchInvokeInner(envelope));
@@ -616,7 +635,15 @@ export function createBroker({
       attempt += 1;
       await records.update(record.runId, { status: 'running', attempts: attempt });
       try {
-        const result = await executeInvoke(envelope, activityDef, ownerEntry, ownerMpId, activityName, record);
+        // The handler window IS the re-entrancy window (F6): a nested invoke
+        // can only originate from inside it.
+        enterExecution(envelope.sourceMpId);
+        let result;
+        try {
+          result = await executeInvoke(envelope, activityDef, ownerEntry, ownerMpId, activityName, record);
+        } finally {
+          exitExecution(envelope.sourceMpId);
+        }
         if (result.status && result.status === 'failed') throw err('ActivityFailed', result.error?.message || 'executor reported failure', { retryable: false });
         validateAgainst(activityDef.resultSchema, result.result, 'ActivityFailed', `activity '${envelope.activity}' result`);
         const final = { rpcId: record.runId, status: 'succeeded', result: result.result };
