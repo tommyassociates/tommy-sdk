@@ -40,9 +40,11 @@ export const DEFAULT_RETRY = Object.freeze({ maxAttempts: 3, backoff: 'exponenti
  *
  * Only MPs whose catalogue domain differs from their id are listed; everything
  * else derives `read:{mpId with - → _}` (see `domainScopeForMp`). MPs whose
- * fallback is not yet a catalogue member (care-plans, calendar, onboarding)
- * are therefore reachable only via an explicit per-primitive scope until the
- * catalogue grows — deliberate, and tracked in HANDOFF-m1-grants.md §A.
+ * fallback is not yet a catalogue member (calendar, onboarding) are therefore
+ * reachable only via an explicit per-primitive scope until the catalogue
+ * grows — deliberate, and tracked in HANDOFF-m1-grants.md §A. `care-plans`
+ * left that list in catalogue 0.3.0-starter, which added `read:care_plans`
+ * for invoicing's three NDIS reads.
  */
 export const DOMAIN_SCOPE_BY_MP = Object.freeze({
   scheduling: 'shifts',
