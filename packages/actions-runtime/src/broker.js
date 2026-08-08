@@ -22,7 +22,10 @@
 import { TommyError, isTommyError } from '@tommy/sdk';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
-import { DEFAULT_THROTTLE_PROFILE, QUEUE_MAX_ENTRIES, QUEUE_MAX_BYTES, SYNC_EMIT_TIMEOUT_MS, DEFAULT_RETRY } from './constants.js';
+import {
+  DEFAULT_THROTTLE_PROFILE, QUEUE_MAX_ENTRIES, QUEUE_MAX_BYTES, SYNC_EMIT_TIMEOUT_MS, DEFAULT_RETRY,
+  SENSITIVE_CONDITIONS, domainScopeForMp,
+} from './constants.js';
 import { createRecordStore } from './records.js';
 import { validateToken } from './capability.js';
 
@@ -67,6 +70,19 @@ export function createBroker({
   now = () => Date.now(),
   online = true,
   throttleOverrides = {},
+  // --- enforcement flags (Class F). Default OFF: turning one ON requires the
+  // matching manifest declarations to exist first (grants / read: scopes), so
+  // each flips in its own wave once the estate declares them. ---
+  /** F1: treat `authorizedCallers: []` as deny-all-cross-MP, not "unset". */
+  strictEmptyCallers = false,
+  /** F2: cross-MP condition reads require a `read:<owner>.<condition>` scope. */
+  enforceConditionScopes = false,
+  /** F3/F4: emit must own the trigger namespace; subscribe must be granted. */
+  strictEmitOwnership = false,
+  /** C1/Option B: `{ mpId: 'domain' }` overrides for read-scope derivation. */
+  domainScopeOverrides = {},
+  /** C1/Option B: primitives derivation must not grant (defaults to the exported set). */
+  sensitiveConditions = SENSITIVE_CONDITIONS,
 } = {}) {
   if (!capabilityService || typeof capabilityService.validate !== 'function') {
     throw new Error('createBroker: capabilityService with validate() required');
@@ -92,6 +108,7 @@ export function createBroker({
   const suppressionTally = new Map(); // `${tenantId}:${trigger}:${day}` -> count
   const debouncePending = new Map();  // `${trigger}:${emitterMpId}` -> {timer, resolvers}
   const invokeChains = new Map();     // sourceMpId -> tail promise (FIFO per source MP)
+  const executingChains = new Map();  // sourceMpId -> depth of handler execution ON that chain (F6)
   const txnSteps = new Map();         // txnId -> [{activity, args, idempotencyKey}]
   const chainBudget = new Map();      // rootRunId -> total run count
   const buckets = new Map();          // `${mpId}:${kind}` -> {tokens, updatedAt}
@@ -164,9 +181,20 @@ export function createBroker({
     const callers = activityDef.authorizedCallers;
     const callerIsTarget = callerMpId === targetMpId;
     const callerFirstParty = mps.get(callerMpId)?.firstParty === true;
+    // Three distinct cases (F1 — they used to be two):
+    //  - non-empty list  -> that list (plus the owner itself)
+    //  - EXPLICIT []     -> the author said "nobody may call this cross-MP";
+    //                       only the owner. Gated on `strictEmptyCallers`
+    //                       because 52 live activities declare [] today and
+    //                       first-party callers rely on the old reading.
+    //  - unset           -> first-party default (NOT default-deny: any
+    //                       registered first-party MP may call it).
+    const explicitEmpty = Array.isArray(callers) && callers.length === 0;
     const allowed = Array.isArray(callers) && callers.length
       ? callers.includes(callerMpId) || callerIsTarget
-      : callerIsTarget || callerFirstParty; // default-deny: first-party + same-MP only
+      : (explicitEmpty && strictEmptyCallers)
+        ? callerIsTarget
+        : callerIsTarget || callerFirstParty;
     if (!allowed) {
       throw err('PermissionDenied', `activity '${qualify(targetMpId, activityName)}' does not list '${callerMpId}' in authorizedCallers`, {
         rule: `activities.${activityName}.authorizedCallers`,
@@ -178,6 +206,95 @@ export function createBroker({
     // never issuable through a capability token (tokens carry catalogue scopes).
     if (!scopes.includes(scope) && !scopes.includes('*') && !callerIsTarget) {
       throw err('PermissionDenied', `caller lacks scope '${scope}'`, { rule: 'permissions', retryable: false });
+    }
+  }
+
+  const isSensitive = (qualified) => (typeof sensitiveConditions?.has === 'function'
+    ? sensitiveConditions.has(qualified)
+    : (sensitiveConditions || []).includes(qualified));
+
+  /**
+   * Shared read-grant test for F2 (conditions) and F4 (triggers) — council C1
+   * resolved to DERIVED scopes (Option B). A read of `{owner}.{primitive}` is
+   * granted by ANY of:
+   *
+   *   1. the explicit per-primitive scope `read:{owner}.{primitive}` — mirrors
+   *      the invoke convention (`invoke:{owner}.{activity}`) and stays valid as
+   *      a strict superset of the derived form;
+   *   2. the owner's DOMAIN scope from the fixed catalogue (`read:shifts` for
+   *      scheduling, `read:attendance` for time-clock, …) — the vocabulary the
+   *      manifests already declare, so most of the estate needs no new
+   *      declaration at all;
+   *   3. '*', the HOST authority marker (inspector replay, txn compensation) —
+   *      never issuable to an MP through a capability token.
+   *
+   * EXCEPT for SENSITIVE_CONDITIONS, where (2) does not apply: those demand the
+   * explicit per-primitive scope. Holding `read:attendance` must not hand a
+   * caller `time-clock.kiosk_pin`.
+   */
+  function readGrant(ownerMpId, primitiveName) {
+    const qualified = qualify(ownerMpId, primitiveName);
+    const explicit = `read:${qualified}`;
+    const domain = domainScopeForMp(ownerMpId, domainScopeOverrides);
+    const sensitive = isSensitive(qualified);
+    return {
+      qualified,
+      explicit,
+      domain,
+      sensitive,
+      // The scopes that would grant this read, most specific first.
+      accepts: sensitive ? [explicit] : [explicit, domain],
+      denialMessage: sensitive
+        ? `caller lacks scope '${explicit}' ('${qualified}' is sensitive — the '${domain}' domain scope does not grant it)`
+        : `caller lacks scope '${explicit}' or '${domain}'`,
+    };
+  }
+
+  const holdsReadGrant = (held, grant) => grant.accepts.some((s) => held.includes(s)) || held.includes('*');
+
+  /**
+   * F2 — condition reads were unmediated: no authz, no scope, no equivalent of
+   * `authorizeInvoke`, so any MP could read any other MP's conditions
+   * (kiosk PINs, vendor settings, client records). Grant resolution per
+   * `readGrant` above; the same-MP (callerIsTarget) exemption mirrors invoke.
+   *
+   * Gated on `enforceConditionScopes` (default OFF) until the last callers
+   * declare their owner-domain scopes (HANDOFF-m1-grants.md §A).
+   */
+  function authorizeQuery(callerMpId, ownerMpId, conditionName, scopes) {
+    if (!enforceConditionScopes) return;
+    if (callerMpId === ownerMpId) return; // an MP always reads its own conditions
+    const grant = readGrant(ownerMpId, conditionName);
+    if (!holdsReadGrant(scopes || [], grant)) {
+      throw err('PermissionDenied', grant.denialMessage, { rule: 'permissions', retryable: false });
+    }
+  }
+
+  /**
+   * F4 — `subscribe()` was completely unauthorized: any MP could subscribe to
+   * any trigger and receive its payload (passive cross-MP exfiltration).
+   * Subscription is a REGISTRATION, not an RPC — there is no envelope and no
+   * capability token on this path — so the grant is read from the subscriber's
+   * REGISTERED MANIFEST `permissions.scopes` — which, under council C1's
+   * derived-scope resolution, is exactly the vocabulary that list already
+   * speaks: the owner's catalogue DOMAIN scope grants its triggers, with the
+   * explicit per-primitive form still accepted and SENSITIVE_CONDITIONS still
+   * excluded from derivation. Trigger ownership is the other way through,
+   * mirroring the same-MP exemption used by invoke/query.
+   *
+   * Shares `strictEmitOwnership` with F3: emit-side and subscribe-side trigger
+   * authority land (and flip) together.
+   */
+  function authorizeSubscribe(subscriberMpId, triggerQualified) {
+    if (!strictEmitOwnership) return;
+    const [ownerMpId, triggerName] = splitQualified(triggerQualified);
+    if (ownerMpId === subscriberMpId) return; // an MP always hears its own triggers
+    const declared = mps.get(subscriberMpId)?.manifest.permissions?.scopes || [];
+    const grant = readGrant(ownerMpId, triggerName);
+    if (!holdsReadGrant(declared, grant)) {
+      throw err('PermissionDenied', `mp '${subscriberMpId}' may not subscribe to '${triggerQualified}': ${grant.denialMessage}`, {
+        rule: 'permissions', retryable: false,
+      });
     }
   }
 
@@ -362,6 +479,23 @@ export function createBroker({
     const ownerEntry = mps.get(ownerMpId);
     const triggerDef = ownerEntry?.manifest.triggers?.[triggerName];
     if (!triggerDef) throw err('UnknownTrigger', `trigger '${triggerQualified}' is not declared by any registered MP`, { retryable: false });
+
+    // F3 — owner assert. The owner is resolved from the trigger STRING and was
+    // never checked against the emitter, so any MP could emit
+    // `time-clock.shift_marked_absent` (or `scheduling.shift_assigned`) and
+    // drive another MP's Actions. EXEMPT: the platform-emit / host-injection
+    // intake — those envelopes are authenticated at the socket boundary and
+    // carry a host-supplied `identity` with NO capability token, legitimately
+    // emitting on the owning MP's behalf (tommy-app mp-loader/platform-emit.js).
+    // Asserted BEFORE the offline enqueue, so a queued emit is checked once at
+    // enqueue and its drain (which replays with `identity` attached) is not
+    // re-judged.
+    const hostOriginated = !envelope.capabilityToken && !!envelope.identity;
+    if (strictEmitOwnership && ownerMpId !== emitterMp && !hostOriginated) {
+      throw err('PermissionDenied', `mp '${emitterMp}' may not emit '${triggerQualified}' — the trigger is owned by '${ownerMpId}'`, {
+        rule: 'triggers.owner', retryable: false,
+      });
+    }
     validateAgainst(triggerDef.payloadSchema, envelope.payload, 'InvalidPayload', `trigger '${triggerQualified}' payload`);
 
     // D21 emit-side short-circuit: no enabled consumer -> suppress (tally only).
@@ -443,6 +577,8 @@ export function createBroker({
     const ownerEntry = mps.get(ownerMpId);
     const conditionDef = ownerEntry?.manifest.conditions?.[conditionName];
     if (!conditionDef) throw err('UnknownCondition', `condition '${envelope.condition}' is not registered`, { retryable: false });
+
+    authorizeQuery(envelope.sourceMpId, ownerMpId, conditionName, identity.scopes);
     validateAgainst(conditionDef.inputSchema, envelope.args, 'InvalidPayload', `condition '${envelope.condition}' args`);
 
     const cacheKey = `${tenantId}:${envelope.condition}:${JSON.stringify(envelope.args)}`;
@@ -533,8 +669,26 @@ export function createBroker({
     return { rpcId: record.runId, status: 'succeeded', result };
   }
 
+  /**
+   * F6 — re-entrancy. The chain for `mpId` is "executing" for exactly as long
+   * as one of its dispatches is inside an activity handler/executor. A nested
+   * invoke can only be issued from THERE (handler code calling
+   * `tommy.actions.invoke` again), so an invoke that arrives while its own
+   * chain is executing is a descendant of the dispatch holding the chain —
+   * queueing it behind that dispatch is a guaranteed deadlock. It runs INLINE
+   * on the running chain instead, which is also the correct ordering: the
+   * ancestor is, by construction, still ahead of it.
+   */
+  function enterExecution(mpId) { executingChains.set(mpId, (executingChains.get(mpId) || 0) + 1); }
+  function exitExecution(mpId) {
+    const depth = (executingChains.get(mpId) || 0) - 1;
+    if (depth > 0) executingChains.set(mpId, depth); else executingChains.delete(mpId);
+  }
+
   async function dispatchInvoke(envelope) {
     const sourceMpId = envelope.sourceMpId;
+    // Re-entrant (nested) dispatch: run inline, never behind our own ancestor.
+    if (executingChains.has(sourceMpId)) return dispatchInvokeInner(envelope);
     // FIFO per source MP (§3.3): chain this dispatch after the previous one.
     const tail = invokeChains.get(sourceMpId) || Promise.resolve();
     const run = tail.catch(() => {}).then(() => dispatchInvokeInner(envelope));
@@ -562,7 +716,14 @@ export function createBroker({
     if (chain.rootRunId) checkChain(envelope.sourceMpId, `invoke(${envelope.activity})`, chain);
 
     const idempotencyKey = idempotencyKeyFor(activityDef, envelope);
-    const processedKey = idempotencyKey && `${envelope.activity}:${idempotencyKey}`;
+    // F5 — TENANT-SCOPED. The ledger key used to be (activity, key) only, and
+    // `derived_from_input` keys are a hash of the args alone, so the same
+    // logical write in two tenants collided and the second replayed the
+    // first tenant's stored result. Mirrors conditionCache/suppressionTally,
+    // which were already tenant-scoped. `processedKeys` lives only for the
+    // lifetime of this broker (no persistence, and the offline queue stores
+    // ENVELOPES, not ledger keys), so the format change replays nothing.
+    const processedKey = idempotencyKey && `${tenantId}:${envelope.activity}:${idempotencyKey}`;
     if (processedKey && processedKeys.has(processedKey)) {
       // Repeat key -> stored prior result, not re-applied (§3.2).
       return { ...processedKeys.get(processedKey), idempotentReplay: true };
@@ -616,7 +777,15 @@ export function createBroker({
       attempt += 1;
       await records.update(record.runId, { status: 'running', attempts: attempt });
       try {
-        const result = await executeInvoke(envelope, activityDef, ownerEntry, ownerMpId, activityName, record);
+        // The handler window IS the re-entrancy window (F6): a nested invoke
+        // can only originate from inside it.
+        enterExecution(envelope.sourceMpId);
+        let result;
+        try {
+          result = await executeInvoke(envelope, activityDef, ownerEntry, ownerMpId, activityName, record);
+        } finally {
+          exitExecution(envelope.sourceMpId);
+        }
         if (result.status && result.status === 'failed') throw err('ActivityFailed', result.error?.message || 'executor reported failure', { retryable: false });
         validateAgainst(activityDef.resultSchema, result.result, 'ActivityFailed', `activity '${envelope.activity}' result`);
         const final = { rpcId: record.runId, status: 'succeeded', result: result.result };
@@ -742,6 +911,7 @@ export function createBroker({
 
     subscribe(mpId, trigger, handler) {
       const qualified = trigger.includes('.') ? trigger : qualify(mpId, trigger);
+      authorizeSubscribe(mpId, qualified);
       const set = subscribers.get(qualified) || new Set();
       const entry = { mpId, handler };
       set.add(entry);
