@@ -223,6 +223,31 @@ export function createBroker({
     }
   }
 
+  /**
+   * F4 — `subscribe()` was completely unauthorized: any MP could subscribe to
+   * any trigger and receive its payload (passive cross-MP exfiltration).
+   * Subscription is a REGISTRATION, not an RPC — there is no envelope and no
+   * capability token on this path — so the grant is read from the subscriber's
+   * REGISTERED MANIFEST `permissions.scopes`, the same list the host mints its
+   * tokens from. Trigger ownership is the other way through, mirroring the
+   * same-MP exemption used by invoke/query.
+   *
+   * Shares `strictEmitOwnership` with F3: emit-side and subscribe-side trigger
+   * authority land (and flip) together.
+   */
+  function authorizeSubscribe(subscriberMpId, triggerQualified) {
+    if (!strictEmitOwnership) return;
+    const [ownerMpId] = splitQualified(triggerQualified);
+    if (ownerMpId === subscriberMpId) return; // an MP always hears its own triggers
+    const declared = mps.get(subscriberMpId)?.manifest.permissions?.scopes || [];
+    const scope = `read:${triggerQualified}`;
+    if (!declared.includes(scope) && !declared.includes('*')) {
+      throw err('PermissionDenied', `mp '${subscriberMpId}' lacks scope '${scope}' to subscribe to '${triggerQualified}'`, {
+        rule: 'permissions', retryable: false,
+      });
+    }
+  }
+
   // --- Active Trigger Index (D21) -------------------------------------------
 
   function actionKey(tenantId, mpId, actionId) { return `${tenantId}:${mpId}:${actionId}`; }
@@ -404,6 +429,23 @@ export function createBroker({
     const ownerEntry = mps.get(ownerMpId);
     const triggerDef = ownerEntry?.manifest.triggers?.[triggerName];
     if (!triggerDef) throw err('UnknownTrigger', `trigger '${triggerQualified}' is not declared by any registered MP`, { retryable: false });
+
+    // F3 — owner assert. The owner is resolved from the trigger STRING and was
+    // never checked against the emitter, so any MP could emit
+    // `time-clock.shift_marked_absent` (or `scheduling.shift_assigned`) and
+    // drive another MP's Actions. EXEMPT: the platform-emit / host-injection
+    // intake — those envelopes are authenticated at the socket boundary and
+    // carry a host-supplied `identity` with NO capability token, legitimately
+    // emitting on the owning MP's behalf (tommy-app mp-loader/platform-emit.js).
+    // Asserted BEFORE the offline enqueue, so a queued emit is checked once at
+    // enqueue and its drain (which replays with `identity` attached) is not
+    // re-judged.
+    const hostOriginated = !envelope.capabilityToken && !!envelope.identity;
+    if (strictEmitOwnership && ownerMpId !== emitterMp && !hostOriginated) {
+      throw err('PermissionDenied', `mp '${emitterMp}' may not emit '${triggerQualified}' — the trigger is owned by '${ownerMpId}'`, {
+        rule: 'triggers.owner', retryable: false,
+      });
+    }
     validateAgainst(triggerDef.payloadSchema, envelope.payload, 'InvalidPayload', `trigger '${triggerQualified}' payload`);
 
     // D21 emit-side short-circuit: no enabled consumer -> suppress (tally only).
@@ -812,6 +854,7 @@ export function createBroker({
 
     subscribe(mpId, trigger, handler) {
       const qualified = trigger.includes('.') ? trigger : qualify(mpId, trigger);
+      authorizeSubscribe(mpId, qualified);
       const set = subscribers.get(qualified) || new Set();
       const entry = { mpId, handler };
       set.add(entry);
