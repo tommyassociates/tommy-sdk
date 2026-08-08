@@ -54,6 +54,17 @@ export default {
       "items": { "type": "string", "pattern": "^[a-z]{2}(-[A-Z]{2})?$" }
     },
 
+    "legacyPackages": {
+      "description": "IDENTITY ADOPTION (council C3). Legacy addon package keys whose EXISTING install identity this MP adopts — the `addon_installs.package` values (snake_case, e.g. 'time_clock') that must activate this MP with zero tenant action. Read-time mapping ONLY: install rows are never written, migrated, or deleted because of this field. Entries must be globally unique across ALL loaded manifests (injectivity, asserted at load); an entry equal to this MP's own id simply declares that the identically-named legacy addon is this MP's. Absent means the MP has no legacy identity to adopt.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "description": "A legacy addon package key. Underscores allowed here (the MP `id` pattern stays underscore-free) — this field is where legacy keys live. Hyphens are accepted too so an MP may name the identically-titled legacy addon when its own id is hyphenated.",
+        "pattern": "^[a-z][a-z0-9_-]*[a-z0-9]$"
+      }
+    },
+
     "permissions": {
       "description": "Capability-based permission model. The MP receives a token bound to exactly these scopes; the host enforces them at the sandbox boundary.",
       "type": "object",

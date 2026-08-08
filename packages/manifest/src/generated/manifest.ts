@@ -181,6 +181,10 @@ homepage?: string
  */
 locales?: [string, ...(string)[]]
 /**
+ * IDENTITY ADOPTION (council C3). Legacy addon package keys whose EXISTING install identity this MP adopts — the `addon_installs.package` values (snake_case, e.g. 'time_clock') that must activate this MP with zero tenant action. Read-time mapping ONLY: install rows are never written, migrated, or deleted because of this field. Entries must be globally unique across ALL loaded manifests (injectivity, asserted at load); an entry equal to this MP's own id simply declares that the identically-named legacy addon is this MP's. Absent means the MP has no legacy identity to adopt.
+ */
+legacyPackages?: string[]
+/**
  * Capability-based permission model. The MP receives a token bound to exactly these scopes; the host enforces them at the sandbox boundary.
  */
 permissions?: {
