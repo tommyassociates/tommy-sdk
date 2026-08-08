@@ -67,6 +67,15 @@ export function createBroker({
   now = () => Date.now(),
   online = true,
   throttleOverrides = {},
+  // --- enforcement flags (Class F). Default OFF: turning one ON requires the
+  // matching manifest declarations to exist first (grants / read: scopes), so
+  // each flips in its own wave once the estate declares them. ---
+  /** F1: treat `authorizedCallers: []` as deny-all-cross-MP, not "unset". */
+  strictEmptyCallers = false,
+  /** F2: cross-MP condition reads require a `read:<owner>.<condition>` scope. */
+  enforceConditionScopes = false,
+  /** F3/F4: emit must own the trigger namespace; subscribe must be granted. */
+  strictEmitOwnership = false,
 } = {}) {
   if (!capabilityService || typeof capabilityService.validate !== 'function') {
     throw new Error('createBroker: capabilityService with validate() required');
@@ -165,9 +174,20 @@ export function createBroker({
     const callers = activityDef.authorizedCallers;
     const callerIsTarget = callerMpId === targetMpId;
     const callerFirstParty = mps.get(callerMpId)?.firstParty === true;
+    // Three distinct cases (F1 — they used to be two):
+    //  - non-empty list  -> that list (plus the owner itself)
+    //  - EXPLICIT []     -> the author said "nobody may call this cross-MP";
+    //                       only the owner. Gated on `strictEmptyCallers`
+    //                       because 52 live activities declare [] today and
+    //                       first-party callers rely on the old reading.
+    //  - unset           -> first-party default (NOT default-deny: any
+    //                       registered first-party MP may call it).
+    const explicitEmpty = Array.isArray(callers) && callers.length === 0;
     const allowed = Array.isArray(callers) && callers.length
       ? callers.includes(callerMpId) || callerIsTarget
-      : callerIsTarget || callerFirstParty; // default-deny: first-party + same-MP only
+      : (explicitEmpty && strictEmptyCallers)
+        ? callerIsTarget
+        : callerIsTarget || callerFirstParty;
     if (!allowed) {
       throw err('PermissionDenied', `activity '${qualify(targetMpId, activityName)}' does not list '${callerMpId}' in authorizedCallers`, {
         rule: `activities.${activityName}.authorizedCallers`,
