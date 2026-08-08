@@ -22,7 +22,10 @@
 import { TommyError, isTommyError } from '@tommy/sdk';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
-import { DEFAULT_THROTTLE_PROFILE, QUEUE_MAX_ENTRIES, QUEUE_MAX_BYTES, SYNC_EMIT_TIMEOUT_MS, DEFAULT_RETRY } from './constants.js';
+import {
+  DEFAULT_THROTTLE_PROFILE, QUEUE_MAX_ENTRIES, QUEUE_MAX_BYTES, SYNC_EMIT_TIMEOUT_MS, DEFAULT_RETRY,
+  SENSITIVE_CONDITIONS, domainScopeForMp,
+} from './constants.js';
 import { createRecordStore } from './records.js';
 import { validateToken } from './capability.js';
 
@@ -76,6 +79,10 @@ export function createBroker({
   enforceConditionScopes = false,
   /** F3/F4: emit must own the trigger namespace; subscribe must be granted. */
   strictEmitOwnership = false,
+  /** C1/Option B: `{ mpId: 'domain' }` overrides for read-scope derivation. */
+  domainScopeOverrides = {},
+  /** C1/Option B: primitives derivation must not grant (defaults to the exported set). */
+  sensitiveConditions = SENSITIVE_CONDITIONS,
 } = {}) {
   if (!capabilityService || typeof capabilityService.validate !== 'function') {
     throw new Error('createBroker: capabilityService with validate() required');
@@ -202,24 +209,64 @@ export function createBroker({
     }
   }
 
+  const isSensitive = (qualified) => (typeof sensitiveConditions?.has === 'function'
+    ? sensitiveConditions.has(qualified)
+    : (sensitiveConditions || []).includes(qualified));
+
+  /**
+   * Shared read-grant test for F2 (conditions) and F4 (triggers) — council C1
+   * resolved to DERIVED scopes (Option B). A read of `{owner}.{primitive}` is
+   * granted by ANY of:
+   *
+   *   1. the explicit per-primitive scope `read:{owner}.{primitive}` — mirrors
+   *      the invoke convention (`invoke:{owner}.{activity}`) and stays valid as
+   *      a strict superset of the derived form;
+   *   2. the owner's DOMAIN scope from the fixed catalogue (`read:shifts` for
+   *      scheduling, `read:attendance` for time-clock, …) — the vocabulary the
+   *      manifests already declare, so most of the estate needs no new
+   *      declaration at all;
+   *   3. '*', the HOST authority marker (inspector replay, txn compensation) —
+   *      never issuable to an MP through a capability token.
+   *
+   * EXCEPT for SENSITIVE_CONDITIONS, where (2) does not apply: those demand the
+   * explicit per-primitive scope. Holding `read:attendance` must not hand a
+   * caller `time-clock.kiosk_pin`.
+   */
+  function readGrant(ownerMpId, primitiveName) {
+    const qualified = qualify(ownerMpId, primitiveName);
+    const explicit = `read:${qualified}`;
+    const domain = domainScopeForMp(ownerMpId, domainScopeOverrides);
+    const sensitive = isSensitive(qualified);
+    return {
+      qualified,
+      explicit,
+      domain,
+      sensitive,
+      // The scopes that would grant this read, most specific first.
+      accepts: sensitive ? [explicit] : [explicit, domain],
+      denialMessage: sensitive
+        ? `caller lacks scope '${explicit}' ('${qualified}' is sensitive — the '${domain}' domain scope does not grant it)`
+        : `caller lacks scope '${explicit}' or '${domain}'`,
+    };
+  }
+
+  const holdsReadGrant = (held, grant) => grant.accepts.some((s) => held.includes(s)) || held.includes('*');
+
   /**
    * F2 — condition reads were unmediated: no authz, no scope, no equivalent of
    * `authorizeInvoke`, so any MP could read any other MP's conditions
-   * (kiosk PINs, vendor settings, client records). The scope name MIRRORS the
-   * invoke convention exactly — `read:{ownerMpId}.{conditionName}` where
-   * invoke uses `invoke:{ownerMpId}.{activityName}` — including the '*' host
-   * authority marker and the same-MP (callerIsTarget) exemption.
+   * (kiosk PINs, vendor settings, client records). Grant resolution per
+   * `readGrant` above; the same-MP (callerIsTarget) exemption mirrors invoke.
    *
-   * Gated on `enforceConditionScopes` (default OFF): no manifest declares a
-   * `read:` scope for a cross-MP condition yet.
+   * Gated on `enforceConditionScopes` (default OFF) until the last callers
+   * declare their owner-domain scopes (HANDOFF-m1-grants.md §A).
    */
   function authorizeQuery(callerMpId, ownerMpId, conditionName, scopes) {
     if (!enforceConditionScopes) return;
     if (callerMpId === ownerMpId) return; // an MP always reads its own conditions
-    const scope = `read:${qualify(ownerMpId, conditionName)}`;
-    const held = scopes || [];
-    if (!held.includes(scope) && !held.includes('*')) {
-      throw err('PermissionDenied', `caller lacks scope '${scope}'`, { rule: 'permissions', retryable: false });
+    const grant = readGrant(ownerMpId, conditionName);
+    if (!holdsReadGrant(scopes || [], grant)) {
+      throw err('PermissionDenied', grant.denialMessage, { rule: 'permissions', retryable: false });
     }
   }
 
@@ -228,21 +275,24 @@ export function createBroker({
    * any trigger and receive its payload (passive cross-MP exfiltration).
    * Subscription is a REGISTRATION, not an RPC — there is no envelope and no
    * capability token on this path — so the grant is read from the subscriber's
-   * REGISTERED MANIFEST `permissions.scopes`, the same list the host mints its
-   * tokens from. Trigger ownership is the other way through, mirroring the
-   * same-MP exemption used by invoke/query.
+   * REGISTERED MANIFEST `permissions.scopes` — which, under council C1's
+   * derived-scope resolution, is exactly the vocabulary that list already
+   * speaks: the owner's catalogue DOMAIN scope grants its triggers, with the
+   * explicit per-primitive form still accepted and SENSITIVE_CONDITIONS still
+   * excluded from derivation. Trigger ownership is the other way through,
+   * mirroring the same-MP exemption used by invoke/query.
    *
    * Shares `strictEmitOwnership` with F3: emit-side and subscribe-side trigger
    * authority land (and flip) together.
    */
   function authorizeSubscribe(subscriberMpId, triggerQualified) {
     if (!strictEmitOwnership) return;
-    const [ownerMpId] = splitQualified(triggerQualified);
+    const [ownerMpId, triggerName] = splitQualified(triggerQualified);
     if (ownerMpId === subscriberMpId) return; // an MP always hears its own triggers
     const declared = mps.get(subscriberMpId)?.manifest.permissions?.scopes || [];
-    const scope = `read:${triggerQualified}`;
-    if (!declared.includes(scope) && !declared.includes('*')) {
-      throw err('PermissionDenied', `mp '${subscriberMpId}' lacks scope '${scope}' to subscribe to '${triggerQualified}'`, {
+    const grant = readGrant(ownerMpId, triggerName);
+    if (!holdsReadGrant(declared, grant)) {
+      throw err('PermissionDenied', `mp '${subscriberMpId}' may not subscribe to '${triggerQualified}': ${grant.denialMessage}`, {
         rule: 'permissions', retryable: false,
       });
     }

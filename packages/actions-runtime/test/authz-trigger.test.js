@@ -6,8 +6,11 @@
  *     emit `time-clock.shift_marked_absent` and drive another MP's Action.
  *     The platform-emit / host-injection intake is exempt.
  * F4: subscribing was entirely unauthorized — passive cross-MP exfiltration.
- *     A cross-MP subscription now needs the trigger owner's `read:` scope in
- *     the subscriber's declared manifest permissions.
+ *     A cross-MP subscription now needs a read grant on the trigger, resolved
+ *     the same way F2 resolves condition reads (council C1 / Option B): the
+ *     owner's catalogue DOMAIN scope, or the explicit per-primitive scope, read
+ *     from the subscriber's DECLARED MANIFEST permissions. SENSITIVE_CONDITIONS
+ *     entries are excluded from domain derivation here too.
  *
  * Both ride `strictEmitOwnership` (default OFF) — the manifests declare no
  * `read:` trigger scopes yet.
@@ -30,9 +33,9 @@ const mp = (id, { triggers = {}, scopes } = {}) => ({
   ...(scopes ? { permissions: { scopes } } : {}),
 });
 
-async function world({ strictEmitOwnership, subscriberScopes } = {}) {
+async function world({ strictEmitOwnership, subscriberScopes, sensitiveConditions } = {}) {
   const issuer = createFakeIssuer();
-  const broker = createBroker({ capabilityService: issuer, strictEmitOwnership });
+  const broker = createBroker({ capabilityService: issuer, strictEmitOwnership, sensitiveConditions });
   broker.registerMp(mp('time-clock', { triggers: { shift_marked_absent: trigger() } }), { handlers: {} });
   broker.registerMp(mp('leave', { triggers: { leave_created: trigger() }, scopes: subscriberScopes }), { handlers: {} });
   const leaveToken = await issuer.issue('leave', '1.0.0', TENANT, [], 'i-leave');
@@ -101,14 +104,36 @@ describe('subscribe — trigger read grant (F4)', () => {
     expect(typeof w.subscribeForeign()).toBe('function');
   });
 
-  it('flag ON: a cross-MP subscription without the read: scope is PermissionDenied', async () => {
+  it('flag ON: a cross-MP subscription with no read grant is PermissionDenied', async () => {
     const w = await world({ strictEmitOwnership: true });
-    expect(() => w.subscribeForeign()).toThrow(/lacks scope 'read:time-clock.shift_marked_absent'/);
+    expect(() => w.subscribeForeign()).toThrow(/read:time-clock.shift_marked_absent/);
+    // The denial names the derived route as well as the explicit one.
+    expect(() => w.subscribeForeign()).toThrow(/read:attendance/);
   });
 
-  it('flag ON: the declared read: scope grants the subscription', async () => {
+  it("flag ON: the owner's declared DOMAIN scope grants the subscription (Option B)", async () => {
+    const w = await world({ strictEmitOwnership: true, subscriberScopes: ['read:attendance'] });
+    expect(typeof w.subscribeForeign()).toBe('function');
+  });
+
+  it('flag ON: the explicit per-primitive scope grants the subscription (superset)', async () => {
     const w = await world({ strictEmitOwnership: true, subscriberScopes: ['read:time-clock.shift_marked_absent'] });
     expect(typeof w.subscribeForeign()).toBe('function');
+  });
+
+  it("flag ON: an unrelated owner's domain scope does not grant it", async () => {
+    const w = await world({ strictEmitOwnership: true, subscriberScopes: ['read:shifts', 'read:leave'] });
+    expect(() => w.subscribeForeign()).toThrow(/PermissionDenied|read:attendance/);
+  });
+
+  it('flag ON: a SENSITIVE trigger is excluded from domain derivation', async () => {
+    const sensitiveConditions = new Set(['time-clock.shift_marked_absent']);
+    const domainOnly = await world({ strictEmitOwnership: true, subscriberScopes: ['read:attendance'], sensitiveConditions });
+    expect(() => domainOnly.subscribeForeign()).toThrow(/is sensitive/);
+    const explicit = await world({
+      strictEmitOwnership: true, subscriberScopes: ['read:time-clock.shift_marked_absent'], sensitiveConditions,
+    });
+    expect(typeof explicit.subscribeForeign()).toBe('function');
   });
 
   it('flag ON: subscribing to your OWN trigger needs no scope (qualified or not)', async () => {
