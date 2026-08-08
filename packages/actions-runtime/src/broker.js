@@ -202,6 +202,27 @@ export function createBroker({
     }
   }
 
+  /**
+   * F2 — condition reads were unmediated: no authz, no scope, no equivalent of
+   * `authorizeInvoke`, so any MP could read any other MP's conditions
+   * (kiosk PINs, vendor settings, client records). The scope name MIRRORS the
+   * invoke convention exactly — `read:{ownerMpId}.{conditionName}` where
+   * invoke uses `invoke:{ownerMpId}.{activityName}` — including the '*' host
+   * authority marker and the same-MP (callerIsTarget) exemption.
+   *
+   * Gated on `enforceConditionScopes` (default OFF): no manifest declares a
+   * `read:` scope for a cross-MP condition yet.
+   */
+  function authorizeQuery(callerMpId, ownerMpId, conditionName, scopes) {
+    if (!enforceConditionScopes) return;
+    if (callerMpId === ownerMpId) return; // an MP always reads its own conditions
+    const scope = `read:${qualify(ownerMpId, conditionName)}`;
+    const held = scopes || [];
+    if (!held.includes(scope) && !held.includes('*')) {
+      throw err('PermissionDenied', `caller lacks scope '${scope}'`, { rule: 'permissions', retryable: false });
+    }
+  }
+
   // --- Active Trigger Index (D21) -------------------------------------------
 
   function actionKey(tenantId, mpId, actionId) { return `${tenantId}:${mpId}:${actionId}`; }
@@ -464,6 +485,8 @@ export function createBroker({
     const ownerEntry = mps.get(ownerMpId);
     const conditionDef = ownerEntry?.manifest.conditions?.[conditionName];
     if (!conditionDef) throw err('UnknownCondition', `condition '${envelope.condition}' is not registered`, { retryable: false });
+
+    authorizeQuery(envelope.sourceMpId, ownerMpId, conditionName, identity.scopes);
     validateAgainst(conditionDef.inputSchema, envelope.args, 'InvalidPayload', `condition '${envelope.condition}' args`);
 
     const cacheKey = `${tenantId}:${envelope.condition}:${JSON.stringify(envelope.args)}`;
