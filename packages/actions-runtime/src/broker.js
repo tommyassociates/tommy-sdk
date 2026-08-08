@@ -666,7 +666,14 @@ export function createBroker({
     if (chain.rootRunId) checkChain(envelope.sourceMpId, `invoke(${envelope.activity})`, chain);
 
     const idempotencyKey = idempotencyKeyFor(activityDef, envelope);
-    const processedKey = idempotencyKey && `${envelope.activity}:${idempotencyKey}`;
+    // F5 — TENANT-SCOPED. The ledger key used to be (activity, key) only, and
+    // `derived_from_input` keys are a hash of the args alone, so the same
+    // logical write in two tenants collided and the second replayed the
+    // first tenant's stored result. Mirrors conditionCache/suppressionTally,
+    // which were already tenant-scoped. `processedKeys` lives only for the
+    // lifetime of this broker (no persistence, and the offline queue stores
+    // ENVELOPES, not ledger keys), so the format change replays nothing.
+    const processedKey = idempotencyKey && `${tenantId}:${envelope.activity}:${idempotencyKey}`;
     if (processedKey && processedKeys.has(processedKey)) {
       // Repeat key -> stored prior result, not re-applied (§3.2).
       return { ...processedKeys.get(processedKey), idempotentReplay: true };
