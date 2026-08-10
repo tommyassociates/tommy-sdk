@@ -41,6 +41,17 @@ function describeSemantic(err) {
     };
   }
   if (err.schemaPath.includes('/activities/')) {
+    // The activities block has TWO allOf branches; index 1 is the L22
+    // naturalKeyField guard. Naming them apart matters — reporting a
+    // naturalKeyField misuse as an offline-replay error would send the author
+    // to edit the wrong field.
+    if (/\/activities\/additionalProperties\/allOf\/1\//.test(err.schemaPath)) {
+      return {
+        path,
+        rule: 'natural-key-field-requires-natural-key',
+        message: `activity '${name}' declares naturalKeyField but its idempotency is not 'natural_key' — the broker only reads the field on the natural_key branch, so the declaration would silently do nothing.`,
+      };
+    }
     return {
       path,
       rule: 'offline-replay-requires-idempotency',

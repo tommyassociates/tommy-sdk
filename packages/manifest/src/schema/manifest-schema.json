@@ -170,6 +170,11 @@
             "description": "How an idempotency key is formed so retries/replays are safe.",
             "enum": ["client_key", "derived_from_input", "natural_key", "none"]
           },
+          "naturalKeyField": {
+            "description": "The field of `inputSchema` that IS this activity's natural key — the thing whose identity makes two invocations the same fact. Read by the broker (`idempotencyKeyFor`, actions-runtime) as `n-<value>`; a dotted path is resolved into nested args. ONLY meaningful with `idempotency: natural_key`, and declaring it elsewhere is rejected. If omitted the broker defaults to `args.id`, and where there is no `args.id` it falls back to hashing the WHOLE args — which is `derived_from_input` by another name. That default was unreachable from a manifest until this field existed (the activity object is additionalProperties:false), which is why most of the estate's natural_key activities key on `args.id` whether or not that is their real key. Declare it wherever the key is NOT `id` — e.g. an invitation keyed on its token, a view row keyed on (kind, targetId), a setting keyed on its name.",
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+          },
           "offlineReplayable": {
             "description": "If true, the invocation can be queued offline and replayed on reconnect.",
             "type": "boolean"
@@ -199,6 +204,11 @@
             "if": { "properties": { "idempotency": { "const": "none" }, "offlineReplayable": { "const": true } } },
             "then": false,
             "$comment": "An offline-replayable activity MUST have an idempotency strategy."
+          },
+          {
+            "if": { "required": ["naturalKeyField"] },
+            "then": { "properties": { "idempotency": { "const": "natural_key" } } },
+            "$comment": "naturalKeyField is read ONLY on the natural_key branch of the broker's idempotencyKeyFor. Declaring it beside any other strategy is a silent no-op, so it is rejected rather than ignored."
           }
         ]
       }

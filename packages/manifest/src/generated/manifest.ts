@@ -218,7 +218,7 @@ legacyPackages?: string[]
  */
 permissions?: {
 /**
- * Declared capability scopes. Format verb:resource. Default-deny: anything not listed is unreachable.
+ * Declared capability scopes. Two forms, both default-deny (anything not listed is unreachable): (1) CATALOGUE form `verb:resource` (e.g. read:shifts) — a member of the permission catalogue, and the form the host resolves domain reads through (council C1 / Option B); (2) QUALIFIED per-primitive form `verb:<mpId>.<primitive>` (e.g. invoke:team-comms.send_message) — the vocabulary the Actions broker and the server InvokeExecutor actually enforce for a cross-MP invoke, which has NO domain derivation and therefore cannot be expressed in catalogue form. Qualified scopes are exempt from catalogue membership: they are addressed by the owning MP's manifest, not by the fixed catalogue.
  */
 scopes?: string[]
 /**
