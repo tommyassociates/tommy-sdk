@@ -71,12 +71,12 @@ export default {
       "additionalProperties": false,
       "properties": {
         "scopes": {
-          "description": "Declared capability scopes. Format verb:resource. Default-deny: anything not listed is unreachable.",
+          "description": "Declared capability scopes. Two forms, both default-deny (anything not listed is unreachable): (1) CATALOGUE form `verb:resource` (e.g. read:shifts) — a member of the permission catalogue, and the form the host resolves domain reads through (council C1 / Option B); (2) QUALIFIED per-primitive form `verb:<mpId>.<primitive>` (e.g. invoke:team-comms.send_message) — the vocabulary the Actions broker and the server InvokeExecutor actually enforce for a cross-MP invoke, which has NO domain derivation and therefore cannot be expressed in catalogue form. Qualified scopes are exempt from catalogue membership: they are addressed by the owning MP's manifest, not by the fixed catalogue.",
           "type": "array",
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "pattern": "^(read|write|invoke):[a-z][a-z0-9_]*$"
+            "pattern": "^(read|write|invoke):([a-z][a-z0-9_]*|[a-z][a-z0-9-]{1,38}[a-z0-9]\\.[a-z][a-z0-9_]*)$"
           }
         },
         "roles": {
@@ -187,7 +187,7 @@ export default {
             }
           },
           "authorizedCallers": {
-            "description": "MP ids permitted to invoke this activity. Default-deny: empty/absent means first-party + same-MP only.",
+            "description": "MP ids permitted to invoke this activity. THREE distinct cases, and they are not interchangeable (broker authorizeInvoke, F1): (1) NON-EMPTY list -> exactly those MPs, plus the owning MP itself; (2) EXPLICIT [] -> the owning MP ONLY, i.e. deliberately closed to every other MP (this is the tightest setting, and it is what the estate's 53 [] declarations mean — cross-MP writes are opened through narrow purpose-built activities such as scheduling.update_shift_from_leave rather than by opening CRUD); (3) ABSENT -> the permissive first-party default: ANY registered first-party MP may call it. Note (2) and (3) are OPPOSITES, so omitting the field is not equivalent to declaring it empty. The strict reading of (2) is gated on the host's `strictEmptyCallers`, which is ON in tommy-app's mp-loader; with it off, (2) falls through to (3).",
             "type": "array",
             "items": { "type": "string" }
           },
