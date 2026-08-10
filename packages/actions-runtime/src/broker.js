@@ -28,6 +28,7 @@ import {
 } from './constants.js';
 import { createRecordStore } from './records.js';
 import { validateToken } from './capability.js';
+import { evaluatePredicate as evaluateDeclaredPredicate } from './predicate.js';
 
 const err = (code, message, extra = {}) => new TommyError({ code, message, ...extra });
 
@@ -35,6 +36,26 @@ const dayKey = (ts) => new Date(ts).toISOString().slice(0, 10);
 
 /** inputMap sources the M1 broker EXECUTES (harden round-1: base four + default). */
 const M1_SOURCES = new Set(['trigger', 'condition', 'option']);
+
+/**
+ * Platform-provided triggers, available on EVERY registered MP's namespace
+ * without the MP declaring them. Closed set, in-binary — the same firewall the
+ * predicate operators sit behind.
+ *
+ * `settings.changed` — the manifest-driven settings engine fires it after a
+ * setting of that MP actually moves, carrying { changedKeys }. A no-op write
+ * fires nothing.
+ */
+const SYSTEM_TRIGGERS = Object.freeze({
+  'settings.changed': Object.freeze({
+    emission: 'async',
+    payloadSchema: {
+      type: 'object',
+      required: ['changedKeys'],
+      properties: { changedKeys: { type: 'array', items: { type: 'string' } } },
+    },
+  }),
+});
 
 function dottedGet(obj, path) {
   return String(path).split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
@@ -103,6 +124,7 @@ export function createBroker({
   const mps = new Map();              // mpId -> { manifest, handlers, firstParty }
   const subscribers = new Map();      // trigger -> Set<{mpId, handler}>
   const actionState = new Map();      // `${tenantId}:${mpId}:${actionId}` -> {enabled, options}
+  const settingState = new Map();     // `${tenantId}:${mpId}` -> { key: value } (manifest-driven settings projection)
   const processedKeys = new Map();    // `${activity}:${idempotencyKey}` -> stored result
   const conditionCache = new Map();   // `${tenantId}:${condition}:${argsJson}` -> {value, expiresAt}
   const suppressionTally = new Map(); // `${tenantId}:${trigger}:${day}` -> count
@@ -302,6 +324,14 @@ export function createBroker({
 
   function actionKey(tenantId, mpId, actionId) { return `${tenantId}:${mpId}:${actionId}`; }
 
+  /** Drop this tenant's memoised condition results (a settings write may change them). */
+  function invalidateConditionCache(tenantId) {
+    const prefix = `${tenantId}:`;
+    for (const key of [...conditionCache.keys()]) {
+      if (key.startsWith(prefix)) conditionCache.delete(key);
+    }
+  }
+
   function actionsForTrigger(tenantId, triggerQualified) {
     const wired = [];
     for (const [mpId, entry] of mps) {
@@ -477,7 +507,13 @@ export function createBroker({
     const [ownerMpId, triggerName] = splitQualified(envelope.trigger.includes('.') ? envelope.trigger : qualify(emitterMp, envelope.trigger));
     const triggerQualified = qualify(ownerMpId, triggerName);
     const ownerEntry = mps.get(ownerMpId);
-    const triggerDef = ownerEntry?.manifest.triggers?.[triggerName];
+    const triggerDef = ownerEntry?.manifest.triggers?.[triggerName]
+      // SYSTEM triggers are provided BY the platform ON every registered MP's
+      // namespace, so no manifest declares them (and none should have to —
+      // `<mpId>.settings.changed` fires because the host changed that MP's
+      // settings, not because the MP asked). Only for a registered MP: an
+      // unknown owner is still UnknownTrigger.
+      || (ownerEntry && SYSTEM_TRIGGERS[triggerName]);
     if (!triggerDef) throw err('UnknownTrigger', `trigger '${triggerQualified}' is not declared by any registered MP`, { retryable: false });
 
     // F3 — owner assert. The owner is resolved from the trigger STRING and was
@@ -908,6 +944,56 @@ export function createBroker({
       const prev = actionState.get(key) || {};
       actionState.set(key, { enabled: enabled !== undefined ? enabled : prev.enabled, options: options !== undefined ? options : prev.options });
     },
+
+    // --- manifest-driven settings (P1 engine) --------------------------------
+    // The per-tenant SETTINGS projection. The system of record is wherever the
+    // field's declared `store` says it is (the existing workforce/team/vendor
+    // stores at P1 — nothing migrated); this is the device-side read model the
+    // renderer, `tommy.settings.get()` and `{ from: setting }` predicates all
+    // share, so a write is live everywhere without a reload.
+    setSettingState(tenantId, mpId, values = {}) {
+      const key = `${tenantId}:${mpId}`;
+      settingState.set(key, { ...(settingState.get(key) || {}), ...values });
+      // A condition may read a setting, so a settings write invalidates this
+      // tenant's memoised condition results — otherwise a cacheable condition
+      // keeps answering from the pre-write world for its whole TTL.
+      invalidateConditionCache(tenantId);
+    },
+
+    /**
+     * This MP's OWN settings document (a copy — callers must not mutate the
+     * projection). Cross-MP reads are NOT served here: an MP reads another
+     * MP's setting only through a declared `{ from: setting, mp }` source,
+     * whose dependency the manifest states, never by asking for a namespace
+     * it did not declare.
+     */
+    settingsFor(tenantId, mpId) {
+      return { ...(settingState.get(`${tenantId}:${mpId}`) || {}) };
+    },
+
+    /**
+     * Declared settings PAGES from the registered manifests — the display side
+     * the projection omits (titles, sections, field types, predicates). The
+     * `actionCatalog()` precedent: state and declaration are joined on the
+     * device, not duplicated over the wire.
+     */
+    settingsCatalog() {
+      const out = [];
+      for (const [mpId, entry] of mps) {
+        for (const page of entry.manifest.contributions?.settings || []) {
+          out.push({ mpId, page });
+        }
+      }
+      return out;
+    },
+
+    /**
+     * THE predicate evaluator (R4). Exposed on the broker so every gate in the
+     * platform — Action `when`, interaction visibleWhen, settings
+     * visibleWhen/readOnlyWhen — reaches the SAME implementation. Callers pass
+     * a context bag of resolved source values; they never compare.
+     */
+    evaluatePredicate: evaluateDeclaredPredicate,
 
     subscribe(mpId, trigger, handler) {
       const qualified = trigger.includes('.') ? trigger : qualify(mpId, trigger);

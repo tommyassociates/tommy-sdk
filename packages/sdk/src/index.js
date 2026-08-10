@@ -23,6 +23,11 @@ export { DEFAULT_RPC_TIMEOUT_MS } from './adapter.js';
 const STUB_NAMESPACES = [
   'ui', 'directory', 'device', 'host', 'navigation', 'theme', 'messaging',
   'clock', 'lifecycle', 'notifications', 'session', 'user', 'billing',
+  // Manifest-driven settings runtime delivery: `tommy.settings.get()` reads
+  // THIS MP's own declared settings document. There is no cross-MP read on
+  // this namespace — an MP reads another's setting only through a declared
+  // `{ from: setting, mp }` source, so the dependency is in the manifest.
+  'settings',
 ];
 
 function stubNamespace(name) {
