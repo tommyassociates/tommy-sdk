@@ -546,6 +546,25 @@ export default {
               "description": { "type": "string" }
             }
           }
+        },
+        "auditEvents": {
+          "description": "AUDIT RULING 2a (Mason, 2026-08-11) — CUSTOM audit-event types this MP may emit through `tommy.host.auditLog`. Audit logs are HOST-owned: system events stay host/server-side, the audit-log PANE is host-rendered (`tommy.ui.showAuditPane` — the MP supplies a subject + an anchor element and receives NO data), and an MP's only write path into the trail is emitting an event id DECLARED here. The host enforces the declaration at emit time — an undeclared id is a LOUD named denial, never a silent drop (the five-silent-drops lesson, ORCHESTRATOR 2026-08-11 §5) — and the host stamps actor/tenant/mpId itself, so an MP cannot forge provenance. `label.key` must exist in the MP's shipped locale bundle (checker rule M28).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "label"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "The event id the MP passes to tommy.host.auditLog. Unqualified — the host stamps the mpId, so the recorded event is '<mpId>.<id>'." },
+              "label": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["key"],
+                "properties": { "key": { "type": "string", "description": "tommy.t locale key for the rendered feed line (same shape as interactions[].label — M24/M28 check it against the shipped bundle)." } }
+              },
+              "severity": { "enum": ["info", "warning", "critical"], "default": "info", "description": "Display severity in the host-rendered feed. Advisory — never an authority signal." }
+            }
+          }
         }
       }
     },
