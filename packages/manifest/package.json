@@ -18,6 +18,7 @@
       "types": "./src/node.d.ts",
       "import": "./src/node.js"
     },
+    "./legacy-packages": "./src/legacy-packages.js",
     "./schema": "./src/schema/manifest-schema.json",
     "./catalogue": "./src/catalogue/permission-catalogue.json"
   },

@@ -69,3 +69,26 @@ export function loadSchema(): Record<string, unknown>;
 export function loadCatalogue(path?: string): Catalogue;
 export function searchCatalogue(catalogue: Catalogue, query?: CatalogueQuery): CatalogueEntry[];
 export function suggestScope(catalogue: Catalogue, unknown: string): string | null;
+
+// --- Identity adoption (council C3) ----------------------------------------
+
+export interface ManifestIdentitySummary {
+  id?: string;
+  legacyPackages?: string[];
+}
+
+export interface LegacyPackageIndex {
+  /** package key (legacy OR canonical) -> canonical mpId. */
+  byPackage: Map<string, string>;
+  /** canonical mpId -> the legacy package keys it adopts. */
+  byMpId: Map<string, string[]>;
+}
+
+export class LegacyPackageCollisionError extends Error {
+  packageKey?: string;
+  mpIds?: string[];
+}
+
+export function legacyPackagesOf(manifest: ManifestIdentitySummary): string[];
+export function buildLegacyPackageIndex(manifests: ManifestIdentitySummary[]): LegacyPackageIndex;
+export function resolveMpIdWith(index: LegacyPackageIndex, packageKey: string): string;

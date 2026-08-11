@@ -54,18 +54,29 @@ export default {
       "items": { "type": "string", "pattern": "^[a-z]{2}(-[A-Z]{2})?$" }
     },
 
+    "legacyPackages": {
+      "description": "IDENTITY ADOPTION (council C3). Legacy addon package keys whose EXISTING install identity this MP adopts — the `addon_installs.package` values (snake_case, e.g. 'time_clock') that must activate this MP with zero tenant action. Read-time mapping ONLY: install rows are never written, migrated, or deleted because of this field. Entries must be globally unique across ALL loaded manifests (injectivity, asserted at load); an entry equal to this MP's own id simply declares that the identically-named legacy addon is this MP's. Absent means the MP has no legacy identity to adopt.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "description": "A legacy addon package key. Underscores allowed here (the MP `id` pattern stays underscore-free) — this field is where legacy keys live. Hyphens are accepted too so an MP may name the identically-titled legacy addon when its own id is hyphenated.",
+        "pattern": "^[a-z][a-z0-9_-]*[a-z0-9]$"
+      }
+    },
+
     "permissions": {
       "description": "Capability-based permission model. The MP receives a token bound to exactly these scopes; the host enforces them at the sandbox boundary.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "scopes": {
-          "description": "Declared capability scopes. Format verb:resource. Default-deny: anything not listed is unreachable.",
+          "description": "Declared capability scopes. Two forms, both default-deny (anything not listed is unreachable): (1) CATALOGUE form `verb:resource` (e.g. read:shifts) — a member of the permission catalogue, and the form the host resolves domain reads through (council C1 / Option B); (2) QUALIFIED per-primitive form `verb:<mpId>.<primitive>` (e.g. invoke:team-comms.send_message) — the vocabulary the Actions broker and the server InvokeExecutor actually enforce for a cross-MP invoke, which has NO domain derivation and therefore cannot be expressed in catalogue form. Qualified scopes are exempt from catalogue membership: they are addressed by the owning MP's manifest, not by the fixed catalogue.",
           "type": "array",
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "pattern": "^(read|write|invoke):[a-z][a-z0-9_]*$"
+            "pattern": "^(read|write|invoke):([a-z][a-z0-9_]*|[a-z][a-z0-9-]{1,38}[a-z0-9]\\.[a-z][a-z0-9_]*)$"
           }
         },
         "roles": {
@@ -163,6 +174,11 @@ export default {
             "description": "How an idempotency key is formed so retries/replays are safe.",
             "enum": ["client_key", "derived_from_input", "natural_key", "none"]
           },
+          "naturalKeyField": {
+            "description": "The field of `inputSchema` that IS this activity's natural key — the thing whose identity makes two invocations the same fact. Read by the broker (`idempotencyKeyFor`, actions-runtime) as `n-<value>`; a dotted path is resolved into nested args. ONLY meaningful with `idempotency: natural_key`, and declaring it elsewhere is rejected. If omitted the broker defaults to `args.id`, and where there is no `args.id` it falls back to hashing the WHOLE args — which is `derived_from_input` by another name. That default was unreachable from a manifest until this field existed (the activity object is additionalProperties:false), which is why most of the estate's natural_key activities key on `args.id` whether or not that is their real key. Declare it wherever the key is NOT `id` — e.g. an invitation keyed on its token, a view row keyed on (kind, targetId), a setting keyed on its name.",
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
+          },
           "offlineReplayable": {
             "description": "If true, the invocation can be queued offline and replayed on reconnect.",
             "type": "boolean"
@@ -176,7 +192,7 @@ export default {
             }
           },
           "authorizedCallers": {
-            "description": "MP ids permitted to invoke this activity. Default-deny: empty/absent means first-party + same-MP only.",
+            "description": "MP ids permitted to invoke this activity. THREE distinct cases, and they are not interchangeable (broker authorizeInvoke, F1): (1) NON-EMPTY list -> exactly those MPs, plus the owning MP itself; (2) EXPLICIT [] -> the owning MP ONLY, i.e. deliberately closed to every other MP (this is the tightest setting, and it is what the estate's 53 [] declarations mean — cross-MP writes are opened through narrow purpose-built activities such as scheduling.update_shift_from_leave rather than by opening CRUD); (3) ABSENT -> the permissive first-party default: ANY registered first-party MP may call it. Note (2) and (3) are OPPOSITES, so omitting the field is not equivalent to declaring it empty. The strict reading of (2) is gated on the host's `strictEmptyCallers`, which is ON in tommy-app's mp-loader; with it off, (2) falls through to (3).",
             "type": "array",
             "items": { "type": "string" }
           },
@@ -192,6 +208,11 @@ export default {
             "if": { "properties": { "idempotency": { "const": "none" }, "offlineReplayable": { "const": true } } },
             "then": false,
             "$comment": "An offline-replayable activity MUST have an idempotency strategy."
+          },
+          {
+            "if": { "required": ["naturalKeyField"] },
+            "then": { "properties": { "idempotency": { "const": "natural_key" } } },
+            "$comment": "naturalKeyField is read ONLY on the natural_key branch of the broker's idempotencyKeyFor. Declaring it beside any other strategy is a silent no-op, so it is rejected rather than ignored."
           }
         ]
       }
@@ -451,7 +472,23 @@ export default {
           }
         },
         "modals": { "type": "array", "items": { "$ref": "#/$defs/namedContribution" } },
-        "settingsPages": { "type": "array", "items": { "$ref": "#/$defs/namedContribution" } },
+        "settings": {
+          "description": "MANIFEST-DRIVEN SETTINGS §2.2 — the MP's settings pages, DECLARED not hand-coded. The host renders them; no MP ships a settings view. Absent means this MP declares no settings (the state of all 17 manifests at P0 — the grammar is frozen before any MP uses it, so the addition is provably backward-compatible).",
+          "$comment": "SETTINGS P0 (schema freeze). What is NOT here yet, by design: the renderer, the GET/PUT /api/v1/mp/settings endpoint and its SERVER-SIDE write validator (a P1 BLOCKER, not a P5 nicety — R5), and any page migration. Check C22 'settings-declarability' is RESERVED against this field: it fails a submission shipping a hand-coded MP settings page that could have been declared here. That is the ratchet that stops the 53 hand-coded pages growing back.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/settingsPage" }
+        },
+        "settingsPages": {
+          "description": "DEPRECATED (manifest-driven settings §2.2) — the inert {id,name,description} stub that predates the settings grammar. It never had a consumer. Superseded by 'settings' (array of settingsPage). RETAINED so every manifest authored against it still validates unchanged; new manifests MUST use 'settings'. Declaring both is legal but 'settings' is the only one rendered. Removal is a future manifestVersion bump and must carry a deprecations[]/removalPlan entry (C18).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/namedContribution" },
+          "deprecated": true
+        },
+        "permissions": {
+          "description": "MANIFEST-DRIVEN SETTINGS §4.3 / S6 — permission rows this MP OWNS. Ownership becomes server-declared (owner: {kind: host|mp, mpId}) instead of re-derived client-side from the two hard-coded hashes in the legacy permissions page (resourceTypeMapping, addonPackageToSystemSectionMapping — both delete when this lands). Claimed rows move onto that MP's own permissions page; UNCLAIMED rows stay on Tommy's (host-owned, fail-safe toward visibility).",
+          "type": "array",
+          "items": { "$ref": "#/$defs/permissionClaim" }
+        },
         "interactions": {
           "description": "2.22 E7 (D20) — declared interaction points: SDK-rendered affordances that emit the MP-owned trigger '<mpId>.ui.<id>' with ZERO MP code. Payload binds ONLY from the declared view context (route params / declared panel bindings — no DOM scraping; free-form listeners are forbidden). visibleWhen gates VISIBILITY only, never authority (the 2.20 L3 rule). hideWhenUnwired (default true, D21): an interaction with no enabled consuming Action is not rendered.",
           "type": "array",
@@ -507,6 +544,25 @@ export default {
             "properties": {
               "command": { "type": "string", "pattern": "^/[a-z][a-z0-9-]*$" },
               "description": { "type": "string" }
+            }
+          }
+        },
+        "auditEvents": {
+          "description": "AUDIT RULING 2a (Mason, 2026-08-11) — CUSTOM audit-event types this MP may emit through `tommy.host.auditLog`. Audit logs are HOST-owned: system events stay host/server-side, the audit-log PANE is host-rendered (`tommy.ui.showAuditPane` — the MP supplies a subject + an anchor element and receives NO data), and an MP's only write path into the trail is emitting an event id DECLARED here. The host enforces the declaration at emit time — an undeclared id is a LOUD named denial, never a silent drop (the five-silent-drops lesson, ORCHESTRATOR 2026-08-11 §5) — and the host stamps actor/tenant/mpId itself, so an MP cannot forge provenance. `label.key` must exist in the MP's shipped locale bundle (checker rule M28).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "label"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "The event id the MP passes to tommy.host.auditLog. Unqualified — the host stamps the mpId, so the recorded event is '<mpId>.<id>'." },
+              "label": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["key"],
+                "properties": { "key": { "type": "string", "description": "tommy.t locale key for the rendered feed line (same shape as interactions[].label — M24/M28 check it against the shipped bundle)." } }
+              },
+              "severity": { "enum": ["info", "warning", "critical"], "default": "info", "description": "Display severity in the host-rendered feed. Advisory — never an authority signal." }
             }
           }
         }
@@ -694,7 +750,8 @@ export default {
       "type": "object"
     },
     "inputMapSource": {
-      "description": "One source for a single mapped field. The original four shapes (trigger / condition / option / const — actions-runtime.md §9.7) plus the 2.22 additions: serviceRead (E6), item (E5 forEach element), template (E3 — plain-text composition with {{placeholder | pipe}} syntax, tooling-validated). Every non-template shape may carry an optional 'default' and an optional closed-operator 'transform' chain (E2, max 8 steps).",
+      "description": "One source for a single mapped field. The original four shapes (trigger / condition / option / const — actions-runtime.md §9.7) plus the 2.22 additions: serviceRead (E6), item (E5 forEach element), template (E3 — plain-text composition with {{placeholder | pipe}} syntax, tooling-validated), and the manifest-driven-settings addition: setting (S5). Every non-template shape may carry an optional 'default' and an optional closed-operator 'transform' chain (E2, max 8 steps).",
+      "$comment": "SETTINGS P0: 'setting' (S5) is the ONE AND ONLY grammar addition the manifest-driven-settings design makes to the wiring vocabulary. Everything else the settings grammar needs — feature gates, permission gates, other-MP-installed gates, integration-connected gates — reuses trigger/condition/serviceRead/option/const/item/template verbatim.",
       "oneOf": [
         {
           "type": "object",
@@ -756,6 +813,25 @@ export default {
         {
           "type": "object",
           "additionalProperties": false,
+          "required": ["from", "path"],
+          "properties": {
+            "from": { "const": "setting" },
+            "mp": {
+              "description": "OPTIONAL cross-MP qualifier: the id of the MP that OWNS the setting. Absent means this MP's own settings namespace. Ownership rule (Mason, 2026-08-10): the MP that would BREAK if the setting vanished owns it — a reader declares the dependency here, so an uninstalled owner makes the reading section 'unavailable' instead of rendering a dead control. A cross-MP read joins the dependency set exactly like a cross-MP trigger/condition source.",
+              "type": "string"
+            },
+            "path": {
+              "description": "The declared setting key (optionally a dotted path INTO a structured setting value), resolved against the owning MP's declared contributions.settings fields. An undeclared key is a validation error, never a silent undefined.",
+              "type": "string"
+            },
+            "default": {},
+            "transform": { "$ref": "#/$defs/transformChain" }
+          },
+          "$comment": "S5 (manifest-driven settings) — read a sibling (or, with 'mp', a cross-MP) SETTING as a wiring/predicate source. This is the only shape the settings work adds; it supplies an operand, never an operator. Reading a setting NEVER confers authority: visibleWhen/readOnlyWhen gate visibility only, and the server re-checks requiresPermission on every write (the 2.20 L3 rule)."
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
           "required": ["const"],
           "properties": {
             "const": {},
@@ -805,7 +881,8 @@ export default {
       }
     },
     "predicate": {
-      "description": "2.22 — a closed L6-comparator predicate over declared sources (used by activity.select 'when' and contributions.interactions 'visibleWhen'). One level of allOf/anyOf composition.",
+      "description": "2.22 — a closed L6-comparator predicate over declared sources (used by activity.select 'when', contributions.interactions 'visibleWhen', and — unchanged and unwidened — contributions.settings pages/sections/fields 'visibleWhen' and 'readOnlyWhen'). One level of allOf/anyOf composition.",
+      "$comment": "FIREWALL (2.20 §6, restated for SETTINGS P0): the settings grammar $refs THIS definition verbatim. Section kinds and field types are DATA for the renderer; they never add evaluator capability. The operator set below is closed and IN-BINARY — a new predicate operator is a binary release, not config. There is exactly ONE evaluator: an adapter that re-implements any comparison operator is the R4 drift risk and is forbidden (lint-enforced).",
       "oneOf": [
         {
           "type": "object",
@@ -868,6 +945,224 @@ export default {
           "properties": {
             "else": { "const": true },
             "skip": { "const": true }
+          }
+        }
+      ]
+    },
+    "settingsPage": {
+      "description": "MANIFEST-DRIVEN SETTINGS §2.2 — one declared settings PAGE contributed by this MP. The host renders it; there is no per-MP hand-coded settings view. A page is pure DECLARATION: it names the sections, the fields, and the predicates that gate them, and nothing else. Rendered under /settings/mp/:mpId/ alongside that MP's Permissions · Actions · Notifications · About.",
+      "$comment": "FIREWALL (2.20 §6): section kinds and field types are DATA for the renderer; they never add evaluator capability. No expression language, ever — a new predicate operator is a binary release, not config. SECURITY: 'visibleWhen' is NEVER enforced server-side — hiding is not revoking; 'requiresPermission' is what the server enforces on read and on every write.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "sections"],
+      "properties": {
+        "id": {
+          "description": "Stable page id, unique within this MP. Forms the route segment under /settings/mp/:mpId/.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "title": {
+          "description": "Page title. A tommy.t locale key (preferred — the ~160 settings keys are harvested per MP before its pages migrate) or a literal fallback string.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "icon": { "type": "string" },
+        "order": {
+          "description": "Sort order within this MP's settings list. Lower first; ties fall back to declaration order.",
+          "type": "integer"
+        },
+        "requiresPermission": {
+          "description": "Tenant permission name gating this page (the existing custom authorize! system, NOT a token scope). ENFORCED SERVER-SIDE on read and on every write to the page's fields — unlike visibleWhen, which is a rendering hint only.",
+          "type": "string"
+        },
+        "visibleWhen": { "$ref": "#/$defs/predicate" },
+        "serviceReads": {
+          "description": "2.22 E6 host service-reads declared as PREDICATE SOURCES for this page (referenced as { from: serviceRead, ref, path }). Evaluated under the viewing tenant's existing leases/grants and joining this page's dependency surface. Shape mirrors actions.*.serviceReads verbatim (D22 seed discipline: mirrored, never re-authored).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["ref", "name"],
+            "properties": {
+              "ref": { "type": "string" },
+              "name": { "type": "string", "pattern": "^tommy\\.[a-z][a-z0-9.]*[a-zA-Z0-9]$" },
+              "input": {
+                "type": "object",
+                "additionalProperties": { "$ref": "#/$defs/inputMapSource" }
+              }
+            }
+          }
+        },
+        "conditions": {
+          "description": "Conditions declared as PREDICATE SOURCES for this page (referenced as { from: condition, ref, path }). May be this MP's own, another installed MP's, or a 'tommy.*' platform condition (always-present for the §9.6 dependency set). Shape mirrors actions.*.conditions verbatim (D22 seed discipline: mirrored, never re-authored).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "ref": { "type": "string", "description": "Local alias for this evaluation (defaults to 'name'). visibleWhen/readOnlyWhen sources reference it." },
+              "mp": { "type": "string", "description": "Source owning the condition. Defaults to this MP. MAY be a 'tommy.*' platform namespace." },
+              "name": { "type": "string" },
+              "input": {
+                "type": "object",
+                "additionalProperties": { "$ref": "#/$defs/inputMapSource" }
+              },
+              "args": { "type": "object", "description": "Static literal args (pre-E1 form)." }
+            }
+          }
+        },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/settingsSection" }
+        }
+      }
+    },
+    "settingsSection": {
+      "description": "MANIFEST-DRIVEN SETTINGS §2.2 — one section (a card) of a settings page. 'kind' selects WHICH host renderer draws the section; it is DATA, not capability.",
+      "$comment": "P0 FREEZE SCOPE: only 'kind: fields' (and 'kind: permissions', whose rows are the permission-typed fields) carries payload grammar in P0. The kind-specific payloads for 'collection' (S1 — CRUD list source), 'form_data' (S1b — dynamic-form table binding), 'actions' (the MP's Action list) and 'link' (S4 — deep-link target into a host/other-MP surface) are DELIBERATELY NOT frozen here: they are the P1 engine's schema addition, made once their renderer exists. Declaring such a section in P0 is legal and inert.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "title": {
+          "description": "Section heading. A tommy.t locale key (preferred) or a literal fallback string.",
+          "type": "string",
+          "maxLength": 120
+        },
+        "description": {
+          "description": "Introductory copy under the heading. A tommy.t locale key (preferred) or a literal fallback string.",
+          "type": "string",
+          "maxLength": 500
+        },
+        "visibleWhen": { "$ref": "#/$defs/predicate" },
+        "kind": {
+          "description": "Which host renderer draws this section. 'fields' — the generic field list (the existing action-options-form renderer's shape). 'permissions' — permission rows this MP owns (see contributions.permissions). 'actions' — this MP's Action list. 'collection' (S1) — a CRUD list of MP-owned records. 'form_data' (S1b) — a dynamic-form data table. 'link' (S4) — a deep-link row into a host or other-MP surface.",
+          "enum": ["fields", "permissions", "actions", "collection", "form_data", "link"]
+        },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/settingsField" }
+        }
+      }
+    },
+    "settingsField": {
+      "description": "MANIFEST-DRIVEN SETTINGS §2.2 — one setting. 'type' selects WHICH host control renders it and how the server type-checks the write; it is DATA for the renderer and adds no evaluator capability. Measured against the 53 hand-coded pages, ~92% of existing fields are expressible with this catalogue.",
+      "$comment": "SERVER IS AUTHORITATIVE: every write is validated against THIS declaration (undeclared key rejected) and against the owning page's requiresPermission. min/max/step/maxLength/enum are UI + write-validation constraints, not business rules. PAYROLL / COMPLIANCE (R7): for 'money' and 'percent' — and for any field feeding pay, overtime, leave accrual, award interpretation or a statutory figure — the declared constraints are UI-VALIDATION ONLY; tommy-api re-computes the figure of record and its result wins. Never present a client-side computation from these values as authoritative.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "type"],
+      "properties": {
+        "key": {
+          "description": "The setting key, unique within this MP. Snake_case, matching the persisted key. Addressed by { from: setting, path } predicates and by GET/PUT /api/v1/mp/settings as (tenantId, mpId, key). For 'type: permission' this is the permission NAME (a permission-catalogue row this MP claims).",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "type": {
+          "description": "The field's declared type. CLOSED SET — a new type is a host binary release (a new renderer + a new server type-check), never config.",
+          "enum": [
+            "boolean",
+            "integer",
+            "number",
+            "string",
+            "enum",
+            "text",
+            "template",
+            "date",
+            "time_range",
+            "duration_minutes",
+            "money",
+            "percent",
+            "permission"
+          ]
+        },
+        "label": {
+          "description": "Field label. A tommy.t locale key (preferred) or a literal fallback string.",
+          "type": "string"
+        },
+        "hint": {
+          "description": "Help text under the control. A tommy.t locale key (preferred) or a literal fallback string.",
+          "type": "string"
+        },
+        "default": {
+          "description": "Value used when the tenant has never set this key. Must satisfy the field's own type/constraints."
+        },
+        "store": {
+          "description": "WHERE the value lives. Absent (or kind 'native') means the native MP-settings store — new settings are born native and NO data migration happens. A non-native kind is the design's legacyBinding: the value stays exactly where it lives today (workforce_profile / team_setting / vendor_account / team_feature), so the existing keys never move and the existing optimistic-serialize-rollback write path keeps working.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "enum": ["native", "workforce_profile", "team_setting", "vendor_account", "team_feature"] },
+            "key": {
+              "description": "The legacy column/JSONB key when it differs from 'key'. Absent means the same name.",
+              "type": "string"
+            }
+          }
+        },
+        "visibleWhen": { "$ref": "#/$defs/predicate" },
+        "readOnlyWhen": { "$ref": "#/$defs/predicate" },
+        "min": { "description": "integer / number / duration_minutes / money / percent — inclusive lower bound (UI + write validation).", "type": "number" },
+        "max": { "description": "integer / number / duration_minutes / money / percent — inclusive upper bound (UI + write validation).", "type": "number" },
+        "step": { "description": "integer / number / duration_minutes / money / percent — stepper increment.", "type": "number" },
+        "enum": {
+          "description": "type: enum — the STATIC option list. Mutually exclusive with optionsFrom.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value"],
+            "properties": {
+              "value": {
+                "description": "The persisted value. A scalar (string / number / boolean) — expressed as anyOf rather than a union type[] so the schema stays clean under the validator's Ajv strict mode.",
+                "anyOf": [{ "type": "string" }, { "type": "number" }, { "type": "boolean" }]
+              },
+              "label": { "description": "A tommy.t locale key (preferred) or a literal fallback string.", "type": "string" }
+            }
+          }
+        },
+        "optionsFrom": {
+          "description": "S3 — type: enum with a DYNAMIC option list, sourced through the existing wiring vocabulary (a declared condition / serviceRead / setting, optionally through a closed E2 transform chain). Mutually exclusive with enum. Adds no evaluator capability: it is a read, not a query language.",
+          "$ref": "#/$defs/inputMapSource"
+        },
+        "nullAt": {
+          "description": "integer / number / duration_minutes — the sentinel control value that PERSISTS AS NULL (off). Reproduces the existing 'stepper reports 0, the setter translates 0 -> null' pattern without any code.",
+          "type": "number"
+        },
+        "nullLabel": {
+          "description": "Label rendered when the value equals nullAt (e.g. the 'Never' shown at 0). A tommy.t locale key (preferred) or a literal fallback string.",
+          "type": "string"
+        },
+        "templateDefault": {
+          "description": "type: template — the default message template shown as the control's placeholder when the tenant has not overridden it. Follows the E3 template rules (plain text only, {{placeholder | pipe}}); rendered as data, never HTML.",
+          "type": "string",
+          "maxLength": 1000
+        },
+        "maxLength": { "description": "string / text / template — maximum length (UI + write validation).", "type": "integer", "minimum": 1 }
+      }
+    },
+    "permissionClaim": {
+      "description": "MANIFEST-DRIVEN SETTINGS §4.3 / S6 — an OWNERSHIP CLAIM over a permission row, so the permissions UI groups rows by their declared owner instead of re-deriving ownership client-side from hard-coded hashes. Either a single permission 'name' or a whole 'resourceType' family.",
+      "$comment": "RULED (Mason, 2026-08-10): an UNCLAIMED row is HOST-owned — it renders on Tommy's own permissions page under the 'Tommy' group. The fail-safe direction is toward VISIBILITY: a duplicated permission is cosmetic, an invisible one is a security hole. A DOUBLE CLAIM (two MPs claiming the same name/resourceType) is a HARD BUILD ERROR; unclaimed rows warn and are listed every build. Rows belonging to an UNINSTALLED MP render read-only under 'Inactive Mini Programs' with the MP named.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "properties": {
+            "name": { "description": "A single permission name this MP owns.", "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["resourceType"],
+          "properties": {
+            "resourceType": { "description": "A permission resource type whose whole family this MP owns.", "type": "string", "minLength": 1 }
           }
         }
       ]

@@ -17,7 +17,7 @@ export type Category = ("scheduling" | "time_attendance" | "hr_people" | "financ
  */
 export type ContractVersion = string
 /**
- * One source for a single mapped field. The original four shapes (trigger / condition / option / const — actions-runtime.md §9.7) plus the 2.22 additions: serviceRead (E6), item (E5 forEach element), template (E3 — plain-text composition with {{placeholder | pipe}} syntax, tooling-validated). Every non-template shape may carry an optional 'default' and an optional closed-operator 'transform' chain (E2, max 8 steps).
+ * One source for a single mapped field. The original four shapes (trigger / condition / option / const — actions-runtime.md §9.7) plus the 2.22 additions: serviceRead (E6), item (E5 forEach element), template (E3 — plain-text composition with {{placeholder | pipe}} syntax, tooling-validated), and the manifest-driven-settings addition: setting (S5). Every non-template shape may carry an optional 'default' and an optional closed-operator 'transform' chain (E2, max 8 steps).
  * 
  * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
  * via the `definition` "inputMapSource".
@@ -46,6 +46,18 @@ default?: unknown
 transform?: TransformChain
 } | {
 from: "item"
+path: string
+default?: unknown
+transform?: TransformChain
+} | {
+from: "setting"
+/**
+ * OPTIONAL cross-MP qualifier: the id of the MP that OWNS the setting. Absent means this MP's own settings namespace. Ownership rule (Mason, 2026-08-10): the MP that would BREAK if the setting vanished owns it — a reader declares the dependency here, so an uninstalled owner makes the reading section 'unavailable' instead of rendering a dead control. A cross-MP read joins the dependency set exactly like a cross-MP trigger/condition source.
+ */
+mp?: string
+/**
+ * The declared setting key (optionally a dotted path INTO a structured setting value), resolved against the owning MP's declared contributions.settings fields. An undeclared key is a validation error, never a silent undefined.
+ */
 path: string
 default?: unknown
 transform?: TransformChain
@@ -93,7 +105,7 @@ else: true
 skip: true
 })
 /**
- * 2.22 — a closed L6-comparator predicate over declared sources (used by activity.select 'when' and contributions.interactions 'visibleWhen'). One level of allOf/anyOf composition.
+ * 2.22 — a closed L6-comparator predicate over declared sources (used by activity.select 'when', contributions.interactions 'visibleWhen', and — unchanged and unwidened — contributions.settings pages/sections/fields 'visibleWhen' and 'readOnlyWhen'). One level of allOf/anyOf composition.
  * 
  * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
  * via the `definition` "predicate".
@@ -141,6 +153,23 @@ operands?: unknown[]
  * via the `definition` "surface".
  */
 export type Surface = ("dashboard" | "team_member_details" | "client_details" | "full_page")
+/**
+ * MANIFEST-DRIVEN SETTINGS §4.3 / S6 — an OWNERSHIP CLAIM over a permission row, so the permissions UI groups rows by their declared owner instead of re-deriving ownership client-side from hard-coded hashes. Either a single permission 'name' or a whole 'resourceType' family.
+ * 
+ * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
+ * via the `definition` "permissionClaim".
+ */
+export type PermissionClaim = ({
+/**
+ * A single permission name this MP owns.
+ */
+name: string
+} | {
+/**
+ * A permission resource type whose whole family this MP owns.
+ */
+resourceType: string
+})
 
 /**
  * Schema for a Tommy Mini Program manifest. Authored as YAML (manifest.yml); this JSON Schema validates the parsed object. Every contract is a JSON Schema so AI-authored Mini Programs are first-class.
@@ -181,11 +210,15 @@ homepage?: string
  */
 locales?: [string, ...(string)[]]
 /**
+ * IDENTITY ADOPTION (council C3). Legacy addon package keys whose EXISTING install identity this MP adopts — the `addon_installs.package` values (snake_case, e.g. 'time_clock') that must activate this MP with zero tenant action. Read-time mapping ONLY: install rows are never written, migrated, or deleted because of this field. Entries must be globally unique across ALL loaded manifests (injectivity, asserted at load); an entry equal to this MP's own id simply declares that the identically-named legacy addon is this MP's. Absent means the MP has no legacy identity to adopt.
+ */
+legacyPackages?: string[]
+/**
  * Capability-based permission model. The MP receives a token bound to exactly these scopes; the host enforces them at the sandbox boundary.
  */
 permissions?: {
 /**
- * Declared capability scopes. Format verb:resource. Default-deny: anything not listed is unreachable.
+ * Declared capability scopes. Two forms, both default-deny (anything not listed is unreachable): (1) CATALOGUE form `verb:resource` (e.g. read:shifts) — a member of the permission catalogue, and the form the host resolves domain reads through (council C1 / Option B); (2) QUALIFIED per-primitive form `verb:<mpId>.<primitive>` (e.g. invoke:team-comms.send_message) — the vocabulary the Actions broker and the server InvokeExecutor actually enforce for a cross-MP invoke, which has NO domain derivation and therefore cannot be expressed in catalogue form. Qualified scopes are exempt from catalogue membership: they are addressed by the owning MP's manifest, not by the fixed catalogue.
  */
 scopes?: string[]
 /**
@@ -431,7 +464,19 @@ detail?: boolean
 masterId?: string
 }[]
 modals?: NamedContribution[]
+/**
+ * MANIFEST-DRIVEN SETTINGS §2.2 — the MP's settings pages, DECLARED not hand-coded. The host renders them; no MP ships a settings view. Absent means this MP declares no settings (the state of all 17 manifests at P0 — the grammar is frozen before any MP uses it, so the addition is provably backward-compatible).
+ */
+settings?: SettingsPage[]
+/**
+ * @deprecated
+ * DEPRECATED (manifest-driven settings §2.2) — the inert {id,name,description} stub that predates the settings grammar. It never had a consumer. Superseded by 'settings' (array of settingsPage). RETAINED so every manifest authored against it still validates unchanged; new manifests MUST use 'settings'. Declaring both is legal but 'settings' is the only one rendered. Removal is a future manifestVersion bump and must carry a deprecations[]/removalPlan entry (C18).
+ */
 settingsPages?: NamedContribution[]
+/**
+ * MANIFEST-DRIVEN SETTINGS §4.3 / S6 — permission rows this MP OWNS. Ownership becomes server-declared (owner: {kind: host|mp, mpId}) instead of re-derived client-side from the two hard-coded hashes in the legacy permissions page (resourceTypeMapping, addonPackageToSystemSectionMapping — both delete when this lands). Claimed rows move onto that MP's own permissions page; UNCLAIMED rows stay on Tommy's (host-owned, fail-safe toward visibility).
+ */
+permissions?: PermissionClaim[]
 /**
  * 2.22 E7 (D20) — declared interaction points: SDK-rendered affordances that emit the MP-owned trigger '<mpId>.ui.<id>' with ZERO MP code. Payload binds ONLY from the declared view context (route params / declared panel bindings — no DOM scraping; free-form listeners are forbidden). visibleWhen gates VISIBILITY only, never authority (the 2.20 L3 rule). hideWhenUnwired (default true, D21): an interaction with no enabled consuming Action is not rendered.
  */
@@ -462,6 +507,25 @@ hideWhenUnwired?: boolean
 slashCommands?: {
 command: string
 description: string
+}[]
+/**
+ * AUDIT RULING 2a (Mason, 2026-08-11) — CUSTOM audit-event types this MP may emit through `tommy.host.auditLog`. Audit logs are HOST-owned: system events stay host/server-side, the audit-log PANE is host-rendered (`tommy.ui.showAuditPane` — the MP supplies a subject + an anchor element and receives NO data), and an MP's only write path into the trail is emitting an event id DECLARED here. The host enforces the declaration at emit time — an undeclared id is a LOUD named denial, never a silent drop (the five-silent-drops lesson, ORCHESTRATOR 2026-08-11 §5) — and the host stamps actor/tenant/mpId itself, so an MP cannot forge provenance. `label.key` must exist in the MP's shipped locale bundle (checker rule M28).
+ */
+auditEvents?: {
+/**
+ * The event id the MP passes to tommy.host.auditLog. Unqualified — the host stamps the mpId, so the recorded event is '<mpId>.<id>'.
+ */
+id: string
+label: {
+/**
+ * tommy.t locale key for the rendered feed line (same shape as interactions[].label — M24/M28 check it against the shipped bundle).
+ */
+key: string
+}
+/**
+ * Display severity in the host-rendered feed. Advisory — never an authority signal.
+ */
+severity?: ("info" | "warning" | "critical")
 }[]
 }
 /**
@@ -601,4 +665,236 @@ export interface NamedContribution {
 id: string
 name: string
 description?: string
+}
+/**
+ * MANIFEST-DRIVEN SETTINGS §2.2 — one declared settings PAGE contributed by this MP. The host renders it; there is no per-MP hand-coded settings view. A page is pure DECLARATION: it names the sections, the fields, and the predicates that gate them, and nothing else. Rendered under /settings/mp/:mpId/ alongside that MP's Permissions · Actions · Notifications · About.
+ * 
+ * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
+ * via the `definition` "settingsPage".
+ */
+export interface SettingsPage {
+/**
+ * Stable page id, unique within this MP. Forms the route segment under /settings/mp/:mpId/.
+ */
+id: string
+/**
+ * Page title. A tommy.t locale key (preferred — the ~160 settings keys are harvested per MP before its pages migrate) or a literal fallback string.
+ */
+title: string
+icon?: string
+/**
+ * Sort order within this MP's settings list. Lower first; ties fall back to declaration order.
+ */
+order?: number
+/**
+ * Tenant permission name gating this page (the existing custom authorize! system, NOT a token scope). ENFORCED SERVER-SIDE on read and on every write to the page's fields — unlike visibleWhen, which is a rendering hint only.
+ */
+requiresPermission?: string
+visibleWhen?: Predicate
+/**
+ * 2.22 E6 host service-reads declared as PREDICATE SOURCES for this page (referenced as { from: serviceRead, ref, path }). Evaluated under the viewing tenant's existing leases/grants and joining this page's dependency surface. Shape mirrors actions.*.serviceReads verbatim (D22 seed discipline: mirrored, never re-authored).
+ */
+serviceReads?: {
+ref: string
+name: string
+input?: {
+[k: string]: InputMapSource
+}
+}[]
+/**
+ * Conditions declared as PREDICATE SOURCES for this page (referenced as { from: condition, ref, path }). May be this MP's own, another installed MP's, or a 'tommy.*' platform condition (always-present for the §9.6 dependency set). Shape mirrors actions.*.conditions verbatim (D22 seed discipline: mirrored, never re-authored).
+ */
+conditions?: {
+/**
+ * Local alias for this evaluation (defaults to 'name'). visibleWhen/readOnlyWhen sources reference it.
+ */
+ref?: string
+/**
+ * Source owning the condition. Defaults to this MP. MAY be a 'tommy.*' platform namespace.
+ */
+mp?: string
+name: string
+input?: {
+[k: string]: InputMapSource
+}
+/**
+ * Static literal args (pre-E1 form).
+ */
+args?: {
+[k: string]: unknown
+}
+}[]
+/**
+ * @minItems 1
+ */
+sections: [SettingsSection, ...(SettingsSection)[]]
+}
+/**
+ * MANIFEST-DRIVEN SETTINGS §2.2 — one section (a card) of a settings page. 'kind' selects WHICH host renderer draws the section; it is DATA, not capability.
+ * 
+ * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
+ * via the `definition` "settingsSection".
+ */
+export interface SettingsSection {
+id: string
+/**
+ * Section heading. A tommy.t locale key (preferred) or a literal fallback string.
+ */
+title?: string
+/**
+ * Introductory copy under the heading. A tommy.t locale key (preferred) or a literal fallback string.
+ */
+description?: string
+visibleWhen?: Predicate
+/**
+ * Which host renderer draws this section. 'fields' — the generic field list (the existing action-options-form renderer's shape). 'permissions' — permission rows this MP owns (see contributions.permissions). 'actions' — this MP's Action list. 'collection' (S1) — a CRUD list of MP-owned records. 'form_data' (S1b) — a dynamic-form data table. 'link' (S4) — a deep-link row into a host or other-MP surface.
+ */
+kind: ("fields" | "permissions" | "actions" | "collection" | "form_data" | "link")
+fields?: SettingsField[]
+}
+/**
+ * MANIFEST-DRIVEN SETTINGS §2.2 — one setting. 'type' selects WHICH host control renders it and how the server type-checks the write; it is DATA for the renderer and adds no evaluator capability. Measured against the 53 hand-coded pages, ~92% of existing fields are expressible with this catalogue.
+ * 
+ * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
+ * via the `definition` "settingsField".
+ */
+export interface SettingsField {
+/**
+ * The setting key, unique within this MP. Snake_case, matching the persisted key. Addressed by { from: setting, path } predicates and by GET/PUT /api/v1/mp/settings as (tenantId, mpId, key). For 'type: permission' this is the permission NAME (a permission-catalogue row this MP claims).
+ */
+key: string
+/**
+ * The field's declared type. CLOSED SET — a new type is a host binary release (a new renderer + a new server type-check), never config.
+ */
+type: ("boolean" | "integer" | "number" | "string" | "enum" | "text" | "template" | "date" | "time_range" | "duration_minutes" | "money" | "percent" | "permission")
+/**
+ * Field label. A tommy.t locale key (preferred) or a literal fallback string.
+ */
+label?: string
+/**
+ * Help text under the control. A tommy.t locale key (preferred) or a literal fallback string.
+ */
+hint?: string
+/**
+ * Value used when the tenant has never set this key. Must satisfy the field's own type/constraints.
+ */
+default?: {
+[k: string]: unknown
+}
+/**
+ * WHERE the value lives. Absent (or kind 'native') means the native MP-settings store — new settings are born native and NO data migration happens. A non-native kind is the design's legacyBinding: the value stays exactly where it lives today (workforce_profile / team_setting / vendor_account / team_feature), so the existing keys never move and the existing optimistic-serialize-rollback write path keeps working.
+ */
+store?: {
+kind: ("native" | "workforce_profile" | "team_setting" | "vendor_account" | "team_feature")
+/**
+ * The legacy column/JSONB key when it differs from 'key'. Absent means the same name.
+ */
+key?: string
+}
+visibleWhen?: Predicate
+readOnlyWhen?: Predicate
+/**
+ * integer / number / duration_minutes / money / percent — inclusive lower bound (UI + write validation).
+ */
+min?: number
+/**
+ * integer / number / duration_minutes / money / percent — inclusive upper bound (UI + write validation).
+ */
+max?: number
+/**
+ * integer / number / duration_minutes / money / percent — stepper increment.
+ */
+step?: number
+/**
+ * type: enum — the STATIC option list. Mutually exclusive with optionsFrom.
+ * 
+ * @minItems 1
+ */
+enum?: [{
+/**
+ * The persisted value. A scalar (string / number / boolean) — expressed as anyOf rather than a union type[] so the schema stays clean under the validator's Ajv strict mode.
+ */
+value: (string | number | boolean)
+/**
+ * A tommy.t locale key (preferred) or a literal fallback string.
+ */
+label?: string
+}, ...({
+/**
+ * The persisted value. A scalar (string / number / boolean) — expressed as anyOf rather than a union type[] so the schema stays clean under the validator's Ajv strict mode.
+ */
+value: (string | number | boolean)
+/**
+ * A tommy.t locale key (preferred) or a literal fallback string.
+ */
+label?: string
+})[]]
+/**
+ * One source for a single mapped field. The original four shapes (trigger / condition / option / const — actions-runtime.md §9.7) plus the 2.22 additions: serviceRead (E6), item (E5 forEach element), template (E3 — plain-text composition with {{placeholder | pipe}} syntax, tooling-validated), and the manifest-driven-settings addition: setting (S5). Every non-template shape may carry an optional 'default' and an optional closed-operator 'transform' chain (E2, max 8 steps).
+ */
+optionsFrom?: ({
+from: "trigger"
+path: string
+default?: unknown
+transform?: TransformChain
+} | {
+from: "condition"
+ref: string
+path: string
+default?: unknown
+transform?: TransformChain
+} | {
+from: "serviceRead"
+ref: string
+path: string
+default?: unknown
+transform?: TransformChain
+} | {
+from: "option"
+path: string
+default?: unknown
+transform?: TransformChain
+} | {
+from: "item"
+path: string
+default?: unknown
+transform?: TransformChain
+} | {
+from: "setting"
+/**
+ * OPTIONAL cross-MP qualifier: the id of the MP that OWNS the setting. Absent means this MP's own settings namespace. Ownership rule (Mason, 2026-08-10): the MP that would BREAK if the setting vanished owns it — a reader declares the dependency here, so an uninstalled owner makes the reading section 'unavailable' instead of rendering a dead control. A cross-MP read joins the dependency set exactly like a cross-MP trigger/condition source.
+ */
+mp?: string
+/**
+ * The declared setting key (optionally a dotted path INTO a structured setting value), resolved against the owning MP's declared contributions.settings fields. An undeclared key is a validation error, never a silent undefined.
+ */
+path: string
+default?: unknown
+transform?: TransformChain
+} | {
+const: unknown
+default?: unknown
+} | {
+/**
+ * E3 — plain text with {{source.path | operator(args)}} placeholders over this Action's declared sources; rendered as data (textContent downstream, never HTML). Templates used for user-facing copy SHOULD default into optionsSchema so tenants/AI can tune them.
+ */
+template: string
+default?: unknown
+})
+/**
+ * integer / number / duration_minutes — the sentinel control value that PERSISTS AS NULL (off). Reproduces the existing 'stepper reports 0, the setter translates 0 -> null' pattern without any code.
+ */
+nullAt?: number
+/**
+ * Label rendered when the value equals nullAt (e.g. the 'Never' shown at 0). A tommy.t locale key (preferred) or a literal fallback string.
+ */
+nullLabel?: string
+/**
+ * type: template — the default message template shown as the control's placeholder when the tenant has not overridden it. Follows the E3 template rules (plain text only, {{placeholder | pipe}}); rendered as data, never HTML.
+ */
+templateDefault?: string
+/**
+ * string / text / template — maximum length (UI + write validation).
+ */
+maxLength?: number
 }

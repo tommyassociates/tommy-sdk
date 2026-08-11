@@ -41,6 +41,17 @@ function describeSemantic(err) {
     };
   }
   if (err.schemaPath.includes('/activities/')) {
+    // The activities block has TWO allOf branches; index 1 is the L22
+    // naturalKeyField guard. Naming them apart matters — reporting a
+    // naturalKeyField misuse as an offline-replay error would send the author
+    // to edit the wrong field.
+    if (/\/activities\/additionalProperties\/allOf\/1\//.test(err.schemaPath)) {
+      return {
+        path,
+        rule: 'natural-key-field-requires-natural-key',
+        message: `activity '${name}' declares naturalKeyField but its idempotency is not 'natural_key' — the broker only reads the field on the natural_key branch, so the declaration would silently do nothing.`,
+      };
+    }
     return {
       path,
       rule: 'offline-replay-requires-idempotency',
@@ -283,10 +294,28 @@ export function validateManifest(source, opts = {}) {
   if (shape.length > 0) return { ok: false, manifestId, errors: shape };
 
   // Layer 3 — Catalogue
+  //
+  // The QUALIFIED per-primitive form (`verb:<mpId>.<primitive>`, e.g.
+  // invoke:team-comms.send_message) is exempt: it is addressed by the OWNING
+  // MP's manifest, not by the fixed catalogue, so catalogue membership is not
+  // the right question to ask of it. Layer 2's pattern already constrains its
+  // shape, and layer 4 (cross-reference) is where a qualified scope naming a
+  // primitive nobody publishes should be caught.
+  //
+  // This exemption is not new policy — it is the grammar catching up with what
+  // is already enforced at runtime. A cross-MP invoke has no domain derivation:
+  // the broker's authorizeInvoke and the server's InvokeExecutor both require
+  // exactly `invoke:<owner>.<activity>`, so that string is the ONLY way a
+  // manifest can declare the authority it needs. tommy-api's own checker
+  // (Mp::ManifestCheck M08/M02) has always skipped catalogue membership for
+  // this form; the schema and this layer were the last two places still
+  // rejecting it, which is why the seven live cross-MP wirings had to be
+  // granted out of band by seed data instead of declared.
   const catalogue = loadCatalogue(opts.catalogueOverride ?? opts.cataloguePath);
+  const isQualified = (scope) => /^(read|write|invoke):[a-z][a-z0-9-]*\.[a-z][a-z0-9_]*$/.test(scope);
   const cat = [];
   (data.permissions?.scopes ?? []).forEach((scope, idx) => {
-    if (!catalogue.scopes.has(scope)) {
+    if (!isQualified(scope) && !catalogue.scopes.has(scope)) {
       const suggestion = suggestScope(catalogue, scope);
       cat.push(
         finalize(

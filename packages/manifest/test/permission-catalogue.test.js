@@ -56,6 +56,57 @@ describe('permission catalogue enforcement', () => {
   });
 });
 
+// The QUALIFIED per-primitive form. A cross-MP invoke has no domain derivation:
+// broker.authorizeInvoke and the server InvokeExecutor both require exactly
+// `invoke:<owner>.<activity>`, so that string is the only way a manifest can
+// declare the authority it needs — but the schema pattern and the catalogue
+// layer used to reject it, which is precisely why seven live cross-MP wirings
+// were granted out of band by seed data instead of being declared (convergence
+// M08, 2026-08-10). Both layers now admit it; the catalogue is not the right
+// authority for a scope addressed by another MP's manifest.
+describe('qualified per-primitive scopes', () => {
+  const withScopes = (...scopes) => [
+    'manifestVersion: "1"',
+    'id: qualified-scope-mp',
+    'version: 1.0.0',
+    'name: Qualified Scope',
+    'category: comms',
+    'publisher: { id: x, name: X, type: first_party }',
+    `permissions: { scopes: [${scopes.join(', ')}] }`,
+  ].join('\n');
+
+  it('accepts a cross-MP invoke scope on a hyphenated MP id', () => {
+    expect(validateManifest(withScopes('invoke:team-comms.send_message')).ok).toBe(true);
+  });
+
+  it('accepts a cross-MP invoke scope on an unhyphenated MP id', () => {
+    expect(validateManifest(withScopes('invoke:scheduling.update_shift_from_leave')).ok).toBe(true);
+  });
+
+  it('accepts the qualified READ form the broker also honours', () => {
+    expect(validateManifest(withScopes('read:time-clock.shift_marked_absent')).ok).toBe(true);
+  });
+
+  it('mixes qualified and catalogue scopes in one manifest', () => {
+    const result = validateManifest(withScopes('read:leave', 'invoke:team-comms.send_message'));
+    expect(result.ok).toBe(true);
+  });
+
+  it('is exempt from the catalogue, NOT from the shape rule', () => {
+    // No dot -> still an ordinary catalogue lookup, still rejected.
+    const flat = validateManifest(withScopes('invoke:send_message'));
+    expect(flat.ok).toBe(false);
+    expect(flat.errors[0].rule).toBe('permission-not-in-catalogue');
+
+    // Dotted but malformed -> layer 2 rejects it before the catalogue is asked.
+    for (const bad of ['invoke:Team-Comms.send_message', 'invoke:team-comms.', 'invoke:.send_message']) {
+      const res = validateManifest(withScopes(bad));
+      expect(res.ok, `${bad} should not validate`).toBe(false);
+      expect(res.errors[0].layer).toBe(2);
+    }
+  });
+});
+
 describe('catalogue integrity', () => {
   it('is versioned and non-empty', () => {
     expect(catalogue.version).toBeTruthy();
