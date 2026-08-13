@@ -5,7 +5,14 @@
   "description": "Schema for a Tommy Mini Program manifest. Authored as YAML (manifest.yml); this JSON Schema validates the parsed object. Every contract is a JSON Schema so AI-authored Mini Programs are first-class.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["manifestVersion", "id", "version", "name", "publisher", "category"],
+  "required": [
+    "manifestVersion",
+    "id",
+    "version",
+    "name",
+    "publisher",
+    "category"
+  ],
   "properties": {
     "manifestVersion": {
       "description": "Manifest format version. Bump only on breaking format changes.",
@@ -21,9 +28,19 @@
       "type": "string",
       "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z-.]+)?(?:\\+[0-9A-Za-z-.]+)?$"
     },
-    "name": { "type": "string", "minLength": 1, "maxLength": 60 },
-    "category": { "$ref": "#/$defs/category" },
-    "description": { "type": "string", "minLength": 1, "maxLength": 280 },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 60
+    },
+    "category": {
+      "$ref": "#/$defs/category"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 280
+    },
     "icon": {
       "description": "Path, relative to the bundle root, to the MP icon (square, >=256px).",
       "type": "string",
@@ -32,42 +49,61 @@
     "publisher": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "name", "type"],
+      "required": [
+        "id",
+        "name",
+        "type"
+      ],
       "properties": {
-        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
-        "name": { "type": "string", "minLength": 1 },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
         "type": {
           "description": "Trust tier of the publisher. Sets the review path AND execution-mode eligibility (see execution-modes.md): 'first_party' distributed through Tommy's pipeline may run in-process; every other type runs sandboxed, mandatorily. 'ai_authored' is treated as 'unknown' regardless of who prompted.",
-          "enum": ["first_party", "verified_third_party", "unknown", "ai_authored"]
+          "enum": [
+            "first_party",
+            "verified_third_party",
+            "unknown",
+            "ai_authored"
+          ]
         },
-        "homepage": { "type": "string", "format": "uri" }
+        "homepage": {
+          "type": "string",
+          "format": "uri"
+        }
       }
     },
     "locales": {
       "description": "BCP-47 locale tags the MP ships translations for. First entry is the fallback.",
       "type": "array",
       "minItems": 1,
-      "items": { "type": "string", "pattern": "^[a-z]{2}(-[A-Z]{2})?$" }
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+      }
     },
-
     "legacyPackages": {
-      "description": "IDENTITY ADOPTION (council C3). Legacy addon package keys whose EXISTING install identity this MP adopts — the `addon_installs.package` values (snake_case, e.g. 'time_clock') that must activate this MP with zero tenant action. Read-time mapping ONLY: install rows are never written, migrated, or deleted because of this field. Entries must be globally unique across ALL loaded manifests (injectivity, asserted at load); an entry equal to this MP's own id simply declares that the identically-named legacy addon is this MP's. Absent means the MP has no legacy identity to adopt.",
+      "description": "IDENTITY ADOPTION (council C3). Legacy addon package keys whose EXISTING install identity this MP adopts \u2014 the `addon_installs.package` values (snake_case, e.g. 'time_clock') that must activate this MP with zero tenant action. Read-time mapping ONLY: install rows are never written, migrated, or deleted because of this field. Entries must be globally unique across ALL loaded manifests (injectivity, asserted at load); an entry equal to this MP's own id simply declares that the identically-named legacy addon is this MP's. Absent means the MP has no legacy identity to adopt.",
       "type": "array",
       "uniqueItems": true,
       "items": {
         "type": "string",
-        "description": "A legacy addon package key. Underscores allowed here (the MP `id` pattern stays underscore-free) — this field is where legacy keys live. Hyphens are accepted too so an MP may name the identically-titled legacy addon when its own id is hyphenated.",
+        "description": "A legacy addon package key. Underscores allowed here (the MP `id` pattern stays underscore-free) \u2014 this field is where legacy keys live. Hyphens are accepted too so an MP may name the identically-titled legacy addon when its own id is hyphenated.",
         "pattern": "^[a-z][a-z0-9_-]*[a-z0-9]$"
       }
     },
-
     "permissions": {
       "description": "Capability-based permission model. The MP receives a token bound to exactly these scopes; the host enforces them at the sandbox boundary.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "scopes": {
-          "description": "Declared capability scopes. Two forms, both default-deny (anything not listed is unreachable): (1) CATALOGUE form `verb:resource` (e.g. read:shifts) — a member of the permission catalogue, and the form the host resolves domain reads through (council C1 / Option B); (2) QUALIFIED per-primitive form `verb:<mpId>.<primitive>` (e.g. invoke:team-comms.send_message) — the vocabulary the Actions broker and the server InvokeExecutor actually enforce for a cross-MP invoke, which has NO domain derivation and therefore cannot be expressed in catalogue form. Qualified scopes are exempt from catalogue membership: they are addressed by the owning MP's manifest, not by the fixed catalogue.",
+          "description": "Declared capability scopes. Two forms, both default-deny (anything not listed is unreachable): (1) CATALOGUE form `verb:resource` (e.g. read:shifts) \u2014 a member of the permission catalogue, and the form the host resolves domain reads through (council C1 / Option B); (2) QUALIFIED per-primitive form `verb:<mpId>.<primitive>` (e.g. invoke:team-comms.send_message) \u2014 the vocabulary the Actions broker and the server InvokeExecutor actually enforce for a cross-MP invoke, which has NO domain derivation and therefore cannot be expressed in catalogue form. Qualified scopes are exempt from catalogue membership: they are addressed by the owning MP's manifest, not by the fixed catalogue.",
           "type": "array",
           "uniqueItems": true,
           "items": {
@@ -78,11 +114,12 @@
         "roles": {
           "description": "Install-time RBAC: which tenant roles may use this MP. Maps to the existing Tommy role model.",
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
-
     "network": {
       "description": "Network egress allowlist. Enforced by the per-MP CSP connect-src. Default is none.",
       "type": "object",
@@ -100,78 +137,149 @@
         }
       }
     },
-
     "triggers": {
       "description": "Events this MP emits onto the Actions bus. Async fan-out by default.",
       "type": "object",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["description", "payloadSchema", "emission"],
+        "required": [
+          "description",
+          "payloadSchema",
+          "emission"
+        ],
         "properties": {
-          "description": { "type": "string" },
+          "description": {
+            "type": "string"
+          },
           "payloadSchema": {
             "description": "JSON Schema for the trigger payload. Validated at emit time.",
             "$ref": "#/$defs/jsonSchema"
           },
-          "emission": { "enum": ["sync", "async", "debounced"] },
-          "debounceMs": { "type": "integer", "minimum": 0, "maximum": 60000 },
-          "contractVersion": { "$ref": "#/$defs/contractVersion" },
-          "deprecated": { "$ref": "#/$defs/deprecatedMarker" }
+          "emission": {
+            "enum": [
+              "sync",
+              "async",
+              "debounced"
+            ]
+          },
+          "debounceMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 60000
+          },
+          "contractVersion": {
+            "$ref": "#/$defs/contractVersion"
+          },
+          "deprecated": {
+            "$ref": "#/$defs/deprecatedMarker"
+          }
         },
         "allOf": [
           {
-            "if": { "properties": { "emission": { "const": "debounced" } } },
-            "then": { "required": ["debounceMs"] }
+            "if": {
+              "properties": {
+                "emission": {
+                  "const": "debounced"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "debounceMs"
+              ]
+            }
           }
         ]
       }
     },
-
     "conditions": {
       "description": "Synchronous-style queries other MPs may evaluate against this MP. Pure, side-effect-free.",
       "type": "object",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["description", "inputSchema", "returnSchema", "latencyBudgetMs"],
+        "required": [
+          "description",
+          "inputSchema",
+          "returnSchema",
+          "latencyBudgetMs"
+        ],
         "properties": {
-          "description": { "type": "string" },
-          "inputSchema": { "$ref": "#/$defs/jsonSchema" },
-          "returnSchema": { "$ref": "#/$defs/jsonSchema" },
+          "description": {
+            "type": "string"
+          },
+          "inputSchema": {
+            "$ref": "#/$defs/jsonSchema"
+          },
+          "returnSchema": {
+            "$ref": "#/$defs/jsonSchema"
+          },
           "latencyBudgetMs": {
             "description": "Max evaluation time. Exceeding it is a timeout (see actions-runtime.md).",
-            "type": "integer", "minimum": 1, "maximum": 5000
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000
           },
-          "cacheable": { "type": "boolean", "default": false },
-          "cacheTtlMs": { "type": "integer", "minimum": 0 },
-          "contractVersion": { "$ref": "#/$defs/contractVersion" },
-          "deprecated": { "$ref": "#/$defs/deprecatedMarker" }
+          "cacheable": {
+            "type": "boolean",
+            "default": false
+          },
+          "cacheTtlMs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "contractVersion": {
+            "$ref": "#/$defs/contractVersion"
+          },
+          "deprecated": {
+            "$ref": "#/$defs/deprecatedMarker"
+          }
         }
       }
     },
-
     "activities": {
       "description": "Side-effecting operations other MPs may invoke against this MP.",
       "type": "object",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["description", "inputSchema", "sideEffect", "idempotency", "offlineReplayable"],
+        "required": [
+          "description",
+          "inputSchema",
+          "sideEffect",
+          "idempotency",
+          "offlineReplayable"
+        ],
         "properties": {
-          "description": { "type": "string" },
-          "inputSchema": { "$ref": "#/$defs/jsonSchema" },
-          "resultSchema": { "$ref": "#/$defs/jsonSchema" },
+          "description": {
+            "type": "string"
+          },
+          "inputSchema": {
+            "$ref": "#/$defs/jsonSchema"
+          },
+          "resultSchema": {
+            "$ref": "#/$defs/jsonSchema"
+          },
           "sideEffect": {
             "description": "Declared effect class. Must match static analysis at review time.",
-            "enum": ["local_write", "server_write", "external_call"]
+            "enum": [
+              "local_write",
+              "server_write",
+              "external_call"
+            ]
           },
           "idempotency": {
             "description": "How an idempotency key is formed so retries/replays are safe.",
-            "enum": ["client_key", "derived_from_input", "natural_key", "none"]
+            "enum": [
+              "client_key",
+              "derived_from_input",
+              "natural_key",
+              "none"
+            ]
           },
           "naturalKeyField": {
-            "description": "The field of `inputSchema` that IS this activity's natural key — the thing whose identity makes two invocations the same fact. Read by the broker (`idempotencyKeyFor`, actions-runtime) as `n-<value>`; a dotted path is resolved into nested args. ONLY meaningful with `idempotency: natural_key`, and declaring it elsewhere is rejected. If omitted the broker defaults to `args.id`, and where there is no `args.id` it falls back to hashing the WHOLE args — which is `derived_from_input` by another name. That default was unreachable from a manifest until this field existed (the activity object is additionalProperties:false), which is why most of the estate's natural_key activities key on `args.id` whether or not that is their real key. Declare it wherever the key is NOT `id` — e.g. an invitation keyed on its token, a view row keyed on (kind, targetId), a setting keyed on its name.",
+            "description": "The field of `inputSchema` that IS this activity's natural key \u2014 the thing whose identity makes two invocations the same fact. Read by the broker (`idempotencyKeyFor`, actions-runtime) as `n-<value>`; a dotted path is resolved into nested args. ONLY meaningful with `idempotency: natural_key`, and declaring it elsewhere is rejected. If omitted the broker defaults to `args.id`, and where there is no `args.id` it falls back to hashing the WHOLE args \u2014 which is `derived_from_input` by another name. That default was unreachable from a manifest until this field existed (the activity object is additionalProperties:false), which is why most of the estate's natural_key activities key on `args.id` whether or not that is their real key. Declare it wherever the key is NOT `id` \u2014 e.g. an invitation keyed on its token, a view row keyed on (kind, targetId), a setting keyed on its name.",
             "type": "string",
             "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$"
           },
@@ -183,78 +291,162 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "maxAttempts": { "type": "integer", "minimum": 0, "maximum": 10 },
-              "backoff": { "enum": ["none", "linear", "exponential"] }
+              "maxAttempts": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10
+              },
+              "backoff": {
+                "enum": [
+                  "none",
+                  "linear",
+                  "exponential"
+                ]
+              }
             }
           },
           "callerPolicy": {
-            "description": "Who may invoke this activity, SAID OUT LOUD. Authoritative over `authorizedCallers` wherever it is present (broker authorizeInvoke). One value per case: `owner_only` -> the owning MP alone, deliberately closed to every other MP; `first_party` -> the owning MP plus ANY registered first-party MP; `listed` -> the owning MP plus exactly the MPs named in `authorizedCallers`, which must then be non-empty. WHY IT EXISTS (ruling, Mason 2026-08-12, backlog D.40): `authorizedCallers` could only say owner-only by being an EMPTY ARRAY and first-party by being ABSENT, so two of its three cases were carried by the shape of an omission rather than by a value — indistinguishable from an author who forgot, and the empty case read two ways depending on the host's `strictEmptyCallers` flag. The estate's 58 owner-only activities were migrated to `callerPolicy: owner_only` in the same change, which is why no manifest declares `authorizedCallers: []` today. PREFER THIS FIELD in new manifests; reach for a bare `authorizedCallers` only alongside `callerPolicy: listed`.",
-            "enum": ["owner_only", "first_party", "listed"]
+            "description": "Who may invoke this activity, SAID OUT LOUD. Authoritative over `authorizedCallers` wherever it is present (broker authorizeInvoke). One value per case: `owner_only` -> the owning MP alone, deliberately closed to every other MP; `first_party` -> the owning MP plus ANY registered first-party MP; `listed` -> the owning MP plus exactly the MPs named in `authorizedCallers`, which must then be non-empty. WHY IT EXISTS (ruling, Mason 2026-08-12, backlog D.40): `authorizedCallers` could only say owner-only by being an EMPTY ARRAY and first-party by being ABSENT, so two of its three cases were carried by the shape of an omission rather than by a value \u2014 indistinguishable from an author who forgot, and the empty case read two ways depending on the host's `strictEmptyCallers` flag. The estate's 58 owner-only activities were migrated to `callerPolicy: owner_only` in the same change, which is why no manifest declares `authorizedCallers: []` today. PREFER THIS FIELD in new manifests; reach for a bare `authorizedCallers` only alongside `callerPolicy: listed`.",
+            "enum": [
+              "owner_only",
+              "first_party",
+              "listed"
+            ]
           },
           "authorizedCallers": {
-            "description": "MP ids permitted to invoke this activity. PREFER `callerPolicy` — this field alone can only state the `listed` case unambiguously. THREE distinct cases, and they are not interchangeable (broker authorizeInvoke, F1): (1) NON-EMPTY list -> exactly those MPs, plus the owning MP itself; (2) EXPLICIT [] -> the owning MP ONLY, i.e. deliberately closed to every other MP. NO MANIFEST DECLARES THIS ANY MORE — the estate's 58 such activities migrated to `callerPolicy: owner_only` (D.40, 2026-08-13); it stays legal so that nothing which validated before stops validating, but it is the ambiguous spelling and new manifests must not use it; (3) ABSENT -> the permissive first-party default: ANY registered first-party MP may call it. Note (2) and (3) are OPPOSITES, so omitting the field is not equivalent to declaring it empty. The strict reading of (2) is gated on the host's `strictEmptyCallers`, which is ON in tommy-app's mp-loader; with it off, (2) falls through to (3). None of that ambiguity applies when `callerPolicy` is present, which is the point of it.",
+            "description": "MP ids permitted to invoke this activity. PREFER `callerPolicy` \u2014 this field alone can only state the `listed` case unambiguously. THREE distinct cases, and they are not interchangeable (broker authorizeInvoke, F1): (1) NON-EMPTY list -> exactly those MPs, plus the owning MP itself; (2) EXPLICIT [] -> the owning MP ONLY, i.e. deliberately closed to every other MP. NO MANIFEST DECLARES THIS ANY MORE \u2014 the estate's 58 such activities migrated to `callerPolicy: owner_only` (D.40, 2026-08-13); it stays legal so that nothing which validated before stops validating, but it is the ambiguous spelling and new manifests must not use it; (3) ABSENT -> the permissive first-party default: ANY registered first-party MP may call it. Note (2) and (3) are OPPOSITES, so omitting the field is not equivalent to declaring it empty. The strict reading of (2) is gated on the host's `strictEmptyCallers`, which is ON in tommy-app's mp-loader; with it off, (2) falls through to (3). None of that ambiguity applies when `callerPolicy` is present, which is the point of it.",
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
           "permission": {
             "description": "Tenant permission name gating the underlying domain write (the existing custom authorize! system, NOT a token scope). REQUIRED by tommy-api's fail-closed floor for any server_write activity backed by a registered server executor: the executor refuses a privileged write whose manifest declares no permission (InvokeExecutor hardening 2026-07-11; the v1.1 J1 fixtures carry 'timesheet_access').",
             "type": "string"
           },
-          "contractVersion": { "$ref": "#/$defs/contractVersion" },
-          "deprecated": { "$ref": "#/$defs/deprecatedMarker" }
+          "contractVersion": {
+            "$ref": "#/$defs/contractVersion"
+          },
+          "deprecated": {
+            "$ref": "#/$defs/deprecatedMarker"
+          }
         },
         "allOf": [
           {
-            "if": { "properties": { "idempotency": { "const": "none" }, "offlineReplayable": { "const": true } } },
+            "if": {
+              "properties": {
+                "idempotency": {
+                  "const": "none"
+                },
+                "offlineReplayable": {
+                  "const": true
+                }
+              }
+            },
             "then": false,
             "$comment": "An offline-replayable activity MUST have an idempotency strategy."
           },
           {
-            "if": { "required": ["naturalKeyField"] },
-            "then": { "properties": { "idempotency": { "const": "natural_key" } } },
+            "if": {
+              "required": [
+                "naturalKeyField"
+              ]
+            },
+            "then": {
+              "properties": {
+                "idempotency": {
+                  "const": "natural_key"
+                }
+              }
+            },
             "$comment": "naturalKeyField is read ONLY on the natural_key branch of the broker's idempotencyKeyFor. Declaring it beside any other strategy is a silent no-op, so it is rejected rather than ignored."
           },
           {
             "if": {
-              "required": ["callerPolicy"],
-              "properties": { "callerPolicy": { "const": "listed" } }
+              "required": [
+                "callerPolicy"
+              ],
+              "properties": {
+                "callerPolicy": {
+                  "const": "listed"
+                }
+              }
             },
             "then": {
-              "required": ["authorizedCallers"],
-              "properties": { "authorizedCallers": { "type": "array", "minItems": 1 } }
+              "required": [
+                "authorizedCallers"
+              ],
+              "properties": {
+                "authorizedCallers": {
+                  "type": "array",
+                  "minItems": 1
+                }
+              }
             },
-            "$comment": "`listed` names its callers in authorizedCallers. An absent or empty list beside it would collapse to owner-only at the broker while the manifest says otherwise — the same absence-carries-meaning defect callerPolicy was added to remove."
+            "$comment": "`listed` names its callers in authorizedCallers. An absent or empty list beside it would collapse to owner-only at the broker while the manifest says otherwise \u2014 the same absence-carries-meaning defect callerPolicy was added to remove."
           },
           {
             "if": {
-              "required": ["callerPolicy"],
-              "properties": { "callerPolicy": { "enum": ["owner_only", "first_party"] } }
+              "required": [
+                "callerPolicy"
+              ],
+              "properties": {
+                "callerPolicy": {
+                  "enum": [
+                    "owner_only",
+                    "first_party"
+                  ]
+                }
+              }
             },
-            "then": { "not": { "required": ["authorizedCallers"] } },
+            "then": {
+              "not": {
+                "required": [
+                  "authorizedCallers"
+                ]
+              }
+            },
             "$comment": "owner_only and first_party are complete on their own. A companion authorizedCallers would be a second, contradictable source of truth for one question, and the broker would silently ignore it."
           }
         ]
       }
     },
-
     "actions": {
-      "description": "Declarative trigger->(condition)->activity wiring — the IFTTT-style rules the MP proposes. Inter-MP behaviour that is hard-coded today becomes a configurable Action here, so it can be enabled/disabled and customised per tenant. Analysed by review check C15 for loops/amplification.",
+      "description": "Declarative trigger->(condition)->activity wiring \u2014 the IFTTT-style rules the MP proposes. Inter-MP behaviour that is hard-coded today becomes a configurable Action here, so it can be enabled/disabled and customised per tenant. Analysed by review check C15 for loops/amplification.",
       "type": "object",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["title", "trigger", "activity", "enabledByDefault", "required", "userConfigurable"],
+        "required": [
+          "title",
+          "trigger",
+          "activity",
+          "enabledByDefault",
+          "required",
+          "userConfigurable"
+        ],
         "properties": {
-          "title": { "type": "string" },
-          "description": { "type": "string" },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
           "trigger": {
             "description": "The trigger that fires this Action.",
             "type": "object",
             "additionalProperties": false,
-            "required": ["name"],
+            "required": [
+              "name"
+            ],
             "properties": {
-              "mp": { "type": "string", "description": "Source owning the trigger. Defaults to this MP. A cross-MP source requires that MP to be installed. MAY be a 'tommy.*' platform namespace (e.g. 'tommy.clock' with name 'scheduled') to subscribe to a system-supplied platform trigger from platform-primitives.md — platform sources are treated as ALWAYS-PRESENT by the §9.6 derived dependency set (never a missing dependency, never a hidden Action)." },
-              "name": { "type": "string" },
+              "mp": {
+                "type": "string",
+                "description": "Source owning the trigger. Defaults to this MP. A cross-MP source requires that MP to be installed. MAY be a 'tommy.*' platform namespace (e.g. 'tommy.clock' with name 'scheduled') to subscribe to a system-supplied platform trigger from platform-primitives.md \u2014 platform sources are treated as ALWAYS-PRESENT by the \u00a79.6 derived dependency set (never a missing dependency, never a hidden Action)."
+              },
+              "name": {
+                "type": "string"
+              },
               "debounceMs": {
                 "description": "Optional subscriber-side debounce/dwell (ms) the broker coalesces against before firing this Action. Reuses the same emission-debounce convention as MP-owned 'debounced' triggers. Required by review check C15 when wiring a high-frequency platform trigger (e.g. tommy.clock.scheduled, tommy.session.active_user_changed) whose underlying trigger is not already debounced.",
                 "type": "integer",
@@ -264,62 +456,92 @@
             }
           },
           "conditions": {
-            "description": "Optional gates evaluated before the activity runs. All must pass. Per 2.22 E1 a condition may be PARAMETERIZED via 'input' (mapped from trigger/option/const or an EARLIER-listed condition's return — DAG order, cycles rejected by the validator) and aliased via 'ref' so one condition can be evaluated twice with different inputs.",
+            "description": "Optional gates evaluated before the activity runs. All must pass. Per 2.22 E1 a condition may be PARAMETERIZED via 'input' (mapped from trigger/option/const or an EARLIER-listed condition's return \u2014 DAG order, cycles rejected by the validator) and aliased via 'ref' so one condition can be evaluated twice with different inputs.",
             "type": "array",
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["name"],
+              "required": [
+                "name"
+              ],
               "properties": {
-                "ref": { "type": "string", "description": "Local alias for this evaluation (defaults to 'name'). inputMap/predicate sources reference it." },
-                "mp": { "type": "string", "description": "Source owning the condition. Defaults to this MP. MAY be a 'tommy.*' platform namespace (e.g. 'tommy.host' with name 'tenantSetting', or 'tommy.session' with name 'current_user') for a system-supplied platform condition — platform sources are ALWAYS-PRESENT for the §9.6 dependency set." },
-                "name": { "type": "string" },
-                "input": {
-                  "description": "2.22 E1 — mapped condition inputs, validated against the condition's inputSchema before evaluation. Sources: trigger/option/const/earlier condition.",
-                  "type": "object",
-                  "additionalProperties": { "$ref": "#/$defs/inputMapSource" }
+                "ref": {
+                  "type": "string",
+                  "description": "Local alias for this evaluation (defaults to 'name'). inputMap/predicate sources reference it."
                 },
-                "args": { "type": "object", "description": "Static literal args (pre-E1 form). Prefer 'input' for anything mapped; 'args' remains valid for pure literals." }
+                "mp": {
+                  "type": "string",
+                  "description": "Source owning the condition. Defaults to this MP. MAY be a 'tommy.*' platform namespace (e.g. 'tommy.host' with name 'tenantSetting', or 'tommy.session' with name 'current_user') for a system-supplied platform condition \u2014 platform sources are ALWAYS-PRESENT for the \u00a79.6 dependency set."
+                },
+                "name": {
+                  "type": "string"
+                },
+                "input": {
+                  "description": "2.22 E1 \u2014 mapped condition inputs, validated against the condition's inputSchema before evaluation. Sources: trigger/option/const/earlier condition.",
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "#/$defs/inputMapSource"
+                  }
+                },
+                "args": {
+                  "type": "object",
+                  "description": "Static literal args (pre-E1 form). Prefer 'input' for anything mapped; 'args' remains valid for pure literals."
+                }
               }
             }
           },
           "activity": {
-            "description": "The activity invoked when the trigger fires and conditions pass. THREE forms (2.22): a single target; a 'select' branch list (E4 — ordered, first-match-wins over closed predicates, REQUIRED terminal else — the validator enforces last-entry-is-else); or a 'computed' Computed-Action function reference (the declared functions: entry runs server-side in the AFR and returns the intent envelope — 2.22 §4).",
+            "description": "The activity invoked when the trigger fires and conditions pass. THREE forms (2.22): a single target; a 'select' branch list (E4 \u2014 ordered, first-match-wins over closed predicates, REQUIRED terminal else \u2014 the validator enforces last-entry-is-else); or a 'computed' Computed-Action function reference (the declared functions: entry runs server-side in the AFR and returns the intent envelope \u2014 2.22 \u00a74).",
             "oneOf": [
               {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["name"],
+                "required": [
+                  "name"
+                ],
                 "properties": {
-                  "mp": { "type": "string", "description": "Source owning the activity. Defaults to this MP. MAY be a 'tommy.*' platform namespace (e.g. 'tommy.notifications' with name 'send_push', 'tommy.ui' with name 'navigate', or 'tommy.device' with name 'requestKioskMode') for a system-supplied platform activity — platform sources are ALWAYS-PRESENT for the §9.6 dependency set. Note: messaging content (send_message and inbound message triggers) is NOT platform; it is Team Comms MP-owned (team-comms.*), deferred to M5 (D5 stands). The only platform messaging primitive is tommy.messaging.resetSession." },
-                  "name": { "type": "string" },
+                  "mp": {
+                    "type": "string",
+                    "description": "Source owning the activity. Defaults to this MP. MAY be a 'tommy.*' platform namespace (e.g. 'tommy.notifications' with name 'send_push', 'tommy.ui' with name 'navigate', or 'tommy.device' with name 'requestKioskMode') for a system-supplied platform activity \u2014 platform sources are ALWAYS-PRESENT for the \u00a79.6 dependency set. Note: messaging content (send_message and inbound message triggers) is NOT platform; it is Team Comms MP-owned (team-comms.*), deferred to M5 (D5 stands). The only platform messaging primitive is tommy.messaging.resetSession."
+                  },
+                  "name": {
+                    "type": "string"
+                  },
                   "inputMap": {
-                    "description": "Declarative, non-Turing-complete arg assembly: each target activity-input field maps from exactly one source (trigger payload / a listed condition or serviceRead return / an option / a const / a template / the forEach item), optionally through a closed transform chain (2.22 E2, max 8 steps). The broker assembles and validates args against the activity inputSchema. See actions-runtime.md §9.7 + 2.22 §2.",
+                    "description": "Declarative, non-Turing-complete arg assembly: each target activity-input field maps from exactly one source (trigger payload / a listed condition or serviceRead return / an option / a const / a template / the forEach item), optionally through a closed transform chain (2.22 E2, max 8 steps). The broker assembles and validates args against the activity inputSchema. See actions-runtime.md \u00a79.7 + 2.22 \u00a72.",
                     "type": "object",
-                    "additionalProperties": { "$ref": "#/$defs/inputMapSource" }
+                    "additionalProperties": {
+                      "$ref": "#/$defs/inputMapSource"
+                    }
                   }
                 }
               },
               {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["select"],
+                "required": [
+                  "select"
+                ],
                 "properties": {
                   "select": {
-                    "description": "2.22 E4 — ordered branch list; first matching 'when' wins; the LAST entry MUST be the else branch (validator-enforced). Every branch's target joins the dependency set, authorization, and 2.21 consumer expectations whether or not it fired.",
+                    "description": "2.22 E4 \u2014 ordered branch list; first matching 'when' wins; the LAST entry MUST be the else branch (validator-enforced). Every branch's target joins the dependency set, authorization, and 2.21 consumer expectations whether or not it fired.",
                     "type": "array",
                     "minItems": 2,
-                    "items": { "$ref": "#/$defs/selectBranch" }
+                    "items": {
+                      "$ref": "#/$defs/selectBranch"
+                    }
                   }
                 }
               },
               {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["computed"],
+                "required": [
+                  "computed"
+                ],
                 "properties": {
                   "computed": {
-                    "description": "2.22 §4 — the name of a functions: entry in THIS manifest. The function executes server-side (AFR), receives the trigger payload + this Action's declared condition/serviceRead returns + options, and returns the activity-invoke envelope the executor validates and dispatches.",
+                    "description": "2.22 \u00a74 \u2014 the name of a functions: entry in THIS manifest. The function executes server-side (AFR), receives the trigger payload + this Action's declared condition/serviceRead returns + options, and returns the activity-invoke envelope the executor validates and dispatches.",
                     "type": "string",
                     "pattern": "^[a-z][a-z0-9_]*$"
                   }
@@ -328,34 +550,53 @@
             ]
           },
           "forEach": {
-            "description": "2.22 E5 — bounded fan-out: evaluate the activity once per element of a condition/serviceRead-returned collection. 'item' becomes a valid inputMap source. Truncation at maxItems is recorded on the action-run; C15 flags unbounded sources; metered as ONE execution.",
+            "description": "2.22 E5 \u2014 bounded fan-out: evaluate the activity once per element of a condition/serviceRead-returned collection. 'item' becomes a valid inputMap source. Truncation at maxItems is recorded on the action-run; C15 flags unbounded sources; metered as ONE execution.",
             "type": "object",
             "additionalProperties": false,
-            "required": ["from", "maxItems"],
+            "required": [
+              "from",
+              "maxItems"
+            ],
             "properties": {
-              "from": { "$ref": "#/$defs/inputMapSource" },
-              "maxItems": { "type": "integer", "minimum": 1, "maximum": 100 }
+              "from": {
+                "$ref": "#/$defs/inputMapSource"
+              },
+              "maxItems": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              }
             }
           },
           "serviceReads": {
-            "description": "2.22 E6 — host service-reads (tommy.* SR primitives, e.g. tommy.directory.resolve) declared as wiring sources, evaluated under the installer-tenant's existing leases/grants and joining the Action's dependency/authz surface.",
+            "description": "2.22 E6 \u2014 host service-reads (tommy.* SR primitives, e.g. tommy.directory.resolve) declared as wiring sources, evaluated under the installer-tenant's existing leases/grants and joining the Action's dependency/authz surface.",
             "type": "array",
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["ref", "name"],
+              "required": [
+                "ref",
+                "name"
+              ],
               "properties": {
-                "ref": { "type": "string" },
-                "name": { "type": "string", "pattern": "^tommy\\.[a-z][a-z0-9.]*[a-zA-Z0-9]$" },
+                "ref": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string",
+                  "pattern": "^tommy\\.[a-z][a-z0-9.]*[a-zA-Z0-9]$"
+                },
                 "input": {
                   "type": "object",
-                  "additionalProperties": { "$ref": "#/$defs/inputMapSource" }
+                  "additionalProperties": {
+                    "$ref": "#/$defs/inputMapSource"
+                  }
                 }
               }
             }
           },
           "interaction": {
-            "description": "2.22 §2.7 — interaction-level guards for this Action.",
+            "description": "2.22 \u00a72.7 \u2014 interaction-level guards for this Action.",
             "type": "object",
             "additionalProperties": false,
             "properties": {
@@ -363,18 +604,33 @@
                 "description": "The declarative confirm guard: the host renders tommy.ui.confirm BEFORE dispatch; decline = a typed skip recorded on the action-run. 'message' follows the E3 template rules (plain text only, placeholders + transform pipes).",
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["title", "message"],
+                "required": [
+                  "title",
+                  "message"
+                ],
                 "properties": {
-                  "title": { "type": "string", "maxLength": 80 },
-                  "message": { "type": "string", "maxLength": 500 },
-                  "confirmLabel": { "type": "string", "maxLength": 40 },
-                  "destructive": { "type": "boolean", "default": false }
+                  "title": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "confirmLabel": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "destructive": {
+                    "type": "boolean",
+                    "default": false
+                  }
                 }
               }
             }
           },
           "optionsSchema": {
-            "description": "JSON Schema for the Action's user-editable options (e.g. parameter mappings, thresholds). Powers the Action settings UI. MP-defined and not hard-encoded here. Convention: when the trigger is tommy.clock.scheduled, this optionsSchema carries the schedule config { schedule: {kind:'cron',cron,timezone} | {kind:'at',at,recurrence?}, jitterSec?, catchUpPolicy?:'skip'|'fire_once' } (schedule-as-setting; see manifest-schema.md and platform-primitives.md §3). The @tommy/manifest validator enforces the canonical shape for clock-triggered Actions.",
+            "description": "JSON Schema for the Action's user-editable options (e.g. parameter mappings, thresholds). Powers the Action settings UI. MP-defined and not hard-encoded here. Convention: when the trigger is tommy.clock.scheduled, this optionsSchema carries the schedule config { schedule: {kind:'cron',cron,timezone} | {kind:'at',at,recurrence?}, jitterSec?, catchUpPolicy?:'skip'|'fire_once' } (schedule-as-setting; see manifest-schema.md and platform-primitives.md \u00a73). The @tommy/manifest validator enforces the canonical shape for clock-triggered Actions.",
             "$ref": "#/$defs/jsonSchema"
           },
           "optionsDefault": {
@@ -382,7 +638,7 @@
             "type": "object"
           },
           "enabledByDefault": {
-            "description": "Whether the Action is active when the MP is installed. Ignored when 'required' is true — a required Action is always enabled.",
+            "description": "Whether the Action is active when the MP is installed. Ignored when 'required' is true \u2014 a required Action is always enabled.",
             "type": "boolean"
           },
           "required": {
@@ -390,63 +646,129 @@
             "type": "boolean"
           },
           "userConfigurable": {
-            "description": "If true, a tenant admin may edit the Action's options and — when not 'required' — enable/disable it. If false the Action is locked: the MP controls it and the user cannot change it.",
+            "description": "If true, a tenant admin may edit the Action's options and \u2014 when not 'required' \u2014 enable/disable it. If false the Action is locked: the MP controls it and the user cannot change it.",
             "type": "boolean"
           }
         }
       }
     },
-
     "panels": {
       "description": "Dashboard / detail-surface panels this MP contributes.",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "name", "surfaces", "size"],
+        "required": [
+          "id",
+          "name",
+          "surfaces",
+          "size"
+        ],
         "properties": {
-          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
-          "name": { "type": "string", "maxLength": 48 },
-          "description": { "type": "string", "maxLength": 200 },
-          "icon": { "type": "string" },
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 48
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "icon": {
+            "type": "string"
+          },
           "surfaces": {
             "type": "array",
             "minItems": 1,
-            "items": { "$ref": "#/$defs/surface" }
+            "items": {
+              "$ref": "#/$defs/surface"
+            }
           },
           "size": {
             "description": "Grid units (host grid is 12 columns; rows are fixed-height).",
             "type": "object",
             "additionalProperties": false,
-            "required": ["defaultW", "defaultH"],
+            "required": [
+              "defaultW",
+              "defaultH"
+            ],
             "properties": {
-              "defaultW": { "type": "integer", "minimum": 1, "maximum": 12 },
-              "defaultH": { "type": "integer", "minimum": 1, "maximum": 12 },
-              "minW": { "type": "integer", "minimum": 1, "maximum": 12 },
-              "minH": { "type": "integer", "minimum": 1, "maximum": 12 },
-              "maxW": { "type": "integer", "minimum": 1, "maximum": 12 },
-              "maxH": { "type": "integer", "minimum": 1, "maximum": 12 }
+              "defaultW": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12
+              },
+              "defaultH": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12
+              },
+              "minW": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12
+              },
+              "minH": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12
+              },
+              "maxW": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12
+              },
+              "maxH": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 12
+              }
             }
           },
           "dataRequirements": {
             "description": "Which conditions/scopes this panel needs to render. Used by the review pipeline's permission-minimality check.",
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
           "refresh": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["policy"],
+            "required": [
+              "policy"
+            ],
             "properties": {
-              "policy": { "enum": ["manual", "interval", "on_trigger"] },
-              "intervalMs": { "type": "integer", "minimum": 5000 },
-              "trigger": { "type": "string" }
+              "policy": {
+                "enum": [
+                  "manual",
+                  "interval",
+                  "on_trigger"
+                ]
+              },
+              "intervalMs": {
+                "type": "integer",
+                "minimum": 5000
+              },
+              "trigger": {
+                "type": "string"
+              }
             }
           },
           "rbac": {
             "type": "object",
             "additionalProperties": false,
-            "properties": { "roles": { "type": "array", "items": { "type": "string" } } }
+            "properties": {
+              "roles": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "configSchema": {
             "description": "JSON Schema for per-tenant panel config. Powers the panel settings UI.",
@@ -456,18 +778,24 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "defaultSurface": { "$ref": "#/$defs/surface" },
-              "order": { "type": "integer" }
+              "defaultSurface": {
+                "$ref": "#/$defs/surface"
+              },
+              "order": {
+                "type": "integer"
+              }
             }
           },
           "offline": {
             "description": "How the panel behaves with no connectivity.",
-            "enum": ["cached_stale", "needs_connection"]
+            "enum": [
+              "cached_stale",
+              "needs_connection"
+            ]
           }
         }
       }
     },
-
     "contributions": {
       "description": "Non-panel UI surfaces. Forward-looking; slashCommands reserved.",
       "type": "object",
@@ -478,79 +806,348 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["id", "path", "name"],
+            "required": [
+              "id",
+              "path",
+              "name"
+            ],
             "properties": {
-              "id": { "type": "string" },
-              "path": { "type": "string", "pattern": "^/[a-zA-Z0-9/:_-]*$", "description": "Canonical route path. May carry :params (e.g. /care-plans/:id/details/)." },
-              "name": { "type": "string" },
-              "index": { "type": "boolean", "default": false },
-              "master": { "type": "boolean", "default": false, "description": "Marks a master route of a master-detail pair (host emits F7 master:true + detailRoutes)." },
-              "detail": { "type": "boolean", "default": false, "description": "Marks a detail route paired to a master via masterId." },
-              "masterId": { "type": "string", "description": "On a detail route: the id of the master route it belongs to." }
+              "id": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string",
+                "pattern": "^/[a-zA-Z0-9/:_-]*$",
+                "description": "Canonical route path. May carry :params (e.g. /care-plans/:id/details/)."
+              },
+              "name": {
+                "type": "string"
+              },
+              "index": {
+                "type": "boolean",
+                "default": false
+              },
+              "master": {
+                "type": "boolean",
+                "default": false,
+                "description": "Marks a master route of a master-detail pair (host emits F7 master:true + detailRoutes)."
+              },
+              "detail": {
+                "type": "boolean",
+                "default": false,
+                "description": "Marks a detail route paired to a master via masterId."
+              },
+              "masterId": {
+                "type": "string",
+                "description": "On a detail route: the id of the master route it belongs to."
+              }
             }
           }
         },
-        "modals": { "type": "array", "items": { "$ref": "#/$defs/namedContribution" } },
-        "settings": {
-          "description": "MANIFEST-DRIVEN SETTINGS §2.2 — the MP's settings pages, DECLARED not hand-coded. The host renders them; no MP ships a settings view. Absent means this MP declares no settings (the state of all 17 manifests at P0 — the grammar is frozen before any MP uses it, so the addition is provably backward-compatible).",
-          "$comment": "SETTINGS P0 (schema freeze). What is NOT here yet, by design: the renderer, the GET/PUT /api/v1/mp/settings endpoint and its SERVER-SIDE write validator (a P1 BLOCKER, not a P5 nicety — R5), and any page migration. Check C22 'settings-declarability' is RESERVED against this field: it fails a submission shipping a hand-coded MP settings page that could have been declared here. That is the ratchet that stops the 53 hand-coded pages growing back.",
+        "modals": {
           "type": "array",
-          "items": { "$ref": "#/$defs/settingsPage" }
+          "items": {
+            "$ref": "#/$defs/namedContribution"
+          }
+        },
+        "settings": {
+          "description": "MANIFEST-DRIVEN SETTINGS \u00a72.2 \u2014 the MP's settings pages, DECLARED not hand-coded. The host renders them; no MP ships a settings view. Absent means this MP declares no settings (the state of all 17 manifests at P0 \u2014 the grammar is frozen before any MP uses it, so the addition is provably backward-compatible).",
+          "$comment": "SETTINGS P0 (schema freeze). What is NOT here yet, by design: the renderer, the GET/PUT /api/v1/mp/settings endpoint and its SERVER-SIDE write validator (a P1 BLOCKER, not a P5 nicety \u2014 R5), and any page migration. Check C22 'settings-declarability' is RESERVED against this field: it fails a submission shipping a hand-coded MP settings page that could have been declared here. That is the ratchet that stops the 53 hand-coded pages growing back.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/settingsPage"
+          }
         },
         "settingsPages": {
-          "description": "DEPRECATED (manifest-driven settings §2.2) — the inert {id,name,description} stub that predates the settings grammar. It never had a consumer. Superseded by 'settings' (array of settingsPage). RETAINED so every manifest authored against it still validates unchanged; new manifests MUST use 'settings'. Declaring both is legal but 'settings' is the only one rendered. Removal is a future manifestVersion bump and must carry a deprecations[]/removalPlan entry (C18).",
+          "description": "DEPRECATED (manifest-driven settings \u00a72.2) \u2014 the inert {id,name,description} stub that predates the settings grammar. It never had a consumer. Superseded by 'settings' (array of settingsPage). RETAINED so every manifest authored against it still validates unchanged; new manifests MUST use 'settings'. Declaring both is legal but 'settings' is the only one rendered. Removal is a future manifestVersion bump and must carry a deprecations[]/removalPlan entry (C18).",
           "type": "array",
-          "items": { "$ref": "#/$defs/namedContribution" },
+          "items": {
+            "$ref": "#/$defs/namedContribution"
+          },
           "deprecated": true
         },
-        "permissions": {
-          "description": "MANIFEST-DRIVEN SETTINGS §4.3 / S6 — permission rows this MP OWNS. Ownership becomes server-declared (owner: {kind: host|mp, mpId}) instead of re-derived client-side from the two hard-coded hashes in the legacy permissions page (resourceTypeMapping, addonPackageToSystemSectionMapping — both delete when this lands). Claimed rows move onto that MP's own permissions page; UNCLAIMED rows stay on Tommy's (host-owned, fail-safe toward visibility).",
-          "type": "array",
-          "items": { "$ref": "#/$defs/permissionClaim" }
-        },
-        "interactions": {
-          "description": "2.22 E7 (D20) — declared interaction points: SDK-rendered affordances that emit the MP-owned trigger '<mpId>.ui.<id>' with ZERO MP code. Payload binds ONLY from the declared view context (route params / declared panel bindings — no DOM scraping; free-form listeners are forbidden). visibleWhen gates VISIBILITY only, never authority (the 2.20 L3 rule). hideWhenUnwired (default true, D21): an interaction with no enabled consuming Action is not rendered.",
+        "tourAnchors": {
+          "description": "PARKED A.1 \u2014 the MP's TOUR ANCHOR declarations: the DOM contract a tour step may address. An anchor called `x` on MP `y` means the MP renders `data-tour-target=\"y.x\"`. THIS IS THE ONLY THING THE HOST MAY DEPEND ON: `panel-runtime/panel-tile.js` attaches a CLOSED shadow root on the plain-DOM render path, so the host genuinely cannot query an MP's DOM and a `document.querySelector`-based tour runtime is only accidentally correct. Enforced by checker M19 (declared anchors must appear in the MP source) and M22 (no CSS selectors anywhere under tours).",
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["id", "kind", "surface", "label", "payload"],
+            "required": [
+              "name"
+            ],
             "properties": {
-              "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
-              "kind": { "enum": ["button", "menu_item", "list_row_action", "fab", "link"] },
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "description": "Anchor name, unique within the MP (checker M25). The rendered attribute is `data-tour-target=\"<mpId>.<name>\"`. Dots are excluded so the mpId prefix stays unambiguous."
+              },
+              "description": {
+                "type": "string",
+                "description": "What this anchor points at, for the author of a tour that consumes it."
+              }
+            }
+          }
+        },
+        "tours": {
+          "description": "PARKED A.1 \u2014 tours this MP contributes. The host owns the RUNTIME and the preconditions; the MP owns only what its own surface can state. Absent means this MP declares no tours.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "steps"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "description": "Stable tour id, unique within the MP (checker M25). \u26a0 THE WIRE KEY IS THIS ID: `tours.seen[id]` is keyed by it, so RENAMING AN ID RE-ONBOARDS THE ENTIRE EXISTING USER BASE."
+              },
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "roles": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Roles eligible for this tour. The host ANDs this into its unconditional precondition; it is not something the MP evaluates."
+              },
+              "replayable": {
+                "type": "boolean",
+                "default": false,
+                "description": "May be re-run from a replay link. VALIDATOR-DERIVED from fixture self-sufficiency (checker M21): declaring it over a fixture that cannot clean up after itself leaves residue on a live surface on every replay."
+              },
+              "autoLaunch": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "When this tour offers itself unprompted.",
+                "properties": {
+                  "when": {
+                    "$ref": "#/$defs/predicate",
+                    "description": "DOMAIN readiness only. \u26a0 IT MAY NOT REFERENCE TOUR STATE (seen / launched / enabled / dismissed / completed) \u2014 checker M20 rejects that: the host applies enabled \u2227 \u00acseen \u2227 \u00aclaunched \u2227 role-eligible \u2227 no-tour-running as an UNCONDITIONAL precondition, and an MP predicate over the same state would make the host and the MP two authorities on one decision."
+                  }
+                }
+              },
+              "steps": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "anchor"
+                  ],
+                  "properties": {
+                    "anchor": {
+                      "type": "string",
+                      "description": "The anchor this step points at. Must be declared in `contributions.tourAnchors` (checker M19) UNLESS the step is host chrome \u2014 either `host: true` or a `tommy.`-prefixed anchor naming the host's own furniture."
+                    },
+                    "host": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "This step targets HOST chrome (sidebar, navbar, dashboard shell), not the MP's own DOM, so no MP anchor declaration is expected."
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "body": {
+                      "type": "string"
+                    },
+                    "placement": {
+                      "enum": [
+                        "top",
+                        "bottom",
+                        "left",
+                        "right",
+                        "auto"
+                      ],
+                      "default": "auto"
+                    },
+                    "timeoutMs": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "How long the runtime waits for the anchor to resolve VISIBLE before the step fails. The failure is self-concealing without telemetry \u2014 a failed auto-launched tour is recorded as completed, so the second user never hits it \u2014 which is why layer 4 (TOUR_STEP_FAILED) is part of the design rather than an extra."
+                    }
+                  }
+                }
+              },
+              "fixtures": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "ref",
+                    "activity"
+                  ],
+                  "properties": {
+                    "ref": {
+                      "type": "string",
+                      "description": "Name this fixture is referenced by, unique within the tour. Also the `ref` component of the derived idempotency key `tour:<tourId>:<userId>:<ref>`."
+                    },
+                    "activity": {
+                      "type": "string",
+                      "description": "The declared activity that CREATES the fixture. An activity, not a free-form seed: it is scoped, permissioned and audited like any other write."
+                    },
+                    "input": {
+                      "type": "object",
+                      "description": "Static input for the create activity."
+                    },
+                    "teardown": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "activity"
+                      ],
+                      "description": "The activity that REMOVES the fixture. Checker M21 refuses a fixture without one \u2014 and `replayable: true` over such a fixture \u2014 because the measured failure is a browser closed mid-tour leaving PERMANENT SAMPLE RECORDS on a live surface with no sweeper. Declared here as shape; M21 owns the policy, so the two never become two authorities on one decision.",
+                      "properties": {
+                        "activity": {
+                          "type": "string"
+                        },
+                        "input": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  }
+                },
+                "description": "Records seeded for the duration of the tour. `fixtures[]` exists rather than a step action precisely because A STEP ACTION HAS NO TEARDOWN CONTRACT."
+              }
+            }
+          }
+        },
+        "permissions": {
+          "description": "MANIFEST-DRIVEN SETTINGS \u00a74.3 / S6 \u2014 permission rows this MP OWNS. Ownership becomes server-declared (owner: {kind: host|mp, mpId}) instead of re-derived client-side from the two hard-coded hashes in the legacy permissions page (resourceTypeMapping, addonPackageToSystemSectionMapping \u2014 both delete when this lands). Claimed rows move onto that MP's own permissions page; UNCLAIMED rows stay on Tommy's (host-owned, fail-safe toward visibility).",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/permissionClaim"
+          }
+        },
+        "interactions": {
+          "description": "2.22 E7 (D20) \u2014 declared interaction points: SDK-rendered affordances that emit the MP-owned trigger '<mpId>.ui.<id>' with ZERO MP code. Payload binds ONLY from the declared view context (route params / declared panel bindings \u2014 no DOM scraping; free-form listeners are forbidden). visibleWhen gates VISIBILITY only, never authority (the 2.20 L3 rule). hideWhenUnwired (default true, D21): an interaction with no enabled consuming Action is not rendered.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "surface",
+              "label",
+              "payload"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$"
+              },
+              "kind": {
+                "enum": [
+                  "button",
+                  "menu_item",
+                  "list_row_action",
+                  "fab",
+                  "link"
+                ]
+              },
               "surface": {
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
-                  "route": { "type": "string", "description": "A contributions.routes path (may carry :params)." },
-                  "panel": { "type": "string", "description": "A panels[].id." }
+                  "route": {
+                    "type": "string",
+                    "description": "A contributions.routes path (may carry :params)."
+                  },
+                  "panel": {
+                    "type": "string",
+                    "description": "A panels[].id."
+                  }
                 },
-                "oneOf": [ { "required": ["route"] }, { "required": ["panel"] } ]
+                "oneOf": [
+                  {
+                    "required": [
+                      "route"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "panel"
+                    ]
+                  }
+                ]
               },
               "label": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["key"],
-                "properties": { "key": { "type": "string", "description": "tommy.t locale key." } }
+                "required": [
+                  "key"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "description": "tommy.t locale key."
+                  }
+                }
               },
-              "icon": { "type": "string" },
+              "icon": {
+                "type": "string"
+              },
               "payload": {
                 "description": "Fields the emitted trigger carries, each bound from the declared view context.",
                 "type": "object",
                 "additionalProperties": {
                   "type": "object",
                   "additionalProperties": false,
-                  "oneOf": [ { "required": ["from", "param"] }, { "required": ["from", "path"] }, { "required": ["const"] } ],
+                  "oneOf": [
+                    {
+                      "required": [
+                        "from",
+                        "param"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "from",
+                        "path"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "const"
+                      ]
+                    }
+                  ],
                   "properties": {
-                    "from": { "enum": ["route", "context"] },
-                    "param": { "type": "string", "description": "from: route — the route :param name." },
-                    "path": { "type": "string", "description": "from: context — a dotted path into the surface's declared data bindings." },
+                    "from": {
+                      "enum": [
+                        "route",
+                        "context"
+                      ]
+                    },
+                    "param": {
+                      "type": "string",
+                      "description": "from: route \u2014 the route :param name."
+                    },
+                    "path": {
+                      "type": "string",
+                      "description": "from: context \u2014 a dotted path into the surface's declared data bindings."
+                    },
                     "const": {}
                   }
                 }
               },
-              "visibleWhen": { "$ref": "#/$defs/predicate" },
-              "hideWhenUnwired": { "type": "boolean", "default": true }
+              "visibleWhen": {
+                "$ref": "#/$defs/predicate"
+              },
+              "hideWhenUnwired": {
+                "type": "boolean",
+                "default": true
+              }
             }
           }
         },
@@ -559,59 +1156,112 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["command", "description"],
+            "required": [
+              "command",
+              "description"
+            ],
             "properties": {
-              "command": { "type": "string", "pattern": "^/[a-z][a-z0-9-]*$" },
-              "description": { "type": "string" }
+              "command": {
+                "type": "string",
+                "pattern": "^/[a-z][a-z0-9-]*$"
+              },
+              "description": {
+                "type": "string"
+              }
             }
           }
         },
         "auditEvents": {
-          "description": "AUDIT RULING 2a (Mason, 2026-08-11) — CUSTOM audit-event types this MP may emit through `tommy.host.auditLog`. Audit logs are HOST-owned: system events stay host/server-side, the audit-log PANE is host-rendered (`tommy.ui.showAuditPane` — the MP supplies a subject + an anchor element and receives NO data), and an MP's only write path into the trail is emitting an event id DECLARED here. The host enforces the declaration at emit time — an undeclared id is a LOUD named denial, never a silent drop (the five-silent-drops lesson, ORCHESTRATOR 2026-08-11 §5) — and the host stamps actor/tenant/mpId itself, so an MP cannot forge provenance. `label.key` must exist in the MP's shipped locale bundle (checker rule M28).",
+          "description": "AUDIT RULING 2a (Mason, 2026-08-11) \u2014 CUSTOM audit-event types this MP may emit through `tommy.host.auditLog`. Audit logs are HOST-owned: system events stay host/server-side, the audit-log PANE is host-rendered (`tommy.ui.showAuditPane` \u2014 the MP supplies a subject + an anchor element and receives NO data), and an MP's only write path into the trail is emitting an event id DECLARED here. The host enforces the declaration at emit time \u2014 an undeclared id is a LOUD named denial, never a silent drop (the five-silent-drops lesson, ORCHESTRATOR 2026-08-11 \u00a75) \u2014 and the host stamps actor/tenant/mpId itself, so an MP cannot forge provenance. `label.key` must exist in the MP's shipped locale bundle (checker rule M28).",
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["id", "label"],
+            "required": [
+              "id",
+              "label"
+            ],
             "properties": {
-              "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "The event id the MP passes to tommy.host.auditLog. Unqualified — the host stamps the mpId, so the recorded event is '<mpId>.<id>'." },
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_]*$",
+                "description": "The event id the MP passes to tommy.host.auditLog. Unqualified \u2014 the host stamps the mpId, so the recorded event is '<mpId>.<id>'."
+              },
               "label": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["key"],
-                "properties": { "key": { "type": "string", "description": "tommy.t locale key for the rendered feed line (same shape as interactions[].label — M24/M28 check it against the shipped bundle)." } }
+                "required": [
+                  "key"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "description": "tommy.t locale key for the rendered feed line (same shape as interactions[].label \u2014 M24/M28 check it against the shipped bundle)."
+                  }
+                }
               },
-              "severity": { "enum": ["info", "warning", "critical"], "default": "info", "description": "Display severity in the host-rendered feed. Advisory — never an authority signal." }
+              "severity": {
+                "enum": [
+                  "info",
+                  "warning",
+                  "critical"
+                ],
+                "default": "info",
+                "description": "Display severity in the host-rendered feed. Advisory \u2014 never an authority signal."
+              }
             }
           }
         }
       }
     },
-
     "localData": {
       "description": "Object stores this MP persists in its per-MP IndexedDB database.",
       "type": "object",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["keyPath", "recordSchema", "syncStrategy"],
+        "required": [
+          "keyPath",
+          "recordSchema",
+          "syncStrategy"
+        ],
         "properties": {
-          "keyPath": { "type": "string" },
-          "recordSchema": { "$ref": "#/$defs/jsonSchema" },
+          "keyPath": {
+            "type": "string"
+          },
+          "recordSchema": {
+            "$ref": "#/$defs/jsonSchema"
+          },
           "indexes": {
             "type": "array",
             "items": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["name", "keyPath"],
+              "required": [
+                "name",
+                "keyPath"
+              ],
               "properties": {
-                "name": { "type": "string" },
-                "keyPath": { "type": "string" },
-                "unique": { "type": "boolean", "default": false }
+                "name": {
+                  "type": "string"
+                },
+                "keyPath": {
+                  "type": "string"
+                },
+                "unique": {
+                  "type": "boolean",
+                  "default": false
+                }
               }
             }
           },
-          "syncStrategy": { "enum": ["server_authoritative", "last_write_wins", "custom"] },
+          "syncStrategy": {
+            "enum": [
+              "server_authoritative",
+              "last_write_wins",
+              "custom"
+            ]
+          },
           "customResolverActivity": {
             "description": "Required when syncStrategy is 'custom': the activity that resolves a conflict.",
             "type": "string"
@@ -619,90 +1269,189 @@
         },
         "allOf": [
           {
-            "if": { "properties": { "syncStrategy": { "const": "custom" } } },
-            "then": { "required": ["customResolverActivity"] }
+            "if": {
+              "properties": {
+                "syncStrategy": {
+                  "const": "custom"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "customResolverActivity"
+              ]
+            }
           }
         ]
       }
     },
-
     "functions": {
-      "description": "2.22 §4 (D19) — Computed Action functions: the custom-code escape hatch, packaged INSIDE this reviewed artifact and executed SERVER-SIDE in the Action Function Runtime (pure compute; no I/O; inputs assembled by the platform; returns the intent envelope the executor validates and dispatches). Each entry is a PrimitiveContract row (2.21). C20 flags functions expressible under the declarative grammar.",
+      "description": "2.22 \u00a74 (D19) \u2014 Computed Action functions: the custom-code escape hatch, packaged INSIDE this reviewed artifact and executed SERVER-SIDE in the Action Function Runtime (pure compute; no I/O; inputs assembled by the platform; returns the intent envelope the executor validates and dispatches). Each entry is a PrimitiveContract row (2.21). C20 flags functions expressible under the declarative grammar.",
       "type": "object",
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["entry", "runtime", "description", "resultSchema", "timeoutMs", "memoryMb", "reads", "targets"],
+        "required": [
+          "entry",
+          "runtime",
+          "description",
+          "resultSchema",
+          "timeoutMs",
+          "memoryMb",
+          "reads",
+          "targets"
+        ],
         "properties": {
-          "entry": { "type": "string", "pattern": "^functions/[A-Za-z0-9._/-]+\\.(js|ts)$" },
-          "runtime": { "enum": ["afr-js@1"] },
-          "description": { "type": "string" },
-          "inputSchema": { "$ref": "#/$defs/jsonSchema" },
-          "resultSchema": { "$ref": "#/$defs/jsonSchema" },
-          "timeoutMs": { "type": "integer", "minimum": 50, "maximum": 5000 },
-          "memoryMb": { "type": "integer", "minimum": 16, "maximum": 128 },
+          "entry": {
+            "type": "string",
+            "pattern": "^functions/[A-Za-z0-9._/-]+\\.(js|ts)$"
+          },
+          "runtime": {
+            "enum": [
+              "afr-js@1"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "inputSchema": {
+            "$ref": "#/$defs/jsonSchema"
+          },
+          "resultSchema": {
+            "$ref": "#/$defs/jsonSchema"
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "minimum": 50,
+            "maximum": 5000
+          },
+          "memoryMb": {
+            "type": "integer",
+            "minimum": 16,
+            "maximum": 128
+          },
           "reads": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "conditions": { "type": "array", "items": { "type": "string" } },
-              "serviceReads": { "type": "array", "items": { "type": "string", "pattern": "^tommy\\." } }
+              "conditions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "serviceReads": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^tommy\\."
+                }
+              }
             }
           },
           "targets": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["activities"],
+            "required": [
+              "activities"
+            ],
             "properties": {
-              "activities": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+              "activities": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                }
+              }
             }
           },
-          "contractVersion": { "$ref": "#/$defs/contractVersion" },
-          "deprecated": { "$ref": "#/$defs/deprecatedMarker" }
+          "contractVersion": {
+            "$ref": "#/$defs/contractVersion"
+          },
+          "deprecated": {
+            "$ref": "#/$defs/deprecatedMarker"
+          }
         }
       }
     },
-
     "deprecations": {
-      "description": "2.21 §2/§11 (D17) — deprecation declarations for primitives this version retains-but-sunsets. A removal MUST be covered here (C18 fails closed on undeclared breaks).",
+      "description": "2.21 \u00a72/\u00a711 (D17) \u2014 deprecation declarations for primitives this version retains-but-sunsets. A removal MUST be covered here (C18 fails closed on undeclared breaks).",
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["primitive", "since", "reason"],
+        "required": [
+          "primitive",
+          "since",
+          "reason"
+        ],
         "properties": {
-          "primitive": { "type": "string" },
-          "replacedBy": { "type": "string" },
-          "since": { "type": "string", "description": "MP version the deprecation was published in." },
-          "sunsetAfter": { "type": "string" },
-          "migration": { "description": "inputMap-grammar migration hint for consumers (actions-runtime.md §9.7).", "type": "object" },
-          "reason": { "type": "string" }
+          "primitive": {
+            "type": "string"
+          },
+          "replacedBy": {
+            "type": "string"
+          },
+          "since": {
+            "type": "string",
+            "description": "MP version the deprecation was published in."
+          },
+          "sunsetAfter": {
+            "type": "string"
+          },
+          "migration": {
+            "description": "inputMap-grammar migration hint for consumers (actions-runtime.md \u00a79.7).",
+            "type": "object"
+          },
+          "reason": {
+            "type": "string"
+          }
         }
       }
     },
-
     "removalPlan": {
-      "description": "2.21 §2 (D17) — required when this version REMOVES a previously-active primitive. deprecationWindowDays >= the 30d platform floor (hard outer bound 180d).",
+      "description": "2.21 \u00a72 (D17) \u2014 required when this version REMOVES a previously-active primitive. deprecationWindowDays >= the 30d platform floor (hard outer bound 180d).",
       "type": "object",
       "additionalProperties": false,
-      "required": ["removedPrimitives", "reason", "deprecationWindowDays"],
+      "required": [
+        "removedPrimitives",
+        "reason",
+        "deprecationWindowDays"
+      ],
       "properties": {
-        "removedPrimitives": { "type": "array", "minItems": 1, "items": { "type": "string" } },
-        "reason": { "type": "string" },
-        "replacement": { "type": "string" },
-        "deprecationWindowDays": { "type": "integer", "minimum": 30, "maximum": 180 }
+        "removedPrimitives": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "reason": {
+          "type": "string"
+        },
+        "replacement": {
+          "type": "string"
+        },
+        "deprecationWindowDays": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 180
+        }
       }
     },
-
     "review": {
       "description": "Metadata consumed by the Mini Program Review Pipeline (Phase 4).",
       "type": "object",
       "additionalProperties": false,
-      "required": ["thirdPartyScripts"],
+      "required": [
+        "thirdPartyScripts"
+      ],
       "properties": {
         "declaredCapabilities": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "thirdPartyScripts": {
           "description": "External scripts the MP loads. MUST be [] or an explicit list; review rejects undeclared ones.",
@@ -710,11 +1459,23 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["url", "purpose", "integrity"],
+            "required": [
+              "url",
+              "purpose",
+              "integrity"
+            ],
             "properties": {
-              "url": { "type": "string", "format": "uri" },
-              "purpose": { "type": "string" },
-              "integrity": { "type": "string", "pattern": "^sha(256|384|512)-" }
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "purpose": {
+                "type": "string"
+              },
+              "integrity": {
+                "type": "string",
+                "pattern": "^sha(256|384|512)-"
+              }
             }
           }
         },
@@ -722,18 +1483,25 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "claim": { "type": "string", "maxLength": 500 },
-            "retainsPersonalData": { "type": "boolean" },
-            "maxRetentionDays": { "type": "integer", "minimum": 0 }
+            "claim": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "retainsPersonalData": {
+              "type": "boolean"
+            },
+            "maxRetentionDays": {
+              "type": "integer",
+              "minimum": 0
+            }
           }
         }
       }
     }
   },
-
   "$defs": {
     "category": {
-      "description": "Primary content category, from the fixed catalogue. Required Identity field. Drives the intake-form picker (W15), the MCP scaffold_mp param, and a net-new Features/install browse/filter facet (NOTE: this browse facet does not exist in the wireframes yet — the field enables it; today only publisher.type, a trust tier, exists and it is NOT a content category). A single primary category (not categories[]) keeps C1 validation and the picker simple; an optional secondary tags[] is deferred to a later schema minor. 'other' is the safety valve so AI generation never blocks on an unmappable MP. Extensible; new categories add enum values (mirrors the $defs/surface convention).",
+      "description": "Primary content category, from the fixed catalogue. Required Identity field. Drives the intake-form picker (W15), the MCP scaffold_mp param, and a net-new Features/install browse/filter facet (NOTE: this browse facet does not exist in the wireframes yet \u2014 the field enables it; today only publisher.type, a trust tier, exists and it is NOT a content category). A single primary category (not categories[]) keeps C1 validation and the picker simple; an optional secondary tags[] is deferred to a later schema minor. 'other' is the safety valve so AI generation never blocks on an unmappable MP. Extensible; new categories add enum values (mirrors the $defs/surface convention).",
       "type": "string",
       "enum": [
         "scheduling",
@@ -750,18 +1518,32 @@
       ]
     },
     "surface": {
-      "description": "A host surface a panel/contribution can target. Extensible; new surfaces add enum values. team_member_details and client_details are host surfaces that MPs contribute panel 'tabs' into — Team Members and Clients are NOT Mini Programs.",
+      "description": "A host surface a panel/contribution can target. Extensible; new surfaces add enum values. team_member_details and client_details are host surfaces that MPs contribute panel 'tabs' into \u2014 Team Members and Clients are NOT Mini Programs.",
       "type": "string",
-      "enum": ["dashboard", "team_member_details", "client_details", "full_page"]
+      "enum": [
+        "dashboard",
+        "team_member_details",
+        "client_details",
+        "full_page"
+      ]
     },
     "namedContribution": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "name"],
+      "required": [
+        "id",
+        "name"
+      ],
       "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "description": { "type": "string" }
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
       }
     },
     "jsonSchema": {
@@ -769,74 +1551,130 @@
       "type": "object"
     },
     "inputMapSource": {
-      "description": "One source for a single mapped field. The original four shapes (trigger / condition / option / const — actions-runtime.md §9.7) plus the 2.22 additions: serviceRead (E6), item (E5 forEach element), template (E3 — plain-text composition with {{placeholder | pipe}} syntax, tooling-validated), and the manifest-driven-settings addition: setting (S5). Every non-template shape may carry an optional 'default' and an optional closed-operator 'transform' chain (E2, max 8 steps).",
-      "$comment": "SETTINGS P0: 'setting' (S5) is the ONE AND ONLY grammar addition the manifest-driven-settings design makes to the wiring vocabulary. Everything else the settings grammar needs — feature gates, permission gates, other-MP-installed gates, integration-connected gates — reuses trigger/condition/serviceRead/option/const/item/template verbatim.",
+      "description": "One source for a single mapped field. The original four shapes (trigger / condition / option / const \u2014 actions-runtime.md \u00a79.7) plus the 2.22 additions: serviceRead (E6), item (E5 forEach element), template (E3 \u2014 plain-text composition with {{placeholder | pipe}} syntax, tooling-validated), and the manifest-driven-settings addition: setting (S5). Every non-template shape may carry an optional 'default' and an optional closed-operator 'transform' chain (E2, max 8 steps).",
+      "$comment": "SETTINGS P0: 'setting' (S5) is the ONE AND ONLY grammar addition the manifest-driven-settings design makes to the wiring vocabulary. Everything else the settings grammar needs \u2014 feature gates, permission gates, other-MP-installed gates, integration-connected gates \u2014 reuses trigger/condition/serviceRead/option/const/item/template verbatim.",
       "oneOf": [
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["from", "path"],
+          "required": [
+            "from",
+            "path"
+          ],
           "properties": {
-            "from": { "const": "trigger" },
-            "path": { "type": "string" },
+            "from": {
+              "const": "trigger"
+            },
+            "path": {
+              "type": "string"
+            },
             "default": {},
-            "transform": { "$ref": "#/$defs/transformChain" }
+            "transform": {
+              "$ref": "#/$defs/transformChain"
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["from", "ref", "path"],
+          "required": [
+            "from",
+            "ref",
+            "path"
+          ],
           "properties": {
-            "from": { "const": "condition" },
-            "ref": { "type": "string" },
-            "path": { "type": "string" },
+            "from": {
+              "const": "condition"
+            },
+            "ref": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
             "default": {},
-            "transform": { "$ref": "#/$defs/transformChain" }
+            "transform": {
+              "$ref": "#/$defs/transformChain"
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["from", "ref", "path"],
+          "required": [
+            "from",
+            "ref",
+            "path"
+          ],
           "properties": {
-            "from": { "const": "serviceRead" },
-            "ref": { "type": "string" },
-            "path": { "type": "string" },
+            "from": {
+              "const": "serviceRead"
+            },
+            "ref": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
             "default": {},
-            "transform": { "$ref": "#/$defs/transformChain" }
+            "transform": {
+              "$ref": "#/$defs/transformChain"
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["from", "path"],
+          "required": [
+            "from",
+            "path"
+          ],
           "properties": {
-            "from": { "const": "option" },
-            "path": { "type": "string" },
+            "from": {
+              "const": "option"
+            },
+            "path": {
+              "type": "string"
+            },
             "default": {},
-            "transform": { "$ref": "#/$defs/transformChain" }
+            "transform": {
+              "$ref": "#/$defs/transformChain"
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["from", "path"],
+          "required": [
+            "from",
+            "path"
+          ],
           "properties": {
-            "from": { "const": "item" },
-            "path": { "type": "string" },
+            "from": {
+              "const": "item"
+            },
+            "path": {
+              "type": "string"
+            },
             "default": {},
-            "transform": { "$ref": "#/$defs/transformChain" }
+            "transform": {
+              "$ref": "#/$defs/transformChain"
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["from", "path"],
+          "required": [
+            "from",
+            "path"
+          ],
           "properties": {
-            "from": { "const": "setting" },
+            "from": {
+              "const": "setting"
+            },
             "mp": {
-              "description": "OPTIONAL cross-MP qualifier: the id of the MP that OWNS the setting. Absent means this MP's own settings namespace. Ownership rule (Mason, 2026-08-10): the MP that would BREAK if the setting vanished owns it — a reader declares the dependency here, so an uninstalled owner makes the reading section 'unavailable' instead of rendering a dead control. A cross-MP read joins the dependency set exactly like a cross-MP trigger/condition source.",
+              "description": "OPTIONAL cross-MP qualifier: the id of the MP that OWNS the setting. Absent means this MP's own settings namespace. Ownership rule (Mason, 2026-08-10): the MP that would BREAK if the setting vanished owns it \u2014 a reader declares the dependency here, so an uninstalled owner makes the reading section 'unavailable' instead of rendering a dead control. A cross-MP read joins the dependency set exactly like a cross-MP trigger/condition source.",
               "type": "string"
             },
             "path": {
@@ -844,14 +1682,18 @@
               "type": "string"
             },
             "default": {},
-            "transform": { "$ref": "#/$defs/transformChain" }
+            "transform": {
+              "$ref": "#/$defs/transformChain"
+            }
           },
-          "$comment": "S5 (manifest-driven settings) — read a sibling (or, with 'mp', a cross-MP) SETTING as a wiring/predicate source. This is the only shape the settings work adds; it supplies an operand, never an operator. Reading a setting NEVER confers authority: visibleWhen/readOnlyWhen gate visibility only, and the server re-checks requiresPermission on every write (the 2.20 L3 rule)."
+          "$comment": "S5 (manifest-driven settings) \u2014 read a sibling (or, with 'mp', a cross-MP) SETTING as a wiring/predicate source. This is the only shape the settings work adds; it supplies an operand, never an operator. Reading a setting NEVER confers authority: visibleWhen/readOnlyWhen gate visibility only, and the server re-checks requiresPermission on every write (the 2.20 L3 rule)."
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["const"],
+          "required": [
+            "const"
+          ],
           "properties": {
             "const": {},
             "default": {}
@@ -860,12 +1702,14 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["template"],
+          "required": [
+            "template"
+          ],
           "properties": {
             "template": {
               "type": "string",
               "maxLength": 1000,
-              "description": "E3 — plain text with {{source.path | operator(args)}} placeholders over this Action's declared sources; rendered as data (textContent downstream, never HTML). Templates used for user-facing copy SHOULD default into optionsSchema so tenants/AI can tune them."
+              "description": "E3 \u2014 plain text with {{source.path | operator(args)}} placeholders over this Action's declared sources; rendered as data (textContent downstream, never HTML). Templates used for user-facing copy SHOULD default into optionsSchema so tenants/AI can tune them."
             },
             "default": {}
           }
@@ -873,61 +1717,122 @@
       ]
     },
     "transformChain": {
-      "description": "2.22 E2 — an ordered chain (max 8) of closed-set operators applied to the resolved source value. Operators are IN-BINARY; config supplies operands only (the L6 app-store line). Type-checked against the source/target schemas by the validator.",
+      "description": "2.22 E2 \u2014 an ordered chain (max 8) of closed-set operators applied to the resolved source value. Operators are IN-BINARY; config supplies operands only (the L6 app-store line). Type-checked against the source/target schemas by the validator.",
       "type": "array",
       "maxItems": 8,
-      "items": { "$ref": "#/$defs/transformStep" }
+      "items": {
+        "$ref": "#/$defs/transformStep"
+      }
     },
     "transformStep": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["op"],
+      "required": [
+        "op"
+      ],
       "properties": {
         "op": {
           "enum": [
-            "concat", "upper", "lower", "trim", "slice", "replace",
-            "add", "subtract", "multiply", "divide", "round", "clamp",
-            "format", "add_duration", "diff", "day_of_week", "bucket_time",
-            "coalesce", "default", "exists", "not", "equals",
+            "concat",
+            "upper",
+            "lower",
+            "trim",
+            "slice",
+            "replace",
+            "add",
+            "subtract",
+            "multiply",
+            "divide",
+            "round",
+            "clamp",
+            "format",
+            "add_duration",
+            "diff",
+            "day_of_week",
+            "bucket_time",
+            "coalesce",
+            "default",
+            "exists",
+            "not",
+            "equals",
             "map",
-            "first", "last", "count", "sum", "pluck", "join", "find", "filter"
+            "first",
+            "last",
+            "count",
+            "sum",
+            "pluck",
+            "join",
+            "find",
+            "filter"
           ]
         },
         "args": {
-          "description": "Operator operands (literals or source refs where the operator signature allows — 2.22 §2.2 is the signature table). 'map' takes {table:{from:to,...}, default}; 'bucket_time' takes {ranges:[{from,to,label}], timezoneFrom?}; 'find'/'filter' take an L6 predicate over item fields.",
+          "description": "Operator operands (literals or source refs where the operator signature allows \u2014 2.22 \u00a72.2 is the signature table). 'map' takes {table:{from:to,...}, default}; 'bucket_time' takes {ranges:[{from,to,label}], timezoneFrom?}; 'find'/'filter' take an L6 predicate over item fields.",
           "type": "object"
         }
       }
     },
     "predicate": {
-      "description": "2.22 — a closed L6-comparator predicate over declared sources (used by activity.select 'when', contributions.interactions 'visibleWhen', and — unchanged and unwidened — contributions.settings pages/sections/fields 'visibleWhen' and 'readOnlyWhen'). One level of allOf/anyOf composition.",
-      "$comment": "FIREWALL (2.20 §6, restated for SETTINGS P0): the settings grammar $refs THIS definition verbatim. Section kinds and field types are DATA for the renderer; they never add evaluator capability. The operator set below is closed and IN-BINARY — a new predicate operator is a binary release, not config. There is exactly ONE evaluator: an adapter that re-implements any comparison operator is the R4 drift risk and is forbidden (lint-enforced).",
+      "description": "2.22 \u2014 a closed L6-comparator predicate over declared sources (used by activity.select 'when', contributions.interactions 'visibleWhen', and \u2014 unchanged and unwidened \u2014 contributions.settings pages/sections/fields 'visibleWhen' and 'readOnlyWhen'). One level of allOf/anyOf composition.",
+      "$comment": "FIREWALL (2.20 \u00a76, restated for SETTINGS P0): the settings grammar $refs THIS definition verbatim. Section kinds and field types are DATA for the renderer; they never add evaluator capability. The operator set below is closed and IN-BINARY \u2014 a new predicate operator is a binary release, not config. There is exactly ONE evaluator: an adapter that re-implements any comparison operator is the R4 drift risk and is forbidden (lint-enforced).",
       "oneOf": [
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["source", "op"],
+          "required": [
+            "source",
+            "op"
+          ],
           "properties": {
-            "source": { "$ref": "#/$defs/inputMapSource" },
-            "op": { "enum": ["exists", "not_exists", "equals", "not_equals", "one_of", "range"] },
+            "source": {
+              "$ref": "#/$defs/inputMapSource"
+            },
+            "op": {
+              "enum": [
+                "exists",
+                "not_exists",
+                "equals",
+                "not_equals",
+                "one_of",
+                "range"
+              ]
+            },
             "operand": {},
-            "operands": { "type": "array" }
+            "operands": {
+              "type": "array"
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["allOf"],
+          "required": [
+            "allOf"
+          ],
           "properties": {
-            "allOf": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/predicate/oneOf/0" } }
+            "allOf": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/predicate/oneOf/0"
+              }
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["anyOf"],
+          "required": [
+            "anyOf"
+          ],
           "properties": {
-            "anyOf": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/predicate/oneOf/0" } }
+            "anyOf": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/predicate/oneOf/0"
+              }
+            }
           }
         }
       ]
@@ -938,42 +1843,81 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["when", "name"],
+          "required": [
+            "when",
+            "name"
+          ],
           "properties": {
-            "when": { "$ref": "#/$defs/predicate" },
-            "mp": { "type": "string" },
-            "name": { "type": "string" },
-            "inputMap": { "type": "object", "additionalProperties": { "$ref": "#/$defs/inputMapSource" } }
+            "when": {
+              "$ref": "#/$defs/predicate"
+            },
+            "mp": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "inputMap": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/inputMapSource"
+              }
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["else", "name"],
+          "required": [
+            "else",
+            "name"
+          ],
           "properties": {
-            "else": { "const": true },
-            "mp": { "type": "string" },
-            "name": { "type": "string" },
-            "inputMap": { "type": "object", "additionalProperties": { "$ref": "#/$defs/inputMapSource" } }
+            "else": {
+              "const": true
+            },
+            "mp": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "inputMap": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/inputMapSource"
+              }
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["else", "skip"],
+          "required": [
+            "else",
+            "skip"
+          ],
           "properties": {
-            "else": { "const": true },
-            "skip": { "const": true }
+            "else": {
+              "const": true
+            },
+            "skip": {
+              "const": true
+            }
           }
         }
       ]
     },
     "settingsPage": {
-      "description": "MANIFEST-DRIVEN SETTINGS §2.2 — one declared settings PAGE contributed by this MP. The host renders it; there is no per-MP hand-coded settings view. A page is pure DECLARATION: it names the sections, the fields, and the predicates that gate them, and nothing else. Rendered under /settings/mp/:mpId/ alongside that MP's Permissions · Actions · Notifications · About.",
-      "$comment": "FIREWALL (2.20 §6): section kinds and field types are DATA for the renderer; they never add evaluator capability. No expression language, ever — a new predicate operator is a binary release, not config. SECURITY: 'visibleWhen' is NEVER enforced server-side — hiding is not revoking; 'requiresPermission' is what the server enforces on read and on every write.",
+      "description": "MANIFEST-DRIVEN SETTINGS \u00a72.2 \u2014 one declared settings PAGE contributed by this MP. The host renders it; there is no per-MP hand-coded settings view. A page is pure DECLARATION: it names the sections, the fields, and the predicates that gate them, and nothing else. Rendered under /settings/mp/:mpId/ alongside that MP's Permissions \u00b7 Actions \u00b7 Notifications \u00b7 About.",
+      "$comment": "FIREWALL (2.20 \u00a76): section kinds and field types are DATA for the renderer; they never add evaluator capability. No expression language, ever \u2014 a new predicate operator is a binary release, not config. SECURITY: 'visibleWhen' is NEVER enforced server-side \u2014 hiding is not revoking; 'requiresPermission' is what the server enforces on read and on every write.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "title", "sections"],
+      "required": [
+        "id",
+        "title",
+        "sections"
+      ],
       "properties": {
         "id": {
           "description": "Stable page id, unique within this MP. Forms the route segment under /settings/mp/:mpId/.",
@@ -981,72 +1925,109 @@
           "pattern": "^[a-z][a-z0-9-]*$"
         },
         "title": {
-          "description": "Page title. A tommy.t locale key (preferred — the ~160 settings keys are harvested per MP before its pages migrate) or a literal fallback string.",
+          "description": "Page title. A tommy.t locale key (preferred \u2014 the ~160 settings keys are harvested per MP before its pages migrate) or a literal fallback string.",
           "type": "string",
           "minLength": 1,
           "maxLength": 80
         },
-        "icon": { "type": "string" },
+        "icon": {
+          "type": "string"
+        },
         "order": {
           "description": "Sort order within this MP's settings list. Lower first; ties fall back to declaration order.",
           "type": "integer"
         },
         "requiresPermission": {
-          "description": "Tenant permission name gating this page (the existing custom authorize! system, NOT a token scope). ENFORCED SERVER-SIDE on read and on every write to the page's fields — unlike visibleWhen, which is a rendering hint only.",
+          "description": "Tenant permission name gating this page (the existing custom authorize! system, NOT a token scope). ENFORCED SERVER-SIDE on read and on every write to the page's fields \u2014 unlike visibleWhen, which is a rendering hint only.",
           "type": "string"
         },
-        "visibleWhen": { "$ref": "#/$defs/predicate" },
+        "visibleWhen": {
+          "$ref": "#/$defs/predicate"
+        },
         "serviceReads": {
           "description": "2.22 E6 host service-reads declared as PREDICATE SOURCES for this page (referenced as { from: serviceRead, ref, path }). Evaluated under the viewing tenant's existing leases/grants and joining this page's dependency surface. Shape mirrors actions.*.serviceReads verbatim (D22 seed discipline: mirrored, never re-authored).",
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["ref", "name"],
+            "required": [
+              "ref",
+              "name"
+            ],
             "properties": {
-              "ref": { "type": "string" },
-              "name": { "type": "string", "pattern": "^tommy\\.[a-z][a-z0-9.]*[a-zA-Z0-9]$" },
+              "ref": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string",
+                "pattern": "^tommy\\.[a-z][a-z0-9.]*[a-zA-Z0-9]$"
+              },
               "input": {
                 "type": "object",
-                "additionalProperties": { "$ref": "#/$defs/inputMapSource" }
+                "additionalProperties": {
+                  "$ref": "#/$defs/inputMapSource"
+                }
               }
             }
           }
         },
         "conditions": {
-          "description": "Conditions declared as PREDICATE SOURCES for this page (referenced as { from: condition, ref, path }). May be this MP's own, another installed MP's, or a 'tommy.*' platform condition (always-present for the §9.6 dependency set). Shape mirrors actions.*.conditions verbatim (D22 seed discipline: mirrored, never re-authored).",
+          "description": "Conditions declared as PREDICATE SOURCES for this page (referenced as { from: condition, ref, path }). May be this MP's own, another installed MP's, or a 'tommy.*' platform condition (always-present for the \u00a79.6 dependency set). Shape mirrors actions.*.conditions verbatim (D22 seed discipline: mirrored, never re-authored).",
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["name"],
+            "required": [
+              "name"
+            ],
             "properties": {
-              "ref": { "type": "string", "description": "Local alias for this evaluation (defaults to 'name'). visibleWhen/readOnlyWhen sources reference it." },
-              "mp": { "type": "string", "description": "Source owning the condition. Defaults to this MP. MAY be a 'tommy.*' platform namespace." },
-              "name": { "type": "string" },
+              "ref": {
+                "type": "string",
+                "description": "Local alias for this evaluation (defaults to 'name'). visibleWhen/readOnlyWhen sources reference it."
+              },
+              "mp": {
+                "type": "string",
+                "description": "Source owning the condition. Defaults to this MP. MAY be a 'tommy.*' platform namespace."
+              },
+              "name": {
+                "type": "string"
+              },
               "input": {
                 "type": "object",
-                "additionalProperties": { "$ref": "#/$defs/inputMapSource" }
+                "additionalProperties": {
+                  "$ref": "#/$defs/inputMapSource"
+                }
               },
-              "args": { "type": "object", "description": "Static literal args (pre-E1 form)." }
+              "args": {
+                "type": "object",
+                "description": "Static literal args (pre-E1 form)."
+              }
             }
           }
         },
         "sections": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/settingsSection" }
+          "items": {
+            "$ref": "#/$defs/settingsSection"
+          }
         }
       }
     },
     "settingsSection": {
-      "description": "MANIFEST-DRIVEN SETTINGS §2.2 — one section (a card) of a settings page. 'kind' selects WHICH host renderer draws the section; it is DATA, not capability.",
-      "$comment": "P0 FREEZE SCOPE: only 'kind: fields' (and 'kind: permissions', whose rows are the permission-typed fields) carries payload grammar in P0. The kind-specific payloads for 'collection' (S1 — CRUD list source), 'form_data' (S1b — dynamic-form table binding), 'actions' (the MP's Action list) and 'link' (S4 — deep-link target into a host/other-MP surface) are DELIBERATELY NOT frozen here: they are the P1 engine's schema addition, made once their renderer exists. Declaring such a section in P0 is legal and inert.",
+      "description": "MANIFEST-DRIVEN SETTINGS \u00a72.2 \u2014 one section (a card) of a settings page. 'kind' selects WHICH host renderer draws the section; it is DATA, not capability.",
+      "$comment": "P0 FREEZE SCOPE: only 'kind: fields' (and 'kind: permissions', whose rows are the permission-typed fields) carries payload grammar in P0. The kind-specific payloads for 'collection' (S1 \u2014 CRUD list source), 'form_data' (S1b \u2014 dynamic-form table binding), 'actions' (the MP's Action list) and 'link' (S4 \u2014 deep-link target into a host/other-MP surface) are DELIBERATELY NOT frozen here: they are the P1 engine's schema addition, made once their renderer exists. Declaring such a section in P0 is legal and inert.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "kind"],
+      "required": [
+        "id",
+        "kind"
+      ],
       "properties": {
-        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
         "title": {
           "description": "Section heading. A tommy.t locale key (preferred) or a literal fallback string.",
           "type": "string",
@@ -1057,23 +2038,37 @@
           "type": "string",
           "maxLength": 500
         },
-        "visibleWhen": { "$ref": "#/$defs/predicate" },
+        "visibleWhen": {
+          "$ref": "#/$defs/predicate"
+        },
         "kind": {
-          "description": "Which host renderer draws this section. 'fields' — the generic field list (the existing action-options-form renderer's shape). 'permissions' — permission rows this MP owns (see contributions.permissions). 'actions' — this MP's Action list. 'collection' (S1) — a CRUD list of MP-owned records. 'form_data' (S1b) — a dynamic-form data table. 'link' (S4) — a deep-link row into a host or other-MP surface.",
-          "enum": ["fields", "permissions", "actions", "collection", "form_data", "link"]
+          "description": "Which host renderer draws this section. 'fields' \u2014 the generic field list (the existing action-options-form renderer's shape). 'permissions' \u2014 permission rows this MP owns (see contributions.permissions). 'actions' \u2014 this MP's Action list. 'collection' (S1) \u2014 a CRUD list of MP-owned records. 'form_data' (S1b) \u2014 a dynamic-form data table. 'link' (S4) \u2014 a deep-link row into a host or other-MP surface.",
+          "enum": [
+            "fields",
+            "permissions",
+            "actions",
+            "collection",
+            "form_data",
+            "link"
+          ]
         },
         "fields": {
           "type": "array",
-          "items": { "$ref": "#/$defs/settingsField" }
+          "items": {
+            "$ref": "#/$defs/settingsField"
+          }
         }
       }
     },
     "settingsField": {
-      "description": "MANIFEST-DRIVEN SETTINGS §2.2 — one setting. 'type' selects WHICH host control renders it and how the server type-checks the write; it is DATA for the renderer and adds no evaluator capability. Measured against the 53 hand-coded pages, ~92% of existing fields are expressible with this catalogue.",
-      "$comment": "SERVER IS AUTHORITATIVE: every write is validated against THIS declaration (undeclared key rejected) and against the owning page's requiresPermission. min/max/step/maxLength/enum are UI + write-validation constraints, not business rules. PAYROLL / COMPLIANCE (R7): for 'money' and 'percent' — and for any field feeding pay, overtime, leave accrual, award interpretation or a statutory figure — the declared constraints are UI-VALIDATION ONLY; tommy-api re-computes the figure of record and its result wins. Never present a client-side computation from these values as authoritative.",
+      "description": "MANIFEST-DRIVEN SETTINGS \u00a72.2 \u2014 one setting. 'type' selects WHICH host control renders it and how the server type-checks the write; it is DATA for the renderer and adds no evaluator capability. Measured against the 53 hand-coded pages, ~92% of existing fields are expressible with this catalogue.",
+      "$comment": "SERVER IS AUTHORITATIVE: every write is validated against THIS declaration (undeclared key rejected) and against the owning page's requiresPermission. min/max/step/maxLength/enum are UI + write-validation constraints, not business rules. PAYROLL / COMPLIANCE (R7): for 'money' and 'percent' \u2014 and for any field feeding pay, overtime, leave accrual, award interpretation or a statutory figure \u2014 the declared constraints are UI-VALIDATION ONLY; tommy-api re-computes the figure of record and its result wins. Never present a client-side computation from these values as authoritative.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["key", "type"],
+      "required": [
+        "key",
+        "type"
+      ],
       "properties": {
         "key": {
           "description": "The setting key, unique within this MP. Snake_case, matching the persisted key. Addressed by { from: setting, path } predicates and by GET/PUT /api/v1/mp/settings as (tenantId, mpId, key). For 'type: permission' this is the permission NAME (a permission-catalogue row this MP claims).",
@@ -1081,7 +2076,7 @@
           "pattern": "^[a-z][a-z0-9_]*$"
         },
         "type": {
-          "description": "The field's declared type. CLOSED SET — a new type is a host binary release (a new renderer + a new server type-check), never config.",
+          "description": "The field's declared type. CLOSED SET \u2014 a new type is a host binary release (a new renderer + a new server type-check), never config.",
           "enum": [
             "boolean",
             "integer",
@@ -1110,46 +2105,84 @@
           "description": "Value used when the tenant has never set this key. Must satisfy the field's own type/constraints."
         },
         "store": {
-          "description": "WHERE the value lives. Absent (or kind 'native') means the native MP-settings store — new settings are born native and NO data migration happens. A non-native kind is the design's legacyBinding: the value stays exactly where it lives today (workforce_profile / team_setting / vendor_account / team_feature), so the existing keys never move and the existing optimistic-serialize-rollback write path keeps working.",
+          "description": "WHERE the value lives. Absent (or kind 'native') means the native MP-settings store \u2014 new settings are born native and NO data migration happens. A non-native kind is the design's legacyBinding: the value stays exactly where it lives today (workforce_profile / team_setting / vendor_account / team_feature), so the existing keys never move and the existing optimistic-serialize-rollback write path keeps working.",
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind"],
+          "required": [
+            "kind"
+          ],
           "properties": {
-            "kind": { "enum": ["native", "workforce_profile", "team_setting", "vendor_account", "team_feature"] },
+            "kind": {
+              "enum": [
+                "native",
+                "workforce_profile",
+                "team_setting",
+                "vendor_account",
+                "team_feature"
+              ]
+            },
             "key": {
               "description": "The legacy column/JSONB key when it differs from 'key'. Absent means the same name.",
               "type": "string"
             }
           }
         },
-        "visibleWhen": { "$ref": "#/$defs/predicate" },
-        "readOnlyWhen": { "$ref": "#/$defs/predicate" },
-        "min": { "description": "integer / number / duration_minutes / money / percent — inclusive lower bound (UI + write validation).", "type": "number" },
-        "max": { "description": "integer / number / duration_minutes / money / percent — inclusive upper bound (UI + write validation).", "type": "number" },
-        "step": { "description": "integer / number / duration_minutes / money / percent — stepper increment.", "type": "number" },
+        "visibleWhen": {
+          "$ref": "#/$defs/predicate"
+        },
+        "readOnlyWhen": {
+          "$ref": "#/$defs/predicate"
+        },
+        "min": {
+          "description": "integer / number / duration_minutes / money / percent \u2014 inclusive lower bound (UI + write validation).",
+          "type": "number"
+        },
+        "max": {
+          "description": "integer / number / duration_minutes / money / percent \u2014 inclusive upper bound (UI + write validation).",
+          "type": "number"
+        },
+        "step": {
+          "description": "integer / number / duration_minutes / money / percent \u2014 stepper increment.",
+          "type": "number"
+        },
         "enum": {
-          "description": "type: enum — the STATIC option list. Mutually exclusive with optionsFrom.",
+          "description": "type: enum \u2014 the STATIC option list. Mutually exclusive with optionsFrom.",
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["value"],
+            "required": [
+              "value"
+            ],
             "properties": {
               "value": {
-                "description": "The persisted value. A scalar (string / number / boolean) — expressed as anyOf rather than a union type[] so the schema stays clean under the validator's Ajv strict mode.",
-                "anyOf": [{ "type": "string" }, { "type": "number" }, { "type": "boolean" }]
+                "description": "The persisted value. A scalar (string / number / boolean) \u2014 expressed as anyOf rather than a union type[] so the schema stays clean under the validator's Ajv strict mode.",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  }
+                ]
               },
-              "label": { "description": "A tommy.t locale key (preferred) or a literal fallback string.", "type": "string" }
+              "label": {
+                "description": "A tommy.t locale key (preferred) or a literal fallback string.",
+                "type": "string"
+              }
             }
           }
         },
         "optionsFrom": {
-          "description": "S3 — type: enum with a DYNAMIC option list, sourced through the existing wiring vocabulary (a declared condition / serviceRead / setting, optionally through a closed E2 transform chain). Mutually exclusive with enum. Adds no evaluator capability: it is a read, not a query language.",
+          "description": "S3 \u2014 type: enum with a DYNAMIC option list, sourced through the existing wiring vocabulary (a declared condition / serviceRead / setting, optionally through a closed E2 transform chain). Mutually exclusive with enum. Adds no evaluator capability: it is a read, not a query language.",
           "$ref": "#/$defs/inputMapSource"
         },
         "nullAt": {
-          "description": "integer / number / duration_minutes — the sentinel control value that PERSISTS AS NULL (off). Reproduces the existing 'stepper reports 0, the setter translates 0 -> null' pattern without any code.",
+          "description": "integer / number / duration_minutes \u2014 the sentinel control value that PERSISTS AS NULL (off). Reproduces the existing 'stepper reports 0, the setter translates 0 -> null' pattern without any code.",
           "type": "number"
         },
         "nullLabel": {
@@ -1157,47 +2190,67 @@
           "type": "string"
         },
         "templateDefault": {
-          "description": "type: template — the default message template shown as the control's placeholder when the tenant has not overridden it. Follows the E3 template rules (plain text only, {{placeholder | pipe}}); rendered as data, never HTML.",
+          "description": "type: template \u2014 the default message template shown as the control's placeholder when the tenant has not overridden it. Follows the E3 template rules (plain text only, {{placeholder | pipe}}); rendered as data, never HTML.",
           "type": "string",
           "maxLength": 1000
         },
-        "maxLength": { "description": "string / text / template — maximum length (UI + write validation).", "type": "integer", "minimum": 1 }
+        "maxLength": {
+          "description": "string / text / template \u2014 maximum length (UI + write validation).",
+          "type": "integer",
+          "minimum": 1
+        }
       }
     },
     "permissionClaim": {
-      "description": "MANIFEST-DRIVEN SETTINGS §4.3 / S6 — an OWNERSHIP CLAIM over a permission row, so the permissions UI groups rows by their declared owner instead of re-deriving ownership client-side from hard-coded hashes. Either a single permission 'name' or a whole 'resourceType' family.",
-      "$comment": "RULED (Mason, 2026-08-10): an UNCLAIMED row is HOST-owned — it renders on Tommy's own permissions page under the 'Tommy' group. The fail-safe direction is toward VISIBILITY: a duplicated permission is cosmetic, an invisible one is a security hole. A DOUBLE CLAIM (two MPs claiming the same name/resourceType) is a HARD BUILD ERROR; unclaimed rows warn and are listed every build. Rows belonging to an UNINSTALLED MP render read-only under 'Inactive Mini Programs' with the MP named.",
+      "description": "MANIFEST-DRIVEN SETTINGS \u00a74.3 / S6 \u2014 an OWNERSHIP CLAIM over a permission row, so the permissions UI groups rows by their declared owner instead of re-deriving ownership client-side from hard-coded hashes. Either a single permission 'name' or a whole 'resourceType' family.",
+      "$comment": "RULED (Mason, 2026-08-10): an UNCLAIMED row is HOST-owned \u2014 it renders on Tommy's own permissions page under the 'Tommy' group. The fail-safe direction is toward VISIBILITY: a duplicated permission is cosmetic, an invisible one is a security hole. A DOUBLE CLAIM (two MPs claiming the same name/resourceType) is a HARD BUILD ERROR; unclaimed rows warn and are listed every build. Rows belonging to an UNINSTALLED MP render read-only under 'Inactive Mini Programs' with the MP named.",
       "oneOf": [
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["name"],
+          "required": [
+            "name"
+          ],
           "properties": {
-            "name": { "description": "A single permission name this MP owns.", "type": "string", "minLength": 1 }
+            "name": {
+              "description": "A single permission name this MP owns.",
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["resourceType"],
+          "required": [
+            "resourceType"
+          ],
           "properties": {
-            "resourceType": { "description": "A permission resource type whose whole family this MP owns.", "type": "string", "minLength": 1 }
+            "resourceType": {
+              "description": "A permission resource type whose whole family this MP owns.",
+              "type": "string",
+              "minLength": 1
+            }
           }
         }
       ]
     },
     "contractVersion": {
-      "description": "2.21 (D17) — primitive-level semver, independent of the MP version. Defaults to the MP version at build when absent; the build emits the normalized PrimitiveContract tuple either way.",
+      "description": "2.21 (D17) \u2014 primitive-level semver, independent of the MP version. Defaults to the MP version at build when absent; the build emits the normalized PrimitiveContract tuple either way.",
       "type": "string",
       "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$"
     },
     "deprecatedMarker": {
-      "description": "2.21 §4 (D17) — marks a retained primitive as deprecated (still fully dispatchable; broker stamps touching runs). Removal itself additionally requires the top-level removalPlan.",
+      "description": "2.21 \u00a74 (D17) \u2014 marks a retained primitive as deprecated (still fully dispatchable; broker stamps touching runs). Removal itself additionally requires the top-level removalPlan.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "replacement": { "type": "string" },
-        "removeAfter": { "type": "string" }
+        "replacement": {
+          "type": "string"
+        },
+        "removeAfter": {
+          "type": "string"
+        }
       }
     }
   }
