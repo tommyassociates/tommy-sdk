@@ -28,6 +28,12 @@ const STUB_NAMESPACES = [
   // this namespace — an MP reads another's setting only through a declared
   // `{ from: setting, mp }` source, so the dependency is in the manifest.
   'settings',
+  // PARKED A.1 — `tommy.tours.start(id)` / `.available()`, a handle on the HOST's
+  // existing tour runtime (tommy-core/src/tour). REGISTRATION IS NOT HERE, on
+  // purpose: the host registers an MP's DECLARED tours at load, because the
+  // manifest is what the publish-time checker vets (M19-M22) and a tour
+  // registered imperatively at runtime would route around all four gates.
+  'tours',
 ];
 
 function stubNamespace(name) {
