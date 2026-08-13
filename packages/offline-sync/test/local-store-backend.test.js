@@ -11,6 +11,22 @@ import {
   describe, it, expect, beforeEach, afterEach,
 } from 'vitest';
 import { createLocalStorageBackend, hasWebStorage, createDataManager } from '../src/index.js';
+import { databaseName } from '../src/names.js';
+
+/**
+ * Database names come from the RESOLVER, not from literals (§8.8 requirement 3,
+ * enforced by `sdk check:store-name-literals` — this file was its one standing
+ * violation, parked as E.49).
+ *
+ * The literals it replaces were legitimate test INPUT, not hand-built store
+ * names in a code path, so an allowlist entry would have been defensible. Going
+ * through the resolver is strictly better: it keeps this test honest if the name
+ * scheme ever changes, and it proves the backend is exercised with names the
+ * resolver actually produces rather than with a hand-copy of them that could
+ * drift silently. The tenant id still varies per case, which is what the
+ * cross-tenant-bleed assertion below needs.
+ */
+const dbFor = (tenantId) => databaseName({ tenantId }, 'scheduling');
 
 function fakeLocalStorage() {
   const map = new Map();
@@ -27,7 +43,7 @@ afterEach(() => { delete globalThis.localStorage; });
 
 describe('createLocalStorageBackend', () => {
   it('round-trips get/put/getAll/delete', async () => {
-    const b = createLocalStorageBackend('tommy-mp:team-3:scheduling', 'settings');
+    const b = createLocalStorageBackend(dbFor('team-3'), 'settings');
     expect(await b.getAll()).toEqual([]);
 
     await b.put('view', { key: 'view', value: { durationType: 'day' } });
@@ -40,17 +56,17 @@ describe('createLocalStorageBackend', () => {
   });
 
   it('persists across a fresh backend for the same (db, store) — survives reload', async () => {
-    const first = createLocalStorageBackend('tommy-mp:team-3:scheduling', 'settings');
+    const first = createLocalStorageBackend(dbFor('team-3'), 'settings');
     await first.put('view', { key: 'view', value: { viewType: 'role', durationType: 'week' } });
 
     // A new backend instance = the shell reloaded and re-created the store.
-    const afterReload = createLocalStorageBackend('tommy-mp:team-3:scheduling', 'settings');
+    const afterReload = createLocalStorageBackend(dbFor('team-3'), 'settings');
     expect((await afterReload.get('view')).value).toEqual({ viewType: 'role', durationType: 'week' });
   });
 
   it('scopes storage per (tenant, mp, store) — no cross-tenant bleed', async () => {
-    const team3 = createLocalStorageBackend('tommy-mp:team-3:scheduling', 'settings');
-    const team9 = createLocalStorageBackend('tommy-mp:team-9:scheduling', 'settings');
+    const team3 = createLocalStorageBackend(dbFor('team-3'), 'settings');
+    const team9 = createLocalStorageBackend(dbFor('team-9'), 'settings');
     await team3.put('view', { key: 'view', value: { durationType: 'day' } });
     expect(await team9.get('view')).toBeUndefined();
   });
@@ -58,7 +74,7 @@ describe('createLocalStorageBackend', () => {
   it('degrades to empty (never throws) when there is no Web Storage', async () => {
     delete globalThis.localStorage;
     expect(hasWebStorage()).toBe(false);
-    const b = createLocalStorageBackend('tommy-mp:team-3:scheduling', 'settings');
+    const b = createLocalStorageBackend(dbFor('team-3'), 'settings');
     await b.put('view', { key: 'view', value: { x: 1 } }); // no-op, must not throw
     expect(await b.getAll()).toEqual([]);
   });
