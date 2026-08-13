@@ -178,6 +178,28 @@ contributions:
     }
   });
 
+  it('accepts the chain field and per-step requireInteraction', () => {
+    // ⚠ BOTH FIELDS WERE FOUND BY PORTING A REAL TOUR, not by review. The
+    // grammar was derived from the four checker rules and NEITHER field appears
+    // in any of them, so neither existed. Without `nextTour` the shipped
+    // four-tour chain (Scheduling → Time Clock → Timesheets → Team) silently
+    // shortens; without `requireInteraction` three steps of the timesheets tour
+    // lose their real-interaction requirement.
+    const r = validateManifest(withBody(`
+contributions:
+  tourAnchors:
+    - name: approve-button
+  tours:
+    - id: timesheets
+      nextTour: team
+      steps:
+        - anchor: approve-button
+          requireInteraction: true
+          timeoutMs: 15000
+`));
+    expect(r.ok, errorText(r)).toBe(true);
+  });
+
   it('REJECTS a dotted tour id', () => {
     // ⚠ The id is the WIRE KEY: `tours.seen[id]`. Keeping it to one flat token
     // is what stops an id from drifting into a path-like shape that invites

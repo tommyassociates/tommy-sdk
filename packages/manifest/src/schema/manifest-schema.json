@@ -922,6 +922,11 @@
                 "default": false,
                 "description": "May be re-run from a replay link. VALIDATOR-DERIVED from fixture self-sufficiency (checker M21): declaring it over a fixture that cannot clean up after itself leaves residue on a live surface on every replay."
               },
+              "nextTour": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_-]*$",
+                "description": "The tour to chain into when this one completes. \u26a0 WITHOUT IT A CHAIN SILENTLY SHORTENS: `tour-overlay.vue`'s `nextTourTargetPkg` returns null, the final CTA degrades to a plain \"End tour\" and the journey stops there. The shipped chain is Scheduling \u2192 Time Clock \u2192 Timesheets \u2192 Team, and each link is one of these fields. The named tour need not belong to this MP \u2014 an app-level tour is a legal target."
+              },
               "autoLaunch": {
                 "type": "object",
                 "additionalProperties": false,
@@ -967,6 +972,11 @@
                         "auto"
                       ],
                       "default": "auto"
+                    },
+                    "requireInteraction": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "The user must perform the real interaction to advance; the overlay's primary-button fallback is disabled for this step. \u26a0 USE ONLY WHERE THE TARGET IS CERTAIN TO BE PRESENT. The fallback exists because a step whose anchor never resolves would otherwise TRAP the user \u2014 the shipped time-clock tour deliberately leaves its clock-in step WITHOUT this flag for exactly that reason (a user already clocked on has no Start button), while its clock-out step sets it because by then the button is guaranteed. `timeoutMs` bounds the risk and should always accompany it."
                     },
                     "timeoutMs": {
                       "type": "integer",
