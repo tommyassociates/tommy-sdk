@@ -191,8 +191,12 @@ export default {
               "backoff": { "enum": ["none", "linear", "exponential"] }
             }
           },
+          "callerPolicy": {
+            "description": "Who may invoke this activity, SAID OUT LOUD. Authoritative over `authorizedCallers` wherever it is present (broker authorizeInvoke). One value per case: `owner_only` -> the owning MP alone, deliberately closed to every other MP; `first_party` -> the owning MP plus ANY registered first-party MP; `listed` -> the owning MP plus exactly the MPs named in `authorizedCallers`, which must then be non-empty. WHY IT EXISTS (ruling, Mason 2026-08-12, backlog D.40): `authorizedCallers` could only say owner-only by being an EMPTY ARRAY and first-party by being ABSENT, so two of its three cases were carried by the shape of an omission rather than by a value — indistinguishable from an author who forgot, and the empty case read two ways depending on the host's `strictEmptyCallers` flag. The estate's 58 owner-only activities were migrated to `callerPolicy: owner_only` in the same change, which is why no manifest declares `authorizedCallers: []` today. PREFER THIS FIELD in new manifests; reach for a bare `authorizedCallers` only alongside `callerPolicy: listed`.",
+            "enum": ["owner_only", "first_party", "listed"]
+          },
           "authorizedCallers": {
-            "description": "MP ids permitted to invoke this activity. THREE distinct cases, and they are not interchangeable (broker authorizeInvoke, F1): (1) NON-EMPTY list -> exactly those MPs, plus the owning MP itself; (2) EXPLICIT [] -> the owning MP ONLY, i.e. deliberately closed to every other MP (this is the tightest setting, and it is what the estate's 53 [] declarations mean — cross-MP writes are opened through narrow purpose-built activities such as scheduling.update_shift_from_leave rather than by opening CRUD); (3) ABSENT -> the permissive first-party default: ANY registered first-party MP may call it. Note (2) and (3) are OPPOSITES, so omitting the field is not equivalent to declaring it empty. The strict reading of (2) is gated on the host's `strictEmptyCallers`, which is ON in tommy-app's mp-loader; with it off, (2) falls through to (3).",
+            "description": "MP ids permitted to invoke this activity. PREFER `callerPolicy` — this field alone can only state the `listed` case unambiguously. THREE distinct cases, and they are not interchangeable (broker authorizeInvoke, F1): (1) NON-EMPTY list -> exactly those MPs, plus the owning MP itself; (2) EXPLICIT [] -> the owning MP ONLY, i.e. deliberately closed to every other MP. NO MANIFEST DECLARES THIS ANY MORE — the estate's 58 such activities migrated to `callerPolicy: owner_only` (D.40, 2026-08-13); it stays legal so that nothing which validated before stops validating, but it is the ambiguous spelling and new manifests must not use it; (3) ABSENT -> the permissive first-party default: ANY registered first-party MP may call it. Note (2) and (3) are OPPOSITES, so omitting the field is not equivalent to declaring it empty. The strict reading of (2) is gated on the host's `strictEmptyCallers`, which is ON in tommy-app's mp-loader; with it off, (2) falls through to (3). None of that ambiguity applies when `callerPolicy` is present, which is the point of it.",
             "type": "array",
             "items": { "type": "string" }
           },
@@ -213,6 +217,25 @@ export default {
             "if": { "required": ["naturalKeyField"] },
             "then": { "properties": { "idempotency": { "const": "natural_key" } } },
             "$comment": "naturalKeyField is read ONLY on the natural_key branch of the broker's idempotencyKeyFor. Declaring it beside any other strategy is a silent no-op, so it is rejected rather than ignored."
+          },
+          {
+            "if": {
+              "required": ["callerPolicy"],
+              "properties": { "callerPolicy": { "const": "listed" } }
+            },
+            "then": {
+              "required": ["authorizedCallers"],
+              "properties": { "authorizedCallers": { "type": "array", "minItems": 1 } }
+            },
+            "$comment": "`listed` names its callers in authorizedCallers. An absent or empty list beside it would collapse to owner-only at the broker while the manifest says otherwise — the same absence-carries-meaning defect callerPolicy was added to remove."
+          },
+          {
+            "if": {
+              "required": ["callerPolicy"],
+              "properties": { "callerPolicy": { "enum": ["owner_only", "first_party"] } }
+            },
+            "then": { "not": { "required": ["authorizedCallers"] } },
+            "$comment": "owner_only and first_party are complete on their own. A companion authorizedCallers would be a second, contradictable source of truth for one question, and the broker would silently ignore it."
           }
         ]
       }

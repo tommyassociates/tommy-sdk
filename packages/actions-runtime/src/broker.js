@@ -94,7 +94,11 @@ export function createBroker({
   // --- enforcement flags (Class F). Default OFF: turning one ON requires the
   // matching manifest declarations to exist first (grants / read: scopes), so
   // each flips in its own wave once the estate declares them. ---
-  /** F1: treat `authorizedCallers: []` as deny-all-cross-MP, not "unset". */
+  /**
+   * F1: treat `authorizedCallers: []` as deny-all-cross-MP, not "unset".
+   * Governs ONLY that legacy spelling — `callerPolicy: owner_only` says the same
+   * thing unconditionally and is not gated on this flag (D.40).
+   */
   strictEmptyCallers = false,
   /** F2: cross-MP condition reads require a `read:<owner>.<condition>` scope. */
   enforceConditionScopes = false,
@@ -201,25 +205,48 @@ export function createBroker({
 
   function authorizeInvoke(callerMpId, targetMpId, activityName, activityDef, scopes) {
     const callers = activityDef.authorizedCallers;
+    const policy = activityDef.callerPolicy;
     const callerIsTarget = callerMpId === targetMpId;
     const callerFirstParty = mps.get(callerMpId)?.firstParty === true;
-    // Three distinct cases (F1 — they used to be two):
-    //  - non-empty list  -> that list (plus the owner itself)
+    // `callerPolicy` (D.40, ruled 2026-08-12) states the answer outright and is
+    // AUTHORITATIVE wherever it appears. `authorizedCallers` alone can only say
+    // `listed` unambiguously — its other two cases are carried by the SHAPE of
+    // the value (empty array / absent field), which is indistinguishable from an
+    // author who forgot. The estate's 58 owner-only activities were migrated to
+    // `callerPolicy: owner_only`, so the explicit-[] branch below is legal but
+    // unpopulated; it is kept so nothing that validated before stops validating.
+    //
+    // Three distinct cases either way (F1 — they used to be two):
+    //  - non-empty list  -> that list (plus the owner itself)      = `listed`
     //  - EXPLICIT []     -> the author said "nobody may call this cross-MP";
-    //                       only the owner. Gated on `strictEmptyCallers`
-    //                       because 52 live activities declare [] today and
-    //                       first-party callers rely on the old reading.
+    //                       only the owner. Gated on `strictEmptyCallers`,
+    //                       which tommy-app's mp-loader sets ON. Spell this
+    //                       `callerPolicy: owner_only` instead.
     //  - unset           -> first-party default (NOT default-deny: any
-    //                       registered first-party MP may call it).
+    //                       registered first-party MP may call it)
+    //                                                              = `first_party`
     const explicitEmpty = Array.isArray(callers) && callers.length === 0;
-    const allowed = Array.isArray(callers) && callers.length
-      ? callers.includes(callerMpId) || callerIsTarget
-      : (explicitEmpty && strictEmptyCallers)
-        ? callerIsTarget
-        : callerIsTarget || callerFirstParty;
+    const byCallerPolicy = {
+      owner_only: () => callerIsTarget,
+      first_party: () => callerIsTarget || callerFirstParty,
+      listed: () => callerIsTarget || (Array.isArray(callers) && callers.includes(callerMpId)),
+    }[policy];
+    const allowed = byCallerPolicy
+      ? byCallerPolicy()
+      : Array.isArray(callers) && callers.length
+        ? callers.includes(callerMpId) || callerIsTarget
+        : (explicitEmpty && strictEmptyCallers)
+          ? callerIsTarget
+          : callerIsTarget || callerFirstParty;
     if (!allowed) {
-      throw err('PermissionDenied', `activity '${qualify(targetMpId, activityName)}' does not list '${callerMpId}' in authorizedCallers`, {
-        rule: `activities.${activityName}.authorizedCallers`,
+      const rule = byCallerPolicy
+        ? `activities.${activityName}.callerPolicy`
+        : `activities.${activityName}.authorizedCallers`;
+      const because = byCallerPolicy
+        ? `declares callerPolicy '${policy}', which does not admit '${callerMpId}'`
+        : `does not list '${callerMpId}' in authorizedCallers`;
+      throw err('PermissionDenied', `activity '${qualify(targetMpId, activityName)}' ${because}`, {
+        rule,
         retryable: false,
       });
     }

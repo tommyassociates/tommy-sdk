@@ -8,6 +8,15 @@
  * the live estate has cross-MP callers that must first be granted explicitly.
  * Both flag states are asserted here, plus the first-party default path the
  * register flags as untested.
+ *
+ * SECOND HALF (D.40, ruled 2026-08-12) — `callerPolicy`. The three cases above
+ * are only two-thirds sayable with `authorizedCallers`: owner-only is spelled by
+ * an EMPTY ARRAY and first-party by an ABSENT FIELD, so both are carried by the
+ * shape of the value rather than by a value, and the empty case reads two ways
+ * depending on `strictEmptyCallers`. `callerPolicy: owner_only | first_party |
+ * listed` says it outright and is authoritative wherever present. The second
+ * describe block below pins that it is NOT gated on the flag — that is the whole
+ * point of it, and it is the property a future flag flip could silently undo.
  */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
@@ -46,19 +55,32 @@ async function world({ strictEmptyCallers } = {}) {
     delete_attendance: activity({ authorizedCallers: [] }),
     touch_attendance: activity(),
     record_view: activity({ authorizedCallers: ['timesheets'] }),
+    // D.40 — the same three cases said out loud. `sync_attendance` lists the
+    // THIRD-party MP deliberately: it proves `listed` overrides both defaults in
+    // both directions (a third party in, a first party out), which neither the
+    // empty nor the absent spelling can express.
+    purge_attendance: activity({ callerPolicy: 'owner_only' }),
+    open_attendance: activity({ callerPolicy: 'first_party' }),
+    sync_attendance: activity({ callerPolicy: 'listed', authorizedCallers: ['acme-reporting'] }),
   }), {
     handlers: {
       activities: {
         delete_attendance: () => ({ deleted: true }),
         touch_attendance: () => ({ touched: true }),
         record_view: () => ({ recorded: true }),
+        purge_attendance: () => ({ purged: true }),
+        open_attendance: () => ({ opened: true }),
+        sync_attendance: () => ({ synced: true }),
       },
     },
   });
   broker.registerMp(manifest('timesheets', 'first_party', {}), { handlers: {} });
   broker.registerMp(manifest('acme-reporting', 'third_party', {}), { handlers: {} });
 
-  const scopes = ['invoke:time-clock.delete_attendance', 'invoke:time-clock.touch_attendance', 'invoke:time-clock.record_view'];
+  const scopes = [
+    'invoke:time-clock.delete_attendance', 'invoke:time-clock.touch_attendance', 'invoke:time-clock.record_view',
+    'invoke:time-clock.purge_attendance', 'invoke:time-clock.open_attendance', 'invoke:time-clock.sync_attendance',
+  ];
   const firstPartyToken = await issuer.issue('timesheets', '1.0.0', TENANT, scopes, 'i-ts');
   const thirdPartyToken = await issuer.issue('acme-reporting', '1.0.0', TENANT, scopes, 'i-acme');
   const ownerToken = await issuer.issue('time-clock', '1.0.0', TENANT, [], 'i-tc');
@@ -130,5 +152,60 @@ describe('authorizeInvoke — empty vs unset authorizedCallers (F1)', () => {
     }).catch((e) => e);
     expect(rejection.code).toBe('PermissionDenied');
     expect(rejection.message).toContain("lacks scope 'invoke:time-clock.record_view'");
+  });
+});
+
+describe('authorizeInvoke — callerPolicy says the case outright (D.40)', () => {
+  it('owner_only denies a FIRST-PARTY caller under BOTH flag states', async () => {
+    // The property that matters: unlike `authorizedCallers: []`, this does not
+    // depend on strictEmptyCallers. Flipping that flag off must not silently
+    // re-open 58 owner-only activities to every first-party MP.
+    for (const w of [await world(), await world({ strictEmptyCallers: true })]) {
+      // eslint-disable-next-line no-await-in-loop
+      const rejection = await w.asFirstParty('purge_attendance').catch((e) => e);
+      expect(rejection.code).toBe('PermissionDenied');
+      expect(rejection.rule).toBe('activities.purge_attendance.callerPolicy');
+      expect(rejection.message).toContain("declares callerPolicy 'owner_only'");
+    }
+  });
+
+  it('owner_only still allows the OWNING MP', async () => {
+    const w = await world();
+    expect((await w.asOwner('purge_attendance')).result).toEqual({ purged: true });
+  });
+
+  it('first_party allows a first-party caller and denies a third-party one', async () => {
+    const w = await world({ strictEmptyCallers: true });
+    expect((await w.asFirstParty('open_attendance')).result).toEqual({ opened: true });
+    const rejection = await w.asThirdParty('open_attendance').catch((e) => e);
+    expect(rejection.code).toBe('PermissionDenied');
+    expect(rejection.rule).toBe('activities.open_attendance.callerPolicy');
+  });
+
+  it('listed overrides BOTH defaults: the listed third party is in, the unlisted first party is out', async () => {
+    const w = await world({ strictEmptyCallers: true });
+    expect((await w.asThirdParty('sync_attendance')).result).toEqual({ synced: true });
+    const rejection = await w.asFirstParty('sync_attendance').catch((e) => e);
+    expect(rejection.code).toBe('PermissionDenied');
+    expect(rejection.rule).toBe('activities.sync_attendance.callerPolicy');
+  });
+
+  it('callerPolicy is AUTHORITATIVE over a contradicting authorizedCallers', async () => {
+    // The schema rejects this pairing (owner_only/first_party forbid a companion
+    // list) precisely so one question has one answer. Pinned anyway: a manifest
+    // that reaches the broker unvalidated must resolve the tightest way, not
+    // fall through to the list.
+    const issuer = createFakeIssuer();
+    const broker = createBroker({ capabilityService: issuer });
+    broker.registerMp(manifest('time-clock', 'first_party', {
+      purge_attendance: activity({ callerPolicy: 'owner_only', authorizedCallers: ['timesheets'] }),
+    }), { handlers: { activities: { purge_attendance: () => ({ purged: true }) } } });
+    broker.registerMp(manifest('timesheets', 'first_party', {}), { handlers: {} });
+    const token = await issuer.issue('timesheets', '1.0.0', TENANT, ['invoke:time-clock.purge_attendance'], 'i-ts');
+    const rejection = await broker.invoke({
+      sourceMpId: 'timesheets', instanceId: 'i-ts', capabilityToken: token, activity: 'time-clock.purge_attendance', args: {},
+    }).catch((e) => e);
+    expect(rejection.code).toBe('PermissionDenied');
+    expect(rejection.rule).toBe('activities.purge_attendance.callerPolicy');
   });
 });

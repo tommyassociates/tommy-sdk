@@ -101,7 +101,9 @@ activities:
       type: object
       properties:
         checkinId: { type: string }
-    authorizedCallers: []              # default-deny: same-MP + first-party only
+    callerPolicy: owner_only           # owner_only | first_party | listed.
+                                       # owner_only = this MP alone. NOT the same as
+                                       # omitting the field, which means ANY first-party MP.
 
 # --- Actions (declarative trigger -> activity wiring) ------------------------
 actions:
