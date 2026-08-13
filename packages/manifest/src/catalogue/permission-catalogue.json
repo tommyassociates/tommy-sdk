@@ -1,5 +1,5 @@
 {
-  "_comment": "VENDORED FROM plans/refactor-plan/05-deliverables/02-manifest-tooling/permission-catalogue.sample.json \u2014 this copy is the runtime source of truth shipped inside @tommy/manifest (a pinned @tommy/manifest version = a pinned catalogue version). The catalogue is FIXED and versioned (Phase 3 Q2) \u2014 MPs may only request scopes that appear here; @tommy/manifest validate layer 3 rejects any non-member with the named rule 'permission-not-in-catalogue'. This is the M1 STARTER set (covers every scope the reference manifest uses); the EXHAUSTIVE production catalogue is a deliberate, reviewed Tommy authoring task before M4 (README:68, security-model.md \u00a72) \u2014 NOT an M1 gate. Growing it: add entries here, bump catalogueVersion, review. Scope form: verb:resource (verb in read|write|invoke). sensitivity (low|medium|high) drives review attention; deviceCapabilityRequired is checked against the device by the production manifest strip.",
+  "_comment": "VENDORED FROM plans/refactor-plan/05-deliverables/02-manifest-tooling/permission-catalogue.sample.json — this copy is the runtime source of truth shipped inside @tommy/manifest (a pinned @tommy/manifest version = a pinned catalogue version). The catalogue is FIXED and versioned (Phase 3 Q2) — MPs may only request scopes that appear here; @tommy/manifest validate layer 3 rejects any non-member with the named rule 'permission-not-in-catalogue'. This is the M1 STARTER set (covers every scope the reference manifest uses); the EXHAUSTIVE production catalogue is a deliberate, reviewed Tommy authoring task before M4 (README:68, security-model.md §2) — NOT an M1 gate. Growing it: add entries here, bump catalogueVersion, review. Scope form: verb:resource (verb in read|write|invoke). sensitivity (low|medium|high) drives review attention; deviceCapabilityRequired is checked against the device by the production manifest strip.",
   "catalogueVersion": "0.3.0-starter",
   "categories": [
     "team",
@@ -52,6 +52,20 @@
       "sensitivity": "low"
     },
     {
+      "scope": "write:locations",
+      "category": "directory",
+      "title": "Manage locations",
+      "description": "Create, update and delete the team's locations. Locations are directory reference data that shifts, timesheets and team members are all assigned against, so a delete is felt across those domains rather than being local to the location record. Held by the `team` MP, which owns directory CRUD (Mason, 2026-08-13) and owns the invite/member surfaces where a location is assigned.",
+      "sensitivity": "high"
+    },
+    {
+      "scope": "write:tags",
+      "category": "directory",
+      "title": "Manage tags, roles and skills",
+      "description": "Create, update and delete tags. ONE scope covers roles, skills and free tags because they are ONE table distinguished by a `context` column and served by one endpoint (core/src/api.js createTag/updateTag/deleteTag) — splitting it into three would invent a boundary the data model does not have. Roles in particular gate permissions and pay-template membership, and every tag kind is assigned to team members, shifts and documents, so a delete is felt across those domains rather than being local to the tag row. Held by the `team` MP, which owns directory CRUD (Mason, A.10 2026-08-12) and owns the invite surface where a tag is created. System and protected roles are refused server-side and surfaced read-only through `directory.tags()`'s `system`/`protected` flags.",
+      "sensitivity": "high"
+    },
+    {
       "scope": "read:roles",
       "category": "directory",
       "title": "Read roles",
@@ -97,7 +111,7 @@
       "scope": "read:pay_templates",
       "category": "timesheets",
       "title": "Read pay templates",
-      "description": "View the team's pay templates (rates and allowances) for pickers and pay estimates. Read-only: no MP owns this domain \u2014 there is no payroll MP, so it is served as a platform read.",
+      "description": "View the team's pay templates (rates and allowances) for pickers and pay estimates. Read-only: no MP owns this domain — there is no payroll MP, so it is served as a platform read.",
       "sensitivity": "medium"
     },
     {
@@ -272,7 +286,7 @@
       "scope": "read:messages_inbound",
       "category": "comms",
       "title": "Subscribe to inbound messages",
-      "description": "Receive inbound message/read/typing/block triggers from Team Comms as they arrive. Default-deny \u2014 an MP granted this sees only ACL-filtered events for conversations its installer may see. The inbound-notification privacy gate.",
+      "description": "Receive inbound message/read/typing/block triggers from Team Comms as they arrive. Default-deny — an MP granted this sees only ACL-filtered events for conversations its installer may see. The inbound-notification privacy gate.",
       "sensitivity": "high"
     },
     {
@@ -324,7 +338,7 @@
       "scope": "invoke:device_geolocation",
       "category": "device",
       "title": "Use location",
-      "description": "Device geolocation \u2014 one-time (getLocation) or ongoing (watchLocation). Ongoing use shows a persistent host indicator.",
+      "description": "Device geolocation — one-time (getLocation) or ongoing (watchLocation). Ongoing use shows a persistent host indicator.",
       "sensitivity": "high",
       "deviceCapabilityRequired": "geolocation"
     },
