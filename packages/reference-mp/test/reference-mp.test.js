@@ -16,10 +16,37 @@ import { createDataManager } from '@tommy/offline-sync';
 import { createPanelHost } from '@tommy/panel-runtime';
 import referenceMp, { postCheckin } from '../src/index.js';
 
-const TENANT = 'team-4401';
+// ⚠ ONE TENANT PER WORLD, NOT ONE FOR THE FILE — this is what made the suite
+// order-dependent, and the mechanism is worth stating because it is invisible
+// from the test body.
+//
+// `checkins` declares `syncStrategy: last_write_wins`, and this package's
+// vitest.config.js sets `environment: 'jsdom'`. So `hasWebStorage()` is TRUE
+// here (it is false under plain node), and offline-sync's defaultBackend picks
+// `createLocalStorageBackend(databaseName(token, mpId), …)` instead of memory.
+// `databaseName` is `tommy-mp:{tenantId}:{mpId}` — so with a file-level constant
+// tenant, EVERY world built by bootWorld() resolved to the SAME localStorage
+// keys, and jsdom keeps localStorage alive across examples. A `beforeEach` that
+// boots a genuinely fresh broker/sdk/host therefore still inherited the previous
+// example's check-ins.
+//
+// Two examples read that as a product answer: the cross-MP condition saw
+// `checkedIn: true` where it had written nothing, and the offline replay found
+// one record before draining where it expects zero.
+//
+// A distinct tenant per world fixes it at the level the platform already models
+// — `names.js` exists precisely so two teams running the same MP never share a
+// store (the D-multi-team regression it names) — so this also EXERCISES that
+// partitioning rather than only working around the symptom. Clearing
+// localStorage in an afterEach would go green too, but would leave every world
+// on one store name, one deleted hook away from the same bug and proving
+// nothing about partitioning.
+let worldSeq = 0;
 const flush = () => new Promise((resolve) => { setTimeout(resolve, 5); });
 
 async function bootWorld() {
+  worldSeq += 1;
+  const TENANT = `team-4401-w${worldSeq}`;
   const issuer = createFakeIssuer();
   const broker = createBroker({ capabilityService: issuer });
   const parsed = parseManifest(referenceMp.manifest).data;
@@ -42,7 +69,7 @@ async function bootWorld() {
   const adapter = createDirectAdapter({ broker, init });
   const sdk = buildSdk({ adapter, init, data, panels: host.panelsApiFor(parsed.id, parsed.panels), locales: referenceMp.locales });
   referenceMp.register(sdk);
-  return { broker, sdk, host, parsed, issuer };
+  return { broker, sdk, host, parsed, issuer, tenant: TENANT };
 }
 
 describe('reference MP (team-checkin)', () => {
@@ -82,7 +109,7 @@ describe('reference MP (team-checkin)', () => {
     // A first-party caller MP queries the reference MP's condition.
     const caller = { id: 'timesheets', version: '1.0.0', publisher: { type: 'first_party' }, triggers: {}, conditions: {}, activities: {}, actions: {} };
     world.broker.registerMp(caller, { handlers: {} });
-    const callerToken = await world.issuer.issue('timesheets', '1.0.0', TENANT, [], 'inst-ts');
+    const callerToken = await world.issuer.issue('timesheets', '1.0.0', world.tenant, [], 'inst-ts');
 
     const before = await world.broker.query({
       sourceMpId: 'timesheets', instanceId: 'inst-ts', capabilityToken: callerToken,
@@ -98,7 +125,7 @@ describe('reference MP (team-checkin)', () => {
     const fresh = await bootWorld();
     await postCheckin(fresh.sdk, { status: 'ok' });
     await flush();
-    const callerB = await fresh.issuer.issue('timesheets', '1.0.0', TENANT, [], 'inst-ts');
+    const callerB = await fresh.issuer.issue('timesheets', '1.0.0', fresh.tenant, [], 'inst-ts');
     fresh.broker.registerMp(caller, { handlers: {} });
     const after = await fresh.broker.query({
       sourceMpId: 'timesheets', instanceId: 'inst-ts', capabilityToken: callerB,
@@ -137,8 +164,8 @@ describe('reference MP (team-checkin)', () => {
 
   it('the 2.22 teaching Actions register and surface in per-tenant state (dispatch deferred)', () => {
     // enabledByDefault:false → never dispatched; required lock enforced.
-    expect(() => world.broker.setActionState(TENANT, 'team-checkin', 'record_on_checkin', { enabled: false }))
+    expect(() => world.broker.setActionState(world.tenant, 'team-checkin', 'record_on_checkin', { enabled: false }))
       .toThrow(/required/);
-    world.broker.setActionState(TENANT, 'team-checkin', 'notify_manager_when_struggling', { enabled: false, options: {} });
+    world.broker.setActionState(world.tenant, 'team-checkin', 'notify_manager_when_struggling', { enabled: false, options: {} });
   });
 });
