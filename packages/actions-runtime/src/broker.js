@@ -359,6 +359,28 @@ export function createBroker({
     }
   }
 
+  /**
+   * D.36 — `subscribe()` is grant-tested (F4) and the DECLARATIVE binding was
+   * not, so an MP could consume another MP's trigger simply by naming it in an
+   * Action. Same test, same vocabulary, same source: the consumer's registered
+   * manifest scopes, since neither path carries a capability token.
+   *
+   * A binding that fails the test is DROPPED from the wiring rather than
+   * throwing. The imperative path can reject at `subscribe()` because a caller
+   * is waiting; here the caller is an unrelated MP's emit, and failing its emit
+   * because a third party declared an ungranted Action would make one MP's
+   * manifest able to break another's writes. Dropping also keeps
+   * `triggerIsActive` honest — an ungranted binding is not a consumer, so the
+   * emit suppresses exactly as it would with no binding at all.
+   */
+  function actionBindingAuthorized(consumerMpId, triggerQualified) {
+    if (!strictEmitOwnership) return true;
+    const [ownerMpId, triggerName] = splitQualified(triggerQualified);
+    if (ownerMpId === consumerMpId) return true;
+    const declared = mps.get(consumerMpId)?.manifest.permissions?.scopes || [];
+    return holdsReadGrant(declared, readGrant(ownerMpId, triggerName));
+  }
+
   function actionsForTrigger(tenantId, triggerQualified) {
     const wired = [];
     for (const [mpId, entry] of mps) {
@@ -366,6 +388,7 @@ export function createBroker({
       for (const [actionId, action] of Object.entries(actions)) {
         const srcMp = action.trigger.mp || mpId;
         if (qualify(srcMp, action.trigger.name) !== triggerQualified) continue;
+        if (!actionBindingAuthorized(mpId, triggerQualified)) continue;
         const state = actionState.get(actionKey(tenantId, mpId, actionId))
           || { enabled: action.required ? true : action.enabledByDefault, options: action.optionsDefault || {} };
         if (action.required || state.enabled) wired.push({ mpId, actionId, action, options: state.options });
@@ -381,8 +404,36 @@ export function createBroker({
 
   // --- dispatch internals ----------------------------------------------------
 
-  async function runAction(tenantId, triggerPayload, wiredAction, chain, identity) {
+  /**
+   * D.35 — an Action's dispatches run as the MP that OWNS the Action, not as
+   * whoever emitted the trigger.
+   *
+   * `sourceMpId` was already the action owner, but the IDENTITY handed down was
+   * the emitter's, and `identity.scopes` is what `authorizeQuery` judges. So an
+   * Action owned by A, fired by B's emit, read A's cross-MP condition gates
+   * with B's grants — wrongly allowing when B held a grant A does not, and
+   * wrongly denying when A held one B does not. The attribution was wrong the
+   * same way: the run record carried B's capability token.
+   *
+   * There is no capability token on this path (nobody made an RPC — the broker
+   * is running a declared wiring), so the scopes come from the executing MP's
+   * REGISTERED MANIFEST, exactly as `authorizeSubscribe` reads them for the
+   * other tokenless path. The emitter's token id is kept as `causedByTokenId`
+   * so the chain is still traceable to the emit that caused it.
+   */
+  function identityForAction(executingMpId, emitterIdentity) {
+    return {
+      mpId: executingMpId,
+      tenantId: emitterIdentity?.tenantId,
+      scopes: mps.get(executingMpId)?.manifest.permissions?.scopes || [],
+      tokenId: undefined,
+      causedByTokenId: emitterIdentity?.tokenId,
+    };
+  }
+
+  async function runAction(tenantId, triggerPayload, wiredAction, chain, emitterIdentity) {
     const { mpId, actionId, action, options } = wiredAction;
+    const identity = identityForAction(mpId, emitterIdentity);
 
     // Shared inputMap source resolver — base four (trigger/option/const/
     // condition) + default EXECUTED; E2 (transform) / E3 (template) rejected.
@@ -707,6 +758,37 @@ export function createBroker({
         // back to whole-args derivation — identical retries still replay,
         // distinct writes still apply.
         return value !== undefined ? `n-${value}` : `n-${JSON.stringify(envelope.args)}`;
+      }
+      // D.37 — `correlationKey` is what the two host-owned scheduled-write
+      // system activities declare (`tommy.clock.schedule_follow_up` /
+      // `cancel_follow_up`, api `Mp::Activities::SYSTEM_DEFINITIONS`). It fell
+      // through to `default` and behaved EXACTLY as `none` — and because both
+      // also declare `offlineReplayable: true`, that is precisely the
+      // unkeyed-yet-replayable combination the schema forbids, hidden in the
+      // one place the manifest checker cannot see (system activities bypass
+      // it). A follow-up and its cancellation are the same FAMILY of fact, so
+      // the key is the caller's correlation key, which both inputSchemas
+      // REQUIRE — a replayed drain of the same scheduling carries the same key
+      // and the ledger absorbs it.
+      case 'correlationKey': {
+        const value = envelope.args?.correlationKey;
+        if (value === undefined || value === null || value === '') {
+          throw err('InvalidPayload', 'idempotency=correlationKey requires args.correlationKey', { retryable: false });
+        }
+        // ⚠ THE KEY IS THE CORRELATION KEY *AND* THE REST OF THE ARGS, which is
+        // a deliberate deviation from the parked note's "key on
+        // args.correlationKey". Keying on the correlation key ALONE would make
+        // `schedule_follow_up({correlationKey, fireAt})` un-rescheduable: moving
+        // an existing follow-up to a new time is a distinct write that would be
+        // swallowed and replay the first scheduling's stored result, silently.
+        // That is the M3 `set_mileage_status` approve→reject failure exactly,
+        // and it is why `natural_key` carries the same whole-args fallback a few
+        // lines above. Identical retries and offline drains still carry
+        // identical args, so they still collapse — which is the whole point.
+        const rest = { ...envelope.args };
+        delete rest.correlationKey;
+        const tail = Object.keys(rest).length ? `-${JSON.stringify(rest)}` : '';
+        return `c-${value}${tail}`;
       }
       default:
         return undefined; // 'none' — forbidden with offlineReplayable (validator-enforced)
