@@ -49,12 +49,12 @@ describe('L22 — naturalKeyField on the activity schema', () => {
     const yaml = withActivity(
       '    sideEffect: local_write\n'
       + '    idempotency: natural_key\n'
-      + '    naturalKeyField: token\n',
+      + '    naturalKeyField: id\n',
     );
     const result = validateManifest(yaml);
     expect(result.errors).toEqual([]);
     expect(result.ok).toBe(true);
-    expect(activityOf(yaml).naturalKeyField).toBe('token');
+    expect(activityOf(yaml).naturalKeyField).toBe('id');
   });
 
   it('accepts a DOTTED path, because the broker resolves one (dottedGet)', () => {
@@ -109,5 +109,103 @@ describe('L22 — naturalKeyField on the activity schema', () => {
     );
     expect(validateManifest(yaml).ok).toBe(true);
     expect(activityOf(yaml).naturalKeyField).toBeUndefined();
+  });
+});
+
+/**
+ * D.38 — the field must name a SCALAR PROPERTY OF THE INPUT, not just look like
+ * a name. Both failures below are silent at runtime, which is why they are
+ * refused at author time rather than left to a survey.
+ *
+ * The broker builds the key as `n-${value}` — a template literal. A field
+ * pointing at an OBJECT therefore yields `n-[object Object]` for every call,
+ * and an ARRAY yields its join. Every invocation collides on one key, so the
+ * second DISTINCT write replays the first's stored result instead of applying:
+ * the M3 `set_mileage_status` approve→reject failure, reproduced by
+ * declaration rather than by omission.
+ *
+ * A field naming nothing at all is the quieter one: the broker resolves
+ * `undefined` and falls back to hashing the whole args, so the manifest
+ * advertises a natural key it does not have and the fallback hides it.
+ */
+describe('D.38 — naturalKeyField must resolve to a scalar identity', () => {
+  // `        id: { type: string }` appears three times in the fixture — twice in
+  // condition schemas and LAST in the activity's inputSchema, which is the one
+  // this rule reads. A plain `.replace` rewrites the first (a condition), so the
+  // activity keeps its original property and every case here would test nothing.
+  const PROPS_LINE = '        id: { type: string }\n';
+  const replaceLast = (source, find, next) => {
+    const at = source.lastIndexOf(find);
+    expect(at, 'the activity inputSchema anchor must still exist').toBeGreaterThan(-1);
+    return source.slice(0, at) + next + source.slice(at + find.length);
+  };
+  const withInput = (idempotencyBlock, props) => replaceLast(
+    BASE.replace(ANCHOR, idempotencyBlock), PROPS_LINE, props,
+  );
+
+  it('REFUSES an OBJECT-typed field — every call would collide on the same key', () => {
+    const yaml = withInput(
+      '    sideEffect: local_write\n'
+      + '    idempotency: natural_key\n'
+      + '    naturalKeyField: attributes\n',
+      '        attributes: { type: object }\n',
+    );
+    const errors = errorsOf(yaml);
+    expect(errors.join(' ')).toContain('natural-key-field-not-scalar');
+    expect(errors.join(' ')).toContain('object');
+  });
+
+  it('REFUSES an ARRAY-typed field for the same reason', () => {
+    const yaml = withInput(
+      '    sideEffect: local_write\n'
+      + '    idempotency: natural_key\n'
+      + '    naturalKeyField: userIds\n',
+      '        userIds: { type: array, items: { type: string } }\n',
+    );
+    expect(errorsOf(yaml).join(' ')).toContain('natural-key-field-not-scalar');
+  });
+
+  it('REFUSES a field that is not in the inputSchema at all — the fallback would hide it', () => {
+    const yaml = withInput(
+      '    sideEffect: local_write\n'
+      + '    idempotency: natural_key\n'
+      + '    naturalKeyField: ghostId\n',
+      '        id: { type: string }\n',
+    );
+    expect(errorsOf(yaml).join(' ')).toContain('natural-key-field-not-in-input');
+  });
+
+  it('ACCEPTS a scalar identity — the shape the whole estate uses', () => {
+    for (const type of ['string', 'integer', 'number']) {
+      const yaml = withInput(
+        '    sideEffect: local_write\n'
+        + '    idempotency: natural_key\n'
+        + '    naturalKeyField: thingId\n',
+        `        thingId: { type: ${type} }\n`,
+      );
+      expect(errorsOf(yaml), `${type} must be accepted`).toEqual([]);
+    }
+  });
+
+  it('does NOT pile a second error onto the wrong-strategy case — one fix, named once', () => {
+    const yaml = withInput(
+      '    sideEffect: local_write\n'
+      + '    idempotency: client_key\n'
+      + '    naturalKeyField: ghostId\n',
+      '        id: { type: string }\n',
+    ).replace('    offlineReplayable: true\n', '    offlineReplayable: false\n');
+    const errors = errorsOf(yaml);
+    expect(errors.join(' ')).toContain('natural-key-field-requires-natural-key');
+    expect(errors.join(' ')).not.toContain('natural-key-field-not-in-input');
+  });
+
+  it('leaves a DOTTED path alone — its type is not knowable from the inputSchema', () => {
+    const yaml = withInput(
+      '    sideEffect: local_write\n'
+      + '    idempotency: natural_key\n'
+      + '    naturalKeyField: invitation.token\n',
+      '        invitation: { type: object }\n',
+    );
+    expect(errorsOf(yaml)).toEqual([]);
   });
 });

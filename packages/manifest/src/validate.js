@@ -184,6 +184,55 @@ function crossRefErrors(doc, lineCounter, data) {
     }
   };
 
+  // --- naturalKeyField must name a SCALAR property of the inputSchema -------
+  //
+  // The broker builds the key as `n-${value}` (broker.js idempotencyKeyFor), a
+  // template literal. So a field pointing at an OBJECT stringifies to
+  // `n-[object Object]` and an ARRAY to `n-a,b` — every invocation collides,
+  // and the second distinct write replays the first's stored result instead of
+  // applying. That is the M3 `set_mileage_status` approve→reject failure
+  // exactly, and it is SILENT: no error, a plausible key, the wrong answer.
+  //
+  // The schema can say `naturalKeyField` is a string; it cannot say the string
+  // must name a scalar property of a sibling object, which is why this lives in
+  // the cross-reference layer. Naming a property that does not exist at all is
+  // also caught here — the broker would fall back to whole-args derivation, so
+  // the declaration would be decoration rather than the contract it looks like.
+  //
+  // Dotted paths are ACCEPTED without inspection: `a.b` addresses a nested
+  // property whose type the inputSchema often does not spell out, and refusing
+  // what cannot be checked would be worse than allowing it.
+  for (const [name, act] of Object.entries(data.activities ?? {})) {
+    const field = act.naturalKeyField;
+    if (typeof field !== 'string' || field.includes('.')) continue;
+    // Beside another strategy the field is already refused by name
+    // (natural-key-field-requires-natural-key). Adding a second complaint about
+    // a field the broker will never read would send the author to the wrong fix.
+    if (act.idempotency !== 'natural_key') continue;
+    const props = act.inputSchema?.properties;
+    if (!props || typeof props !== 'object') continue;
+    const prop = props[field];
+    if (prop === undefined) {
+      errors.push(
+        finalize(doc, lineCounter, {
+          path: ['activities', name, 'naturalKeyField'],
+          rule: 'natural-key-field-not-in-input',
+          message: `activity '${name}' declares naturalKeyField '${field}', which is not a property of its inputSchema — the broker would find nothing there and silently fall back to hashing the whole args, so the declaration promises a contract it does not deliver.`,
+        }, 4),
+      );
+      continue;
+    }
+    if (prop.type === 'object' || prop.type === 'array') {
+      errors.push(
+        finalize(doc, lineCounter, {
+          path: ['activities', name, 'naturalKeyField'],
+          rule: 'natural-key-field-not-scalar',
+          message: `activity '${name}' declares naturalKeyField '${field}', which is an ${prop.type} — the broker interpolates the value into the key, so every call would collide on the same string and the second distinct write would replay the first's result. A natural key must be a scalar identity.`,
+        }, 4),
+      );
+    }
+  }
+
   for (const [name, action] of Object.entries(data.actions ?? {})) {
     const trig = action.trigger;
     if (trig && !trig.mp && trig.name != null) {
