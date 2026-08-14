@@ -226,23 +226,38 @@ export function createBroker({
     //                       registered first-party MP may call it)
     //                                                              = `first_party`
     const explicitEmpty = Array.isArray(callers) && callers.length === 0;
-    const byCallerPolicy = {
+
+    // ONE CODE PATH (totality step 3, ruled 2026-08-14). This used to be a
+    // declared-policy table with a THREE-CASE FALLBACK beside it for activities
+    // declaring no `callerPolicy`, so the same three answers were spelled twice
+    // and could drift apart. Step 3 as originally filed said DELETE the
+    // fallback — but `callerPolicy` is deliberately still OPTIONAL (making it
+    // `required` breaks a published v1 contract, so it is deferred to the next
+    // manifestVersion bump), and deleting the fallback would leave `allowed`
+    // UNDEFINED for a manifest that legally omits the field: default-DENY, for
+    // exactly the third-party author the deferral was protecting.
+    //
+    // So NORMALISE instead of deleting. The effective policy is derived once,
+    // from the declared value or from what the legacy shape MEANT, and the
+    // single table below decides. Same one path, no unreachable branch, and an
+    // omitting manifest keeps its documented default instead of silently
+    // becoming uninvokable.
+    const effectivePolicy = policy
+      || (Array.isArray(callers) && callers.length ? 'listed' : null)
+      || ((explicitEmpty && strictEmptyCallers) ? 'owner_only' : 'first_party');
+    const allowed = {
       owner_only: () => callerIsTarget,
       first_party: () => callerIsTarget || callerFirstParty,
       listed: () => callerIsTarget || (Array.isArray(callers) && callers.includes(callerMpId)),
-    }[policy];
-    const allowed = byCallerPolicy
-      ? byCallerPolicy()
-      : Array.isArray(callers) && callers.length
-        ? callers.includes(callerMpId) || callerIsTarget
-        : (explicitEmpty && strictEmptyCallers)
-          ? callerIsTarget
-          : callerIsTarget || callerFirstParty;
+    }[effectivePolicy]();
     if (!allowed) {
-      const rule = byCallerPolicy
+      // The rule cited stays the one the AUTHOR wrote — an activity that said
+      // `listed` through a bare `authorizedCallers` must not be told it failed
+      // a `callerPolicy` it never declared.
+      const rule = policy
         ? `activities.${activityName}.callerPolicy`
         : `activities.${activityName}.authorizedCallers`;
-      const because = byCallerPolicy
+      const because = policy
         ? `declares callerPolicy '${policy}', which does not admit '${callerMpId}'`
         : `does not list '${callerMpId}' in authorizedCallers`;
       throw err('PermissionDenied', `activity '${qualify(targetMpId, activityName)}' ${because}`, {
