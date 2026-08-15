@@ -41,7 +41,7 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
      * The PanelsApi for one MP instance — injected as `tommy.panels`.
      * register() only accepts ids the manifest DECLARES (contract-first).
      */
-    panelsApiFor(mpId, manifestPanelsRaw = {}, { firstParty = false } = {}) {
+    panelsApiFor(mpId, manifestPanelsRaw = {}, { firstParty = false, onEmbed } = {}) {
       const manifestPanels = Object.fromEntries(normalizePanels(manifestPanelsRaw));
       declarations.set(mpId, manifestPanels);
       const defs = registrations.get(mpId) || new Map();
@@ -71,6 +71,32 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
         },
         async requestNavigation() {
           throw new Error('tommy.panels.requestNavigation: host navigation lands with the shell integration (M1 loader)');
+        },
+        /**
+         * A.6 — EMBED ANOTHER MP'S PANEL into an element of this one's surface.
+         *
+         * The park this closes recorded that `team_member_details` was already
+         * a real manifest surface that `layoutFor` resolves and that
+         * `mps/documents` already declared a panel for — and that there was
+         * still no way to ASK for one, because `attachSurface` is host-only and
+         * unreachable from MP source. This is that ask. The MP supplies
+         * `{ mpId, panelId, el, surfaceContext }`; the host resolves consent,
+         * mounts the OWNING MP's own component with the OWNING MP's own sdk,
+         * and returns a disposer.
+         *
+         * The embedded panel is NOT this MP's code and never becomes it: it
+         * renders in its owner's context, reads its owner's conditions and is
+         * torn down through the returned handle. Nothing about the embedded
+         * MP's data crosses into the embedder.
+         *
+         * Every check lives host-side (`onEmbed`), because a caller-supplied
+         * assertion is not a permission.
+         */
+        async embed(opts = {}) {
+          if (typeof onEmbed !== 'function') {
+            throw new Error('tommy.panels.embed: the host has no embed integration');
+          }
+          return onEmbed({ ...opts, callerMpId: mpId });
         },
         reportSize(panelId, size) {
           if (onEvent) onEvent({ type: 'panel-size', panelId, size, at: Date.now() });
@@ -137,6 +163,15 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
       app.mount(el);
       mounted.set(el, { app, el, surface });
       return { panelCount: tiles.length };
+    },
+
+    /**
+     * A.6 — one MP's DECLARED panel entry (the manifest copy, not the
+     * registration), so the loader can resolve embed consent against the
+     * contract rather than against whatever the MP happened to register.
+     */
+    panelDeclaration(mpId, panelId) {
+      return (declarations.get(mpId) || {})[panelId] || null;
     },
 
     /** Whether THIS host already has an app mounted into `el` (the loader uses

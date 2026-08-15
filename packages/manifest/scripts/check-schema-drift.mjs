@@ -16,6 +16,24 @@ const pairs = [
     plans: '../../../../plans/refactor-plan/05-deliverables/05-reference-mp/reference-manifest.yml',
     label: 'reference manifest',
   },
+  // A.6 — THE API COPY, WHICH HAD NO GUARD AT ALL AND WAS ALREADY STALE.
+  //
+  // There are THREE copies of this schema, not two: the vendored one, the
+  // plans one, and `api/config/mp_contract/manifest-schema.json`, which is
+  // what `Mp::ChecksRunner` and `Mp::ManifestCheck::Contract` validate every
+  // SUBMISSION against. Only the first two were checked, so the one the SERVER
+  // enforces was free to drift — and had: it was missing `correlationKey` from
+  // the idempotency enum, so any manifest declaring it validated in the CLI
+  // and would have been REJECTED at publish.
+  //
+  // Found while adding `panels[].authorizedCallers`: the client accepted it and
+  // the server would have refused the same file. Named `plans` here only
+  // because that is the field the loop reads; it is a peer copy, not a source.
+  {
+    vendored: '../src/schema/manifest-schema.json',
+    plans: '../../../../api/config/mp_contract/manifest-schema.json',
+    label: 'manifest schema (api copy — what the SERVER validates submissions against)',
+  },
 ];
 
 let drift = false;

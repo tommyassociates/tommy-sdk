@@ -270,7 +270,7 @@
             ]
           },
           "idempotency": {
-            "description": "How an idempotency key is formed so retries/replays are safe. `correlationKey` keys a FOLLOW-UP FAMILY on the caller\u0027s `args.correlationKey` (plus the remaining args, so a re-scheduling to a new time is not swallowed as a replay); it is what the host-owned `tommy.clock.*` scheduled writes declare, and it was expressible nowhere until it was added here \u2014 the broker fell through to `none`, which their `offlineReplayable: true` forbids.",
+            "description": "How an idempotency key is formed so retries/replays are safe. `correlationKey` keys a FOLLOW-UP FAMILY on the caller's `args.correlationKey` (plus the remaining args, so a re-scheduling to a new time is not swallowed as a replay); it is what the host-owned `tommy.clock.*` scheduled writes declare, and it was expressible nowhere until it was added here \u2014 the broker fell through to `none`, which their `offlineReplayable: true` forbids.",
             "enum": [
               "client_key",
               "correlationKey",
@@ -793,6 +793,15 @@
               "cached_stale",
               "needs_connection"
             ]
+          },
+          "authorizedCallers": {
+            "description": "A.6 \u2014 the mpIds allowed to EMBED this panel through tommy.panels.embed. Consent is contract-first and DEFAULT-DENY: an absent or empty list means no other MP may embed the panel, matching how activities and conditions already express caller consent. Embedding is only ever possible on an embeddable host surface (team_member_details today); this field says WHO, the surfaces list says WHERE.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            },
+            "uniqueItems": true
           }
         }
       }
