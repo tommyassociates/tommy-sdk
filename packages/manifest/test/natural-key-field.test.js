@@ -102,13 +102,29 @@ describe('L22 — naturalKeyField on the activity schema', () => {
     expect(broker).toContain("activityDef.naturalKeyField || 'id'");
   });
 
-  it('omitting it stays legal — the default is still args.id, so this change is purely additive', () => {
+  // ⚠ SUPERSEDED BY D.38 RULING (a), 2026-08-15 — kept, inverted, and NOT
+  // deleted, because the assertion it used to make is the whole reason the
+  // estate drifted. It read "omitting it stays legal — the default is still
+  // args.id, so this change is purely additive". L22 was additive by design and
+  // that was right AT THE TIME: the field had just become reachable and nothing
+  // declared it yet.
+  //
+  // Two years of manifests later, 74 of 114 natural_key activities had never
+  // declared one, and this test was the thing certifying that as fine. Its
+  // premise was also only half true — the broker is `naturalKeyField || 'id'`,
+  // so the default is args.id ONLY when the activity has an `id` property; the
+  // estate's undeclared ones mostly do not, and they fell through to
+  // `n-${JSON.stringify(args)}`, which is `derived_from_input` wearing a
+  // different prefix. Omitting the field never meant "key on id". It meant
+  // "key on everything, but say otherwise".
+  it('omitting it is now REFUSED — L22 was additive, D.38(a) closed the spelling', () => {
     const yaml = withActivity(
       '    sideEffect: local_write\n'
       + '    idempotency: natural_key\n',
     );
-    expect(validateManifest(yaml).ok).toBe(true);
-    expect(activityOf(yaml).naturalKeyField).toBeUndefined();
+    const result = validateManifest(yaml);
+    expect(result.ok).toBe(false);
+    expect(result.errors.map((e) => e.rule)).toContain('natural-key-requires-field');
   });
 });
 
@@ -207,5 +223,56 @@ describe('D.38 — naturalKeyField must resolve to a scalar identity', () => {
       '        invitation: { type: object }\n',
     );
     expect(errorsOf(yaml)).toEqual([]);
+  });
+
+  // D.38 ruling (a), 2026-08-15 — the OTHER half of L22. L22 made the field
+  // reachable; this makes it MANDATORY, so `natural_key` can no longer be
+  // spelled in the way that silently means `derived_from_input`. 74 of the
+  // estate's 114 natural_key activities were spelled exactly that way and were
+  // all re-declared in the same commit, so the estate enters this rule clean.
+  describe('natural_key REQUIRES the field', () => {
+    it('REFUSES natural_key with no naturalKeyField — it was never a natural key', () => {
+      const yaml = withActivity(
+        '    sideEffect: local_write\n'
+        + '    idempotency: natural_key\n',
+      );
+      const errors = errorsOf(yaml);
+      expect(errors.join(' ')).toContain('natural-key-requires-field');
+      // The message must name the honest alternative, or the author's only
+      // route out is to invent a key — which is the regression this ruling
+      // rejected (declaring one collapses two distinct writes into a replay).
+      expect(errors.join(' ')).toContain('derived_from_input');
+    });
+
+    it('is SILENT once a real field is declared', () => {
+      const yaml = withActivity(
+        '    sideEffect: local_write\n'
+        + '    idempotency: natural_key\n'
+        + '    naturalKeyField: id\n',
+      );
+      expect(errorsOf(yaml)).toEqual([]);
+    });
+
+    it('does not fire for any OTHER strategy — only natural_key promises a key', () => {
+      for (const strategy of ['derived_from_input', 'client_key', 'none']) {
+        const yaml = withActivity(
+          '    sideEffect: local_write\n'
+          + `    idempotency: ${strategy}\n`,
+        ).replace('    offlineReplayable: true\n', '    offlineReplayable: false\n');
+        expect(errorsOf(yaml).join(' ')).not.toContain('natural-key-requires-field');
+      }
+    });
+
+    it('does NOT double-report with the ghost-field rule — one fix, named once', () => {
+      const yaml = withInput(
+        '    sideEffect: local_write\n'
+        + '    idempotency: natural_key\n'
+        + '    naturalKeyField: ghostId\n',
+        '        id: { type: string }\n',
+      );
+      const errors = errorsOf(yaml).join(' ');
+      expect(errors).toContain('natural-key-field-not-in-input');
+      expect(errors).not.toContain('natural-key-requires-field');
+    });
   });
 });

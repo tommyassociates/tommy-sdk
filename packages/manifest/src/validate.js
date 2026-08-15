@@ -202,6 +202,30 @@ function crossRefErrors(doc, lineCounter, data) {
   // Dotted paths are ACCEPTED without inspection: `a.b` addresses a nested
   // property whose type the inputSchema often does not spell out, and refusing
   // what cannot be checked would be worse than allowing it.
+  // D.38 ruling (a), 2026-08-15 — `natural_key` WITHOUT `naturalKeyField` is
+  // refused, because it was never a natural key. The broker's natural_key branch
+  // falls back to `n-${JSON.stringify(args)}` when the field is missing, which is
+  // byte-for-byte the behaviour of `derived_from_input` under a different prefix.
+  // 74 of the estate's 114 natural_key activities were spelled that way; all 74
+  // were re-declared as `derived_from_input` in the same commit, so the estate
+  // enters this rule already clean and it can be an ERROR rather than a warning.
+  //
+  // The point is that the declaration should state what happens. A strategy that
+  // silently degrades into a different strategy makes `natural_key` unreadable —
+  // you cannot tell the 40 real identity keys from the 74 whole-args hashes
+  // without opening the broker. Refusing the empty spelling keeps the two apart.
+  for (const [name, act] of Object.entries(data.activities ?? {})) {
+    if (act.idempotency === 'natural_key' && act.naturalKeyField === undefined) {
+      errors.push(
+        finalize(doc, lineCounter, {
+          path: ['activities', name, 'idempotency'],
+          rule: 'natural-key-requires-field',
+          message: `activity '${name}' declares idempotency 'natural_key' but no naturalKeyField — the broker falls back to hashing the whole args, which IS 'derived_from_input'. Declare the identity field, or declare 'derived_from_input' and say what it actually does.`,
+        }, 4),
+      );
+    }
+  }
+
   for (const [name, act] of Object.entries(data.activities ?? {})) {
     const field = act.naturalKeyField;
     if (typeof field !== 'string' || field.includes('.')) continue;
