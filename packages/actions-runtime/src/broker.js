@@ -27,6 +27,7 @@ import {
   SENSITIVE_CONDITIONS, domainScopeForMp,
 } from './constants.js';
 import { createRecordStore } from './records.js';
+import { createIdempotencyLedger } from './idempotency-ledger.js';
 import { validateToken } from './capability.js';
 import { evaluatePredicate as evaluateDeclaredPredicate } from './predicate.js';
 
@@ -108,6 +109,13 @@ export function createBroker({
   domainScopeOverrides = {},
   /** C1/Option B: primitives derivation must not grant (defaults to the exported set). */
   sensitiveConditions = SENSITIVE_CONDITIONS,
+  /**
+   * D.39 (c) — the DURABLE half of the idempotency ledger. Defaults to a
+   * storage-detecting ledger, so the shell gets persistence with no wiring and
+   * node/tests keep exactly today's memory-only behaviour. Injectable for tests.
+   * Pass `null` to disable persistence outright.
+   */
+  idempotencyLedger = createIdempotencyLedger(),
 } = {}) {
   if (!capabilityService || typeof capabilityService.validate !== 'function') {
     throw new Error('createBroker: capabilityService with validate() required');
@@ -889,6 +897,26 @@ export function createBroker({
       return { ...processedKeys.get(processedKey), idempotentReplay: true };
     }
 
+    // D.39 (c) — the DURABLE half, consulted only after the in-memory Map
+    // misses, so in-session behaviour (full replay, with the stored result) is
+    // completely unchanged. A hit here means "this key was processed in an
+    // EARLIER session", which the Map could never know: `client_key` promised
+    // exactly-once and delivered it only until the next reload.
+    //
+    // The response is SUPPRESSION, not replay — there is no stored result to
+    // return, because results are deliberately never persisted (the ledger
+    // header explains why: `issue_kiosk_pin` returns a live PIN). Callers get
+    // `idempotentReplay: true` as before, plus `resultRetained: false` so the
+    // absence of `result` is a declared outcome rather than a surprise.
+    //
+    // ⚠ Scoped to `client_key` at the CALL SITE as well as inside the ledger.
+    // Other strategies derive their key from the args, so persisting them would
+    // put tenant data (a PIN, an id) on disk inside the key itself — and D.39
+    // is about the caller-supplied-key case regardless.
+    if (processedKey && activityDef.idempotency === 'client_key' && idempotencyLedger?.has(processedKey)) {
+      return { status: 'succeeded', idempotentReplay: true, resultRetained: false };
+    }
+
     // Offline (§7 + queue §3): replayable -> queue; else typed Offline reject.
     if (!isOnline && activityDef.sideEffect !== 'local_write') {
       if (activityDef.offlineReplayable) {
@@ -951,6 +979,9 @@ export function createBroker({
         const final = { rpcId: record.runId, status: 'succeeded', result: result.result };
         await records.update(record.runId, { status: 'succeeded', result: result.result });
         if (processedKey) processedKeys.set(processedKey, final);
+        // D.39 (c) — record the KEY durably (never `final`, which holds the
+        // result). Only for client_key; see the read side above.
+        if (processedKey && activityDef.idempotency === 'client_key') idempotencyLedger?.add(processedKey);
         if (envelope.txnId) {
           const steps = txnSteps.get(envelope.txnId) || [];
           steps.push({ activity: envelope.activity, args: envelope.args, idempotencyKey });
