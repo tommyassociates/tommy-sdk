@@ -28,6 +28,7 @@ import {
 } from './constants.js';
 import { createRecordStore } from './records.js';
 import { createIdempotencyLedger } from './idempotency-ledger.js';
+import { createDurableQueue } from './durable-queue.js';
 import { validateToken } from './capability.js';
 import { evaluatePredicate as evaluateDeclaredPredicate } from './predicate.js';
 
@@ -116,6 +117,13 @@ export function createBroker({
    * Pass `null` to disable persistence outright.
    */
   idempotencyLedger = createIdempotencyLedger(),
+  /**
+   * D.43 — the offline queue's durable half. Same seam and same reasoning as
+   * the ledger above: it detects storage itself, so the shell gets persistence
+   * with no wiring and node/tests keep today's memory-only behaviour. Pass
+   * `null` to disable persistence outright.
+   */
+  offlineQueue = createDurableQueue({ now }),
 } = {}) {
   if (!capabilityService || typeof capabilityService.validate !== 'function') {
     throw new Error('createBroker: capabilityService with validate() required');
@@ -146,8 +154,10 @@ export function createBroker({
   const txnSteps = new Map();         // txnId -> [{activity, args, idempotencyKey}]
   const chainBudget = new Map();      // rootRunId -> total run count
   const buckets = new Map();          // `${mpId}:${kind}` -> {tokens, updatedAt}
-  const queue = [];                   // offline queue rows {sourceMpId, envelope, bytes, seq}
-  let queueSeq = 0;
+  // Offline queue rows {sourceMpId, envelope, bytes, seq, queuedAt}. The store
+  // owns the array and persists it (D.43); `null` opts out of persistence, and
+  // gets a storage-less instance rather than a second code path.
+  const queueStore = offlineQueue || createDurableQueue({ now, storage: null });
   let isOnline = online;
 
   const qualify = (mpId, name) => `${mpId}.${name}`;
@@ -644,8 +654,8 @@ export function createBroker({
 
     // Offline: durable queue, resolve queuedFor (actions-runtime.md §1.5).
     if (!isOnline) {
-      enqueueOffline(emitterMp, { ...envelope, identity });
-      return { emitId: `queued-${queueSeq}`, deliveredTo: 0, queuedFor: 1 };
+      const queuedSeq = enqueueOffline(emitterMp, { ...envelope, identity });
+      return { emitId: `queued-${queuedSeq}`, deliveredTo: 0, queuedFor: 1 };
     }
 
     const chain = envelope.chain || { rootRunId: undefined, depth: 0, chainPath: [] };
@@ -1041,18 +1051,17 @@ export function createBroker({
 
   function enqueueOffline(sourceMpId, envelope) {
     const bytes = JSON.stringify(envelope.args || envelope.payload || {}).length;
-    const partition = queue.filter((row) => row.sourceMpId === sourceMpId);
+    const partition = queueStore.all().filter((row) => row.sourceMpId === sourceMpId);
     const partitionBytes = partition.reduce((sum, row) => sum + row.bytes, 0);
     if (partition.length >= QUEUE_MAX_ENTRIES || partitionBytes + bytes > QUEUE_MAX_BYTES) {
       throw err('Offline_QueueFull', `offline queue full for mp '${sourceMpId}' (${partition.length} entries)`, { retryable: false });
     }
-    queueSeq += 1;
-    queue.push({ sourceMpId, envelope, bytes, seq: queueSeq });
+    return queueStore.push({ sourceMpId, envelope, bytes });
   }
 
   async function drainOfflineQueue() {
     const bySource = new Map();
-    for (const row of queue.splice(0)) {
+    for (const row of queueStore.takeAll()) {
       const list = bySource.get(row.sourceMpId) || [];
       list.push(row);
       bySource.set(row.sourceMpId, list);
@@ -1225,9 +1234,13 @@ export function createBroker({
     isOnline: () => isOnline,
     drainOfflineQueue,
     queueStats() {
+      const rows = queueStore.all();
       const bySource = {};
-      for (const row of queue) bySource[row.sourceMpId] = (bySource[row.sourceMpId] || 0) + 1;
-      return { total: queue.length, bySource };
+      for (const row of rows) bySource[row.sourceMpId] = (bySource[row.sourceMpId] || 0) + 1;
+      // `expiredOnLoad` is reported rather than swallowed: dropping a row past
+      // its TTL is the one path that discards an accepted write (D.43), so the
+      // host can surface it instead of the write silently never appearing.
+      return { total: rows.length, bySource, expiredOnLoad: queueStore.expiredOnLoad() };
     },
 
     async teardown() { /* flush semantics: nothing buffered at M1 beyond debounce */ },

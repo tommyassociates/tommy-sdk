@@ -3,8 +3,9 @@
  * the same broker serves the postMessage transport at M4).
  */
 export { createBroker } from './broker.js';
-export { createRecordStore, createMemoryBackend } from './records.js';
+export { createRecordStore, createMemoryBackend, createWebStorageBackend } from './records.js';
 export { createIdempotencyLedger } from './idempotency-ledger.js';
+export { createDurableQueue } from './durable-queue.js';
 export { validateToken, createFakeIssuer } from './capability.js';
 // THE predicate evaluator (there is exactly one — R4). Anything that gates on
 // a declared predicate imports it from here and supplies a context bag; no
