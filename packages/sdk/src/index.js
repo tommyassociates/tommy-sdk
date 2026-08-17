@@ -34,6 +34,12 @@ const STUB_NAMESPACES = [
   // manifest is what the publish-time checker vets (M19-M22) and a tour
   // registered imperatively at runtime would route around all four gates.
   'tours',
+  // A.8 — `tommy.identity.subject()`, WHOSE data the surface is scoped to.
+  // READ-ONLY by ruling: the acting subject is device-wide and outlives the
+  // navigation that set it, so an MP that could re-point it would change what
+  // ANOTHER MP shows on its next mount. Setting stays with navigation
+  // (`?actor_id=`) and the shell.
+  'identity',
 ];
 
 function stubNamespace(name) {
