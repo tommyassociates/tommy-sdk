@@ -2,9 +2,21 @@
  * records.js — the action-run record store (actions-runtime.md §5).
  *
  * Lives in the BROKER'S OWN store (`tommy-broker` — offline-sync.md §1),
- * never an MP-reachable one. Storage backend is injected: an in-memory
- * backend for tests and node, an IndexedDB backend in the shell (the loader
- * supplies it). Client→api sync of these records is the runs/sync drain
+ * never an MP-reachable one. Storage backend is injected via `recordBackend`
+ * on `createBroker`.
+ *
+ * ⚠ NOTHING INJECTS ONE TODAY, so every run record dies with the tab.
+ * This header used to say the shell supplied an IndexedDB backend "(the
+ * loader supplies it)". It never did — `recordBackend` appears nowhere in
+ * `app/src`, so the seam was designed and the shell half was never wired,
+ * and a reader was left believing these records were durable when they are
+ * a `Map` in closure scope. Corrected rather than left as an aspiration:
+ * the durability claim is the one thing an observability/audit store must
+ * not overstate. Tracked with the two sibling in-memory stores (the offline
+ * queue and the idempotency ledger) on the backlog's D.43 — the fix wants
+ * ONE persistence seam for all three, which is a ruling, not a patch.
+ *
+ * Client→api sync of these records is the runs/sync drain
  * (contract §3), owned by the loader/inspector stream — this store exposes
  * the query + replay surface the inspector consumes.
  *
