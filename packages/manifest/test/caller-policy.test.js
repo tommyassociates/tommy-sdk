@@ -26,7 +26,7 @@ import { validateManifest, parseManifest } from '../src/index.js';
 import { loadSchema } from '../src/schema.js';
 
 const BASE = readFileSync(fileURLToPath(new URL('./fixtures/valid-minimal.yml', import.meta.url)), 'utf8');
-const ANCHOR = '    authorizedCallers: []\n';
+const ANCHOR = '    callerPolicy: owner_only\n';
 
 /** valid-minimal with its one activity's caller declaration rewritten. */
 function withCallers(block) {
@@ -83,13 +83,31 @@ describe('D.40 — callerPolicy on the activity schema', () => {
     expect(errorsOf(withCallers('    callerPolicy: anyone\n')).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('the legacy spellings still validate — the change is additive (ruled 2026-08-13)', () => {
-    // `[]` no longer appears anywhere in the estate, but it stays legal: the
-    // ruling was additive, so a manifest that validated yesterday validates
-    // today. The fixture itself is the `[]` case.
+  it('an activity that OMITS callerPolicy is REJECTED (operator ruling 2026-08-19)', () => {
+    // ⚠ THIS TEST USED TO ASSERT THE OPPOSITE, and the reversal is the record.
+    // It was "the legacy spellings still validate — the change is additive
+    // (ruled 2026-08-13)", pinning a deliberate decision to leave the field
+    // OPTIONAL because making it required is the first non-additive change this
+    // v1 grammar has made. The operator overturned that on 2026-08-19: the
+    // permissive `first_party` default was still being carried by an OMISSION
+    // on 119 activities, where a forgotten field and a deliberate "any
+    // first-party MP may call this" are indistinguishable — the exact
+    // absence-carries-meaning defect callerPolicy was introduced to remove.
+    //
+    // WHAT DID NOT CHANGE, and the distinction matters: this closes the
+    // AUTHORING hole, not a runtime one. The broker still DERIVES an effective
+    // policy for a manifest that omits the field (authorizeInvoke normalises
+    // rather than deny-by-default), so nothing already published changes
+    // behaviour — it simply can no longer be authored that way.
+    expect(validateManifest(withCallers('')).ok, 'absent callerPolicy must fail').toBe(false);
+    expect(errorsOf(withCallers('')).join(' ')).toContain('callerPolicy');
+    // A bare `authorizedCallers` is no longer enough on its own either: it can
+    // only state the `listed` case, and it now has to say so.
+    expect(validateManifest(withCallers('    authorizedCallers: [time-clock]\n')).ok).toBe(false);
+    // The same declaration WITH the policy is fine.
+    expect(validateManifest(withCallers('    callerPolicy: listed\n    authorizedCallers: [time-clock]\n')).ok).toBe(true);
+    // And the fixture, which now declares owner_only, still validates.
     expect(validateManifest(BASE).ok).toBe(true);
-    expect(validateManifest(withCallers('')).ok).toBe(true); // absent field
-    expect(validateManifest(withCallers('    authorizedCallers: [time-clock]\n')).ok).toBe(true);
   });
 
   it('the schema and the BROKER agree on the field name and the three values', () => {

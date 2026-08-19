@@ -32,12 +32,12 @@ triggers:
 activities:
   real_activity:
     description: a
+    callerPolicy: owner_only
     sideEffect: local_write
     idempotency: derived_from_input
     offlineReplayable: false
     inputSchema: { type: object, additionalProperties: false, properties: { id: { type: string } } }
     resultSchema: { type: object }
-    authorizedCallers: []
 `;
 
   it('flags a select branch whose local target is undeclared', () => {
@@ -97,12 +97,12 @@ triggers:
 activities:
   record:
     description: r
+    callerPolicy: owner_only
     sideEffect: local_write
     idempotency: derived_from_input
     offlineReplayable: false
     inputSchema: { type: object, additionalProperties: false, properties: { id: { type: string } } }
     resultSchema: { type: object }
-    authorizedCallers: []
 functions:
   reconcile:
     entry: functions/reconcile.js

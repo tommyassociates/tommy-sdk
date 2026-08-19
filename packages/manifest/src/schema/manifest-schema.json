@@ -249,7 +249,8 @@
           "inputSchema",
           "sideEffect",
           "idempotency",
-          "offlineReplayable"
+          "offlineReplayable",
+          "callerPolicy"
         ],
         "properties": {
           "description": {
@@ -307,7 +308,7 @@
             }
           },
           "callerPolicy": {
-            "description": "Who may invoke this activity, SAID OUT LOUD. Authoritative over `authorizedCallers` wherever it is present (broker authorizeInvoke). One value per case: `owner_only` -> the owning MP alone, deliberately closed to every other MP; `first_party` -> the owning MP plus ANY registered first-party MP; `listed` -> the owning MP plus exactly the MPs named in `authorizedCallers`, which must then be non-empty. WHY IT EXISTS (ruling, Mason 2026-08-12, backlog D.40): `authorizedCallers` could only say owner-only by being an EMPTY ARRAY and first-party by being ABSENT, so two of its three cases were carried by the shape of an omission rather than by a value \u2014 indistinguishable from an author who forgot, and the empty case read two ways depending on the host's `strictEmptyCallers` flag. The estate's 58 owner-only activities were migrated to `callerPolicy: owner_only` in the same change, which is why no manifest declares `authorizedCallers: []` today. PREFER THIS FIELD in new manifests; reach for a bare `authorizedCallers` only alongside `callerPolicy: listed`.",
+            "description": "REQUIRED since 2026-08-19 (operator ruling, backlog D.40 follow-on step 2) \u2014 every activity must SAY who may invoke it. This is the first non-additive change to this v1 grammar: a manifest that omits the field no longer validates. It was deferred for exactly that reason, and taken deliberately, because the alternative is that the permissive `first_party` default keeps being carried by an OMISSION on the 119 activities where a forgotten field and a deliberate \u201cany first-party MP may call this\u201d are indistinguishable. The broker still derives an effective policy for a legacy manifest (`authorizeInvoke` normalises rather than deletes), so runtime behaviour for anything already published is unchanged \u2014 what changes is that new manifests cannot leave the question to silence. Who may invoke this activity, SAID OUT LOUD. Authoritative over `authorizedCallers` wherever it is present (broker authorizeInvoke). One value per case: `owner_only` -> the owning MP alone, deliberately closed to every other MP; `first_party` -> the owning MP plus ANY registered first-party MP; `listed` -> the owning MP plus exactly the MPs named in `authorizedCallers`, which must then be non-empty. WHY IT EXISTS (ruling, Mason 2026-08-12, backlog D.40): `authorizedCallers` could only say owner-only by being an EMPTY ARRAY and first-party by being ABSENT, so two of its three cases were carried by the shape of an omission rather than by a value \u2014 indistinguishable from an author who forgot, and the empty case read two ways depending on the host's `strictEmptyCallers` flag. The estate's 58 owner-only activities were migrated to `callerPolicy: owner_only` in the same change, which is why no manifest declares `authorizedCallers: []` today. PREFER THIS FIELD in new manifests; reach for a bare `authorizedCallers` only alongside `callerPolicy: listed`.",
             "enum": [
               "owner_only",
               "first_party",

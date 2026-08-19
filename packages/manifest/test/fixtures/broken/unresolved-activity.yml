@@ -22,6 +22,7 @@ triggers:
 activities:
   record_thing:
     description: Persist a thing.
+    callerPolicy: first_party
     sideEffect: local_write
     idempotency: derived_from_input
     offlineReplayable: false

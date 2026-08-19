@@ -52,7 +52,7 @@ activities:
       type: object
       properties:
         thingId: { type: string }
-    authorizedCallers: []
+    callerPolicy: owner_only
 actions:
   record_on_thing:
     title: Record thing

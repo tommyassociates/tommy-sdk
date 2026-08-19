@@ -13,6 +13,7 @@ publisher:
 activities:
   record_thing:
     description: Persist a thing.
+    callerPolicy: first_party
     sideEffect: local_write
     idempotency: none          # BREAK: none + offlineReplayable:true is invalid
     offlineReplayable: true
