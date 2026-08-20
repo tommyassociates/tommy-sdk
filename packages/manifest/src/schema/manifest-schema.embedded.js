@@ -1720,7 +1720,7 @@ export default {
               "$ref": "#/$defs/transformChain"
             }
           },
-          "$comment": "S5 (manifest-driven settings) \u2014 read a sibling (or, with 'mp', a cross-MP) SETTING as a wiring/predicate source. This is the only shape the settings work adds; it supplies an operand, never an operator. Reading a setting NEVER confers authority: visibleWhen/readOnlyWhen gate visibility only, and the server re-checks requiresPermission on every write (the 2.20 L3 rule)."
+          "$comment": "S5 (manifest-driven settings) \u2014 read a sibling (or, with 'mp', a cross-MP) SETTING as a wiring/predicate source. This is the only shape the settings work adds; it supplies an operand, never an operator. Reading a setting NEVER confers authority: visibleWhen/readOnlyWhen gate visibility only, and the write is re-checked by the endpoint the field is bound to. \u26a0 The 2.20 L3 rule was written as \"the server re-checks requiresPermission on every write\"; that is NOT what runs today \u2014 requiresPermission is declarative and unenforced (2026-08-20)."
         },
         {
           "type": "object",
@@ -1944,7 +1944,7 @@ export default {
     },
     "settingsPage": {
       "description": "MANIFEST-DRIVEN SETTINGS \u00a72.2 \u2014 one declared settings PAGE contributed by this MP. The host renders it; there is no per-MP hand-coded settings view. A page is pure DECLARATION: it names the sections, the fields, and the predicates that gate them, and nothing else. Rendered under /settings/mp/:mpId/ alongside that MP's Permissions \u00b7 Actions \u00b7 Notifications \u00b7 About.",
-      "$comment": "FIREWALL (2.20 \u00a76): section kinds and field types are DATA for the renderer; they never add evaluator capability. No expression language, ever \u2014 a new predicate operator is a binary release, not config. SECURITY: 'visibleWhen' is NEVER enforced server-side \u2014 hiding is not revoking; 'requiresPermission' is what the server enforces on read and on every write.",
+      "$comment": "FIREWALL (2.20 \u00a76): section kinds and field types are DATA for the renderer; they never add evaluator capability. No expression language, ever \u2014 a new predicate operator is a binary release, not config. SECURITY: 'visibleWhen' is NEVER enforced server-side \u2014 hiding is not revoking; 'requiresPermission' is where a page STATES its gate, but as of 2026-08-20 nothing enforces it \u2014 not the server, not the broker, not the renderer (see the field's own description). The real gate on a settings write is the endpoint the field writes through.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -1972,7 +1972,7 @@ export default {
           "type": "integer"
         },
         "requiresPermission": {
-          "description": "Tenant permission name gating this page (the existing custom authorize! system, NOT a token scope). ENFORCED SERVER-SIDE on read and on every write to the page's fields \u2014 unlike visibleWhen, which is a rendering hint only.",
+          "description": "Tenant permission name gating this page (the existing custom authorize! system, NOT a token scope). \u26a0 DECLARATIVE TODAY \u2014 NOTHING ENFORCES THIS FIELD, and this description used to claim the opposite (\"ENFORCED SERVER-SIDE on read and on every write\"). Verified 2026-08-20 across the whole estate: no api code reads it (the only Ruby reference is the M27 checker itself), and neither the Actions broker nor the settings renderer consults it. What actually gates a settings write is the EXISTING endpoint each field writes through \u2014 settings-model.js binds every declared field to the store action the hand-coded page already used, which is exactly why P1 needed no new server validator. So a name here neither grants nor revokes anything yet and MUST NOT be relied on as a gate. It is still the right place to state the page's intended gate: the day enforcement lands it becomes live and fails CLOSED, which is why M27 refuses a name that resolves to no permission row.",
           "type": "string"
         },
         "visibleWhen": {

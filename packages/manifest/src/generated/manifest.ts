@@ -437,6 +437,10 @@ order?: number
  * How the panel behaves with no connectivity.
  */
 offline?: ("cached_stale" | "needs_connection")
+/**
+ * A.6 — the mpIds allowed to EMBED this panel through tommy.panels.embed. Consent is contract-first and DEFAULT-DENY: an absent or empty list means no other MP may embed the panel, matching how activities and conditions already express caller consent. Embedding is only ever possible on an embeddable host surface (team_member_details today); this field says WHO, the surfaces list says WHERE.
+ */
+authorizedCallers?: string[]
 }[]
 /**
  * Non-panel UI surfaces. Forward-looking; slashCommands reserved.
@@ -473,6 +477,158 @@ settings?: SettingsPage[]
  * DEPRECATED (manifest-driven settings §2.2) — the inert {id,name,description} stub that predates the settings grammar. It never had a consumer. Superseded by 'settings' (array of settingsPage). RETAINED so every manifest authored against it still validates unchanged; new manifests MUST use 'settings'. Declaring both is legal but 'settings' is the only one rendered. Removal is a future manifestVersion bump and must carry a deprecations[]/removalPlan entry (C18).
  */
 settingsPages?: NamedContribution[]
+/**
+ * PARKED A.1 — the MP's TOUR ANCHOR declarations: the DOM contract a tour step may address. An anchor called `x` on MP `y` means the MP renders `data-tour-target="y.x"`. THIS IS THE ONLY THING THE HOST MAY DEPEND ON: `panel-runtime/panel-tile.js` attaches a CLOSED shadow root on the plain-DOM render path, so the host genuinely cannot query an MP's DOM and a `document.querySelector`-based tour runtime is only accidentally correct. Enforced by checker M19 (declared anchors must appear in the MP source) and M22 (no CSS selectors anywhere under tours).
+ */
+tourAnchors?: {
+/**
+ * Anchor name, unique within the MP (checker M25). The rendered attribute is `data-tour-target="<mpId>.<name>"`. Dots are excluded so the mpId prefix stays unambiguous.
+ */
+name: string
+/**
+ * What this anchor points at, for the author of a tour that consumes it.
+ */
+description?: string
+}[]
+/**
+ * PARKED A.1 — tours this MP contributes. The host owns the RUNTIME and the preconditions; the MP owns only what its own surface can state. Absent means this MP declares no tours.
+ */
+tours?: {
+/**
+ * Stable tour id, unique within the MP (checker M25). ⚠ THE WIRE KEY IS THIS ID: `tours.seen[id]` is keyed by it, so RENAMING AN ID RE-ONBOARDS THE ENTIRE EXISTING USER BASE.
+ */
+id: string
+title?: string
+description?: string
+/**
+ * Roles eligible for this tour. The host ANDs this into its unconditional precondition; it is not something the MP evaluates.
+ */
+roles?: string[]
+/**
+ * May be re-run from a replay link. VALIDATOR-DERIVED from fixture self-sufficiency (checker M21): declaring it over a fixture that cannot clean up after itself leaves residue on a live surface on every replay.
+ */
+replayable?: boolean
+/**
+ * The tour to chain into when this one completes. ⚠ WITHOUT IT A CHAIN SILENTLY SHORTENS: `tour-overlay.vue`'s `nextTourTargetPkg` returns null, the final CTA degrades to a plain "End tour" and the journey stops there. The shipped chain is Scheduling → Time Clock → Timesheets → Team, and each link is one of these fields. The named tour need not belong to this MP — an app-level tour is a legal target.
+ */
+nextTour?: string
+/**
+ * When this tour offers itself unprompted.
+ */
+autoLaunch?: {
+/**
+ * 2.22 — a closed L6-comparator predicate over declared sources (used by activity.select 'when', contributions.interactions 'visibleWhen', and — unchanged and unwidened — contributions.settings pages/sections/fields 'visibleWhen' and 'readOnlyWhen'). One level of allOf/anyOf composition.
+ */
+when?: ({
+source: InputMapSource
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+operand?: unknown
+operands?: unknown[]
+} | {
+/**
+ * @minItems 1
+ */
+allOf: [{
+source: InputMapSource
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+operand?: unknown
+operands?: unknown[]
+}, ...({
+source: InputMapSource
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+operand?: unknown
+operands?: unknown[]
+})[]]
+} | {
+/**
+ * @minItems 1
+ */
+anyOf: [{
+source: InputMapSource
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+operand?: unknown
+operands?: unknown[]
+}, ...({
+source: InputMapSource
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+operand?: unknown
+operands?: unknown[]
+})[]]
+})
+}
+/**
+ * @minItems 1
+ */
+steps: [{
+/**
+ * The anchor this step points at. Must be declared in `contributions.tourAnchors` (checker M19) UNLESS the step is host chrome — either `host: true` or a `tommy.`-prefixed anchor naming the host's own furniture.
+ */
+anchor: string
+/**
+ * This step targets HOST chrome (sidebar, navbar, dashboard shell), not the MP's own DOM, so no MP anchor declaration is expected.
+ */
+host?: boolean
+title?: string
+body?: string
+placement?: ("top" | "bottom" | "left" | "right" | "auto")
+/**
+ * The user must perform the real interaction to advance; the overlay's primary-button fallback is disabled for this step. ⚠ USE ONLY WHERE THE TARGET IS CERTAIN TO BE PRESENT. The fallback exists because a step whose anchor never resolves would otherwise TRAP the user — the shipped time-clock tour deliberately leaves its clock-in step WITHOUT this flag for exactly that reason (a user already clocked on has no Start button), while its clock-out step sets it because by then the button is guaranteed. `timeoutMs` bounds the risk and should always accompany it.
+ */
+requireInteraction?: boolean
+/**
+ * How long the runtime waits for the anchor to resolve VISIBLE before the step fails. The failure is self-concealing without telemetry — a failed auto-launched tour is recorded as completed, so the second user never hits it — which is why layer 4 (TOUR_STEP_FAILED) is part of the design rather than an extra.
+ */
+timeoutMs?: number
+}, ...({
+/**
+ * The anchor this step points at. Must be declared in `contributions.tourAnchors` (checker M19) UNLESS the step is host chrome — either `host: true` or a `tommy.`-prefixed anchor naming the host's own furniture.
+ */
+anchor: string
+/**
+ * This step targets HOST chrome (sidebar, navbar, dashboard shell), not the MP's own DOM, so no MP anchor declaration is expected.
+ */
+host?: boolean
+title?: string
+body?: string
+placement?: ("top" | "bottom" | "left" | "right" | "auto")
+/**
+ * The user must perform the real interaction to advance; the overlay's primary-button fallback is disabled for this step. ⚠ USE ONLY WHERE THE TARGET IS CERTAIN TO BE PRESENT. The fallback exists because a step whose anchor never resolves would otherwise TRAP the user — the shipped time-clock tour deliberately leaves its clock-in step WITHOUT this flag for exactly that reason (a user already clocked on has no Start button), while its clock-out step sets it because by then the button is guaranteed. `timeoutMs` bounds the risk and should always accompany it.
+ */
+requireInteraction?: boolean
+/**
+ * How long the runtime waits for the anchor to resolve VISIBLE before the step fails. The failure is self-concealing without telemetry — a failed auto-launched tour is recorded as completed, so the second user never hits it — which is why layer 4 (TOUR_STEP_FAILED) is part of the design rather than an extra.
+ */
+timeoutMs?: number
+})[]]
+/**
+ * Records seeded for the duration of the tour. `fixtures[]` exists rather than a step action precisely because A STEP ACTION HAS NO TEARDOWN CONTRACT.
+ */
+fixtures?: {
+/**
+ * Name this fixture is referenced by, unique within the tour. Also the `ref` component of the derived idempotency key `tour:<tourId>:<userId>:<ref>`.
+ */
+ref: string
+/**
+ * The declared activity that CREATES the fixture. An activity, not a free-form seed: it is scoped, permissioned and audited like any other write.
+ */
+activity: string
+/**
+ * Static input for the create activity.
+ */
+input?: {
+[k: string]: unknown
+}
+/**
+ * The activity that REMOVES the fixture. Checker M21 refuses a fixture without one — and `replayable: true` over such a fixture — because the measured failure is a browser closed mid-tour leaving PERMANENT SAMPLE RECORDS on a live surface with no sweeper. Declared here as shape; M21 owns the policy, so the two never become two authorities on one decision.
+ */
+teardown?: {
+activity: string
+input?: {
+[k: string]: unknown
+}
+}
+}[]
+}[]
 /**
  * MANIFEST-DRIVEN SETTINGS §4.3 / S6 — permission rows this MP OWNS. Ownership becomes server-declared (owner: {kind: host|mp, mpId}) instead of re-derived client-side from the two hard-coded hashes in the legacy permissions page (resourceTypeMapping, addonPackageToSystemSectionMapping — both delete when this lands). Claimed rows move onto that MP's own permissions page; UNCLAIMED rows stay on Tommy's (host-owned, fail-safe toward visibility).
  */
@@ -687,7 +843,7 @@ icon?: string
  */
 order?: number
 /**
- * Tenant permission name gating this page (the existing custom authorize! system, NOT a token scope). ENFORCED SERVER-SIDE on read and on every write to the page's fields — unlike visibleWhen, which is a rendering hint only.
+ * Tenant permission name gating this page (the existing custom authorize! system, NOT a token scope). ⚠ DECLARATIVE TODAY — NOTHING ENFORCES THIS FIELD, and this description used to claim the opposite ("ENFORCED SERVER-SIDE on read and on every write"). Verified 2026-08-20 across the whole estate: no api code reads it (the only Ruby reference is the M27 checker itself), and neither the Actions broker nor the settings renderer consults it. What actually gates a settings write is the EXISTING endpoint each field writes through — settings-model.js binds every declared field to the store action the hand-coded page already used, which is exactly why P1 needed no new server validator. So a name here neither grants nor revokes anything yet and MUST NOT be relied on as a gate. It is still the right place to state the page's intended gate: the day enforcement lands it becomes live and fails CLOSED, which is why M27 refuses a name that resolves to no permission row.
  */
 requiresPermission?: string
 visibleWhen?: Predicate
