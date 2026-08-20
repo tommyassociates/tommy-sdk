@@ -323,8 +323,17 @@
             }
           },
           "permission": {
-            "description": "Tenant permission name gating the underlying domain write (the existing custom authorize! system, NOT a token scope). REQUIRED by tommy-api's fail-closed floor for any server_write activity backed by a registered server executor: the executor refuses a privileged write whose manifest declares no permission (InvokeExecutor hardening 2026-07-11; the v1.1 J1 fixtures carry 'timesheet_access').",
+            "description": "Tenant permission name gating the underlying domain write (the existing custom authorize! system, NOT a token scope). REQUIRED by tommy-api's fail-closed floor for any server_write activity backed by a registered server executor: the executor refuses a privileged write whose manifest declares no permission (InvokeExecutor hardening 2026-07-11). \u26a0 THE NAME MUST BE A REAL ROW. Permission rows are created per team from api/config/manifests/permissions.yml (system) or by an addon install; HasAuthorization#authorize! SWALLOWS RecordNotFound for unknown names, so a name with no row behind it PASSES SILENTLY and the gate you think you declared does nothing. The v1.1 J1 fixture value 'timesheet_access' was exactly that \u2014 a fixture string that never existed as a row, carried into three shipped manifests and gating nothing until it was caught on 2026-08-20.",
             "type": "string"
+          },
+          "permissionOperation": {
+            "description": "WHICH CRUD OPERATION the named `permission` is checked for, said out loud. Required whenever `permission` is present. Tommy permission rows carry an `operations` array and Permission#authorized? refuses any operation outside it, so the operation is HALF the authorization decision \u2014 and it used to be hard-coded to 'update' in InvokeExecutor. That default silently inverted the check for every create-or-delete-shaped activity: `shift_create_access` declares operations ['create'], so naming it on `create_shift` under the hard-coded 'update' denied EVERY call. Declared here rather than inferred from the activity name, because a name is a guess ('publish_shifts', 'submit_form', 'assign_shift' have no honest prefix) and this programme's rule is that absence and inference must not carry meaning. REQUIREDNESS IS ENFORCED BY RULE M05, NOT BY THIS SCHEMA, and deliberately so: the api validates submissions with the json-schema gem, which predates draft-7 `if`/`then`, so a conditional here would be INERT in the one copy that gates publishing \u2014 a rule that looks enforced and is not, which is the exact defect this whole change exists to remove. Shape here, policy in the rules.",
+            "enum": [
+              "create",
+              "read",
+              "update",
+              "delete"
+            ]
           },
           "contractVersion": {
             "$ref": "#/$defs/contractVersion"
