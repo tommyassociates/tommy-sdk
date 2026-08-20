@@ -124,6 +124,16 @@ export function createBroker({
    * `null` to disable persistence outright.
    */
   offlineQueue = createDurableQueue({ now }),
+  /**
+   * How long a dispatch waits for an EXPECTED-but-unregistered MP (see
+   * `expectedMps` below) before giving up and raising the ordinary
+   * Unknown{Condition,Activity}. Only ever applies to an MP the host announced
+   * through `expectMps()` and only while it has not registered, so it can never
+   * delay a call to an MP that is genuinely absent. Deliberately larger than a
+   * condition's own `latencyBudgetMs`: this is bundle fetch + eval on a cold
+   * radio, not a query.
+   */
+  registrationTimeoutMs = 8000,
 } = {}) {
   if (!capabilityService || typeof capabilityService.validate !== 'function') {
     throw new Error('createBroker: capabilityService with validate() required');
@@ -142,6 +152,26 @@ export function createBroker({
 
   // --- registries -----------------------------------------------------------
   const mps = new Map();              // mpId -> { manifest, handlers, firstParty }
+  // PROVIDER READINESS — the registration race, made waitable.
+  //
+  // An MP registers only once its bundle has been fetched and evaluated, and the
+  // host mounts each MP's surfaces AS SOON AS THAT MP registers rather than
+  // blocking the route on the whole fan-out (mp-loader/index.js
+  // `mountReadySurfacesFor`, the instant-boot optimisation). So a panel can be
+  // live and querying while a DIFFERENT MP it consumes is still mid-fetch — and
+  // the consumer sees `UnknownCondition`, which is indistinguishable from
+  // "that MP is not installed" and is usually swallowed by a safeQuery default.
+  // Measured on `availability/main`, 2026-08-21: all four `leave.*` reads failed
+  // with `condition 'leave.leave_requests' is not registered` while the SAME
+  // boot summary reported `mps: 2, mounted: 2` — leave was installed, loading,
+  // and simply had not got there yet.
+  //
+  // `expectMps()` lets the host declare the set it is ABOUT to register, so the
+  // broker can tell "not yet" from "not installed" and await the first rather
+  // than failing it. Nothing waits on an MP the host never announced, so an
+  // absent MP still fails fast, exactly as before.
+  const expectedMps = new Set();      // announced by the host, not yet registered
+  const registrationWaiters = new Map(); // mpId -> Set<resolve>
   const subscribers = new Map();      // trigger -> Set<{mpId, handler}>
   const actionState = new Map();      // `${tenantId}:${mpId}:${actionId}` -> {enabled, options}
   const settingState = new Map();     // `${tenantId}:${mpId}` -> { key: value } (manifest-driven settings projection)
@@ -715,13 +745,43 @@ export function createBroker({
     return { emitId: record.runId, deliveredTo: 0, queuedFor: 0, coalescing: true };
   }
 
+  /**
+   * Resolve an MP entry, WAITING for registration if the host has announced the
+   * MP but its bundle has not finished loading. Returns the entry, or undefined
+   * when the MP is absent, never announced, or failed to arrive in time — in
+   * which case the caller raises exactly the error it raised before.
+   *
+   * ⚠ THE WAIT IS GATED ON THE MP BEING WHOLLY UNREGISTERED, deliberately. A
+   * REGISTERED MP that lacks the named condition/activity is a manifest error,
+   * and waiting on it would turn an instant, accurate failure into a timeout
+   * that lies about the cause. Only "not here YET" waits.
+   */
+  async function resolveMpEntry(mpId) {
+    const entry = mps.get(mpId);
+    if (entry) return entry;
+    if (!expectedMps.has(mpId)) return undefined;
+
+    let waiters = registrationWaiters.get(mpId);
+    if (!waiters) { waiters = new Set(); registrationWaiters.set(mpId, waiters); }
+
+    await new Promise((resolve) => {
+      const done = () => { clearTimeout(timer); waiters.delete(done); resolve(); };
+      const timer = setTimeout(done, registrationTimeoutMs);
+      // Never hold a process open on a wait nobody is watching (node/tests).
+      if (typeof timer?.unref === 'function') timer.unref();
+      waiters.add(done);
+    });
+
+    return mps.get(mpId);
+  }
+
   async function dispatchQuery(envelope) {
     const identity = envelope.identity || authenticate(envelope);
     const tenantId = envelope.tenantId || identity.tenantId;
     takeToken(envelope.sourceMpId, 'query');
 
     const [ownerMpId, conditionName] = splitQualified(envelope.condition);
-    const ownerEntry = mps.get(ownerMpId);
+    const ownerEntry = await resolveMpEntry(ownerMpId);
     const conditionDef = ownerEntry?.manifest.conditions?.[conditionName];
     if (!conditionDef) throw err('UnknownCondition', `condition '${envelope.condition}' is not registered`, { retryable: false });
 
@@ -880,7 +940,11 @@ export function createBroker({
     takeToken(envelope.sourceMpId, 'invoke');
 
     const [ownerMpId, activityName] = splitQualified(envelope.activity);
-    const ownerEntry = mps.get(ownerMpId);
+    // The WRITE half of the same race. A cross-MP write usually happens long
+    // after boot, so it is far less likely to hit it than a panel's first read —
+    // but "less likely" is how the read half survived unnoticed behind a
+    // safeQuery default, and a half-fixed race is worse than a known one.
+    const ownerEntry = await resolveMpEntry(ownerMpId);
     const activityDef = ownerEntry?.manifest.activities?.[activityName];
     if (!activityDef) throw err('UnknownActivity', `activity '${envelope.activity}' is not registered`, { retryable: false });
 
@@ -1093,6 +1157,43 @@ export function createBroker({
         handlers: handlers || {},
         firstParty: firstParty !== undefined ? firstParty : manifest.publisher?.type === 'first_party',
       });
+      // Release anything waiting on this MP to arrive (see `expectedMps`).
+      expectedMps.delete(manifest.id);
+      const waiters = registrationWaiters.get(manifest.id);
+      if (waiters) {
+        registrationWaiters.delete(manifest.id);
+        for (const done of [...waiters]) done();
+      }
+    },
+
+    /**
+     * Announce the MPs the host is ABOUT to register — the loading set, declared
+     * before the fan-out that registers them. A dispatch to one of these waits
+     * for it to arrive instead of failing as unknown; a dispatch to anything
+     * else is unaffected and still fails immediately.
+     *
+     * Announcing is a promise the host must keep: an MP announced and never
+     * registered costs every caller `registrationTimeoutMs` before failing, so
+     * announce the set that is genuinely being loaded, and call
+     * `stopExpecting()` for any that drops out (a failed bundle fetch, a flag
+     * that resolves off). Ids already registered are ignored.
+     */
+    expectMps(mpIds = []) {
+      for (const mpId of mpIds) if (mpId && !mps.has(mpId)) expectedMps.add(mpId);
+    },
+
+    /**
+     * Withdraw an announcement — the MP is not coming after all. Releases every
+     * waiter at once so they fail NOW with the honest "not registered" rather
+     * than each burning the full timeout on an MP already known to be absent.
+     */
+    stopExpecting(mpId) {
+      expectedMps.delete(mpId);
+      const waiters = registrationWaiters.get(mpId);
+      if (waiters) {
+        registrationWaiters.delete(mpId);
+        for (const done of [...waiters]) done();
+      }
     },
 
     unregisterMp(mpId) { mps.delete(mpId); },
