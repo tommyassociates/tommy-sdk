@@ -1,6 +1,6 @@
 {
   "_comment": "VENDORED FROM plans/refactor-plan/05-deliverables/02-manifest-tooling/permission-catalogue.sample.json — this copy is the runtime source of truth shipped inside @tommy/manifest (a pinned @tommy/manifest version = a pinned catalogue version). The catalogue is FIXED and versioned (Phase 3 Q2) — MPs may only request scopes that appear here; @tommy/manifest validate layer 3 rejects any non-member with the named rule 'permission-not-in-catalogue'. This is the M1 STARTER set (covers every scope the reference manifest uses); the EXHAUSTIVE production catalogue is a deliberate, reviewed Tommy authoring task before M4 (README:68, security-model.md §2) — NOT an M1 gate. Growing it: add entries here, bump catalogueVersion, review. Scope form: verb:resource (verb in read|write|invoke). sensitivity (low|medium|high) drives review attention; deviceCapabilityRequired is checked against the device by the production manifest strip.",
-  "catalogueVersion": "0.3.0-starter",
+  "catalogueVersion": "0.4.0-starter",
   "categories": [
     "team",
     "directory",
@@ -294,6 +294,20 @@
       "category": "comms",
       "title": "Send messages",
       "description": "Send team messages.",
+      "sensitivity": "high"
+    },
+    {
+      "scope": "read:calls",
+      "category": "comms",
+      "title": "Read call history",
+      "description": "Read voice/video call records and their participants — call history, per-call detail, and the tenant's calling feature flags.",
+      "sensitivity": "high"
+    },
+    {
+      "scope": "write:calls",
+      "category": "comms",
+      "title": "Start and end calls",
+      "description": "Create, join, decline and end voice/video calls on the member's behalf.",
       "sensitivity": "high"
     },
     {

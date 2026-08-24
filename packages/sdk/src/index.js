@@ -34,6 +34,15 @@ const STUB_NAMESPACES = [
   // manifest is what the publish-time checker vets (M19-M22) and a tour
   // registered imperatively at runtime would route around all four gates.
   'tours',
+  // `tommy.calls.*` — the Calls MP's window onto the HOST calling runtime
+  // (2026-08-24, migrating `video_calls`, the last legacy addon, to an MP).
+  // The runtime — tommy-core's video_calls store and the webrtc/device/pip/
+  // media-state managers — deliberately stays host-side: the global
+  // incoming-call modal and the public guest-join page depend on it and are not
+  // part of the MP, so moving it would fork call state across two owners. Every
+  // method is scope-gated (`read:calls` / `write:calls`), and anything opening a
+  // camera or microphone additionally passes tripleGate.
+  'calls',
   // A.8 — `tommy.identity.subject()`, WHOSE data the surface is scoped to.
   // READ-ONLY by ruling: the acting subject is device-wide and outlives the
   // navigation that set it, so an MP that could re-point it would change what
