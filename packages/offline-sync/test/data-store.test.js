@@ -197,3 +197,97 @@ describe('tommy.data stores', () => {
     expect((await store.get('d1'))._dirty).toBe(true); // dirty optimistic — never pruned
   });
 });
+
+describe('windowCache — a malformed DTO must not corrupt the window', () => {
+  // REGRESSION (spec mp-windowed-cache, review 2026-08-27). `reconcile` writes
+  // records one at a time and prunes AFTERWARDS, and windowCache used to swallow
+  // any error it raised. A schema violation in the MIDDLE of a batch therefore
+  // committed the rows before it, lost every row after it, skipped the prune
+  // entirely, and returned a normal-looking array — so a surface showed a
+  // half-updated window forever, with no signal and no self-healing.
+  const strict = {
+    entries: {
+      keyPath: 'id',
+      syncStrategy: 'last_write_wins',
+      recordSchema: {
+        type: 'object',
+        required: ['id'],
+        additionalProperties: false,
+        properties: { id: { type: 'string' }, title: { type: 'string' }, note: { type: 'string' } },
+      },
+    },
+  };
+
+  it('keeps every VALID row and still prunes, dropping only the bad one', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData: strict });
+    const store = data.store('entries');
+    await store.put({ id: 'stale', title: 'server dropped me' });
+    await store.markSynced('stale');
+
+    const errors = [];
+    const realError = console.error;
+    console.error = (...a) => errors.push(a.join(' '));
+    try {
+      const wc = data.windowCache('entries', {
+        fetch: async () => ([
+          { id: 'a', title: 'first' },
+          { id: 'b', title: 'bad', nope: 'not in the schema' }, // additionalProperties: false
+          { id: 'c', title: 'queued behind the bad one' },
+        ]),
+        scopeOf: () => () => true,
+      });
+      const ids = (await wc.sync({})).map((r) => r.id).sort();
+
+      // `c` is the one that proves it: it is VALID and was previously lost
+      // purely because it sat after `b` in the batch.
+      expect(ids).toEqual(['a', 'c']);
+      // The prune must still run — `stale` is exactly the row a silent throw stranded.
+      expect(ids).not.toContain('stale');
+      // And it must be REPORTED. Dropping a row is a judgement call; dropping it
+      // silently is the defect.
+      expect(errors.join(' ')).toMatch(/\[windowCache\].*rejected by the store schema/);
+    } finally {
+      console.error = realError;
+    }
+  });
+
+  it('survives a toRecord that throws, without losing the other rows', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData: strict });
+    const errors = [];
+    const realError = console.error;
+    console.error = (...a) => errors.push(a.join(' '));
+    try {
+      const wc = data.windowCache('entries', {
+        fetch: async () => ([{ id: 'a' }, { id: 'boom' }, { id: 'c' }]),
+        toRecord: (dto) => { if (dto.id === 'boom') throw new Error('cannot map'); return dto; },
+        scopeOf: () => () => true,
+      });
+      const ids = (await wc.sync({})).map((r) => r.id).sort();
+      expect(ids).toEqual(['a', 'c']);
+      expect(errors.join(' ')).toMatch(/toRecord threw/);
+    } finally {
+      console.error = realError;
+    }
+  });
+
+  it('hands `prev` to toRecord WITHOUT meta stamps, so the documented spread works', async () => {
+    // `getAll` returns rows carrying `_rev/_dirty/_updatedAt`, and `prev` exists
+    // to be spread into the new record. Un-stripped, that spread failed
+    // `additionalProperties: false` and the update vanished into the swallow —
+    // sync() returned the STALE row as though it had succeeded.
+    const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData: strict });
+    const store = data.store('entries');
+    await store.put({ id: 'r1', title: 'old', note: 'rich field only the cache has' });
+    await store.markSynced('r1');
+
+    const wc = data.windowCache('entries', {
+      fetch: async () => ([{ id: 'r1', title: 'new' }]), // thin DTO, no `note`
+      keyOf: (dto) => dto.id,
+      toRecord: (dto, prev) => ({ ...prev, ...dto }),
+      scopeOf: () => () => true,
+    });
+    const [row] = await wc.sync({});
+    expect(row.title).toBe('new');                            // the update lands
+    expect(row.note).toBe('rich field only the cache has');   // and prev is preserved
+  });
+});

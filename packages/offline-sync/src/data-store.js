@@ -121,12 +121,29 @@ export function createDataStore({ name, keyPath = 'id', recordSchema, backend = 
     }
   }
 
+  /** The schema failure for `record`, or null when it is valid. Shared by `put`
+   *  (which throws) and callers that need to CHECK without writing. */
+  const schemaFailure = (record) => {
+    if (!validate || validate(record)) return null;
+    return (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ');
+  };
+
   const api = {
     async get(key) {
       return backend.get(key);
     },
+    /** ⚠ Returns records WITH their `_rev/_dirty/_updatedAt` meta stamps. Use
+     *  `readWhere` for clean, re-put-safe domain rows — feeding a `getAll` row
+     *  back into `put` fails any `additionalProperties: false` recordSchema,
+     *  which is what every MP cache store declares. */
     async getAll() {
       return snapshot();
+    },
+    /** Whether `record` satisfies the declared recordSchema — the failure detail,
+     *  or null. Lets a caller PARTITION a batch instead of discovering the first
+     *  bad row mid-write, when earlier rows are already committed. */
+    validateRecord(record) {
+      return schemaFailure(record);
     },
     /** Cache-read half of SWR: the stored records matching `predicate(record)`,
      *  meta stamps stripped (clean domain rows). Sorting is the caller's job. */
@@ -134,9 +151,9 @@ export function createDataStore({ name, keyPath = 'id', recordSchema, backend = 
       return (await snapshot()).filter(predicate).map(stripMeta);
     },
     async put(record, { dedupeKey } = {}) {
-      if (validate && !validate(record)) {
-        const detail = (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ');
-        throw new Error(`store '${name}': record failed recordSchema: ${detail}`);
+      const failure = schemaFailure(record);
+      if (failure) {
+        throw new Error(`store '${name}': record failed recordSchema: ${failure}`);
       }
       const key = keyOf(record);
       if (key === undefined) throw new Error(`store '${name}': record missing keyPath '${keyPath}'`);
