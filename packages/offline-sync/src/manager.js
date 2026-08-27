@@ -38,7 +38,12 @@ function defaultBackend(dbName, storeName, syncStrategy) {
  *   derived from it, never passed separately (offline-sync.md §1).
  * @param {string} opts.mpId
  * @param {object} opts.localData manifest.localData (validated upstream)
- * @param {function} [opts.backendFactory] (databaseName, storeName) => backend
+ * @param {function} [opts.backendFactory] (databaseName, storeName, syncStrategy)
+ *   => backend. ⚠ `syncStrategy` is passed so a host factory can make the SAME
+ *   persist-vs-memory decision `defaultBackend` makes. Without it a factory has
+ *   no way to tell a client-owned store from a server-authoritative cache, and
+ *   would either persist caches that must not survive a session or drop
+ *   preferences that must.
  * @param {function} [opts.now]
  */
 export function createDataManager({ capabilityToken, mpId, localData = {}, backendFactory, now }) {
@@ -48,7 +53,7 @@ export function createDataManager({ capabilityToken, mpId, localData = {}, backe
 
   for (const [storeName, decl] of Object.entries(localData)) {
     const backend = backendFactory
-      ? backendFactory(dbName, storeName)
+      ? backendFactory(dbName, storeName, decl.syncStrategy)
       : defaultBackend(dbName, storeName, decl.syncStrategy);
     stores.set(storeName, createDataStore({
       name: storeName,
