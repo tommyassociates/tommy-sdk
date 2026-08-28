@@ -429,6 +429,35 @@ rbac?: {
 roles?: string[]
 }
 configSchema?: JsonSchema2
+/**
+ * 01c FR-11 — the panel's DECLARED parameter vocabulary: the inputs a placement may bind, so the host's per-panel settings UI can render them without executing MP code. Distinct from configSchema (free-form per-tenant config): params are the identity inputs a surface or admin supplies (e.g. which client this panel is about). At render time the host resolves each param in FR-12 order — surface context first, then the admin's static value, then the declaration default — and a required param that resolves to nothing renders the panel as needs-configuration, never half-drawn.
+ */
+params?: {
+/**
+ * Binding key — the exact key a PanelInstance.params entry names.
+ */
+name: string
+/**
+ * Value shape the panel expects. 'id' marks an entity id (e.g. actor_id, client_id) so the settings UI can offer a picker rather than a text field.
+ */
+type: ("string" | "integer" | "boolean" | "id")
+/**
+ * If true, a placement with no resolvable value renders needs-configuration instead of mounting the panel.
+ */
+required?: boolean
+/**
+ * Where a value may come from: 'context' = only ever supplied by the surface (the settings UI never offers it as editable); 'static' = only an admin-set value; 'any' = context first, then static.
+ */
+source?: ("context" | "static" | "any")
+/**
+ * Settings-UI display label; falls back to the name.
+ */
+label?: string
+/**
+ * Settings-UI help text.
+ */
+description?: string
+}[]
 placement?: {
 defaultSurface?: Surface
 order?: number
