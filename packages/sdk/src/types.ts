@@ -370,6 +370,60 @@ export interface PanelCell {
   readonly h: number;
 }
 
+/**
+ * One panel PLACED on a composed dashboard tab — a `panels[]` entry of the
+ * `dashboards` team Setting document (scope 01c). The composition references
+ * panels by (mpId, panelId); the manifest declaration stays the authority on
+ * eligibility, rbac and size bounds at resolve time. `mpId` is `"core"` for
+ * legacy first-party panels.
+ */
+export interface ComposedPanelInstance {
+  /** Placement uuid — the tile key; the same panel may be placed twice on one tab. */
+  readonly id: string;
+  readonly mpId: MpId;
+  readonly panelId: string;
+  /** Grid units on the host's 12-column grid (w 1–12; clamped to the declaration's size envelope at resolve time). */
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+  /** Per-placement parameter bindings: fed from surface context, pinned statically by the admin, or left to the declaration default. */
+  readonly params?: Readonly<Record<string,
+    | { readonly source: 'context' }
+    | { readonly source: 'static'; readonly value: unknown }
+    | { readonly source: 'default' }>>;
+  /** Per-tenant panel config validated against the manifest configSchema. */
+  readonly config?: Readonly<Record<string, unknown>>;
+  /**
+   * Placement-level audience targeting. Entries are tag ids (`members` may
+   * also hold a userId). AND across present non-empty contexts, OR within a
+   * list; absent/empty = everyone.
+   */
+  readonly visibility?: {
+    readonly audience?: {
+      readonly roles?: readonly string[];
+      readonly members?: readonly string[];
+      readonly tags?: readonly string[];
+      readonly locations?: readonly string[];
+      readonly skills?: readonly string[];
+    };
+  };
+}
+
+/**
+ * One resolved tile of a composed tab: the placement joined to its manifest
+ * declaration and the grid cell it occupies. `decl` is null when the placing
+ * MP is uninstalled or no longer declares the panel — the entry is KEPT and
+ * the host renders an unavailable tile in its cell (a stored composition
+ * never silently loses a placement). The declaration's shape is owned by the
+ * manifest schema, not this contract — opaque here.
+ */
+export interface ResolvedPanelEntry {
+  readonly instance: ComposedPanelInstance;
+  readonly decl: Readonly<Record<string, unknown>> | null;
+  readonly cell: PanelCell;
+}
+
 export interface PanelContext {
   readonly panelId: string;
   readonly surface: Surface;

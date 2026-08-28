@@ -132,13 +132,35 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
      * The skeleton paints with the grid; each tile reveals progressively.
      * `mpId` scopes the mount to a single MP (filtered BEFORE the panel
      * budget, so a scoped surface is never truncated by another MP).
+     *
+     * `layout` (scope 01c) switches the mount to COMPOSED mode: the array is
+     * `resolveComposedLayout`'s output and IS the tile list — order, geometry
+     * and visibility were decided upstream; the host neither re-filters nor
+     * re-sorts. Absent `layout`, declaration mode below runs exactly as
+     * before — that dormancy is load-bearing (every pre-01c surface mounts
+     * through it).
      */
-    mountSurface(el, { surface, viewerRoles = [], ctxFor, mpId, panelId }) {
+    mountSurface(el, { surface, viewerRoles = [], ctxFor, mpId, panelId, layout }) {
       // Idempotent per element: re-mounting into the same element replaces its
       // app (never touches another element hosting the same surface name).
       this.unmountSurface(el);
-      const groups = this.layoutFor(surface, viewerRoles, { mpId, panelId });
-      const tiles = groups.flatMap(({ mpId, defs }) => defs.map((def) => ({ mpId, def })));
+      let tiles;
+      if (Array.isArray(layout)) {
+        // A resolved entry with no decl (MP uninstalled) or no live
+        // registration (MP failed to boot) still OWNS its cell: it becomes an
+        // "unavailable" tile, never a PanelTile — no load attempt, no
+        // retry/circuit-breaker state for code that isn't there.
+        tiles = layout
+          .filter((entry) => entry && entry.instance)
+          .map((entry) => {
+            const defs = registrations.get(entry.instance.mpId);
+            const def = (entry.decl && defs && defs.get(entry.instance.panelId)) || null;
+            return { mpId: entry.instance.mpId, def, entry };
+          });
+      } else {
+        const groups = this.layoutFor(surface, viewerRoles, { mpId, panelId });
+        tiles = groups.flatMap(({ mpId, defs }) => defs.map((def) => ({ mpId, def })));
+      }
       if (tiles.length > SURFACE_PANEL_BUDGET) {
         // Advisory budget: log through the hook, render the budgeted slice.
         if (onEvent) onEvent({ type: 'surface-budget-exceeded', surface, count: tiles.length, at: Date.now() });
@@ -147,12 +169,39 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
       const app = createApp({
         name: 'MpPanelSurface',
         render: () => h('div', { class: 'mp-panel-grid', 'data-mp-surface': surface },
-          tiles.map(({ mpId, def }) => h(PanelTile, {
-            key: `${mpId}:${def.id}`,
-            def,
-            ctx: ctxFor ? ctxFor(mpId, def) : { panelId: def.id, surface, surfaceContext: { surface }, config: {}, online: true },
-            onEvent,
-          }))),
+          tiles.map(({ mpId, def, entry }) => {
+            // Composed placement is an INLINE style on the tile root (Vue
+            // fallthrough onto PanelTile's single root div): explicit start
+            // lines, because `span` alone would let the grid autoplace and
+            // lose the composed x/y. Declaration mode has no cell — no style.
+            const cell = entry && entry.cell;
+            const style = cell
+              ? { gridColumn: `${cell.x + 1} / span ${cell.w}`, gridRow: `${cell.y + 1} / span ${cell.h}` }
+              : undefined;
+            if (entry && !def) {
+              return h('div', {
+                key: entry.instance.id,
+                class: 'mp-panel-unavailable',
+                'data-panel-id': entry.instance.panelId,
+                'data-mp-id': entry.instance.mpId,
+                style,
+              });
+            }
+            return h(PanelTile, {
+              // Composed keys are the INSTANCE uuid — the same panel may be
+              // placed twice on one tab.
+              key: entry ? entry.instance.id : `${mpId}:${def.id}`,
+              style,
+              def,
+              // Composed mode hands ctxFor the full resolver entry as a third
+              // argument (params/config/cell live there); declaration-mode
+              // calls stay two-arg so arity-sniffing hosts see no change.
+              ctx: ctxFor
+                ? (entry ? ctxFor(mpId, def, entry) : ctxFor(mpId, def))
+                : { panelId: def.id, surface, surfaceContext: { surface }, config: (entry && entry.instance.config) || {}, online: true },
+              onEvent,
+            });
+          })),
       });
       // Install the host F7 runtime (Framework7Vue + registerComponents + $f7)
       // onto the surface app so component-path tiles resolve `f7-*` globals.
