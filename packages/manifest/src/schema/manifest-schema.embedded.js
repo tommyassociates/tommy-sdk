@@ -789,6 +789,57 @@ export default {
             "description": "JSON Schema for per-tenant panel config. Powers the panel settings UI.",
             "$ref": "#/$defs/jsonSchema"
           },
+          "params": {
+            "description": "01c FR-11 — the panel's DECLARED parameter vocabulary: the inputs a placement may bind, so the host's per-panel settings UI can render them without executing MP code. Distinct from configSchema (free-form per-tenant config): params are the identity inputs a surface or admin supplies (e.g. which client this panel is about). At render time the host resolves each param in FR-12 order — surface context first, then the admin's static value, then the declaration default — and a required param that resolves to nothing renders the panel as needs-configuration, never half-drawn.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "type"
+              ],
+              "properties": {
+                "name": {
+                  "description": "Binding key — the exact key a PanelInstance.params entry names.",
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9_]*$"
+                },
+                "type": {
+                  "description": "Value shape the panel expects. 'id' marks an entity id (e.g. actor_id, client_id) so the settings UI can offer a picker rather than a text field.",
+                  "enum": [
+                    "string",
+                    "integer",
+                    "boolean",
+                    "id"
+                  ]
+                },
+                "required": {
+                  "description": "If true, a placement with no resolvable value renders needs-configuration instead of mounting the panel.",
+                  "type": "boolean",
+                  "default": false
+                },
+                "source": {
+                  "description": "Where a value may come from: 'context' = only ever supplied by the surface (the settings UI never offers it as editable); 'static' = only an admin-set value; 'any' = context first, then static.",
+                  "enum": [
+                    "context",
+                    "static",
+                    "any"
+                  ],
+                  "default": "any"
+                },
+                "label": {
+                  "description": "Settings-UI display label; falls back to the name.",
+                  "type": "string"
+                },
+                "description": {
+                  "description": "Settings-UI help text.",
+                  "type": "string",
+                  "maxLength": 200
+                }
+              }
+            }
+          },
           "placement": {
             "type": "object",
             "additionalProperties": false,

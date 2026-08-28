@@ -100,6 +100,22 @@ describe('resolveComposedLayout', () => {
     expect(out[0].cell).toEqual({ panelId: 'gone-panel', x: 3, y: 1, w: 4, h: 2 });
   });
 
+  it('passes a declaration carrying params[] through UNTOUCHED — param resolution is host-side (FR-11/FR-12)', () => {
+    // The resolver joins, gates and clamps; it must NOT interpret the declared
+    // param vocabulary — the host's settings UI and FR-12 resolution read it
+    // off the entry's decl. Pin object IDENTITY, not just deep equality, so a
+    // future "helpful" normalization step in the resolver fails loudly here.
+    const params = [
+      { name: 'client_id', type: 'id', required: true, source: 'context' },
+      { name: 'window_days', type: 'integer', source: 'static', label: 'Window' },
+    ];
+    const declaring = { clients: { 'client-visits': { surfaces: ['dashboard'], params } } };
+    const out = resolveComposedLayout([place('clients', 'client-visits')], 'dashboard', { panelsByMp: declaring });
+    expect(out).toHaveLength(1);
+    expect(out[0].decl).toBe(declaring.clients['client-visits']); // same object, not a copy
+    expect(out[0].decl.params).toBe(params);                      // vocabulary rides along verbatim
+  });
+
   it('skips malformed instances without throwing; non-array input resolves empty', () => {
     const composed = [
       null,

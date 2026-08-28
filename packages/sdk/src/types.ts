@@ -411,16 +411,40 @@ export interface ComposedPanelInstance {
 }
 
 /**
+ * One declared panel parameter — a manifest `panels[].params[]` entry (01c
+ * FR-11). The declaration is what lets the host's per-panel settings UI
+ * render a panel's inputs WITHOUT executing MP code, and what the FR-12
+ * resolution order runs against: surface context → admin static value →
+ * declaration default → needs-configuration.
+ */
+export interface PanelParamSpec {
+  /** Binding key — the exact key a `ComposedPanelInstance.params` entry names. */
+  readonly name: string;
+  /** `'id'` marks an entity id (e.g. actor_id, client_id) so the settings UI offers a picker, not a text field. */
+  readonly type: 'string' | 'integer' | 'boolean' | 'id';
+  /** If true and nothing resolves a value, the host renders needs-configuration instead of mounting. Default false. */
+  readonly required?: boolean;
+  /** Legal provenance: 'context' = surface-supplied only (never admin-editable); 'static' = admin-set only; 'any' = context first, then static. Default 'any'. */
+  readonly source?: 'context' | 'static' | 'any';
+  /** Settings-UI display label; falls back to the name. */
+  readonly label?: string;
+  /** Settings-UI help text (schema-capped at 200 chars). */
+  readonly description?: string;
+}
+
+/**
  * One resolved tile of a composed tab: the placement joined to its manifest
  * declaration and the grid cell it occupies. `decl` is null when the placing
  * MP is uninstalled or no longer declares the panel — the entry is KEPT and
  * the host renders an unavailable tile in its cell (a stored composition
  * never silently loses a placement). The declaration's shape is owned by the
- * manifest schema, not this contract — opaque here.
+ * manifest schema, not this contract — opaque here EXCEPT `params`, the one
+ * slice the host must read (settings UI + FR-12 resolution), which the
+ * resolver passes through untouched.
  */
 export interface ResolvedPanelEntry {
   readonly instance: ComposedPanelInstance;
-  readonly decl: Readonly<Record<string, unknown>> | null;
+  readonly decl: (Readonly<Record<string, unknown>> & { readonly params?: readonly PanelParamSpec[] }) | null;
   readonly cell: PanelCell;
 }
 
