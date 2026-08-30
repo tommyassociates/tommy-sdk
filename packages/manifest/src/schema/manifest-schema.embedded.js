@@ -1603,12 +1603,13 @@ export default {
       ]
     },
     "surface": {
-      "description": "A host surface a panel/contribution can target. Extensible; new surfaces add enum values. team_member_details and client_details are host surfaces that MPs contribute panel 'tabs' into \u2014 Team Members and Clients are NOT Mini Programs.",
+      "description": "A host surface a panel/contribution can target. Extensible; new surfaces add enum values. team_member_details and client_details are host surfaces that MPs contribute panel 'tabs' into \u2014 Team Members and Clients are NOT Mini Programs. reports_home (scope 02a) is the Reports MP's home page \u2014 a subjectless host surface whose stored dashboard tabs mount like the detail surfaces.",
       "type": "string",
       "enum": [
         "dashboard",
         "team_member_details",
         "client_details",
+        "reports_home",
         "full_page"
       ]
     },

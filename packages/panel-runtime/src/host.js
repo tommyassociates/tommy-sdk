@@ -192,6 +192,11 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
               // placed twice on one tab.
               key: entry ? entry.instance.id : `${mpId}:${def.id}`,
               style,
+              // The instance id on the tile ELEMENT (attrs fall through to
+              // the root) — hosts overlay per-tile chrome (edit-mode
+              // controls) and need to address tiles unambiguously; the def
+              // id alone is ambiguous when one panel is placed twice.
+              'data-instance-id': entry ? entry.instance.id : undefined,
               def,
               // Composed mode hands ctxFor the full resolver entry as a third
               // argument (params/config/cell live there); declaration-mode
