@@ -15,7 +15,9 @@
  *
  * What is persisted is REDACTED — no `args`, `result` or `payload`. See
  * createWebStorageBackend: a record is diagnostics, not a pending write, and
- * it answers "what ran, when, did it fail" without the tenant payload.
+ * it answers "what ran, when, did it fail" without the tenant payload. The
+ * same projection now bounds the IN-MEMORY tier too (memory audit): only the
+ * newest records keep payloads — createRecordStore's full-fidelity window.
  *
  * Client→api sync of these records is the runs/sync drain
  * (contract §3), owned by the loader/inspector stream — this store exposes
@@ -34,13 +36,47 @@ export function createMemoryBackend() {
     async get(runId) { return rows.get(runId); },
     async all() { return [...rows.values()]; },
     async count() { return rows.size; },
+    async delete(runId) { rows.delete(runId); },
+    /** Atomic field release — see createRecordStore's window: a read-then-write
+     *  would clobber a concurrent update() (adversarial review 2026-08-31). */
+    async releaseFields(runId, fields) {
+      const current = rows.get(runId);
+      if (!current) return;
+      const copy = { ...current };
+      for (const field of fields) delete copy[field];
+      rows.set(runId, copy);
+    },
   };
 }
 
 /** Fields a persisted record NEVER carries — see createWebStorageBackend. */
 const REDACTED_FIELDS = ['args', 'result', 'payload'];
 
+/**
+ * What the in-memory FULL-FIDELITY WINDOW releases — `result`/`payload` only.
+ * `args` STAYS: `broker.replay(runId)` re-dispatches from `record.args`, so
+ * releasing them made every run older than the window unreplayable, and worse,
+ * an activity with a permissive/absent inputSchema would have re-dispatched a
+ * real write with `args === undefined` (adversarial review 2026-08-31).
+ * Persistence still drops all three — that tier is disk, this one is not.
+ */
+const WINDOW_RELEASED_FIELDS = ['result', 'payload'];
+
+/**
+ * THE redaction — the persisted tier's projection, and (memory audit) the
+ * in-memory tier's too once a record leaves the full-fidelity window below.
+ * ONE rule, shared: a second redaction rule is how the two tiers drift.
+ */
+function redact(record, fields = REDACTED_FIELDS) {
+  const copy = { ...record };
+  for (const field of fields) delete copy[field];
+  return copy;
+}
+
 const PERSIST_MAX = 200;
+/** How many of the NEWEST records keep full `args`/`result` in memory (memory
+ *  audit): a day-long session held payloads for all 5000 retained records. */
+const FULL_FIDELITY_MAX = 200;
 const STORAGE_KEY = 'mp-action-records';
 
 /** The runtime's Web Storage, or null (node, or access throws when locked down). */
@@ -66,20 +102,16 @@ function webStorage() {
  * applies here — there is no reason to put tenant data on disk for a store
  * whose job is observability.
  *
- * In-session behaviour is UNCHANGED: the memory tier front-runs every read, so
- * the inspector still sees full records for everything this session produced.
+ * In-session reads are still front-run by the memory tier; how long a record
+ * KEEPS its payloads there is the record store's call, not this backend's —
+ * createRecordStore re-puts records through `redact` once they leave its
+ * full-fidelity window (memory audit), and this tier stores what it is given.
  * A reload returns the redacted history, which is strictly more than the
  * nothing it returned before.
  */
 export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
   const store = () => (storage === undefined ? webStorage() : storage);
-  const rows = new Map(); // runId -> FULL record (this session only)
-
-  function redact(record) {
-    const copy = { ...record };
-    for (const field of REDACTED_FIELDS) delete copy[field];
-    return copy;
-  }
+  const rows = new Map(); // runId -> record AS GIVEN (this session only)
 
   function loadPersisted() {
     const s = store();
@@ -146,9 +178,38 @@ function defaultBackend() {
   return webStorage() ? createWebStorageBackend() : createMemoryBackend();
 }
 
-export function createRecordStore({ backend = defaultBackend(), now = () => Date.now(), retentionMax = 5000 } = {}) {
+export function createRecordStore({
+  backend = defaultBackend(), now = () => Date.now(), retentionMax = 5000, fullFidelityMax = FULL_FIDELITY_MAX,
+} = {}) {
+  // Full-fidelity window (memory audit): only the NEWEST `fullFidelityMax`
+  // records keep `args`/`result`/`payload` in the backend. A record that falls
+  // out is not lost — it is re-put through `redact`, the SAME projection the
+  // persisted tier writes, so the inspector still gets the record (what ran,
+  // when, did it fail), minus the tenant payload. The record COUNT cap
+  // (`retentionMax`) is unchanged.
+  const fullWindow = []; // runIds in open order — oldest first
+  const inWindow = new Set();
+
   async function put(record) {
     await backend.put(record);
+    fullWindow.push(record.runId);
+    inWindow.add(record.runId);
+    while (fullWindow.length > fullFidelityMax) {
+      const fallen = fullWindow.shift();
+      inWindow.delete(fallen);
+      if (backend.releaseFields) {
+        // eslint-disable-next-line no-await-in-loop
+        await backend.releaseFields(fallen, WINDOW_RELEASED_FIELDS);
+      } else {
+        // Fallback for a backend without the atomic seam: re-read as LATE as
+        // possible so a concurrent update() is the thing we redact, not the
+        // thing we clobber.
+        // eslint-disable-next-line no-await-in-loop
+        const old = await backend.get(fallen);
+        // eslint-disable-next-line no-await-in-loop
+        if (old) await backend.put(redact(old, WINDOW_RELEASED_FIELDS));
+      }
+    }
     // Bounded retention (harden assumption): drop oldest beyond the cap.
     if ((await backend.count()) > retentionMax) {
       const all = await backend.all();
@@ -157,6 +218,7 @@ export function createRecordStore({ backend = defaultBackend(), now = () => Date
       for (let i = 0; i < excess; i += 1) {
         // eslint-disable-next-line no-await-in-loop
         if (backend.delete) await backend.delete(all[i].runId);
+        if (inWindow.delete(all[i].runId)) fullWindow.splice(fullWindow.indexOf(all[i].runId), 1);
       }
     }
     return record;
@@ -202,7 +264,10 @@ export function createRecordStore({ backend = defaultBackend(), now = () => Date
         next.finishedAt = now();
         next.durationMs = next.finishedAt - next.startedAt;
       }
-      await backend.put(next);
+      // Outside the window a late patch must not resurrect released payloads —
+      // but the CALLER still gets what it computed (returning the redacted copy
+      // silently dropped `result` from the return value; adversarial review).
+      await backend.put(inWindow.has(runId) ? next : redact(next, WINDOW_RELEASED_FIELDS));
       return next;
     },
 

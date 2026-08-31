@@ -40,6 +40,19 @@ const dayKey = (ts) => new Date(ts).toISOString().slice(0, 10);
 const M1_SOURCES = new Set(['trigger', 'condition', 'option']);
 
 /**
+ * Memory bounds (memory audit, 2026-08): broker-lifetime maps are CACHES, not
+ * ledgers — a day-long session grew both without limit. Each carries a hard
+ * cap; eviction changes cost (a recompute / a re-apply), never correctness.
+ */
+const CONDITION_CACHE_MAX = 500;
+/** Mirrors the idempotency-ledger's DEFAULT_MAX idiom: insertion order IS
+ *  eviction order (FIFO). */
+const PROCESSED_KEYS_MAX = 1000;
+/** Keys whose RESULT was released but whose already-applied fact must survive
+ *  — far cheaper per entry, so it holds an order of magnitude more. */
+const APPLIED_KEYS_OVERFLOW_MAX = 10000;
+
+/**
  * Platform-provided triggers, available on EVERY registered MP's namespace
  * without the MP declaring them. Closed set, in-binary — the same firewall the
  * predicate operators sit behind.
@@ -175,8 +188,9 @@ export function createBroker({
   const subscribers = new Map();      // trigger -> Set<{mpId, handler}>
   const actionState = new Map();      // `${tenantId}:${mpId}:${actionId}` -> {enabled, options}
   const settingState = new Map();     // `${tenantId}:${mpId}` -> { key: value } (manifest-driven settings projection)
-  const processedKeys = new Map();    // `${activity}:${idempotencyKey}` -> stored result
-  const conditionCache = new Map();   // `${tenantId}:${condition}:${argsJson}` -> {value, expiresAt}
+  const processedKeys = new Map();    // `${tenantId}:${activity}:${idempotencyKey}` -> stored result (FIFO cap PROCESSED_KEYS_MAX)
+  const appliedKeysOverflow = new Set(); // keys evicted from processedKeys — the fact survives, the result does not
+  const conditionCache = new Map();   // `${tenantId}:${condition}:${argsJson}` -> {value, expiresAt} (cap CONDITION_CACHE_MAX)
   const suppressionTally = new Map(); // `${tenantId}:${trigger}:${day}` -> count
   const debouncePending = new Map();  // `${trigger}:${emitterMpId}` -> {timer, resolvers}
   const invokeChains = new Map();     // sourceMpId -> tail promise (FIFO per source MP)
@@ -775,6 +789,30 @@ export function createBroker({
     return mps.get(mpId);
   }
 
+  /**
+   * Cap the condition cache (memory audit): on every set, once the cache
+   * exceeds CONDITION_CACHE_MAX, drop EXPIRED entries first, then evict
+   * oldest-by-expiresAt until within bound. Eviction costs a recompute on the
+   * next read — never a wrong value.
+   */
+  function pruneConditionCache(justSetKey = null) {
+    if (conditionCache.size <= CONDITION_CACHE_MAX) return;
+    const t = now();
+    for (const [key, entry] of conditionCache) {
+      if (entry.expiresAt <= t) conditionCache.delete(key);
+    }
+    // Oldest-INSERTED first (Map order — the idempotency-ledger idiom), never
+    // the entry this call just stored. Ranking by expiresAt instead meant a
+    // short-TTL condition was deleted by the very prune its own set()
+    // triggered, starving it on EVERY read for the rest of the session
+    // (adversarial review 2026-08-31).
+    for (const key of conditionCache.keys()) {
+      if (conditionCache.size <= CONDITION_CACHE_MAX) break;
+      if (key === justSetKey) continue;
+      conditionCache.delete(key);
+    }
+  }
+
   async function dispatchQuery(envelope) {
     const identity = envelope.identity || authenticate(envelope);
     const tenantId = envelope.tenantId || identity.tenantId;
@@ -792,6 +830,9 @@ export function createBroker({
     if (conditionDef.cacheable) {
       const hit = conditionCache.get(cacheKey);
       if (hit && hit.expiresAt > now()) return hit.value;
+      // Expired: RECLAIM it, don't just skip it (memory audit) — a skipped
+      // entry sat in the map until the next owner server_write, if ever.
+      if (hit) conditionCache.delete(cacheKey);
     }
 
     const handler = ownerEntry.handlers?.conditions?.[conditionName];
@@ -820,8 +861,11 @@ export function createBroker({
       const value = await Promise.race([Promise.resolve(handler(envelope.args, { tenantId })), timeout]);
       validateAgainst(conditionDef.returnSchema, value, 'ConditionError', `condition '${envelope.condition}' return`);
       await records.update(record.runId, { status: 'succeeded', result: value });
-      if (conditionDef.cacheable) {
-        conditionCache.set(cacheKey, { value, expiresAt: now() + (conditionDef.cacheTtlMs || 0) });
+      // A zero/absent TTL entry is born expired — the read path above can
+      // never serve it, so storing it is pure retention (memory audit).
+      if (conditionDef.cacheable && conditionDef.cacheTtlMs > 0) {
+        conditionCache.set(cacheKey, { value, expiresAt: now() + conditionDef.cacheTtlMs });
+        pruneConditionCache(cacheKey);
       }
       return value;
     } catch (cause) {
@@ -970,6 +1014,12 @@ export function createBroker({
       // Repeat key -> stored prior result, not re-applied (§3.2).
       return { ...processedKeys.get(processedKey), idempotentReplay: true };
     }
+    if (processedKey && appliedKeysOverflow.has(processedKey)) {
+      // Applied earlier this session; its result was released by the cap. The
+      // write is still SUPPRESSED — the same degraded shape the durable-ledger
+      // path returns when it knows the key but not the result.
+      return { status: 'succeeded', idempotentReplay: true, resultRetained: false };
+    }
 
     // D.39 (c) — the DURABLE half, consulted only after the in-memory Map
     // misses, so in-session behaviour (full replay, with the stored result) is
@@ -1052,7 +1102,26 @@ export function createBroker({
         validateAgainst(activityDef.resultSchema, result.result, 'ActivityFailed', `activity '${envelope.activity}' result`);
         const final = { rpcId: record.runId, status: 'succeeded', result: result.result };
         await records.update(record.runId, { status: 'succeeded', result: result.result });
-        if (processedKey) processedKeys.set(processedKey, final);
+        if (processedKey) {
+          processedKeys.set(processedKey, final);
+          // FIFO cap (memory audit): each entry holds a FULL activity result.
+          // The RESULT is what is released — the KEY moves to a keys-only
+          // overflow set, because dropping it outright silently RE-APPLIED the
+          // write for natural_key/derived_from_input, which have no durable
+          // ledger behind them (adversarial review 2026-08-31: a second PIN
+          // rotation, a duplicate follow-up). Keys are small; results are not.
+          while (processedKeys.size > PROCESSED_KEYS_MAX) {
+            const oldest = processedKeys.keys().next();
+            if (oldest.done) break;
+            processedKeys.delete(oldest.value);
+            appliedKeysOverflow.add(oldest.value);
+            while (appliedKeysOverflow.size > APPLIED_KEYS_OVERFLOW_MAX) {
+              const stale = appliedKeysOverflow.values().next();
+              if (stale.done) break;
+              appliedKeysOverflow.delete(stale.value);
+            }
+          }
+        }
         // D.39 (c) — record the KEY durably (never `final`, which holds the
         // result). Only for client_key; see the read side above.
         if (processedKey && activityDef.idempotency === 'client_key') idempotencyLedger?.add(processedKey);
