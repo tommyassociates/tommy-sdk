@@ -104,13 +104,21 @@ export function createDataStore({ name, keyPath = 'id', recordSchema, backend = 
     };
   }
 
-  async function notify(changedKey) {
+  /**
+   * Fan a change out to subscribers. `changed` is ONE key or an iterable of
+   * them — reconcile passes the whole batch so a merge of N records wakes
+   * every subscriber exactly once instead of N times (see reconcile below).
+   */
+  async function notify(changed) {
+    const changedKeys = (changed && typeof changed !== 'string' && typeof changed[Symbol.iterator] === 'function')
+      ? new Set(changed)
+      : new Set([changed]);
     const records = await snapshot();
     for (const handler of wholeStoreSubscribers) {
       try { handler(records); } catch (_) { /* subscriber errors are theirs */ }
     }
     for (const sub of selectorSubscribers) {
-      if (!sub.touched.has('*') && !sub.touched.has(changedKey)) continue;
+      if (!sub.touched.has('*') && ![...changedKeys].some((k) => sub.touched.has(k))) continue;
       const touched = new Set();
       const value = sub.selector(trackedQuery(records, touched));
       sub.touched = touched;
@@ -133,7 +141,7 @@ export function createDataStore({ name, keyPath = 'id', recordSchema, backend = 
     async readWhere(predicate = () => true) {
       return (await snapshot()).filter(predicate).map(stripMeta);
     },
-    async put(record, { dedupeKey } = {}) {
+    async put(record, { dedupeKey, silent = false } = {}) {
       if (validate && !validate(record)) {
         const detail = (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ');
         throw new Error(`store '${name}': record failed recordSchema: ${detail}`);
@@ -149,12 +157,12 @@ export function createDataStore({ name, keyPath = 'id', recordSchema, backend = 
         ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}),
       };
       await backend.put(key, stamped);
-      await notify(key);
+      if (!silent) await notify(key);
       return key;
     },
-    async delete(key) {
+    async delete(key, { silent = false } = {}) {
       await backend.delete(key);
-      await notify(key);
+      if (!silent) await notify(key);
     },
     /** Sync engine hook: clear _dirty after a successful push. */
     async markSynced(key) {
@@ -174,12 +182,32 @@ export function createDataStore({ name, keyPath = 'id', recordSchema, backend = 
     async reconcile(records = [], { scope } = {}) {
       const existing = await backend.getAll();
       const incoming = new Set();
+      // ONE notify for the whole merge, at the end. Per-record notifies made a
+      // reconcile of N rows wake every subscriber N times, each with a
+      // partially-merged snapshot — so an instant-data surface repainted N
+      // times on a single revalidate, and anything its render kicks off (the
+      // Forms activity pane's per-subject reads) ran N times over a list that
+      // grew by one row each pass. Quadratic, and every intermediate paint was
+      // a lie about the store's contents.
+      const changed = new Set();
       for (const record of records) {
-        // eslint-disable-next-line no-await-in-loop
-        const key = await api.put(record);
+        let key;
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          key = await api.put(record, { silent: true });
+        } catch (_) {
+          // ONE record that fails `recordSchema` must not cost the whole merge.
+          // The throw used to abort the loop mid-way, which still left the
+          // records before it in the store (each had already notified on its
+          // own put); with a single notify at the end, an abort would paint
+          // NOTHING — a surface going blank because row 12 of 31 had a number
+          // where the schema wants a string. Skip it and merge the rest.
+          continue;
+        }
         // eslint-disable-next-line no-await-in-loop
         await api.markSynced(key);
         incoming.add(String(key));
+        changed.add(key);
       }
       let pruned = 0;
       for (const row of existing) {
@@ -187,9 +215,11 @@ export function createDataStore({ name, keyPath = 'id', recordSchema, backend = 
         if (incoming.has(String(key)) || row._dirty) continue; // kept: fresh or optimistic
         if (scope && !scope(row)) continue; // out of the reconcile scope
         // eslint-disable-next-line no-await-in-loop
-        await api.delete(key);
+        await api.delete(key, { silent: true });
+        changed.add(key);
         pruned += 1;
       }
+      if (changed.size) await notify(changed);
       return { upserted: incoming.size, pruned };
     },
     subscribe(handler) {
