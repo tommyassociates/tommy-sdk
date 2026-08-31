@@ -38,17 +38,33 @@ function defaultBackend(dbName, storeName, syncStrategy) {
  *   derived from it, never passed separately (offline-sync.md §1).
  * @param {string} opts.mpId
  * @param {object} opts.localData manifest.localData (validated upstream)
- * @param {function} [opts.backendFactory] (databaseName, storeName) => backend
+ * @param {function} [opts.backendFactory] (databaseName, storeName, syncStrategy)
+ *   => backend. ⚠ THE THIRD ARGUMENT IS LOAD-BEARING, NOT DECORATION. The host's
+ *   factory (app/src/services/mp-loader/mp-store-backend.js) mirrors the
+ *   persist-vs-memory rule below and cannot see the manifest, so `syncStrategy` is
+ *   the only way it can tell a client-owned store from a server-authoritative
+ *   cache. It was omitted here from M1 while the host factory arrived later
+ *   reading it, so it was `undefined` at every real call site, the host's guard
+ *   always took its early return, and EVERY MP store in the shell was a memory
+ *   store — MP persistence silently off, measured as zero `mp-store:*` keys after a
+ *   five-surface walk. Do not drop it again.
  * @param {function} [opts.now]
+ * @param {function} [opts.onPersistError] called when a write could not be
+ *   persisted — `{ store, key, reason, bytes, budget, evicted }`. The SDK cannot
+ *   know where such a report should go (console, telemetry, a user-facing
+ *   "saved on this device only"), so the host decides. Without a handler the
+ *   write still rejects; it just goes unreported.
  */
-export function createDataManager({ capabilityToken, mpId, localData = {}, backendFactory, now }) {
+export function createDataManager({
+  capabilityToken, mpId, localData = {}, backendFactory, now, onPersistError,
+}) {
   const dbName = databaseName(capabilityToken, mpId);
   const stores = new Map();
   const syncMeta = new Map(); // storeName -> { lastSyncedAt, pending, online }
 
   for (const [storeName, decl] of Object.entries(localData)) {
     const backend = backendFactory
-      ? backendFactory(dbName, storeName)
+      ? backendFactory(dbName, storeName, decl.syncStrategy)
       : defaultBackend(dbName, storeName, decl.syncStrategy);
     stores.set(storeName, createDataStore({
       name: storeName,
@@ -56,6 +72,8 @@ export function createDataManager({ capabilityToken, mpId, localData = {}, backe
       recordSchema: decl.recordSchema,
       backend,
       now,
+      ...(decl.maxRows ? { maxRows: decl.maxRows } : {}),
+      onPersistError,
     }));
     syncMeta.set(storeName, { lastSyncedAt: null, pending: 0, online: true, strategy: decl.syncStrategy || 'server_authoritative' });
   }

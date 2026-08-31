@@ -5,5 +5,6 @@
 export { databaseName, BROKER_DATABASE } from './names.js';
 export {
   createDataStore, createMemoryStoreBackend, createLocalStorageBackend, hasWebStorage,
+  PersistError,
 } from './data-store.js';
 export { createDataManager, createReplayCoordinator } from './manager.js';
