@@ -129,11 +129,11 @@ export function createDataStore({
    * Rows lacking `_updatedAt` sort as UNKNOWN age, not as epoch-zero, so they
    * are evicted only after genuinely-older stamped rows.
    *
-   * Deletion goes straight to the backend and notifies ONCE: routing each
-   * delete through `api.delete` fired a full subscriber pass per row (202
-   * repaints for one logical change, measured).
+   * Deletion is silent and the evicted keys join the caller's `changed` set,
+   * so the whole reconcile notifies ONCE: a notify per deleted row fired a
+   * full subscriber pass each (202 repaints for one logical change, measured).
    */
-  async function enforceRowCap({ protect } = {}) {
+  async function enforceRowCap({ protect, changed } = {}) {
     if (!Number.isFinite(maxRows) || maxRows <= 0) return 0;
     const rows = await backend.getAll();
     if (rows.length <= maxRows) return 0;
@@ -148,10 +148,13 @@ export function createDataStore({
     const unstamped = evictable.filter((row) => !row._updatedAt);
     const doomed = [...stamped, ...unstamped].slice(0, over);
     for (const row of doomed) {
+      const key = keyOf(row);
       // eslint-disable-next-line no-await-in-loop
-      await backend.delete(keyOf(row));
+      await api.delete(key, { silent: true });
+      if (changed) changed.add(key);
     }
-    if (doomed.length) await notify();
+    // No `changed` set (a direct caller): notify once for the whole batch.
+    if (!changed && doomed.length) await notify(doomed.map((row) => keyOf(row)));
     return doomed.length;
   }
 
@@ -163,13 +166,21 @@ export function createDataStore({
     };
   }
 
-  async function notify(changedKey) {
+  /**
+   * Fan a change out to subscribers. `changed` is ONE key or an iterable of
+   * them — reconcile passes the whole batch so a merge of N records wakes
+   * every subscriber exactly once instead of N times (see reconcile below).
+   */
+  async function notify(changed) {
+    const changedKeys = (changed && typeof changed !== 'string' && typeof changed[Symbol.iterator] === 'function')
+      ? new Set(changed)
+      : new Set([changed]);
     const records = await snapshot();
     for (const handler of wholeStoreSubscribers) {
       try { handler(records); } catch (_) { /* subscriber errors are theirs */ }
     }
     for (const sub of selectorSubscribers) {
-      if (!sub.touched.has('*') && !sub.touched.has(changedKey)) continue;
+      if (!sub.touched.has('*') && ![...changedKeys].some((k) => sub.touched.has(k))) continue;
       const touched = new Set();
       const value = sub.selector(trackedQuery(records, touched));
       sub.touched = touched;
@@ -192,7 +203,7 @@ export function createDataStore({
     async readWhere(predicate = () => true) {
       return (await snapshot()).filter(predicate).map(stripMeta);
     },
-    async put(record, { dedupeKey } = {}) {
+    async put(record, { dedupeKey, silent = false } = {}) {
       if (validate && !validate(record)) {
         const detail = (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ');
         throw new Error(`store '${name}': record failed recordSchema: ${detail}`);
@@ -208,12 +219,12 @@ export function createDataStore({
         ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}),
       };
       await backend.put(key, stamped);
-      await notify(key);
+      if (!silent) await notify(key);
       return key;
     },
-    async delete(key) {
+    async delete(key, { silent = false } = {}) {
       await backend.delete(key);
-      await notify(key);
+      if (!silent) await notify(key);
     },
     /** Sync engine hook: clear _dirty after a successful push. */
     async markSynced(key) {
@@ -233,12 +244,32 @@ export function createDataStore({
     async reconcile(records = [], { scope } = {}) {
       const existing = await backend.getAll();
       const incoming = new Set();
+      // ONE notify for the whole merge, at the end. Per-record notifies made a
+      // reconcile of N rows wake every subscriber N times, each with a
+      // partially-merged snapshot — so an instant-data surface repainted N
+      // times on a single revalidate, and anything its render kicks off (the
+      // Forms activity pane's per-subject reads) ran N times over a list that
+      // grew by one row each pass. Quadratic, and every intermediate paint was
+      // a lie about the store's contents.
+      const changed = new Set();
       for (const record of records) {
-        // eslint-disable-next-line no-await-in-loop
-        const key = await api.put(record);
+        let key;
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          key = await api.put(record, { silent: true });
+        } catch (_) {
+          // ONE record that fails `recordSchema` must not cost the whole merge.
+          // The throw used to abort the loop mid-way, which still left the
+          // records before it in the store (each had already notified on its
+          // own put); with a single notify at the end, an abort would paint
+          // NOTHING — a surface going blank because row 12 of 31 had a number
+          // where the schema wants a string. Skip it and merge the rest.
+          continue;
+        }
         // eslint-disable-next-line no-await-in-loop
         await api.markSynced(key);
         incoming.add(String(key));
+        changed.add(key);
       }
       let pruned = 0;
       for (const row of existing) {
@@ -246,13 +277,17 @@ export function createDataStore({
         if (incoming.has(String(key)) || row._dirty) continue; // kept: fresh or optimistic
         if (scope && !scope(row)) continue; // out of the reconcile scope
         // eslint-disable-next-line no-await-in-loop
-        await api.delete(key);
+        await api.delete(key, { silent: true });
+        changed.add(key);
         pruned += 1;
       }
       // Out-of-scope rows survive the prune above BY DESIGN (that is what
       // scoped reconcile means), so the cap is the only thing standing
-      // between a window-paging store and unbounded growth.
-      const evicted = await enforceRowCap({ protect: incoming });
+      // between a window-paging store and unbounded growth. Evictions join
+      // the SAME `changed` batch as the upserts and prunes, so the whole
+      // reconcile still costs exactly one notify.
+      const evicted = await enforceRowCap({ protect: incoming, changed });
+      if (changed.size) await notify(changed);
       return { upserted: incoming.size, pruned, ...(evicted ? { evicted } : {}) };
     },
     subscribe(handler) {

@@ -198,6 +198,62 @@ describe('tommy.data stores', () => {
     expect((await store.get('b1')).hours).toBe(9); // out of scope — untouched
     expect((await store.get('d1'))._dirty).toBe(true); // dirty optimistic — never pruned
   });
+
+  it('reconcile notifies subscribers ONCE for the whole merge, with the final set', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData });
+    const store = data.store('entries');
+    await store.put({ id: 'old', shiftId: 's-0', hours: 1 }); await store.markSynced('old');
+
+    // Per-record notifies made an N-row reconcile wake every subscriber N
+    // times, each with a partially-merged snapshot — the quadratic repaint (and
+    // the request storm it drove on any surface that fetches per rendered row).
+    const paints = [];
+    store.subscribe((rows) => paints.push(rows.map((r) => r.id).sort()));
+    await store.reconcile([
+      { id: 'a', shiftId: 's-1', hours: 1 },
+      { id: 'b', shiftId: 's-2', hours: 2 },
+      { id: 'c', shiftId: 's-3', hours: 3 },
+    ]);
+
+    expect(paints.length).toBe(1);
+    expect(paints[0]).toEqual(['a', 'b', 'c']); // the final set, not a prefix of it
+  });
+
+  it('reconcile merges every VALID record when one fails the schema', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData });
+    const store = data.store('entries');
+
+    const paints = [];
+    store.subscribe((rows) => paints.push(rows.map((r) => r.id).sort()));
+    const result = await store.reconcile([
+      { id: 'a', shiftId: 's-1', hours: 1 },
+      { id: 'bad', shiftId: 's-2', hours: 'not-a-number' }, // fails recordSchema
+      { id: 'c', shiftId: 's-3', hours: 3 },
+    ]);
+
+    // The bad row is skipped, not fatal — a surface must not go blank because
+    // one row of thirty had the wrong type.
+    expect(result.upserted).toBe(2);
+    expect(paints).toEqual([['a', 'c']]);
+    expect(await store.get('bad')).toBeUndefined();
+  });
+
+  it('reconcile still wakes a selector subscriber that read one of the merged keys', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData });
+    const store = data.store('entries');
+    await store.put({ id: 'a', shiftId: 's-1', hours: 1 }); await store.markSynced('a');
+
+    // The batched notify carries the whole changed set, so a selector that only
+    // ever read key 'a' must still fire when 'a' is one of many rows merged.
+    const fired = [];
+    store.subscribeQuery((q) => q.get('a')?.hours || 0, (value) => fired.push(value));
+    await store.reconcile([
+      { id: 'z', shiftId: 's-9', hours: 9 },
+      { id: 'a', shiftId: 's-1', hours: 7 },
+    ]);
+
+    expect(fired).toEqual([7]);
+  });
 });
 
 /**
