@@ -147,12 +147,12 @@ operands?: unknown[]
 })[]]
 })
 /**
- * A host surface a panel/contribution can target. Extensible; new surfaces add enum values. team_member_details and client_details are host surfaces that MPs contribute panel 'tabs' into — Team Members and Clients are NOT Mini Programs.
+ * A host surface a panel/contribution can target. Extensible; new surfaces add enum values. team_member_details and client_details are host surfaces that MPs contribute panel 'tabs' into — Team Members and Clients are NOT Mini Programs. reports_home (scope 02a) is the Reports MP's home page — a subjectless host surface whose stored dashboard tabs mount like the detail surfaces.
  * 
  * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
  * via the `definition` "surface".
  */
-export type Surface = ("dashboard" | "team_member_details" | "client_details" | "full_page")
+export type Surface = ("dashboard" | "team_member_details" | "client_details" | "reports_home" | "full_page")
 /**
  * MANIFEST-DRIVEN SETTINGS §4.3 / S6 — an OWNERSHIP CLAIM over a permission row, so the permissions UI groups rows by their declared owner instead of re-deriving ownership client-side from hard-coded hashes. Either a single permission 'name' or a whole 'resourceType' family.
  * 

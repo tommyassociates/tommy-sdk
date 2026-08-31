@@ -790,7 +790,7 @@ export default {
             "$ref": "#/$defs/jsonSchema"
           },
           "params": {
-            "description": "01c FR-11 — the panel's DECLARED parameter vocabulary: the inputs a placement may bind, so the host's per-panel settings UI can render them without executing MP code. Distinct from configSchema (free-form per-tenant config): params are the identity inputs a surface or admin supplies (e.g. which client this panel is about). At render time the host resolves each param in FR-12 order — surface context first, then the admin's static value, then the declaration default — and a required param that resolves to nothing renders the panel as needs-configuration, never half-drawn.",
+            "description": "01c FR-11 \u2014 the panel's DECLARED parameter vocabulary: the inputs a placement may bind, so the host's per-panel settings UI can render them without executing MP code. Distinct from configSchema (free-form per-tenant config): params are the identity inputs a surface or admin supplies (e.g. which client this panel is about). At render time the host resolves each param in FR-12 order \u2014 surface context first, then the admin's static value, then the declaration default \u2014 and a required param that resolves to nothing renders the panel as needs-configuration, never half-drawn.",
             "type": "array",
             "items": {
               "type": "object",
@@ -801,7 +801,7 @@ export default {
               ],
               "properties": {
                 "name": {
-                  "description": "Binding key — the exact key a PanelInstance.params entry names.",
+                  "description": "Binding key \u2014 the exact key a PanelInstance.params entry names.",
                   "type": "string",
                   "pattern": "^[a-z][a-z0-9_]*$"
                 },
@@ -1346,6 +1346,11 @@ export default {
               "last_write_wins",
               "custom"
             ]
+          },
+          "maxRows": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Optional resident-row ceiling for this store. Omit to take the DataStore default (50000), which is sized for a windowed server cache. A client-owned store holding user-authored rows wants a far tighter bound \u2014 the cap is a runaway backstop, and eviction never touches an unsynced row."
           },
           "customResolverActivity": {
             "description": "Required when syncStrategy is 'custom': the activity that resolves a conflict.",
