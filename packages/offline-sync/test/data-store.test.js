@@ -1,11 +1,13 @@
 /**
  * data-store.test.js — per-(tenant, MP) naming (token-derived, never
  * caller-constructed), recordSchema enforcement on put, sync metadata
- * stamps, and the selector subscription (offline-sync.md §1/§4;
- * sdk-types.ts DataStore).
+ * stamps, the selector subscription (offline-sync.md §1/§4;
+ * sdk-types.ts DataStore), and the reconcile row cap.
  */
 import { describe, it, expect } from 'vitest';
-import { databaseName, BROKER_DATABASE, createDataManager } from '../src/index.js';
+import {
+  databaseName, BROKER_DATABASE, createDataManager, createDataStore,
+} from '../src/index.js';
 
 const token = { tenantId: 'team-4401', mpId: 'time-clock' };
 
@@ -251,5 +253,122 @@ describe('tommy.data stores', () => {
     ]);
 
     expect(fired).toEqual([7]);
+  });
+});
+
+/**
+ * The row cap (`maxRows`) — the backstop against a windowed cache growing for
+ * the life of the tab. Scoped reconcile prunes only the CURRENT scope, so every
+ * previously-viewed window survives by design; without the cap the store just
+ * accumulates. Exercised through createDataStore directly because `maxRows` is
+ * a store-construction option (createDataManager builds its stores on the
+ * default).
+ */
+describe('reconcile row cap', () => {
+  // put() stamps `_updatedAt` from `now()` and eviction orders by that stamp;
+  // a real clock ties every row written inside the same millisecond, so tests
+  // that care about age inject a monotonic one.
+  const ticker = () => {
+    let t = Date.parse('2026-08-31T00:00:00.000Z');
+    return () => { t += 1000; return t; };
+  };
+  const row = (id, window) => ({ id, shiftId: `s-${window}`, hours: window });
+  const windowRows = (w, count) => Array.from({ length: count }, (_, i) => row(`w${w}-${i}`, w));
+  const idsOf = async (store) => (await store.getAll()).map((r) => r.id).sort();
+
+  it('holds a window-paging store at or under maxRows across successive reconciles', async () => {
+    const store = createDataStore({ name: 'entries', maxRows: 20, now: ticker() });
+    // Each window reconciles under its OWN scope, so every earlier window is
+    // out of scope and survives the prune — uncapped this ends at 50 rows.
+    for (let w = 0; w < 5; w += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await store.reconcile(windowRows(w, 10), { scope: (r) => r.hours === w });
+    }
+    const rows = await store.getAll();
+    expect(rows.length).toBeLessThanOrEqual(20);
+    // and what is still resident is the two most recent windows
+    expect([...new Set(rows.map((r) => r.hours))].sort()).toEqual([3, 4]);
+  });
+
+  it('evicts the OLDEST rows by _updatedAt and keeps the newest', async () => {
+    const store = createDataStore({ name: 'entries', maxRows: 3, now: ticker() });
+    // Two OLD windows land first (each its own scope, so neither prunes the
+    // other) — these are the eviction candidates.
+    await store.reconcile([row('r1', 1), row('r2', 2)], { scope: (r) => r.hours <= 2 });
+    await store.reconcile([row('r3', 3)], { scope: (r) => r.hours === 3 });
+    // The CURRENT window arrives and takes the store over the cap.
+    const result = await store.reconcile([row('r4', 4), row('r5', 5)], { scope: (r) => r.hours >= 4 });
+    expect(result).toEqual({ upserted: 2, pruned: 0, evicted: 2 }); // evictions are reported
+    expect((await idsOf(store)).sort()).toEqual(['r3', 'r4', 'r5']); // r1/r2 were the oldest
+  });
+
+  it('never evicts the window the reconcile JUST fetched — it stays over the cap instead', async () => {
+    // The whole incoming set exceeds the cap: honouring it would mean dropping
+    // rows fetched microseconds earlier, so the grid would silently paint half
+    // a window. Staying over cap is the honest outcome (adversarial review
+    // 2026-08-31), exactly like the all-dirty case below.
+    const store = createDataStore({ name: 'entries', maxRows: 3, now: ticker() });
+    const result = await store.reconcile(
+      ['r1', 'r2', 'r3', 'r4', 'r5'].map((id, i) => row(id, i)),
+      { scope: () => true },
+    );
+    expect(result).toEqual({ upserted: 5, pruned: 0 }); // nothing evicted, nothing reported
+    expect((await idsOf(store)).sort()).toEqual(['r1', 'r2', 'r3', 'r4', 'r5']);
+  });
+
+  it('eviction notifies as ONE batch — the subscriber cost does not scale with rows evicted', async () => {
+    // Per-row api.delete fired a full subscriber pass each (202 repaints for
+    // one logical change, measured) — eviction is a single batched mutation
+    // now, so evicting 6 rows costs the same notifications as evicting 1.
+    const countFor = async (oldRows) => {
+      // maxRows 1: the seed reconcile leaves all `oldRows` resident (they are
+      // the protected incoming window), so the NEXT reconcile has exactly
+      // `oldRows` evictable candidates.
+      const store = createDataStore({ name: 'entries', maxRows: 1, now: ticker() });
+      const seed = Array.from({ length: oldRows }, (_, i) => row(`o${i}`, i));
+      await store.reconcile(seed, { scope: (r) => r.hours < oldRows });
+      let notifications = 0;
+      store.subscribe(() => { notifications += 1; });
+      const result = await store.reconcile([row('n1', 99)], { scope: (r) => r.hours === 99 });
+      return { notifications, evicted: result.evicted };
+    };
+    const one = await countFor(1);   // 1 old row resident -> evicts 1
+    const many = await countFor(6);  // 6 old rows resident -> evicts 6
+    expect(one.evicted).toBe(1);
+    expect(many.evicted).toBe(6);
+    expect(many.notifications).toBe(one.notifications);
+  });
+
+  it('NEVER evicts a _dirty row — an all-dirty store stays over the cap instead', async () => {
+    const store = createDataStore({ name: 'entries', maxRows: 3, now: ticker() });
+    for (const id of ['d1', 'd2', 'd3', 'd4', 'd5']) {
+      // eslint-disable-next-line no-await-in-loop
+      await store.put(row(id, 1)); // left dirty: an unpushed local write
+    }
+    const result = await store.reconcile([], { scope: () => true });
+
+    expect(result).toEqual({ upserted: 0, pruned: 0 }); // nothing was evictable
+    const rows = await store.getAll();
+    expect(rows.length).toBe(5); // over the cap ON PURPOSE
+    expect(rows.every((r) => r._dirty)).toBe(true); // not one local edit dropped
+  });
+
+  it('evicts around a dirty row: old clean rows go, the unpushed write stays', async () => {
+    const store = createDataStore({ name: 'entries', maxRows: 3, now: ticker() });
+    await store.reconcile([row('c1', 1), row('c2', 1)], { scope: () => true }); // oldest, clean
+    await store.put(row('d1', 2)); // a local edit, newer than c1/c2, never pushed
+
+    const result = await store.reconcile([row('c4', 3), row('c5', 3)], { scope: (r) => r.hours === 3 });
+
+    expect(result).toEqual({ upserted: 2, pruned: 0, evicted: 2 });
+    expect(await idsOf(store)).toEqual(['c4', 'c5', 'd1']);
+    expect((await store.get('d1'))._dirty).toBe(true);
+  });
+
+  it('leaves the result shape untouched when it evicts nothing', async () => {
+    const store = createDataStore({ name: 'entries', maxRows: 100, now: ticker() });
+    const result = await store.reconcile([row('a', 1), row('b', 1)], { scope: () => true });
+    expect(result).toEqual({ upserted: 2, pruned: 0 }); // no `evicted` key at all
+    expect('evicted' in result).toBe(false);
   });
 });

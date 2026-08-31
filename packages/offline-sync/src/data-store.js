@@ -81,7 +81,24 @@ export function createLocalStorageBackend(dbName, storeName) {
   };
 }
 
-export function createDataStore({ name, keyPath = 'id', recordSchema, backend = createMemoryStoreBackend(), now = () => Date.now() }) {
+/**
+ * Default row cap for a store (memory audit 2026-08-31). `reconcile` prunes
+ * only rows in the CURRENT scope, so a store fed one window after another
+ * (schedule/attendance/timesheet caches paging through weeks) accumulated
+ * every window ever viewed for the world's lifetime.
+ *
+ * DELIBERATELY GENEROUS (owner ruling 2026-08-31: optimise for fast toggle,
+ * not minimum memory). This is a backstop against UNBOUNDED growth, never a
+ * working-set limit: a large tenant's real working set (the bench's 401
+ * members / 8,865 events) must stay resident so returning to a team repaints
+ * warm instead of re-fetching. Callers needing a tighter bound pass `maxRows`.
+ */
+const DEFAULT_MAX_ROWS = 50000;
+
+export function createDataStore({
+  name, keyPath = 'id', recordSchema, backend = createMemoryStoreBackend(),
+  now = () => Date.now(), maxRows = DEFAULT_MAX_ROWS,
+}) {
   const validate = recordSchema ? ajv.compile(recordSchema) : null;
   const wholeStoreSubscribers = new Set();
   const selectorSubscribers = new Set(); // {selector, handler, touched:Set, last}
@@ -95,6 +112,51 @@ export function createDataStore({ name, keyPath = 'id', recordSchema, backend = 
   );
 
   async function snapshot() { return backend.getAll(); }
+
+  /**
+   * Evict the OLDEST evictable rows once the store exceeds `maxRows`.
+   *
+   * NEVER evictable:
+   *   · `_dirty` rows — unpushed local writes; dropping one silently loses a
+   *     user's edit. A store whose rows are all dirty stays OVER the cap:
+   *     the sync engine, not eviction, is what relieves it.
+   *   · `protect` — the keys the in-flight reconcile just fetched. Without
+   *     this the budget was computed against ALL rows (dirty included) but
+   *     spent on the only candidates available, which are the freshest ones:
+   *     a store holding many dirty rows strip-mined the CURRENT window and the
+   *     grid silently painted half of it (adversarial review 2026-08-31).
+   *
+   * Rows lacking `_updatedAt` sort as UNKNOWN age, not as epoch-zero, so they
+   * are evicted only after genuinely-older stamped rows.
+   *
+   * Deletion is silent and the evicted keys join the caller's `changed` set,
+   * so the whole reconcile notifies ONCE: a notify per deleted row fired a
+   * full subscriber pass each (202 repaints for one logical change, measured).
+   */
+  async function enforceRowCap({ protect, changed } = {}) {
+    if (!Number.isFinite(maxRows) || maxRows <= 0) return 0;
+    const rows = await backend.getAll();
+    if (rows.length <= maxRows) return 0;
+    const evictable = rows.filter((row) => !row._dirty
+      && !(protect && protect.has(String(keyOf(row)))));
+    // Budget against what may ACTUALLY go: never more than the evictable set,
+    // so a dirty-heavy store stays over the cap instead of eating fresh rows.
+    const over = Math.min(rows.length - maxRows, evictable.length);
+    if (over <= 0) return 0;
+    const stamped = evictable.filter((row) => row._updatedAt)
+      .sort((a, b) => String(a._updatedAt).localeCompare(String(b._updatedAt)));
+    const unstamped = evictable.filter((row) => !row._updatedAt);
+    const doomed = [...stamped, ...unstamped].slice(0, over);
+    for (const row of doomed) {
+      const key = keyOf(row);
+      // eslint-disable-next-line no-await-in-loop
+      await api.delete(key, { silent: true });
+      if (changed) changed.add(key);
+    }
+    // No `changed` set (a direct caller): notify once for the whole batch.
+    if (!changed && doomed.length) await notify(doomed.map((row) => keyOf(row)));
+    return doomed.length;
+  }
 
   function trackedQuery(records, touched) {
     const byKey = new Map(records.map((r) => [keyOf(r), r]));
@@ -219,8 +281,14 @@ export function createDataStore({ name, keyPath = 'id', recordSchema, backend = 
         changed.add(key);
         pruned += 1;
       }
+      // Out-of-scope rows survive the prune above BY DESIGN (that is what
+      // scoped reconcile means), so the cap is the only thing standing
+      // between a window-paging store and unbounded growth. Evictions join
+      // the SAME `changed` batch as the upserts and prunes, so the whole
+      // reconcile still costs exactly one notify.
+      const evicted = await enforceRowCap({ protect: incoming, changed });
       if (changed.size) await notify(changed);
-      return { upserted: incoming.size, pruned };
+      return { upserted: incoming.size, pruned, ...(evicted ? { evicted } : {}) };
     },
     subscribe(handler) {
       wholeStoreSubscribers.add(handler);
