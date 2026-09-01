@@ -40,8 +40,8 @@
     "yaml": "^2.5.1"
   },
   "devDependencies": {
-    "json-schema-to-typescript": "^15.0.3",
-    "typescript": "^5.6.3",
-    "vitest": "^2.1.4"
+    "json-schema-to-typescript": "^16.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   }
 }

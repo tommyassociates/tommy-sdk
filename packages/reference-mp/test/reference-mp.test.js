@@ -24,7 +24,7 @@ import referenceMp, { postCheckin } from '../src/index.js';
 // vitest.config.js sets `environment: 'jsdom'`. So `hasWebStorage()` is TRUE
 // here (it is false under plain node), and offline-sync's defaultBackend picks
 // `createLocalStorageBackend(databaseName(token, mpId), …)` instead of memory.
-// `databaseName` is `tommy-mp:{tenantId}:{mpId}` — so with a file-level constant
+// `databaseName` includes both tenantId and mpId — so with a file-level constant
 // tenant, EVERY world built by bootWorld() resolved to the SAME localStorage
 // keys, and jsdom keeps localStorage alive across examples. A `beforeEach` that
 // boots a genuinely fresh broker/sdk/host therefore still inherited the previous

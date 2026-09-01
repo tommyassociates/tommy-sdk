@@ -852,21 +852,6 @@ export function createBroker({
       online: isOnline,
     });
 
-    // ⚠ THIS DEADLINE MUST NOT THROW AWAY AN ANSWER THAT ARRIVES.
-    //
-    // It used to be a bare `Promise.race([handler(...), timeout])`, and that is
-    // the same defect that left the Forms surface blank over a stack of
-    // successful 200s (mp-slow-read-blanks-surface): when the handler resolved a
-    // few hundred milliseconds after the deadline, the race had already settled,
-    // and 31 fetched, parsed, validated rows were dropped on the floor with
-    // nothing logged. The caller still has to be protected from a handler that
-    // never settles — that is what the budget is FOR — so the deadline stays and
-    // the caller still gets its Timeout. What changes is what happens to the late
-    // value: it is recorded on the run (so the trail says "this read succeeded,
-    // late" rather than just "timed out"), and for a cacheable condition it seeds
-    // the condition cache, which makes the very next read — the SWR revalidate
-    // moments later — instant instead of another timeout. A slow read now heals
-    // itself; before, every attempt failed identically forever.
     const budget = conditionDef.latencyBudgetMs || 5000;
     let timer;
     let deadlinePassed = false;
@@ -876,10 +861,9 @@ export function createBroker({
         reject(err('Timeout', `condition '${envelope.condition}' exceeded latencyBudgetMs ${budget}`, { retryable: false, runId: record.runId }));
       }, budget);
     });
-    const settling = Promise.resolve(handler(envelope.args, { tenantId })).then(
+    const deadlineAwareResult = Promise.resolve(handler(envelope.args, { tenantId })).then(
       (late) => {
         if (!deadlinePassed) return late;
-        // Best-effort, fire-and-forget: nobody is awaiting this any more.
         Promise.resolve()
           .then(async () => {
             await records.update(record.runId, { status: 'succeeded', result: late, note: 'resolved after latency budget' });
@@ -888,18 +872,16 @@ export function createBroker({
               pruneConditionCache(cacheKey);
             }
           })
-          .catch(() => { /* the caller already has its Timeout; this is salvage */ });
+          .catch(() => { /* best effort */ });
         return late;
       },
       (cause) => {
-        // A late REJECTION is noise: the caller has its Timeout and an unhandled
-        // rejection here would be all cost and no signal.
         if (deadlinePassed) return undefined;
         throw cause;
       },
     );
     try {
-      const value = await Promise.race([settling, timeout]);
+      const value = await Promise.race([deadlineAwareResult, timeout]);
       validateAgainst(conditionDef.returnSchema, value, 'ConditionError', `condition '${envelope.condition}' return`);
       await records.update(record.runId, { status: 'succeeded', result: value });
       // A zero/absent TTL entry is born expired — the read path above can

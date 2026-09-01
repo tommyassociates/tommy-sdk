@@ -1,5 +1,9 @@
-//@import '~tommy-core/src/tommy.scss';
-@import '../../node_modules/tommy-core/src/scss/tommy.scss';
+@import '@fontsource/inter/300.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+
+@import 'tommy-core/src/scss/tommy';
 // @import '~material-icons/iconfont/material-icons.css';
 
 // import '~vue-cal/dist/vue-cal.css'

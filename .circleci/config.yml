@@ -6,18 +6,20 @@
 # Design: plans/refactor-plan/06-instrumentation/detectors-in-ci.md.
 version: 2.1
 orbs:
-  node: circleci/node@5.0.2
+  node: circleci/node@7.2.1
 jobs:
   lint-isolation:
     executor: node/default
     steps:
       - checkout
+      - node/install:
+          node-version: '24.20.0'
       - run:
           name: Clone tommy-app (sibling — drift check)
-          command: git clone --depth=1 git@github.com:tommyassociates/tommy-app.git ../app
+          command: bash scripts/clone-ci-sibling.sh git@github.com:tommyassociates/tommy-app.git ../app
       - run:
           name: Clone tommy-core (sibling — drift check)
-          command: git clone --depth=1 git@github.com:tommyassociates/tommy-core.git ../core
+          command: bash scripts/clone-ci-sibling.sh git@github.com:tommyassociates/tommy-core.git ../core
       - node/install-packages:
           pkg-manager: yarn-berry
       - run:

@@ -93,7 +93,7 @@ app.post('/addon/sandbox/upload/:package/:environment/:version', (req, res) => {
   const version = req.params.version
   addonUploader('upload', pkg, environment, version, (errs, jsons) => {
     if (errs) {
-      res.status(500).send(errs[0] || errs[1])
+      res.status(500).send(errs)
     } else {
       res.send(jsons[0] || jsons[1])
     }
