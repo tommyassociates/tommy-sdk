@@ -149,7 +149,19 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
   /** Persist `map`. Returns the same result shape as put/delete. */
   function save(map, protect) {
     const store = webStorage();
-    if (!store) return { ok: true }; // no storage at all: nothing was promised
+    if (!store) {
+      // NOT `{ ok: true }`. This backend is only ever chosen because Web Storage
+      // existed at construction, so reaching here means it went away mid-session
+      // (a WKWebView data store cleared, a permission revoked) — and answering
+      // "ok" to a write that reached nothing is the exact silent-loss shape this
+      // store's quota path was written to end (review finding F4). Retain the
+      // rows for the session and tell the caller, the same way the quota branch
+      // does.
+      memoryFallback.set(storeKey, new Map(map));
+      return {
+        ok: false, reason: 'unavailable', budget: maxBytes, evicted: [],
+      };
+    }
     const { total, evicted } = evictToFit(map, protect);
     if (total > maxBytes) {
       // Over budget with nothing left to give — every remaining row is either
@@ -259,6 +271,16 @@ export function createDataStore({
    * never opens.
    */
   let residentCount = null;
+  // ⚠ THE CAP CAN BE SATURATED, AND THEN IT MUST STOP TRYING. `enforceRowCap`
+  // evicts nothing when every resident row is dirty (an unsynced drafts store is
+  // exactly that by definition — Phase 2 documents it as the expected steady
+  // state). `residentCount` therefore stays above `maxRows` forever, and without
+  // this latch EVERY later put paid a full `backend.getAll()` walk that could
+  // not help — quietly breaking the "no extra store walk per write" constraint in
+  // the configuration most likely to hit it (review finding F5). Anything that
+  // can make a row evictable again — a delete, a markSynced clearing `_dirty` —
+  // clears the latch.
+  let capSaturated = false;
 
   /**
    * Tell the host a write did not reach disk. One channel, not two: the host
@@ -493,16 +515,20 @@ export function createDataStore({
       // row while it was still arriving, evicting rows the same merge was about
       // to add.
       let evicted = [];
-      if (!deferCap && residentCount > maxRows) {
+      if (!deferCap && residentCount > maxRows && !capSaturated) {
         // `protect` the row just written — it is the newest thing in the store,
         // and eviction spending its budget on it would undo the write.
         evicted = await enforceRowCap({ protect: new Set([String(key)]) });
+        // Nothing could go: the walk cannot help until something becomes
+        // evictable, so stop repeating it (see `capSaturated`).
+        capSaturated = evicted.length === 0;
       }
       // One notify for the write AND anything it displaced.
       if (!silent) await notify(evicted.length ? [key, ...evicted] : key);
       return key;
     },
     async delete(key, { silent = false } = {}) {
+      capSaturated = false;   // one fewer row: the cap may be able to act again
       if (residentCount !== null && (await backend.get(key)) !== undefined) residentCount -= 1;
       const persisted = await backend.delete(key);
       if (!silent) await notify(key);
@@ -520,6 +546,8 @@ export function createDataStore({
       // copy on the way.
       const { _persistFailed: _pf, ...rest } = record;
       await backend.put(key, { ...rest, _dirty: false });
+      capSaturated = false;   // a clean row is an evictable row
+
     },
     /**
      * SWR reconcile — merge a fresh AUTHORITATIVE set of records into the store,
@@ -558,13 +586,30 @@ export function createDataStore({
         try {
           // eslint-disable-next-line no-await-in-loop
           key = await api.put(record, { silent: true, deferCap: true });
-        } catch (_) {
-          // ONE record that fails `recordSchema` must not cost the whole merge.
-          // The throw used to abort the loop mid-way, which still left the
-          // records before it in the store (each had already notified on its
-          // own put); with a single notify at the end, an abort would paint
-          // NOTHING — a surface going blank because row 12 of 31 had a number
-          // where the schema wants a string. Skip it and merge the rest.
+        } catch (e) {
+          // ⚠ TWO DIFFERENT FAILURES ARRIVE HERE AND THEY ARE NOT THE SAME ROW.
+          //
+          // A `PersistError` means the row IS in the store — the backend kept it
+          // in memory and flagged `_persistFailed` — it just did not reach disk.
+          // Skipping it here left it out of `incoming`, so the prune below then
+          // DELETED it as absent, microseconds after the retain contract promised
+          // to keep it. On a durable cache under storage pressure, which is the
+          // one place this failure is likely at scale, `_persistFailed` was
+          // therefore unobservable and the Phase 3 guarantee did not hold on the
+          // reconcile path (review finding F2). Count it as present.
+          //
+          // Anything else — a `recordSchema` rejection — genuinely is not in the
+          // store, and skipping it is correct: ONE bad record must not cost the
+          // whole merge. The throw used to abort the loop mid-way, which with a
+          // single notify at the end would paint NOTHING — a surface going blank
+          // because row 12 of 31 had a number where the schema wants a string.
+          if (e?.name === 'PersistError') {
+            const failedKey = keyOf(record);
+            if (failedKey !== undefined) {
+              incoming.add(String(failedKey));
+              changed.add(failedKey);
+            }
+          }
           continue;
         }
         // eslint-disable-next-line no-await-in-loop
@@ -606,6 +651,7 @@ export function createDataStore({
         ? await enforceWindowRetention({ current: String(windowKey), changed })
         : [];
       const evicted = await enforceRowCap({ protect: incoming, changed });
+      capSaturated = false;   // the merge changed both the row set and its dirtiness
       if (changed.size) await notify(changed);
       return {
         upserted: incoming.size,

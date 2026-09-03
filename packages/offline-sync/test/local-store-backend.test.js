@@ -71,12 +71,22 @@ describe('createLocalStorageBackend', () => {
     expect(await team9.get('view')).toBeUndefined();
   });
 
-  it('degrades to empty (never throws) when there is no Web Storage', async () => {
+  it('RETAINS the row and reports failure when Web Storage has gone away', async () => {
+    // This backend is only ever chosen because Web Storage existed when the
+    // store was built, so reaching here means it went away mid-session (a
+    // WKWebView data store cleared, a permission revoked). It used to answer
+    // `{ ok: true }` and drop the write — a silent loss with a success result,
+    // the very shape the quota path was written to end (review finding F4).
+    // The row is now held for the session and the caller is told; only the
+    // BACKEND stays throw-free, and DataStore turns the report into a
+    // PersistError for the surface above it.
     delete globalThis.localStorage;
     expect(hasWebStorage()).toBe(false);
     const b = createLocalStorageBackend(dbFor('team-3'), 'settings');
-    await b.put('view', { key: 'view', value: { x: 1 } }); // no-op, must not throw
-    expect(await b.getAll()).toEqual([]);
+    const res = await b.put('view', { key: 'view', value: { x: 1 } });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('unavailable');
+    expect(await b.getAll()).toEqual([{ key: 'view', value: { x: 1 } }]);
   });
 });
 
