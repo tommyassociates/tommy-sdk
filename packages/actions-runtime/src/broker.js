@@ -866,7 +866,28 @@ export function createBroker({
         if (!deadlinePassed) return late;
         Promise.resolve()
           .then(async () => {
-            await records.update(record.runId, { status: 'succeeded', result: late, note: 'resolved after latency budget' });
+            // ⚠ VALIDATE THE LATE VALUE TOO. The on-time path runs the
+            // returnSchema gate BEFORE caching, and the read path serves a cache
+            // hit without re-validating — so caching an unvalidated late value
+            // made the schema guarantee conditional on the handler having been
+            // FAST, and a handler that misbehaves only when slow could poison
+            // every caller for the whole TTL (review round-1 finding F4). A late
+            // value that fails its own contract is not worth healing with.
+            validateAgainst(conditionDef.returnSchema, late, 'ConditionError', `condition '${envelope.condition}' late return`);
+            // ⚠ THE RUN STAYS FAILED. The caller experienced a Timeout, and the
+            // catch below has already recorded it; flipping the SAME runId to
+            // `succeeded` erased that error, so a later triage of "the surface
+            // failed to load" found a clean history — the same invisibility this
+            // spec exists to end (review round-1 finding F5). Record the salvage
+            // as its own outcome instead.
+            // The status STAYS `failed` — a new vocabulary value would drop the
+            // run out of every `status: 'failed'` filter an engineer would use to
+            // find it, which is the opposite of the fix. The salvage rides its own
+            // fields, so the timeout and its error are both still on the record.
+            await records.update(record.runId, {
+              lateResult: late,
+              note: 'resolved after latency budget; the caller had already timed out',
+            });
             if (conditionDef.cacheable && conditionDef.cacheTtlMs > 0) {
               conditionCache.set(cacheKey, { value: late, expiresAt: now() + conditionDef.cacheTtlMs });
               pruneConditionCache(cacheKey);
