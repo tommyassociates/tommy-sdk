@@ -101,3 +101,51 @@ describe('F5 — a saturated row cap stops walking the store on every write', ()
     expect((await store.getAll()).length).toBe(2);
   });
 });
+
+/** A backend that keeps rows but reports every DELETE as never reaching disk. */
+function undeletableBackend() {
+  const inner = createMemoryStoreBackend();
+  return {
+    get: (k) => inner.get(k),
+    getAll: () => inner.getAll(),
+    put: (k, r) => inner.put(k, r),
+    keys: () => inner.keys(),
+    async delete(k) { await inner.delete(k); return { ok: false, reason: 'unavailable' }; },
+  };
+}
+
+describe('QG-R3-2 — a failed eviction must not abort the reconcile around it', () => {
+  it('completes the reconcile, notifies once, and returns full counts', async () => {
+    // `delete()` rejects on a backend that cannot reach disk, and the prune,
+    // the row cap and window retention all delete INSIDE loops in the middle of
+    // reconcile. One failed eviction used to throw out after the rows had
+    // merged and before the single notify: subscribers never woke, the cap and
+    // retention never finished, and the store was left half-pruned. Invisible,
+    // too — `fetchAndReconcile` swallows the rejection to keep the cache.
+    const store = createDataStore({
+      name: 'grid', keyPath: 'id', backend: undeletableBackend(),
+    });
+    await store.reconcile([{ id: 'a' }, { id: 'b' }], { scope: () => true });
+
+    let notifications = 0;
+    store.subscribe(() => { notifications += 1; });
+    notifications = 0; // subscribe() paints once on attach
+
+    // 'b' is absent from the incoming set, so the prune must delete it.
+    const res = await store.reconcile([{ id: 'a' }], { scope: () => true });
+
+    expect(res.pruned).toBe(1);          // the count is complete, not truncated
+    expect(res.upserted).toBe(1);
+    expect(notifications).toBe(1);       // the one notify still fired
+  });
+
+  it('still surfaces a delete failure to a caller who asked for the delete', async () => {
+    // The swallow is scoped to evictions the STORE performs. An explicit
+    // `delete()` is a caller's instruction and must still report failure.
+    const store = createDataStore({
+      name: 'grid', keyPath: 'id', backend: undeletableBackend(),
+    });
+    await store.put({ id: 'a' });
+    await expect(store.delete('a')).rejects.toThrow();
+  });
+});

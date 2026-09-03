@@ -333,6 +333,31 @@ export function createDataStore({
    * change costs one subscriber pass: a notify per deleted row fired a full
    * pass each (202 repaints for one logical change, measured).
    */
+  /**
+   * Internal eviction — a delete the STORE performs, not one a caller asked for.
+   *
+   * ⚠ IT MUST NOT THROW. `delete()` rejects with a `PersistError` when the
+   * backend cannot reach disk, and the three internal call sites all run inside
+   * loops in the middle of a reconcile: the prune, the row cap and window
+   * retention. One failed eviction there aborted the WHOLE reconcile — after
+   * the rows had merged, before `if (changed.size) await notify(changed)`. So
+   * subscribers never woke, the cap and retention never finished, and the store
+   * was left half-pruned; `fetchAndReconcile` swallows the rejection to keep the
+   * cache intact, which made the whole thing invisible. Exactly the storage
+   * pressure this store exists to survive was the trigger.
+   *
+   * The failure is still REPORTED — `delete()` calls `reportPersistFailure`
+   * before it throws — and the row simply stays resident, which is the same
+   * outcome the cap already tolerates for a `_dirty` row.
+   */
+  async function evict(key) {
+    try {
+      await api.delete(key, { silent: true });
+    } catch (e) {
+      if (e?.name !== 'PersistError') throw e;
+    }
+  }
+
   async function enforceRowCap({ protect, changed } = {}) {
     if (!Number.isFinite(maxRows) || maxRows <= 0) return [];
     const rows = await backend.getAll();
@@ -351,7 +376,7 @@ export function createDataStore({
     for (const row of doomed) {
       const key = keyOf(row);
       // eslint-disable-next-line no-await-in-loop
-      await api.delete(key, { silent: true });
+      await evict(key);
       if (changed) changed.add(key);
       evicted.push(key);
     }
@@ -420,7 +445,7 @@ export function createDataStore({
       if (!row || row._window == null || !drop.has(row._window) || row._dirty) continue;
       const key = keyOf(row);
       // eslint-disable-next-line no-await-in-loop
-      await api.delete(key, { silent: true });
+      await evict(key);
       if (changed) changed.add(key);
     }
     return doomed;
@@ -647,7 +672,7 @@ export function createDataStore({
         if (incoming.has(String(key)) || row._dirty) continue; // kept: fresh or optimistic
         if (scope && !scope(row)) continue; // out of the reconcile scope
         // eslint-disable-next-line no-await-in-loop
-        await api.delete(key, { silent: true });
+        await evict(key);
         changed.add(key);
         pruned += 1;
       }
