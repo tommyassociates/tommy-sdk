@@ -50,7 +50,13 @@ export function createMemoryBackend() {
 }
 
 /** Fields a persisted record NEVER carries — see createWebStorageBackend. */
-const REDACTED_FIELDS = ['args', 'result', 'payload'];
+// `lateResult` carries a FULL handler return value, exactly like `result` — it
+// is the salvaged value of a condition whose caller had already timed out. It was
+// added (round-1 F5) without being added here, so condition results were written
+// to localStorage and never released from the in-memory window: a payload-bearing
+// field outside both projections, which is the one shape these lists exist to
+// prevent (round-2 finding R2-F4).
+const REDACTED_FIELDS = ['args', 'result', 'payload', 'lateResult'];
 
 /**
  * What the in-memory FULL-FIDELITY WINDOW releases — `result`/`payload` only.
@@ -60,7 +66,7 @@ const REDACTED_FIELDS = ['args', 'result', 'payload'];
  * real write with `args === undefined` (adversarial review 2026-08-31).
  * Persistence still drops all three — that tier is disk, this one is not.
  */
-const WINDOW_RELEASED_FIELDS = ['result', 'payload'];
+const WINDOW_RELEASED_FIELDS = ['result', 'payload', 'lateResult'];
 
 /**
  * THE redaction — the persisted tier's projection, and (memory audit) the

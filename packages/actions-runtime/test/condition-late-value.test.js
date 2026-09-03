@@ -10,7 +10,9 @@
  * would look for.
  */
 import { describe, it, expect } from 'vitest';
-import { createBroker, createFakeIssuer } from '../src/index.js';
+import {
+  createBroker, createFakeIssuer, createRecordStore, createWebStorageBackend,
+} from '../src/index.js';
 
 const TENANT = 'team-3';
 
@@ -96,5 +98,101 @@ describe('a condition value that lands after the budget', () => {
     await tick(20);
     // Nothing poisoned: the next read runs the handler again.
     expect(await query()).toEqual({ rows: ['fresh'] });
+  });
+});
+
+
+/**
+ * Round-2 findings R2-F3 and R2-F4 — both defects in the late-value salvage
+ * ITSELF, i.e. in the round-1 repair above. The salvage runs DETACHED, an
+ * unbounded time after its dispatch returned, and neither the cache it writes
+ * nor the record field it adds was reasoned about under that condition.
+ */
+describe('R2-F3 — a late value must not resurrect data a write has since deleted', () => {
+  /** A handler that hangs on its FIRST call and answers instantly after. */
+  function slowThenFast(fast) {
+    let calls = 0;
+    let releaseFirst;
+    const handler = () => {
+      calls += 1;
+      if (calls === 1) return new Promise((r) => { releaseFirst = r; });
+      return Promise.resolve(fast);
+    };
+    return { handler, release: (v) => releaseFirst(v), calls: () => calls };
+  }
+
+  it('drops the salvage when the cache was invalidated while the read was in flight', async () => {
+    const h = slowThenFast({ rows: [{ id: 'fresh' }] });
+    const { broker, query } = await world(h.handler);
+    await expect(query()).rejects.toThrow(/exceeded latencyBudgetMs/);
+
+    // The invalidation lands AFTER the caller timed out and BEFORE the slow read
+    // returns — the window this branch is open for, and the one nobody sized.
+    // `setSettingState` is one of the two real invalidation paths (the other is
+    // a server_write sweeping its owner's keys); either proves the same thing.
+    broker.setSettingState(TENANT, 'demo', { anything: 1 });
+
+    h.release({ rows: [{ id: 'deleted-row' }] });
+    await tick(30);
+
+    // The salvage must have been DROPPED. If it had been cached, this read would
+    // be served from it and the handler would never run a second time — and the
+    // caller would see `deleted-row`, which the invalidation said is gone.
+    const second = await query();
+    expect(h.calls()).toBe(2);
+    expect(second.rows).toEqual([{ id: 'fresh' }]);
+  });
+
+  it('still caches a late value when nothing invalidated', async () => {
+    // The guard must not disable the salvage it is protecting.
+    const h = slowThenFast({ rows: [{ id: 'fresh' }] });
+    const { broker, query } = await world(h.handler);
+    await expect(query()).rejects.toThrow(/exceeded latencyBudgetMs/);
+    h.release({ rows: [{ id: 'salvaged' }] });
+    await tick(30);
+    const [rec] = await broker.records.query({ status: 'failed' });
+    expect(rec.lateResult).toEqual({ rows: [{ id: 'salvaged' }] });
+    // Served from the cache the salvage wrote — the handler is NOT re-entered.
+    const second = await query();
+    expect(second.rows).toEqual([{ id: 'salvaged' }]);
+    expect(h.calls()).toBe(1);
+  });
+});
+
+describe('R2-F4 — the salvaged value is payload-bearing and must be redacted', () => {
+  it('never reaches the persisted tier, while the note that explains it does', async () => {
+    // `lateResult` carries a FULL handler return value, exactly like `result`.
+    // Round 1 added it without adding it to either projection, so condition
+    // results were written to localStorage and never released from the
+    // in-memory window — a payload-bearing field outside both lists, which is
+    // the one shape those lists exist to prevent.
+    //
+    // ⚠ ASSERTED AGAINST THE STORAGE, not against a convenience accessor. The
+    // first version of this test guarded on an API that does not exist, so it
+    // passed against the BROKEN code too — vacuous, and caught only by running
+    // it against the pre-fix records.js.
+    const storage = (() => {
+      const map = new Map();
+      return {
+        getItem: (k) => (map.has(k) ? map.get(k) : null),
+        setItem: (k, v) => map.set(k, String(v)),
+        removeItem: (k) => map.delete(k),
+        key: (i) => [...map.keys()][i],
+        get length() { return map.size; },
+        _dump: () => [...map.values()].join(''),
+      };
+    })();
+    const store = createRecordStore({ backend: createWebStorageBackend({ storage }) });
+    const rec = await store.open({ kind: 'query', tenantId: TENANT, targetMpId: 'demo' });
+    await store.update(rec.runId, {
+      status: 'failed',
+      lateResult: { rows: [{ id: 'SENSITIVE-PAYLOAD' }] },
+      note: 'resolved after latency budget; the caller had already timed out',
+    });
+
+    const onDisk = storage._dump();
+    expect(onDisk).toContain('resolved after latency budget');
+    expect(onDisk).not.toContain('SENSITIVE-PAYLOAD');
+    expect(onDisk).not.toContain('lateResult');
   });
 });

@@ -191,6 +191,10 @@ export function createBroker({
   const processedKeys = new Map();    // `${tenantId}:${activity}:${idempotencyKey}` -> stored result (FIFO cap PROCESSED_KEYS_MAX)
   const appliedKeysOverflow = new Set(); // keys evicted from processedKeys — the fact survives, the result does not
   const conditionCache = new Map();   // `${tenantId}:${condition}:${argsJson}` -> {value, expiresAt} (cap CONDITION_CACHE_MAX)
+  // Bumped by EVERY condition-cache invalidation. The late-value salvage runs
+  // detached, long after its dispatch returned, so it must be able to tell that
+  // the world moved underneath it — see `conditionCacheEpoch` at its call site.
+  let conditionCacheEpoch = 0;
   const suppressionTally = new Map(); // `${tenantId}:${trigger}:${day}` -> count
   const debouncePending = new Map();  // `${trigger}:${emitterMpId}` -> {timer, resolvers}
   const invokeChains = new Map();     // sourceMpId -> tail promise (FIFO per source MP)
@@ -431,6 +435,7 @@ export function createBroker({
   /** Drop this tenant's memoised condition results (a settings write may change them). */
   function invalidateConditionCache(tenantId) {
     const prefix = `${tenantId}:`;
+    conditionCacheEpoch += 1;
     for (const key of [...conditionCache.keys()]) {
       if (key.startsWith(prefix)) conditionCache.delete(key);
     }
@@ -861,6 +866,9 @@ export function createBroker({
         reject(err('Timeout', `condition '${envelope.condition}' exceeded latencyBudgetMs ${budget}`, { retryable: false, runId: record.runId }));
       }, budget);
     });
+    // Captured BEFORE the handler runs, so any invalidation during the read is
+    // visible to the detached salvage below.
+    const epochAtDispatch = conditionCacheEpoch;
     const deadlineAwareResult = Promise.resolve(handler(envelope.args, { tenantId })).then(
       (late) => {
         if (!deadlinePassed) return late;
@@ -888,6 +896,16 @@ export function createBroker({
               lateResult: late,
               note: 'resolved after latency budget; the caller had already timed out',
             });
+            // ⚠ ONLY IF THE WORLD DID NOT MOVE. This branch runs DETACHED, an
+            // unbounded time after its dispatch returned — that is the whole
+            // point of it. So a `server_write` that deleted these very rows can
+            // land in between, sweep the cache, and then be undone by this write
+            // putting the pre-delete value back for a full TTL: deleted rows
+            // reappear on the next read and stay for a minute (round-2 finding
+            // R2-F3). The epoch is bumped by every invalidation, so an unchanged
+            // epoch is proof that nothing invalidated while this read was in
+            // flight. If it moved, the value is stale by definition — drop it.
+            if (conditionCacheEpoch !== epochAtDispatch) return;
             if (conditionDef.cacheable && conditionDef.cacheTtlMs > 0) {
               conditionCache.set(cacheKey, { value: late, expiresAt: now() + conditionDef.cacheTtlMs });
               pruneConditionCache(cacheKey);
@@ -1176,6 +1194,7 @@ export function createBroker({
         }
         // §2.5 cache invalidation: owner's server_write invalidates its condition cache.
         if (activityDef.sideEffect === 'server_write') {
+          conditionCacheEpoch += 1;
           for (const key of conditionCache.keys()) {
             if (key.startsWith(`${tenantId}:${ownerMpId}.`)) conditionCache.delete(key);
           }
