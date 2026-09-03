@@ -608,6 +608,19 @@ export function createDataStore({
             if (failedKey !== undefined) {
               incoming.add(String(failedKey));
               changed.add(failedKey);
+              // ...and clear `_dirty`, which `put` stamped on the way in. This
+              // row came from the SERVER; leaving it dirty misuses the flag that
+              // means "unpushed user work" and makes the row untouchable — dirty
+              // rows are exempt from the prune, from the row cap and from window
+              // retention, and this one is never `_window`-tagged either, so a
+              // store under storage pressure would accumulate rows nothing could
+              // ever collect (round-2 finding QG-R2-2, a consequence of the F2
+              // repair above). `_persistFailed` is deliberately KEPT: not on disk
+              // is still true.
+              // eslint-disable-next-line no-await-in-loop
+              const retained = await backend.get(failedKey);
+              // eslint-disable-next-line no-await-in-loop
+              if (retained) await backend.put(failedKey, { ...retained, _dirty: false });
             }
           }
           continue;
