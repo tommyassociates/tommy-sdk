@@ -203,6 +203,16 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
 const DEFAULT_MAX_ROWS = 50000;
 
 /**
+ * How many WINDOWS a window-paging store keeps (spec mp-durable-instant-surfaces
+ * round-5). Three, because the experience being bought is instant
+ * back-navigation: the window you are on plus the one either side of it covers
+ * "back to last week and forward again" without a fetch, and every window beyond
+ * that is an archive nobody asked to keep. Only applies to reconciles that pass a
+ * `windowKey`; a store that never does is unaffected.
+ */
+const DEFAULT_MAX_WINDOWS = 3;
+
+/**
  * Thrown by `put`/`delete` when the write could not be persisted.
  *
  * ⚠ IT REJECTS *AND* THE ROW IS FLAGGED, DELIBERATELY BOTH. Rejecting alone
@@ -227,7 +237,7 @@ export class PersistError extends Error {
 
 export function createDataStore({
   name, keyPath = 'id', recordSchema, backend = createMemoryStoreBackend(),
-  now = () => Date.now(), maxRows = DEFAULT_MAX_ROWS, onPersistError,
+  now = () => Date.now(), maxRows = DEFAULT_MAX_ROWS, maxWindows = DEFAULT_MAX_WINDOWS, onPersistError,
 }) {
   const validate = recordSchema ? ajv.compile(recordSchema) : null;
   const wholeStoreSubscribers = new Set();
@@ -324,6 +334,74 @@ export function createDataStore({
       evicted.push(key);
     }
     return evicted;
+  }
+
+  /**
+   * Keep the K most recently touched WINDOWS; delete the rows of older ones.
+   *
+   * ⚠ THE ROW CAP CANNOT DO THIS JOB. `enforceRowCap` sorts by `_updatedAt` and
+   * drops the oldest ROWS, which on a window-paging store strip-mines whichever
+   * window happens to hold the least recently written rows — potentially half of
+   * the window the user is looking at. Retention has to be by window or it is
+   * not retention, it is corruption of an arbitrary page.
+   *
+   * The current window is never dropped, dirty rows are never dropped (they are
+   * unsynced local writes, same exemption as everywhere else), and untagged rows
+   * are invisible to this pass — a store that never passes `windowKey` behaves
+   * exactly as it did before.
+   *
+   * Recency is per WINDOW, and it is a VISIT COUNTER, not a timestamp.
+   *
+   * ⚠ `_updatedAt` IS NOT GOOD ENOUGH FOR THIS AND THE TEST CAUGHT IT. Paging
+   * quickly (or any run of reconciles inside one millisecond) stamps several
+   * windows identically, and with tied stamps "most recent" collapses to
+   * whatever order the backend happens to iterate in — which dropped the middle
+   * window and kept the oldest. `windowVisits` records the order windows were
+   * actually reconciled in, so recency is exact regardless of clock resolution.
+   * `_updatedAt` remains the tie-break for windows this session has not visited
+   * (rows rehydrated from disk carry no visit number).
+   */
+  // Visit order for window retention: windowKey -> monotonically increasing
+  // sequence, bumped every time a reconcile names that window. Per store
+  // instance and deliberately NOT persisted — it describes this session's
+  // navigation, and a rehydrated store falls back to `_updatedAt`.
+  const windowVisits = new Map();
+  let windowVisitSeq = 0;
+
+  async function enforceWindowRetention({ current, changed, keep = maxWindows } = {}) {
+    if (!Number.isFinite(keep) || keep <= 0) return [];
+    const rows = await backend.getAll();
+    const lastTouched = new Map();
+    for (const row of rows) {
+      const w = row && row._window;
+      if (w == null) continue;
+      const at = String(row._updatedAt || '');
+      const prev = lastTouched.get(w);
+      if (prev === undefined || at.localeCompare(prev) > 0) lastTouched.set(w, at);
+    }
+    if (lastTouched.size <= keep) return [];
+    const ordered = [...lastTouched.entries()]
+      .sort((a, b) => {
+        const va = windowVisits.get(a[0]);
+        const vb = windowVisits.get(b[0]);
+        if (va !== undefined || vb !== undefined) return (vb ?? -1) - (va ?? -1);
+        return b[1].localeCompare(a[1]);
+      })
+      .map(([w]) => w);
+    // The current window is retained regardless of stamp order — it is the one
+    // the user is looking at, and on a first visit its rows may be the oldest.
+    const kept = new Set([current, ...ordered.filter((w) => w !== current).slice(0, Math.max(0, keep - 1))]);
+    const doomed = ordered.filter((w) => !kept.has(w));
+    if (!doomed.length) return [];
+    const drop = new Set(doomed);
+    for (const row of rows) {
+      if (!row || row._window == null || !drop.has(row._window) || row._dirty) continue;
+      const key = keyOf(row);
+      // eslint-disable-next-line no-await-in-loop
+      await api.delete(key, { silent: true });
+      if (changed) changed.add(key);
+    }
+    return doomed;
   }
 
   function trackedQuery(records, touched) {
@@ -452,8 +530,19 @@ export function createDataStore({
      * pruned, and only rows matching `scope` are prune-candidates (e.g. "in this
      * window") — omit `scope` for a whole-store authoritative replace. Returns
      * `{ upserted, pruned }`.
+     *
+     * `windowKey` (optional) TAGS the rows this reconcile wrote with the window
+     * they belong to, which is what makes bounded retention possible on a
+     * PERSISTED store. Scoped reconcile deliberately leaves out-of-scope rows
+     * alone — that is what scoping means — so paging week to week ACCUMULATES
+     * every week ever viewed, bounded only by the row cap. In memory that lasts
+     * a session; on disk it is forever, which is precisely the 50-200MB archive
+     * the legacy Vuex plugin refused to keep (`core/src/store/plugins/
+     * indexeddb.js`). With a `windowKey`, `enforceWindowRetention` keeps the K
+     * most recently touched windows and drops the rest. Untagged rows are never
+     * touched by it: a non-windowed store behaves exactly as before.
      */
-    async reconcile(records = [], { scope } = {}) {
+    async reconcile(records = [], { scope, windowKey } = {}) {
       const existing = await backend.getAll();
       const incoming = new Set();
       // ONE notify for the whole merge, at the end. Per-record notifies made a
@@ -480,6 +569,17 @@ export function createDataStore({
         }
         // eslint-disable-next-line no-await-in-loop
         await api.markSynced(key);
+        // Tag the row with the window it was fetched under, so retention can
+        // drop whole windows later. Written straight to the backend rather than
+        // through `put` so it costs no schema validation and no extra notify —
+        // `_window` is store metadata, the same class as `_updatedAt`, and must
+        // never reach a recordSchema.
+        if (windowKey != null) {
+          // eslint-disable-next-line no-await-in-loop
+          const stored = await backend.get(key);
+          // eslint-disable-next-line no-await-in-loop
+          if (stored) await backend.put(key, { ...stored, _window: String(windowKey) });
+        }
         incoming.add(String(key));
         changed.add(key);
       }
@@ -498,9 +598,21 @@ export function createDataStore({
       // between a window-paging store and unbounded growth. Evictions join
       // the SAME `changed` batch as the upserts and prunes, so the whole
       // reconcile still costs exactly one notify.
+      if (windowKey != null) {
+        windowVisitSeq += 1;
+        windowVisits.set(String(windowKey), windowVisitSeq);
+      }
+      const dropped = windowKey != null
+        ? await enforceWindowRetention({ current: String(windowKey), changed })
+        : [];
       const evicted = await enforceRowCap({ protect: incoming, changed });
       if (changed.size) await notify(changed);
-      return { upserted: incoming.size, pruned, ...(evicted.length ? { evicted: evicted.length } : {}) };
+      return {
+        upserted: incoming.size,
+        pruned,
+        ...(dropped.length ? { windowsDropped: dropped.length } : {}),
+        ...(evicted.length ? { evicted: evicted.length } : {}),
+      };
     },
     subscribe(handler) {
       wholeStoreSubscribers.add(handler);

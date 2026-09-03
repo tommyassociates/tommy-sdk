@@ -58,6 +58,18 @@ function describeSemantic(err) {
       message: `activity '${name}' is offlineReplayable but idempotency is 'none' — an offline-replayable activity must have an idempotency strategy.`,
     };
   }
+  // The localData block now has TWO allOf branches, and naming them apart
+  // matters for the same reason it does for activities above: a store that
+  // persists without a cap is not a sync-resolver problem, and reporting it as
+  // one sends the author to add `customResolverActivity` to a
+  // server_authoritative store, which is meaningless.
+  if (/\/localData\/additionalProperties\/allOf\/1\//.test(err.schemaPath)) {
+    return {
+      path,
+      rule: 'persist-requires-max-rows',
+      message: `localData store '${name}' sets persist:true but does not set maxRows — a persisted store on the 50000 default keeps every window ever viewed on the user's disk. Size it as rows-per-window x windows-retained.`,
+    };
+  }
   return {
     path,
     rule: 'custom-sync-requires-resolver',

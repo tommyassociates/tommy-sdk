@@ -1346,7 +1346,11 @@
           "maxRows": {
             "type": "integer",
             "minimum": 1,
-            "description": "Optional resident-row ceiling for this store. Omit to take the DataStore default (50000), which is sized for a windowed server cache. A client-owned store holding user-authored rows wants a far tighter bound \u2014 the cap is a runaway backstop, and eviction never touches an unsynced row."
+            "description": "Optional resident-row ceiling for this store. Omit to take the DataStore default (50000), which is a RUNAWAY BACKSTOP and not a working-set size. REQUIRED when persist is true: a persisted store on the default keeps every window ever viewed on the user's disk, which is how the legacy vuex plugin reached 50-200MB and why it excluded the windowed collections outright. Derive it as rows-per-window x windows-retained, with headroom. Eviction never touches an unsynced row."
+          },
+          "persist": {
+            "type": "boolean",
+            "description": "Whether this store's rows survive a shell reload. Server-authoritative caches default to FALSE and are opted in per store: persistence is what makes a surface paint instantly on a cold boot, and it is also what puts the rows on disk, so each store accepts the staleness and privacy contract deliberately. Stores holding person-level CONTENT rather than operational records (message bodies, care plans, client PII, form answers, document instances, onboarding details, call history) must stay false. Requires maxRows."
           },
           "customResolverActivity": {
             "description": "Required when syncStrategy is 'custom': the activity that resolves a conflict.",
@@ -1365,6 +1369,23 @@
             "then": {
               "required": [
                 "customResolverActivity"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "persist": {
+                  "const": true
+                }
+              },
+              "required": [
+                "persist"
+              ]
+            },
+            "then": {
+              "required": [
+                "maxRows"
               ]
             }
           }

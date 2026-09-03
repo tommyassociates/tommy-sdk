@@ -25,6 +25,7 @@ const EXPECTED_LAYER = {
   'offline-replay-requires-idempotency': 5,
   'debounced-requires-debounceMs': 5,
   'custom-sync-requires-resolver': 5,
+  'persist-requires-max-rows': 5,
 };
 
 // A few fixtures where the offending token must appear on the reported line —

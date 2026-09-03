@@ -29,6 +29,14 @@ function defaultBackend(dbName, storeName, syncStrategy) {
   if (syncStrategy === 'last_write_wins' && hasWebStorage()) {
     return createLocalStorageBackend(dbName, storeName);
   }
+  // ⚠ A `persist: true` SERVER-AUTHORITATIVE STORE STILL LANDS IN MEMORY HERE,
+  // and that is deliberate. Durable caching needs a store far larger than Web
+  // Storage can hold, so the backend for it is IndexedDB-backed and lives in the
+  // HOST (`app/src/services/mp-loader/mp-store-durable-backend.js`) — the SDK
+  // package must not grow a storage dependency, and only the host knows the
+  // account the database has to be namespaced by. With no host factory injected
+  // (node, tests, a standalone SDK consumer) memory is the correct answer: the
+  // declaration is honoured by whoever can honour it.
   return createMemoryStoreBackend();
 }
 
@@ -63,8 +71,12 @@ export function createDataManager({
   const syncMeta = new Map(); // storeName -> { lastSyncedAt, pending, online }
 
   for (const [storeName, decl] of Object.entries(localData)) {
+    // The 4th argument is the store DECLARATION, added for `persist` (spec
+    // mp-durable-instant-surfaces). Positional 1-3 are unchanged, so an existing
+    // factory that reads three arguments keeps working untouched — the same
+    // widening discipline the `syncStrategy` argument itself went through.
     const backend = backendFactory
-      ? backendFactory(dbName, storeName, decl.syncStrategy)
+      ? backendFactory(dbName, storeName, decl.syncStrategy, decl)
       : defaultBackend(dbName, storeName, decl.syncStrategy);
     stores.set(storeName, createDataStore({
       name: storeName,
@@ -84,7 +96,18 @@ export function createDataManager({
   // preservation across a thin DTO), and reconcile them into the store under
   // `scope`. A failed fetch is swallowed so the SWR paint holds (cache intact).
   // Returns the reconciled, scope-filtered cache read.
-  async function fetchAndReconcile(store, keyPath, { fetch, toRecord, keyOf }, scope, window) {
+  function windowKeyOf(window) {
+    if (window == null || typeof window !== 'object') return undefined;
+    const keys = Object.keys(window).sort();
+    if (!keys.length) return undefined;
+    try {
+      return JSON.stringify(keys.map((k) => [k, window[k]]));
+    } catch (_) {
+      return undefined; // unserialisable window — no key, no window retention
+    }
+  }
+
+  async function fetchAndReconcile(store, keyPath, { fetch, toRecord, keyOf }, scope, window, windowKey) {
     let dtos = null;
     try {
       dtos = typeof fetch === 'function' ? await fetch(window) : null;
@@ -101,7 +124,7 @@ export function createDataManager({
         (dto) => toRecord(dto, prevByKey ? prevByKey.get(String(keyOf(dto))) : undefined),
       );
       try {
-        await store.reconcile(records, { scope });
+        await store.reconcile(records, { scope, ...(windowKey != null ? { windowKey } : {}) });
       } catch (_) { /* store error — keep the cache intact */ }
     }
     return store.readWhere(scope);
@@ -126,6 +149,18 @@ export function createDataManager({
      * rich-field preservation across a thin DTO). A failed `fetch` is swallowed
      * so the SWR paint holds (cache left intact).
      */
+    /**
+     * A stable identity for a window, so retention can count windows rather than
+     * rows (`DataStore.enforceWindowRetention`). Windows are plain
+     * `{ startAt, endAt }`-ish objects, so the key is their sorted JSON — two
+     * calls describing the same week must produce the same key or every
+     * revalidate would look like a NEW window and the retention budget would
+     * churn through three of them per session.
+     *
+     * `undefined`/`null` windows (whole-store caches) get no key, which switches
+     * window retention off for that store — correct, because a store with no
+     * window has nothing to retain BY window and the row cap is the right bound.
+     */
     windowCache(storeName, {
       fetch, toRecord = (dto) => dto, scopeOf, keyOf,
     } = {}) {
@@ -135,7 +170,9 @@ export function createDataManager({
       const scopeFor = (window) => (scopeOf ? scopeOf(window) : () => true);
       return {
         read: (window) => store.readWhere(scopeFor(window)),
-        sync: (window) => fetchAndReconcile(store, keyPath, { fetch, toRecord, keyOf }, scopeFor(window), window),
+        sync: (window) => fetchAndReconcile(
+          store, keyPath, { fetch, toRecord, keyOf }, scopeFor(window), window, windowKeyOf(window),
+        ),
       };
     },
     /**
