@@ -1,0 +1,26 @@
+# A store that PERSISTS without declaring maxRows. The DataStore default is
+# 50000 — a runaway backstop, not a working-set size — so a persisted store on
+# it keeps every window the user ever paged through, on their disk.
+---
+# Layer 5 — semantic: a persisted localData store with no maxRows.
+manifestVersion: "1"
+id: persist-no-cap
+version: 1.0.0
+name: Persist No Cap
+category: comms
+description: A persisted store missing its maxRows cap.
+publisher:
+  id: tommy-labs
+  name: Tommy Labs
+  type: first_party
+localData:
+  things:
+    keyPath: id
+    syncStrategy: server_authoritative
+    persist: true       # BREAK: custom requires customResolverActivity
+    recordSchema:
+      type: object
+      required: [id]
+      additionalProperties: false
+      properties:
+        id: { type: string }
