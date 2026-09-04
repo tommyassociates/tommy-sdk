@@ -107,3 +107,59 @@ describe('the paint ceiling (contract item 3, the platform half)', () => {
     expect(await lq.revalidate()).toEqual([]);
   });
 });
+
+/**
+ * pruneScope — review CAL-FILTERED-PRUNE.
+ *
+ * `scope` answers "what should this surface show". `reconcile` reused it to
+ * answer "what may this read DELETE", and those diverge the moment a read is
+ * FILTERED: the rows the filter never covered are absent from the answer and
+ * were deleted as though the server had dropped them. Scheduling hit this twice
+ * and hand-rolled a separate predicate in both writers; this is that predicate
+ * as a primitive.
+ */
+describe('pruneScope separates what a read may show from what it may delete', () => {
+  const manager = () => createDataManager({
+    capabilityToken: { tenantId: 'team-3', mpId: 'filtered-mp' }, mpId: 'filtered-mp',
+    localData: { rows: { keyPath: 'id' } },
+    backendFactory: () => createMemoryStoreBackend(),
+  });
+
+  const seed = async (store, ids) => {
+    for (const id of ids) {
+      await store.put({ id, member: id });
+      await store.markSynced(id);
+    }
+  };
+
+  it('a filtered read with pruneScope:()=>false writes without deleting', async () => {
+    const mgr = manager();
+    const store = mgr.store('rows');
+    await seed(store, ['a', 'b']);
+    const lq = mgr.liveQuery('rows', {
+      scope: () => true,
+      pruneScope: () => false,
+      fetch: () => [{ id: 'a', member: 'a' }],     // only member a's rows came back
+    });
+    await lq.revalidate();
+    expect((await store.getAll()).map((r) => r.id).sort()).toEqual(['a', 'b']);
+  });
+
+  it('WITHOUT pruneScope the same read deletes the rows it never covered', async () => {
+    // The defect, pinned so the primitive cannot be quietly removed.
+    const mgr = manager();
+    const store = mgr.store('rows');
+    await seed(store, ['a', 'b']);
+    const lq = mgr.liveQuery('rows', { scope: () => true, fetch: () => [{ id: 'a', member: 'a' }] });
+    await lq.revalidate();
+    expect((await store.getAll()).map((r) => r.id)).toEqual(['a']);
+  });
+
+  it('pruneScope does not narrow what the surface READS', async () => {
+    const mgr = manager();
+    const store = mgr.store('rows');
+    await seed(store, ['a', 'b']);
+    const lq = mgr.liveQuery('rows', { scope: () => true, pruneScope: () => false, fetch: () => [] });
+    expect((await lq.read()).map((r) => r.id).sort()).toEqual(['a', 'b']);
+  });
+});

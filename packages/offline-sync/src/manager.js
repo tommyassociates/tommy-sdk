@@ -224,7 +224,7 @@ export function createDataManager({
      * to the same result — harmless). `fetch`/`toRecord`/`keyOf` are as windowCache.
      */
     liveQuery(storeName, {
-      scope, fetch, toRecord = (dto) => dto, keyOf,
+      scope, pruneScope, fetch, toRecord = (dto) => dto, keyOf,
     } = {}) {
       const store = stores.get(storeName);
       if (!store) throw new Error(`tommy.data.liveQuery('${storeName}'): store not declared in manifest.localData`);
@@ -243,6 +243,19 @@ export function createDataManager({
        * "what this read covers", or an aged row would silently escape pruning.
        */
       const predicate = painted(scopePredicate);
+      /**
+       * ⚠ READING AND DELETING ARE NOT THE SAME AUTHORITY (review
+       * CAL-FILTERED-PRUNE). `scope` answers "what should this surface show";
+       * `reconcile` reuses it to answer "what may this read DELETE", and those
+       * diverge the moment a read is FILTERED. A member-filtered calendar read
+       * scoped by window alone deletes every other member's cached entries for
+       * that window — the same defect scheduling hit twice (SCE-R2-2), and the
+       * reason its writers hand-rolled a separate prune predicate. `pruneScope`
+       * makes that expressible instead of hand-rolled: pass `() => false` for a
+       * read that may write but must not delete. Omitted, behaviour is
+       * unchanged — the scope governs both, as before.
+       */
+      const prunePredicate = typeof pruneScope === 'function' ? pruneScope : scopePredicate;
       return {
         store,
         read: () => store.readWhere(predicate),
@@ -267,7 +280,7 @@ export function createDataManager({
         // not the design. A whole-store cache still passes no window and so still
         // opts out, exactly as windowCache does.
         revalidate: (window) => fetchAndReconcile(
-          store, keyPath, { fetch, toRecord, keyOf }, scopePredicate, window, windowKeyOf(window),
+          store, keyPath, { fetch, toRecord, keyOf }, prunePredicate, window, windowKeyOf(window),
         ).then(() => store.readWhere(predicate)),
       };
     },
