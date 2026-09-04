@@ -168,6 +168,20 @@ describe('window retention through liveQuery (the production path)', () => {
     expect(row._window).toBeDefined();
   });
 
+  it('a source with NO fetch never reconciles, so its store must be tagged by its own writer', async () => {
+    // The shipped scheduling shape (SchedulingMain.vue instantSources): store,
+    // scope and paint, no `fetch`. `fetchAndReconcile` sees `dtos = null` and
+    // reconciles NOTHING, so no `windowKey` the mixin passes can ever reach the
+    // store. Declaring `instantWindow()` on such a surface is decorative — the
+    // tag has to come from whoever actually writes the cache (review
+    // R2-F1-VERIFY). Pinned so a future reader does not "fix" retention by
+    // adding a window to a fetch-less source again.
+    const mgr = manager();
+    const lq = mgr.liveQuery('grid', { scope: () => true });
+    await lq.revalidate({ week: 'w1' });
+    expect(await lq.store.getAll()).toEqual([]);
+  });
+
   it('stays inert for a whole-store liveQuery that passes no window', async () => {
     const mgr = manager();
     const lq = mgr.liveQuery('grid', { scope: () => true, fetch: () => [{ id: 'only' }] });
