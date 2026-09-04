@@ -225,6 +225,14 @@ const DEFAULT_MAX_ROWS = 50000;
 const DEFAULT_MAX_WINDOWS = 3;
 
 /**
+ * How old a row may be and still be PAINTED — a platform promise, not a per-store
+ * tuning knob. A device left closed for a fortnight must start cold rather than
+ * confident: a stale roster or compliance surface with nothing on it saying it is
+ * stale is worse than an empty one.
+ */
+export const PAINT_CEILING_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
  * Thrown by `put`/`delete` when the write could not be persisted.
  *
  * ⚠ IT REJECTS *AND* THE ROW IS FLAGGED, DELIBERATELY BOTH. Rejecting alone
@@ -493,8 +501,31 @@ export function createDataStore({
     },
     /** Cache-read half of SWR: the stored records matching `predicate(record)`,
      *  meta stamps stripped (clean domain rows). Sorting is the caller's job. */
+    /**
+     * ⚠ THE PAINT CEILING LIVES HERE, AT THE READ ITSELF (review
+     * PAINT-CEILING-DIRECT-READS). It was written into `liveQuery` and then
+     * `windowCache`, and both were still the wrong altitude: MPs read their
+     * stores DIRECTLY too (`schedule-flow.cachedRowsInWindow`,
+     * `scheduling/conditions` fallback, the team member-profile page), so the
+     * scheduling grid could paint rows up to the store's 30-day TTL off disk. A
+     * promise about what may be SHOWN has to sit where every reader passes, or
+     * it is a promise about one code path.
+     *
+     * `getAll()` is deliberately NOT filtered: it is the WRITERS' view (building
+     * a `prevById` merge map, reconciling, measuring), and hiding rows from a
+     * writer would make it delete or duplicate what it cannot see.
+     *
+     * A `_dirty` row is exempt — a local write that has not reached the server,
+     * whose age is not a reason to hide it from its author.
+     */
     async readWhere(predicate = () => true) {
-      return (await snapshot()).filter(predicate).map(stripMeta);
+      const cutoff = now() - PAINT_CEILING_MS;
+      const paintable = (row) => {
+        if (!row || row._dirty) return true;
+        const at = Date.parse(row._updatedAt || '');
+        return !Number.isFinite(at) || at >= cutoff;
+      };
+      return (await snapshot()).filter(paintable).filter(predicate).map(stripMeta);
     },
     async put(record, { dedupeKey, silent = false, deferCap = false } = {}) {
       if (validate && !validate(record)) {

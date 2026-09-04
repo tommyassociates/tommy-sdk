@@ -7,7 +7,7 @@
  * surviving a PERMISSION CHANGE with no bound on its age. These pin both.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { createMemoryStoreBackend } from '../src/data-store.js';
+import { createDataStore, createMemoryStoreBackend } from '../src/data-store.js';
 import { createDataManager } from '../src/manager.js';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -161,5 +161,51 @@ describe('pruneScope separates what a read may show from what it may delete', ()
     await seed(store, ['a', 'b']);
     const lq = mgr.liveQuery('rows', { scope: () => true, pruneScope: () => false, fetch: () => [] });
     expect((await lq.read()).map((r) => r.id).sort()).toEqual(['a', 'b']);
+  });
+});
+
+/**
+ * PAINT-CEILING-DIRECT-READS — the ceiling at the read itself.
+ *
+ * It was written into `liveQuery`, then widened to `windowCache`, and both were
+ * the wrong altitude: MPs read their stores DIRECTLY too, so the scheduling grid
+ * could paint rows up to the store's 30-day TTL off disk. `readWhere` is where
+ * every reader passes.
+ */
+describe('the paint ceiling applies to a direct store read', () => {
+  const storeAt = (nowFn) => createDataStore({
+    name: 'rows', keyPath: 'id', backend: createMemoryStoreBackend(), now: nowFn,
+  });
+
+  const seeded = async () => {
+    const t0 = Date.parse('2026-09-04T00:00:00.000Z');
+    let clock = t0 - (10 * DAY);
+    const store = storeAt(() => clock);
+    await store.put({ id: 'old' });
+    await store.markSynced('old');
+    clock = t0 - (1 * DAY);
+    await store.put({ id: 'fresh' });
+    await store.markSynced('fresh');
+    clock = t0;
+    return store;
+  };
+
+  it('readWhere omits a row stamped 10 days ago and keeps the fresh one', async () => {
+    const store = await seeded();
+    expect((await store.readWhere(() => true)).map((r) => r.id)).toEqual(['fresh']);
+  });
+
+  it('getAll still returns it — that is the WRITERS view, and hiding rows there causes deletes', async () => {
+    const store = await seeded();
+    expect((await store.getAll()).map((r) => r.id).sort()).toEqual(['fresh', 'old']);
+  });
+
+  it('a dirty row is exempt however old — it has not reached the server', async () => {
+    const t0 = Date.parse('2026-09-04T00:00:00.000Z');
+    let clock = t0 - (40 * DAY);
+    const store = storeAt(() => clock);
+    await store.put({ id: 'mine' });             // never markSynced
+    clock = t0;
+    expect((await store.readWhere(() => true)).map((r) => r.id)).toEqual(['mine']);
   });
 });

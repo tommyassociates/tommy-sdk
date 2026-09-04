@@ -14,13 +14,9 @@
  */
 import { databaseName } from './names.js';
 
-/**
- * How old a row may be and still be PAINTED. Declared here rather than per store
- * because it is a platform promise, not a per-MP tuning knob: the spec's
- * invalidation contract calls it "the platform additionally refuses to PAINT
- * rows older than 7 days".
- */
-const PAINT_CEILING_MS = 7 * 24 * 60 * 60 * 1000;
+// The ceiling itself is enforced in `DataStore.readWhere` (every reader passes
+// there, including MPs reading their stores directly). These wrappers stay so a
+// manager-level read is filtered even against a store built with a custom clock.
 const nowMs = () => Date.now();
 
 /**
@@ -41,7 +37,7 @@ const paintable = (row) => {
 /** Compose a caller's scope with the paint ceiling. */
 const painted = (predicate) => (row) => predicate(row) && paintable(row);
 import {
-  createDataStore, createMemoryStoreBackend, createLocalStorageBackend, hasWebStorage,
+  createDataStore, createMemoryStoreBackend, createLocalStorageBackend, hasWebStorage, PAINT_CEILING_MS,
 } from './data-store.js';
 
 /**
