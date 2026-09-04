@@ -13,6 +13,15 @@
  * them from M1's fabric work onward).
  */
 import { databaseName } from './names.js';
+
+/**
+ * How old a row may be and still be PAINTED. Declared here rather than per store
+ * because it is a platform promise, not a per-MP tuning knob: the spec's
+ * invalidation contract calls it "the platform additionally refuses to PAINT
+ * rows older than 7 days".
+ */
+const PAINT_CEILING_MS = 7 * 24 * 60 * 60 * 1000;
+const nowMs = () => Date.now();
 import {
   createDataStore, createMemoryStoreBackend, createLocalStorageBackend, hasWebStorage,
 } from './data-store.js';
@@ -199,7 +208,25 @@ export function createDataManager({
       const store = stores.get(storeName);
       if (!store) throw new Error(`tommy.data.liveQuery('${storeName}'): store not declared in manifest.localData`);
       const keyPath = localData[storeName]?.keyPath || 'id';
-      const predicate = typeof scope === 'function' ? scope : () => true;
+      const scopePredicate = typeof scope === 'function' ? scope : () => true;
+      /**
+       * ⚠ THE PAINT CEILING (invalidation contract item 3, second half). A cache
+       * that persists has no natural end: a device left closed for a fortnight
+       * would otherwise reopen and paint a confident, wrong fortnight-old
+       * surface — which on a compliance or roster screen is worse than an empty
+       * one, because nothing on it says it is old. Rows past the ceiling are not
+       * PAINTED; they are still stored, and the store's own TTL evicts them at
+       * open. A `_dirty` row is exempt: it is a local write that has not reached
+       * the server, and its age is not a reason to hide it from its author.
+       * Applied to the READ paths only — the reconcile scope must keep meaning
+       * "what this read covers", or an aged row would silently escape pruning.
+       */
+      const paintable = (row) => {
+        if (!row || row._dirty) return true;
+        const at = Date.parse(row._updatedAt || '');
+        return !Number.isFinite(at) || (nowMs() - at) < PAINT_CEILING_MS;
+      };
+      const predicate = (row) => scopePredicate(row) && paintable(row);
       return {
         store,
         read: () => store.readWhere(predicate),
@@ -224,8 +251,8 @@ export function createDataManager({
         // not the design. A whole-store cache still passes no window and so still
         // opts out, exactly as windowCache does.
         revalidate: (window) => fetchAndReconcile(
-          store, keyPath, { fetch, toRecord, keyOf }, predicate, window, windowKeyOf(window),
-        ),
+          store, keyPath, { fetch, toRecord, keyOf }, scopePredicate, window, windowKeyOf(window),
+        ).then(() => store.readWhere(predicate)),
       };
     },
     /** DataApi.syncState — SWR UX inputs (offline-sync.md §6). */
