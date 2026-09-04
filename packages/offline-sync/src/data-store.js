@@ -258,6 +258,7 @@ export class PersistError extends Error {
 export function createDataStore({
   name, keyPath = 'id', recordSchema, backend = createMemoryStoreBackend(),
   now = () => Date.now(), maxRows = DEFAULT_MAX_ROWS, maxWindows = DEFAULT_MAX_WINDOWS, onPersistError,
+  syncStrategy = 'server_authoritative',
 }) {
   const validate = recordSchema ? ajv.compile(recordSchema) : null;
   const wholeStoreSubscribers = new Set();
@@ -423,6 +424,17 @@ export function createDataStore({
   const windowVisits = new Map();
   let windowVisitSeq = 0;
 
+  /**
+   * Whether a row may be PAINTED. Caches age out at the platform ceiling;
+   * client-owned (`last_write_wins`) rows never do — they are the only copy.
+   */
+  const ceilingApplies = syncStrategy !== 'last_write_wins';
+  const paintable = (row) => {
+    if (!ceilingApplies || !row || row._dirty) return true;
+    const at = Date.parse(row._updatedAt || '');
+    return !Number.isFinite(at) || at >= now() - PAINT_CEILING_MS;
+  };
+
   async function enforceWindowRetention({ current, changed, keep = maxWindows } = {}) {
     if (!Number.isFinite(keep) || keep <= 0) return [];
     const rows = await backend.getAll();
@@ -496,35 +508,43 @@ export function createDataStore({
     async get(key) {
       return backend.get(key);
     },
+    /** Rows a surface may SHOW: schema rows with the paint ceiling applied. */
     async getAll() {
+      return (await snapshot()).filter(paintable);
+    },
+    /**
+     * The WRITERS' view: every row, ceiling and all. A writer building a merge
+     * map (`prevById`) or reconciling must see rows it may not paint, or it will
+     * delete or duplicate what it cannot see.
+     */
+    async getAllRaw() {
       return snapshot();
     },
     /** Cache-read half of SWR: the stored records matching `predicate(record)`,
      *  meta stamps stripped (clean domain rows). Sorting is the caller's job. */
     /**
-     * ⚠ THE PAINT CEILING LIVES HERE, AT THE READ ITSELF (review
-     * PAINT-CEILING-DIRECT-READS). It was written into `liveQuery` and then
-     * `windowCache`, and both were still the wrong altitude: MPs read their
-     * stores DIRECTLY too (`schedule-flow.cachedRowsInWindow`,
-     * `scheduling/conditions` fallback, the team member-profile page), so the
-     * scheduling grid could paint rows up to the store's 30-day TTL off disk. A
-     * promise about what may be SHOWN has to sit where every reader passes, or
-     * it is a promise about one code path.
+     * ⚠ THE PAINT CEILING LIVES AT THE READ, AND IT IS THE DEFAULT.
      *
-     * `getAll()` is deliberately NOT filtered: it is the WRITERS' view (building
-     * a `prevById` merge map, reconciling, measuring), and hiding rows from a
-     * writer would make it delete or duplicate what it cannot see.
+     * It was written into `liveQuery`, widened to `windowCache`, then moved
+     * here to `readWhere` — and each time it was still one path among several,
+     * because MPs also read through `getAll()` (time-clock derives clock-in
+     * state that way, off a persisted cache). Three rounds of the same
+     * correction. So the ceiling now governs BOTH read APIs and the unfiltered
+     * view is the one that must be asked for by name: `getAllRaw()`. The unsafe
+     * behaviour requires an explicit opt-in, rather than the safe behaviour
+     * requiring twenty-nine call sites to remember it.
      *
-     * A `_dirty` row is exempt — a local write that has not reached the server,
-     * whose age is not a reason to hide it from its author.
+     * ⚠ AND IT APPLIES TO CACHES ONLY. A `last_write_wins` store is not stale
+     * server data going off — it is the user's OWN row, the truth, and the only
+     * copy. Ageing a member's saved settings or a half-typed draft out of a read
+     * would be data loss dressed as a freshness guarantee. The first version of
+     * this fix did exactly that; the strategy is now threaded from the manifest
+     * so the rule can tell a cache from a client-owned record.
+     *
+     * A `_dirty` row is exempt regardless: it has not reached the server, and
+     * its age is not a reason to hide it from its author.
      */
     async readWhere(predicate = () => true) {
-      const cutoff = now() - PAINT_CEILING_MS;
-      const paintable = (row) => {
-        if (!row || row._dirty) return true;
-        const at = Date.parse(row._updatedAt || '');
-        return !Number.isFinite(at) || at >= cutoff;
-      };
       return (await snapshot()).filter(paintable).filter(predicate).map(stripMeta);
     },
     async put(record, { dedupeKey, silent = false, deferCap = false } = {}) {

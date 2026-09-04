@@ -41,7 +41,9 @@ describe('the paint ceiling (contract item 3, the platform half)', () => {
     const lq = await withRowAged(8);
     expect(await lq.read()).toEqual([]);
     // Still STORED — the ceiling governs the paint; the store's TTL evicts.
-    expect((await lq.store.getAll()).length).toBe(1);
+    // `getAllRaw` is the unfiltered view: `getAll` carries the ceiling now
+    // (review PAINT-CEILING-GETALL-READERS), because MPs paint through it too.
+    expect((await lq.store.getAllRaw()).length).toBe(1);
   });
 
   it('subscribe does not emit an over-age row either', async () => {
@@ -76,7 +78,7 @@ describe('the paint ceiling (contract item 3, the platform half)', () => {
     await store.markSynced('1');
     clock = t0;
     expect(await wc.read({ from: 1, to: 2 })).toEqual([]);
-    expect((await store.getAll()).length).toBe(1);   // stored, just not painted
+    expect((await store.getAllRaw()).length).toBe(1);   // stored, just not painted
   });
 
   it('windowCache.sync returns the painted set, not the raw reconcile read', async () => {
@@ -195,9 +197,38 @@ describe('the paint ceiling applies to a direct store read', () => {
     expect((await store.readWhere(() => true)).map((r) => r.id)).toEqual(['fresh']);
   });
 
-  it('getAll still returns it — that is the WRITERS view, and hiding rows there causes deletes', async () => {
+  it('getAll carries the ceiling too — MPs paint through it, so it cannot be the raw view', async () => {
+    // ⚠ THIS ASSERTION USED TO SAY THE OPPOSITE, and it was wrong. Round 6 put
+    // the ceiling on `readWhere` only and reasoned that `getAll` was "the
+    // writers' view". It is not: twenty-odd MP call sites read `getAll()` to
+    // PAINT — time-clock derives clock-in state from it off a persisted cache.
+    // Leaving it unfiltered left the ceiling bypassed for all of them (review
+    // PAINT-CEILING-GETALL-READERS). The safe behaviour is now the default and
+    // the raw view is the one you ask for by name.
     const store = await seeded();
-    expect((await store.getAll()).map((r) => r.id).sort()).toEqual(['fresh', 'old']);
+    expect((await store.getAll()).map((r) => r.id)).toEqual(['fresh']);
+  });
+
+  it('getAllRaw is the writers view — hiding rows from a writer causes deletes', async () => {
+    const store = await seeded();
+    expect((await store.getAllRaw()).map((r) => r.id).sort()).toEqual(['fresh', 'old']);
+  });
+
+  it('a client-owned (last_write_wins) store never ages out — it is the only copy', async () => {
+    // A member's saved settings or half-typed draft is not stale server data
+    // going off. Ageing it out of a read would be data loss dressed as a
+    // freshness guarantee — which the first version of this fix did.
+    const t0 = Date.parse('2026-09-04T00:00:00.000Z');
+    let clock = t0 - (60 * DAY);
+    const store = createDataStore({
+      name: 'settings', keyPath: 'key', backend: createMemoryStoreBackend(),
+      now: () => clock, syncStrategy: 'last_write_wins',
+    });
+    await store.put({ key: 'vendor', value: { tax: 10 } });
+    await store.markSynced('vendor');
+    clock = t0;
+    expect((await store.readWhere(() => true)).map((r) => r.key)).toEqual(['vendor']);
+    expect((await store.getAll()).length).toBe(1);
   });
 
   it('a dirty row is exempt however old — it has not reached the server', async () => {

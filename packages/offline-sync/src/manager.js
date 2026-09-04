@@ -108,6 +108,11 @@ export function createDataManager({
       backend,
       now,
       ...(decl.maxRows ? { maxRows: decl.maxRows } : {}),
+      // The paint ceiling applies to CACHES, not to client-owned rows: a
+      // `last_write_wins` store holds the user's own settings and drafts, the
+      // only copy, and ageing those out of a read is data loss wearing a
+      // freshness guarantee.
+      syncStrategy: decl.syncStrategy || 'server_authoritative',
       onPersistError,
     }));
     syncMeta.set(storeName, { lastSyncedAt: null, pending: 0, online: true, strategy: decl.syncStrategy || 'server_authoritative' });
