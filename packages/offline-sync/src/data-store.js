@@ -505,7 +505,23 @@ export function createDataStore({
   }
 
   const api = {
+    /**
+     * ⚠ THE THIRD READ API, AND THE THIRD TIME. The ceiling went to `readWhere`
+     * (round 6), then `getAll` (round 7), and `get(key)` was still uncovered —
+     * so a persisted store could prefill an EDIT FORM or answer a by-id
+     * condition from a row up to the 30-day store TTL (review
+     * PAINT-CEILING-GET-KEY). A form prefilled from a fortnight-old row is worse
+     * than an empty one: the operator saves it back as current.
+     *
+     * Every read a surface can reach is now ceilinged by default, and each has a
+     * `Raw` twin for the writers that must see what they may not paint.
+     */
     async get(key) {
+      const row = await backend.get(key);
+      return paintable(row) ? row : undefined;
+    },
+    /** The WRITERS' single-row view: unfiltered, for merge and reconcile paths. */
+    async getRaw(key) {
       return backend.get(key);
     },
     /** Rows a surface may SHOW: schema rows with the paint ceiling applied. */

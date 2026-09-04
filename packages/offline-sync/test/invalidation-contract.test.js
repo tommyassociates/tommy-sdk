@@ -231,6 +231,20 @@ describe('the paint ceiling applies to a direct store read', () => {
     expect((await store.getAll()).length).toBe(1);
   });
 
+  it('get(key) carries the ceiling — an edit form must not prefill from a stale row', async () => {
+    // The third read API, uncovered until review PAINT-CEILING-GET-KEY. A form
+    // prefilled from a fortnight-old row is worse than an empty one: the
+    // operator saves it back as current.
+    const store = await seeded();
+    expect(await store.get('old')).toBeUndefined();
+    expect((await store.get('fresh'))?.id).toBe('fresh');
+  });
+
+  it('getRaw(key) is the writers view — a read-modify-write must see what it may not paint', async () => {
+    const store = await seeded();
+    expect((await store.getRaw('old'))?.id).toBe('old');
+  });
+
   it('a dirty row is exempt however old — it has not reached the server', async () => {
     const t0 = Date.parse('2026-09-04T00:00:00.000Z');
     let clock = t0 - (40 * DAY);
