@@ -514,6 +514,16 @@ export function createDataStore({
       }
       const stamped = {
         ...record,
+        // ⚠ CARRY `_window` FORWARD. It is store metadata of the same class as
+        // `_rev` — the caller's record never contains it — so spreading the
+        // record over the row DROPPED it, and any writer that reconciles
+        // without a `windowKey` (a filtered read, an optimistic form write)
+        // silently un-tagged rows a windowed read had tagged. Retention only
+        // sees `_window` rows (enforceWindowRetention), so a store with mixed
+        // writers leaked out of its own retention bound one row at a time. A
+        // reconcile that DOES carry a windowKey re-stamps the row afterwards,
+        // so this preserves without ever pinning a row to a stale window.
+        ...(previous?._window != null ? { _window: previous._window } : {}),
         _rev: (previous?._rev || 0) + 1,
         _updatedAt: new Date(now()).toISOString(),
         _dirty: true,

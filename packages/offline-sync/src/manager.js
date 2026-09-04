@@ -215,7 +215,17 @@ export function createDataManager({
           emit(); // instant first paint from the warm cache
           return () => { live = false; off(); };
         },
-        revalidate: (window) => fetchAndReconcile(store, keyPath, { fetch, toRecord, keyOf }, predicate, window),
+        // ⚠ PASS THE WINDOW KEY. This dropped it while `windowCache.sync` (above)
+        // passed it, so every liveQuery-driven store wrote UNTAGGED rows — and
+        // `enforceWindowRetention` only ever touches rows carrying `_window`
+        // (data-store.js:423). Window retention therefore never ran for a single
+        // production store, because liveQuery is the path the instant surfaces
+        // use. The stores were bounded by `maxRows` alone, which is the backstop,
+        // not the design. A whole-store cache still passes no window and so still
+        // opts out, exactly as windowCache does.
+        revalidate: (window) => fetchAndReconcile(
+          store, keyPath, { fetch, toRecord, keyOf }, predicate, window, windowKeyOf(window),
+        ),
       };
     },
     /** DataApi.syncState — SWR UX inputs (offline-sync.md §6). */

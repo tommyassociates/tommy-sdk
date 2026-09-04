@@ -11,6 +11,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { createDataStore, createMemoryStoreBackend } from '../src/data-store.js';
+import { createDataManager } from '../src/manager.js';
 
 const store = (opts = {}) => createDataStore({
   name: 'grid',
@@ -93,5 +94,87 @@ describe('window retention', () => {
     const [row] = await s.readWhere(() => true);
     expect(row._window).toBeUndefined();
     expect(row).toEqual({ id: '1' });
+  });
+});
+
+/**
+ * ⚠ AND IT MUST RUN ON THE PATH PRODUCTION ACTUALLY USES (review F2).
+ *
+ * Everything above drives `store.reconcile` directly with a `windowKey`. No
+ * production surface does that: the instant surfaces go through
+ * `liveQuery.revalidate`, which dropped the key on the floor while its sibling
+ * `windowCache.sync` passed it. `enforceWindowRetention` only ever touches rows
+ * carrying `_window` (data-store.js:423), so retention never ran for a single
+ * shipped store — the feature was tested into existence and then bypassed.
+ */
+describe('window retention through liveQuery (the production path)', () => {
+  const manager = () => createDataManager({
+    capabilityToken: { tenantId: 'team-3', mpId: 'grid-mp' }, mpId: 'grid-mp',
+    localData: { grid: { keyPath: 'id' } },
+    backendFactory: () => createMemoryStoreBackend(),
+  });
+
+  /**
+   * Modelled on the real shape (calendar/src/panels/CalendarMain.vue:513):
+   * the scope is a CLOSURE over the surface's current window, so paging forward
+   * leaves the previous window's rows in the store rather than pruning them.
+   * That is what makes these caches accumulate, and therefore what retention
+   * exists to bound.
+   */
+  const gridQuery = (mgr, state) => mgr.liveQuery('grid', {
+    scope: (row) => row.week === state.week,
+    fetch: (window) => [{ id: `${window.week}-a`, week: window.week }],
+  });
+  const visit = async (lq, state, week) => { state.week = week; await lq.revalidate({ week }); };
+
+  it('tags rows with the window the surface fetched them for', async () => {
+    const mgr = manager();
+    const state = { week: 'w1' };
+    const lq = gridQuery(mgr, state);
+    await visit(lq, state, 'w1');
+    const raw = await lq.store.getAll();
+    expect(raw.length).toBe(1);
+    // Untagged rows are invisible to retention, which is the whole defect.
+    expect(raw.every((r) => r._window != null)).toBe(true);
+  });
+
+  it('evicts the oldest window when a fourth is visited', async () => {
+    const mgr = manager();
+    const state = { week: 'w1' };
+    const lq = gridQuery(mgr, state);
+    await visit(lq, state, 'w1');
+    await visit(lq, state, 'w2');
+    await visit(lq, state, 'w3');
+    // Three windows have accumulated — the window-scoped prune left each alone.
+    expect((await lq.store.getAll()).map((r) => r.id).sort()).toEqual(['w1-a', 'w2-a', 'w3-a']);
+    await visit(lq, state, 'w4');
+    const ids = (await lq.store.getAll()).map((r) => r.id).sort();
+    expect(ids).toEqual(['w2-a', 'w3-a', 'w4-a']);   // maxWindows defaults to 3
+  });
+
+  it('a writer that passes no windowKey does not un-tag rows a windowed read tagged', async () => {
+    // `put` spreads the caller's record over the row, and the record never
+    // carries `_window` — so an untagged writer (a filtered read, an optimistic
+    // form write) used to strip the tag, and the row became invisible to
+    // retention. A store with mixed writers leaked out of its own bound.
+    const mgr = manager();
+    const state = { week: 'w1' };
+    const lq = gridQuery(mgr, state);
+    await visit(lq, state, 'w1');
+    // A second writer on the same store, with no window of its own.
+    const plain = mgr.liveQuery('grid', { scope: (r) => r.id === 'w1-a', fetch: () => [{ id: 'w1-a', week: 'w1' }] });
+    await plain.revalidate();
+    const [row] = await lq.store.getAll();
+    expect(row._window).toBeDefined();
+  });
+
+  it('stays inert for a whole-store liveQuery that passes no window', async () => {
+    const mgr = manager();
+    const lq = mgr.liveQuery('grid', { scope: () => true, fetch: () => [{ id: 'only' }] });
+    await lq.revalidate();
+    await lq.revalidate();
+    const raw = await lq.store.getAll();
+    expect(raw.length).toBe(1);
+    expect(raw[0]._window).toBeUndefined();
   });
 });
