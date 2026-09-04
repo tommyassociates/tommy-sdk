@@ -63,6 +63,34 @@ describe('the paint ceiling (contract item 3, the platform half)', () => {
     expect((await lq.read()).map((r) => r.id)).toEqual(['local']);
   });
 
+  it('applies to windowCache.read too, not just liveQuery (review R2-F2)', async () => {
+    // The ceiling is a platform promise about what may be SHOWN. Living inside
+    // liveQuery, it left windowCache — the path timesheets_cache and
+    // invoicing_cache are read through — painting up to the 30-day store TTL.
+    const t0 = Date.parse('2026-09-04T00:00:00.000Z');
+    let clock = t0 - (8 * DAY);
+    const mgr = manager(() => clock);
+    const wc = mgr.windowCache('rows', { fetch: () => [] });
+    const store = mgr.store('rows');
+    await store.put({ id: '1' });
+    await store.markSynced('1');
+    clock = t0;
+    expect(await wc.read({ from: 1, to: 2 })).toEqual([]);
+    expect((await store.getAll()).length).toBe(1);   // stored, just not painted
+  });
+
+  it('windowCache.sync returns the painted set, not the raw reconcile read', async () => {
+    const t0 = Date.parse('2026-09-04T00:00:00.000Z');
+    let clock = t0 - (8 * DAY);
+    const mgr = manager(() => clock);
+    const wc = mgr.windowCache('rows', { fetch: () => [] });
+    const store = mgr.store('rows');
+    await store.put({ id: 'old' });
+    await store.markSynced('old');
+    clock = t0;
+    expect(await wc.sync({ from: 1, to: 2 })).toEqual([]);
+  });
+
   it('a revalidate that rejects does not re-emit rows the ceiling excluded', async () => {
     const t0 = Date.parse('2026-09-04T00:00:00.000Z');
     let clock = t0 - (9 * DAY);

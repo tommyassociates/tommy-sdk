@@ -22,6 +22,24 @@ import { databaseName } from './names.js';
  */
 const PAINT_CEILING_MS = 7 * 24 * 60 * 60 * 1000;
 const nowMs = () => Date.now();
+
+/**
+ * ⚠ SHARED BY BOTH READ APIs (review R2-F2). This lived inside `liveQuery`, so
+ * `windowCache.read`/`sync` — the path `timesheets_cache` and `invoicing_cache`
+ * are read through — painted rows right up to the 30-day store TTL. The ceiling
+ * is a platform promise about what may be SHOWN, not a property of one helper,
+ * so it belongs to every read the manager hands out. A `_dirty` row is exempt:
+ * it is a local write that has not reached the server, and its age is not a
+ * reason to hide it from its author.
+ */
+const paintable = (row) => {
+  if (!row || row._dirty) return true;
+  const at = Date.parse(row._updatedAt || '');
+  return !Number.isFinite(at) || (nowMs() - at) < PAINT_CEILING_MS;
+};
+
+/** Compose a caller's scope with the paint ceiling. */
+const painted = (predicate) => (row) => predicate(row) && paintable(row);
 import {
   createDataStore, createMemoryStoreBackend, createLocalStorageBackend, hasWebStorage,
 } from './data-store.js';
@@ -178,10 +196,13 @@ export function createDataManager({
       const keyPath = localData[storeName]?.keyPath || 'id';
       const scopeFor = (window) => (scopeOf ? scopeOf(window) : () => true);
       return {
-        read: (window) => store.readWhere(scopeFor(window)),
+        // The ceiling governs what is READ back for painting; the reconcile
+        // scope below stays the caller's own, or an aged row would silently
+        // escape pruning while still sitting in the store.
+        read: (window) => store.readWhere(painted(scopeFor(window))),
         sync: (window) => fetchAndReconcile(
           store, keyPath, { fetch, toRecord, keyOf }, scopeFor(window), window, windowKeyOf(window),
-        ),
+        ).then(() => store.readWhere(painted(scopeFor(window)))),
       };
     },
     /**
@@ -221,12 +242,7 @@ export function createDataManager({
        * Applied to the READ paths only — the reconcile scope must keep meaning
        * "what this read covers", or an aged row would silently escape pruning.
        */
-      const paintable = (row) => {
-        if (!row || row._dirty) return true;
-        const at = Date.parse(row._updatedAt || '');
-        return !Number.isFinite(at) || (nowMs() - at) < PAINT_CEILING_MS;
-      };
-      const predicate = (row) => scopePredicate(row) && paintable(row);
+      const predicate = painted(scopePredicate);
       return {
         store,
         read: () => store.readWhere(predicate),
