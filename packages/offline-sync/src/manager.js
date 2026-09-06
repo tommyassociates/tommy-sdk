@@ -17,6 +17,15 @@ import { databaseName } from './names.js';
 // The ceiling itself is enforced in `DataStore.readWhere` (every reader passes
 // there, including MPs reading their stores directly). These wrappers stay so a
 // manager-level read is filtered even against a store built with a custom clock.
+//
+// ⚠ AND THE CLOCK MUST BE THE INJECTED ONE. This copy of the ceiling called
+// `Date.now()` directly while the stores below were built with the caller's
+// `now`, so the manager and its own stores disagreed about the time. A test
+// that travels its clock forward was measured against the WALL clock instead —
+// `invalidation-contract.test.js` pins t0 = 2026-09-04 and passed only while the
+// real date was near it, going red on its own once the wall clock moved past
+// 2026-09-05. A ceiling that ignores the clock it was given is not a ceiling
+// anyone can reason about, in a test or in the field.
 const nowMs = () => Date.now();
 
 /**
@@ -28,14 +37,14 @@ const nowMs = () => Date.now();
  * it is a local write that has not reached the server, and its age is not a
  * reason to hide it from its author.
  */
-const paintable = (row) => {
+const paintableAt = (clock) => (row) => {
   if (!row || row._dirty) return true;
   const at = Date.parse(row._updatedAt || '');
-  return !Number.isFinite(at) || (nowMs() - at) < PAINT_CEILING_MS;
+  return !Number.isFinite(at) || (clock() - at) < PAINT_CEILING_MS;
 };
 
 /** Compose a caller's scope with the paint ceiling. */
-const painted = (predicate) => (row) => predicate(row) && paintable(row);
+const paintedBy = (paintable) => (predicate) => (row) => predicate(row) && paintable(row);
 import {
   createDataStore, createMemoryStoreBackend, createLocalStorageBackend, hasWebStorage, PAINT_CEILING_MS,
 } from './data-store.js';
@@ -90,6 +99,10 @@ export function createDataManager({
   capabilityToken, mpId, localData = {}, backendFactory, now, onPersistError,
 }) {
   const dbName = databaseName(capabilityToken, mpId);
+  // The manager's ceiling reads the SAME clock its stores were built with.
+  const clock = typeof now === 'function' ? now : nowMs;
+  const paintable = paintableAt(clock);
+  const painted = paintedBy(paintable);
   const stores = new Map();
   const syncMeta = new Map(); // storeName -> { lastSyncedAt, pending, online }
 
@@ -135,6 +148,25 @@ export function createDataManager({
     }
   }
 
+  /** Drop the sync-metadata stamps so a row is safe to SPREAD into a record. */
+  const stripMeta = (row) => Object.fromEntries(
+    Object.entries(row).filter(([k]) => !k.startsWith('_')),
+  );
+
+  /** Tell the host a fetched DTO could not be cached, and why. */
+  function reportRejected(store, reasons) {
+    if (typeof onPersistError !== 'function') return;
+    try {
+      onPersistError({
+        event: 'record_rejected',
+        store: store?.name,
+        reason: 'recordSchema',
+        rejected: reasons.length,
+        detail: reasons[0],
+      });
+    } catch (_) { /* the reporter's problem, not the sync's */ }
+  }
+
   async function fetchAndReconcile(store, keyPath, { fetch, toRecord, keyOf }, scope, window, windowKey) {
     let dtos = null;
     try {
@@ -145,14 +177,50 @@ export function createDataManager({
     if (Array.isArray(dtos)) {
       let prevByKey = null;
       if (keyOf) {
-        const existing = await store.getAll();
-        prevByKey = new Map(existing.map((row) => [String(row[keyPath]), row]));
+        // ⚠ getAllRaw, NOT getAll, AND STRIPPED. Two defects met on this line.
+        //
+        // (1) `getAll()` applies the paint ceiling, so since that landed a row
+        //     older than 7 days was INVISIBLE to the merge map — `toRecord(dto,
+        //     undefined)` then ran as though the row were new and silently
+        //     dropped exactly the rich fields this map exists to preserve. The
+        //     MP-side rule already says a writer building a `prevById` map must
+        //     read `getAllRaw()`; this is the SDK's own copy of that shape.
+        // (2) The rows carry `_rev/_dirty/_updatedAt`, and `prev` is documented
+        //     to be SPREAD into the new record. Every MP cache declares
+        //     `additionalProperties: false`, so the documented pattern poisoned
+        //     its own record: the write threw, the `try` below swallowed it, and
+        //     the STALE row came back as though the sync had succeeded.
+        const existing = await store.getAllRaw();
+        prevByKey = new Map(existing.map((row) => [String(row[keyPath]), stripMeta(row)]));
       }
       const records = dtos.map(
         (dto) => toRecord(dto, prevByKey ? prevByKey.get(String(keyOf(dto))) : undefined),
       );
+
+      // ⚠ THE MISSING HALF WAS THE REPORT, NOT THE SURVIVAL. The spec inherited
+      // a claim from sdk commit e7b4cbe that one malformed DTO left the store
+      // half-written with the prune never run. That was TRUE of the code that
+      // commit was written against and is NOT true of this branch: `reconcile`
+      // already catches a `recordSchema` rejection per record, skips that row
+      // and carries on, so the valid rows land and the prune still runs
+      // (data-store.js, the `catch` inside the reconcile loop). Verified by
+      // removing this partition — the valid rows and the prune both survived.
+      //
+      // What it does NOT do is tell anyone. A row silently vanishing from a
+      // cache because the server changed a field's type is exactly the kind of
+      // drift that goes unnoticed for months. Partitioning here keeps the write
+      // path free of throw/catch churn AND gives the rejects somewhere to go.
+      const valid = [];
+      const rejected = [];
+      for (const record of records) {
+        const why = typeof store.validateRecord === 'function' ? store.validateRecord(record) : null;
+        if (why) rejected.push(why); else valid.push(record);
+      }
+      // Dropping a malformed row is a judgement call; dropping it SILENTLY is
+      // not. The rejects go out the same channel as every other data loss.
+      if (rejected.length) reportRejected(store, rejected);
       try {
-        await store.reconcile(records, { scope, ...(windowKey != null ? { windowKey } : {}) });
+        await store.reconcile(valid, { scope, ...(windowKey != null ? { windowKey } : {}) });
       } catch (_) { /* store error — keep the cache intact */ }
     }
     return store.readWhere(scope);

@@ -62,6 +62,19 @@ export function hasWebStorage() {
 const DEFAULT_MAX_BYTES = 512 * 1024;
 
 /**
+ * How much bigger than the store's byte budget the RETAINED (undisked) map may
+ * get before the retention bound starts dropping the oldest rows.
+ *
+ * ⚠ NOT A TUNING KNOB, AND NOT 1. At 1 the bound fires on the first refused
+ * write and deletes a draft the quota guard had just chosen to keep — the
+ * opposite of that spec's decision, and it broke its invariant test. The
+ * headroom is what makes "refuse rather than drop" still true for the case it
+ * was written about, while a session that refuses thousands of writes is still
+ * bounded rather than growing one row at a time forever.
+ */
+const RETAINED_BUDGET_MULTIPLE = 2;
+
+/**
  * Rows a failed save is holding in memory, keyed by store key.
  *
  * ⚠ THIS IS WHAT MADE THE OLD COMMENT TRUE. `save()` used to swallow the quota
@@ -146,6 +159,87 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
     return { total, evicted };
   }
 
+  /**
+   * Bound the map we RETAIN in memory when a save could not reach disk.
+   *
+   * ⚠ THIS WALKS BACK A DELIBERATE DECISION, AND IT IS THE POINT. The quota
+   * guard chose "refuse rather than drop a draft", which is right for the WRITE
+   * — but it said nothing about what the refusal accumulates. `load()` prefers
+   * the retained map, so every refused write copied it, added a row, and
+   * re-retained it ONE ROW LARGER, for the life of the session. The row cap
+   * cannot help: `put` stamps `_dirty` on every write, the cap never evicts a
+   * dirty row, and `capSaturated` then latches. So the degraded state grew
+   * without any bound at all — the "no unbounded store" objective the quota
+   * guard declared and did not deliver.
+   *
+   * ⚠ THE CEILING HAS HEADROOM ON PURPOSE, and the first cut of this did not.
+   * Bounding at `maxBytes` itself made the VERY FIRST refused write start
+   * dropping drafts — which does not bound a leak, it just deletes the work the
+   * quota guard had deliberately kept, immediately. The failing case was the
+   * finalized spec's own invariant test. So the retained map gets its own
+   * ceiling at a multiple of the store budget: an over-budget store still keeps
+   * every draft through the refusals a member can realistically produce, and
+   * only genuinely unbounded growth is trimmed.
+   *
+   * It drops OLDEST-FIRST, and unlike `evictToFit` it may drop a `_dirty` row —
+   * past this point every row is dirty and the alternative is unbounded growth.
+   * That is a real cost: a member's oldest unsent draft can go. It is therefore
+   * never silent — the keys come back to `put`, which tells subscribers and the
+   * host. Silently discarding typed work would be a worse defect than the leak
+   * this closes.
+   */
+  function boundRetained(map, protect) {
+    const ceiling = maxBytes * RETAINED_BUDGET_MULTIPLE;
+    let total = 0;
+    const rows = [];
+    for (const [key, record] of map) {
+      const bytes = entryBytes(key, record);
+      total += bytes;
+      if (protect !== undefined && String(key) === String(protect)) continue;
+      rows.push({ key, bytes, at: record && record._updatedAt ? String(record._updatedAt) : '' });
+    }
+    if (total <= ceiling) return [];
+    rows.sort((a, b) => {
+      if (!a.at && !b.at) return 0;
+      if (!a.at) return 1;
+      if (!b.at) return -1;
+      return a.at.localeCompare(b.at);
+    });
+    const discarded = [];
+    for (const row of rows) {
+      if (total <= ceiling) break;
+      map.delete(row.key);
+      total -= row.bytes;
+      discarded.push(row.key);
+    }
+    return discarded;
+  }
+
+  /** Retain `map` for the session, bounded, and report what the bound cost. */
+  function retain(map, protect) {
+    const discarded = boundRetained(map, protect);
+    memoryFallback.set(storeKey, new Map(map));
+    return discarded;
+  }
+
+  /**
+   * Patch a row already held in the retained map, WITHOUT a second save.
+   *
+   * `put` flags a refused row `_persistFailed` so a surface can say so. Doing
+   * that through `backend.put` ran the whole save path a second time per refused
+   * write — `evictToFit`, a full `JSON.stringify` of the store, the retention
+   * copy — so a store under pressure paid twice the cost exactly when it could
+   * least afford it. The row is already in memory; patch it there.
+   */
+  function patchRetained(key, patch) {
+    const map = memoryFallback.get(storeKey);
+    if (!map) return false;
+    const record = map.get(String(key));
+    if (!record) return false;
+    map.set(String(key), { ...record, ...patch });
+    return true;
+  }
+
   /** Persist `map`. Returns the same result shape as put/delete. */
   function save(map, protect) {
     const store = webStorage();
@@ -157,18 +251,18 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
       // store's quota path was written to end (review finding F4). Retain the
       // rows for the session and tell the caller, the same way the quota branch
       // does.
-      memoryFallback.set(storeKey, new Map(map));
+      const discarded = retain(map, protect);
       return {
-        ok: false, reason: 'unavailable', budget: maxBytes, evicted: [],
+        ok: false, reason: 'unavailable', budget: maxBytes, evicted: [], discarded,
       };
     }
     const { total, evicted } = evictToFit(map, protect);
     if (total > maxBytes) {
       // Over budget with nothing left to give — every remaining row is either
       // dirty or the row being written. Refuse rather than drop a draft.
-      memoryFallback.set(storeKey, new Map(map));
+      const discarded = retain(map, protect);
       return {
-        ok: false, reason: 'budget', bytes: total, budget: maxBytes, evicted,
+        ok: false, reason: 'budget', bytes: total, budget: maxBytes, evicted, discarded,
       };
     }
     try {
@@ -180,9 +274,9 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
       // The ORIGIN quota, not our own budget — some other key filled the 5MB, or
       // storage is disabled. Keep the rows for the session so the write is not
       // simply lost, and tell the caller it did not reach disk.
-      memoryFallback.set(storeKey, new Map(map));
+      const discarded = retain(map, protect);
       return {
-        ok: false, reason: 'quota', bytes: total, budget: maxBytes, evicted, error: e?.name || 'Error',
+        ok: false, reason: 'quota', bytes: total, budget: maxBytes, evicted, discarded, error: e?.name || 'Error',
       };
     }
   }
@@ -197,6 +291,7 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
     },
     async delete(key) { const map = load(); map.delete(String(key)); return save(map); },
     keys() { return [...load().keys()]; },
+    patchRetained,
   };
 }
 
@@ -301,9 +396,61 @@ export function createDataStore({
     if (typeof onPersistError !== 'function') return;
     try {
       onPersistError({
+        event: 'persist_failed',
         store: name,
         key,
         reason: result?.reason || 'unknown',
+        bytes: result?.bytes,
+        budget: result?.budget,
+        evicted: result?.evicted || [],
+      });
+    } catch (_) { /* the reporter's problem, not the write's */ }
+  };
+
+  /**
+   * Tell the host the RETENTION BOUND dropped rows from the in-memory fallback.
+   *
+   * The most serious of the three reports, because these rows were never on disk
+   * and are now gone entirely — including `_dirty` ones, which no other path
+   * will drop. It is reported BEFORE the persist failure so that if a host
+   * de-dupes, the louder fact is the one that survives.
+   */
+  const reportRetentionDiscard = (result, key) => {
+    if (typeof onPersistError !== 'function') return;
+    try {
+      onPersistError({
+        event: 'retention_discarded',
+        store: name,
+        key,
+        reason: result?.reason || 'budget',
+        bytes: result?.bytes,
+        budget: result?.budget,
+        evicted: result?.discarded || [],
+      });
+    } catch (_) { /* the reporter's problem, not the write's */ }
+  };
+
+  /**
+   * Tell the host the byte guard DELETED rows on a write that SUCCEEDED.
+   *
+   * ⚠ IT SHARES THE CHANNEL AND NOT THE MESSAGE, and the `event` discriminator
+   * is what keeps those apart. Routing an eviction through the failure shape
+   * would have been wrong twice over. Its text is hard-wired to failure language
+   * — "write not persisted", "rows are retained in memory ... flagged
+   * _persistFailed" — none of which is true here: the write reached disk and
+   * OTHER rows were dropped to make room. And the host de-dupes once per
+   * `mpId:store` for the session, so an eviction reported first would have
+   * permanently SUPPRESSED a later genuine persist failure on that same store —
+   * silencing the more serious event with the less serious one.
+   */
+  const reportPersistEviction = (result, key) => {
+    if (typeof onPersistError !== 'function') return;
+    try {
+      onPersistError({
+        event: 'evicted',
+        store: name,
+        key,
+        reason: 'budget',
         bytes: result?.bytes,
         budget: result?.budget,
         evicted: result?.evicted || [],
@@ -505,6 +652,8 @@ export function createDataStore({
   }
 
   const api = {
+    /** The declared store name — so a report can say WHICH store rejected. */
+    name,
     /**
      * ⚠ THE THIRD READ API, AND THE THIRD TIME. The ceiling went to `readWhere`
      * (round 6), then `getAll` (round 7), and `get(key)` was still uncovered —
@@ -563,6 +712,22 @@ export function createDataStore({
     async readWhere(predicate = () => true) {
       return (await snapshot()).filter(paintable).filter(predicate).map(stripMeta);
     },
+    /**
+     * Why a record would be REFUSED by `put`, or null if it would be accepted.
+     *
+     * A caller writing many records at once needs to know this BEFORE the write,
+     * not by catching partway through: `reconcile` puts row by row and prunes
+     * afterwards, so one bad record used to abort the batch with valid rows
+     * already written and the prune never run. There is no other way to ask —
+     * the schema is compiled in here and deliberately not exposed.
+     */
+    validateRecord(record) {
+      if (validate && !validate(record)) {
+        return (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ');
+      }
+      if (keyOf(record) === undefined) return `record missing keyPath '${keyPath}'`;
+      return null;
+    },
     async put(record, { dedupeKey, silent = false, deferCap = false } = {}) {
       if (validate && !validate(record)) {
         const detail = (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ');
@@ -602,8 +767,26 @@ export function createDataStore({
         // The row IS in the store — the backend retained it in memory — but it
         // is not on disk. Flag it so a surface can say so, notify so the flag
         // reaches that surface, tell the host, and only then reject.
-        await backend.put(key, { ...stamped, _persistFailed: true });
-        if (!silent) await notify(key);
+        //
+        // ⚠ FLAG IT IN PLACE WHERE THE BACKEND CAN. Re-putting ran the entire
+        // save path a second time per refused write — evictToFit, a full
+        // stringify of the store, the retention copy — doubling the cost of a
+        // store already under pressure. `patchRetained` is optional, so a custom
+        // backend without it keeps the old behaviour rather than losing the flag.
+        if (typeof backend.patchRetained === 'function') {
+          if (!backend.patchRetained(key, { _persistFailed: true })) {
+            await backend.put(key, { ...stamped, _persistFailed: true });
+          }
+        } else {
+          await backend.put(key, { ...stamped, _persistFailed: true });
+        }
+        // The retention bound may have dropped the OLDEST rows to stay bounded.
+        // Those rows are gone from this device, so they are accounted for the
+        // same way an eviction is: counter, subscribers, host — never silence.
+        const discarded = persisted.discarded || [];
+        if (discarded.length && residentCount !== null) residentCount -= discarded.length;
+        if (!silent) await notify(discarded.length ? [key, ...discarded] : key);
+        if (discarded.length) reportRetentionDiscard(persisted, key);
         reportPersistFailure(persisted, key);
         throw new PersistError(name, persisted);
       }
@@ -616,6 +799,21 @@ export function createDataStore({
       // enforces once at the end: without it a merge would trim itself row by
       // row while it was still arriving, evicting rows the same merge was about
       // to add.
+      // ⚠ THE BYTE GUARD'S OWN DELETIONS, ACCOUNTED FOR. `save()` has always
+      // RETURNED the keys `evictToFit` dropped on the success path, and `put`
+      // read only `ok === false` — so a successful write that deleted rows told
+      // nobody. Three things were wrong at once: subscribers never woke for rows
+      // that had vanished from under them, `residentCount` kept counting rows
+      // that no longer existed (inflating it until the row cap ran on a store
+      // that had not saturated, or latched `capSaturated` against a phantom),
+      // and the host heard nothing about storage pressure that HAD cost data.
+      const byteEvicted = persisted?.evicted || [];
+      if (byteEvicted.length) {
+        if (residentCount !== null) residentCount -= byteEvicted.length;
+        // Rows actually went, so the cap may be able to act again.
+        capSaturated = false;
+        reportPersistEviction(persisted, key);
+      }
       let evicted = [];
       if (!deferCap && residentCount > maxRows && !capSaturated) {
         // `protect` the row just written — it is the newest thing in the store,
@@ -625,8 +823,10 @@ export function createDataStore({
         // evictable, so stop repeating it (see `capSaturated`).
         capSaturated = evicted.length === 0;
       }
-      // One notify for the write AND anything it displaced.
-      if (!silent) await notify(evicted.length ? [key, ...evicted] : key);
+      // One notify for the write AND anything it displaced — by the byte guard
+      // or the row cap. Still ONE subscriber pass for one logical change.
+      const displaced = byteEvicted.length ? [...byteEvicted, ...evicted] : evicted;
+      if (!silent) await notify(displaced.length ? [key, ...displaced] : key);
       return key;
     },
     async delete(key, { silent = false } = {}) {

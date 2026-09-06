@@ -360,3 +360,230 @@ describe('quota-guard red · finding 3: backendFactory loses syncStrategy', () =
     expect((await afterReload.store('settings').get('view'))?.value).toEqual({ mode: 'week' });
   });
 });
+
+/**
+ * QG-R5-1 — the byte guard's own deletions, accounted for.
+ *
+ * `save()` has always RETURNED the keys `evictToFit` dropped on the SUCCESS
+ * path, and `put` read only `ok === false`. So a write that succeeded while
+ * silently deleting other rows told nobody: subscribers never woke for rows that
+ * had vanished, `residentCount` kept counting them, and the host heard nothing
+ * about storage pressure that had actually cost data.
+ *
+ * ⚠ REACHING THIS PATH TAKES WORK, and that is itself the finding recorded in
+ * the spec. `put` stamps `_dirty: true` on every write and `evictToFit` skips
+ * dirty rows, so through the DataStore the byte guard cannot evict ANYTHING
+ * until something clears the flag. These tests call `markSynced` to do what a
+ * push would. The defect is in the primitive, not in the shipped estate.
+ */
+describe('QG-R5-1: the byte guard\'s own evictions are accounted for', () => {
+  const ticker = () => {
+    let t = Date.parse('2026-08-31T00:00:00.000Z');
+    return () => { t += 1000; return t; };
+  };
+  const filler = (id, n) => ({ id, blob: 'x'.repeat(n) });
+
+  /** Rows written, then pushed — i.e. evictable, the way a synced cache is. */
+  async function seedSynced(store, count, size) {
+    for (let i = 1; i <= count; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await store.put(filler(`r-${i}`, size));
+      // eslint-disable-next-line no-await-in-loop
+      await store.markSynced(`r-${i}`);
+    }
+  }
+
+  it('notifies subscribers with the evicted keys in ONE batch and reports to the host', async () => {
+    const reports = [];
+    const store = createDataStore({
+      name: 'documents_cache',
+      backend: createLocalStorageBackend(dbFor('team-3'), 'qg_r5_1_notify', { maxBytes: 4000 }),
+      onPersistError: (r) => reports.push(r),
+      now: ticker(),
+    });
+    await seedSynced(store, 4, 800);
+
+    const batches = [];
+    store.subscribe(() => { batches.push(1); });
+    await store.put(filler('r-new', 800));
+
+    // ONE subscriber pass for one logical change — the write AND everything it
+    // displaced — not a pass per evicted row. That is the 202-repaints lesson.
+    expect(batches.length).toBe(1);
+
+    // The host was told, and told the TRUTH: a successful write, not a failure.
+    const eviction = reports.find((r) => r.event === 'evicted');
+    expect(eviction).toBeTruthy();
+    expect(eviction.evicted.length).toBeGreaterThan(0);
+    expect(reports.some((r) => r.event === 'persist_failed')).toBe(false);
+  });
+
+  it('keeps residentCount accurate, so a later put does not walk getAll()', async () => {
+    // The counter is what gates the row cap. Over-counting evicted rows inflates
+    // it until the cap runs on a store nowhere near its ceiling — the exact cost
+    // the counter exists to avoid — or latches `capSaturated` against phantoms.
+    //
+    // ⚠ maxRows IS PINNED TO THE TRUE COUNT, deliberately. With any slack the
+    // test passes with or without the fix, because the inflated counter never
+    // crosses the ceiling and nothing observable differs. The first cut of this
+    // test had that slack and went green against the reverted fix.
+    const reports = [];
+    const inner = createLocalStorageBackend(dbFor('team-3'), 'qg_r5_1_count', { maxBytes: 4000 });
+    let getAllCalls = 0;
+    const counting = {
+      ...inner,
+      async getAll() { getAllCalls += 1; return inner.getAll(); },
+    };
+    const store = createDataStore({
+      name: 'documents_cache',
+      // 4 seeded - 1 evicted + 1 written = 5 resident after the second put, so
+      // the ceiling sits exactly ON the true count and one phantom crosses it.
+      maxRows: 5,
+      backend: counting,
+      onPersistError: (r) => reports.push(r),
+      now: ticker(),
+    });
+    await seedSynced(store, 4, 800);
+    await store.put(filler('r-new', 800));   // evicts
+
+    // Pin the arithmetic the ceiling depends on: 4 seeded + 1 written - 1 gone.
+    const evicted = reports.flatMap((r) => r.evicted || []);
+    expect(evicted.length).toBe(1);
+    expect((await store.getAllRaw()).length).toBe(4);
+
+    const before = getAllCalls;
+    await store.put(filler('r-newer', 10));
+    // True count reaches 5, at the ceiling but not over it, so the cap must not
+    // run. Counting the evicted row would make it 6 and open a getAll() walk.
+    expect(getAllCalls).toBe(before + 1);    // notify's own snapshot, and nothing else
+  });
+
+  it('does not report an eviction as a failed write', async () => {
+    const reports = [];
+    const store = createDataStore({
+      name: 'documents_cache',
+      backend: createLocalStorageBackend(dbFor('team-3'), 'qg_r5_1_truth', { maxBytes: 4000 }),
+      onPersistError: (r) => reports.push(r),
+      now: ticker(),
+    });
+    await seedSynced(store, 4, 800);
+    // The write must RESOLVE — it reached disk. Only other rows went.
+    await expect(store.put(filler('r-new', 800))).resolves.toBeTruthy();
+    // ⚠ ASSERT THE REPORT EXISTS BEFORE ASSERTING ITS SHAPE. `every` on an empty
+    // array is true, so the obvious version of this test passes when NOTHING is
+    // reported — which is precisely the defect. It went green against the
+    // reverted fix until this line was added.
+    expect(reports.length).toBeGreaterThan(0);
+    expect(reports.every((r) => r.event === 'evicted')).toBe(true);
+    expect(reports.every((r) => (r.evicted || []).length > 0)).toBe(true);
+  });
+});
+
+/**
+ * QG-R5-2 — the degraded state is BOUNDED.
+ *
+ * This is the item `mp-store-quota-guard` declared in its own Scope ("the memory
+ * fallback's own boundedness") and Objectives ("No unbounded store") and did not
+ * deliver. Every refused write re-retained the whole map one row larger, and the
+ * row cap could not help: `put` stamps `_dirty` on every write, the cap never
+ * evicts a dirty row, and `capSaturated` latches after the first no-op walk.
+ */
+describe('QG-R5-2: a store past its byte budget stops growing', () => {
+  const ticker = () => {
+    let t = Date.parse('2026-08-31T00:00:00.000Z');
+    return () => { t += 1000; return t; };
+  };
+
+  it('bounds the retained map, keeps rejecting, and never discards silently', async () => {
+    const reports = [];
+    const backend = createLocalStorageBackend(dbFor('team-3'), 'qg_r5_2_bound', { maxBytes: 3000 });
+    const store = createDataStore({
+      name: 'mileage_drafts',
+      backend,
+      onPersistError: (r) => reports.push(r),
+      now: ticker(),
+    });
+
+    let rejections = 0;
+    for (let i = 0; i < 50; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await store.put({ id: `d-${i}`, notes: 'x'.repeat(400) }).catch((e) => {
+        if (e instanceof PersistError) rejections += 1; else throw e;
+      });
+    }
+
+    // 1. The write still REJECTS. Bounding the retained map must not quietly
+    //    turn a refused write into a successful-looking one.
+    expect(rejections).toBeGreaterThan(0);
+
+    // 2. The map STOPPED GROWING. Before this phase it held all 50.
+    const resident = await store.getAllRaw();
+    expect(resident.length).toBeLessThan(50);
+
+    // 3. And it is bounded by the ceiling, not by luck.
+    const bytes = JSON.stringify(resident).length;
+    expect(bytes).toBeLessThanOrEqual(3000 * 2 + 1000);   // ceiling + one row's slack
+
+    // 4. NOT SILENT. Dropping a member's typed draft without saying so would be
+    //    a worse defect than the leak this closes.
+    const discards = reports.filter((r) => r.event === 'retention_discarded');
+    expect(discards.length).toBeGreaterThan(0);
+    expect(discards.flatMap((r) => r.evicted).length).toBeGreaterThan(0);
+  });
+
+  it('drops the OLDEST rows, not the newest', async () => {
+    const reports = [];
+    const store = createDataStore({
+      name: 'mileage_drafts',
+      backend: createLocalStorageBackend(dbFor('team-3'), 'qg_r5_2_oldest', { maxBytes: 2000 }),
+      onPersistError: (r) => reports.push(r),
+      now: ticker(),
+    });
+    for (let i = 0; i < 30; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await store.put({ id: `d-${String(i).padStart(2, '0')}`, notes: 'x'.repeat(300) }).catch(() => {});
+    }
+    const ids = (await store.getAllRaw()).map((r) => r.id).sort();
+    // The most recent draft a member typed is the one they still care about.
+    expect(ids).toContain('d-29');
+    expect(ids).not.toContain('d-00');
+  });
+
+  it('keeps every draft through the refusals the finalized spec was written about', async () => {
+    // ⚠ THE COUNTER-TEST, and it is why the ceiling has headroom. The first cut
+    // bounded at maxBytes itself, so the FIRST refused write deleted a draft —
+    // walking back "refuse rather than drop a draft" completely rather than
+    // merely bounding it. That broke the quota guard's own invariant test.
+    const reports = [];
+    const store = createDataStore({
+      name: 'mileage_drafts',
+      backend: createLocalStorageBackend(dbFor('team-3'), 'qg_r5_2_headroom', { maxBytes: 3000 }),
+      onPersistError: (r) => reports.push(r),
+      now: ticker(),
+    });
+    for (let i = 0; i < 4; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await store.put({ id: `d-${i}`, notes: 'x'.repeat(700) }).catch(() => {});
+    }
+    // Over budget — writes are being refused — but nothing has been thrown away.
+    expect(reports.some((r) => r.event === 'persist_failed')).toBe(true);
+    expect(reports.some((r) => r.event === 'retention_discarded')).toBe(false);
+    expect((await store.getAllRaw()).length).toBe(4);
+  });
+
+  it('does not run the whole save path twice per refused write', async () => {
+    // The degraded state must not also be quadratically expensive: each refused
+    // write used to stringify the entire store TWICE — once for the write, once
+    // to re-put the row with `_persistFailed`.
+    globalThis.localStorage = fakeLocalStorage({ maxBytes: 400 });
+    const inner = createLocalStorageBackend(dbFor('team-3'), 'qg_r5_2_twice');
+    let puts = 0;
+    const counting = { ...inner, async put(k, r) { puts += 1; return inner.put(k, r); } };
+    const store = createDataStore({ name: 'mileage_drafts', backend: counting, now: ticker() });
+
+    await store.put({ id: 'a', notes: 'x'.repeat(2000) }).catch(() => {});
+    expect(puts).toBe(1);
+    // ...and the flag still reached the row, which is what the second put was for.
+    expect((await store.getAllRaw())[0]._persistFailed).toBe(true);
+  });
+});
