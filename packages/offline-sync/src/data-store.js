@@ -411,8 +411,17 @@ export function createDataStore({
    * Account for the rows a backend result says are GONE — byte-evicted on a
    * successful save, or discarded by the retention bound on a failed one.
    *
-   * ⚠ ONE OWNER FOR ALL THREE CALL SITES. Phase 1 handled only `put`'s success
-   * branch, so two other paths kept the original defect (review MSRB-3):
+   * ⚠ ONE OWNER FOR THE THREE PATHS THAT CAN RECEIVE GONE ROWS — which is not
+   * the same as every path that writes, and the comment used to blur the two.
+   * `reconcile`'s silent puts and the `backend.put` calls whose result is
+   * discarded do NOT go through here; they are not covered, and they do not need
+   * to be, because none of them receives a result carrying `evicted` or
+   * `discarded`. Widening the owner to reach paths that cannot reach it would be
+   * machinery for its own sake. If that ever changes, this is the seam to route
+   * them through.
+   *
+   * Phase 1 handled only `put`'s success branch, so two other paths kept the
+   * original defect (review MSRB-3):
    * `put`'s FAILURE branch, where `save()` returns a non-empty `evicted`
    * alongside `ok:false` whenever the byte guard cleared every clean row and the
    * store was still over budget; and `delete()`, which can byte-evict on success

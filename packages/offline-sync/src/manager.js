@@ -14,39 +14,30 @@
  */
 import { databaseName } from './names.js';
 
-// The ceiling itself is enforced in `DataStore.readWhere` (every reader passes
-// there, including MPs reading their stores directly). These wrappers stay so a
-// manager-level read is filtered even against a store built with a custom clock.
+// ⚠ THE MANAGER NO LONGER KEEPS ITS OWN COPY OF THE PAINT CEILING, and removing
+// it is the fix rather than a simplification of one.
 //
-// ⚠ AND THE CLOCK MUST BE THE INJECTED ONE. This copy of the ceiling called
-// `Date.now()` directly while the stores below were built with the caller's
-// `now`, so the manager and its own stores disagreed about the time. A test
-// that travels its clock forward was measured against the WALL clock instead —
-// `invalidation-contract.test.js` pins t0 = 2026-09-04 and passed only while the
-// real date was near it, going red on its own once the wall clock moved past
-// 2026-09-05. A ceiling that ignores the clock it was given is not a ceiling
-// anyone can reason about, in a test or in the field.
-const nowMs = () => Date.now();
-
-/**
- * ⚠ SHARED BY BOTH READ APIs (review R2-F2). This lived inside `liveQuery`, so
- * `windowCache.read`/`sync` — the path `timesheets_cache` and `invoicing_cache`
- * are read through — painted rows right up to the 30-day store TTL. The ceiling
- * is a platform promise about what may be SHOWN, not a property of one helper,
- * so it belongs to every read the manager hands out. A `_dirty` row is exempt:
- * it is a local write that has not reached the server, and its age is not a
- * reason to hide it from its author.
- */
-const paintableAt = (clock) => (row) => {
-  if (!row || row._dirty) return true;
-  const at = Date.parse(row._updatedAt || '');
-  return !Number.isFinite(at) || (clock() - at) < PAINT_CEILING_MS;
-};
-
-/** Compose a caller's scope with the paint ceiling. */
-const paintedBy = (paintable) => (predicate) => (row) => predicate(row) && paintable(row);
+// The ceiling is enforced in `DataStore.readWhere`, which EVERY read here passes
+// through — `windowCache.read`, `windowCache.sync` and `liveQuery` all end in
+// `store.readWhere(...)`. So this file's `painted()` wrapper was a second copy of
+// one rule, and the second copy was the less informed of the two: the store's
+// knows the store's `syncStrategy` and exempts client-owned (`last_write_wins`)
+// rows, because ageing out a member's own saved settings or half-typed draft is
+// data loss dressed as a freshness guarantee. This copy knew nothing about
+// strategy and filtered them anyway.
+//
+// It also drifted on the clock. It called `Date.now()` while the stores were
+// built with the caller's injected `now`, so the manager and its own stores
+// disagreed about the time — `invalidation-contract.test.js` pins
+// t0 = 2026-09-04 and passed only while the real date was near it, going red on
+// its own once the wall clock moved past 2026-09-05. That was repaired by
+// threading the clock through; this removes the thing that needed threading.
+//
+// Teaching the duplicate about `syncStrategy` would have left two rules to keep
+// in step, which is what produced both defects. One rule, at the read every
+// caller already passes through.
 import {
-  createDataStore, createMemoryStoreBackend, createLocalStorageBackend, hasWebStorage, PAINT_CEILING_MS,
+  createDataStore, createMemoryStoreBackend, createLocalStorageBackend, hasWebStorage,
 } from './data-store.js';
 
 /**
@@ -99,10 +90,6 @@ export function createDataManager({
   capabilityToken, mpId, localData = {}, backendFactory, now, onPersistError,
 }) {
   const dbName = databaseName(capabilityToken, mpId);
-  // The manager's ceiling reads the SAME clock its stores were built with.
-  const clock = typeof now === 'function' ? now : nowMs;
-  const paintable = paintableAt(clock);
-  const painted = paintedBy(paintable);
   const stores = new Map();
   const syncMeta = new Map(); // storeName -> { lastSyncedAt, pending, online }
 
@@ -268,10 +255,10 @@ export function createDataManager({
         // The ceiling governs what is READ back for painting; the reconcile
         // scope below stays the caller's own, or an aged row would silently
         // escape pruning while still sitting in the store.
-        read: (window) => store.readWhere(painted(scopeFor(window))),
+        read: (window) => store.readWhere(scopeFor(window)),
         sync: (window) => fetchAndReconcile(
           store, keyPath, { fetch, toRecord, keyOf }, scopeFor(window), window, windowKeyOf(window),
-        ).then(() => store.readWhere(painted(scopeFor(window)))),
+        ).then(() => store.readWhere(scopeFor(window))),
       };
     },
     /**
@@ -308,10 +295,16 @@ export function createDataManager({
        * PAINTED; they are still stored, and the store's own TTL evicts them at
        * open. A `_dirty` row is exempt: it is a local write that has not reached
        * the server, and its age is not a reason to hide it from its author.
-       * Applied to the READ paths only — the reconcile scope must keep meaning
-       * "what this read covers", or an aged row would silently escape pruning.
+       *
+       * ⚠ THE CEILING IS APPLIED BY `DataStore.readWhere`, NOT HERE. The manager
+       * used to wrap this predicate in its own copy of the rule; that copy could
+       * not see the store's `syncStrategy` and so filtered client-owned rows the
+       * store deliberately exempts. The read below passes through the store's
+       * ceiling either way, and the reconcile scope stays the caller's own — it
+       * must keep meaning "what this read covers", or an aged row would silently
+       * escape pruning.
        */
-      const predicate = painted(scopePredicate);
+      const predicate = scopePredicate;
       /**
        * ⚠ READING AND DELETING ARE NOT THE SAME AUTHORITY (review
        * CAL-FILTERED-PRUNE). `scope` answers "what should this surface show";

@@ -254,3 +254,47 @@ describe('the paint ceiling applies to a direct store read', () => {
     expect((await store.readWhere(() => true)).map((r) => r.id)).toEqual(['mine']);
   });
 });
+
+/**
+ * The ceiling has ONE owner (spec mp-bounds-the-scanner-cannot-see phase 4).
+ *
+ * The manager kept its own copy of the paint ceiling. It was the less informed
+ * of the two: `DataStore.paintable` knows the store's `syncStrategy` and exempts
+ * client-owned (`last_write_wins`) rows — ageing out a member's own saved
+ * settings or half-typed draft is data loss dressed as a freshness guarantee —
+ * while the manager's copy knew nothing about strategy and filtered them anyway.
+ *
+ * Not reachable in the shipped estate when it was found: no MP reads a
+ * `last_write_wins` store through `liveQuery` or `windowCache`. Fixed because
+ * the primitive was wrong, and pinned here so it cannot come back.
+ */
+describe('the paint ceiling has one owner', () => {
+  const agedManager = (localData, clock) => createDataManager({
+    capabilityToken: { tenantId: 'team-3', mpId: 'ceiling-mp' },
+    mpId: 'ceiling-mp',
+    localData,
+    backendFactory: () => createMemoryStoreBackend(),
+    now: clock,
+  });
+
+  const seedAged = async (decl, ageDays) => {
+    const t0 = Date.parse('2026-09-04T00:00:00.000Z');
+    let clock = t0 - (ageDays * DAY);
+    const mgr = agedManager({ rows: decl }, () => clock);
+    const store = mgr.store('rows');
+    await store.put({ id: '1' });
+    await store.markSynced('1');
+    clock = t0;
+    return mgr.windowCache('rows', { fetch: async () => null, scopeOf: () => () => true });
+  };
+
+  it('still shows a CLIENT-OWNED row past the ceiling — it is the only copy', async () => {
+    const cache = await seedAged({ keyPath: 'id', syncStrategy: 'last_write_wins' }, 30);
+    expect((await cache.read({})).map((r) => r.id)).toEqual(['1']);
+  });
+
+  it('still hides a SERVER-AUTHORITATIVE row past the ceiling', async () => {
+    const cache = await seedAged({ keyPath: 'id', syncStrategy: 'server_authoritative' }, 30);
+    expect(await cache.read({})).toEqual([]);
+  });
+});
