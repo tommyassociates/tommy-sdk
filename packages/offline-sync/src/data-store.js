@@ -839,12 +839,16 @@ export function createDataStore({
         } else {
           reput = await backend.put(key, { ...stamped, _persistFailed: true });
         }
-        if (reput) accountForGoneRows(reput, key);
+        // ⚠ ITS KEYS JOIN THE BATCH TOO. Counting and reporting them while
+        // leaving them out of the notify meant a selector subscriber watching a
+        // row the re-put displaced never woke — the row vanished from under a
+        // surface that had asked to be told (review BSC5-2).
+        const reputGone = reput ? accountForGoneRows(reput, key) : [];
         // Rows may be gone even on the FAILURE path: the retention bound drops
         // the oldest, and the byte guard can have evicted every clean row and
         // still left the store over budget. Both are accounted for the same way
         // — counter, subscribers, host — never silence.
-        const gone = accountForGoneRows(persisted, key);
+        const gone = [...accountForGoneRows(persisted, key), ...reputGone];
         if (!silent) await notify(gone.length ? [key, ...gone] : key);
         reportPersistFailure(persisted, key);
         throw new PersistError(name, persisted);
