@@ -411,17 +411,20 @@ export function createDataStore({
    * Account for the rows a backend result says are GONE — byte-evicted on a
    * successful save, or discarded by the retention bound on a failed one.
    *
-   * ⚠ THE OWNER FOR EVERY PATH THAT CAN RECEIVE GONE ROWS, and the comment here
-   * has now been wrong in BOTH directions, which is worth recording rather than
-   * quietly fixing twice. It first claimed "one owner for all three call sites"
-   * when three other paths were uncovered; the correction then claimed those
-   * paths "do not receive a result carrying evicted or discarded", and that was
-   * false too (review BSC-5). `reconcile` puts through `api.put`, so its rows
-   * were always covered — only its notify is silent. And the localStorage
-   * backend returns `evicted` on success and `evicted`/`discarded` on every
-   * failure branch, so the DIRECT `backend.put` calls — `markSynced` and the
-   * `_persistFailed` re-put — genuinely did receive gone rows and genuinely did
-   * drop them. They are routed through here now.
+   * ⚠ THE OWNER FOR EVERY `backend.put`/`delete` RESULT IN THIS FILE — and this
+   * comment has now been wrong three times, which is worth recording rather
+   * than quietly fixing again. It first claimed "one owner for all three call
+   * sites" while three paths were uncovered; the correction claimed those paths
+   * "do not receive a result carrying evicted or discarded", which was false
+   * too; the rewrite after that said "every path" while `reconcile`'s own two
+   * direct `backend.put` calls still dropped theirs (reviews MSRB-3, BSC-5,
+   * BSC3-4).
+   *
+   * The claim is now a RULE rather than a count, because a count is the thing
+   * that keeps going stale: EVERY `backend.put(...)` and `backend.delete(...)`
+   * result in this file is fed to `accountForGoneRows`. A new call site that
+   * ignores its result is the defect, and `grep 'await backend\.\(put\|delete\)'`
+   * against this function's call sites is how to check it.
    *
    * Phase 1 handled only `put`'s success branch, so the other paths kept the
    * original defect (review MSRB-3):
@@ -982,8 +985,15 @@ export function createDataStore({
               // is still true.
               // eslint-disable-next-line no-await-in-loop
               const retained = await backend.get(failedKey);
-              // eslint-disable-next-line no-await-in-loop
-              if (retained) await backend.put(failedKey, { ...retained, _dirty: false });
+              if (retained) {
+                // eslint-disable-next-line no-await-in-loop
+                const cleared = await backend.put(failedKey, { ...retained, _dirty: false });
+                // Clearing `_dirty` makes the row EVICTABLE, so this write can
+                // displace others — the same reason `markSynced` had to be
+                // routed through here (review BSC3-4). Its keys join the batch
+                // `reconcile` already notifies at the end.
+                for (const k of accountForGoneRows(cleared, failedKey)) changed.add(k);
+              }
             }
           }
           continue;
@@ -998,8 +1008,11 @@ export function createDataStore({
         if (windowKey != null) {
           // eslint-disable-next-line no-await-in-loop
           const stored = await backend.get(key);
-          // eslint-disable-next-line no-await-in-loop
-          if (stored) await backend.put(key, { ...stored, _window: String(windowKey) });
+          if (stored) {
+            // eslint-disable-next-line no-await-in-loop
+            const stamped = await backend.put(key, { ...stored, _window: String(windowKey) });
+            for (const k of accountForGoneRows(stamped, key)) changed.add(k);
+          }
         }
         incoming.add(String(key));
         changed.add(key);
