@@ -458,10 +458,15 @@ export function createDataStore({
   /**
    * Tell the host the RETENTION BOUND dropped rows from the in-memory fallback.
    *
-   * The most serious of the three reports, because these rows were never on disk
-   * and are now gone entirely — including `_dirty` ones, which no other path
-   * will drop. It is reported BEFORE the persist failure so that if a host
-   * de-dupes, the louder fact is the one that survives.
+   * The most serious of the three reports: these rows are gone from this device
+   * entirely — including `_dirty` ones, which no other path will drop — and
+   * anything unsynced in them was never pushed.
+   *
+   * ⚠ IT CANNOT SAY THEY NEVER REACHED DISK, and this comment used to. A row may
+   * have been persisted by an earlier successful write and then dropped from the
+   * retained map when the bound fired. The emitted sentence was narrowed for
+   * exactly that reason (review MSRB-R1-1); the comment stating the old claim as
+   * fact outlived it (review BSC-R2-6).
    */
   const reportRetentionDiscard = (result, key) => {
     if (typeof onPersistError !== 'function') return;

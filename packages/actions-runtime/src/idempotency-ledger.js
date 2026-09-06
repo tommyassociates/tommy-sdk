@@ -174,12 +174,20 @@ const EPOCHS_MAX = 500;
  * DURABLE INVALIDATION EPOCHS — the half of `invalidatesIdempotency` that a
  * reload used to undo (review BSC-1).
  *
- * The epoch exists so a post-invalidation invoke presents a derived key the
- * SERVER has never seen, making its `Mp::Invocation` lookup miss. Held in a
- * closure Map, that worked until the shell reloaded — at which point the counter
- * reset to 0, the next invoke re-presented the ORIGINAL key, and the server
- * replayed the stale result. The exact defect the epoch was added to stop, one
- * refresh away.
+ * The epoch exists so a post-invalidation invoke FROM THIS DEVICE presents a
+ * derived key the server has never seen, making its `Mp::Invocation` lookup
+ * miss. Held in a closure Map, that worked until the shell reloaded — at which
+ * point the counter reset to 0, the next invoke re-presented the ORIGINAL key,
+ * and the server replayed the stale result. The exact defect the epoch was added
+ * to stop, one refresh away.
+ *
+ * ⚠ PER-DEVICE, WHILE THE SERVER LEDGER IS PER-TEAM, and this is a documented
+ * limit rather than an oversight (review BSC-R2-7). `find_succeeded` matches on
+ * (team, activity, idempotency_key), so a SECOND device that has not seen the
+ * invalidation is still at epoch 0, still presents the unstamped key, and is
+ * still replayed. Closing that needs the epoch to live server-side — an API
+ * change this work is scoped out of. What this closes is the reload case, which
+ * is the common one and was undoing the invalidation on a single device.
  *
  * ⚠ NO TTL, UNLIKE THE LEDGER ABOVE. An idempotency key expiring is safe — the
  * worst case is a write runs twice. An EPOCH expiring is not: it would silently
@@ -204,14 +212,28 @@ export function createInvalidationEpochs({ storage } = {}) {
   function load() {
     const s = store();
     if (!s) return new Map(memory);
+    let disk = new Map();
     try {
       const raw = s.getItem(EPOCHS_STORAGE_KEY);
       const parsed = raw ? JSON.parse(raw) : null;
-      if (!parsed || typeof parsed !== 'object') return new Map();
-      return new Map(Object.entries(parsed).filter(([, n]) => Number.isFinite(n)));
+      if (parsed && typeof parsed === 'object') {
+        disk = new Map(Object.entries(parsed).filter(([, n]) => Number.isFinite(n)));
+      }
     } catch (_) {
-      return new Map();   // corrupt — behave as never-invalidated
+      disk = new Map();   // corrupt — fall back on memory alone
     }
+    // ⚠ MEMORY IS MERGED IN, NOT SKIPPED WHEN STORAGE EXISTS. The fallback was
+    // reachable only when Web Storage was ABSENT — so on a device where storage
+    // exists but the WRITE fails (quota full, private-mode quirk), `save` kept
+    // the epoch in memory and `load` then ignored it, reading the stale disk
+    // value straight back. The invalidation was lost in-session on exactly the
+    // devices under storage pressure, which is the opposite of what the comment
+    // above promised (review BSC-R2-3).
+    //
+    // The higher counter wins: an epoch only ever moves forward, so max() is the
+    // correct merge and cannot walk one backwards.
+    for (const [k, v] of memory) if (!disk.has(k) || v > disk.get(k)) disk.set(k, v);
+    return disk;
   }
 
   function save(map) {

@@ -253,3 +253,29 @@ describe('the invalidation epoch survives a reload', () => {
     expect(w.lastKey().startsWith('e1.')).toBe(true);
   });
 });
+
+/**
+ * BSC-R2-3 — storage that EXISTS but cannot be written to.
+ *
+ * The in-memory fallback was reachable only when Web Storage was absent. On a
+ * device where it exists and the write fails — quota full, private-mode quirk —
+ * `save` kept the epoch in memory and `load` ignored it, reading the stale disk
+ * value back. The invalidation was lost in-session on exactly the devices under
+ * storage pressure.
+ */
+describe('the epoch survives storage that will not accept writes', () => {
+  it('keeps invalidating in-session when setItem throws', async () => {
+    const map = new Map();
+    const readOnly = {
+      getItem: (k) => (map.has(k) ? map.get(k) : null),
+      setItem: () => { const e = new Error('full'); e.name = 'QuotaExceededError'; throw e; },
+      removeItem: (k) => map.delete(k),
+    };
+    const epochs = createInvalidationEpochs({ storage: readOnly });
+    expect(epochs.get('team-9:availability.lock_window')).toBe(0);
+    epochs.bump('team-9:availability.lock_window');
+    // Nothing reached disk — but the invalidation must still hold for this
+    // session, which is what the fallback is FOR.
+    expect(epochs.get('team-9:availability.lock_window')).toBe(1);
+  });
+});
