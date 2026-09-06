@@ -121,3 +121,72 @@ describe('declared idempotency invalidation', () => {
     expect(otherRepeat.idempotentReplay).toBe(true);
   });
 });
+
+/**
+ * PHASE 1 (mp-bounds-the-scanner-cannot-see) — the invalidation reaches the
+ * SERVER's ledger too, not only the client's memory.
+ *
+ * `invalidatesIdempotency` cleared `processedKeys` and `appliedKeysOverflow` and
+ * was documented as though that were the whole story. It is not: the server
+ * keeps its own ledger of succeeded invocations, looked up by (team, activity,
+ * idempotency_key) and replayed verbatim (invoke_executor.rb find_succeeded).
+ * So the runtime cleared one ledger and claimed both, and a repeat invoke after
+ * an invalidation still got the stale result back over the wire.
+ */
+describe('the invalidation epoch reaches the server ledger', () => {
+  /** Same world, but recording the key the SERVER is asked about. */
+  async function keyRecordingWorld() {
+    const keys = [];
+    const issuer = createFakeIssuer();
+    const broker = createBroker({
+      capabilityService: issuer,
+      serverInvoke: async ({ activity, idempotencyKey }) => {
+        keys.push({ activity: String(activity), idempotencyKey });
+        return { ok: true };
+      },
+    });
+    broker.registerMp(manifest, { handlers: { conditions: {}, activities: {} } });
+    const token = await issuer.issue('availability', '1.0.0', TENANT, [], 'i-1');
+    const call = (name, args = { shiftId: 's-1' }) => broker.invoke({
+      sourceMpId: 'availability', instanceId: 'i-1', capabilityToken: token,
+      activity: `availability.${name}`, args,
+    });
+    const lastKeyFor = (name) => [...keys].reverse().find((k) => k.activity.endsWith(name))?.idempotencyKey;
+    return { call, keys, lastKeyFor };
+  }
+
+  it('presents a key the server has not seen after an invalidation', async () => {
+    const w = await keyRecordingWorld();
+    await w.call('lock_window');
+    const first = w.lastKeyFor('lock_window');
+
+    await w.call('unlock_window');
+    await w.call('lock_window');
+    const after = w.lastKeyFor('lock_window');
+
+    // Same activity, same args — but the key the SERVER is asked about differs,
+    // so find_succeeded misses and the write genuinely runs again.
+    expect(after).not.toBe(first);
+    expect(after.startsWith('e1.')).toBe(true);
+  });
+
+  it('leaves a non-invalidated activity\'s key untouched', async () => {
+    const w = await keyRecordingWorld();
+    await w.call('unrelated_write', { x: 1 });
+    const before = w.lastKeyFor('unrelated_write');
+    await w.call('unlock_window');
+    await w.call('unrelated_write', { x: 1 });
+
+    // The epoch is PER ACTIVITY. A shared epoch would churn every unrelated
+    // write's key on any invalidation, writing a new server row each time.
+    expect(w.lastKeyFor('unrelated_write')).toBe(before);
+  });
+
+  it('is byte-identical to the old key until something invalidates', async () => {
+    const w = await keyRecordingWorld();
+    await w.call('lock_window', { shiftId: 's-9' });
+    // Epoch 0 carries no stamp, so an install that has never invalidated writes
+    // exactly the keys it always did — no new Mp::Invocation rows, no churn.
+    expect(w.lastKeyFor('lock_window')).toBe(`d-${JSON.stringify({ shiftId: 's-9' })}`);
+  });
+});
