@@ -32,10 +32,19 @@ export const DEFAULT_RETRY = Object.freeze({ maxAttempts: 3, backoff: 'exponenti
  * `backoff` has been a manifest-schema enum (`none | linear | exponential`)
  * since v1 and is declared by 26 activities across 14 MPs plus the reference
  * MP — and until spec mp-declared-bounds-that-dont-bind nothing implemented it.
- * The three attempts fired back to back, which matters most for the one
- * retryable error the runtime raises on its own: `RateLimited`. Three immediate
- * retries against a token bucket are guaranteed to fail and burn the whole
- * budget in the same millisecond.
+ * The three attempts fired back to back, so the spacing applies to the errors a
+ * HANDLER raises — a transient host read, a 5xx from an adapter — which are the
+ * only ones that reach the loop.
+ *
+ * ⚠ IT DOES NOT COVER `RateLimited`, and an earlier version of this comment
+ * claimed it did. `takeToken` runs at the top of `dispatchInvokeInner`
+ * (broker.js:1053), ~100 lines BEFORE the retry loop opens (broker.js:1157), so
+ * a throttled invoke throws straight out of the dispatch and gets zero attempts
+ * and zero backoff. Where a `RateLimited` does reach a loop — a nested child
+ * bubbling up through its parent's handler — the arithmetic still does not
+ * close: the bucket refills `perMin * elapsedMinutes`, so at 120 invokes/min one
+ * token needs 500ms while the default schedule spends 300ms across both gaps.
+ * Spacing the throttle case properly is a limiter change, not a backoff change.
  *
  * ⚠ THE CAP IS NOT A TUNING KNOB. Every Action run inherits this timing, so an
  * uncapped exponential turns a millisecond dead-letter into a multi-second one
