@@ -408,6 +408,35 @@ export function createDataStore({
   };
 
   /**
+   * Account for the rows a backend result says are GONE — byte-evicted on a
+   * successful save, or discarded by the retention bound on a failed one.
+   *
+   * ⚠ ONE OWNER FOR ALL THREE CALL SITES. Phase 1 handled only `put`'s success
+   * branch, so two other paths kept the original defect (review MSRB-3):
+   * `put`'s FAILURE branch, where `save()` returns a non-empty `evicted`
+   * alongside `ok:false` whenever the byte guard cleared every clean row and the
+   * store was still over budget; and `delete()`, which can byte-evict on success
+   * and can trip the retention bound on failure, and read neither field. In both
+   * cases `residentCount` inflated and the keys were missing from the notify
+   * batch, so selector subscribers watching those rows never fired.
+   *
+   * Returns the keys, for the caller to fold into the ONE notify it already
+   * makes — never a notify per row.
+   */
+  function accountForGoneRows(persisted, key) {
+    const byteEvicted = persisted?.evicted || [];
+    const discarded = persisted?.discarded || [];
+    const gone = byteEvicted.length + discarded.length;
+    if (!gone) return [];
+    if (residentCount !== null) residentCount -= gone;
+    // Rows actually went, so the cap may be able to act again.
+    capSaturated = false;
+    if (byteEvicted.length) reportPersistEviction(persisted, key);
+    if (discarded.length) reportRetentionDiscard(persisted, key);
+    return [...byteEvicted, ...discarded];
+  }
+
+  /**
    * Tell the host the RETENTION BOUND dropped rows from the in-memory fallback.
    *
    * The most serious of the three reports, because these rows were never on disk
@@ -780,13 +809,12 @@ export function createDataStore({
         } else {
           await backend.put(key, { ...stamped, _persistFailed: true });
         }
-        // The retention bound may have dropped the OLDEST rows to stay bounded.
-        // Those rows are gone from this device, so they are accounted for the
-        // same way an eviction is: counter, subscribers, host — never silence.
-        const discarded = persisted.discarded || [];
-        if (discarded.length && residentCount !== null) residentCount -= discarded.length;
-        if (!silent) await notify(discarded.length ? [key, ...discarded] : key);
-        if (discarded.length) reportRetentionDiscard(persisted, key);
+        // Rows may be gone even on the FAILURE path: the retention bound drops
+        // the oldest, and the byte guard can have evicted every clean row and
+        // still left the store over budget. Both are accounted for the same way
+        // — counter, subscribers, host — never silence.
+        const gone = accountForGoneRows(persisted, key);
+        if (!silent) await notify(gone.length ? [key, ...gone] : key);
         reportPersistFailure(persisted, key);
         throw new PersistError(name, persisted);
       }
@@ -807,13 +835,7 @@ export function createDataStore({
       // that no longer existed (inflating it until the row cap ran on a store
       // that had not saturated, or latched `capSaturated` against a phantom),
       // and the host heard nothing about storage pressure that HAD cost data.
-      const byteEvicted = persisted?.evicted || [];
-      if (byteEvicted.length) {
-        if (residentCount !== null) residentCount -= byteEvicted.length;
-        // Rows actually went, so the cap may be able to act again.
-        capSaturated = false;
-        reportPersistEviction(persisted, key);
-      }
+      const byteEvicted = accountForGoneRows(persisted, key);
       let evicted = [];
       if (!deferCap && residentCount > maxRows && !capSaturated) {
         // `protect` the row just written — it is the newest thing in the store,
@@ -833,7 +855,12 @@ export function createDataStore({
       capSaturated = false;   // one fewer row: the cap may be able to act again
       if (residentCount !== null && (await backend.get(key)) !== undefined) residentCount -= 1;
       const persisted = await backend.delete(key);
-      if (!silent) await notify(key);
+      // `backend.delete` runs the same `save()` as a put, so it can byte-evict
+      // on success and trip the retention bound on failure. This path read
+      // neither field, so a delete that displaced other rows inflated the
+      // counter and left subscribers watching those rows asleep.
+      const gone = accountForGoneRows(persisted, key);
+      if (!silent) await notify(gone.length ? [key, ...gone] : key);
       if (persisted && persisted.ok === false) {
         reportPersistFailure(persisted, key);
         throw new PersistError(name, persisted);

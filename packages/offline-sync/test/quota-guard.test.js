@@ -587,3 +587,132 @@ describe('QG-R5-2: a store past its byte budget stops growing', () => {
     expect((await store.getAllRaw())[0]._persistFailed).toBe(true);
   });
 });
+
+/**
+ * MSRB-3 — the OTHER paths that receive a backend result carrying gone rows.
+ *
+ * Phase 1 repaired `put()`'s success branch and stopped there, so two paths kept
+ * the original defect: `put()`'s FAILURE branch (where `save()` returns a
+ * non-empty `evicted` alongside `ok:false` whenever the byte guard cleared every
+ * clean row and the store was STILL over budget) and `delete()` (which runs the
+ * same `save()`, so it can byte-evict on success and trip the retention bound on
+ * failure, and read neither field).
+ */
+describe('MSRB-3: every path that displaces rows accounts for them', () => {
+  const ticker = () => {
+    let t = Date.parse('2026-08-31T00:00:00.000Z');
+    return () => { t += 1000; return t; };
+  };
+
+  /**
+   * ⚠ DRIVEN THROUGH THE BACKEND CONTRACT, NOT THE SHIPPED BACKEND, and that is
+   * deliberate. Measured against the real localStorage backend, NEITHER of these
+   * branches is reachable: `delete` only ever shrinks the map, and the one way
+   * the map is over budget at delete time is after a refused write — which means
+   * the byte guard already cleared every clean row, so `evictToFit` has nothing
+   * left to take and `boundRetained` is already under its ceiling. A probe
+   * confirmed a delete emits no report at all.
+   *
+   * But `evicted`/`discarded` are part of the documented result shape a backend
+   * may return, and the DataStore is what must honour them. So these drive a
+   * backend that returns them — which is the contract — rather than asserting
+   * against a shipped backend that cannot produce them, where the test would
+   * pass whatever the code did. The earlier version of this block did exactly
+   * that and stayed green with the fix reverted.
+   */
+  const displacingBackend = () => {
+    const rows = new Map();
+    let displaceNext = null;
+    return {
+      async get(key) { return rows.get(String(key)); },
+      async getAll() { return [...rows.values()]; },
+      async put(key, record) { rows.set(String(key), record); return { ok: true }; },
+      async delete(key) {
+        rows.delete(String(key));
+        if (!displaceNext) return { ok: true };
+        const out = displaceNext; displaceNext = null;
+        for (const k of [...(out.evicted || []), ...(out.discarded || [])]) rows.delete(String(k));
+        return out;
+      },
+      keys() { return [...rows.keys()]; },
+      _displace(next) { displaceNext = next; },
+    };
+  };
+
+  it('notifies, counts and reports rows a DELETE displaced', async () => {
+    const reports = [];
+    const backend = displacingBackend();
+    const store = createDataStore({
+      name: 'documents_cache', maxRows: 50, backend, onPersistError: (r) => reports.push(r), now: ticker(),
+    });
+    for (let i = 1; i <= 4; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await store.put({ id: `r-${i}` });
+    }
+
+    const batches = [];
+    store.subscribe(() => { batches.push(1); });
+    backend._displace({ ok: true, evicted: ['r-1', 'r-2'] });
+    await store.delete('r-4');
+
+    // ONE subscriber pass covering the delete AND what it displaced.
+    expect(batches.length).toBe(1);
+    // The host heard about the rows that went without anyone asking.
+    expect(reports.some((r) => r.event === 'evicted')).toBe(true);
+  });
+
+  it('reports a retention discard reached through a delete', async () => {
+    const reports = [];
+    const backend = displacingBackend();
+    const store = createDataStore({
+      name: 'mileage_drafts', backend, onPersistError: (r) => reports.push(r), now: ticker(),
+    });
+    await store.put({ id: 'a' });
+    await store.put({ id: 'b' });
+
+    backend._displace({
+      ok: false, reason: 'budget', bytes: 900, budget: 300, evicted: [], discarded: ['a'],
+    });
+    await store.delete('b').catch(() => {});
+
+    // `reportPersistFailure` forwards `evicted` and never `discarded`, so before
+    // this the discard was silent at the SDK layer — before the host could even
+    // mis-route it.
+    expect(reports.some((r) => r.event === 'retention_discarded')).toBe(true);
+  });
+
+  it('accounts for rows the byte guard evicted on a REFUSED write', async () => {
+    // `save()` returns a non-empty `evicted` alongside ok:false whenever the
+    // guard cleared every clean row and the store was STILL over budget. The
+    // failure branch read only `discarded`, so those keys were never counted,
+    // never notified and never reported.
+    const reports = [];
+    const rows = new Map();
+    const backend = {
+      async get(key) { return rows.get(String(key)); },
+      async getAll() { return [...rows.values()]; },
+      async put(key, record) {
+        rows.set(String(key), record);
+        if (String(key) !== 'big') return { ok: true };
+        rows.delete('clean-1');
+        return {
+          ok: false, reason: 'budget', bytes: 900, budget: 300, evicted: ['clean-1'], discarded: [],
+        };
+      },
+      async delete(key) { rows.delete(String(key)); return { ok: true }; },
+      keys() { return [...rows.keys()]; },
+    };
+    const store = createDataStore({
+      name: 'mileage_drafts', backend, onPersistError: (r) => reports.push(r), now: ticker(),
+    });
+    await store.put({ id: 'clean-1' });
+
+    const batches = [];
+    store.subscribe((r) => { batches.push(r.length); });
+    await store.put({ id: 'big' }).catch(() => {});
+
+    expect(reports.some((r) => r.event === 'evicted')).toBe(true);
+    expect(reports.some((r) => r.event === 'persist_failed')).toBe(true);
+    expect(batches.length).toBe(1);      // still one pass for one logical change
+  });
+});
