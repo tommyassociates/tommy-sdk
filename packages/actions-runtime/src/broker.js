@@ -24,6 +24,7 @@ import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import {
   DEFAULT_THROTTLE_PROFILE, QUEUE_MAX_ENTRIES, QUEUE_MAX_BYTES, SYNC_EMIT_TIMEOUT_MS, DEFAULT_RETRY,
+  retryDelayMs,
   SENSITIVE_CONDITIONS, domainScopeForMp,
 } from './constants.js';
 import { createRecordStore } from './records.js';
@@ -147,6 +148,12 @@ export function createBroker({
    * radio, not a query.
    */
   registrationTimeoutMs = 8000,
+  /**
+   * How the retry loop waits between attempts. Injectable so a test can assert
+   * the SCHEDULE rather than sit through it — the delays are small by design,
+   * but a suite that waits them out is a suite that gets them shortened.
+   */
+  sleep = (ms) => (ms > 0 ? new Promise((resolve) => { setTimeout(resolve, ms); }) : Promise.resolve()),
 } = {}) {
   if (!capabilityService || typeof capabilityService.validate !== 'function') {
     throw new Error('createBroker: capabilityService with validate() required');
@@ -1149,6 +1156,13 @@ export function createBroker({
     let lastError;
     while (attempt < Math.max(1, retry.maxAttempts)) {
       attempt += 1;
+      // ⚠ THE DECLARED BACKOFF, ACTUALLY APPLIED. `retry.backoff` was a
+      // schema-validated field that nothing read, so three attempts fired in
+      // the same millisecond — useless against `RateLimited`, which is the one
+      // retryable error this runtime raises itself. Capped in constants.js so
+      // a dead-letter still lands well inside a second.
+      // eslint-disable-next-line no-await-in-loop
+      if (attempt > 1) await sleep(retryDelayMs(retry.backoff, attempt));
       await records.update(record.runId, { status: 'running', attempts: attempt });
       try {
         // The handler window IS the re-entrancy window (F6): a nested invoke
@@ -1166,6 +1180,26 @@ export function createBroker({
         await records.update(record.runId, { status: 'succeeded', result: result.result });
         if (processedKey) {
           processedKeys.set(processedKey, final);
+          // ⚠ A RECORDED RESULT OUTLIVES THE STATE IT DESCRIBES unless something
+          // says otherwise. `derived_from_input` hashes the args, so it replays
+          // for identical args forever — right while the state still holds,
+          // wrong the moment a sibling activity clears it. `lock_window_for_shift`
+          // records `{locked: true}`; `unlock_window_for_shift` clears the flags
+          // under a DIFFERENT activity name, so a re-assign hit the recorded key
+          // and returned `{locked: true}` with no read and no write. The MP names
+          // the dependency (`invalidatesIdempotency`) because the broker cannot
+          // know which activities are inverses of each other, and a blanket
+          // "any write clears every key" rule would delete the duplicate
+          // suppression the fan-out depends on.
+          for (const staleActivity of activityDef.invalidatesIdempotency || []) {
+            const prefix = `${tenantId}:${ownerMpId}.${staleActivity}:`;
+            for (const key of [...processedKeys.keys()]) {
+              if (key.startsWith(prefix)) processedKeys.delete(key);
+            }
+            for (const key of [...appliedKeysOverflow]) {
+              if (key.startsWith(prefix)) appliedKeysOverflow.delete(key);
+            }
+          }
           // FIFO cap (memory audit): each entry holds a FULL activity result.
           // The RESULT is what is released — the KEY moves to a keys-only
           // overflow set, because dropping it outright silently RE-APPLIED the

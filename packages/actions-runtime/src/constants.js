@@ -27,6 +27,41 @@ export const SYNC_EMIT_TIMEOUT_MS = 3000;
 export const DEFAULT_RETRY = Object.freeze({ maxAttempts: 3, backoff: 'exponential' });
 
 /**
+ * The spacing behind `retry.backoff`, and the cap that keeps it honest.
+ *
+ * `backoff` has been a manifest-schema enum (`none | linear | exponential`)
+ * since v1 and is declared by 26 activities across 14 MPs plus the reference
+ * MP — and until spec mp-declared-bounds-that-dont-bind nothing implemented it.
+ * The three attempts fired back to back, which matters most for the one
+ * retryable error the runtime raises on its own: `RateLimited`. Three immediate
+ * retries against a token bucket are guaranteed to fail and burn the whole
+ * budget in the same millisecond.
+ *
+ * ⚠ THE CAP IS NOT A TUNING KNOB. Every Action run inherits this timing, so an
+ * uncapped exponential turns a millisecond dead-letter into a multi-second one
+ * and anything waiting on a run — a spinner, a fixed test timeout — waits with
+ * it. At 100ms base and a 400ms ceiling the default 3-attempt budget adds 300ms
+ * total, so a dead-letter still lands well inside a second.
+ */
+export const RETRY_BASE_DELAY_MS = 100;
+export const RETRY_MAX_DELAY_MS = 400;
+
+/**
+ * Delay BEFORE `attempt` (1-based). The first attempt is never delayed.
+ * `none` keeps the old behaviour for an activity that wants it, and is the
+ * honest way to ask for immediate retries now that the default spaces them.
+ */
+export function retryDelayMs(backoff, attempt) {
+  if (attempt <= 1) return 0;
+  const n = attempt - 1;
+  if (backoff === 'none') return 0;
+  if (backoff === 'linear') return Math.min(RETRY_BASE_DELAY_MS * n, RETRY_MAX_DELAY_MS);
+  // 'exponential', and anything unrecognised — the schema constrains the value,
+  // but a runtime that guesses wrong should guess toward spacing, not against.
+  return Math.min(RETRY_BASE_DELAY_MS * (2 ** (n - 1)), RETRY_MAX_DELAY_MS);
+}
+
+/**
  * Read-scope DERIVATION map (council C1 / Option B).
  *
  * The fixed permission catalogue (@tommy/manifest

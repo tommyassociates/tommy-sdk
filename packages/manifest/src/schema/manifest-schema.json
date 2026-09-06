@@ -270,6 +270,14 @@
               "external_call"
             ]
           },
+          "invalidatesIdempotency": {
+            "description": "Activity names in THIS MP whose recorded idempotency results this activity's success makes stale. A `derived_from_input` key is a hash of the args, so it replays forever for identical args \u2014 correct while the state it describes still holds, wrong the moment a sibling activity clears that state. `lock_window_for_shift` records `{locked: true}`; `unlock_window_for_shift` genuinely clears the flags under a DIFFERENT activity name, so a re-assign with identical args used to hit the recorded key and return `{locked: true}` with no read and no write \u2014 a succeeded run reporting a lock that never happened. Naming the dependency is deliberate rather than deriving it: the broker cannot know which pairs of activities are inverses, and a blanket \"any write clears every key\" rule would delete the duplicate-suppression that the fan-out depends on. Entries are bare activity names (no `mpId.` prefix) and are invalidated tenant-scoped, on success only.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
           "idempotency": {
             "description": "How an idempotency key is formed so retries/replays are safe. `correlationKey` keys a FOLLOW-UP FAMILY on the caller's `args.correlationKey` (plus the remaining args, so a re-scheduling to a new time is not swallowed as a replay); it is what the host-owned `tommy.clock.*` scheduled writes declare, and it was expressible nowhere until it was added here \u2014 the broker fell through to `none`, which their `offlineReplayable: true` forbids.",
             "enum": [
