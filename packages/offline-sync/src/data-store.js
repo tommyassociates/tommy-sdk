@@ -411,16 +411,19 @@ export function createDataStore({
    * Account for the rows a backend result says are GONE — byte-evicted on a
    * successful save, or discarded by the retention bound on a failed one.
    *
-   * ⚠ ONE OWNER FOR THE THREE PATHS THAT CAN RECEIVE GONE ROWS — which is not
-   * the same as every path that writes, and the comment used to blur the two.
-   * `reconcile`'s silent puts and the `backend.put` calls whose result is
-   * discarded do NOT go through here; they are not covered, and they do not need
-   * to be, because none of them receives a result carrying `evicted` or
-   * `discarded`. Widening the owner to reach paths that cannot reach it would be
-   * machinery for its own sake. If that ever changes, this is the seam to route
-   * them through.
+   * ⚠ THE OWNER FOR EVERY PATH THAT CAN RECEIVE GONE ROWS, and the comment here
+   * has now been wrong in BOTH directions, which is worth recording rather than
+   * quietly fixing twice. It first claimed "one owner for all three call sites"
+   * when three other paths were uncovered; the correction then claimed those
+   * paths "do not receive a result carrying evicted or discarded", and that was
+   * false too (review BSC-5). `reconcile` puts through `api.put`, so its rows
+   * were always covered — only its notify is silent. And the localStorage
+   * backend returns `evicted` on success and `evicted`/`discarded` on every
+   * failure branch, so the DIRECT `backend.put` calls — `markSynced` and the
+   * `_persistFailed` re-put — genuinely did receive gone rows and genuinely did
+   * drop them. They are routed through here now.
    *
-   * Phase 1 handled only `put`'s success branch, so two other paths kept the
+   * Phase 1 handled only `put`'s success branch, so the other paths kept the
    * original defect (review MSRB-3):
    * `put`'s FAILURE branch, where `save()` returns a non-empty `evicted`
    * alongside `ok:false` whenever the byte guard cleared every clean row and the
@@ -818,13 +821,17 @@ export function createDataStore({
         // stringify of the store, the retention copy — doubling the cost of a
         // store already under pressure. `patchRetained` is optional, so a custom
         // backend without it keeps the old behaviour rather than losing the flag.
+        // The re-put fallback runs the whole save path again, so its result can
+        // carry gone rows of its own — dropped on the floor until BSC-5.
+        let reput = null;
         if (typeof backend.patchRetained === 'function') {
           if (!backend.patchRetained(key, { _persistFailed: true })) {
-            await backend.put(key, { ...stamped, _persistFailed: true });
+            reput = await backend.put(key, { ...stamped, _persistFailed: true });
           }
         } else {
-          await backend.put(key, { ...stamped, _persistFailed: true });
+          reput = await backend.put(key, { ...stamped, _persistFailed: true });
         }
+        if (reput) accountForGoneRows(reput, key);
         // Rows may be gone even on the FAILURE path: the retention bound drops
         // the oldest, and the byte guard can have evicted every clean row and
         // still left the store over budget. Both are accounted for the same way
@@ -890,7 +897,13 @@ export function createDataStore({
       // is no longer "saved on this device only", whatever happened to the local
       // copy on the way.
       const { _persistFailed: _pf, ...rest } = record;
-      await backend.put(key, { ...rest, _dirty: false });
+      // ⚠ THIS WRITE CAN DISPLACE ROWS TOO. Marking a row synced makes it
+      // evictable, which is exactly when the byte guard can act — and this path
+      // discarded the result unconditionally, so those keys were never counted,
+      // never notified and never reported (review BSC-5).
+      const persisted = await backend.put(key, { ...rest, _dirty: false });
+      const gone = accountForGoneRows(persisted, key);
+      if (gone.length) await notify(gone);
       capSaturated = false;   // a clean row is an evictable row
 
     },

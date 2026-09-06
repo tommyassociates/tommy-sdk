@@ -4,7 +4,7 @@
  */
 export { createBroker } from './broker.js';
 export { createRecordStore, createMemoryBackend, createWebStorageBackend } from './records.js';
-export { createIdempotencyLedger } from './idempotency-ledger.js';
+export { createIdempotencyLedger, createInvalidationEpochs } from './idempotency-ledger.js';
 export { createDurableQueue } from './durable-queue.js';
 export { validateToken, createFakeIssuer } from './capability.js';
 // THE predicate evaluator (there is exactly one — R4). Anything that gates on

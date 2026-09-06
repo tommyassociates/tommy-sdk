@@ -28,7 +28,7 @@ import {
   SENSITIVE_CONDITIONS, domainScopeForMp,
 } from './constants.js';
 import { createRecordStore } from './records.js';
-import { createIdempotencyLedger } from './idempotency-ledger.js';
+import { createIdempotencyLedger, createInvalidationEpochs } from './idempotency-ledger.js';
 import { createDurableQueue } from './durable-queue.js';
 import { validateToken } from './capability.js';
 import { evaluatePredicate as evaluateDeclaredPredicate } from './predicate.js';
@@ -131,6 +131,7 @@ export function createBroker({
    * Pass `null` to disable persistence outright.
    */
   idempotencyLedger = createIdempotencyLedger(),
+  invalidationEpochs = createInvalidationEpochs(),
   /**
    * D.43 — the offline queue's durable half. Same seam and same reasoning as
    * the ledger above: it detects storage itself, so the shell gets persistence
@@ -196,25 +197,7 @@ export function createBroker({
   const actionState = new Map();      // `${tenantId}:${mpId}:${actionId}` -> {enabled, options}
   const settingState = new Map();     // `${tenantId}:${mpId}` -> { key: value } (manifest-driven settings projection)
   const processedKeys = new Map();    // `${tenantId}:${activity}:${idempotencyKey}` -> stored result (FIFO cap PROCESSED_KEYS_MAX)
-  /**
-   * `${tenantId}:${qualifiedActivity}` -> invalidation count.
-   *
-   * ⚠ THE HALF OF `invalidatesIdempotency` THAT WAS MISSING. Clearing
-   * `processedKeys` and `appliedKeysOverflow` invalidates the CLIENT's memory of
-   * a result. It does nothing to the SERVER's: `Mp::Invocation` rows are looked
-   * up by (team, activity, idempotency_key) and a succeeded row is replayed
-   * verbatim (invoke_executor.rb find_succeeded). So the runtime cleared one
-   * ledger and documented as though it had cleared both, and a repeat invoke
-   * after an invalidation still got the stale result back over the wire.
-   *
-   * Folding this counter into the derived key means a post-invalidation invoke
-   * presents a key the server has never seen, so its lookup correctly misses —
-   * no migration, no endpoint change, no server deploy.
-   *
-   * BUMPED ON INVALIDATION ONLY. A per-invoke bump would defeat idempotency
-   * altogether and grow `Mp::Invocation` without bound.
-   */
-  const invalidationEpochs = new Map();
+
   const appliedKeysOverflow = new Set(); // keys evicted from processedKeys — the fact survives, the result does not
   const conditionCache = new Map();   // `${tenantId}:${condition}:${argsJson}` -> {value, expiresAt} (cap CONDITION_CACHE_MAX)
   // Bumped by EVERY condition-cache invalidation. The late-value salvage runs
@@ -967,12 +950,17 @@ export function createBroker({
   }
 
   function idempotencyKeyFor(activityDef, envelope, epoch = 0) {
-    // ⚠ THE EPOCH IS FOLDED INTO DERIVED KEYS ONLY, and never into a
-    // `client_key`. The caller owns that key and the server's durable ledger is
+    // ⚠ THE EPOCH IS FOLDED INTO EVERY BROKER-DERIVED KEY, and never into a
+    // `client_key`. The caller owns that one and the server's durable ledger is
     // keyed on it; rewriting it under the caller would break exactly-once for
-    // the one idempotency mode that actually has a durable ledger. Derived and
-    // natural keys have no such ledger on the client, which is why the
-    // invalidation exists for them and only them.
+    // the single idempotency mode that actually has a durable client ledger.
+    //
+    // `derived_from_input`, `natural_key` AND `correlationKey` are all derived
+    // by this function and none of them has a client ledger behind it, so all
+    // three take the stamp. `correlationKey` was missed on the first pass
+    // (review BSC-6), which left the two host-owned scheduled-write activities —
+    // `tommy.clock.schedule_follow_up` / `cancel_follow_up`, both also
+    // `offlineReplayable` — with no client ledger AND no invalidation.
     //
     // At epoch 0 the key is byte-identical to what it has always been, so
     // nothing changes for an install that has never invalidated — no new
@@ -1024,7 +1012,7 @@ export function createBroker({
         const rest = { ...envelope.args };
         delete rest.correlationKey;
         const tail = Object.keys(rest).length ? `-${JSON.stringify(rest)}` : '';
-        return `c-${value}${tail}`;
+        return `${stamp}c-${value}${tail}`;
       }
       default:
         return undefined; // 'none' — forbidden with offlineReplayable (validator-enforced)
@@ -1101,7 +1089,7 @@ export function createBroker({
     if (chain.rootRunId) checkChain(envelope.sourceMpId, `invoke(${envelope.activity})`, chain);
 
     const idempotencyKey = idempotencyKeyFor(
-      activityDef, envelope, invalidationEpochs.get(`${tenantId}:${envelope.activity}`) || 0,
+      activityDef, envelope, invalidationEpochs.get(`${tenantId}:${envelope.activity}`),
     );
     // F5 — TENANT-SCOPED. The ledger key used to be (activity, key) only, and
     // `derived_from_input` keys are a hash of the args alone, so the same
@@ -1234,8 +1222,7 @@ export function createBroker({
             }
             // ...and make the SERVER's ledger miss too, by moving the epoch the
             // next derived key for this activity is stamped with.
-            const epochKey = `${tenantId}:${qualified}`;
-            invalidationEpochs.set(epochKey, (invalidationEpochs.get(epochKey) || 0) + 1);
+            invalidationEpochs.bump(`${tenantId}:${qualified}`);
           }
           // FIFO cap (memory audit): each entry holds a FULL activity result.
           // The RESULT is what is released — the KEY moves to a keys-only

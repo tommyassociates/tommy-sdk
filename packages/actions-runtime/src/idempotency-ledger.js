@@ -166,3 +166,87 @@ export function createIdempotencyLedger({
     },
   };
 }
+
+const EPOCHS_STORAGE_KEY = 'mp-invalidation-epochs';
+const EPOCHS_MAX = 500;
+
+/**
+ * DURABLE INVALIDATION EPOCHS — the half of `invalidatesIdempotency` that a
+ * reload used to undo (review BSC-1).
+ *
+ * The epoch exists so a post-invalidation invoke presents a derived key the
+ * SERVER has never seen, making its `Mp::Invocation` lookup miss. Held in a
+ * closure Map, that worked until the shell reloaded — at which point the counter
+ * reset to 0, the next invoke re-presented the ORIGINAL key, and the server
+ * replayed the stale result. The exact defect the epoch was added to stop, one
+ * refresh away.
+ *
+ * ⚠ NO TTL, UNLIKE THE LEDGER ABOVE. An idempotency key expiring is safe — the
+ * worst case is a write runs twice. An EPOCH expiring is not: it would silently
+ * restore the stale server replay. Entries are evicted only by the size cap,
+ * oldest-first, and the cap is large enough that a device would have to
+ * invalidate 500 distinct activities in one installation to reach it.
+ *
+ * ⚠ KEYS CARRY NO ARGUMENTS. The key is `${tenantId}:${mpId}.${activity}` — a
+ * tenant id and a manifest-declared name, never user input. That is what makes
+ * this safe to persist where the derived idempotency keys themselves are not
+ * (they embed `JSON.stringify(args)`, and one of them embeds a PIN).
+ */
+export function createInvalidationEpochs({ storage } = {}) {
+  const store = () => (storage === undefined ? webStorage() : storage);
+  // ⚠ IN-MEMORY FALLBACK, NOT NOTHING. Without this, a runtime with no Web
+  // Storage (node, a locked-down WebView, a private-mode quirk) wrote the epoch
+  // nowhere and read back 0 — so the invalidation stopped working WITHIN the
+  // session too, which is worse than the durability defect this replaced.
+  // Degrade to session-scoped, which is exactly what the old Map gave.
+  const memory = new Map();
+
+  function load() {
+    const s = store();
+    if (!s) return new Map(memory);
+    try {
+      const raw = s.getItem(EPOCHS_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (!parsed || typeof parsed !== 'object') return new Map();
+      return new Map(Object.entries(parsed).filter(([, n]) => Number.isFinite(n)));
+    } catch (_) {
+      return new Map();   // corrupt — behave as never-invalidated
+    }
+  }
+
+  function save(map) {
+    memory.clear();
+    for (const [k, v] of map) memory.set(k, v);
+    const s = store();
+    if (!s) return;
+    try {
+      s.setItem(EPOCHS_STORAGE_KEY, JSON.stringify(Object.fromEntries(map)));
+    } catch (_) {
+      /* quota / disabled — degrade to in-memory-until-reload, never throw on
+         the dispatch path. A lost epoch costs a stale replay; a throw here
+         would cost the write itself. */
+    }
+  }
+
+  return {
+    get(key) {
+      if (!key) return 0;
+      return load().get(key) || 0;
+    },
+    bump(key) {
+      if (!key) return 0;
+      const map = load();
+      const next = (map.get(key) || 0) + 1;
+      map.delete(key);            // re-insert so insertion order stays LRU-ish
+      map.set(key, next);
+      while (map.size > EPOCHS_MAX) {
+        const oldest = map.keys().next();
+        if (oldest.done) break;
+        map.delete(oldest.value);
+      }
+      save(map);
+      return next;
+    },
+    _clear() { memory.clear(); save(new Map()); },
+  };
+}

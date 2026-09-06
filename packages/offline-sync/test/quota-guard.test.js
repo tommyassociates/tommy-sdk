@@ -681,6 +681,43 @@ describe('MSRB-3: every path that displaces rows accounts for them', () => {
     expect(reports.some((r) => r.event === 'retention_discarded')).toBe(true);
   });
 
+  it('accounts for rows markSynced displaced', async () => {
+    // ⚠ THE PATH THE "NARROWED" COMMENT SAID COULD NOT REACH GONE ROWS, and it
+    // was wrong: marking a row synced makes it EVICTABLE, which is precisely
+    // when the byte guard can act. This write discarded its result outright, so
+    // those keys were never counted, notified or reported (review BSC-5).
+    const reports = [];
+    const rows = new Map();
+    const backend = {
+      async get(key) { return rows.get(String(key)); },
+      async getAll() { return [...rows.values()]; },
+      async put(key, record) {
+        rows.set(String(key), record);
+        // Only the markSynced write displaces, so the assertion cannot pass on
+        // some earlier put's report.
+        if (record._dirty === false && rows.has('old-1')) {
+          rows.delete('old-1');
+          return { ok: true, evicted: ['old-1'] };
+        }
+        return { ok: true };
+      },
+      async delete(key) { rows.delete(String(key)); return { ok: true }; },
+      keys() { return [...rows.keys()]; },
+    };
+    const store = createDataStore({
+      name: 'documents_cache', backend, onPersistError: (r) => reports.push(r), now: ticker(),
+    });
+    await store.put({ id: 'old-1' });
+    await store.put({ id: 'fresh' });
+
+    const batches = [];
+    store.subscribe(() => { batches.push(1); });
+    await store.markSynced('fresh');
+
+    expect(reports.some((r) => r.event === 'evicted')).toBe(true);
+    expect(batches.length).toBe(1);        // subscribers woke for the vanished row
+  });
+
   it('accounts for rows the byte guard evicted on a REFUSED write', async () => {
     // `save()` returns a non-empty `evicted` alongside ok:false whenever the
     // guard cleared every clean row and the store was STILL over budget. The
