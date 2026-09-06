@@ -711,8 +711,15 @@ describe('MSRB-3: every path that displaces rows accounts for them', () => {
     store.subscribe((r) => { batches.push(r.length); });
     await store.put({ id: 'big' }).catch(() => {});
 
-    expect(reports.some((r) => r.event === 'evicted')).toBe(true);
-    expect(reports.some((r) => r.event === 'persist_failed')).toBe(true);
+    // ⚠ ONE REPORT, AND IT MUST NOT SAY THE WRITE SUCCEEDED. The first version of
+    // this case asserted BOTH events, pinning the contradiction as expected: the
+    // eviction sentence claims success while the failure sentence, for the same
+    // write, says it did not persist.
+    expect(reports.some((r) => r.event === 'evicted')).toBe(false);
+    const failure = reports.find((r) => r.event === 'persist_failed');
+    expect(failure).toBeTruthy();
+    // The count still reaches the host — through the truthful sentence.
+    expect(failure.evicted).toEqual(['clean-1']);
     expect(batches.length).toBe(1);      // still one pass for one logical change
   });
 });

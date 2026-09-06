@@ -431,7 +431,14 @@ export function createDataStore({
     if (residentCount !== null) residentCount -= gone;
     // Rows actually went, so the cap may be able to act again.
     capSaturated = false;
-    if (byteEvicted.length) reportPersistEviction(persisted, key);
+    // ⚠ ONLY ON A WRITE THAT ACTUALLY SUCCEEDED. The eviction sentence says "the
+    // write SUCCEEDED", so emitting it for a REFUSED write asserts something
+    // false and contradicts the persist_failure report for the same operation —
+    // the harden round's blocking rule, in the mirror direction. It is also
+    // redundant: `reportPersistFailure` already forwards `evicted`, and the
+    // failure sentence already appends ", N older row(s) evicted", so the count
+    // reaches the host truthfully without a second contradictory report.
+    if (byteEvicted.length && persisted?.ok !== false) reportPersistEviction(persisted, key);
     if (discarded.length) reportRetentionDiscard(persisted, key);
     return [...byteEvicted, ...discarded];
   }
