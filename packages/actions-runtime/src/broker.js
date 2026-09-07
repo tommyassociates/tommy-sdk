@@ -809,6 +809,18 @@ export function createBroker({
    * oldest-by-expiresAt until within bound. Eviction costs a recompute on the
    * next read — never a wrong value.
    */
+  /**
+   * Is this answer a report about the READ rather than a value about the world?
+   * The estate-wide `unresolved` contract lets a condition degrade without
+   * lying — it resolves with an empty payload plus the flag instead of throwing.
+   * Caching that pins the ignorance for the whole TTL: retries stop reaching the
+   * handler, so a surface holds its error state long after the cause has passed.
+   * Both cache-write paths in `query` consult this.
+   */
+  function isKnownUnknown(value) {
+    return !!(value && typeof value === 'object' && value.unresolved);
+  }
+
   function pruneConditionCache(justSetKey = null) {
     if (conditionCache.size <= CONDITION_CACHE_MAX) return;
     const t = now();
@@ -915,7 +927,12 @@ export function createBroker({
             // epoch is proof that nothing invalidated while this read was in
             // flight. If it moved, the value is stale by definition — drop it.
             if (conditionCacheEpoch !== epochAtDispatch) return;
-            if (conditionDef.cacheable && conditionDef.cacheTtlMs > 0) {
+            // ⚠ AND NOT A KNOWN-UNKNOWN, same as the on-time path below. A late
+            // value is salvaged so the NEXT read is warm; salvaging an
+            // `unresolved` answer makes the next read cold-in-name-only — it
+            // serves the recorded ignorance instead of retrying. There are two
+            // cache writes in this function and the first fix only covered one.
+            if (conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !isKnownUnknown(late)) {
               conditionCache.set(cacheKey, { value: late, expiresAt: now() + conditionDef.cacheTtlMs });
               pruneConditionCache(cacheKey);
             }
@@ -944,8 +961,7 @@ export function createBroker({
       // a surface stays on its error state for up to a minute after connectivity
       // returns. Caching a known-unknown is the one case where a cache makes the
       // system less correct rather than merely staler.
-      const unresolved = !!(value && typeof value === 'object' && value.unresolved);
-      if (conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !unresolved) {
+      if (conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !isKnownUnknown(value)) {
         conditionCache.set(cacheKey, { value, expiresAt: now() + conditionDef.cacheTtlMs });
         pruneConditionCache(cacheKey);
       }

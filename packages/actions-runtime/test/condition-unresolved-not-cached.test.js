@@ -31,7 +31,7 @@ function ownerWith(handler) {
       conditions: {
         rows: {
           description: 'a cacheable read that can degrade',
-          latencyBudgetMs: 3000,
+          latencyBudgetMs: 30,
           cacheable: true,
           cacheTtlMs: 60000,
           inputSchema: { type: 'object' },
@@ -73,6 +73,32 @@ describe('a condition answer flagged unresolved', () => {
 
     // Without the guard this second call is served from cache: the handler is
     // never reached, and the caller sees the same flagged answer for 60s.
+    const second = await query();
+    expect(calls).toBe(2);
+    expect(second).toEqual({ rows: ['real'] });
+  });
+
+  // ⚠ THERE ARE TWO CACHE WRITES IN `query`, AND THE FIRST FIX COVERED ONE.
+  // When a handler overruns `latencyBudgetMs` the caller is rejected with a
+  // Timeout, but the value is salvaged into the cache when it eventually lands
+  // so the NEXT read is warm. Salvaging an `unresolved` answer makes that next
+  // read cold-in-name-only: it serves the recorded ignorance instead of
+  // retrying, which is the same defect one path over (review RV4-F1).
+  it('is not salvaged into the cache by the late-value path either', async () => {
+    let calls = 0;
+    let releaseSlow;
+    const slow = new Promise((resolve) => { releaseSlow = resolve; });
+    const { query } = await world(async () => {
+      calls += 1;
+      if (calls === 1) { await slow; return { rows: [], unresolved: true }; }
+      return { rows: ['real'] };
+    });
+
+    // First call overruns the budget and rejects; its value lands afterwards.
+    await expect(query()).rejects.toThrow();
+    releaseSlow();
+    await new Promise((r) => { setTimeout(r, 20); });
+
     const second = await query();
     expect(calls).toBe(2);
     expect(second).toEqual({ rows: ['real'] });
