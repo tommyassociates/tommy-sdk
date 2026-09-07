@@ -934,7 +934,18 @@ export function createBroker({
       await records.update(record.runId, { status: 'succeeded', result: value });
       // A zero/absent TTL entry is born expired — the read path above can
       // never serve it, so storing it is pure retention (memory audit).
-      if (conditionDef.cacheable && conditionDef.cacheTtlMs > 0) {
+      //
+      // ⚠ AND NEVER CACHE AN ANSWER THAT SAYS IT DOES NOT KNOW. The estate-wide
+      // `unresolved` contract lets a condition degrade without lying — it
+      // resolves with an empty payload plus the flag rather than throwing. That
+      // is a report about the READ, not a value about the world, and caching it
+      // pins the failure for the whole TTL: every retry the user presses re-reads
+      // the same flagged answer from cache without the handler ever running, so
+      // a surface stays on its error state for up to a minute after connectivity
+      // returns. Caching a known-unknown is the one case where a cache makes the
+      // system less correct rather than merely staler.
+      const unresolved = !!(value && typeof value === 'object' && value.unresolved);
+      if (conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !unresolved) {
         conditionCache.set(cacheKey, { value, expiresAt: now() + conditionDef.cacheTtlMs });
         pruneConditionCache(cacheKey);
       }
