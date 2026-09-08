@@ -107,6 +107,9 @@ export function createBroker({
   now = () => Date.now(),
   online = true,
   throttleOverrides = {},
+  // Trusted host aliases for in-memory configuration only; wire and durable
+  // identities retain the tenant identifier supplied by the authenticated call.
+  tenantStateKey = (tenantId) => tenantId,
   // --- enforcement flags (Class F). Default OFF: turning one ON requires the
   // matching manifest declarations to exist first (grants / read: scopes), so
   // each flips in its own wave once the estate declares them. ---
@@ -440,7 +443,7 @@ export function createBroker({
   // --- Active Trigger Index (D21) -------------------------------------------
 
   function actionKey(tenantId, mpId, actionId, locationId = null) {
-    return `${tenantId}:${mpId}:${actionId}${locationId == null ? '' : `:location:${locationId}`}`;
+    return `${tenantStateKey(tenantId)}:${mpId}:${actionId}${locationId == null ? '' : `:location:${locationId}`}`;
   }
 
   function eventLocation(payload = {}) {
@@ -455,7 +458,7 @@ export function createBroker({
 
   /** Drop this tenant's memoised condition results (a settings write may change them). */
   function invalidateConditionCache(tenantId) {
-    const prefix = `${tenantId}:`;
+    const prefix = `${tenantStateKey(tenantId)}:`;
     conditionCacheEpoch += 1;
     for (const key of [...conditionCache.keys()]) {
       if (key.startsWith(prefix)) conditionCache.delete(key);
@@ -868,7 +871,7 @@ export function createBroker({
     authorizeQuery(envelope.sourceMpId, ownerMpId, conditionName, identity.scopes);
     validateAgainst(conditionDef.inputSchema, envelope.args, 'InvalidPayload', `condition '${envelope.condition}' args`);
 
-    const cacheKey = `${tenantId}:${envelope.condition}:${JSON.stringify(envelope.args)}`;
+    const cacheKey = `${tenantStateKey(tenantId)}:${envelope.condition}:${JSON.stringify(envelope.args)}`;
     if (conditionDef.cacheable) {
       const hit = conditionCache.get(cacheKey);
       if (hit && hit.expiresAt > now()) return hit.value;
@@ -1297,7 +1300,7 @@ export function createBroker({
         if (activityDef.sideEffect === 'server_write') {
           conditionCacheEpoch += 1;
           for (const key of conditionCache.keys()) {
-            if (key.startsWith(`${tenantId}:${ownerMpId}.`)) conditionCache.delete(key);
+            if (key.startsWith(`${tenantStateKey(tenantId)}:${ownerMpId}.`)) conditionCache.delete(key);
           }
         }
         return final;
@@ -1468,7 +1471,7 @@ export function createBroker({
     // renderer, `tommy.settings.get()` and `{ from: setting }` predicates all
     // share, so a write is live everywhere without a reload.
     setSettingState(tenantId, mpId, values = {}) {
-      const key = `${tenantId}:${mpId}`;
+      const key = `${tenantStateKey(tenantId)}:${mpId}`;
       settingState.set(key, { ...(settingState.get(key) || {}), ...values });
       // A condition may read a setting, so a settings write invalidates this
       // tenant's memoised condition results — otherwise a cacheable condition
@@ -1484,7 +1487,7 @@ export function createBroker({
      * it did not declare.
      */
     settingsFor(tenantId, mpId) {
-      return { ...(settingState.get(`${tenantId}:${mpId}`) || {}) };
+      return { ...(settingState.get(`${tenantStateKey(tenantId)}:${mpId}`) || {}) };
     },
 
     /**
