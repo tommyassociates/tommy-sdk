@@ -4,7 +4,7 @@
 // already existed and already read `contributions.tours`,
 // `contributions.tourAnchors`, `tour.autoLaunch.when`, `tour.steps[].anchor`,
 // `step.host`, `tour.replayable` and `tour.fixtures[].teardown` through
-// `Mp::ManifestCheck::Walk` (api/app/services/mp/manifest_check/rules/
+// `Mp::ManifestCheck::Walk` (the API manifest-check rules directory,
 // m19_tour_anchors_rendered.rb, m20_…, m21_…, m22_…). This schema is the shape
 // they were written against.
 //
