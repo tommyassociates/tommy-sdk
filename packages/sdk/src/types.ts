@@ -576,6 +576,17 @@ export interface PickOptions extends PickerOptions {
  * (MP scope ∩ user visibility) — see host-services.md.
  */
 export interface UiApi {
+  /**
+   * Team MP member-edit preflight. Host-owned paid-seat confirmation precedes
+   * both member and regular-hours writes. Decline, expiry or detached popup
+   * resolves approved:false. A confirmation is single-use, instance/account/payload-bound;
+   * offline replay cannot reuse it. No billing data crosses this UI boundary.
+   */
+  confirmTeamMemberUpdate(opts: {
+    memberId: string;
+    data: Record<string, unknown>;
+    el: HTMLElement;
+  }): Promise<{ approved: boolean; restoreConfirmation?: string }>;
   /** Canonical picker — supports mixed kinds and multi-select. */
   pick(opts: PickOptions): Promise<EntityRef[]>;
   // convenience wrappers — common single-kind cases, thin calls to pick():

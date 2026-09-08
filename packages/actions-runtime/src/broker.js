@@ -1075,6 +1075,12 @@ export function createBroker({
         kind: 'invoke',
         activity: envelope.activity,
         args: envelope.args,
+        ...(envelope.activity === 'team.update_member' ? {
+          restoreContext: {
+            mpId: record.sourceMpId, instanceId: envelope.instanceId, tenantId: record.tenantId,
+            deadlineAt: envelope.restoreDeadlineAt, replayed: envelope.restoreReplay === true,
+          },
+        } : {}),
         idempotencyKey: record.idempotencyKey,
         capabilityToken: envelope.capabilityToken?.token,
         txnId: envelope.txnId,
@@ -1375,7 +1381,7 @@ export function createBroker({
         // eslint-disable-next-line no-await-in-loop
         const outcome = await (envelope.trigger
           ? dispatchEmit(envelope)
-          : dispatchInvoke({ ...envelope, idempotencyKey: envelope.idempotencyKey })) // ORIGINAL key
+          : dispatchInvoke({ ...envelope, restoreReplay: true, idempotencyKey: envelope.idempotencyKey })) // ORIGINAL key
           .then((result) => ({ ok: true, result }))
           .catch((error) => ({ ok: false, error }));
         results.push(outcome);
@@ -1546,6 +1552,7 @@ export function createBroker({
       if (!record || record.kind !== 'invoke') throw err('UnknownActivity', `run '${runId}' is not a replayable invoke`, { retryable: false });
       return dispatchInvoke({
         sourceMpId: record.sourceMpId,
+        restoreReplay: true,
         activity: record.activityName,
         args: record.args,
         idempotencyKey: newIdempotencyKey || record.idempotencyKey,

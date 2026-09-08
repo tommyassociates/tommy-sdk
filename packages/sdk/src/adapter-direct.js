@@ -60,6 +60,8 @@ export function createDirectAdapter({ broker, init, rpcTimeoutMs = DEFAULT_RPC_T
       capabilityToken,
       sourceMpId: init.mpId,
       instanceId: init.instanceId,
+      ...(envelope.activity === 'team.update_member'
+        ? { restoreDeadlineAt: Date.now() + rpcTimeoutMs } : {}),
     };
     const ENTRY_BY_KIND = {
       emit: 'emit',
