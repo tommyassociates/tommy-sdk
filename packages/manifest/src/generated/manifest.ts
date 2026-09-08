@@ -4,21 +4,56 @@
 
 /**
  * Primary content category, from the fixed catalogue. Required Identity field. Drives the intake-form picker (W15), the MCP scaffold_mp param, and a net-new Features/install browse/filter facet (NOTE: this browse facet does not exist in the wireframes yet — the field enables it; today only publisher.type, a trust tier, exists and it is NOT a content category). A single primary category (not categories[]) keeps C1 validation and the picker simple; an optional secondary tags[] is deferred to a later schema minor. 'other' is the safety valve so AI generation never blocks on an unmappable MP. Extensible; new categories add enum values (mirrors the $defs/surface convention).
- * 
+ *
  * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
  * via the `definition` "category".
  */
 export type Category = ("scheduling" | "time_attendance" | "hr_people" | "finance_invoicing" | "compliance" | "care_ndis" | "comms" | "reporting" | "productivity" | "integrations" | "other")
 /**
- * 2.21 (D17) — primitive-level semver, independent of the MP version. Defaults to the MP version at build when absent; the build emits the normalized PrimitiveContract tuple either way.
- * 
+ * 2.22 — a closed L6-comparator predicate over declared sources (used by activity.select 'when', contributions.interactions 'visibleWhen', and — unchanged and unwidened — contributions.settings pages/sections/fields 'visibleWhen' and 'readOnlyWhen'). One level of allOf/anyOf composition.
+ *
  * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
- * via the `definition` "contractVersion".
+ * via the `definition` "predicate".
  */
-export type ContractVersion = string
+export type Predicate = ({
+source: InputMapSource
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+operand?: unknown
+operands?: unknown[]
+} | {
+/**
+ * @minItems 1
+ */
+allOf: [{
+source: InputMapSource
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+operand?: unknown
+operands?: unknown[]
+}, ...({
+source: InputMapSource
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+operand?: unknown
+operands?: unknown[]
+})[]]
+} | {
+/**
+ * @minItems 1
+ */
+anyOf: [{
+source: InputMapSource
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+operand?: unknown
+operands?: unknown[]
+}, ...({
+source: InputMapSource
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+operand?: unknown
+operands?: unknown[]
+})[]]
+})
 /**
  * One source for a single mapped field. The original four shapes (trigger / condition / option / const — actions-runtime.md §9.7) plus the 2.22 additions: serviceRead (E6), item (E5 forEach element), template (E3 — plain-text composition with {{placeholder | pipe}} syntax, tooling-validated), and the manifest-driven-settings addition: setting (S5). Every non-template shape may carry an optional 'default' and an optional closed-operator 'transform' chain (E2, max 8 steps).
- * 
+ *
  * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
  * via the `definition` "inputMapSource".
  */
@@ -73,16 +108,37 @@ default?: unknown
 })
 /**
  * 2.22 E2 — an ordered chain (max 8) of closed-set operators applied to the resolved source value. Operators are IN-BINARY; config supplies operands only (the L6 app-store line). Type-checked against the source/target schemas by the validator.
- * 
+ *
  * @maxItems 8
- * 
+ *
  * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
  * via the `definition` "transformChain".
  */
 export type TransformChain = []|[TransformStep]|[TransformStep, TransformStep]|[TransformStep, TransformStep, TransformStep]|[TransformStep, TransformStep, TransformStep, TransformStep]|[TransformStep, TransformStep, TransformStep, TransformStep, TransformStep]|[TransformStep, TransformStep, TransformStep, TransformStep, TransformStep, TransformStep]|[TransformStep, TransformStep, TransformStep, TransformStep, TransformStep, TransformStep, TransformStep]|[TransformStep, TransformStep, TransformStep, TransformStep, TransformStep, TransformStep, TransformStep, TransformStep]
 /**
+ * Whether an otherwise valid declaration is eligible for agent discovery. Omission is a baseline-only compatibility state; the checker requires context or an explained false value for new/materially changed declarations.
+ *
+ * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
+ * via the `definition` "agentVisibility".
+ */
+export type AgentVisibility = boolean
+/**
+ * Required when agentVisible is false. A supported capability cannot be hidden simply to bypass coverage obligations.
+ *
+ * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
+ * via the `definition` "agentVisibilityReason".
+ */
+export type AgentVisibilityReason = string
+/**
+ * 2.21 (D17) — primitive-level semver, independent of the MP version. Defaults to the MP version at build when absent; the build emits the normalized PrimitiveContract tuple either way.
+ *
+ * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
+ * via the `definition` "contractVersion".
+ */
+export type ContractVersion = string
+/**
  * One branch of activity.select (E4). Either a 'when' branch or the REQUIRED terminal 'else' branch (which may 'skip'). The validator enforces: exactly one else, and it is last.
- * 
+ *
  * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
  * via the `definition` "selectBranch".
  */
@@ -105,57 +161,168 @@ else: true
 skip: true
 })
 /**
- * 2.22 — a closed L6-comparator predicate over declared sources (used by activity.select 'when', contributions.interactions 'visibleWhen', and — unchanged and unwidened — contributions.settings pages/sections/fields 'visibleWhen' and 'readOnlyWhen'). One level of allOf/anyOf composition.
- * 
- * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
- * via the `definition` "predicate".
- */
-export type Predicate = ({
-source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
-operand?: unknown
-operands?: unknown[]
-} | {
-/**
- * @minItems 1
- */
-allOf: [{
-source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
-operand?: unknown
-operands?: unknown[]
-}, ...({
-source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
-operand?: unknown
-operands?: unknown[]
-})[]]
-} | {
-/**
- * @minItems 1
- */
-anyOf: [{
-source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
-operand?: unknown
-operands?: unknown[]
-}, ...({
-source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
-operand?: unknown
-operands?: unknown[]
-})[]]
-})
-/**
  * A host surface a panel/contribution can target. Extensible; new surfaces add enum values. team_member_details and client_details are host surfaces that MPs contribute panel 'tabs' into — Team Members and Clients are NOT Mini Programs. reports_home (scope 02a) is the Reports MP's home page — a subjectless host surface whose stored dashboard tabs mount like the detail surfaces.
- * 
+ *
  * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
  * via the `definition` "surface".
  */
 export type Surface = ("dashboard" | "team_member_details" | "client_details" | "reports_home" | "full_page")
 /**
+ * MANIFEST-DRIVEN SETTINGS §2.2 — one setting. 'type' selects WHICH host control renders it and how the server type-checks the write; it is DATA for the renderer and adds no evaluator capability. Measured against the 53 hand-coded pages, ~92% of existing fields are expressible with this catalogue.
+ *
+ * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
+ * via the `definition` "settingsField".
+ */
+export type SettingsField = {
+/**
+ * The setting key, unique within this MP. Snake_case, matching the persisted key. Addressed by { from: setting, path } predicates and by GET/PUT /api/v1/mp/settings as (tenantId, mpId, key). For 'type: permission' this is the permission NAME (a permission-catalogue row this MP claims).
+ */
+key: string
+/**
+ * The field's declared type. CLOSED SET — a new type is a host binary release (a new renderer + a new server type-check), never config.
+ */
+type: ("boolean" | "integer" | "number" | "string" | "enum" | "text" | "template" | "date" | "time_range" | "duration_minutes" | "money" | "percent" | "permission")
+/**
+ * Field label. A tommy.t locale key (preferred) or a literal fallback string.
+ */
+label?: string
+/**
+ * Help text under the control. A tommy.t locale key (preferred) or a literal fallback string.
+ */
+hint?: string
+/**
+ * Value used when the tenant has never set this key. Must satisfy the field's own type/constraints.
+ */
+default?: {
+[k: string]: unknown
+}
+/**
+ * WHERE the value lives. Absent (or kind 'native') means the native MP-settings store — new settings are born native and NO data migration happens. A non-native kind is the design's legacyBinding: the value stays exactly where it lives today (workforce_profile / team_setting / vendor_account / team_feature), so the existing keys never move and the existing optimistic-serialize-rollback write path keeps working.
+ */
+store?: {
+kind: ("native" | "workforce_profile" | "team_setting" | "vendor_account" | "team_feature")
+/**
+ * The legacy column/JSONB key when it differs from 'key'. Absent means the same name.
+ */
+key?: string
+}
+/**
+ * Only a native setting marked true may have a location-scoped override. The native contract accepts team scope by default; this declaration opts into the explicit location precedence rule.
+ */
+locationOverridable?: boolean
+ai?: AiContext
+agentVisible?: AgentVisibility
+agentVisibilityReason?: AgentVisibilityReason
+visibleWhen?: Predicate
+readOnlyWhen?: Predicate
+/**
+ * integer / number / duration_minutes / money / percent — inclusive lower bound (UI + write validation).
+ */
+min?: number
+/**
+ * integer / number / duration_minutes / money / percent — inclusive upper bound (UI + write validation).
+ */
+max?: number
+/**
+ * integer / number / duration_minutes / money / percent — stepper increment.
+ */
+step?: number
+/**
+ * type: enum — the STATIC option list. Mutually exclusive with optionsFrom.
+ *
+ * @minItems 1
+ */
+enum?: [{
+/**
+ * The persisted value. A scalar (string / number / boolean) — expressed as anyOf rather than a union type[] so the schema stays clean under the validator's Ajv strict mode.
+ */
+value: (string | number | boolean)
+/**
+ * A tommy.t locale key (preferred) or a literal fallback string.
+ */
+label?: string
+}, ...({
+/**
+ * The persisted value. A scalar (string / number / boolean) — expressed as anyOf rather than a union type[] so the schema stays clean under the validator's Ajv strict mode.
+ */
+value: (string | number | boolean)
+/**
+ * A tommy.t locale key (preferred) or a literal fallback string.
+ */
+label?: string
+})[]]
+/**
+ * One source for a single mapped field. The original four shapes (trigger / condition / option / const — actions-runtime.md §9.7) plus the 2.22 additions: serviceRead (E6), item (E5 forEach element), template (E3 — plain-text composition with {{placeholder | pipe}} syntax, tooling-validated), and the manifest-driven-settings addition: setting (S5). Every non-template shape may carry an optional 'default' and an optional closed-operator 'transform' chain (E2, max 8 steps).
+ */
+optionsFrom?: ({
+from: "trigger"
+path: string
+default?: unknown
+transform?: TransformChain
+} | {
+from: "condition"
+ref: string
+path: string
+default?: unknown
+transform?: TransformChain
+} | {
+from: "serviceRead"
+ref: string
+path: string
+default?: unknown
+transform?: TransformChain
+} | {
+from: "option"
+path: string
+default?: unknown
+transform?: TransformChain
+} | {
+from: "item"
+path: string
+default?: unknown
+transform?: TransformChain
+} | {
+from: "setting"
+/**
+ * OPTIONAL cross-MP qualifier: the id of the MP that OWNS the setting. Absent means this MP's own settings namespace. Ownership rule (Mason, 2026-08-10): the MP that would BREAK if the setting vanished owns it — a reader declares the dependency here, so an uninstalled owner makes the reading section 'unavailable' instead of rendering a dead control. A cross-MP read joins the dependency set exactly like a cross-MP trigger/condition source.
+ */
+mp?: string
+/**
+ * The declared setting key (optionally a dotted path INTO a structured setting value), resolved against the owning MP's declared contributions.settings fields. An undeclared key is a validation error, never a silent undefined.
+ */
+path: string
+default?: unknown
+transform?: TransformChain
+} | {
+const: unknown
+default?: unknown
+} | {
+/**
+ * E3 — plain text with {{source.path | operator(args)}} placeholders over this Action's declared sources; rendered as data (textContent downstream, never HTML). Templates used for user-facing copy SHOULD default into optionsSchema so tenants/AI can tune them.
+ */
+template: string
+default?: unknown
+})
+/**
+ * integer / number / duration_minutes — the sentinel control value that PERSISTS AS NULL (off). Reproduces the existing 'stepper reports 0, the setter translates 0 -> null' pattern without any code.
+ */
+nullAt?: number
+/**
+ * Label rendered when the value equals nullAt (e.g. the 'Never' shown at 0). A tommy.t locale key (preferred) or a literal fallback string.
+ */
+nullLabel?: string
+/**
+ * type: template — the default message template shown as the control's placeholder when the tenant has not overridden it. Follows the E3 template rules (plain text only, {{placeholder | pipe}}); rendered as data, never HTML.
+ */
+templateDefault?: string
+/**
+ * string / text / template — maximum length (UI + write validation).
+ */
+maxLength?: number
+}
+/**
  * MANIFEST-DRIVEN SETTINGS §4.3 / S6 — an OWNERSHIP CLAIM over a permission row, so the permissions UI groups rows by their declared owner instead of re-deriving ownership client-side from hard-coded hashes. Either a single permission 'name' or a whole 'resourceType' family.
- * 
+ *
  * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
  * via the `definition` "permissionClaim".
  */
@@ -164,11 +331,17 @@ export type PermissionClaim = ({
  * A single permission name this MP owns.
  */
 name: string
+ai?: AiContext
+agentVisible?: AgentVisibility
+agentVisibilityReason?: AgentVisibilityReason
 } | {
 /**
  * A permission resource type whose whole family this MP owns.
  */
 resourceType: string
+ai?: AiContext
+agentVisible?: AgentVisibility
+agentVisibilityReason?: AgentVisibilityReason
 })
 
 /**
@@ -205,12 +378,14 @@ homepage?: string
 }
 /**
  * BCP-47 locale tags the MP ships translations for. First entry is the fallback.
- * 
+ *
  * @minItems 1
  */
 locales?: [string, ...(string)[]]
 /**
  * IDENTITY ADOPTION (council C3). Legacy addon package keys whose EXISTING install identity this MP adopts — the `addon_installs.package` values (snake_case, e.g. 'time_clock') that must activate this MP with zero tenant action. Read-time mapping ONLY: install rows are never written, migrated, or deleted because of this field. Entries must be globally unique across ALL loaded manifests (injectivity, asserted at load); an entry equal to this MP's own id simply declares that the identically-named legacy addon is this MP's. Absent means the MP has no legacy identity to adopt.
+ *
+ * Items: A legacy addon package key. Underscores allowed here (the MP `id` pattern stays underscore-free) — this field is where legacy keys live. Hyphens are accepted too so an MP may name the identically-titled legacy addon when its own id is hyphenated.
  */
 legacyPackages?: string[]
 /**
@@ -230,6 +405,9 @@ roles?: string[]
  * Network egress allowlist. Enforced by the per-MP CSP connect-src. Default is none.
  */
 network?: {
+/**
+ * Items: Exact host (no scheme, no path). Wildcards not allowed.
+ */
 egress?: string[]
 }
 /**
@@ -237,7 +415,15 @@ egress?: string[]
  */
 triggers?: {
 [k: string]: {
-[k: string]: unknown
+description: string
+payloadSchema: JsonSchema
+emission: ("sync" | "async" | "debounced")
+debounceMs?: number
+ai?: AiContext
+agentVisible?: AgentVisibility
+agentVisibilityReason?: AgentVisibilityReason
+contractVersion?: ContractVersion
+deprecated?: DeprecatedMarker
 }
 }
 /**
@@ -246,14 +432,17 @@ triggers?: {
 conditions?: {
 [k: string]: {
 description: string
-inputSchema: JsonSchema
-returnSchema: JsonSchema
+inputSchema: JsonSchema1
+returnSchema: JsonSchema1
 /**
  * Max evaluation time. Exceeding it is a timeout (see actions-runtime.md).
  */
 latencyBudgetMs: number
 cacheable?: boolean
 cacheTtlMs?: number
+ai?: AiContext
+agentVisible?: AgentVisibility
+agentVisibilityReason?: AgentVisibilityReason
 contractVersion?: ContractVersion
 deprecated?: DeprecatedMarker
 }
@@ -263,7 +452,54 @@ deprecated?: DeprecatedMarker
  */
 activities?: {
 [k: string]: {
-[k: string]: unknown
+description: string
+inputSchema: JsonSchema1
+resultSchema?: JsonSchema1
+/**
+ * Declared effect class. Must match static analysis at review time.
+ */
+sideEffect: ("local_write" | "server_write" | "external_call")
+/**
+ * Activity names in THIS MP whose recorded idempotency results this activity's success makes stale. A `derived_from_input` key is a hash of the args, so it replays forever for identical args — correct while the state it describes still holds, wrong the moment a sibling activity clears that state. `lock_window_for_shift` records `{locked: true}`; `unlock_window_for_shift` genuinely clears the flags under a DIFFERENT activity name, so a re-assign with identical args used to hit the recorded key and return `{locked: true}` with no read and no write — a succeeded run reporting a lock that never happened. Naming the dependency is deliberate rather than deriving it: the broker cannot know which pairs of activities are inverses, and a blanket "any write clears every key" rule would delete the duplicate-suppression that the fan-out depends on. Entries are bare activity names (no `mpId.` prefix) and are invalidated tenant-scoped, on success only. Invalidation clears this DEVICE's in-memory results and stamps its subsequent derived keys with a durable per-device epoch so the server's own ledger also misses; that ledger is keyed by team, so a second device that has not seen the invalidation still presents the unstamped key and can still be replayed.
+ */
+invalidatesIdempotency?: string[]
+/**
+ * How an idempotency key is formed so retries/replays are safe. `correlationKey` keys a FOLLOW-UP FAMILY on the caller's `args.correlationKey` (plus the remaining args, so a re-scheduling to a new time is not swallowed as a replay); it is what the host-owned `tommy.clock.*` scheduled writes declare, and it was expressible nowhere until it was added here — the broker fell through to `none`, which their `offlineReplayable: true` forbids.
+ */
+idempotency: ("client_key" | "correlationKey" | "derived_from_input" | "natural_key" | "none")
+/**
+ * The field of `inputSchema` that IS this activity's natural key — the thing whose identity makes two invocations the same fact. Read by the broker (`idempotencyKeyFor`, actions-runtime) as `n-<value>`; a dotted path is resolved into nested args. ONLY meaningful with `idempotency: natural_key`, and declaring it elsewhere is rejected. If omitted the broker defaults to `args.id`, and where there is no `args.id` it falls back to hashing the WHOLE args — which is `derived_from_input` by another name. That default was unreachable from a manifest until this field existed (the activity object is additionalProperties:false), which is why most of the estate's natural_key activities key on `args.id` whether or not that is their real key. Declare it wherever the key is NOT `id` — e.g. an invitation keyed on its token, a view row keyed on (kind, targetId), a setting keyed on its name.
+ */
+naturalKeyField?: string
+/**
+ * If true, the invocation can be queued offline and replayed on reconnect.
+ */
+offlineReplayable: boolean
+retry?: {
+maxAttempts?: number
+backoff?: ("none" | "linear" | "exponential")
+}
+/**
+ * REQUIRED since 2026-08-19 (operator ruling, backlog D.40 follow-on step 2) — every activity must SAY who may invoke it. This is the first non-additive change to this v1 grammar: a manifest that omits the field no longer validates. It was deferred for exactly that reason, and taken deliberately, because the alternative is that the permissive `first_party` default keeps being carried by an OMISSION on the 119 activities where a forgotten field and a deliberate “any first-party MP may call this” are indistinguishable. The broker still derives an effective policy for a legacy manifest (`authorizeInvoke` normalises rather than deletes), so runtime behaviour for anything already published is unchanged — what changes is that new manifests cannot leave the question to silence. Who may invoke this activity, SAID OUT LOUD. Authoritative over `authorizedCallers` wherever it is present (broker authorizeInvoke). One value per case: `owner_only` -> the owning MP alone, deliberately closed to every other MP; `first_party` -> the owning MP plus ANY registered first-party MP; `listed` -> the owning MP plus exactly the MPs named in `authorizedCallers`, which must then be non-empty. WHY IT EXISTS (ruling, Mason 2026-08-12, backlog D.40): `authorizedCallers` could only say owner-only by being an EMPTY ARRAY and first-party by being ABSENT, so two of its three cases were carried by the shape of an omission rather than by a value — indistinguishable from an author who forgot, and the empty case read two ways depending on the host's `strictEmptyCallers` flag. The estate's 58 owner-only activities were migrated to `callerPolicy: owner_only` in the same change, which is why no manifest declares `authorizedCallers: []` today. PREFER THIS FIELD in new manifests; reach for a bare `authorizedCallers` only alongside `callerPolicy: listed`.
+ */
+callerPolicy: ("owner_only" | "first_party" | "listed")
+/**
+ * MP ids permitted to invoke this activity. PREFER `callerPolicy` — this field alone can only state the `listed` case unambiguously. THREE distinct cases, and they are not interchangeable (broker authorizeInvoke, F1): (1) NON-EMPTY list -> exactly those MPs, plus the owning MP itself; (2) EXPLICIT [] -> the owning MP ONLY, i.e. deliberately closed to every other MP. NO MANIFEST DECLARES THIS ANY MORE — the estate's 58 such activities migrated to `callerPolicy: owner_only` (D.40, 2026-08-13); it stays legal so that nothing which validated before stops validating, but it is the ambiguous spelling and new manifests must not use it; (3) ABSENT -> the permissive first-party default: ANY registered first-party MP may call it. Note (2) and (3) are OPPOSITES, so omitting the field is not equivalent to declaring it empty. The strict reading of (2) is gated on the host's `strictEmptyCallers`, which is ON in tommy-app's mp-loader; with it off, (2) falls through to (3). None of that ambiguity applies when `callerPolicy` is present, which is the point of it.
+ */
+authorizedCallers?: string[]
+/**
+ * Tenant permission name gating the underlying domain write (the existing custom authorize! system, NOT a token scope). REQUIRED by tommy-api's fail-closed floor for any server_write activity backed by a registered server executor: the executor refuses a privileged write whose manifest declares no permission (InvokeExecutor hardening 2026-07-11). ⚠ THE NAME MUST BE A REAL ROW. Permission rows are created per team from api/config/manifests/permissions.yml (system) or by an addon install; HasAuthorization#authorize! SWALLOWS RecordNotFound for unknown names, so a name with no row behind it PASSES SILENTLY and the gate you think you declared does nothing. The v1.1 J1 fixture value 'timesheet_access' was exactly that — a fixture string that never existed as a row, carried into three shipped manifests and gating nothing until it was caught on 2026-08-20.
+ */
+permission?: string
+/**
+ * WHICH CRUD OPERATION the named `permission` is checked for, said out loud. Required whenever `permission` is present. Tommy permission rows carry an `operations` array and Permission#authorized? refuses any operation outside it, so the operation is HALF the authorization decision — and it used to be hard-coded to 'update' in InvokeExecutor. That default silently inverted the check for every create-or-delete-shaped activity: `shift_create_access` declares operations ['create'], so naming it on `create_shift` under the hard-coded 'update' denied EVERY call. Declared here rather than inferred from the activity name, because a name is a guess ('publish_shifts', 'submit_form', 'assign_shift' have no honest prefix) and this programme's rule is that absence and inference must not carry meaning. REQUIREDNESS IS ENFORCED BY RULE M05, NOT BY THIS SCHEMA, and deliberately so: the api validates submissions with the json-schema gem, which predates draft-7 `if`/`then`, so a conditional here would be INERT in the one copy that gates publishing — a rule that looks enforced and is not, which is the exact defect this whole change exists to remove. Shape here, policy in the rules.
+ */
+permissionOperation?: ("create" | "read" | "update" | "delete")
+ai?: AiContext
+agentVisible?: AgentVisibility
+agentVisibilityReason?: AgentVisibilityReason
+contractVersion?: ContractVersion
+deprecated?: DeprecatedMarker
 }
 }
 /**
@@ -331,7 +567,7 @@ inputMap?: {
 } | {
 /**
  * 2.22 E4 — ordered branch list; first matching 'when' wins; the LAST entry MUST be the else branch (validator-enforced). Every branch's target joins the dependency set, authorization, and 2.21 consumer expectations whether or not it fired.
- * 
+ *
  * @minItems 2
  */
 select: [SelectBranch, SelectBranch, ...(SelectBranch)[]]
@@ -372,7 +608,7 @@ confirmLabel?: string
 destructive?: boolean
 }
 }
-optionsSchema?: JsonSchema1
+optionsSchema?: JsonSchema2
 /**
  * Default values for the Action's options.
  */
@@ -391,6 +627,13 @@ required: boolean
  * If true, a tenant admin may edit the Action's options and — when not 'required' — enable/disable it. If false the Action is locked: the MP controls it and the user cannot change it.
  */
 userConfigurable: boolean
+/**
+ * Whether this Action may be installed with an explicit location scope. Actions are team-scoped by default; the platform uses the declared location precedence only when this is true.
+ */
+locationOverridable?: boolean
+ai?: AiContext
+agentVisible?: AgentVisibility
+agentVisibilityReason?: AgentVisibilityReason
 }
 }
 /**
@@ -428,7 +671,7 @@ trigger?: string
 rbac?: {
 roles?: string[]
 }
-configSchema?: JsonSchema2
+configSchema?: JsonSchema3
 /**
  * 01c FR-11 — the panel's DECLARED parameter vocabulary: the inputs a placement may bind, so the host's per-panel settings UI can render them without executing MP code. Distinct from configSchema (free-form per-tenant config): params are the identity inputs a surface or admin supplies (e.g. which client this panel is about). At render time the host resolves each param in FR-12 order — surface context first, then the admin's static value, then the declaration default — and a required param that resolves to nothing renders the panel as needs-configuration, never half-drawn.
  */
@@ -668,9 +911,18 @@ permissions?: PermissionClaim[]
 interactions?: {
 id: string
 kind: ("button" | "menu_item" | "list_row_action" | "fab" | "link")
-surface: {
+surface: ({
 [k: string]: unknown
-}
+} & {
+/**
+ * A contributions.routes path (may carry :params).
+ */
+route?: string
+/**
+ * A panels[].id.
+ */
+panel?: string
+})
 label: {
 /**
  * tommy.t locale key.
@@ -682,9 +934,20 @@ icon?: string
  * Fields the emitted trigger carries, each bound from the declared view context.
  */
 payload: {
-[k: string]: {
+[k: string]: ({
 [k: string]: unknown
-}
+} & {
+from?: ("route" | "context")
+/**
+ * from: route — the route :param name.
+ */
+param?: string
+/**
+ * from: context — a dotted path into the surface's declared data bindings.
+ */
+path?: string
+const?: unknown
+})
 }
 visibleWhen?: Predicate
 hideWhenUnwired?: boolean
@@ -718,7 +981,26 @@ severity?: ("info" | "warning" | "critical")
  */
 localData?: {
 [k: string]: {
-[k: string]: unknown
+keyPath: string
+recordSchema: JsonSchema1
+indexes?: {
+name: string
+keyPath: string
+unique?: boolean
+}[]
+syncStrategy: ("server_authoritative" | "last_write_wins" | "custom")
+/**
+ * Optional resident-row ceiling for this store. Omit to take the DataStore default (50000), which is a RUNAWAY BACKSTOP and not a working-set size. REQUIRED when persist is true: a persisted store on the default keeps every window ever viewed on the user's disk, which is how the legacy vuex plugin reached 50-200MB and why it excluded the windowed collections outright. Derive it as rows-per-window x windows-retained, with headroom. Eviction never touches an unsynced row.
+ */
+maxRows?: number
+/**
+ * Whether this store's rows survive a shell reload. Server-authoritative caches default to FALSE and are opted in per store: persistence is what makes a surface paint instantly on a cold boot, and it is also what puts the rows on disk, so each store accepts the staleness and privacy contract deliberately. Stores holding person-level CONTENT rather than operational records (message bodies, care plans, client PII, form answers, document instances, onboarding details, call history) must stay false. Requires maxRows.
+ */
+persist?: boolean
+/**
+ * Required when syncStrategy is 'custom': the activity that resolves a conflict.
+ */
+customResolverActivity?: string
 }
 }
 /**
@@ -729,8 +1011,8 @@ functions?: {
 entry: string
 runtime: "afr-js@1"
 description: string
-inputSchema?: JsonSchema
-resultSchema: JsonSchema
+inputSchema?: JsonSchema1
+resultSchema: JsonSchema1
 timeoutMs: number
 memoryMb: number
 reads: {
@@ -799,23 +1081,61 @@ maxRetentionDays?: number
 }
 }
 /**
- * An embedded JSON Schema (2020-12 subset). Kept permissive here; the manifest tooling validates it is itself a valid schema.
- * 
- * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
- * via the `definition` "jsonSchema".
+ * JSON Schema for the trigger payload. Validated at emit time.
  */
 export interface JsonSchema {
 [k: string]: unknown
 }
 /**
- * 2.21 §4 (D17) — marks a retained primitive as deprecated (still fully dispatchable; broker stamps touching runs). Removal itself additionally requires the top-level removalPlan.
- * 
+ * Trusted, curated metadata that makes a declaration safe to present to an AI-assisted configuration flow. It describes a declaration; it never grants authority or adds an evaluator, executor, or delivery policy.
+ *
  * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
- * via the `definition` "deprecatedMarker".
+ * via the `definition` "aiContext".
  */
-export interface DeprecatedMarker {
-replacement?: string
-removeAfter?: string
+export interface AiContext {
+purpose: string
+effect: string
+/**
+ * @minItems 1
+ * @maxItems 12
+ */
+affects: [string]|[string, string]|[string, string, string]|[string, string, string, string]|[string, string, string, string, string]|[string, string, string, string, string, string]|[string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string]
+/**
+ * Curated user/admin phrasings. No model or runtime component may infer additional executable intent from nearby text.
+ *
+ * @minItems 1
+ * @maxItems 20
+ */
+intents: [string]|[string, string]|[string, string, string]|[string, string, string, string]|[string, string, string, string, string]|[string, string, string, string, string, string]|[string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]
+changeRisk: ("low" | "medium" | "high")
+/**
+ * Configuration reversal is distinct from effects that have already been delivered to a person or external system.
+ */
+reversible: {
+configuration: boolean
+deliveredEffects: boolean
+}
+/**
+ * @maxItems 12
+ */
+sideEffects: []|[string]|[string, string]|[string, string, string]|[string, string, string, string]|[string, string, string, string, string]|[string, string, string, string, string, string]|[string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string]
+/**
+ * Optional authoritative prerequisites. These reuse the only supported predicate grammar and do not create an expression language.
+ *
+ * @maxItems 12
+ */
+preconditions?: []|[Predicate]|[Predicate, Predicate]|[Predicate, Predicate, Predicate]|[Predicate, Predicate, Predicate, Predicate]|[Predicate, Predicate, Predicate, Predicate, Predicate]|[Predicate, Predicate, Predicate, Predicate, Predicate, Predicate]|[Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate]|[Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate]|[Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate]|[Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate]|[Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate]|[Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate, Predicate]
+/**
+ * Near-neighbour exclusion text that prevents the agent from silently selecting this declaration for a related request.
+ */
+notWhenAsked: string
+/**
+ * Whether this declaration is eligible for a new single-activity AI composition after the server applies its independent platform floors.
+ */
+composable: boolean
+moneyMoving: boolean
+destructive: boolean
+notifies: boolean
 }
 /**
  * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
@@ -831,7 +1151,20 @@ args?: {
 }
 }
 /**
+ * 2.21 §4 (D17) — marks a retained primitive as deprecated (still fully dispatchable; broker stamps touching runs). Removal itself additionally requires the top-level removalPlan.
+ *
+ * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
+ * via the `definition` "deprecatedMarker".
+ */
+export interface DeprecatedMarker {
+replacement?: string
+removeAfter?: string
+}
+/**
  * An embedded JSON Schema (2020-12 subset). Kept permissive here; the manifest tooling validates it is itself a valid schema.
+ *
+ * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
+ * via the `definition` "jsonSchema".
  */
 export interface JsonSchema1 {
 [k: string]: unknown
@@ -840,6 +1173,12 @@ export interface JsonSchema1 {
  * An embedded JSON Schema (2020-12 subset). Kept permissive here; the manifest tooling validates it is itself a valid schema.
  */
 export interface JsonSchema2 {
+[k: string]: unknown
+}
+/**
+ * An embedded JSON Schema (2020-12 subset). Kept permissive here; the manifest tooling validates it is itself a valid schema.
+ */
+export interface JsonSchema3 {
 [k: string]: unknown
 }
 /**
@@ -853,7 +1192,7 @@ description?: string
 }
 /**
  * MANIFEST-DRIVEN SETTINGS §2.2 — one declared settings PAGE contributed by this MP. The host renders it; there is no per-MP hand-coded settings view. A page is pure DECLARATION: it names the sections, the fields, and the predicates that gate them, and nothing else. Rendered under /settings/mp/:mpId/ alongside that MP's Permissions · Actions · Notifications · About.
- * 
+ *
  * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
  * via the `definition` "settingsPage".
  */
@@ -916,7 +1255,7 @@ sections: [SettingsSection, ...(SettingsSection)[]]
 }
 /**
  * MANIFEST-DRIVEN SETTINGS §2.2 — one section (a card) of a settings page. 'kind' selects WHICH host renderer draws the section; it is DATA, not capability.
- * 
+ *
  * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
  * via the `definition` "settingsSection".
  */
@@ -936,150 +1275,4 @@ visibleWhen?: Predicate
  */
 kind: ("fields" | "permissions" | "actions" | "collection" | "form_data" | "link")
 fields?: SettingsField[]
-}
-/**
- * MANIFEST-DRIVEN SETTINGS §2.2 — one setting. 'type' selects WHICH host control renders it and how the server type-checks the write; it is DATA for the renderer and adds no evaluator capability. Measured against the 53 hand-coded pages, ~92% of existing fields are expressible with this catalogue.
- * 
- * This interface was referenced by `TommyMiniProgramManifest`'s JSON-Schema
- * via the `definition` "settingsField".
- */
-export interface SettingsField {
-/**
- * The setting key, unique within this MP. Snake_case, matching the persisted key. Addressed by { from: setting, path } predicates and by GET/PUT /api/v1/mp/settings as (tenantId, mpId, key). For 'type: permission' this is the permission NAME (a permission-catalogue row this MP claims).
- */
-key: string
-/**
- * The field's declared type. CLOSED SET — a new type is a host binary release (a new renderer + a new server type-check), never config.
- */
-type: ("boolean" | "integer" | "number" | "string" | "enum" | "text" | "template" | "date" | "time_range" | "duration_minutes" | "money" | "percent" | "permission")
-/**
- * Field label. A tommy.t locale key (preferred) or a literal fallback string.
- */
-label?: string
-/**
- * Help text under the control. A tommy.t locale key (preferred) or a literal fallback string.
- */
-hint?: string
-/**
- * Value used when the tenant has never set this key. Must satisfy the field's own type/constraints.
- */
-default?: {
-[k: string]: unknown
-}
-/**
- * WHERE the value lives. Absent (or kind 'native') means the native MP-settings store — new settings are born native and NO data migration happens. A non-native kind is the design's legacyBinding: the value stays exactly where it lives today (workforce_profile / team_setting / vendor_account / team_feature), so the existing keys never move and the existing optimistic-serialize-rollback write path keeps working.
- */
-store?: {
-kind: ("native" | "workforce_profile" | "team_setting" | "vendor_account" | "team_feature")
-/**
- * The legacy column/JSONB key when it differs from 'key'. Absent means the same name.
- */
-key?: string
-}
-visibleWhen?: Predicate
-readOnlyWhen?: Predicate
-/**
- * integer / number / duration_minutes / money / percent — inclusive lower bound (UI + write validation).
- */
-min?: number
-/**
- * integer / number / duration_minutes / money / percent — inclusive upper bound (UI + write validation).
- */
-max?: number
-/**
- * integer / number / duration_minutes / money / percent — stepper increment.
- */
-step?: number
-/**
- * type: enum — the STATIC option list. Mutually exclusive with optionsFrom.
- * 
- * @minItems 1
- */
-enum?: [{
-/**
- * The persisted value. A scalar (string / number / boolean) — expressed as anyOf rather than a union type[] so the schema stays clean under the validator's Ajv strict mode.
- */
-value: (string | number | boolean)
-/**
- * A tommy.t locale key (preferred) or a literal fallback string.
- */
-label?: string
-}, ...({
-/**
- * The persisted value. A scalar (string / number / boolean) — expressed as anyOf rather than a union type[] so the schema stays clean under the validator's Ajv strict mode.
- */
-value: (string | number | boolean)
-/**
- * A tommy.t locale key (preferred) or a literal fallback string.
- */
-label?: string
-})[]]
-/**
- * One source for a single mapped field. The original four shapes (trigger / condition / option / const — actions-runtime.md §9.7) plus the 2.22 additions: serviceRead (E6), item (E5 forEach element), template (E3 — plain-text composition with {{placeholder | pipe}} syntax, tooling-validated), and the manifest-driven-settings addition: setting (S5). Every non-template shape may carry an optional 'default' and an optional closed-operator 'transform' chain (E2, max 8 steps).
- */
-optionsFrom?: ({
-from: "trigger"
-path: string
-default?: unknown
-transform?: TransformChain
-} | {
-from: "condition"
-ref: string
-path: string
-default?: unknown
-transform?: TransformChain
-} | {
-from: "serviceRead"
-ref: string
-path: string
-default?: unknown
-transform?: TransformChain
-} | {
-from: "option"
-path: string
-default?: unknown
-transform?: TransformChain
-} | {
-from: "item"
-path: string
-default?: unknown
-transform?: TransformChain
-} | {
-from: "setting"
-/**
- * OPTIONAL cross-MP qualifier: the id of the MP that OWNS the setting. Absent means this MP's own settings namespace. Ownership rule (Mason, 2026-08-10): the MP that would BREAK if the setting vanished owns it — a reader declares the dependency here, so an uninstalled owner makes the reading section 'unavailable' instead of rendering a dead control. A cross-MP read joins the dependency set exactly like a cross-MP trigger/condition source.
- */
-mp?: string
-/**
- * The declared setting key (optionally a dotted path INTO a structured setting value), resolved against the owning MP's declared contributions.settings fields. An undeclared key is a validation error, never a silent undefined.
- */
-path: string
-default?: unknown
-transform?: TransformChain
-} | {
-const: unknown
-default?: unknown
-} | {
-/**
- * E3 — plain text with {{source.path | operator(args)}} placeholders over this Action's declared sources; rendered as data (textContent downstream, never HTML). Templates used for user-facing copy SHOULD default into optionsSchema so tenants/AI can tune them.
- */
-template: string
-default?: unknown
-})
-/**
- * integer / number / duration_minutes — the sentinel control value that PERSISTS AS NULL (off). Reproduces the existing 'stepper reports 0, the setter translates 0 -> null' pattern without any code.
- */
-nullAt?: number
-/**
- * Label rendered when the value equals nullAt (e.g. the 'Never' shown at 0). A tommy.t locale key (preferred) or a literal fallback string.
- */
-nullLabel?: string
-/**
- * type: template — the default message template shown as the control's placeholder when the tenant has not overridden it. Follows the E3 template rules (plain text only, {{placeholder | pipe}}); rendered as data, never HTML.
- */
-templateDefault?: string
-/**
- * string / text / template — maximum length (UI + write validation).
- */
-maxLength?: number
 }

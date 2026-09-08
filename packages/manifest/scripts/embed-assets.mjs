@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Regenerates the embedded JS twins of the vendored JSON assets (schema +
-// catalogue). JSON stays the source of truth (drift-checked against plans);
+// catalogue). JSON stays the source of truth (current runtime copies are drift-checked);
 // the .embedded.js modules make the package loadable in the browser/vite
 // pipeline AND plain node without fs reads or JSON import attributes.
 import { readFileSync, writeFileSync } from 'node:fs';

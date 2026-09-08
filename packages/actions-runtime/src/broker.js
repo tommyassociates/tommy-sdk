@@ -107,6 +107,9 @@ export function createBroker({
   now = () => Date.now(),
   online = true,
   throttleOverrides = {},
+  // Trusted host aliases for in-memory configuration only; wire and durable
+  // identities retain the tenant identifier supplied by the authenticated call.
+  tenantStateKey = (tenantId) => tenantId,
   // --- enforcement flags (Class F). Default OFF: turning one ON requires the
   // matching manifest declarations to exist first (grants / read: scopes), so
   // each flips in its own wave once the estate declares them. ---
@@ -194,7 +197,7 @@ export function createBroker({
   const expectedMps = new Set();      // announced by the host, not yet registered
   const registrationWaiters = new Map(); // mpId -> Set<resolve>
   const subscribers = new Map();      // trigger -> Set<{mpId, handler}>
-  const actionState = new Map();      // `${tenantId}:${mpId}:${actionId}` -> {enabled, options}
+  const actionState = new Map();      // tenant / MP / Action / optional location -> {enabled, options}
   const settingState = new Map();     // `${tenantId}:${mpId}` -> { key: value } (manifest-driven settings projection)
   const processedKeys = new Map();    // `${tenantId}:${activity}:${idempotencyKey}` -> stored result (FIFO cap PROCESSED_KEYS_MAX)
 
@@ -439,11 +442,24 @@ export function createBroker({
 
   // --- Active Trigger Index (D21) -------------------------------------------
 
-  function actionKey(tenantId, mpId, actionId) { return `${tenantId}:${mpId}:${actionId}`; }
+  function actionKey(tenantId, mpId, actionId, locationId = null) {
+    return `${tenantStateKey(tenantId)}:${mpId}:${actionId}${locationId == null ? '' : `:location:${locationId}`}`;
+  }
+
+  function eventLocation(payload = {}) {
+    if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    const camel = payload.locationId;
+    const snake = payload.location_id;
+    if (camel != null && snake != null && String(camel) !== String(snake)) {
+      throw err('InvalidPayload', 'Conflicting event location identifiers', { retryable: false });
+    }
+    const value = camel ?? snake;
+    return value == null || value === '' ? null : String(value);
+  }
 
   /** Drop this tenant's memoised condition results (a settings write may change them). */
   function invalidateConditionCache(tenantId) {
-    const prefix = `${tenantId}:`;
+    const prefix = `${tenantStateKey(tenantId)}:`;
     conditionCacheEpoch += 1;
     for (const key of [...conditionCache.keys()]) {
       if (key.startsWith(prefix)) conditionCache.delete(key);
@@ -472,15 +488,19 @@ export function createBroker({
     return holdsReadGrant(declared, readGrant(ownerMpId, triggerName));
   }
 
-  function actionsForTrigger(tenantId, triggerQualified) {
+  function actionsForTrigger(tenantId, triggerQualified, payload) {
     const wired = [];
+    const locationId = eventLocation(payload);
     for (const [mpId, entry] of mps) {
       const actions = entry.manifest.actions || {};
       for (const [actionId, action] of Object.entries(actions)) {
         const srcMp = action.trigger.mp || mpId;
         if (qualify(srcMp, action.trigger.name) !== triggerQualified) continue;
         if (!actionBindingAuthorized(mpId, triggerQualified)) continue;
-        const state = actionState.get(actionKey(tenantId, mpId, actionId))
+        const scopedState = locationId == null ? null : actionState.get(actionKey(tenantId, mpId, actionId, locationId));
+        const local = scopedState?.inherited === true ? null : scopedState;
+        if (local && action.locationOverridable !== true) continue;
+        const state = local || actionState.get(actionKey(tenantId, mpId, actionId))
           || { enabled: action.required ? true : action.enabledByDefault, options: action.optionsDefault || {} };
         if (action.required || state.enabled) wired.push({ mpId, actionId, action, options: state.options });
       }
@@ -488,9 +508,9 @@ export function createBroker({
     return wired;
   }
 
-  function triggerIsActive(tenantId, triggerQualified) {
+  function triggerIsActive(tenantId, triggerQualified, payload) {
     return (subscribers.get(triggerQualified)?.size || 0) > 0
-      || actionsForTrigger(tenantId, triggerQualified).length > 0;
+      || actionsForTrigger(tenantId, triggerQualified, payload).length > 0;
   }
 
   // --- dispatch internals ----------------------------------------------------
@@ -639,7 +659,7 @@ export function createBroker({
       deliveries.push(delivery);
     }
 
-    for (const wired of actionsForTrigger(tenantId, triggerQualified)) {
+    for (const wired of actionsForTrigger(tenantId, triggerQualified, payload)) {
       deliveries.push(
         runAction(tenantId, payload, wired, chain, identity)
           .catch(async (cause) => {
@@ -704,7 +724,7 @@ export function createBroker({
     validateAgainst(triggerDef.payloadSchema, envelope.payload, 'InvalidPayload', `trigger '${triggerQualified}' payload`);
 
     // D21 emit-side short-circuit: no enabled consumer -> suppress (tally only).
-    if (!triggerIsActive(tenantId, triggerQualified)) {
+    if (!triggerIsActive(tenantId, triggerQualified, envelope.payload)) {
       const key = `${tenantId}:${triggerQualified}:${dayKey(now())}`;
       suppressionTally.set(key, (suppressionTally.get(key) || 0) + 1);
       return { emitId: `suppressed-${key}`, deliveredTo: 0, queuedFor: 0, suppressed: true };
@@ -852,7 +872,7 @@ export function createBroker({
     authorizeQuery(envelope.sourceMpId, ownerMpId, conditionName, identity.scopes);
     validateAgainst(conditionDef.inputSchema, envelope.args, 'InvalidPayload', `condition '${envelope.condition}' args`);
 
-    const cacheKey = `${tenantId}:${envelope.condition}:${JSON.stringify(envelope.args)}`;
+    const cacheKey = `${tenantStateKey(tenantId)}:${envelope.condition}:${JSON.stringify(envelope.args)}`;
     if (conditionDef.cacheable) {
       const hit = conditionCache.get(cacheKey);
       if (hit && hit.expiresAt > now()) return hit.value;
@@ -1281,7 +1301,7 @@ export function createBroker({
         if (activityDef.sideEffect === 'server_write') {
           conditionCacheEpoch += 1;
           for (const key of conditionCache.keys()) {
-            if (key.startsWith(`${tenantId}:${ownerMpId}.`)) conditionCache.delete(key);
+            if (key.startsWith(`${tenantStateKey(tenantId)}:${ownerMpId}.`)) conditionCache.delete(key);
           }
         }
         return final;
@@ -1416,15 +1436,33 @@ export function createBroker({
     unregisterMp(mpId) { mps.delete(mpId); },
 
     /** Per-tenant Action state (server is system of record; this is the device projection). */
-    setActionState(tenantId, mpId, actionId, { enabled, options }) {
+    setActionState(tenantId, mpId, actionId, { enabled, options, scopeLocationId, inherited = false, revision }) {
       const entry = mps.get(mpId);
       const action = entry?.manifest.actions?.[actionId];
+      const scoped = scopeLocationId !== undefined && scopeLocationId !== null;
+      if (scoped && (!/^[1-9][0-9]*$/.test(String(scopeLocationId)) || (typeof scopeLocationId === 'number' && !Number.isSafeInteger(scopeLocationId)))) {
+        throw err('InvalidPayload', 'Action scope requires a positive location identifier', { retryable: false });
+      }
+      if (scoped && action && action.locationOverridable !== true) {
+        throw err('PermissionDenied', `action '${actionId}' does not declare location overrides`, { rule: 'actions.locationOverridable', retryable: false });
+      }
+      const key = actionKey(tenantId, mpId, actionId, scoped ? String(scopeLocationId) : null);
+      const prev = actionState.get(key) || {};
+      if (revision !== undefined && (!Number.isSafeInteger(revision) || revision < 0)) {
+        throw err('InvalidPayload', 'Action revision must be a nonnegative integer', { retryable: false });
+      }
+      if (revision !== undefined && prev.revision !== undefined && revision < prev.revision) return;
+      if (scoped && inherited === true) {
+        // Keep the revision tombstone: an older concurrent list response must
+        // not resurrect the override after a reset has committed.
+        actionState.set(key, { inherited: true, revision });
+        return;
+      }
       if (action?.required && enabled === false) {
         throw err('PermissionDenied', `action '${actionId}' is required and cannot be disabled`, { rule: 'actions.required', retryable: false });
       }
-      const key = actionKey(tenantId, mpId, actionId);
-      const prev = actionState.get(key) || {};
-      actionState.set(key, { enabled: enabled !== undefined ? enabled : prev.enabled, options: options !== undefined ? options : prev.options });
+      actionState.set(key, { enabled: enabled !== undefined ? enabled : prev.enabled,
+        options: options !== undefined ? options : prev.options, revision, inherited: false });
     },
 
     // --- manifest-driven settings (P1 engine) --------------------------------
@@ -1434,7 +1472,7 @@ export function createBroker({
     // renderer, `tommy.settings.get()` and `{ from: setting }` predicates all
     // share, so a write is live everywhere without a reload.
     setSettingState(tenantId, mpId, values = {}) {
-      const key = `${tenantId}:${mpId}`;
+      const key = `${tenantStateKey(tenantId)}:${mpId}`;
       settingState.set(key, { ...(settingState.get(key) || {}), ...values });
       // A condition may read a setting, so a settings write invalidates this
       // tenant's memoised condition results — otherwise a cacheable condition
@@ -1450,7 +1488,7 @@ export function createBroker({
      * it did not declare.
      */
     settingsFor(tenantId, mpId) {
-      return { ...(settingState.get(`${tenantId}:${mpId}`) || {}) };
+      return { ...(settingState.get(`${tenantStateKey(tenantId)}:${mpId}`) || {}) };
     },
 
     /**
