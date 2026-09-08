@@ -447,6 +447,7 @@ export function createBroker({
   }
 
   function eventLocation(payload = {}) {
+    if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) return null;
     const camel = payload.locationId;
     const snake = payload.location_id;
     if (camel != null && snake != null && String(camel) !== String(snake)) {

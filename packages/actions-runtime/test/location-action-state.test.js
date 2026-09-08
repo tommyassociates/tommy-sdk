@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 
-async function world() {
+async function world(payloadSchema = { type: 'object' }) {
   const issuer = createFakeIssuer();
   const broker = createBroker({ capabilityService: issuer, idempotencyLedger: null });
   const calls = [];
   broker.registerMp({
     id: 'notices', version: '1.0.0', publisher: { type: 'first_party' }, conditions: {},
-    triggers: { assigned: { emission: 'sync', payloadSchema: { type: 'object' } } },
+    triggers: { assigned: { emission: 'sync', payloadSchema } },
     activities: { notify: { inputSchema: { type: 'object' }, resultSchema: { type: 'object' },
       sideEffect: 'local_write', idempotency: 'derived_from_input', retry: { maxAttempts: 1 } } },
     actions: { notice: { trigger: { name: 'assigned' }, activity: { name: 'notify', inputMap: {
@@ -17,14 +17,35 @@ async function world() {
   const tokens = {};
   for (const tenant of ['team-1', 'team-2']) tokens[tenant] = await issuer.issue('notices', '1.0.0', tenant, [], tenant);
   let id = 0;
-  const emit = (payload = {}, tenant = 'team-1') => broker.emit({
+  const emitRaw = (payload, tenant = 'team-1') => broker.emit({
     sourceMpId: 'notices', instanceId: tenant, capabilityToken: tokens[tenant],
-    trigger: 'notices.assigned', payload: { id: ++id, ...payload },
+    trigger: 'notices.assigned', payload,
   });
-  return { broker, calls, emit };
+  const emit = (payload = {}, tenant = 'team-1') => emitRaw({ id: ++id, ...payload }, tenant);
+  return { broker, calls, emit, emitRaw };
 }
 
 describe('location-owned Action state', () => {
+  it.each([null, undefined, 7, 'text', false, []])('treats accepted non-object payload %j as unscoped without rewriting it', async (payload) => {
+    const w = await world({});
+    w.broker.setActionState('team-1', 'notices', 'notice', { enabled: true, options: { message: 'global' } });
+    w.broker.setActionState('team-1', 'notices', 'notice', { scopeLocationId: 8, enabled: false });
+    await w.emitRaw(payload);
+    expect(w.calls.map((row) => row.message)).toEqual(['global']);
+    const [record] = await w.broker.records.query({ kind: 'emit' });
+    expect(record.args).toEqual(payload);
+
+    w.broker.setActionState('team-1', 'notices', 'notice', { enabled: false });
+    expect(await w.emitRaw(payload)).toMatchObject({ suppressed: true });
+    expect(w.calls).toHaveLength(1);
+  });
+
+  it('still rejects null when the declared payload schema requires an object', async () => {
+    const w = await world();
+    await expect(w.emitRaw(null)).rejects.toMatchObject({ code: 'InvalidPayload' });
+    expect(w.calls).toHaveLength(0);
+  });
+
   it('uses one local option set and leaves other locations/global events unchanged', async () => {
     const w = await world();
     w.broker.setActionState('team-1', 'notices', 'notice', { enabled: true, options: { message: 'global' } });
