@@ -172,6 +172,15 @@ export default {
             "minimum": 0,
             "maximum": 60000
           },
+          "ai": {
+            "$ref": "#/$defs/aiContext"
+          },
+          "agentVisible": {
+            "$ref": "#/$defs/agentVisibility"
+          },
+          "agentVisibilityReason": {
+            "$ref": "#/$defs/agentVisibilityReason"
+          },
           "contractVersion": {
             "$ref": "#/$defs/contractVersion"
           },
@@ -232,6 +241,15 @@ export default {
           "cacheTtlMs": {
             "type": "integer",
             "minimum": 0
+          },
+          "ai": {
+            "$ref": "#/$defs/aiContext"
+          },
+          "agentVisible": {
+            "$ref": "#/$defs/agentVisibility"
+          },
+          "agentVisibilityReason": {
+            "$ref": "#/$defs/agentVisibilityReason"
           },
           "contractVersion": {
             "$ref": "#/$defs/contractVersion"
@@ -346,6 +364,15 @@ export default {
               "update",
               "delete"
             ]
+          },
+          "ai": {
+            "$ref": "#/$defs/aiContext"
+          },
+          "agentVisible": {
+            "$ref": "#/$defs/agentVisibility"
+          },
+          "agentVisibilityReason": {
+            "$ref": "#/$defs/agentVisibilityReason"
           },
           "contractVersion": {
             "$ref": "#/$defs/contractVersion"
@@ -671,6 +698,20 @@ export default {
           "userConfigurable": {
             "description": "If true, a tenant admin may edit the Action's options and \u2014 when not 'required' \u2014 enable/disable it. If false the Action is locked: the MP controls it and the user cannot change it.",
             "type": "boolean"
+          },
+          "locationOverridable": {
+            "description": "Whether this Action may be installed with an explicit location scope. Actions are team-scoped by default; the platform uses the declared location precedence only when this is true.",
+            "type": "boolean",
+            "default": false
+          },
+          "ai": {
+            "$ref": "#/$defs/aiContext"
+          },
+          "agentVisible": {
+            "$ref": "#/$defs/agentVisibility"
+          },
+          "agentVisibilityReason": {
+            "$ref": "#/$defs/agentVisibilityReason"
           }
         }
       }
@@ -2247,6 +2288,20 @@ export default {
             }
           }
         },
+        "locationOverridable": {
+          "description": "Only a native setting marked true may have a location-scoped override. The native contract accepts team scope by default; this declaration opts into the explicit location precedence rule.",
+          "type": "boolean",
+          "default": false
+        },
+        "ai": {
+          "$ref": "#/$defs/aiContext"
+        },
+        "agentVisible": {
+          "$ref": "#/$defs/agentVisibility"
+        },
+        "agentVisibilityReason": {
+          "$ref": "#/$defs/agentVisibilityReason"
+        },
         "visibleWhen": {
           "$ref": "#/$defs/predicate"
         },
@@ -2319,7 +2374,34 @@ export default {
           "type": "integer",
           "minimum": 1
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "locationOverridable"
+            ],
+            "properties": {
+              "locationOverridable": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "store": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "native"
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "Location ownership is a new native-cell capability. A legacy binding keeps its established ownership semantics and cannot acquire a location override by declaration."
+        }
+      ]
     },
     "permissionClaim": {
       "description": "MANIFEST-DRIVEN SETTINGS \u00a74.3 / S6 \u2014 an OWNERSHIP CLAIM over a permission row, so the permissions UI groups rows by their declared owner instead of re-deriving ownership client-side from hard-coded hashes. Either a single permission 'name' or a whole 'resourceType' family.",
@@ -2336,6 +2418,15 @@ export default {
               "description": "A single permission name this MP owns.",
               "type": "string",
               "minLength": 1
+            },
+            "ai": {
+              "$ref": "#/$defs/aiContext"
+            },
+            "agentVisible": {
+              "$ref": "#/$defs/agentVisibility"
+            },
+            "agentVisibilityReason": {
+              "$ref": "#/$defs/agentVisibilityReason"
             }
           }
         },
@@ -2350,10 +2441,144 @@ export default {
               "description": "A permission resource type whose whole family this MP owns.",
               "type": "string",
               "minLength": 1
+            },
+            "ai": {
+              "$ref": "#/$defs/aiContext"
+            },
+            "agentVisible": {
+              "$ref": "#/$defs/agentVisibility"
+            },
+            "agentVisibilityReason": {
+              "$ref": "#/$defs/agentVisibilityReason"
             }
           }
         }
       ]
+    },
+    "aiContext": {
+      "description": "Trusted, curated metadata that makes a declaration safe to present to an AI-assisted configuration flow. It describes a declaration; it never grants authority or adds an evaluator, executor, or delivery policy.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "purpose",
+        "effect",
+        "affects",
+        "intents",
+        "changeRisk",
+        "reversible",
+        "sideEffects",
+        "notWhenAsked",
+        "composable",
+        "moneyMoving",
+        "destructive",
+        "notifies"
+      ],
+      "properties": {
+        "purpose": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "effect": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "affects": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "intents": {
+          "description": "Curated user/admin phrasings. No model or runtime component may infer additional executable intent from nearby text.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        },
+        "changeRisk": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "reversible": {
+          "description": "Configuration reversal is distinct from effects that have already been delivered to a person or external system.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "configuration",
+            "deliveredEffects"
+          ],
+          "properties": {
+            "configuration": {
+              "type": "boolean"
+            },
+            "deliveredEffects": {
+              "type": "boolean"
+            }
+          }
+        },
+        "sideEffects": {
+          "type": "array",
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        },
+        "preconditions": {
+          "description": "Optional authoritative prerequisites. These reuse the only supported predicate grammar and do not create an expression language.",
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "$ref": "#/$defs/predicate"
+          }
+        },
+        "notWhenAsked": {
+          "description": "Near-neighbour exclusion text that prevents the agent from silently selecting this declaration for a related request.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "composable": {
+          "description": "Whether this declaration is eligible for a new single-activity AI composition after the server applies its independent platform floors.",
+          "type": "boolean"
+        },
+        "moneyMoving": {
+          "type": "boolean"
+        },
+        "destructive": {
+          "type": "boolean"
+        },
+        "notifies": {
+          "type": "boolean"
+        }
+      }
+    },
+    "agentVisibility": {
+      "description": "Whether an otherwise valid declaration is eligible for agent discovery. Omission is a baseline-only compatibility state; the checker requires context or an explained false value for new/materially changed declarations.",
+      "type": "boolean"
+    },
+    "agentVisibilityReason": {
+      "description": "Required when agentVisible is false. A supported capability cannot be hidden simply to bypass coverage obligations.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
     },
     "contractVersion": {
       "description": "2.21 (D17) \u2014 primitive-level semver, independent of the MP version. Defaults to the MP version at build when absent; the build emits the normalized PrimitiveContract tuple either way.",
