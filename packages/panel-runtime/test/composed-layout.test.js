@@ -171,6 +171,48 @@ describe('mountSurface composed mode (opts.layout)', () => {
     expect(tiles.every((t) => t.className.includes('mp-panel-tile--ready'))).toBe(true);
   });
 
+  // pack:'flow' — the main dashboard's mode. Stored geometry decides ORDER
+  // (reading order: y then x); the grid decides placement, so a composition
+  // whose widths do not divide 12 never leaves a hole or strands a tile at the
+  // right edge of an otherwise empty row (owner-reported 2026-09-14).
+  it("pack:'flow' orders tiles by y then x and spans without a start line", async () => {
+    const api = host.panelsApiFor('time-clock', panelsByMp['time-clock']);
+    api.register(healthyDef('whos-clocked-in'));
+    api.register(healthyDef('my-week'));
+    const layout = resolveComposedLayout([
+      place('time-clock', 'my-week', { x: 4, y: 3, w: 6, h: 3 }),
+      place('time-clock', 'whos-clocked-in', { x: 0, y: 0, w: 4, h: 3 }),
+    ], 'dashboard', { panelsByMp, viewer: { roles: ['Team Admin'] } });
+
+    host.mountSurface(el, { surface: 'dashboard', layout, pack: 'flow' });
+    await flush();
+
+    const tiles = [...el.querySelectorAll('.mp-panel-tile')];
+    // Array order was my-week first; reading order puts the y0 tile first.
+    expect(tiles.map((t) => t.dataset.panelId)).toEqual(['whos-clocked-in', 'my-week']);
+    expect(tiles[0].style.gridColumn).toBe('span 4');
+    expect(tiles[1].style.gridColumn).toBe('span 6');
+    // No row pinning: the grid flows them, so nothing reproduces the gap the
+    // stored x/y describe.
+    expect(tiles[0].style.gridRow).toBe('');
+    expect(tiles[1].style.gridRow).toBe('');
+  });
+
+  it("without pack:'flow' the stored start lines are still honoured", async () => {
+    const api = host.panelsApiFor('time-clock', panelsByMp['time-clock']);
+    api.register(healthyDef('my-week'));
+    const layout = resolveComposedLayout([
+      place('time-clock', 'my-week', { x: 4, y: 3, w: 6, h: 3 }),
+    ], 'dashboard', { panelsByMp, viewer: { roles: ['Team Admin'] } });
+
+    host.mountSurface(el, { surface: 'dashboard', layout });
+    await flush();
+
+    const tile = el.querySelector('.mp-panel-tile');
+    expect(tile.style.gridColumn).toBe('5 / span 6');
+    expect(tile.style.gridRow).toBe('4 / span 3');
+  });
+
   it('renders unavailable tiles (decl:null AND registered-nowhere) outside PanelTile — no load, no skeleton', async () => {
     const api = host.panelsApiFor('time-clock', panelsByMp['time-clock']);
     const registered = healthyDef('my-week');

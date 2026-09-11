@@ -139,8 +139,29 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
      * re-sorts. Absent `layout`, declaration mode below runs exactly as
      * before — that dormancy is load-bearing (every pre-01c surface mounts
      * through it).
+     *
+     * `pack: 'flow'` (owner-reported 2026-09-14) changes only HOW the composed
+     * cells are placed in CSS: tiles keep their stored ORDER (sorted by y then
+     * x, the reading order the composition was flow-placed in) but are handed
+     * to the grid with `grid-column: span w` and no explicit start line, so the
+     * browser auto-flows them left-to-right with no holes.
+     *
+     * Why it exists: explicit `x`/`y` start lines reproduce every gap the
+     * stored geometry contains. On a 12-column grid a mixed-width composition
+     * ALWAYS contains gaps — a w6 tile after two w4s does not fit in the
+     * remaining 4 columns, so it starts a new row and leaves a 4-column hole —
+     * and per-tile vertical compaction can then lift a row's left-hand
+     * neighbours away, leaving a tile stranded at the right edge of an
+     * otherwise empty row. Both were reported on the main dashboard.
+     *
+     * NOT the default, and never for a surface whose tiles are placed by hand:
+     * `tommy.host.mountDashboardTab` drag & drop SWAPS x/y between two tiles
+     * without touching array order, so ignoring x/y there would make dragging
+     * do nothing. The main dashboard reorders the ARRAY instead (its draggable
+     * list, re-flowed by the serializer on save), which is exactly what this
+     * mode honours.
      */
-    mountSurface(el, { surface, viewerRoles = [], ctxFor, mpId, panelId, layout, onDispose, onPanelElement }) {
+    mountSurface(el, { surface, viewerRoles = [], ctxFor, mpId, panelId, layout, pack = null, onDispose, onPanelElement }) {
       // Idempotent per element: re-mounting into the same element replaces its
       // app (never touches another element hosting the same surface name).
       this.unmountSurface(el);
@@ -150,8 +171,21 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
         // registration (MP failed to boot) still OWNS its cell: it becomes an
         // "unavailable" tile, never a PanelTile — no load attempt, no
         // retry/circuit-breaker state for code that isn't there.
-        tiles = layout
-          .filter((entry) => entry && entry.instance)
+        const entries = layout.filter((entry) => entry && entry.instance);
+        // Flow mode reads the stored geometry as an ORDER, not as coordinates:
+        // the tiles are sorted into reading order here and placed by the grid
+        // below. Stable — equal cells keep their array order.
+        if (pack === 'flow') {
+          entries
+            .map((entry, index) => ({ entry, index }))
+            .sort((a, b) => (
+              ((a.entry.cell?.y ?? 0) - (b.entry.cell?.y ?? 0))
+              || ((a.entry.cell?.x ?? 0) - (b.entry.cell?.x ?? 0))
+              || (a.index - b.index)
+            ))
+            .forEach(({ entry }, position) => { entries[position] = entry; });
+        }
+        tiles = entries
           .map((entry) => {
             const defs = registrations.get(entry.instance.mpId);
             const def = (entry.decl && defs && defs.get(entry.instance.panelId)) || null;
@@ -175,9 +209,12 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
             // lines, because `span` alone would let the grid autoplace and
             // lose the composed x/y. Declaration mode has no cell — no style.
             const cell = entry && entry.cell;
-            const style = cell
-              ? { gridColumn: `${cell.x + 1} / span ${cell.w}`, gridRow: `${cell.y + 1} / span ${cell.h}` }
-              : undefined;
+            let style;
+            if (cell) {
+              style = pack === 'flow'
+                ? { gridColumn: `span ${cell.w}` }
+                : { gridColumn: `${cell.x + 1} / span ${cell.w}`, gridRow: `${cell.y + 1} / span ${cell.h}` };
+            }
             if (entry && !def) {
               return h('div', {
                 key: entry.instance.id,
