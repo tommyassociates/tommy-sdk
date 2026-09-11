@@ -125,6 +125,8 @@ export function createBroker({
   capabilityService,
   recordBackend,
   serverInvoke,
+  // Host-only outcome observation; the broker remains the sole replay owner.
+  onOfflineOutcome,
   now = () => Date.now(),
   online = true,
   throttleOverrides = {},
@@ -1420,6 +1422,11 @@ export function createBroker({
           .then((result) => ({ ok: true, result }))
           .catch((error) => ({ ok: false, error }));
         results.push(outcome);
+        if (typeof onOfflineOutcome === 'function') {
+          try {
+            Promise.resolve(onOfflineOutcome(envelope, outcome)).catch(() => {});
+          } catch (_) { /* An observer cannot interrupt FIFO replay. */ }
+        }
       }
     }
     return results;

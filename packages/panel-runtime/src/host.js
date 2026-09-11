@@ -161,7 +161,7 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
      * list, re-flowed by the serializer on save), which is exactly what this
      * mode honours.
      */
-    mountSurface(el, { surface, viewerRoles = [], ctxFor, mpId, panelId, layout, pack = null }) {
+    mountSurface(el, { surface, viewerRoles = [], ctxFor, mpId, panelId, layout, pack = null, onDispose, onPanelElement }) {
       // Idempotent per element: re-mounting into the same element replaces its
       // app (never touches another element hosting the same surface name).
       this.unmountSurface(el);
@@ -225,6 +225,7 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
               });
             }
             return h(PanelTile, {
+              ref: (instance) => onPanelElement?.(mpId, def, entry, instance?.$el || null),
               // Composed keys are the INSTANCE uuid — the same panel may be
               // placed twice on one tab.
               key: entry ? entry.instance.id : `${mpId}:${def.id}`,
@@ -251,8 +252,11 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
       if (installComponentRuntime) {
         try { installComponentRuntime(app); } catch (e) { if (onEvent) onEvent({ type: 'surface-runtime-install-failed', surface, message: String(e && e.message), at: Date.now() }); }
       }
-      app.mount(el);
-      mounted.set(el, { app, el, surface });
+      try { app.mount(el); } catch (error) {
+        try { onDispose?.(); } finally { app.unmount(); }
+        throw error;
+      }
+      mounted.set(el, { app, el, surface, onDispose });
       return { panelCount: tiles.length };
     },
 
@@ -275,6 +279,7 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
     unmountSurface(el) {
       const entry = mounted.get(el);
       if (entry) {
+        try { entry.onDispose?.(); } catch (_) { /* host cleanup isolation */ }
         entry.app.unmount();
         mounted.delete(el);
       }

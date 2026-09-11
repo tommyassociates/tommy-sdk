@@ -71,6 +71,19 @@ describe('panel host', () => {
     expect(healthy.className).toContain('mp-panel-tile--ready');
   });
 
+  it('disposes host leases before child unmount and only once per surface', async () => {
+    const order = [];
+    const api = host.panelsApiFor('time-clock', manifestPanels);
+    const def = healthyDef('my-week');
+    def.unmount = () => order.push('child');
+    api.register(def);
+    host.mountSurface(el, { surface: 'dashboard', onDispose: () => order.push('host') });
+    await flush();
+    host.unmountSurface(el);
+    host.unmountSurface(el);
+    expect(order).toEqual(['host', 'child']);
+  });
+
   it('Retry re-runs load; 3 consecutive failures escalate to "Reload add-on"', async () => {
     const api = host.panelsApiFor('time-clock', manifestPanels);
     const def = throwingDef('my-week');

@@ -13,6 +13,7 @@
  * them from M1's fabric work onward).
  */
 import { databaseName } from './names.js';
+import { assertCompleteSet, StorageReadError } from './transactional-store.js';
 
 // ⚠ THE MANAGER NO LONGER KEEPS ITS OWN COPY OF THE PAINT CEILING, and removing
 // it is the fix rather than a simplification of one.
@@ -91,6 +92,8 @@ export function createDataManager({
 }) {
   const dbName = databaseName(capabilityToken, mpId);
   const stores = new Map();
+  let disposed = false;
+  const live = () => { if (disposed) throw Object.assign(new Error('Data manager retired'), { name: 'StorageReadError', reason: 'retired' }); };
   const syncMeta = new Map(); // storeName -> { lastSyncedAt, pending, online }
 
   for (const [storeName, decl] of Object.entries(localData)) {
@@ -162,6 +165,7 @@ export function createDataManager({
       dtos = null; // offline / fetch failed — keep the cache, paint holds
     }
     if (Array.isArray(dtos)) {
+      assertCompleteSet(dtos);
       let prevByKey = null;
       if (keyOf) {
         // ⚠ getAllRaw, NOT getAll, AND STRIPPED. Two defects met on this line.
@@ -177,7 +181,16 @@ export function createDataManager({
         //     `additionalProperties: false`, so the documented pattern poisoned
         //     its own record: the write threw, the `try` below swallowed it, and
         //     the STALE row came back as though the sync had succeeded.
-        const existing = await store.getAllRaw();
+        const existing = [];
+        const keys = [...new Set(dtos.map((dto) => String(keyOf(dto))))];
+        let bytes = 2;
+        for (const key of keys) {
+          const row = await store.getRaw(key);
+          if (!row) continue;
+          bytes += new TextEncoder().encode(JSON.stringify(row)).byteLength + 1;
+          if (bytes > 8 * 1024 * 1024) throw new StorageReadError('scan-required');
+          existing.push(row);
+        }
         prevByKey = new Map(existing.map((row) => [String(row[keyPath]), stripMeta(row)]));
       }
       const records = dtos.map(
@@ -208,15 +221,24 @@ export function createDataManager({
       if (rejected.length) reportRejected(store, rejected);
       try {
         await store.reconcile(valid, { scope, ...(windowKey != null ? { windowKey } : {}) });
-      } catch (_) { /* store error — keep the cache intact */ }
+      } catch (error) {
+        // A failed durable write or incomplete read cannot certify the cache
+        // as the complete fresh result. Consumers must retain their error path.
+        if (error?.name === 'StorageReadError' || (error?.name === 'PersistError' && error.retained === false)) throw error;
+      }
     }
     return store.readWhere(scope);
   }
 
   return {
     databaseName: dbName,
+    async dispose(options) {
+      disposed = true;
+      await Promise.all([...stores.values()].map((store) => store.dispose?.(options)));
+    },
     /** DataApi.store — only manifest-declared stores exist. */
     store(name) {
+      live();
       const store = stores.get(name);
       if (!store) throw new Error(`tommy.data.store('${name}'): store not declared in manifest.localData`);
       return store;

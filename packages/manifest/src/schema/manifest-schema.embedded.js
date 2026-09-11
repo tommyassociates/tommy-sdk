@@ -18,6 +18,26 @@ export default {
     "category"
   ],
   "properties": {
+    "subjectCapabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "client_access": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "panelIds"],
+          "properties": {
+            "version": { "const": 1 },
+            "panelIds": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
     "manifestVersion": {
       "description": "Manifest format version. Bump only on breaking format changes.",
       "const": "1"

@@ -1,3 +1,4 @@
+import { createTransactionalDataStore } from './transactional-store.js';
 /**
  * data-store.js — the DataStore behind `tommy.data.store(name)`
  * (sdk-types.ts DataStore/DataApi; offline-sync.md §1/§4).
@@ -347,6 +348,7 @@ export class PersistError extends Error {
     this.budget = result?.budget;
     this.evicted = result?.evicted || [];
     this.storeName = storeName;
+    this.retained = result?.retained !== false;
   }
 }
 
@@ -638,6 +640,8 @@ export function createDataStore({
     return !Number.isFinite(at) || at >= now() - PAINT_CEILING_MS;
   };
 
+  if (backend.transactional) return createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows });
+
   async function enforceWindowRetention({ current, changed, keep = maxWindows } = {}) {
     if (!Number.isFinite(keep) || keep <= 0) return [];
     const rows = await backend.getAll();
@@ -707,7 +711,14 @@ export function createDataStore({
     }
   }
 
+  let disposed = false;
   const api = {
+    dispose(options) {
+      disposed = true;
+      wholeStoreSubscribers.clear();
+      selectorSubscribers.clear();
+      return backend.close?.(options);
+    },
     /** The declared store name — so a report can say WHICH store rejected. */
     name,
     /**
@@ -1069,5 +1080,16 @@ export function createDataStore({
       return () => selectorSubscribers.delete(sub);
     },
   };
-  return api;
+  return new Proxy(api, {
+    get(target, key) {
+      const value = target[key];
+      if (typeof value !== 'function' || key === 'dispose') return value;
+      return (...args) => {
+        const current = () => { if (disposed) throw Object.assign(new Error('Data store retired'), { name: 'StorageReadError', reason: 'retired' }); };
+        current();
+        const result = value.apply(target, args);
+        return result?.then ? result.then((resolved) => { current(); return resolved; }) : result;
+      };
+    },
+  });
 }

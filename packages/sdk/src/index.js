@@ -19,6 +19,7 @@ import { createT } from './i18n.js';
 export { TommyError, TommySDKError, isTommyError } from './errors.js';
 export { createDirectAdapter } from './adapter-direct.js';
 export { DEFAULT_RPC_TIMEOUT_MS } from './adapter.js';
+export { visibleChatMessageIds, visibleChatConversationIds } from './chat-viewport.js';
 
 const STUB_NAMESPACES = [
   'ui', 'directory', 'device', 'host', 'navigation', 'theme', 'messaging',

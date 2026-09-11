@@ -500,9 +500,15 @@ export type Selector<Rec, V> = (q: Query<Rec>) => V;
 
 export interface DataStore<Rec = unknown> {
   get(key: IDBValidKey): Promise<Rec | undefined>;
+  getRaw(key: IDBValidKey): Promise<Rec | undefined>;
+  /** Complete compatibility reads reject when the bounded set cannot fit. */
   getAll(query?: { index?: string; range?: IDBKeyRange }): Promise<Rec[]>;
+  getAllRaw(): Promise<Rec[]>;
+  /** Available on transactional hosts. Each page has at most 100 rows/8 MiB. */
+  scan?(options: { cursor: string | null; limit: number }): Promise<{ rows: Rec[]; nextCursor: string | null; complete: boolean }>;
+  scanRaw?(options: { cursor: string | null; limit: number }): Promise<{ rows: Rec[]; nextCursor: string | null; complete: boolean }>;
   put(record: Rec): Promise<IDBValidKey>;
-  delete(key: IDBValidKey): Promise<void>;
+  delete(key: IDBValidKey, options?: { expectedRevision?: number }): Promise<void>;
   /**
    * Whole-store reactive callback (UNCHANGED, back-compat). Fires on local
    * writes and sync-applied remote changes with the full record set; the
@@ -576,6 +582,19 @@ export interface PickOptions extends PickerOptions {
  * (MP scope ∩ user visibility) — see host-services.md.
  */
 export interface UiApi {
+  /** Captures into the originating registered host pane. Files and URLs never leave the host. */
+  captureChatAttachment(opts: { el: HTMLElement; kind: 'files' | 'photo' | 'audio' }): Promise<{
+    id: string; state: string; count: number; requiresReattachment: boolean;
+    files: readonly { filename: string; contentType: string; byteSize: number }[];
+  } | null>;
+  /** Host-owned canonical blocks. The connected anchor must be registered by the originating pane. */
+  showChatMessageBlocks(opts: {
+    conversationId: string; messageId: string; accessEpisode: string | null; contextVersion: string; el: HTMLElement;
+  }): Promise<{ close(): void }>;
+  /** Host-owned scoped attachments. No URL, bytes or private descriptors are returned. */
+  showChatMessageMedia(opts: {
+    conversationId: string; messageId: string; accessEpisode: string | null; contextVersion: string; el: HTMLElement;
+  }): Promise<{ close(): void }>;
   /**
    * Team MP member-edit preflight. Host-owned paid-seat confirmation precedes
    * both member and regular-hours writes. Decline, expiry or detached popup
@@ -1291,3 +1310,13 @@ declare global {
   // eslint-disable-next-line no-var
   var tommy: TommySdk;
 }
+/** Local viewport selection only; observations still require a scoped host write. */
+export declare function visibleChatMessageIds(
+  elements: Iterable<{ dataset?: { chatMessageId?: string }; isConnected?: boolean; getBoundingClientRect?: () => { top: number; left: number; bottom: number; right: number } }>,
+  options: { active?: boolean; viewport: { top: number; left: number; bottom: number; right: number }; windowBounds: { top: number; left: number; bottom: number; right: number } },
+): string[];
+
+export declare function visibleChatConversationIds(
+  elements: Iterable<{ dataset?: { conversationId?: string }; isConnected?: boolean; getBoundingClientRect?: () => { top: number; left: number; bottom: number; right: number } }>,
+  options: { active?: boolean; viewport: { top: number; left: number; bottom: number; right: number }; windowBounds: { top: number; left: number; bottom: number; right: number } },
+): string[];

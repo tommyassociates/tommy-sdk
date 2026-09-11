@@ -8,3 +8,5 @@ export {
   PersistError,
 } from './data-store.js';
 export { createDataManager, createReplayCoordinator } from './manager.js';
+
+export { StorageReadError } from './transactional-store.js';
