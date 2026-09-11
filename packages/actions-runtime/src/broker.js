@@ -53,6 +53,27 @@ const PROCESSED_KEYS_MAX = 1000;
  *  — far cheaper per entry, so it holds an order of magnitude more. */
 const APPLIED_KEYS_OVERFLOW_MAX = 10000;
 
+// Server-write activities whose host adapter needs replay provenance (see
+// executeInvoke). Additive: an activity in neither set gets exactly the envelope
+// it gets today.
+//  - ALWAYS: `team.update_member` — the member-restore gate reads deadlineAt on
+//    live calls too, so it has always received a restoreContext (replayed:false).
+//  - ON REPLAY ONLY: `time-clock.record_attendance` (scope 11 D23) — the marker
+//    is present on a DRAINED punch and absent on a live one, so the server can
+//    treat "restoreContext present" as "this write waited in the durable queue"
+//    and honour its captured timestamp. A live punch carrying replayed:false would
+//    put the field on every call and blunt that rule.
+const RESTORE_CONTEXT_ALWAYS = new Set(['team.update_member']);
+// Activities that get restoreContext ONLY when the invoke is a durable-queue
+// DRAIN (`restoreDrain`, stamped by drainOfflineQueue). An inspector replay of a
+// live failure also sets `restoreReplay` but never waited in the queue, so it
+// must not be classified as an offline write.
+const RESTORE_CONTEXT_ON_DRAIN = new Set(['time-clock.record_attendance']);
+const wantsRestoreContext = (envelope) => RESTORE_CONTEXT_ALWAYS.has(envelope.activity)
+  || (RESTORE_CONTEXT_ON_DRAIN.has(envelope.activity) && envelope.restoreDrain === true);
+// `queuedAt` is part of the drain-only context; the member-restore wire shape is unchanged.
+const wantsQueuedAt = (envelope) => RESTORE_CONTEXT_ON_DRAIN.has(envelope.activity) && envelope.restoreDrain === true;
+
 /**
  * Platform-provided triggers, available on EVERY registered MP's namespace
  * without the MP declaring them. Closed set, in-binary — the same firewall the
@@ -1075,10 +1096,18 @@ export function createBroker({
         kind: 'invoke',
         activity: envelope.activity,
         args: envelope.args,
-        ...(envelope.activity === 'team.update_member' ? {
+        // Replay provenance rides to the host for the activities that need to
+        // tell a live write from a drained one. `team.update_member` uses it for
+        // the member-restore gate; `time-clock.record_attendance` uses it so a
+        // punch that was queued offline can carry its CAPTURED time and the
+        // moment it was queued to the server (scope 11 D23 — the server honours
+        // the captured timestamp only when this runtime-set marker is present,
+        // never on a bare client claim). Set by the drain, not by MP args.
+        ...(wantsRestoreContext(envelope) ? {
           restoreContext: {
             mpId: record.sourceMpId, instanceId: envelope.instanceId, tenantId: record.tenantId,
             deadlineAt: envelope.restoreDeadlineAt, replayed: envelope.restoreReplay === true,
+            ...(wantsQueuedAt(envelope) && envelope.restoreQueuedAt !== undefined ? { queuedAt: envelope.restoreQueuedAt } : {}),
           },
         } : {}),
         idempotencyKey: record.idempotencyKey,
@@ -1381,7 +1410,13 @@ export function createBroker({
         // eslint-disable-next-line no-await-in-loop
         const outcome = await (envelope.trigger
           ? dispatchEmit(envelope)
-          : dispatchInvoke({ ...envelope, restoreReplay: true, idempotencyKey: envelope.idempotencyKey })) // ORIGINAL key
+          // ORIGINAL key. `restoreQueuedAt` is the moment the row entered the
+          // durable queue (recorded by durable-queue.js on push) — the one fact a
+          // replayed write can carry about how long it waited, and the runtime
+          // sets it here so no MP can forge it.
+          : dispatchInvoke({
+            ...envelope, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
+          }))
           .then((result) => ({ ok: true, result }))
           .catch((error) => ({ ok: false, error }));
         results.push(outcome);
@@ -1599,11 +1634,24 @@ export function createBroker({
     queueStats() {
       const rows = queueStore.all();
       const bySource = {};
-      for (const row of rows) bySource[row.sourceMpId] = (bySource[row.sourceMpId] || 0) + 1;
+      const bytesBySource = {};
+      for (const row of rows) {
+        bySource[row.sourceMpId] = (bySource[row.sourceMpId] || 0) + 1;
+        bytesBySource[row.sourceMpId] = (bytesBySource[row.sourceMpId] || 0) + (row.bytes || 0);
+      }
       // `expiredOnLoad` is reported rather than swallowed: dropping a row past
       // its TTL is the one path that discards an accepted write (D.43), so the
       // host can surface it instead of the write silently never appearing.
-      return { total: rows.length, bySource, expiredOnLoad: queueStore.expiredOnLoad() };
+      // Byte usage and the per-partition caps ride along so a host read can
+      // show queue pressure for one MP without exposing another's rows.
+      return {
+        total: rows.length,
+        bySource,
+        bytesBySource,
+        bytesCap: QUEUE_MAX_BYTES,
+        entriesCap: QUEUE_MAX_ENTRIES,
+        expiredOnLoad: queueStore.expiredOnLoad(),
+      };
     },
 
     async teardown() { /* flush semantics: nothing buffered at M1 beyond debounce */ },
