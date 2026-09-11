@@ -284,6 +284,67 @@ export function createDataManager({
       };
     },
     /**
+     * DataApi.record — the SINGLE-RECORD read-through every detail/edit surface
+     * wants, and the one combinator the SWR set was missing.
+     *
+     * `windowCache`/`liveQuery` are both WINDOW-shaped: they answer "give me the
+     * rows in this range". A detail surface asks a different question — "give me
+     * THIS id" — and the only thing available was a bare `store.get(id)`, which
+     * returns `undefined` on a miss. Every caller then had the same choice, and
+     * they all made it the same wrong way: treat "not cached" as "no data" and
+     * paint an empty surface.
+     *
+     * ⚠ THAT IS NOT A HYPOTHETICAL. Timesheets shipped it: `getTimesheet` was
+     * `store.get(id)` and nothing else, so opening the edit form for any
+     * timesheet outside the loaded window — an activity-log deep link, a cold
+     * refresh on the form URL, a row from a period the grid had not loaded —
+     * rendered a BLANK "Edit Timesheet" over `Total Hours 0m`. Clicking a row in
+     * the visible grid was the one path that always worked, which is why it
+     * survived every hand test. Measured 2026-09-10.
+     *
+     * `get(id)`: cache first (instant, the SWR contract), and ONLY on a miss
+     * fetch that one record, write it through, and return it.
+     *
+     * `fetch(id) → DTO | null` is the MP's own domain call. `toRecord(dto, prev)`
+     * maps it to the store's record shape — the SAME lean-schema discipline
+     * `windowCache` needs, since a record that fails the store's recordSchema is
+     * dropped silently on put.
+     *
+     * ⚠ A FETCH FAILURE AND A GENUINE 404 ARE NOT THE SAME ANSWER, and conflating
+     * them is exactly how the blank form happened. A miss returns `undefined`;
+     * a FAILED fetch REJECTS, so the caller can tell "this record does not
+     * exist" from "I could not reach the server" and say so. Callers that want
+     * the old swallow-everything behaviour must opt in explicitly, in their own
+     * code, where the decision is visible.
+     */
+    record(storeName, { fetch, toRecord = (dto) => dto } = {}) {
+      const store = stores.get(storeName);
+      if (!store) throw new Error(`tommy.data.record('${storeName}'): store not declared in manifest.localData`);
+      return {
+        async get(id, { refresh = false } = {}) {
+          if (id == null) return undefined;
+          const key = String(id);
+          if (!refresh) {
+            const hit = await store.get(key);
+            if (hit) return hit;
+          }
+          if (typeof fetch !== 'function') return undefined;
+          const dto = await fetch(id);
+          if (!dto) return undefined;
+          // `prev` so a thin single-record DTO cannot erase rich fields an
+          // earlier window reconcile already put in the row.
+          const prev = await store.get(key);
+          const rec = toRecord(dto, prev);
+          if (!rec) return undefined;
+          // A cache write must never fail the read it was serving: the record is
+          // returned either way, so a full/blocked store degrades to
+          // fetch-every-time rather than to a blank surface.
+          try { await store.put(rec); } catch (_) { /* cache write is best-effort */ }
+          return rec;
+        },
+      };
+    },
+    /**
      * DataApi.liveQuery — windowCache fused with the store's reactivity: the
      * single "instant + reactive" handle a surface (list OR detail) wants. It
      * unifies the three moving parts that MPs otherwise wire by hand:
