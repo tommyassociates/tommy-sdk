@@ -1634,11 +1634,24 @@ export function createBroker({
     queueStats() {
       const rows = queueStore.all();
       const bySource = {};
-      for (const row of rows) bySource[row.sourceMpId] = (bySource[row.sourceMpId] || 0) + 1;
+      const bytesBySource = {};
+      for (const row of rows) {
+        bySource[row.sourceMpId] = (bySource[row.sourceMpId] || 0) + 1;
+        bytesBySource[row.sourceMpId] = (bytesBySource[row.sourceMpId] || 0) + (row.bytes || 0);
+      }
       // `expiredOnLoad` is reported rather than swallowed: dropping a row past
       // its TTL is the one path that discards an accepted write (D.43), so the
       // host can surface it instead of the write silently never appearing.
-      return { total: rows.length, bySource, expiredOnLoad: queueStore.expiredOnLoad() };
+      // Byte usage and the per-partition caps ride along so a host read can
+      // show queue pressure for one MP without exposing another's rows.
+      return {
+        total: rows.length,
+        bySource,
+        bytesBySource,
+        bytesCap: QUEUE_MAX_BYTES,
+        entriesCap: QUEUE_MAX_ENTRIES,
+        expiredOnLoad: queueStore.expiredOnLoad(),
+      };
     },
 
     async teardown() { /* flush semantics: nothing buffered at M1 beyond debounce */ },
