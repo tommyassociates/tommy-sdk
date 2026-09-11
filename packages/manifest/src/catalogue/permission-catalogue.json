@@ -1,6 +1,6 @@
 {
   "_comment": "VENDORED FROM plans/refactor-plan/05-deliverables/02-manifest-tooling/permission-catalogue.sample.json — this copy is the runtime source of truth shipped inside @tommy/manifest (a pinned @tommy/manifest version = a pinned catalogue version). The catalogue is FIXED and versioned (Phase 3 Q2) — MPs may only request scopes that appear here; @tommy/manifest validate layer 3 rejects any non-member with the named rule 'permission-not-in-catalogue'. This is the M1 STARTER set (covers every scope the reference manifest uses); the EXHAUSTIVE production catalogue is a deliberate, reviewed Tommy authoring task before M4 (README:68, security-model.md §2) — NOT an M1 gate. Growing it: add entries here, bump catalogueVersion, review. Scope form: verb:resource (verb in read|write|invoke). sensitivity (low|medium|high) drives review attention; deviceCapabilityRequired is checked against the device by the production manifest strip.",
-  "catalogueVersion": "0.4.0-starter",
+  "catalogueVersion": "0.5.0-starter",
   "categories": [
     "team",
     "directory",
@@ -329,6 +329,14 @@
       "category": "device",
       "title": "Use camera",
       "description": "Host-mediated photo capture via tommy.device.capturePhoto. The MP receives the photo, not a camera stream.",
+      "sensitivity": "high",
+      "deviceCapabilityRequired": "camera"
+    },
+    {
+      "scope": "invoke:device_camera_preview",
+      "category": "device",
+      "title": "Use live camera preview",
+      "description": "Host-owned live camera viewfinder with on-device face DETECTION (a face count only, never identity, never a biometric template) via tommy.device.startCapturePreview / captureFromPreview / stopCapturePreview. The host owns the video element, the stream, the detection loop and the overlay; the MP receives face counts and the captured photo, never a frame, a MediaStream or face geometry. Sibling of invoke:device_camera, which is unchanged.",
       "sensitivity": "high",
       "deviceCapabilityRequired": "camera"
     },
