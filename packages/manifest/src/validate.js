@@ -157,6 +157,16 @@ function finalize(doc, lineCounter, d, layer, suggestion) {
 
 function crossRefErrors(doc, lineCounter, data) {
   const errors = [];
+  const subjectPanels = new Set(Array.isArray(data.panels) ? data.panels.map((panel) => panel.id) : Object.keys(data.panels ?? {}));
+  for (const [index, panelId] of (data.subjectCapabilities?.client_access?.panelIds ?? []).entries()) {
+    if (!subjectPanels.has(panelId)) {
+      errors.push(finalize(doc, lineCounter, {
+        path: ['subjectCapabilities', 'client_access', 'panelIds', index],
+        rule: 'unresolved-subject-panel',
+        message: `client_access references panel '${panelId}', which is not declared by this Mini Program.`,
+      }, 4));
+    }
+  }
   const triggers = new Set(Object.keys(data.triggers ?? {}));
   const conditions = new Set(Object.keys(data.conditions ?? {}));
   const activities = new Set(Object.keys(data.activities ?? {}));

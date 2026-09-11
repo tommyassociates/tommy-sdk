@@ -6,7 +6,9 @@
   "type": "module",
   "main": "./src/index.js",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./host-store": "./src/host-store/index.js",
+    "./host-store/protocol": "./src/host-store/protocol.js"
   },
   "files": [
     "src"

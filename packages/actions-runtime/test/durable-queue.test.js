@@ -47,11 +47,12 @@ describe('D.43 — the offline queue survives a reload', () => {
   let storage;
   let applied;
 
-  const makeBroker = async ({ online = false, queue } = {}) => {
+  const makeBroker = async ({ online = false, queue, onOfflineOutcome } = {}) => {
     const issuer = createFakeIssuer();
     const broker = createBroker({
       capabilityService: issuer,
       online,
+      onOfflineOutcome,
       // `submit_timesheet` is a `server_write`, so the write lands HERE, not in a
       // local handler — which is the whole point: the row being replayed is a
       // pending call to the server, and losing it loses the user's submission.
@@ -133,6 +134,24 @@ describe('D.43 — the offline queue survives a reload', () => {
     second.broker.setOnline(true);
     await second.broker.drainOfflineQueue();
     expect(applied).toEqual(['w1', 'w2', 'w3']);
+  });
+
+  it('reports each drained original envelope once and isolates observer failures', async () => {
+    const first = await makeBroker();
+    await first.call('w1', 'original-1');
+    await first.call('w2', 'original-2');
+    const outcomes = [];
+    const second = await makeBroker({ onOfflineOutcome: (envelope, outcome) => {
+      outcomes.push({ key: envelope.idempotencyKey, week: envelope.args.week, ok: outcome.ok });
+      if (outcomes.length === 1) throw new Error('Observer failed');
+      return Promise.reject(new Error('Async observer failed'));
+    } });
+    second.broker.setOnline(true);
+    const results = await second.broker.drainOfflineQueue();
+    expect(results.map((row) => row.ok)).toEqual([true, true]);
+    expect(outcomes).toEqual([{ key: 'original-1', week: 'w1', ok: true }, { key: 'original-2', week: 'w2', ok: true }]);
+    expect(applied).toEqual(['w1', 'w2']);
+    expect(second.broker.queueStats().total).toBe(0);
   });
 
   it('NEVER throws when storage is absent, corrupt or over quota — it degrades to memory', () => {

@@ -348,6 +348,15 @@ agentVisibilityReason?: AgentVisibilityReason
  * Schema for a Tommy Mini Program manifest. Authored as YAML (manifest.yml); this JSON Schema validates the parsed object. Every contract is a JSON Schema so AI-authored Mini Programs are first-class.
  */
 export interface TommyMiniProgramManifest {
+subjectCapabilities?: {
+client_access?: {
+version: 1
+/**
+ * @minItems 1
+ */
+panelIds: [string, ...(string)[]]
+}
+}
 /**
  * Manifest format version. Bump only on breaking format changes.
  */
