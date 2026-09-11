@@ -64,9 +64,15 @@ const APPLIED_KEYS_OVERFLOW_MAX = 10000;
 //    and honour its captured timestamp. A live punch carrying replayed:false would
 //    put the field on every call and blunt that rule.
 const RESTORE_CONTEXT_ALWAYS = new Set(['team.update_member']);
-const RESTORE_CONTEXT_ON_REPLAY = new Set(['time-clock.record_attendance']);
+// Activities that get restoreContext ONLY when the invoke is a durable-queue
+// DRAIN (`restoreDrain`, stamped by drainOfflineQueue). An inspector replay of a
+// live failure also sets `restoreReplay` but never waited in the queue, so it
+// must not be classified as an offline write.
+const RESTORE_CONTEXT_ON_DRAIN = new Set(['time-clock.record_attendance']);
 const wantsRestoreContext = (envelope) => RESTORE_CONTEXT_ALWAYS.has(envelope.activity)
-  || (RESTORE_CONTEXT_ON_REPLAY.has(envelope.activity) && envelope.restoreReplay === true);
+  || (RESTORE_CONTEXT_ON_DRAIN.has(envelope.activity) && envelope.restoreDrain === true);
+// `queuedAt` is part of the drain-only context; the member-restore wire shape is unchanged.
+const wantsQueuedAt = (envelope) => RESTORE_CONTEXT_ON_DRAIN.has(envelope.activity) && envelope.restoreDrain === true;
 
 /**
  * Platform-provided triggers, available on EVERY registered MP's namespace
@@ -1101,7 +1107,7 @@ export function createBroker({
           restoreContext: {
             mpId: record.sourceMpId, instanceId: envelope.instanceId, tenantId: record.tenantId,
             deadlineAt: envelope.restoreDeadlineAt, replayed: envelope.restoreReplay === true,
-            ...(envelope.restoreQueuedAt !== undefined ? { queuedAt: envelope.restoreQueuedAt } : {}),
+            ...(wantsQueuedAt(envelope) && envelope.restoreQueuedAt !== undefined ? { queuedAt: envelope.restoreQueuedAt } : {}),
           },
         } : {}),
         idempotencyKey: record.idempotencyKey,
@@ -1409,7 +1415,7 @@ export function createBroker({
           // replayed write can carry about how long it waited, and the runtime
           // sets it here so no MP can forge it.
           : dispatchInvoke({
-            ...envelope, restoreReplay: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
+            ...envelope, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
           }))
           .then((result) => ({ ok: true, result }))
           .catch((error) => ({ ok: false, error }));
