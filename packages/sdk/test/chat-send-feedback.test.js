@@ -1,0 +1,31 @@
+import { afterEach, expect, it, vi } from 'vitest';
+import { createChatSendFeedback } from '../src/index.js';
+afterEach(() => vi.useRealTimers());
+it('shows nothing early, uses one deadline, and retires confirmed sends', () => {
+  vi.useFakeTimers(); vi.setSystemTime(1000);
+  const entries = [{ key: 'a', startedAt: Date.now(), pending: true }];
+  const changed = vi.fn();
+  const clock = createChatSendFeedback({ read: () => entries, onChange: changed });
+  clock.refresh();
+  vi.advanceTimersByTime(10_000);
+  expect(changed).toHaveBeenCalledTimes(1);
+  vi.advanceTimersByTime(19_999);
+  expect(changed.mock.lastCall[0].size).toBe(0);
+  vi.advanceTimersByTime(1);
+  expect([...changed.mock.lastCall[0]]).toEqual(['a']);
+  expect(vi.getTimerCount()).toBe(0);
+  entries[0].pending = false; clock.refresh();
+  expect(changed.mock.lastCall[0].size).toBe(0);
+  clock.dispose();
+});
+it('rechecks elapsed time on resume without polling and cancels on teardown', () => {
+  vi.useFakeTimers(); vi.setSystemTime(1000);
+  const changed = vi.fn();
+  const clock = createChatSendFeedback({ read: () => [{ key: 'a', startedAt: 1000, pending: true }], onChange: changed });
+  clock.refresh();
+  vi.setSystemTime(120_000); clock.refresh();
+  expect([...changed.mock.lastCall[0]]).toEqual(['a']);
+  clock.dispose(); clock.refresh();
+  expect(vi.getTimerCount()).toBe(0);
+  expect(changed).toHaveBeenCalledTimes(2);
+});
