@@ -1320,3 +1320,13 @@ export declare function visibleChatConversationIds(
   elements: Iterable<{ dataset?: { conversationId?: string }; isConnected?: boolean; getBoundingClientRect?: () => { top: number; left: number; bottom: number; right: number } }>,
   options: { active?: boolean; viewport: { top: number; left: number; bottom: number; right: number }; windowBounds: { top: number; left: number; bottom: number; right: number } },
 ): string[];
+
+/** Device-local advisory deadlines; does not read receipts or send messages. */
+export declare const CHAT_SEND_NOTICE_MS: 30000;
+export declare function createChatSendFeedback(options: {
+  read: () => Iterable<{ key: string; startedAt: number; pending: boolean }>;
+  onChange: (delayed: Set<string>) => void;
+  now?: () => number;
+  setTimer?: (callback: () => void, delay: number) => ReturnType<typeof setTimeout>;
+  clearTimer?: (timer: ReturnType<typeof setTimeout>) => void;
+}): Readonly<{ refresh(): void; dispose(): void }>;
