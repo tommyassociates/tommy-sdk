@@ -1004,7 +1004,9 @@ export function createBroker({
       // a surface stays on its error state for up to a minute after connectivity
       // returns. Caching a known-unknown is the one case where a cache makes the
       // system less correct rather than merely staler.
-      if (conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !isKnownUnknown(value)) {
+      // Invalidation can also land before the deadline or while the run record
+      // is being persisted. Neither path may refill the cache with older data.
+      if (conditionCacheEpoch === epochAtDispatch && conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !isKnownUnknown(value)) {
         conditionCache.set(cacheKey, { value, expiresAt: now() + conditionDef.cacheTtlMs });
         pruneConditionCache(cacheKey);
       }
