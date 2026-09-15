@@ -898,6 +898,14 @@ export default {
               },
               "order": {
                 "type": "integer"
+              },
+              "region": {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "bottom"
+                ],
+                "description": "Which dashboard region this panel seeds into. 'top' renders the tile ABOVE the shell/core panels (the legacy band position); omitted or 'bottom' keeps the default MP grid below them."
               }
             }
           },
