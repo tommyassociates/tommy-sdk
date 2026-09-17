@@ -126,7 +126,7 @@ export function createDataManager({
   // `toRecord` (with a `prev` lookup when `keyOf` is supplied, for rich-field
   // preservation across a thin DTO), and reconcile them into the store under
   // `scope`. A failed fetch is swallowed so the SWR paint holds (cache intact).
-  // Returns the reconciled, scope-filtered cache read.
+  // Each public caller performs its own final read with its display scope.
   function windowKeyOf(window) {
     if (window == null || typeof window !== 'object') return undefined;
     const keys = Object.keys(window).sort();
@@ -227,7 +227,6 @@ export function createDataManager({
         if (error?.name === 'StorageReadError' || (error?.name === 'PersistError' && error.retained === false)) throw error;
       }
     }
-    return store.readWhere(scope);
   }
 
   return {
