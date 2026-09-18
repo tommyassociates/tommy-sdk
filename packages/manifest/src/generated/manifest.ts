@@ -704,6 +704,14 @@ description?: string
 placement?: {
 defaultSurface?: Surface
 order?: number
+/**
+ * Which dashboard region this panel seeds into. 'top' renders the tile ABOVE the shell/core panels (the legacy band position); omitted or 'bottom' keeps the default MP grid below them.
+ */
+region?: ("top" | "bottom")
+/**
+ * Whether the host seeds this panel onto an UNCONFIGURED dashboard. Omitted or true: the panel is part of the default composition. false: the panel is NOT seeded — it stays in the Add Panel catalogue and renders only where an admin has placed it. A stored composition is never affected.
+ */
+seed?: boolean
 }
 /**
  * How the panel behaves with no connectivity.
