@@ -1,0 +1,294 @@
+{
+  "fixture": "JF15-predicate-conformance",
+  "contract": "journeys v1.0.6",
+  "written_at": "2026-09-17",
+  "written_by": "BE 0.08 (Task Zero C)",
+  "not_http": true,
+  "purpose": "Conformance cases for the closed JSON predicate contract, replayed by BOTH evaluators (server app/services/ai_settings/predicate.rb and sdk packages/.../predicate.js) so a new operator cannot land in one only (JD11, JD30, landmine 30). Cases with pending=true describe behaviour 11d ADDS at BE 2.06 and are expected to fail until then; cases with server_only=true are never replayed by the SDK evaluator, which has no server context sources.",
+  "notes": {
+    "expect": "true | false | \"refused\" — \"refused\" means the evaluator raises/throws the closed-contract error (server: AiSettings::Error code unsupported_predicate).",
+    "context": "The evaluation context. `_package` names the default MP for a `from: setting` source with no explicit `mp`.",
+    "server_only": "Sources `subject` and `record` are server-side context (05 §3, JD11); the SDK evaluator never sees them.",
+    "pending": "Not yet implemented on this base. 0.08 replays these as pending; 2.06 lands them in both evaluators and the manifest schema and clears the flag."
+  },
+  "cases": [
+    {
+      "name": "exists — a present setting value",
+      "predicate": { "source": { "from": "setting", "path": "onboarding.enabled" }, "op": "exists" },
+      "context": { "_package": "journeys", "journeys": { "onboarding": { "enabled": true } } },
+      "expect": true
+    },
+    {
+      "name": "exists — a missing path is not present",
+      "predicate": { "source": { "from": "setting", "path": "onboarding.missing" }, "op": "exists" },
+      "context": { "_package": "journeys", "journeys": { "onboarding": { "enabled": true } } },
+      "expect": false
+    },
+    {
+      "name": "exists — an explicit null is not present",
+      "predicate": { "source": { "from": "setting", "path": "onboarding.enabled" }, "op": "exists" },
+      "context": { "_package": "journeys", "journeys": { "onboarding": { "enabled": null } } },
+      "expect": false
+    },
+    {
+      "name": "not_exists — a missing path",
+      "predicate": { "source": { "from": "setting", "path": "onboarding.missing" }, "op": "not_exists" },
+      "context": { "_package": "journeys", "journeys": {} },
+      "expect": true
+    },
+    {
+      "name": "not_exists — a present value",
+      "predicate": { "source": { "from": "setting", "path": "onboarding.enabled" }, "op": "not_exists" },
+      "context": { "_package": "journeys", "journeys": { "onboarding": { "enabled": false } } },
+      "expect": false
+    },
+    {
+      "name": "equals — a string match",
+      "predicate": { "source": { "from": "setting", "path": "basis" }, "op": "equals", "operand": "casual" },
+      "context": { "_package": "journeys", "journeys": { "basis": "casual" } },
+      "expect": true
+    },
+    {
+      "name": "equals — a string mismatch",
+      "predicate": { "source": { "from": "setting", "path": "basis" }, "op": "equals", "operand": "casual" },
+      "context": { "_package": "journeys", "journeys": { "basis": "permanent" } },
+      "expect": false
+    },
+    {
+      "name": "equals — a boolean false value matches operand false",
+      "predicate": { "source": { "from": "setting", "path": "flag" }, "op": "equals", "operand": false },
+      "context": { "_package": "journeys", "journeys": { "flag": false } },
+      "expect": true
+    },
+    {
+      "name": "not_equals — a mismatch is true",
+      "predicate": { "source": { "from": "setting", "path": "basis" }, "op": "not_equals", "operand": "casual" },
+      "context": { "_package": "journeys", "journeys": { "basis": "permanent" } },
+      "expect": true
+    },
+    {
+      "name": "not_equals — a match is false",
+      "predicate": { "source": { "from": "setting", "path": "basis" }, "op": "not_equals", "operand": "casual" },
+      "context": { "_package": "journeys", "journeys": { "basis": "casual" } },
+      "expect": false
+    },
+    {
+      "name": "one_of — the value is in operands",
+      "predicate": { "source": { "from": "setting", "path": "state" }, "op": "one_of", "operands": ["VIC", "NSW"] },
+      "context": { "_package": "journeys", "journeys": { "state": "VIC" } },
+      "expect": true
+    },
+    {
+      "name": "one_of — the value is not in operands",
+      "predicate": { "source": { "from": "setting", "path": "state" }, "op": "one_of", "operands": ["VIC", "NSW"] },
+      "context": { "_package": "journeys", "journeys": { "state": "QLD" } },
+      "expect": false
+    },
+    {
+      "name": "range — inside both bounds",
+      "predicate": { "source": { "from": "setting", "path": "hours" }, "op": "range", "operands": [10, 40] },
+      "context": { "_package": "journeys", "journeys": { "hours": 20 } },
+      "expect": true
+    },
+    {
+      "name": "range — below the minimum",
+      "predicate": { "source": { "from": "setting", "path": "hours" }, "op": "range", "operands": [10, 40] },
+      "context": { "_package": "journeys", "journeys": { "hours": 5 } },
+      "expect": false
+    },
+    {
+      "name": "range — a non-numeric value is false, never an error",
+      "predicate": { "source": { "from": "setting", "path": "hours" }, "op": "range", "operands": [10, 40] },
+      "context": { "_package": "journeys", "journeys": { "hours": "twenty" } },
+      "expect": false
+    },
+    {
+      "name": "const source — a literal value",
+      "predicate": { "source": { "const": "yes" }, "op": "equals", "operand": "yes" },
+      "context": { "_package": "journeys", "journeys": {} },
+      "expect": true
+    },
+    {
+      "name": "default — a missing value falls back to the source default",
+      "predicate": { "source": { "from": "setting", "path": "basis", "default": "casual" }, "op": "equals", "operand": "casual" },
+      "context": { "_package": "journeys", "journeys": {} },
+      "expect": true
+    },
+    {
+      "name": "explicit mp — a setting read from another package",
+      "predicate": { "source": { "from": "setting", "mp": "tasks", "path": "reminders.enabled" }, "op": "equals", "operand": true },
+      "context": { "_package": "journeys", "journeys": {}, "tasks": { "reminders": { "enabled": true } } },
+      "expect": true
+    },
+    {
+      "name": "allOf — one level, both true",
+      "predicate": {
+        "allOf": [
+          { "source": { "from": "setting", "path": "basis" }, "op": "equals", "operand": "casual" },
+          { "source": { "from": "setting", "path": "state" }, "op": "one_of", "operands": ["VIC"] }
+        ]
+      },
+      "context": { "_package": "journeys", "journeys": { "basis": "casual", "state": "VIC" } },
+      "expect": true
+    },
+    {
+      "name": "allOf — one level, one false",
+      "predicate": {
+        "allOf": [
+          { "source": { "from": "setting", "path": "basis" }, "op": "equals", "operand": "casual" },
+          { "source": { "from": "setting", "path": "state" }, "op": "one_of", "operands": ["VIC"] }
+        ]
+      },
+      "context": { "_package": "journeys", "journeys": { "basis": "casual", "state": "QLD" } },
+      "expect": false
+    },
+    {
+      "name": "anyOf — one level, one true is enough",
+      "predicate": {
+        "anyOf": [
+          { "source": { "from": "setting", "path": "basis" }, "op": "equals", "operand": "permanent" },
+          { "source": { "from": "setting", "path": "state" }, "op": "one_of", "operands": ["VIC"] }
+        ]
+      },
+      "context": { "_package": "journeys", "journeys": { "basis": "casual", "state": "VIC" } },
+      "expect": true
+    },
+    {
+      "name": "anyOf — one level, all false",
+      "predicate": {
+        "anyOf": [
+          { "source": { "from": "setting", "path": "basis" }, "op": "equals", "operand": "permanent" },
+          { "source": { "from": "setting", "path": "state" }, "op": "one_of", "operands": ["VIC"] }
+        ]
+      },
+      "context": { "_package": "journeys", "journeys": { "basis": "casual", "state": "QLD" } },
+      "expect": false
+    },
+    {
+      "name": "a NESTED group is refused — only one level of allOf/anyOf exists",
+      "predicate": {
+        "allOf": [
+          { "anyOf": [{ "source": { "const": "x" }, "op": "equals", "operand": "x" }] }
+        ]
+      },
+      "context": { "_package": "journeys", "journeys": {} },
+      "expect": "refused"
+    },
+    {
+      "name": "an unknown operator is refused, never silently false",
+      "predicate": { "source": { "from": "setting", "path": "basis" }, "op": "starts_with", "operand": "cas" },
+      "context": { "_package": "journeys", "journeys": { "basis": "casual" } },
+      "expect": "refused"
+    },
+    {
+      "name": "a source transform is refused",
+      "predicate": { "source": { "from": "setting", "path": "basis", "transform": "downcase" }, "op": "exists" },
+      "context": { "_package": "journeys", "journeys": { "basis": "Casual" } },
+      "expect": "refused"
+    },
+    {
+      "name": "an unknown source `from` is refused",
+      "predicate": { "source": { "from": "weather", "path": "today" }, "op": "exists" },
+      "context": { "_package": "journeys", "journeys": {} },
+      "expect": "refused"
+    },
+    {
+      "name": "a null predicate node is true (no condition)",
+      "predicate": null,
+      "context": { "_package": "journeys", "journeys": {} },
+      "expect": true
+    },
+
+    {
+      "name": "includes_any — an array value sharing one element",
+      "predicate": { "source": { "from": "setting", "path": "role_tag_ids" }, "op": "includes_any", "operands": [11, 12] },
+      "context": { "_package": "journeys", "journeys": { "role_tag_ids": [9, 12] } },
+      "expect": true
+    },
+    {
+      "name": "includes_any — an array value sharing nothing",
+      "predicate": { "source": { "from": "setting", "path": "role_tag_ids" }, "op": "includes_any", "operands": [11, 12] },
+      "context": { "_package": "journeys", "journeys": { "role_tag_ids": [7, 9] } },
+      "expect": false
+    },
+    {
+      "name": "includes_any — an empty array value shares nothing",
+      "predicate": { "source": { "from": "setting", "path": "role_tag_ids" }, "op": "includes_any", "operands": [11, 12] },
+      "context": { "_package": "journeys", "journeys": { "role_tag_ids": [] } },
+      "expect": false
+    },
+    {
+      "name": "includes_any — a NON-array value is false, never an error",
+      "predicate": { "source": { "from": "setting", "path": "role_tag_ids" }, "op": "includes_any", "operands": [11, 12] },
+      "context": { "_package": "journeys", "journeys": { "role_tag_ids": 12 } },
+      "expect": false
+    },
+    {
+      "name": "includes_any — a missing value is false, never an error",
+      "predicate": { "source": { "from": "setting", "path": "role_tag_ids" }, "op": "includes_any", "operands": [11, 12] },
+      "context": { "_package": "journeys", "journeys": {} },
+      "expect": false
+    },
+    {
+      "name": "subject source — role tag ids (server only)",
+      "predicate": { "source": { "from": "subject", "path": "role_tag_ids" }, "op": "includes_any", "operands": [11, 12] },
+      "context": { "_package": "journeys", "subject": { "role_tag_ids": [12], "location_ids": [3], "skill_tag_ids": [], "tag_ids": [12, 3], "start_date": "2026-10-01", "creation_path": "invite" } },
+      "expect": true,
+      "server_only": true
+    },
+    {
+      "name": "subject source — location ids sharing nothing (server only)",
+      "predicate": { "source": { "from": "subject", "path": "location_ids" }, "op": "includes_any", "operands": [88] },
+      "context": { "_package": "journeys", "subject": { "role_tag_ids": [12], "location_ids": [3], "skill_tag_ids": [], "tag_ids": [12, 3], "start_date": "2026-10-01", "creation_path": "invite" } },
+      "expect": false,
+      "server_only": true
+    },
+    {
+      "name": "subject source — creation_path equals (server only)",
+      "predicate": { "source": { "from": "subject", "path": "creation_path" }, "op": "equals", "operand": "invite" },
+      "context": { "_package": "journeys", "subject": { "creation_path": "invite" } },
+      "expect": true,
+      "server_only": true
+    },
+    {
+      "name": "subject source — start_date exists (server only)",
+      "predicate": { "source": { "from": "subject", "path": "start_date" }, "op": "exists" },
+      "context": { "_package": "journeys", "subject": { "start_date": "2026-10-01" } },
+      "expect": true,
+      "server_only": true
+    },
+    {
+      "name": "record source — a data field (server only)",
+      "predicate": { "source": { "from": "record", "path": "data.employment_basis" }, "op": "equals", "operand": "casual" },
+      "context": { "_package": "journeys", "record": { "data": { "employment_basis": "casual" }, "facts": { "employment_casual": true } } },
+      "expect": true,
+      "server_only": true
+    },
+    {
+      "name": "record source — the latest fact (server only)",
+      "predicate": { "source": { "from": "record", "path": "facts.employment_casual" }, "op": "equals", "operand": true },
+      "context": { "_package": "journeys", "record": { "data": { "employment_basis": "casual" }, "facts": { "employment_casual": true } } },
+      "expect": true,
+      "server_only": true
+    },
+    {
+      "name": "record source — a missing fact is not present (server only)",
+      "predicate": { "source": { "from": "record", "path": "facts.never_recorded" }, "op": "not_exists" },
+      "context": { "_package": "journeys", "record": { "data": {}, "facts": {} } },
+      "expect": true,
+      "server_only": true
+    },
+    {
+      "name": "allOf mixing a subject source and an existing operator (server only)",
+      "predicate": {
+        "allOf": [
+          { "source": { "from": "subject", "path": "role_tag_ids" }, "op": "includes_any", "operands": [11, 12] },
+          { "source": { "from": "subject", "path": "creation_path" }, "op": "not_equals", "operand": "import" }
+        ]
+      },
+      "context": { "_package": "journeys", "subject": { "role_tag_ids": [12], "creation_path": "invite" } },
+      "expect": true,
+      "server_only": true
+    }
+  ]
+}

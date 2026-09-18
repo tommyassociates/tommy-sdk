@@ -2,8 +2,8 @@
  * predicate.js — THE predicate evaluator. Singular, deliberately.
  *
  * The manifest schema's `$defs/predicate` is a CLOSED L6 comparator set
- * (`exists | not_exists | equals | not_equals | one_of | range`, with one
- * level of `allOf`/`anyOf`). Its own $comment states the rule this file
+ * (`exists | not_exists | equals | not_equals | one_of | range | includes_any`,
+ * with one level of `allOf`/`anyOf`). Its own $comment states the rule this file
  * exists to make enforceable:
  *
  *   "There is exactly ONE evaluator: an adapter that re-implements any
@@ -30,7 +30,14 @@ export class PredicateError extends Error {
   }
 }
 
-const OPERATORS = ['exists', 'not_exists', 'equals', 'not_equals', 'one_of', 'range'];
+/**
+ * The closed set. `includes_any` is the L-1 addition of scope 11d (JD11), and it
+ * landed in BOTH evaluators and the schema in one release, because an operator in
+ * one evaluator only is the R4 drift this file's header forbids: an older binary
+ * that meets it throws `unknown predicate operator`, so it fails CLOSED rather
+ * than evaluating to a silent false.
+ */
+const OPERATORS = ['exists', 'not_exists', 'equals', 'not_equals', 'one_of', 'range', 'includes_any'];
 
 function dottedGet(obj, path) {
   if (!path) return obj;
@@ -129,6 +136,18 @@ function evaluateComparator(node, context) {
       const candidates = Array.isArray(node.operands) ? node.operands
         : (Array.isArray(node.operand) ? node.operand : []);
       return candidates.some((candidate) => sameValue(value, candidate));
+    }
+    case 'includes_any': {
+      // An ARRAY value shares at least one element with `operands`. A non-array
+      // value — including a missing one and a bare scalar that happens to be in
+      // `operands` — is FALSE, never an error and never a coerced single-element
+      // array: "this member's role tags include one of these" has no meaning for
+      // a value that is not a set, and guessing one would make a predicate
+      // match a shape the contract never promised.
+      const candidates = Array.isArray(node.operands) ? node.operands
+        : (Array.isArray(node.operand) ? node.operand : []);
+      if (!Array.isArray(value)) return false;
+      return value.some((element) => candidates.some((candidate) => sameValue(element, candidate)));
     }
     case 'range': {
       // operand { min?, max? } (inclusive), or operands [min, max].

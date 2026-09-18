@@ -17,7 +17,7 @@ export type Category = ("scheduling" | "time_attendance" | "hr_people" | "financ
  */
 export type Predicate = ({
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 } | {
@@ -26,12 +26,12 @@ operands?: unknown[]
  */
 allOf: [{
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 }, ...({
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 })[]]
@@ -41,12 +41,12 @@ operands?: unknown[]
  */
 anyOf: [{
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 }, ...({
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 })[]]
@@ -810,7 +810,7 @@ autoLaunch?: {
  */
 when?: ({
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 } | {
@@ -819,12 +819,12 @@ operands?: unknown[]
  */
 allOf: [{
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 }, ...({
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 })[]]
@@ -834,12 +834,12 @@ operands?: unknown[]
  */
 anyOf: [{
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 }, ...({
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 })[]]

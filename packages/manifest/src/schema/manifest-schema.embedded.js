@@ -1988,7 +1988,8 @@ export default {
                 "equals",
                 "not_equals",
                 "one_of",
-                "range"
+                "range",
+                "includes_any"
               ]
             },
             "operand": {},
