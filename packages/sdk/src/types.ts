@@ -553,13 +553,20 @@ export type DirectoryKind =
 /** Minimal reference to a directory entity. Never a full record. */
 export interface EntityRef {
   readonly kind: DirectoryKind;
+  /** The ENTITY's id: team-member ROW id, location id, or (role/skill/tag) the tag id. */
   readonly id: string;
   readonly displayName: string;
+  /** team_member only: the member's USER id (what assignee_id / user_id fields store). */
+  readonly userId?: string;
+  /** Picker / resolveMany results: the tag the entity is known by in tag-family filters. */
+  readonly tagId?: string;
 }
 
 export interface PickerOptions {
-  /** Entity ids pre-selected when the picker opens. */
+  /** Entity ids (EntityRef.id space) pre-selected when the picker opens. */
   readonly preselected?: readonly string[];
+  /** team_member: pre-select by USER id instead — for fields that store one. */
+  readonly preselectedUserIds?: readonly string[];
   /** Optional modal title. */
   readonly title?: string;
 }
@@ -578,6 +585,9 @@ export interface PickOptions extends PickerOptions {
 /**
  * Host-rendered selection UI. The host opens the app's own picker (in the host
  * realm, permission-scoped to the current user) and returns only the choice.
+ * THIS is how an MP chooses team members / locations / roles / skills / tags:
+ * never load `directory.list()` to fill a <select> (a 10,000-member team stalls
+ * the page). Backing out of a picker returns the selection it opened with.
  * Requires the matching `read:` scope(s); results are double-filtered
  * (MP scope ∩ user visibility) — see host-services.md.
  */
@@ -653,8 +663,8 @@ export interface UiApi {
 export interface DirectoryApi {
   /** id -> EntityRef, or null if the user may not see it. */
   resolve(kind: DirectoryKind, id: string): Promise<EntityRef | null>;
-  /** Batch resolve; only permitted entities are returned. */
-  resolveMany(kind: DirectoryKind, ids: readonly string[]): Promise<ReadonlyArray<EntityRef>>;
+  /** Batch resolve; only permitted entities are returned. `idSpace: 'user'` reads team_member ids as USER ids. */
+  resolveMany(kind: DirectoryKind, ids: readonly string[], opts?: { idSpace?: 'id' | 'user' }): Promise<ReadonlyArray<EntityRef>>;
   /** The entities the user+MP may see. Prefer UiApi pickers — list exposes more data. */
   list(
     kind: DirectoryKind,
