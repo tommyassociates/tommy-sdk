@@ -562,6 +562,11 @@ export interface EntityRef {
   readonly tagId?: string;
 }
 
+/** Cancelled arrays contain only resolvable initial refs; retain the original IDs. */
+export interface PickerResult extends Array<EntityRef> {
+  readonly cancelled?: boolean;
+}
+
 export interface PickerOptions {
   /** Entity ids (EntityRef.id space) pre-selected when the picker opens. */
   readonly preselected?: readonly string[];
@@ -617,17 +622,17 @@ export interface UiApi {
     el: HTMLElement;
   }): Promise<{ approved: boolean; restoreConfirmation?: string }>;
   /** Canonical picker — supports mixed kinds and multi-select. */
-  pick(opts: PickOptions): Promise<EntityRef[]>;
+  pick(opts: PickOptions): Promise<PickerResult>;
   // convenience wrappers — common single-kind cases, thin calls to pick():
   pickTeamMember(opts?: PickerOptions): Promise<EntityRef | null>;
-  pickTeamMembers(opts?: PickerOptions): Promise<EntityRef[]>;
+  pickTeamMembers(opts?: PickerOptions): Promise<PickerResult>;
   pickLocation(opts?: PickerOptions): Promise<EntityRef | null>;
-  pickLocations(opts?: PickerOptions): Promise<EntityRef[]>;
+  pickLocations(opts?: PickerOptions): Promise<PickerResult>;
   pickRole(opts?: PickerOptions): Promise<EntityRef | null>;
   pickSkill(opts?: PickerOptions): Promise<EntityRef | null>;
-  pickSkills(opts?: PickerOptions): Promise<EntityRef[]>;
+  pickSkills(opts?: PickerOptions): Promise<PickerResult>;
   pickTag(opts?: PickerOptions): Promise<EntityRef | null>;
-  pickTags(opts?: PickerOptions): Promise<EntityRef[]>;
+  pickTags(opts?: PickerOptions): Promise<PickerResult>;
   /**
    * Show the host-rendered mini-profile quick-look card for a team member or
    * client. Responsive (desktop dropdown / mobile bottom sheet), permission-
