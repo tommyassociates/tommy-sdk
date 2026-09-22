@@ -242,6 +242,14 @@ export function createBroker({
   // gets a storage-less instance rather than a second code path.
   const queueStore = offlineQueue || createDurableQueue({ now, storage: null });
   let isOnline = online;
+  let pendingWork = 0;
+  let retired = false;
+  async function trackWork(run) {
+    if (retired) throw err('ActivityFailed', 'MP runtime retired', { retryable: false });
+    pendingWork += 1;
+    try { return await run(); } finally { pendingWork -= 1; }
+  }
+
 
   const qualify = (mpId, name) => `${mpId}.${name}`;
   const splitQualified = (qualified) => {
@@ -650,7 +658,9 @@ export function createBroker({
     });
   }
 
-  async function deliverEmit(record, payload, tenantId, identity) {
+  function deliverEmit(...args) { return trackWork(() => deliverEmitInnerTracked(...args)); }
+
+  async function deliverEmitInnerTracked(record, payload, tenantId, identity) {
     const triggerQualified = record.triggerName;
     const chain = { rootRunId: record.rootRunId, depth: record.depth, chainPath: record.chainPath };
     const deliveries = [];
@@ -707,10 +717,12 @@ export function createBroker({
       );
     }
 
-    return deliveries;
+    return deliveries.map((delivery) => trackWork(() => delivery));
   }
 
-  async function dispatchEmit(envelope) {
+  function dispatchEmit(...args) { return trackWork(() => dispatchEmitInnerTracked(...args)); }
+
+  async function dispatchEmitInnerTracked(envelope) {
     const identity = envelope.identity || authenticate(envelope);
     const tenantId = identity.tenantId;
     const [emitterMp] = [envelope.sourceMpId];
@@ -803,7 +815,7 @@ export function createBroker({
     }
     const entry = pending || { superseded: [], resolvers: [] };
     entry.latest = { record, payload };
-    entry.timer = setTimeout(async () => {
+    entry.timer = setTimeout(() => trackWork(async () => {
       debouncePending.delete(key);
       for (const old of entry.superseded) {
         // eslint-disable-next-line no-await-in-loop
@@ -811,7 +823,7 @@ export function createBroker({
       }
       await deliverEmit(entry.latest.record, entry.latest.payload, tenantId, identity);
       await records.update(entry.latest.record.runId, { status: 'succeeded' });
-    }, debounceMs);
+    }), debounceMs);
     debouncePending.set(key, entry);
     return { emitId: record.runId, deliveredTo: 0, queuedFor: 0, coalescing: true };
   }
@@ -882,7 +894,9 @@ export function createBroker({
     }
   }
 
-  async function dispatchQuery(envelope) {
+  function dispatchQuery(...args) { return trackWork(() => dispatchQueryInnerTracked(...args)); }
+
+  async function dispatchQueryInnerTracked(envelope) {
     const identity = envelope.identity || authenticate(envelope);
     const tenantId = envelope.tenantId || identity.tenantId;
     takeToken(envelope.sourceMpId, 'query');
@@ -1140,7 +1154,9 @@ export function createBroker({
     if (depth > 0) executingChains.set(mpId, depth); else executingChains.delete(mpId);
   }
 
-  async function dispatchInvoke(envelope) {
+  function dispatchInvoke(...args) { return trackWork(() => dispatchInvokeInnerTracked(...args)); }
+
+  async function dispatchInvokeInnerTracked(envelope) {
     const sourceMpId = envelope.sourceMpId;
     // Re-entrant (nested) dispatch: run inline, never behind our own ancestor.
     if (executingChains.has(sourceMpId)) return dispatchInvokeInner(envelope);
@@ -1148,7 +1164,9 @@ export function createBroker({
     const tail = invokeChains.get(sourceMpId) || Promise.resolve();
     const run = tail.catch(() => {}).then(() => dispatchInvokeInner(envelope));
     invokeChains.set(sourceMpId, run);
-    return run;
+    try { return await run; } finally {
+      if (invokeChains.get(sourceMpId) === run) invokeChains.delete(sourceMpId);
+    }
   }
 
   async function dispatchInvokeInner(envelope) {
@@ -1361,7 +1379,9 @@ export function createBroker({
     });
   }
 
-  async function rollbackTransaction(envelope) {
+  function rollbackTransaction(...args) { return trackWork(() => rollbackTransactionInnerTracked(...args)); }
+
+  async function rollbackTransactionInnerTracked(envelope) {
     const identity = envelope.identity || authenticate(envelope);
     const steps = txnSteps.get(envelope.txnId) || [];
     txnSteps.delete(envelope.txnId);
@@ -1399,7 +1419,9 @@ export function createBroker({
     return queueStore.push({ sourceMpId, envelope, bytes });
   }
 
-  async function drainOfflineQueue() {
+  function drainOfflineQueue(...args) { return trackWork(() => drainOfflineQueueInnerTracked(...args)); }
+
+  async function drainOfflineQueueInnerTracked() {
     const bySource = new Map();
     for (const row of queueStore.takeAll()) {
       const list = bySource.get(row.sourceMpId) || [];
@@ -1663,6 +1685,18 @@ export function createBroker({
       };
     },
 
-    async teardown() { /* flush semantics: nothing buffered at M1 beyond debounce */ },
+    /** Host retention must not retire a running action or delayed delivery. */
+    hasPendingWork: () => pendingWork > 0 || debouncePending.size > 0,
+    async teardown(instanceId) {
+      if (instanceId != null) return;
+      retired = true;
+      for (const entry of debouncePending.values()) clearTimeout(entry.timer);
+      debouncePending.clear();
+      subscribers.clear();
+      mps.clear();
+      conditionCache.clear();
+      processedKeys.clear();
+      invokeChains.clear();
+    },
   };
 }
