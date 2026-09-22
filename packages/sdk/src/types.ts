@@ -749,6 +749,14 @@ export interface DeviceApi {
 // ============================================================================
 
 export interface HostApi {
+  /** Bounded directory-scoped journey progress. Host rejects stale actor context. */
+  journeysMemberSummaries?(params: {member_ids: ReadonlyArray<string | number>}): Promise<{
+    members: ReadonlyArray<{metric: 'member_next'; member_id: string | number; open_step_count: number; next: ReadonlyArray<Record<string, unknown>>; stuck: boolean; server_time: string}>;
+    server_time: string;
+  }>;
+  /** Mount the permission-scoped next-step panel on a team-member profile. */
+  mountJourneyMemberPanel?(element: HTMLElement, options: {memberId: string | number}): Promise<{close(): void} | null>;
+
   /** Is a platform feature flag enabled for this tenant? (loop-review X8) */
   feature(name: string): Promise<boolean>;
   /** Does the current user hold a permission? Host applies the real RBAC. (X8) */
