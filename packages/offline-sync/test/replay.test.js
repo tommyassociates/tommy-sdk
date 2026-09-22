@@ -165,3 +165,21 @@ describe('offline replay', () => {
     coordinator.stop();
   });
 });
+
+
+describe('replay listener lifetime', () => {
+  it('repeated warm resumes retain exactly one listener, and stop removes it', () => {
+    const listeners = new Set();
+    const coordinator = createReplayCoordinator({
+      broker: {},
+      addOnlineListener: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
+    });
+    for (let i = 0; i < 20; i += 1) coordinator.start();
+    expect(listeners.size).toBe(1);
+    coordinator.stop();
+    expect(listeners.size).toBe(0);
+    coordinator.start();
+    expect(listeners.size).toBe(1);
+    coordinator.stop();
+  });
+});

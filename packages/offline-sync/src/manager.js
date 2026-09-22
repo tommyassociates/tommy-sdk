@@ -460,6 +460,7 @@ export function createReplayCoordinator({ broker, addOnlineListener }) {
 
   return {
     start() {
+      if (unsubscribe) return;
       if (addOnlineListener) {
         unsubscribe = addOnlineListener(() => { drain(); });
       } else if (typeof window !== 'undefined') {
