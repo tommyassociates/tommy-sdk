@@ -1088,6 +1088,15 @@
                   "when": {
                     "$ref": "#/$defs/predicate",
                     "description": "DOMAIN readiness only. \u26a0 IT MAY NOT REFERENCE TOUR STATE (seen / launched / enabled / dismissed / completed) \u2014 checker M20 rejects that: the host applies enabled \u2227 \u00acseen \u2227 \u00aclaunched \u2227 role-eligible \u2227 no-tour-running as an UNCONDITIONAL precondition, and an MP predicate over the same state would make the host and the MP two authorities on one decision."
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "route",
+                      "surface"
+                    ],
+                    "default": "route",
+                    "description": "Route tours use the canonical MP route. Surface tours are offered by the mounted view through tommy.tours.offer; the host owns completion, launch and concurrent-tour guards."
                   }
                 }
               },

@@ -844,6 +844,10 @@ operand?: unknown
 operands?: unknown[]
 })[]]
 })
+/**
+ * Route tours use the canonical MP route. Surface tours are offered by the mounted view through tommy.tours.offer; the host owns completion, launch and concurrent-tour guards.
+ */
+mode?: ("route" | "surface")
 }
 /**
  * @minItems 1
