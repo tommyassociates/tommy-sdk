@@ -12,6 +12,67 @@ import { createDataManager } from '../src/manager.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 
+describe.each([
+  ['timesheets', 'timesheets_cache', 'windowCache'],
+  ['care-plans', 'care_plans_cache', 'liveQuery'],
+])('%s final revalidation read', (mpId, storeName, kind) => {
+  const world = (fetch) => {
+    const data = createDataManager({
+      capabilityToken: { tenantId: 'team-3', mpId }, mpId,
+      localData: { [storeName]: { keyPath: 'id' } },
+      backendFactory: () => createMemoryStoreBackend(),
+    });
+    const store = data.store(storeName);
+    const scope = (row) => row.group === 'visible';
+    const query = kind === 'windowCache'
+      ? data.windowCache(storeName, { fetch, scopeOf: () => scope })
+      : data.liveQuery(storeName, { fetch, scope, pruneScope: () => false });
+    return { data, store, revalidate: () => (kind === 'windowCache' ? query.sync({}) : query.revalidate({})) };
+  };
+
+  it('reads the final display scope once, preserving local edits and isolated return values', async () => {
+    const pending = Promise.withResolvers();
+    const { store, revalidate } = world(() => pending.promise);
+    await store.reconcile([
+      { id: 'remote', group: 'visible', title: 'old' },
+      { id: 'outside', group: 'other', title: 'keep' },
+    ]);
+    const returnedReads = vi.spyOn(store, 'readWhere');
+    const refresh = revalidate();
+    await store.put({ id: 'local', group: 'visible', title: 'unsent edit' });
+    pending.resolve([{ id: 'remote', group: 'visible', title: 'fresh' }]);
+
+    const rows = await refresh;
+    expect(returnedReads).toHaveBeenCalledTimes(1);
+    expect(rows.map((row) => row.id).sort()).toEqual(['local', 'remote']);
+    expect(rows.find((row) => row.id === 'remote').title).toBe('fresh');
+    expect((await store.get('local'))._dirty).toBe(true);
+    expect((await store.get('outside')).title).toBe('keep');
+    expect((await store.get('remote'))._rev).toBe(2);
+    rows.find((row) => row.id === 'remote').title = 'caller mutation';
+    expect((await store.get('remote')).title).toBe('fresh');
+  });
+
+  it('performs a new final read after failed revalidation and subsequent local events', async () => {
+    const { store, revalidate } = world(() => { throw new Error('offline'); });
+    await store.put({ id: 'local', group: 'visible', title: 'first edit' });
+    const returnedReads = vi.spyOn(store, 'readWhere');
+    expect(await revalidate()).toEqual([{ id: 'local', group: 'visible', title: 'first edit' }]);
+    await store.put({ id: 'local', group: 'visible', title: 'later edit' });
+    expect(await revalidate()).toEqual([{ id: 'local', group: 'visible', title: 'later edit' }]);
+    expect(returnedReads).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects an outstanding read after manager retirement even when fetch returns no records', async () => {
+    const pending = Promise.withResolvers();
+    const { data, revalidate } = world(() => pending.promise);
+    const refresh = revalidate();
+    await data.dispose();
+    pending.resolve(null);
+    await expect(refresh).rejects.toMatchObject({ name: 'StorageReadError', reason: 'retired' });
+  });
+});
+
 describe('the paint ceiling (contract item 3, the platform half)', () => {
   const manager = (now) => createDataManager({
     capabilityToken: { tenantId: 'team-3', mpId: 'aged-mp' }, mpId: 'aged-mp',
