@@ -749,6 +749,10 @@ export interface DeviceApi {
 // ============================================================================
 
 export interface HostApi {
+  /** Read-only managed template preview. Does not create a team journey. */
+  journeysTemplatePreview?(params: {product_key: string}): Promise<Record<string, unknown>>;
+  /** Version-checked soft archive; retains existing records and activity. */
+  journeysDeleteFamily?(params: {id: string; base_version: number}): Promise<Record<string, unknown>>;
   /** Bounded directory-scoped journey progress. Host rejects stale actor context. */
   journeysMemberSummaries?(params: {member_ids: ReadonlyArray<string | number>}): Promise<{
     members: ReadonlyArray<{metric: 'member_next'; member_id: string | number; open_step_count: number; next: ReadonlyArray<Record<string, unknown>>; stuck: boolean; server_time: string}>;
