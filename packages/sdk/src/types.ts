@@ -572,6 +572,8 @@ export interface PickerOptions {
   readonly preselected?: readonly string[];
   /** team_member: pre-select by USER id instead — for fields that store one. */
   readonly preselectedUserIds?: readonly string[];
+  /** Tag-family filters may preselect the entity’s backing tag instead of its entity id. */
+  readonly preselectedTagIds?: readonly string[];
   /** Optional modal title. */
   readonly title?: string;
 }
@@ -669,7 +671,7 @@ export interface DirectoryApi {
   /** id -> EntityRef, or null if the user may not see it. */
   resolve(kind: DirectoryKind, id: string): Promise<EntityRef | null>;
   /** Batch resolve; only permitted entities are returned. `idSpace: 'user'` reads team_member ids as USER ids. */
-  resolveMany(kind: DirectoryKind, ids: readonly string[], opts?: { idSpace?: 'id' | 'user' }): Promise<ReadonlyArray<EntityRef>>;
+  resolveMany(kind: DirectoryKind, ids: readonly string[], opts?: { idSpace?: 'id' | 'user' | 'tag' }): Promise<ReadonlyArray<EntityRef>>;
   /** The entities the user+MP may see. Prefer UiApi pickers — list exposes more data. */
   list(
     kind: DirectoryKind,
