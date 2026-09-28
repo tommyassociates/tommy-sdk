@@ -8,6 +8,10 @@ const handleRegistry = new Set();
 const cleanupRegistry = new Set();
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const next = (value) => { if (!integer(value) || value >= Number.MAX_SAFE_INTEGER) throw storageError('write-failed'); return value + 1; };
+// Batched keyed read where the database has one (SQLite); per-key otherwise.
+const getMany = (tx, table, keys) => (typeof tx.getMany === 'function'
+  ? tx.getMany(table, keys)
+  : Promise.all(keys.map((key) => tx.get(table, key))));
 /** A host-local port. Database transactions, not handle queues, serialize other tabs. */
 export function createHostStorePort({ database, backend = 'indexeddb', now = () => Date.now(), randomId = () => globalThis.crypto.randomUUID() } = {}) {
   if (!database?.transaction || !['indexeddb', 'capacitor_sqlite', 'electron_sqlite', 'volatile'].includes(backend)) throw storageError('unavailable');
@@ -97,7 +101,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
         const handle = getHandle(input.handle);
         return await database.transaction('readonly', async (tx) => {
           const store = await current(tx, handle, input.expectedEpoch);
-          const metadata = input.keys ? (await Promise.all(input.keys.map((key) => tx.get('rows', rowKey(handle, store.generation, 'm', key))))).filter(Boolean)
+          const metadata = input.keys ? (await getMany(tx, 'rows', input.keys.map((key) => rowKey(handle, store.generation, 'm', key)))).filter(Boolean)
             : await tx.scan('rows', prefix(handle, store.generation, 'm'), { after: input.afterKey, limit: input.limit + 1 });
           const result = { epoch: handle.epoch, storeRevision: store.revision, rows: [], nextKey: null };
           const included = [];
@@ -126,10 +130,12 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
             lastScanned = row.id;
           }
           if (!input.keys && scanned < metadata.length) result.nextKey = lastScanned;
-          for (const row of included) {
+          const bodies = input.metadataOnly ? []
+            : await getMany(tx, 'rows', included.map((row) => rowKey(handle, store.generation, 'b', row.id)));
+          for (const [index, row] of included.entries()) {
             let value = null;
             if (!input.metadataOnly) {
-              const body = await tx.get('rows', rowKey(handle, store.generation, 'b', row.id));
+              const body = bodies[index];
               if (!body || typeof body.json !== 'string') throw storageError('read-failed');
               try { value = JSON.parse(body.json); } catch (_) { throw storageError('read-failed'); }
             }
