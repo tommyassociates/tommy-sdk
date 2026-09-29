@@ -189,6 +189,15 @@ describe('data service on memory stores', () => {
     expect(await data.read('chats.messages', 'a')).toMatchObject({ chat_id: 7, seq: 2 });
   });
 
+  it('reads a row by its key whether the key is given as a number or as text', async () => {
+    const stores = new Map([['chats.rows', createDataStore({ name: 'chats.rows', backend: createMemoryStoreBackend() })]]);
+    const data = createDataService({ resolve: (name) => (stores.has(name) ? { store: stores.get(name), decl: { keyPath: 'id' } } : null) });
+    await data.ingest('chats.rows', [{ id: 101, title: 'Numeric id' }]);
+    expect((await data.read('chats.rows', '101')).title).toBe('Numeric id');
+    expect((await data.read('chats.rows', 101)).title).toBe('Numeric id');
+    expect(await data.purge('chats.rows', { keys: [101] })).toEqual({ removed: ['101'] });
+  });
+
   it('subscribes to a later page of an indexed query', async () => {
     const data = memoryService();
     for (const [id, seq] of [['a', 1], ['b', 2], ['c', 3]]) await data.mutate('chats.messages', { op: 'put', record: { id, chat_id: 7, seq } });
@@ -357,6 +366,23 @@ describe.each(DATABASES)('large collections on the host store (%s)', (_name, cre
     await data.ingest('chats.messages', messages(7, 1, 250));
     expect(commits.count).toBeLessThanOrEqual(3);
     expect((await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 1 })).rows[0].seq).toBe(1);
+    await close();
+  });
+
+  it('reads and subscribes to more rows than one index page holds', async () => {
+    const { data, close } = hostService(create);
+    await data.ingest('chats.messages', messages(7, 1, 250));
+    const all = await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 1000 });
+    expect(all).toMatchObject({ complete: true, nextCursor: null });
+    expect(all.rows.map((row) => row.seq)).toEqual(messages(7, 1, 250).map((row) => row.seq));
+    const first = await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 120 });
+    expect(first.rows).toHaveLength(120);
+    expect(first.complete).toBe(false);
+    const rest = await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 1000, cursor: first.nextCursor });
+    expect(rest.rows[0].seq).toBe(121);
+    const seen = [];
+    data.subscribe({ collection: 'chats.messages', query: { index: 'byChat', prefix: [7], limit: 200 } }, (rows) => seen.push(rows.length));
+    await vi.waitFor(() => expect(seen).toEqual([200]));
     await close();
   });
 

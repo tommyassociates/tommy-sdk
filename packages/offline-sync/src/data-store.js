@@ -18,13 +18,14 @@ import addFormats from 'ajv-formats';
 const ajv = new Ajv({ allErrors: true, strict: false });
 addFormats(ajv);
 
+/** Rows by key, keyed as strings like every other backend (a numeric id and its text find the same row). */
 export function createMemoryStoreBackend() {
   const rows = new Map();
   return {
-    async get(key) { return rows.get(key); },
+    async get(key) { return rows.get(String(key)); },
     async getAll() { return [...rows.values()]; },
-    async put(key, record) { rows.set(key, record); },
-    async delete(key) { rows.delete(key); },
+    async put(key, record) { rows.set(String(key), record); },
+    async delete(key) { rows.delete(String(key)); },
     keys() { return [...rows.keys()]; },
   };
 }

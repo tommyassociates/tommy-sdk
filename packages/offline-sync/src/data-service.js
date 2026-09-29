@@ -42,19 +42,29 @@ const INGEST_CHUNK = 500;
 // A subject read for purge or trim is bounded; the rest is left for the TTL.
 const SUBJECT_SCAN_LIMIT = 5000;
 
-/** Every row of an index range, raw (dirty flags and all), up to a bound. */
-async function queryAll(store, { index, limit: _limit, cursor: _cursor, ...range }) {
+// A physical index read returns at most this many rows per page.
+const PAGE_ROWS = 100;
+
+/**
+ * Rows of an index range in index order, read in pages: up to `limit`
+ * (`SUBJECT_SCAN_LIMIT` when absent) from `cursor`. `raw` includes rows past
+ * the paint ceiling, with their dirty flags, for writers.
+ */
+async function queryPages(store, index, range, { limit = SUBJECT_SCAN_LIMIT, cursor: start = null, raw = false } = {}) {
   const rows = [];
-  let cursor = null;
+  let cursor = start;
+  let complete = false;
   do {
     // Each page continues from the cursor the previous one returned.
     // eslint-disable-next-line no-await-in-loop
-    const page = await store.query(index, range, { limit: 100, cursor, raw: true });
+    const page = await store.query(index, range, { limit: Math.min(PAGE_ROWS, limit - rows.length), cursor, ...(raw ? { raw: true } : {}) });
     rows.push(...page.rows);
+    complete = page.complete;
     cursor = page.complete ? null : page.nextCursor;
-  } while (cursor !== null && rows.length < SUBJECT_SCAN_LIMIT);
-  return rows;
+  } while (cursor !== null && rows.length < limit);
+  return { rows, nextCursor: complete ? null : cursor, complete };
 }
+const queryAll = (store, { index, limit: _limit, cursor: _cursor, ...range }) => queryPages(store, index, range, { raw: true }).then((page) => page.rows);
 const same = (a, b) => {
   try { return JSON.stringify(a) === JSON.stringify(b); } catch (_) { return false; }
 };
@@ -108,7 +118,7 @@ export function createDataService({
     const { store } = local(target.collection);
     if (target.query) {
       const { index, limit = 50, cursor = null, ...range } = target.query;
-      return (await store.query(index, range, { limit, cursor })).rows;
+      return (await queryPages(store, index, range, { limit, cursor })).rows;
     }
     if (target.key !== undefined && target.key !== null) return (await store.get(String(target.key))) ?? null;
     return store.getAll();
@@ -239,7 +249,7 @@ export function createDataService({
       live();
       const { store } = local(collection);
       const { index, limit = 50, cursor = null, where, ...range } = spec;
-      if (index) return store.query(index, range, { limit, cursor });
+      if (index) return queryPages(store, index, range, { limit, cursor });
       const rows = (await store.getAll()).filter((row) => (typeof where === 'function' ? where(row) : true));
       return { rows: rows.slice(0, limit), nextCursor: null, complete: rows.length <= limit };
     },
