@@ -352,10 +352,34 @@ export class PersistError extends Error {
   }
 }
 
+/**
+ * Index order for stores without a physical index (memory and Web Storage):
+ * the same value order the host store's encoding gives, so a query returns
+ * the same rows in the same order on every backend.
+ */
+function compareIndexValues(a, b) {
+  const rank = (value) => (value === null || value === undefined ? 0 : typeof value === 'boolean' ? 1 : typeof value === 'number' ? 2 : 3);
+  if (rank(a) !== rank(b)) return rank(a) - rank(b);
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+export function queryRows(rows, fields, { equals, prefix, lower, upper } = {}, keyOf = (row) => row.id) {
+  const head = equals || prefix || [];
+  const at = head.length;
+  return rows.filter((row) => head.every((value, index) => compareIndexValues(row[fields[index]], value) === 0)
+    && (lower === undefined || compareIndexValues(row[fields[at]], lower) >= 0)
+    && (upper === undefined || compareIndexValues(row[fields[at]], upper) <= 0))
+    .sort((a, b) => {
+      for (const field of fields) { const result = compareIndexValues(a[field], b[field]); if (result) return result; }
+      const ka = String(keyOf(a)); const kb = String(keyOf(b));
+      return ka < kb ? -1 : ka > kb ? 1 : 0;
+    });
+}
+
 export function createDataStore({
   name, keyPath = 'id', recordSchema, backend = createMemoryStoreBackend(),
   now = () => Date.now(), maxRows = DEFAULT_MAX_ROWS, maxWindows = DEFAULT_MAX_WINDOWS, onPersistError,
-  syncStrategy = 'server_authoritative',
+  syncStrategy = 'server_authoritative', indexes = {},
 }) {
   const validate = recordSchema ? ajv.compile(recordSchema) : null;
   const wholeStoreSubscribers = new Set();
@@ -640,7 +664,8 @@ export function createDataStore({
     return !Number.isFinite(at) || at >= now() - PAINT_CEILING_MS;
   };
 
-  if (backend.transactional) return createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows });
+  if (backend.transactional) return createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows, indexes, queryRows });
+
 
   async function enforceWindowRetention({ current, changed, keep = maxWindows } = {}) {
     if (!Number.isFinite(keep) || keep <= 0) return [];
@@ -712,7 +737,24 @@ export function createDataStore({
   }
 
   let disposed = false;
+  const indexFields = Object.fromEntries(Object.entries(indexes || {}).map(([index, fields]) => [index, Array.isArray(fields) ? fields : [fields]]));
   const api = {
+    /**
+     * Rows by a declared index, in index order, the same as the host store's
+     * physical indexes: `equals`, or a `prefix` of the leading fields with an
+     * inclusive `lower`/`upper` bound on the next one. `cursor` continues.
+     */
+    async query(index, range = {}, { limit = 50, cursor = null } = {}) {
+      const fields = indexFields[index];
+      if (!fields) throw Object.assign(new Error(`store '${name}': index '${index}' is not declared`), { name: 'StorageReadError', reason: 'unserializable' });
+      const rows = queryRows((await snapshot()).filter(paintable), fields, range, keyOf);
+      const start = cursor === null ? 0 : rows.findIndex((row) => String(keyOf(row)) === String(cursor)) + 1;
+      const page = rows.slice(start, start + limit);
+      const more = start + limit < rows.length;
+      return { rows: page, nextCursor: more ? String(keyOf(page.at(-1))) : null, complete: !more };
+    },
+    /** Subscribers read the store again after a change made elsewhere. */
+    async revalidateSubscribers() { await notify([...(backend.keys?.() || [])]); },
     dispose(options) {
       disposed = true;
       wholeStoreSubscribers.clear();
@@ -912,10 +954,15 @@ export function createDataStore({
         throw new PersistError(name, persisted);
       }
     },
-    /** Sync engine hook: clear _dirty after a successful push. */
-    async markSynced(key) {
+    /**
+     * Sync engine hook: clear _dirty after a successful push. With
+     * `expectedRevision`, only while the row is still that revision: a later
+     * local write stays dirty until its own push.
+     */
+    async markSynced(key, { expectedRevision } = {}) {
       const record = await backend.get(key);
       if (!record) return;
+      if (expectedRevision !== undefined && record._rev !== expectedRevision) return;
       // Drop `_persistFailed` alongside `_dirty`: a row that reached the server
       // is no longer "saved on this device only", whatever happened to the local
       // copy on the way.

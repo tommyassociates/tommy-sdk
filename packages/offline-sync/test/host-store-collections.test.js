@@ -1,0 +1,251 @@
+// @vitest-environment node
+/**
+ * The host store's collection layer on both physical engines: namespaced
+ * collections on the existing owner keys, secondary indexes, migrations,
+ * per-collection and per-domain eviction that never touches dirty or authored
+ * rows, inspection and cache clearing for Settings → Data, and the change feed.
+ */
+import { describe, it, expect } from 'vitest';
+import {
+  createHostStorePort, retireHostStorePrincipal, createHostStoreChangeFeed, observeHostStorePort,
+  HOST_DATA_MP_ID, collectionName, storeNameValid,
+} from '../src/host-store/index.js';
+import { DATABASES, identity, createChannelBus } from './helpers/host-databases.js';
+
+const SELECTOR = { authorityOrigin: 'https://api.example.test', viewerId: '7' };
+function openInput({ storeName = 'chats.rows', policy = 'cache', schemaVersion = 1, indexes, limits = {}, who = identity() } = {}) {
+  return {
+    identity: who, storeName, policy, schemaVersion,
+    cacheFingerprint: policy === 'authored' ? null : 'fp-1',
+    limits: { maxRows: 1000, maxAgeMs: policy === 'authored' ? null : 86400000, maxBytes: null, ...limits },
+    ...(indexes ? { indexes } : {}),
+  };
+}
+async function setup(create) {
+  let clock = 1000;
+  const database = create();
+  const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb', now: () => clock });
+  async function open(options) {
+    const opened = await port.open(openInput(options));
+    let revision = opened.storeRevision;
+    return {
+      ...opened,
+      async put(rows, extra = {}) {
+        const result = await port.commit({ handle: opened.handle, expectedEpoch: opened.epoch, expectedStoreRevision: revision,
+          changes: rows.map((value) => ({ op: 'put', key: String(value.id), value })), ...extra });
+        if (result.ok) revision = result.storeRevision;
+        clock += 10;
+        return result;
+      },
+      async remove(keys) {
+        const result = await port.commit({ handle: opened.handle, expectedEpoch: opened.epoch, expectedStoreRevision: revision,
+          changes: keys.map((key) => ({ op: 'delete', key })) });
+        if (result.ok) revision = result.storeRevision;
+        return result;
+      },
+      async all() {
+        const page = await port.read({ handle: opened.handle, expectedEpoch: opened.epoch, afterKey: null, limit: 100 });
+        return page.rows.map((row) => row.value);
+      },
+      query: (input) => port.query({ handle: opened.handle, expectedEpoch: opened.epoch, limit: 100, ...input }),
+      refresh(result) { revision = result.storeRevision; },
+    };
+  }
+  const stores = async () => (await port.inspect({ op: 'stores', selector: SELECTOR })).stores;
+  return { port, open, stores, database, tick: (ms) => { clock += ms; } };
+}
+
+describe.each(DATABASES)('host store collections on %s', (_name, create) => {
+  it('names host collections <domain>.<collection> beside MP stores on the same owner', async () => {
+    const { port, open, stores } = await setup(create);
+    expect(collectionName('chats', 'rows')).toBe('chats.rows');
+    expect(['mp.x', 'Chats.rows', 'a.b.c', 'chats.'].map(storeNameValid)).toEqual([false, false, false, false]);
+    await expect(port.open(openInput({ storeName: 'mp.scheduling' }))).rejects.toMatchObject({ reason: 'unserializable' });
+    const rows = await open({ storeName: 'chats.rows' });
+    const drafts = await open({ storeName: 'drafts', policy: 'authored', who: identity({ mpId: 'forms', tenantId: 'team-4' }) });
+    await rows.put([{ id: 1, title: 'Row' }]);
+    await drafts.put([{ id: 1, body: 'Draft', _dirty: true }]);
+    expect(await rows.all()).toEqual([{ id: 1, title: 'Row' }]);
+    expect(await drafts.all()).toEqual([{ id: 1, body: 'Draft', _dirty: true }]);
+    const listed = await stores();
+    expect(listed.map((row) => [row.label, row.domain, row.policy, row.rowCount, row.dirtyCount])).toEqual([
+      ['chats.rows', 'chats', 'cache', 1, 0],
+      ['mp.forms.drafts', 'mp.forms', 'authored', 1, 1],
+    ]);
+    expect(HOST_DATA_MP_ID).toBe('platform-data');
+  });
+
+  it('isolates principals and accounts', async () => {
+    const { port, open } = await setup(create);
+    const mine = await open();
+    const team = await open({ who: identity({ accountType: 'Team', accountId: '44', tenantId: 'team-44' }) });
+    const other = await open({ who: identity({ viewerId: '8', accountId: '8', tenantId: 'user-8' }) });
+    await mine.put([{ id: 1, who: 'mine' }]);
+    await team.put([{ id: 1, who: 'team' }]);
+    await other.put([{ id: 1, who: 'other' }]);
+    expect(await mine.all()).toEqual([{ id: 1, who: 'mine' }]);
+    expect(await team.all()).toEqual([{ id: 1, who: 'team' }]);
+    const seen = (await port.inspect({ op: 'stores', selector: SELECTOR })).stores;
+    expect(seen.map((row) => [row.accountType, row.accountId])).toEqual([['Team', '44'], ['User', '7']]);
+    const theirs = (await port.inspect({ op: 'stores', selector: { ...SELECTOR, viewerId: '8' } })).stores;
+    await expect(port.inspect({ op: 'rows', selector: SELECTOR, store: theirs[0].id })).resolves.toMatchObject({ ok: false, reason: 'retired' });
+  });
+
+  it('queries secondary indexes in value order and keeps them in step with writes', async () => {
+    const { open } = await setup(create);
+    const messages = await open({ storeName: 'chats.messages', indexes: { bySequence: ['chat_id', 'seq'], byChat: 'chat_id' } });
+    await messages.put([
+      { id: 'a', chat_id: 7, seq: 10 }, { id: 'b', chat_id: 7, seq: 2 }, { id: 'c', chat_id: 12, seq: 1 },
+      { id: 'd', chat_id: 7, seq: 30 }, { id: 'e', chat_id: 1, seq: 5 },
+    ]);
+    const ids = (result) => result.rows.map((row) => row.key);
+    expect(ids(await messages.query({ index: 'byChat', equals: [7] }))).toEqual(['a', 'b', 'd']);
+    expect(ids(await messages.query({ index: 'bySequence', prefix: [7] }))).toEqual(['b', 'a', 'd']);
+    expect(ids(await messages.query({ index: 'bySequence', prefix: [7], lower: 5, upper: 30 }))).toEqual(['a', 'd']);
+    expect(ids(await messages.query({ index: 'bySequence', prefix: [7], upper: 10 }))).toEqual(['b', 'a']);
+    expect(ids(await messages.query({ index: 'byChat', lower: 7 }))).toEqual(['a', 'b', 'd', 'c']);
+    const first = await messages.query({ index: 'bySequence', prefix: [7], limit: 2 });
+    expect(ids(first)).toEqual(['b', 'a']);
+    expect(ids(await messages.query({ index: 'bySequence', prefix: [7], limit: 2, afterKey: first.nextKey }))).toEqual(['d']);
+    await messages.put([{ id: 'a', chat_id: 12, seq: 3 }]);
+    await messages.remove(['d']);
+    expect(ids(await messages.query({ index: 'byChat', equals: [7] }))).toEqual(['b']);
+    expect(ids(await messages.query({ index: 'bySequence', prefix: [12] }))).toEqual(['c', 'a']);
+    await expect(messages.query({ index: 'missing', equals: [1] })).resolves.toMatchObject({ ok: false });
+  });
+
+  it('starts a cache empty at a new schema version and migrates authored rows copy-on-write', async () => {
+    const { port, open } = await setup(create);
+    const cache = await open({ storeName: 'chats.rows' });
+    await cache.put([{ id: 1, v: 1 }]);
+    const upgraded = await open({ storeName: 'chats.rows', schemaVersion: 2 });
+    expect(await upgraded.all()).toEqual([]);
+    await expect(port.open(openInput({ storeName: 'chats.rows', schemaVersion: 1 }))).rejects.toMatchObject({ reason: 'unavailable' });
+
+    const v1 = await open({ storeName: 'outbox', policy: 'authored' });
+    await v1.put([{ id: 1, text: 'one', _dirty: true }, { id: 2, text: 'two', _dirty: true }]);
+    const v2 = await open({ storeName: 'outbox', policy: 'authored', schemaVersion: 2, indexes: { byBody: 'body' } });
+    expect(v2.migration).toEqual({ from: 1, to: 2 });
+    // Reads see the old generation; writes wait for the migration.
+    expect((await v2.all()).map((row) => row.text)).toEqual(['one', 'two']);
+    await expect(v2.put([{ id: 3, body: 'x' }])).resolves.toMatchObject({ ok: false, reason: 'unavailable' });
+    const step = (phase, extra = {}) => port.migration({ handle: v2.handle, expectedEpoch: v2.epoch, phase, ...extra });
+    await step('begin');
+    await step('write', { changes: [{ op: 'put', key: '1', value: { id: 1, body: 'one', _dirty: true } }] });
+    // An interrupted migration leaves version 1 authoritative and restarts from the top.
+    const again = await open({ storeName: 'outbox', policy: 'authored', schemaVersion: 2, indexes: { byBody: 'body' } });
+    const restart = (phase, extra = {}) => port.migration({ handle: again.handle, expectedEpoch: again.epoch, phase, ...extra });
+    expect((await again.all()).map((row) => row.text)).toEqual(['one', 'two']);
+    await restart('begin');
+    await restart('write', { changes: (await again.all()).map((row) => ({ op: 'put', key: String(row.id), value: { id: row.id, body: row.text, _dirty: true } })) });
+    await expect(restart('complete')).resolves.toMatchObject({ ok: true });
+    expect(await again.all()).toEqual([{ id: 1, body: 'one', _dirty: true }, { id: 2, body: 'two', _dirty: true }]);
+    expect((await again.query({ index: 'byBody', equals: ['two'] })).rows.map((row) => row.key)).toEqual(['2']);
+    const listed = (await port.inspect({ op: 'stores', selector: SELECTOR })).stores.find((row) => row.label === 'mp.platform-data.outbox' || row.label === 'outbox');
+    expect(listed).toMatchObject({ schemaVersion: 2, rowCount: 2, dirtyCount: 2, migrating: false });
+    // The superseded handle is retired rather than writing the old shape.
+    await expect(v2.put([{ id: 9, body: 'late' }])).resolves.toMatchObject({ ok: false });
+  });
+
+  it('evicts least recently written cache rows but never dirty rows, and refuses eviction on authored stores', async () => {
+    const { port, open } = await setup(create);
+    await expect(port.open(openInput({ storeName: 'outbox', policy: 'authored', limits: { evict: 'lru' } }))).rejects.toMatchObject({ reason: 'unserializable' });
+    const rows = await open({ limits: { maxRows: 3, evict: 'lru' } });
+    await rows.put([{ id: 1 }]);
+    await rows.put([{ id: 2, _dirty: true }]);
+    await rows.put([{ id: 3 }]);
+    const result = await rows.put([{ id: 4 }, { id: 5 }]);
+    expect(result.ok).toBe(true);
+    expect(result.evicted.map((row) => row.key).sort()).toEqual(['1', '3']);
+    expect((await rows.all()).map((row) => row.id)).toEqual([2, 4, 5]);
+    // Only dirty rows left to give: the write is refused instead.
+    const dirty = await open({ storeName: 'chats.drafts', limits: { maxRows: 1, evict: 'lru' } });
+    await dirty.put([{ id: 1, _dirty: true }]);
+    await expect(dirty.put([{ id: 2 }])).resolves.toMatchObject({ ok: false, reason: 'row-capacity' });
+  });
+
+  it('shares a byte budget across a domain and evicts the oldest rows across its collections', async () => {
+    const { open, stores } = await setup(create);
+    const limits = { evict: 'lru', domainMaxBytes: 400 };
+    const threads = await open({ storeName: 'chats.threads', limits });
+    const messages = await open({ storeName: 'chats.messages', limits });
+    const outbox = await open({ storeName: 'outbox', policy: 'authored' });
+    await outbox.put([{ id: 1, body: 'x'.repeat(300), _dirty: true }]);
+    await threads.put([{ id: 't1', body: 'x'.repeat(100) }]);
+    await messages.put([{ id: 'm1', body: 'x'.repeat(100) }]);
+    await messages.put([{ id: 'm2', _dirty: true, body: 'x'.repeat(100) }]);
+    const result = await threads.put([{ id: 't2', body: 'x'.repeat(100) }]);
+    expect(result.evicted).toEqual([{ label: 'chats.threads', key: 't1' }]);
+    const more = await threads.put([{ id: 't3', body: 'x'.repeat(100) }]);
+    expect(more.evicted).toEqual([{ label: 'chats.messages', key: 'm1' }]);
+    const listed = Object.fromEntries((await stores()).map((row) => [row.label, row]));
+    expect(listed['chats.messages'].rowCount).toBe(1);
+    expect(listed['chats.messages'].dirtyCount).toBe(1);
+    expect(listed.outbox.rowCount).toBe(1);
+    expect(listed['chats.threads'].rowCount).toBe(2);
+  });
+
+  it('lists stores, rows and pending rows, and clears a cache without touching dirty or authored rows', async () => {
+    const { port, open, stores } = await setup(create);
+    const rows = await open();
+    await rows.put([{ id: 1, n: 1 }, { id: 2, n: 2, _dirty: true }], { syncedAt: 5000 });
+    const outbox = await open({ storeName: 'outbox', policy: 'authored' });
+    await outbox.put([{ id: 'q1', body: 'queued', _dirty: true }]);
+    const listed = await stores();
+    const cache = listed.find((row) => row.label === 'chats.rows');
+    expect(cache).toMatchObject({ rowCount: 2, dirtyCount: 1, syncedAt: 5000, evict: 'none' });
+    expect(cache.bytes).toBeGreaterThan(0);
+    const page = await port.inspect({ op: 'rows', selector: SELECTOR, store: cache.id, limit: 1 });
+    expect(page.rows.map((row) => row.value)).toEqual([{ id: 1, n: 1 }]);
+    expect((await port.inspect({ op: 'rows', selector: SELECTOR, store: cache.id, afterKey: page.nextKey })).rows.map((row) => row.key)).toEqual(['2']);
+    expect((await port.inspect({ op: 'pending', selector: SELECTOR, store: cache.id })).rows.map((row) => row.key)).toEqual(['2']);
+    await expect(port.purge({ selector: SELECTOR, store: cache.id })).resolves.toEqual({ ok: true, removed: ['1'] });
+    expect(await rows.all()).toEqual([{ id: 2, n: 2, _dirty: true }]);
+    const draftStore = listed.find((row) => row.policy === 'authored');
+    await expect(port.purge({ selector: SELECTOR, store: draftStore.id })).resolves.toEqual({ ok: true, removed: [] });
+    expect((await stores()).find((row) => row.policy === 'authored').rowCount).toBe(1);
+    await outbox.put([{ id: 'q2', body: 'second', _dirty: true }]);
+    await expect(port.purge({ selector: SELECTOR, store: draftStore.id, keys: ['q2'] })).resolves.toEqual({ ok: true, removed: [] });
+    await expect(port.purge({ selector: SELECTOR, store: draftStore.id, keys: ['q2'], force: true })).resolves.toEqual({ ok: true, removed: ['q2'] });
+    await expect(port.purge({ selector: SELECTOR, store: draftStore.id, force: true })).resolves.toEqual({ ok: true, removed: ['q1'] });
+    expect((await stores()).find((row) => row.policy === 'authored').rowCount).toBe(0);
+  });
+
+  it('purges every namespace of a principal on logout', async () => {
+    const { port, open } = await setup(create);
+    const rows = await open();
+    const drafts = await open({ storeName: 'drafts', policy: 'authored', who: identity({ mpId: 'forms', tenantId: 'team-4' }) });
+    await rows.put([{ id: 1 }]);
+    await drafts.put([{ id: 1, _dirty: true }]);
+    await retireHostStorePrincipal(SELECTOR);
+    expect((await port.inspect({ op: 'stores', selector: SELECTOR })).stores).toEqual([]);
+    await expect(rows.put([{ id: 2 }])).resolves.toMatchObject({ ok: false, reason: 'retired' });
+  });
+
+  it('announces writes, evictions and purges in-app and to other tabs, without values', async () => {
+    const Channel = createChannelBus();
+    const { port, database } = await setup(create);
+    const feed = createHostStoreChangeFeed({ BroadcastChannelImpl: Channel });
+    const otherTab = createHostStoreChangeFeed({ BroadcastChannelImpl: Channel });
+    const observed = observeHostStorePort(port, feed);
+    const local = [];
+    const remote = [];
+    feed.subscribe((event) => local.push(event));
+    otherTab.subscribe((event) => remote.push(event));
+    const opened = await observed.open(openInput({ limits: { maxRows: 1, evict: 'lru' } }));
+    const first = await observed.commit({ handle: opened.handle, expectedEpoch: opened.epoch, expectedStoreRevision: opened.storeRevision,
+      changes: [{ op: 'put', key: '1', value: { id: 1, secret: 'body' } }] });
+    await observed.commit({ handle: opened.handle, expectedEpoch: opened.epoch, expectedStoreRevision: first.storeRevision,
+      changes: [{ op: 'put', key: '2', value: { id: 2, secret: 'body' } }] });
+    const cache = (await observed.inspect({ op: 'stores', selector: SELECTOR })).stores[0];
+    await observed.purge({ selector: SELECTOR, store: cache.id });
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    expect(local.map((event) => [event.type, event.label || null, event.keys])).toEqual([
+      ['commit', 'chats.rows', ['1']], ['commit', 'chats.rows', ['2']], ['evict', null, ['1']], ['purge', null, ['2']],
+    ]);
+    expect(local.every((event) => event.remote === false)).toBe(true);
+    expect(remote.map((event) => [event.type, event.remote])).toEqual([['commit', true], ['commit', true], ['evict', true], ['purge', true]]);
+    expect(JSON.stringify([...local, ...remote])).not.toContain('secret');
+    feed.close(); otherTab.close(); await database.close();
+  });
+});

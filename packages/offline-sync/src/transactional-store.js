@@ -34,7 +34,7 @@ export function assertCompleteSet(rows, { maxRows = 1000, maxBytes = 8 * 1024 * 
 const keyString = (key) => String(key);
 const nextRevision = (value = 0) => { if (!Number.isSafeInteger(value) || value < 0 || value >= Number.MAX_SAFE_INTEGER) throw new StorageReadError('write-failed'); return value + 1; };
 
-export function createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows }) {
+export function createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows, indexes = {}, queryRows = null }) {
   let retired = false;
   let tail = Promise.resolve();
   const subscribers = new Set();
@@ -60,7 +60,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     try { onPersistError?.({ event: 'persist_failed', store: name, key, ...result }); } catch (_) { /* reporting cannot change commit truth */ }
     throw new PersistError(name, { retained: false, ...result });
   }
-  async function mutation(keys, transform, { retry = false } = {}) {
+  async function mutation(keys, transform, { retry = false, syncedAt } = {}) {
     for (let attempt = 0; attempt < (retry ? 3 : 1); attempt += 1) {
       live();
       let snapshot;
@@ -68,7 +68,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       const previous = new Map(snapshot.rows.map((row) => [row.key, row.value]));
       const changes = transform(previous);
       if (!changes.length) return;
-      const result = await backend.commit(snapshot, changes);
+      const result = await backend.commit(snapshot, changes, syncedAt === undefined ? undefined : { syncedAt });
       live();
       if (result.ok !== false) return;
       if (result.reason !== 'conflict' || !retry || attempt === 2) failure(result, keys[0]);
@@ -159,7 +159,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         await notify();
       });
     },
-    async reconcile(records = [], { scope, windowKey } = {}) {
+    async reconcile(records = [], { scope, windowKey, syncedAt = now() } = {}) {
       assertCompleteSet(records);
       assertCompleteSet(records.map((row) => ({ ...row, _rev: Number.MAX_SAFE_INTEGER, _dirty: false,
         _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) })), {
@@ -171,7 +171,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       return exclusive(async () => {
         let upserted = 0;
         for (const [key, row] of incoming) {
-          await mutation([key], (rows) => [{ op: 'put', key, value: { ...row, _rev: nextRevision(rows.get(key)?._rev), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) } }]);
+          await mutation([key], (rows) => [{ op: 'put', key, value: { ...row, _rev: nextRevision(rows.get(key)?._rev), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) } }], { syncedAt });
           upserted += 1;
         }
         if (windowKey != null) { windows.delete(String(windowKey)); windows.set(String(windowKey), now()); }
@@ -194,6 +194,27 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         return { upserted, pruned };
       });
     },
+    // Rows by a secondary index, in index order: the physical index where the
+    // store opened with it, else the declared index over the complete row set.
+    async query(index, range = {}, { limit = 50, cursor = null } = {}) {
+      live();
+      const physical = typeof backend.query === 'function' && (!Array.isArray(backend.indexes) || backend.indexes.includes(index));
+      if (physical) {
+        const result = await backend.query({ index, ...range, limit, afterKey: cursor });
+        live();
+        return { rows: result.rows.map((row) => row.value).filter(paintable).map(copy), nextCursor: result.nextKey, complete: result.nextKey === null };
+      }
+      const declared = indexes?.[index];
+      if (!declared || typeof queryRows !== 'function') throw new StorageReadError(typeof backend.query === 'function' ? 'unserializable' : 'unavailable');
+      const fields = Array.isArray(declared) ? declared : [declared];
+      const rows = queryRows(await api.getAll(), fields, range, (row) => row[keyPath]);
+      const start = cursor === null ? 0 : rows.findIndex((row) => keyString(row[keyPath]) === keyString(cursor)) + 1;
+      const page = rows.slice(start, start + limit);
+      const more = start + limit < rows.length;
+      return { rows: page, nextCursor: more ? keyString(page.at(-1)[keyPath]) : null, complete: !more };
+    },
+    // Another tab or handle changed this store: subscribers read it again.
+    revalidateSubscribers() { return notify(); },
     subscribe(handler) { live(); subscribers.add(handler); return () => subscribers.delete(handler); },
     subscribeQuery(selector, handler, { onError } = {}) {
       live();
