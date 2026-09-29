@@ -19,7 +19,7 @@
  *  - server_write forwards to the injected `serverInvoke` seam (the F0 typed
  *    client's invoke — contract envelope; NEVER an endpoint literal here)
  */
-import { TommyError, isTommyError } from '@tommy/sdk';
+import { TommyError, isTommyError, DEFAULT_RPC_TIMEOUT_MS } from '@tommy/sdk';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import {
@@ -52,6 +52,10 @@ const PROCESSED_KEYS_MAX = 1000;
 /** Keys whose RESULT was released but whose already-applied fact must survive
  *  — far cheaper per entry, so it holds an order of magnitude more. */
 const APPLIED_KEYS_OVERFLOW_MAX = 10000;
+/** Idempotent runs that may be in flight at once. Past it a new keyed invoke
+ *  is refused (`RateLimited`) rather than admitted, so every running key stays
+ *  joinable and a stuck MP cannot pile up work without limit. */
+const INFLIGHT_RUNS_MAX = 500;
 
 // Server-write activities whose host adapter needs replay provenance (see
 // executeInvoke). Additive: an activity in neither set gets exactly the envelope
@@ -187,6 +191,16 @@ export function createBroker({
    */
   registrationTimeoutMs = 8000,
   /**
+   * How long an invoke that joins a run already in flight with its idempotency
+   * key waits for that run before rejecting with a non-retryable `Timeout`.
+   * An envelope carrying `rpcDeadlineAt` (the SDK adapter's own deadline) waits
+   * less: the join gives up shortly before that deadline (`joinWaitMs`), so the
+   * caller receives this error rather than the adapter's generic timeout.
+   * The bound also ends a handler invoking its own activity with its own key,
+   * which would otherwise wait on itself.
+   */
+  inflightJoinTimeoutMs = DEFAULT_RPC_TIMEOUT_MS,
+  /**
    * How the retry loop waits between attempts. Injectable so a test can assert
    * the SCHEDULE rather than sit through it — the delays are small by design,
    * but a suite that waits them out is a suite that gets them shortened.
@@ -244,6 +258,10 @@ export function createBroker({
   const suppressionTally = new Map(); // `${tenantId}:${trigger}:${day}` -> count
   const debouncePending = new Map();  // `${trigger}:${emitterMpId}` -> {timer, resolvers}
   const invokeChains = new Map();     // sourceMpId -> tail promise (FIFO per source MP)
+  const inflightInvokes = new Map();  // processedKey -> { deadlineAt, waiters } of the run applying it
+  // A join rejects this long before the caller's `rpcDeadlineAt` at most, and
+  // never more than a fifth of the time the caller has left.
+  const JOIN_DEADLINE_MARGIN_MS = 250;
   const executingChains = new Map();  // sourceMpId -> depth of handler execution ON that chain (F6)
   const txnSteps = new Map();         // txnId -> [{activity, args, idempotencyKey}]
   const chainBudget = new Map();      // rootRunId -> total run count
@@ -1174,12 +1192,14 @@ export function createBroker({
   /**
    * F6 — re-entrancy. The chain for `mpId` is "executing" for exactly as long
    * as one of its dispatches is inside an activity handler/executor. A nested
-   * invoke can only be issued from THERE (handler code calling
-   * `tommy.actions.invoke` again), so an invoke that arrives while its own
-   * chain is executing is a descendant of the dispatch holding the chain —
-   * queueing it behind that dispatch is a guaranteed deadlock. It runs INLINE
-   * on the running chain instead, which is also the correct ordering: the
-   * ancestor is, by construction, still ahead of it.
+   * invoke is issued from THERE (handler code calling `tommy.actions.invoke`
+   * again), and queueing it behind the dispatch holding the chain would
+   * deadlock, so every invoke that arrives while its MP's chain is executing
+   * runs INLINE. The broker cannot tell a nested invoke from an unrelated one
+   * the MP issues while a handler awaits, so an unrelated invoke in that window
+   * also runs inline and can overlap the running one. One that repeats the
+   * running write's idempotency key joins that run instead of applying it
+   * again (`joinInflightInvoke`).
    */
   function enterExecution(mpId) { executingChains.set(mpId, (executingChains.get(mpId) || 0) + 1); }
   function exitExecution(mpId) {
@@ -1291,6 +1311,75 @@ export function createBroker({
       throw err('Offline', `activity '${envelope.activity}' is not offlineReplayable and the device is offline`, { retryable: false });
     }
 
+    const admitted = {
+      envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, chain, idempotencyKey, processedKey,
+    };
+    if (!processedKey) return runAdmittedInvoke(admitted);
+    // Same key, same tenant, still running: join that run rather than apply the
+    // write a second time. A second invoke can get here while the first is
+    // mid-handler, because an MP's invokes run inline while one of its handlers
+    // is executing (see `dispatchInvokeInnerTracked`).
+    const running = inflightInvokes.get(processedKey);
+    if (running) return joinInflightInvoke(running, envelope);
+    if (inflightInvokes.size >= INFLIGHT_RUNS_MAX) {
+      throw err('RateLimited', `${INFLIGHT_RUNS_MAX} idempotent invokes are already in flight; '${envelope.activity}' was not started`, {
+        rule: 'idempotency.inflight_capacity', retryable: true,
+      });
+    }
+    const run = runAdmittedInvoke(admitted);
+    // Joins wait on the entry, not on `run`: one reaction on the run settles
+    // them all, and a join that times out removes itself.
+    const entry = { deadlineAt: envelope.rpcDeadlineAt, waiters: new Set() };
+    inflightInvokes.set(processedKey, entry);
+    const settle = (outcome) => {
+      if (inflightInvokes.get(processedKey) === entry) inflightInvokes.delete(processedKey);
+      for (const waiter of entry.waiters) waiter(outcome);
+      entry.waiters.clear();
+    };
+    run.then((final) => settle({ final }), (error) => settle({ error }));
+    return run;
+  }
+
+  /**
+   * How long a join may wait: until shortly before the earlier of the joining
+   * call's deadline and the deadline of the call that started the run. The
+   * second bounds a handler that invokes its own activity with its own key,
+   * whose nested call carries a later deadline than the call it is part of.
+   * The adapter stamps `rpcDeadlineAt` from the wall clock, so the time left
+   * is read from the wall clock too, not from `now`.
+   */
+  function joinWaitMs(envelope, running) {
+    const deadlines = [envelope.rpcDeadlineAt, running.deadlineAt].filter(Number.isFinite);
+    if (!deadlines.length) return inflightJoinTimeoutMs;
+    const remaining = Math.min(...deadlines) - Date.now();
+    const margin = Math.min(JOIN_DEADLINE_MARGIN_MS, remaining / 5);
+    return Math.max(0, Math.min(inflightJoinTimeoutMs, remaining - margin));
+  }
+
+  /** Wait for the run in flight with this key: its result (as a replay) or its error, within the join bound. */
+  function joinInflightInvoke(running, envelope) {
+    const waitMs = joinWaitMs(envelope, running);
+    return new Promise((resolve, reject) => {
+      let timer = null;
+      const waiter = ({ final, error }) => {
+        clearTimeout(timer);
+        if (error) reject(error);
+        else resolve({ ...final, idempotentReplay: true });
+      };
+      running.waiters.add(waiter);
+      timer = setTimeout(() => {
+        running.waiters.delete(waiter);
+        reject(err('Timeout', `activity '${envelope.activity}' is already running with this idempotency key and did not settle within ${Math.round(waitMs)}ms`, {
+          rule: 'idempotency.inflight', retryable: false,
+        }));
+      }, waitMs);
+    });
+  }
+
+  /** Record, execute (with retries) and settle one admitted invoke. */
+  async function runAdmittedInvoke({
+    envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, chain, idempotencyKey, processedKey,
+  }) {
     const record = await records.open({
       kind: 'invoke',
       activityName: envelope.activity,
@@ -1474,7 +1563,7 @@ export function createBroker({
           // replayed write can carry about how long it waited, and the runtime
           // sets it here so no MP can forge it.
           : dispatchInvoke({
-            ...envelope, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
+            ...envelope, rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
           }))
           .then((result) => ({ ok: true, result }))
           .catch((error) => ({ ok: false, error }));
@@ -1722,6 +1811,13 @@ export function createBroker({
       };
     },
 
+    /** Diagnostics: idempotent runs in flight, and the joins waiting on them. */
+    inflightStats() {
+      let waiting = 0;
+      for (const entry of inflightInvokes.values()) waiting += entry.waiters.size;
+      return { runs: inflightInvokes.size, waiting };
+    },
+
     /** Host retention must not retire a running action or delayed delivery. */
     hasPendingWork: () => pendingWork > 0 || debouncePending.size > 0,
     async teardown(instanceId) {
@@ -1734,6 +1830,7 @@ export function createBroker({
       conditionCache.clear();
       processedKeys.clear();
       invokeChains.clear();
+      inflightInvokes.clear();
     },
   };
 }

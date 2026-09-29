@@ -62,6 +62,9 @@ export function createDirectAdapter({ broker, init, rpcTimeoutMs = DEFAULT_RPC_T
       instanceId: init.instanceId,
       ...(envelope.activity === 'team.update_member'
         ? { restoreDeadlineAt: Date.now() + rpcTimeoutMs } : {}),
+      // When this call times out here, so the broker can give up first and
+      // answer with its own, more specific error.
+      rpcDeadlineAt: Date.now() + rpcTimeoutMs,
     };
     const ENTRY_BY_KIND = {
       emit: 'emit',
