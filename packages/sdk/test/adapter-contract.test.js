@@ -249,3 +249,18 @@ describe('adapter contract (parameterised — direct adapter at M1)', () => {
     expect(world.sdk.t('missing.key', 'the fallback')).toBe('the fallback');
   });
 });
+
+describe('direct adapter subscriptions', () => {
+  it("register with the instance's tenant, so the broker can check that tenant's grant", () => {
+    const calls = [];
+    const broker = { subscribe: (...args) => { calls.push(args); return () => {}; } };
+    const adapter = createDirectAdapter({
+      broker,
+      init: { mpId: 'timesheets', instanceId: 'inst-9', tenant: { tenantId: 'team-9' } },
+    });
+    adapter.subscribe('time-clock.clock_out', () => {});
+    expect(calls).toHaveLength(1);
+    expect(calls[0].slice(0, 2)).toEqual(['timesheets', 'time-clock.clock_out']);
+    expect(calls[0][3]).toEqual({ tenantId: 'team-9' });
+  });
+});
