@@ -10,6 +10,7 @@ import {
   createHostStorePort, retireHostStorePrincipal, createHostStoreChangeFeed, observeHostStorePort,
   HOST_DATA_MP_ID, collectionName, storeNameValid,
 } from '../src/host-store/index.js';
+import { MIGRATION_LEASE_MS } from '../src/host-store/port.js';
 import { DATABASES, identity, createChannelBus } from './helpers/host-databases.js';
 
 const SELECTOR = { authorityOrigin: 'https://api.example.test', viewerId: '7' };
@@ -116,7 +117,7 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
   });
 
   it('starts a cache empty at a new schema version and migrates authored rows copy-on-write', async () => {
-    const { port, open } = await setup(create);
+    const { port, open, tick } = await setup(create);
     const cache = await open({ storeName: 'chats.rows' });
     await cache.put([{ id: 1, v: 1 }]);
     const upgraded = await open({ storeName: 'chats.rows', schemaVersion: 2 });
@@ -133,11 +134,14 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     const step = (phase, extra = {}) => port.migration({ handle: v2.handle, expectedEpoch: v2.epoch, phase, ...extra });
     await step('begin');
     await step('write', { changes: [{ op: 'put', key: '1', value: { id: 1, body: 'one', _dirty: true } }] });
-    // An interrupted migration leaves version 1 authoritative and restarts from the top.
+    // An interrupted migration leaves version 1 authoritative; once its lease
+    // runs out the next opener restarts from the top.
     const again = await open({ storeName: 'outbox', policy: 'authored', schemaVersion: 2, indexes: { byBody: 'body' } });
     const restart = (phase, extra = {}) => port.migration({ handle: again.handle, expectedEpoch: again.epoch, phase, ...extra });
     expect((await again.all()).map((row) => row.text)).toEqual(['one', 'two']);
-    await restart('begin');
+    await expect(restart('begin')).resolves.toMatchObject({ ok: false, reason: 'busy' });
+    tick(MIGRATION_LEASE_MS + 1);
+    await expect(restart('begin')).resolves.toMatchObject({ ok: true });
     await restart('write', { changes: (await again.all()).map((row) => ({ op: 'put', key: String(row.id), value: { id: row.id, body: row.text, _dirty: true } })) });
     await expect(restart('complete')).resolves.toMatchObject({ ok: true });
     expect(await again.all()).toEqual([{ id: 1, body: 'one', _dirty: true }, { id: 2, body: 'two', _dirty: true }]);
@@ -162,7 +166,7 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     const drafts = await open({ storeName: 'drafts', policy: 'authored', schemaFingerprint: 'schema-a' });
     await drafts.put([{ id: 1, title: 'Kept', _dirty: true }]);
     const reshaped = await open({ storeName: 'drafts', policy: 'authored', schemaFingerprint: 'schema-b', indexes: { byTitle: 'title' } });
-    expect(reshaped.migration).toEqual({ from: 1, to: 1 });
+    expect(reshaped.migration).toEqual({ from: 1, to: 1, fromFingerprint: 'schema-a' });
     await expect(migrate(reshaped, (row) => row)).resolves.toMatchObject({ ok: true });
     const settled = await open({ storeName: 'drafts', policy: 'authored', schemaFingerprint: 'schema-b', indexes: { byTitle: 'title' } });
     expect(settled.migration).toBeFalsy();
@@ -176,7 +180,7 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     const cached = await open({ storeName: 'orders', schemaFingerprint: 'schema-a' });
     await cached.put([{ id: 1, v: 'server' }, { id: 2, v: 'unsent', _dirty: true }]);
     const cachedNext = await open({ storeName: 'orders', schemaFingerprint: 'schema-b' });
-    expect(cachedNext.migration).toEqual({ from: 1, to: 1 });
+    expect(cachedNext.migration).toEqual({ from: 1, to: 1, fromFingerprint: 'schema-a' });
     await migrate(cachedNext, (row) => (row._dirty ? row : null));
     const after = await open({ storeName: 'orders', schemaFingerprint: 'schema-b' });
     expect(after.migration).toBeFalsy();
@@ -191,7 +195,108 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     expect(adopted.migration).toBeFalsy();
     expect(await adopted.all()).toEqual([{ id: 1, _dirty: true }]);
     const changed = await open({ storeName: 'drafts', policy: 'authored', schemaFingerprint: 'schema-b' });
-    expect(changed.migration).toEqual({ from: 1, to: 1 });
+    expect(changed.migration).toEqual({ from: 1, to: 1, fromFingerprint: 'schema-a' });
+  });
+
+  it('lets one of two openers rebuild a store at a time, and loses no authored row when they interleave', async () => {
+    let clock = 1000;
+    const database = create();
+    const kind = database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb';
+    // Two tabs (or windows): two ports over one database.
+    const tabA = createHostStorePort({ database, backend: kind, now: () => clock });
+    const tabB = createHostStorePort({ database, backend: kind, now: () => clock });
+    const input = (schemaFingerprint) => openInput({ storeName: 'drafts', policy: 'authored', schemaFingerprint });
+    const seeded = await tabA.open(input('schema-a'));
+    const drafts = Array.from({ length: 250 }, (_, index) => ({ id: index + 1, title: `Draft ${index + 1}`, _dirty: true }));
+    let revision = seeded.storeRevision;
+    for (let start = 0; start < drafts.length; start += 100) {
+      // eslint-disable-next-line no-await-in-loop
+      const result = await tabA.commit({ handle: seeded.handle, expectedEpoch: seeded.epoch, expectedStoreRevision: revision,
+        changes: drafts.slice(start, start + 100).map((value) => ({ op: 'put', key: String(value.id), value })) });
+      revision = result.storeRevision;
+    }
+    const a = await tabA.open(input('schema-b'));
+    const b = await tabB.open(input('schema-b'));
+    expect([a.migration, b.migration]).toEqual([{ from: 1, to: 1, fromFingerprint: 'schema-a' }, { from: 1, to: 1, fromFingerprint: 'schema-a' }]);
+    const stepA = (phase, extra = {}) => tabA.migration({ handle: a.handle, expectedEpoch: a.epoch, phase, ...extra });
+    const stepB = (phase, extra = {}) => tabB.migration({ handle: b.handle, expectedEpoch: b.epoch, phase, ...extra });
+    const pageOf = async (port, handle, afterKey) => port.read({ handle: handle.handle, expectedEpoch: handle.epoch, afterKey, limit: 100 });
+    await expect(stepA('begin')).resolves.toMatchObject({ ok: true });
+    // B finds A's live lease and does not take the store over.
+    await expect(stepB('begin')).resolves.toMatchObject({ ok: false, reason: 'busy' });
+    let afterKey = null;
+    do {
+      // eslint-disable-next-line no-await-in-loop
+      const page = await pageOf(tabA, a, afterKey);
+      // B keeps trying between A's pages; A's writes renew the lease.
+      // eslint-disable-next-line no-await-in-loop
+      await expect(stepB('begin')).resolves.toMatchObject({ ok: false, reason: 'busy' });
+      // eslint-disable-next-line no-await-in-loop
+      await expect(stepB('write', { changes: [{ op: 'put', key: '1', value: { id: 1, title: 'B' } }] })).resolves.toMatchObject({ ok: false, reason: 'conflict' });
+      clock += MIGRATION_LEASE_MS - 1;
+      // eslint-disable-next-line no-await-in-loop
+      await stepA('write', { changes: page.rows.map((row) => ({ op: 'put', key: row.key, value: row.value })) });
+      afterKey = page.nextKey;
+    } while (afterKey !== null);
+    await expect(stepB('complete')).resolves.toMatchObject({ ok: false, reason: 'conflict' });
+    await expect(stepA('complete')).resolves.toMatchObject({ ok: true });
+    // B reopens after A: the store is rebuilt, every draft is there.
+    const reopened = await tabB.open(input('schema-b'));
+    expect(reopened.migration).toBeFalsy();
+    const kept = [];
+    afterKey = null;
+    do {
+      // eslint-disable-next-line no-await-in-loop
+      const page = await pageOf(tabB, reopened, afterKey);
+      kept.push(...page.rows);
+      afterKey = page.nextKey;
+    } while (afterKey !== null);
+    expect(kept).toHaveLength(250);
+  });
+
+  it('restarts a rebuild whose opener stopped renewing its lease, and refuses that opener afterwards', async () => {
+    let clock = 1000;
+    const database = create();
+    const kind = database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb';
+    const tabA = createHostStorePort({ database, backend: kind, now: () => clock });
+    const tabB = createHostStorePort({ database, backend: kind, now: () => clock });
+    const input = (schemaFingerprint) => openInput({ storeName: 'drafts', policy: 'authored', schemaFingerprint });
+    const seeded = await tabA.open(input('schema-a'));
+    await tabA.commit({ handle: seeded.handle, expectedEpoch: seeded.epoch, expectedStoreRevision: seeded.storeRevision,
+      changes: [1, 2, 3].map((id) => ({ op: 'put', key: String(id), value: { id, _dirty: true } })) });
+    const a = await tabA.open(input('schema-b'));
+    const b = await tabB.open(input('schema-b'));
+    const stepA = (phase, extra = {}) => tabA.migration({ handle: a.handle, expectedEpoch: a.epoch, phase, ...extra });
+    const stepB = (phase, extra = {}) => tabB.migration({ handle: b.handle, expectedEpoch: b.epoch, phase, ...extra });
+    await stepA('begin');
+    await stepA('write', { changes: [{ op: 'put', key: '1', value: { id: 1, _dirty: true } }] });
+    clock += MIGRATION_LEASE_MS + 1;
+    await expect(stepB('begin')).resolves.toMatchObject({ ok: true });
+    const page = await tabB.read({ handle: b.handle, expectedEpoch: b.epoch, afterKey: null, limit: 100 });
+    await stepB('write', { changes: page.rows.map((row) => ({ op: 'put', key: row.key, value: row.value })) });
+    // A wakes up late: none of its steps land in B's generation.
+    await expect(stepA('write', { changes: [{ op: 'put', key: '9', value: { id: 9 } }] })).resolves.toMatchObject({ ok: false, reason: 'conflict' });
+    await expect(stepA('complete')).resolves.toMatchObject({ ok: false, reason: 'conflict' });
+    await expect(stepA('abort')).resolves.toMatchObject({ ok: false, reason: 'conflict' });
+    await expect(stepB('complete')).resolves.toMatchObject({ ok: true });
+    const after = await tabB.open(input('schema-b'));
+    const rows = await tabB.read({ handle: after.handle, expectedEpoch: after.epoch, afterKey: null, limit: 100 });
+    expect(rows.rows.map((row) => row.key)).toEqual(['1', '2', '3']);
+  });
+
+  it('takes a fingerprinted store back to an older version: a cache starts empty, authored rows go through the caller', async () => {
+    const { port, open } = await setup(create);
+    const cache = await open({ storeName: 'shifts', schemaVersion: 2, schemaFingerprint: 'v2' });
+    await cache.put([{ id: 1 }]);
+    const older = await open({ storeName: 'shifts', schemaVersion: 1, schemaFingerprint: 'v1' });
+    expect(older.migration).toBeFalsy();
+    expect(await older.all()).toEqual([]);
+    const drafts = await open({ storeName: 'drafts', policy: 'authored', schemaVersion: 2, schemaFingerprint: 'v2' });
+    await drafts.put([{ id: 1, _dirty: true }]);
+    const rolledBack = await open({ storeName: 'drafts', policy: 'authored', schemaVersion: 1, schemaFingerprint: 'v1' });
+    expect(rolledBack.migration).toEqual({ from: 2, to: 1, fromFingerprint: 'v2' });
+    // An opener that does not fingerprint its schema is still refused.
+    await expect(port.open(openInput({ storeName: 'drafts', policy: 'authored', schemaVersion: 1 }))).rejects.toMatchObject({ reason: 'unavailable' });
   });
 
   it('evicts least recently written cache rows but never dirty rows, and refuses eviction on authored stores', async () => {
