@@ -160,6 +160,36 @@ export function createDataService({
     return next;
   }
 
+  /** Drops a row's unsent changes: the caller removed the row itself. */
+  function dropPending(label, key) {
+    const id = `${label}:${String(key)}`;
+    const entry = outbox.get(id);
+    if (!entry) return;
+    entry.discarded = true;
+    outbox.delete(id);
+    entry.changes.splice(0).forEach((change) => change.reject(serviceError('Change discarded', 'DATA_DISCARDED')));
+  }
+  /**
+   * Removes one row as a purge or trim decided, in turn with local writes to
+   * it: a row written dirty since it was listed stays unless `force`, and a
+   * forced removal drops the row's unsent changes with it. Resolves whether
+   * the row was removed.
+   */
+  function removeRow({ label, store, key, force }) {
+    return serial(`${label}:${key}`, async () => {
+      const row = await store.getRaw(key);
+      if (!row || (!force && row._dirty)) return false;
+      try {
+        await store.delete(key, { silent: true, ...(Number.isSafeInteger(row._rev) ? { expectedRevision: row._rev } : {}) });
+      } catch (error) {
+        // Another tab wrote the row since: it stays.
+        if (error?.reason === 'conflict') return false;
+        throw error;
+      }
+      if (force) dropPending(label, key);
+      return true;
+    });
+  }
   function entryFor({ name, label, key, store, decl }) {
     const id = `${label}:${key}`;
     if (!outbox.has(id)) {
@@ -394,21 +424,22 @@ export function createDataService({
       if (!Array.isArray(rows)) throw serviceError('ingest: rows must be an array', 'DATA_INVALID');
       const keyPath = decl?.keyPath || 'id';
       const inScope = typeof scope === 'function' ? scope : () => true;
-      // Rows a store refuses (schema) or folds together (one key) do not count.
-      let written = 0;
+      // Only rows the store accepts count, once per key; a refused row never
+      // keeps an older stored version alive through a replacement.
+      const accepted = rows.filter((row) => row && typeof row === 'object'
+        && !(typeof store.validateRecord === 'function' && store.validateRecord(row)));
+      const kept = new Set(accepted.map((row) => String(row[keyPath])));
       if (replace && rows.length <= INGEST_CHUNK) {
-        written += (await store.reconcile(rows, { scope: inScope }))?.upserted ?? 0;
+        await store.reconcile(rows, { scope: inScope });
       } else {
         for (let start = 0; start < rows.length; start += INGEST_CHUNK) {
           // Chunks commit in order; each is a bounded complete set.
           // eslint-disable-next-line no-await-in-loop
-          written += (await store.reconcile(rows.slice(start, start + INGEST_CHUNK), { prune: false }))?.upserted ?? 0;
+          await store.reconcile(rows.slice(start, start + INGEST_CHUNK), { prune: false });
         }
-        if (replace) {
-          const kept = new Set(rows.map((row) => String(row?.[keyPath])));
-          await store.reconcile([], { scope: (row) => inScope(row) && !kept.has(String(row[keyPath])) });
-        }
+        if (replace) await store.reconcile([], { scope: (row) => inScope(row) && !kept.has(String(row[keyPath])) });
       }
+      const written = kept.size;
       if (replace) {
         const state = stateFor(targetKey({ collection: name }));
         state.state = 'fresh'; state.syncedAt = now(); state.error = null;
@@ -486,13 +517,7 @@ export function createDataService({
     /** Drops a pending local change after an explicit confirm. */
     async discard(collection, key) {
       const { label, store } = local(collection);
-      const id = `${label}:${String(key)}`;
-      const entry = outbox.get(id);
-      if (entry) {
-        entry.discarded = true;
-        outbox.delete(id);
-        entry.changes.splice(0).forEach((change) => change.reject(serviceError('Change discarded', 'DATA_DISCARDED')));
-      }
+      dropPending(label, key);
       await store.delete(String(key));
       emitStatus();
     },
@@ -514,10 +539,15 @@ export function createDataService({
         entries = (await (store.getAllRaw ? store.getAllRaw() : store.getAll()))
           .map((row) => ({ key: String(row[keyPath]), dirty: !!row._dirty }));
       }
-      const doomed = entries.filter((entry) => force || !entry.dirty).map((entry) => entry.key);
-      for (const key of doomed) await store.delete(key, { silent: true });
+      const { label } = local(collection);
+      const removed = [];
+      for (const { key, dirty } of entries) {
+        if (!force && dirty) continue;
+        // eslint-disable-next-line no-await-in-loop
+        if (await removeRow({ label, store, key, force })) removed.push(key);
+      }
       await store.revalidateSubscribers?.();
-      return { removed: doomed };
+      return { removed };
     },
     /**
      * Keeps the newest `keep` rows of an index range (the last in index
@@ -529,10 +559,15 @@ export function createDataService({
       if (typeof spec.index !== 'string' || !Number.isSafeInteger(spec.keep) || spec.keep < 0) throw serviceError('trim: index and keep are required', 'DATA_INVALID');
       const keyPath = decl?.keyPath || 'id';
       const entries = await rangeKeys(store, keyPath, wholeRange(spec, 'trim'));
-      const doomed = entries.slice(0, Math.max(0, entries.length - spec.keep)).filter((entry) => !entry.dirty).map((entry) => entry.key);
-      for (const key of doomed) await store.delete(key, { silent: true });
-      if (doomed.length) await store.revalidateSubscribers?.();
-      return { removed: doomed };
+      const { label } = local(collection);
+      const removed = [];
+      for (const { key, dirty } of entries.slice(0, Math.max(0, entries.length - spec.keep))) {
+        if (dirty) continue;
+        // eslint-disable-next-line no-await-in-loop
+        if (await removeRow({ label, store, key, force: false })) removed.push(key);
+      }
+      if (removed.length) await store.revalidateSubscribers?.();
+      return { removed };
     },
     status(target) {
       const wanted = targetOf(target);

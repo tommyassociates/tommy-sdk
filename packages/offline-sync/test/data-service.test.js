@@ -382,6 +382,56 @@ describe('whole-range purge and trim, and the rows an ingest stored', () => {
     expect((await data.read('chats.messages'))).toHaveLength(5);
   });
 
+  it('keeps a row written dirty after a purge or trim listed it', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES });
+    let data;
+    let edit = null;
+    // A local edit lands after the range was listed, before its rows are removed.
+    const listing = new Proxy(store, { get(target, property) {
+      if (property !== 'query') return typeof target[property] === 'function' ? target[property].bind(target) : target[property];
+      return async (...args) => {
+        const page = await target.query(...args);
+        if (edit) { data.mutate('chats.messages', { op: 'put', record: edit }); edit = null; }
+        return page;
+      };
+    } });
+    data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store: listing, decl: { keyPath: 'id' } } : null) });
+    await data.ingest('chats.messages', messages(7, 1, 4));
+    edit = { id: '7:1', chat_id: 7, seq: 1, body: 'unsent' };
+    expect((await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] } })).removed).toEqual(['7:2', '7:3', '7:4']);
+    expect(await data.read('chats.messages', '7:1')).toMatchObject({ body: 'unsent', _dirty: true });
+    await data.ingest('chats.messages', messages(7, 2, 4));
+    edit = { id: '7:2', chat_id: 7, seq: 2, body: 'unsent too' };
+    expect((await data.trim('chats.messages', { index: 'byChat', prefix: [7], keep: 1 })).removed).toEqual(['7:3']);
+    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['7:1', '7:2', '7:4']);
+  });
+
+  it('drops the unsent changes of a row it force-purges', async () => {
+    const data = memoryService();
+    const push = vi.fn(async () => { throw Object.assign(new Error('Offline'), { status: 0 }); });
+    data.source('chats.messages', { fetch: async () => [], push });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 1 } });
+    await vi.waitFor(() => expect(data.pending()).toEqual([expect.objectContaining({ key: 'draft', state: 'failed' })]));
+    expect(await data.purge('chats.messages', { force: true, query: { index: 'byChat', prefix: [7] } })).toEqual({ removed: ['draft'] });
+    expect(data.pending()).toEqual([]);
+    await expect(data.retry('chats.messages', 'draft')).resolves.toEqual({ key: 'draft', pushed: false });
+    expect(push).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts each accepted key once, and a refused row never keeps an old version through a replacement', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES, recordSchema: {
+      type: 'object', required: ['id', 'chat_id'], properties: { id: { type: 'string' }, chat_id: { type: 'number' }, seq: { type: 'number' } },
+    } });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    const many = messages(7, 1, 500);
+    // The last key of the first chunk comes again in the second.
+    expect(await data.ingest('chats.messages', [...many, { ...many[499], seq: 9999 }])).toEqual({ written: 500 });
+    await data.ingest('chats.messages', [{ id: 'old', chat_id: 7, seq: 0 }]);
+    const replacement = [...messages(8, 1, 500), { id: 'old', chat_id: 'not a number' }];
+    expect(await data.ingest('chats.messages', replacement, { replace: true })).toEqual({ written: 500 });
+    expect(await data.read('chats.messages', 'old')).toBeNull();
+  });
+
   it('reports the rows an ingest stored, not the rows it was given', async () => {
     const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES, recordSchema: {
       type: 'object', required: ['id', 'chat_id'], properties: { id: { type: 'string' }, chat_id: { type: 'number' }, seq: { type: 'number' } },
