@@ -8,7 +8,7 @@
  * installed on globalThis — the backend reads `globalThis.localStorage`.
  */
 import {
-  describe, it, expect, beforeEach, afterEach,
+  describe, it, expect, beforeEach, afterEach, vi,
 } from 'vitest';
 import { createLocalStorageBackend, hasWebStorage, createDataManager } from '../src/index.js';
 import { databaseName } from '../src/names.js';
@@ -114,5 +114,45 @@ describe('createDataManager default backend selection', () => {
     const afterReload = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
     expect((await afterReload.store('settings').get('view')).value).toEqual({ durationType: 'day' });
     expect(await afterReload.store('schedule_cache').get('s1')).toBeUndefined(); // memory — gone
+  });
+});
+
+/**
+ * Two tabs over the same Web Storage store: each has its own page (its own
+ * module instance, so its own write turns); the origin's Web Locks and the
+ * storage itself are shared.
+ */
+describe('Web Storage stores across tabs', () => {
+  const settle = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+  async function tab() {
+    vi.resetModules();
+    return import('../src/data-store.js');
+  }
+
+  it('a delete fenced to a revision never removes an edit another tab wrote since', async () => {
+    const tabA = await tab();
+    const tabB = await tab();
+    const storeIn = (page, backend) => page.createDataStore({ name: 'drafts', keyPath: 'id', syncStrategy: 'last_write_wins', backend });
+    const seed = storeIn(tabA, tabA.createLocalStorageBackend(dbFor('team-3'), 'drafts'));
+    await seed.put({ id: 'd1', body: 'first' });
+    const listed = await seed.get('d1');
+    const b = storeIn(tabB, tabB.createLocalStorageBackend(dbFor('team-3'), 'drafts'));
+    // Tab B edits the row while tab A is in its fenced delete: right after A
+    // reads the row, or before A's one-step compare-and-delete.
+    let edit = null;
+    const editMeanwhile = async () => {
+      if (!edit) { edit = b.put({ id: 'd1', body: 'edited in tab B' }); await settle(30); }
+    };
+    const inner = tabA.createLocalStorageBackend(dbFor('team-3'), 'drafts');
+    const a = storeIn(tabA, {
+      ...inner,
+      async get(key) { const row = await inner.get(key); await editMeanwhile(); return row; },
+      async deleteIf(key, keep) { await editMeanwhile(); return inner.deleteIf(key, keep); },
+    });
+    const removed = a.delete('d1', { expectedRevision: listed._rev }).then(() => 'deleted', (error) => error.reason);
+    await removed;
+    await edit;
+    const row = await b.get('d1');
+    expect(row).toMatchObject({ body: 'edited in tab B', _dirty: true });
   });
 });
