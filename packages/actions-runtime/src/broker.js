@@ -243,7 +243,7 @@ export function createBroker({
   const suppressionTally = new Map(); // `${tenantId}:${trigger}:${day}` -> count
   const debouncePending = new Map();  // `${trigger}:${emitterMpId}` -> {timer, resolvers}
   const invokeChains = new Map();     // sourceMpId -> tail promise (FIFO per source MP)
-  const inflightInvokes = new Map();  // processedKey -> promise of the run applying it
+  const inflightInvokes = new Map();  // processedKey -> { deadlineAt, waiters } of the run applying it
   // A join rejects this long before the caller's `rpcDeadlineAt` at most, and
   // never more than a fifth of the time the caller has left.
   const JOIN_DEADLINE_MARGIN_MS = 250;
@@ -1285,34 +1285,53 @@ export function createBroker({
     const running = inflightInvokes.get(processedKey);
     if (running) return joinInflightInvoke(running, envelope);
     const run = runAdmittedInvoke(admitted);
-    inflightInvokes.set(processedKey, run);
-    const release = () => { if (inflightInvokes.get(processedKey) === run) inflightInvokes.delete(processedKey); };
-    run.finally(release).catch(() => {});
+    // Joins wait on the entry, not on `run`: one reaction on the run settles
+    // them all, and a join that times out removes itself.
+    const entry = { deadlineAt: envelope.rpcDeadlineAt, waiters: new Set() };
+    inflightInvokes.set(processedKey, entry);
+    const settle = (outcome) => {
+      if (inflightInvokes.get(processedKey) === entry) inflightInvokes.delete(processedKey);
+      for (const waiter of entry.waiters) waiter(outcome);
+      entry.waiters.clear();
+    };
+    run.then((final) => settle({ final }), (error) => settle({ error }));
     return run;
   }
 
   /**
-   * How long a join may wait. The adapter stamps `rpcDeadlineAt` from the wall
-   * clock, so the time left is read from the wall clock too, not from `now`.
+   * How long a join may wait: until shortly before the earlier of the joining
+   * call's deadline and the deadline of the call that started the run. The
+   * second bounds a handler that invokes its own activity with its own key,
+   * whose nested call carries a later deadline than the call it is part of.
+   * The adapter stamps `rpcDeadlineAt` from the wall clock, so the time left
+   * is read from the wall clock too, not from `now`.
    */
-  function joinWaitMs(envelope) {
-    if (!Number.isFinite(envelope.rpcDeadlineAt)) return inflightJoinTimeoutMs;
-    const remaining = envelope.rpcDeadlineAt - Date.now();
+  function joinWaitMs(envelope, running) {
+    const deadlines = [envelope.rpcDeadlineAt, running.deadlineAt].filter(Number.isFinite);
+    if (!deadlines.length) return inflightJoinTimeoutMs;
+    const remaining = Math.min(...deadlines) - Date.now();
     const margin = Math.min(JOIN_DEADLINE_MARGIN_MS, remaining / 5);
     return Math.max(0, Math.min(inflightJoinTimeoutMs, remaining - margin));
   }
 
   /** Wait for the run in flight with this key: its result (as a replay) or its error, within the join bound. */
   function joinInflightInvoke(running, envelope) {
-    const waitMs = joinWaitMs(envelope);
-    let timer;
-    const bound = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(err('Timeout', `activity '${envelope.activity}' is already running with this idempotency key and did not settle within ${waitMs}ms`, {
-        rule: 'idempotency.inflight', retryable: false,
-      })), waitMs);
+    const waitMs = joinWaitMs(envelope, running);
+    return new Promise((resolve, reject) => {
+      let timer = null;
+      const waiter = ({ final, error }) => {
+        clearTimeout(timer);
+        if (error) reject(error);
+        else resolve({ ...final, idempotentReplay: true });
+      };
+      running.waiters.add(waiter);
+      timer = setTimeout(() => {
+        running.waiters.delete(waiter);
+        reject(err('Timeout', `activity '${envelope.activity}' is already running with this idempotency key and did not settle within ${Math.round(waitMs)}ms`, {
+          rule: 'idempotency.inflight', retryable: false,
+        }));
+      }, waitMs);
     });
-    return Promise.race([running.then((final) => ({ ...final, idempotentReplay: true })), bound])
-      .finally(() => clearTimeout(timer));
   }
 
   /** Record, execute (with retries) and settle one admitted invoke. */
@@ -1744,6 +1763,13 @@ export function createBroker({
         entriesCap: QUEUE_MAX_ENTRIES,
         expiredOnLoad: queueStore.expiredOnLoad(),
       };
+    },
+
+    /** Diagnostics: idempotent runs in flight, and the joins waiting on them. */
+    inflightStats() {
+      let waiting = 0;
+      for (const entry of inflightInvokes.values()) waiting += entry.waiters.size;
+      return { runs: inflightInvokes.size, waiting };
     },
 
     /** Host retention must not retire a running action or delayed delivery. */

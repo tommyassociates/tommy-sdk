@@ -316,4 +316,38 @@ describe('an invoke joins a run in flight with the same key', () => {
     expect(calls).toBe(1);
     expect(receipt.result).toEqual({ innerRule: 'idempotency.inflight', innerRetryable: false });
   });
+
+  it("a handler's self-invoke is refused before the enclosing call's deadline, however late it starts", async () => {
+    let calls = 0;
+    const w = await adapterWorld({
+      rpcTimeoutMs: 400,
+      save: async (args, adapter) => {
+        calls += 1;
+        await tick(150);
+        const inner = await adapter.rpc({ kind: 'invoke', activity: 'availability.save', args }).catch((e) => e);
+        return { innerRule: inner.rule, innerRetryable: inner.retryable };
+      },
+    });
+    const receipt = await settles(w.call({ id: 7 }), 1500, 'late self-invoke');
+    expect(calls).toBe(1);
+    expect(receipt.result).toEqual({ innerRule: 'idempotency.inflight', innerRetryable: false });
+  });
+
+  it('joins that time out on a run that never settles leave nothing waiting on it', async () => {
+    const started = deferred();
+    const w = await world({ save: activity() }, () => ({
+      save: async () => {
+        started.resolve();
+        await new Promise(() => {});
+      },
+    }), { inflightJoinTimeoutMs: 5 });
+    w.invoke('save', { id: 7 }).catch(() => {});
+    await started.promise;
+    for (let i = 0; i < 20; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const joined = await w.invoke('save', { id: 7 }).catch((e) => e);
+      expect(joined.rule).toBe('idempotency.inflight');
+    }
+    expect(w.broker.inflightStats()).toEqual({ runs: 1, waiting: 0 });
+  });
 });
