@@ -1004,6 +1004,10 @@ localData?: {
 [k: string]: {
 keyPath: string
 recordSchema: JsonSchema1
+/**
+ * Optional version of this store's schema. The host rebuilds the store on the device when it changes, or when keyPath, indexes or recordSchema change: cached server rows sync again, and authored and unsent rows go through the bundle's optional migrate(row, { fromSchema, toSchema, store }) and are kept when they fit, else set aside unsent (Settings → App Data → Pending sync). A lower version (a rolled-back MP) starts caches empty and sets authored rows aside. Publish a schema change for an authored store with min_host_api >= 4.
+ */
+schemaVersion?: number
 indexes?: {
 name: string
 keyPath: string
@@ -1011,7 +1015,7 @@ unique?: boolean
 }[]
 syncStrategy: ("server_authoritative" | "last_write_wins" | "custom")
 /**
- * Optional resident-row ceiling for this store. Omit to take the DataStore default (50000), which is a RUNAWAY BACKSTOP and not a working-set size. REQUIRED when persist is true: a persisted store on the default keeps every window ever viewed on the user's disk, which is how the legacy vuex plugin reached 50-200MB and why it excluded the windowed collections outright. Derive it as rows-per-window x windows-retained, with headroom. Eviction never touches an unsynced row.
+ * Optional resident-row ceiling for this store. Omit to take the default (50000 rows for a store kept in memory, 20000 for one the host keeps on the device; the host caps a declaration at 50000), which is a RUNAWAY BACKSTOP and not a working-set size. REQUIRED when persist is true: a persisted store on the default keeps every window ever viewed on the user's disk, which is how the legacy vuex plugin reached 50-200MB and why it excluded the windowed collections outright. Derive it as rows-per-window x windows-retained, with headroom. Eviction never touches an unsynced row.
  */
 maxRows?: number
 /**
