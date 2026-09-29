@@ -52,9 +52,9 @@ const PROCESSED_KEYS_MAX = 1000;
 /** Keys whose RESULT was released but whose already-applied fact must survive
  *  — far cheaper per entry, so it holds an order of magnitude more. */
 const APPLIED_KEYS_OVERFLOW_MAX = 10000;
-/** Idempotent runs still in flight that a repeat of their key can join. Past
- *  it the oldest stops being joinable (a repeat then runs on its own); its
- *  current joins still settle with it. */
+/** Idempotent runs that may be in flight at once. Past it a new keyed invoke
+ *  is refused (`RateLimited`) rather than admitted, so every running key stays
+ *  joinable and a stuck MP cannot pile up work without limit. */
 const INFLIGHT_RUNS_MAX = 500;
 
 // Server-write activities whose host adapter needs replay provenance (see
@@ -1288,16 +1288,16 @@ export function createBroker({
     // is executing (see `dispatchInvokeInnerTracked`).
     const running = inflightInvokes.get(processedKey);
     if (running) return joinInflightInvoke(running, envelope);
+    if (inflightInvokes.size >= INFLIGHT_RUNS_MAX) {
+      throw err('RateLimited', `${INFLIGHT_RUNS_MAX} idempotent invokes are already in flight; '${envelope.activity}' was not started`, {
+        rule: 'idempotency.inflight_capacity', retryable: true,
+      });
+    }
     const run = runAdmittedInvoke(admitted);
     // Joins wait on the entry, not on `run`: one reaction on the run settles
     // them all, and a join that times out removes itself.
     const entry = { deadlineAt: envelope.rpcDeadlineAt, waiters: new Set() };
     inflightInvokes.set(processedKey, entry);
-    while (inflightInvokes.size > INFLIGHT_RUNS_MAX) {
-      const oldest = inflightInvokes.keys().next();
-      if (oldest.done) break;
-      inflightInvokes.delete(oldest.value);
-    }
     const settle = (outcome) => {
       if (inflightInvokes.get(processedKey) === entry) inflightInvokes.delete(processedKey);
       for (const waiter of entry.waiters) waiter(outcome);
