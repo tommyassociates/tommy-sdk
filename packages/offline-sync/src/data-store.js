@@ -384,6 +384,7 @@ export function createDataStore({
   const validate = recordSchema ? ajv.compile(recordSchema) : null;
   const wholeStoreSubscribers = new Set();
   const selectorSubscribers = new Set(); // {selector, handler, touched:Set, last}
+  const changeListeners = new Set();
 
   /**
    * Resident row count, so `put` can bound the store WITHOUT walking it.
@@ -720,6 +721,9 @@ export function createDataStore({
     const changedKeys = (changed && typeof changed !== 'string' && typeof changed[Symbol.iterator] === 'function')
       ? new Set(changed)
       : new Set([changed]);
+    for (const listener of changeListeners) {
+      try { listener(); } catch (_) { /* listener errors are theirs */ }
+    }
     const records = await snapshot();
     for (const handler of wholeStoreSubscribers) {
       try { handler(records); } catch (_) { /* subscriber errors are theirs */ }
@@ -744,10 +748,10 @@ export function createDataStore({
      * physical indexes: `equals`, or a `prefix` of the leading fields with an
      * inclusive `lower`/`upper` bound on the next one. `cursor` continues.
      */
-    async query(index, range = {}, { limit = 50, cursor = null } = {}) {
+    async query(index, range = {}, { limit = 50, cursor = null, raw = false } = {}) {
       const fields = indexFields[index];
       if (!fields) throw Object.assign(new Error(`store '${name}': index '${index}' is not declared`), { name: 'StorageReadError', reason: 'unserializable' });
-      const rows = queryRows((await snapshot()).filter(paintable), fields, range, keyOf);
+      const rows = queryRows((await snapshot()).filter((row) => raw || paintable(row)), fields, range, keyOf);
       const start = cursor === null ? 0 : rows.findIndex((row) => String(keyOf(row)) === String(cursor)) + 1;
       const page = rows.slice(start, start + limit);
       const more = start + limit < rows.length;
@@ -759,6 +763,7 @@ export function createDataStore({
       disposed = true;
       wholeStoreSubscribers.clear();
       selectorSubscribers.clear();
+      changeListeners.clear();
       return backend.close?.(options);
     },
     /** The declared store name — so a report can say WHICH store rejected. */
@@ -997,9 +1002,11 @@ export function createDataStore({
      * indexeddb.js`). With a `windowKey`, `enforceWindowRetention` keeps the K
      * most recently touched windows and drops the rest. Untagged rows are never
      * touched by it: a non-windowed store behaves exactly as before.
+     *
+     * `prune: false` only upserts: no row the set leaves out is removed.
      */
-    async reconcile(records = [], { scope, windowKey } = {}) {
-      const existing = await backend.getAll();
+    async reconcile(records = [], { scope, windowKey, prune = true } = {}) {
+      const existing = prune ? await backend.getAll() : [];
       const incoming = new Set();
       // ONE notify for the whole merge, at the end. Per-record notifies made a
       // reconcile of N rows wake every subscriber N times, each with a
@@ -1114,6 +1121,11 @@ export function createDataStore({
     subscribe(handler) {
       wholeStoreSubscribers.add(handler);
       return () => wholeStoreSubscribers.delete(handler);
+    },
+    /** Called after every change, before subscribers read the store. */
+    onChange(listener) {
+      changeListeners.add(listener);
+      return () => changeListeners.delete(listener);
     },
     subscribeQuery(selector, handler) {
       const sub = { selector, handler, touched: new Set(['*']), last: undefined };

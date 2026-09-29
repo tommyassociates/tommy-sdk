@@ -7,6 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createDataService, createDataStore, createMemoryStoreBackend, createDataManager } from '../src/index.js';
 import { createHostStorePort, createHostStoreChangeFeed, observeHostStorePort } from '../src/host-store/index.js';
+import { COMPLETE_ROWS } from '../src/host-store/protocol.js';
 import { DATABASES, identity, createChannelBus } from './helpers/host-databases.js';
 
 const settle = () => new Promise((resolve) => { setTimeout(resolve, 0); });
@@ -220,6 +221,10 @@ describe('MP data API confinement', () => {
     await data.refresh('shifts');
     expect((await data.read('shifts')).map((row) => row.id)).toEqual(['1', '2']);
     expect(data.status('shifts').state).toBe('fresh');
+    await data.ingest('mp.scheduling.shifts', [{ id: '3', at: 'wed' }]);
+    expect((await data.read('shifts', '3'))._dirty).toBe(false);
+    await expect(data.ingest('chats.messages', [{ id: 'x' }])).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
+    await expect(data.trim('mp.time-clock.shifts', { index: 'by_day', keep: 1 })).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
   });
   it('queries the indexes its manifest declares', async () => {
     const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {
@@ -275,5 +280,94 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     expect((await store.query('byDay', {}, { limit: 2, cursor: first.nextCursor })).rows.map((row) => row.id)).toEqual(['3']);
     await expect(store.query('undeclared')).rejects.toMatchObject({ reason: 'unserializable' });
     await database.close();
+  });
+});
+
+/** A host-store-backed data service over `chats.messages`, counting commits. */
+function hostService(create, { maxRows = 5000 } = {}) {
+  const database = create();
+  const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+  const commits = { count: 0 };
+  const counted = { ...port, commit: (input) => { commits.count += 1; return port.commit(input); } };
+  const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+    limits: { maxRows, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+  const backend = transactionalBackend(counted, null, options);
+  // The shell adapter refuses a complete read past COMPLETE_ROWS, as here.
+  const bounded = { ...backend, async getAll() {
+    const rows = await backend.getAll();
+    if (rows.length > COMPLETE_ROWS) throw Object.assign(new Error('scan-required'), { name: 'StorageReadError', reason: 'scan-required' });
+    return rows;
+  } };
+  const store = createDataStore({ name: 'chats.messages', backend: bounded, indexes: INDEXES });
+  const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+  return { data, store, commits, close: () => database.close() };
+}
+const messages = (chat, from, to) => Array.from({ length: to - from + 1 }, (_, index) => ({ id: `${chat}:${from + index}`, chat_id: chat, seq: from + index }));
+
+describe.each([
+  ['memory', () => ({ data: memoryService(), close: () => {} })],
+  ...DATABASES.map(([name, create]) => [`host store (${name})`, () => hostService(create)]),
+])('server rows written into a collection (%s)', (_name, make) => {
+  it('ingests server rows as synced, never pruning unless the set replaces a scope', async () => {
+    const { data, close } = make();
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 99 } });
+    await data.ingest('chats.messages', messages(7, 1, 3));
+    await data.ingest('chats.messages', messages(8, 1, 2));
+    expect((await data.read('chats.messages')).map((row) => [row.id, row._dirty]).sort()).toEqual([
+      ['7:1', false], ['7:2', false], ['7:3', false], ['8:1', false], ['8:2', false], ['draft', true],
+    ]);
+    expect(data.pending()).toEqual([]);
+    // A complete set for chat 7 prunes the chat-7 rows it leaves out; dirty rows stay.
+    await data.ingest('chats.messages', messages(7, 2, 3), { replace: true, scope: (row) => row.chat_id === 7 });
+    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['7:2', '7:3', '8:1', '8:2', 'draft']);
+    expect(data.status('chats.messages').state).toBe('fresh');
+    await close();
+  });
+
+  it('purges one subject by index, and specific keys, keeping unsent rows unless forced', async () => {
+    const { data, close } = make();
+    await data.ingest('chats.messages', [...messages(7, 1, 3), ...messages(8, 1, 2)]);
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 99 } });
+    expect(await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] } })).toEqual({ removed: ['7:1', '7:2', '7:3'] });
+    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['8:1', '8:2', 'draft']);
+    expect(await data.purge('chats.messages', { keys: ['8:2', 'draft', 'missing'] })).toEqual({ removed: ['8:2'] });
+    expect(await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] }, force: true })).toEqual({ removed: ['draft'] });
+    expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['8:1']);
+    await close();
+  });
+
+  it('trims a subject to its newest rows in index order, never an unsent one', async () => {
+    const { data, close } = make();
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 0 } });
+    await data.ingest('chats.messages', [...messages(7, 1, 6), ...messages(8, 1, 2)]);
+    const seen = [];
+    data.subscribe({ collection: 'chats.messages', query: { index: 'byChat', prefix: [7], limit: 100 } }, (rows) => seen.push(rows.map((row) => row.seq)));
+    await vi.waitFor(() => expect(seen.at(-1)).toEqual([0, 1, 2, 3, 4, 5, 6]));
+    expect(await data.trim('chats.messages', { index: 'byChat', prefix: [7], keep: 3 })).toEqual({ removed: ['7:1', '7:2', '7:3'] });
+    await vi.waitFor(() => expect(seen.at(-1)).toEqual([0, 4, 5, 6]));
+    expect(await data.trim('chats.messages', { index: 'byChat', prefix: [8], keep: 3 })).toEqual({ removed: [] });
+    await expect(data.trim('chats.messages', { prefix: [7], keep: 3 })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await close();
+  });
+});
+
+describe.each(DATABASES)('large collections on the host store (%s)', (_name, create) => {
+  it('writes a page of server rows in bounded transactions, not one per row', async () => {
+    const { data, commits, close } = hostService(create);
+    await data.ingest('chats.messages', messages(7, 1, 250));
+    expect(commits.count).toBeLessThanOrEqual(3);
+    expect((await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 1 })).rows[0].seq).toBe(1);
+    await close();
+  });
+
+  it('keeps a subscription live once the collection outgrows a complete read', async () => {
+    const { data, close } = hostService(create);
+    for (let chat = 1; chat <= 3; chat += 1) await data.ingest('chats.messages', messages(chat, 1, 400)); // eslint-disable-line no-await-in-loop
+    const seen = [];
+    data.subscribe({ collection: 'chats.messages', query: { index: 'byChat', prefix: [9], limit: 10 } }, (rows) => seen.push(rows.map((row) => row.seq)));
+    await vi.waitFor(() => expect(seen).toEqual([[]]));
+    await data.ingest('chats.messages', messages(9, 1, 2));
+    await vi.waitFor(() => expect(seen.at(-1)).toEqual([1, 2]));
+    await close();
   });
 });

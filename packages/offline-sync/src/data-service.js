@@ -5,8 +5,10 @@
  *   query(collection, spec)           rows by a declared index, in index order
  *   subscribe(target, callback)       the current value now, then on every change
  *   refresh(target, options)          a scheduled, coalesced background sync
+ *   ingest(collection, rows, options) server rows a domain received, stored synced
  *   mutate(collection, command)       an optimistic write, pushed when possible
  *   purge(collection, options)        clear cached rows (never dirty ones unless forced)
+ *   trim(collection, options)         keep a subject's newest rows by index order
  *   status(target)                    fresh | stale | refreshing | offline | error
  *
  * The host builds one over its domain collections (`<domain>.<collection>`);
@@ -35,6 +37,24 @@ export function createImmediateScheduler() {
 }
 
 const serviceError = (message, code) => Object.assign(new Error(message), { name: 'DataServiceError', code });
+// One reconcile carries a bounded complete set; larger ingests go in chunks.
+const INGEST_CHUNK = 500;
+// A subject read for purge or trim is bounded; the rest is left for the TTL.
+const SUBJECT_SCAN_LIMIT = 5000;
+
+/** Every row of an index range, raw (dirty flags and all), up to a bound. */
+async function queryAll(store, { index, limit: _limit, cursor: _cursor, ...range }) {
+  const rows = [];
+  let cursor = null;
+  do {
+    // Each page continues from the cursor the previous one returned.
+    // eslint-disable-next-line no-await-in-loop
+    const page = await store.query(index, range, { limit: 100, cursor, raw: true });
+    rows.push(...page.rows);
+    cursor = page.complete ? null : page.nextCursor;
+  } while (cursor !== null && rows.length < SUBJECT_SCAN_LIMIT);
+  return rows;
+}
 const same = (a, b) => {
   try { return JSON.stringify(a) === JSON.stringify(b); } catch (_) { return false; }
 };
@@ -245,7 +265,8 @@ export function createDataService({
           callback(value);
         }).catch((error) => { if (active) { try { onError?.(error); } catch (_) { /* isolated */ } } });
       };
-      const offStore = store.subscribe(() => emit());
+      // A change listener reads only this target, however large the collection.
+      const offStore = typeof store.onChange === 'function' ? store.onChange(() => emit()) : store.subscribe(() => emit());
       const offFeed = feed?.subscribe((event) => {
         if (event.label === label || event.labels?.includes(label) || (event.type === 'purge' && !event.label)) emit();
       });
@@ -313,7 +334,7 @@ export function createDataService({
             return;
           }
           const record = (spec.toRecord || ((value) => value))(dto, prev ? bare(prev) : prev);
-          await store.reconcile([record], { scope: () => false });
+          await store.reconcile([record], { prune: false });
           return;
         }
         const scope = typeof spec.scope === 'function' ? spec.scope(wanted) : () => true;
@@ -330,6 +351,39 @@ export function createDataService({
         throw error;
       }).finally(() => { state.flight = null; emitStatus(); });
       return settle(state.flight);
+    },
+    /**
+     * Stores rows a domain received from the server (a page, an event, a
+     * detail read) as synced rows: views subscribed to them update, nothing is
+     * pushed. With `replace`, the rows are the complete set for `scope` (a row
+     * predicate; the whole collection without one): rows in scope that the set
+     * leaves out are removed, dirty rows never, and the collection is fresh.
+     */
+    async ingest(collection, rows, { replace = false, scope = null } = {}) {
+      live();
+      const { name, store, decl } = local(collection);
+      if (!Array.isArray(rows)) throw serviceError('ingest: rows must be an array', 'DATA_INVALID');
+      const keyPath = decl?.keyPath || 'id';
+      const inScope = typeof scope === 'function' ? scope : () => true;
+      if (replace && rows.length <= INGEST_CHUNK) {
+        await store.reconcile(rows, { scope: inScope });
+      } else {
+        for (let start = 0; start < rows.length; start += INGEST_CHUNK) {
+          // Chunks commit in order; each is a bounded complete set.
+          // eslint-disable-next-line no-await-in-loop
+          await store.reconcile(rows.slice(start, start + INGEST_CHUNK), { prune: false });
+        }
+        if (replace) {
+          const kept = new Set(rows.map((row) => String(row?.[keyPath])));
+          await store.reconcile([], { scope: (row) => inScope(row) && !kept.has(String(row[keyPath])) });
+        }
+      }
+      if (replace) {
+        const state = stateFor(targetKey({ collection: name }));
+        state.state = 'fresh'; state.syncedAt = now(); state.error = null;
+        emitStatus();
+      }
+      return { written: rows.length };
     },
     /**
      * `{ op: 'put', record } | { op: 'patch', key, patch } | { op: 'delete', key }`.
@@ -411,15 +465,37 @@ export function createDataService({
       await store.delete(String(key));
       emitStatus();
     },
-    /** Clears a collection's cached rows. Dirty rows stay unless `force`. */
-    async purge(collection, { force = false } = {}) {
+    /**
+     * Clears a collection's cached rows, or only `keys`, or only the rows of
+     * an index range (`query: { index, prefix | equals | lower | upper }`).
+     * Dirty rows stay unless `force`.
+     */
+    async purge(collection, { force = false, keys = null, query = null } = {}) {
       live();
-      const { store } = local(collection);
-      const rows = await (store.getAllRaw ? store.getAllRaw() : store.getAll());
-      const keyPath = local(collection).decl?.keyPath || 'id';
+      const { store, decl } = local(collection);
+      const keyPath = decl?.keyPath || 'id';
+      let rows;
+      if (Array.isArray(keys)) rows = (await Promise.all(keys.map((key) => store.getRaw(String(key))))).filter(Boolean);
+      else if (query) rows = await queryAll(store, query);
+      else rows = await (store.getAllRaw ? store.getAllRaw() : store.getAll());
       const doomed = rows.filter((row) => force || !row._dirty).map((row) => String(row[keyPath]));
       for (const key of doomed) await store.delete(key, { silent: true });
       await store.revalidateSubscribers?.();
+      return { removed: doomed };
+    },
+    /**
+     * Keeps the newest `keep` rows of an index range (the last in index
+     * order) and removes the older ones. Dirty rows are never removed.
+     */
+    async trim(collection, { index, keep, ...range } = {}) {
+      live();
+      const { store, decl } = local(collection);
+      if (typeof index !== 'string' || !Number.isSafeInteger(keep) || keep < 0) throw serviceError('trim: index and keep are required', 'DATA_INVALID');
+      const keyPath = decl?.keyPath || 'id';
+      const rows = await queryAll(store, { index, ...range });
+      const doomed = rows.slice(0, Math.max(0, rows.length - keep)).filter((row) => !row._dirty).map((row) => String(row[keyPath]));
+      for (const key of doomed) await store.delete(key, { silent: true });
+      if (doomed.length) await store.revalidateSubscribers?.();
       return { removed: doomed };
     },
     status(target) {
