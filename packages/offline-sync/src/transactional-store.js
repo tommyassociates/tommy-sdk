@@ -203,7 +203,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
      * in `scope` (every row without one) that the set leaves out are removed,
      * dirty rows never. Upserts commit in bounded batches, not one per row.
      * `keepDirty: true` leaves a row with an unsent local write as it is
-     * (counted as `skipped`), decided inside the same commit.
+     * (its key listed in `skipped`), decided inside the same commit.
      */
     async reconcile(records = [], { scope, windowKey, syncedAt = now(), prune = true, keepDirty = false } = {}) {
       assertCompleteSet(records);
@@ -216,19 +216,18 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       for (const row of records) { if (!validateRecord(row)) incoming.set(keyString(row[keyPath]), copy(row)); }
       return exclusive(async () => {
         let upserted = 0;
-        let skipped = 0;
+        const skipped = new Set();
         const stamp = (row, previous) => ({ ...row, _rev: nextRevision(previous?._rev), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) });
         for (const batch of upsertBatches(incoming)) {
-          let written = batch.length;
+          let left = [];
           await mutation(batch.map(([key]) => key), (rows) => {
-            const writes = keepDirty ? batch.filter(([key]) => !rows.get(key)?._dirty) : batch;
-            written = writes.length;
-            return writes.map(([key, row]) => ({ op: 'put', key, value: stamp(row, rows.get(key)) }));
+            left = keepDirty ? batch.filter(([key]) => rows.get(key)?._dirty).map(([key]) => key) : [];
+            return batch.filter(([key]) => !left.includes(key)).map(([key, row]) => ({ op: 'put', key, value: stamp(row, rows.get(key)) }));
           }, { syncedAt, retry: true });
-          upserted += written;
-          skipped += batch.length - written;
+          upserted += batch.length - left.length;
+          left.forEach((key) => skipped.add(key));
         }
-        const counts = skipped ? { skipped } : {};
+        const counts = skipped.size ? { skipped: [...skipped] } : {};
         if (windowKey != null) { windows.delete(String(windowKey)); windows.set(String(windowKey), now()); }
         if (!prune) {
           await notify();

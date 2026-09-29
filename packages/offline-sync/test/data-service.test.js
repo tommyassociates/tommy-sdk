@@ -372,6 +372,15 @@ describe.each([
     await close();
   });
 
+  it('counts an unsent row left in two chunks once', async () => {
+    const { data, close } = make();
+    await data.mutate('chats.messages', { op: 'put', record: { id: '7:1', chat_id: 7, seq: 1, body: 'unsent' } });
+    const rows = [...messages(7, 1, 500), { id: '7:1', chat_id: 7, seq: 1 }];
+    expect(await data.ingest('chats.messages', rows)).toEqual({ written: 499 });
+    expect(await data.read('chats.messages', '7:1')).toMatchObject({ body: 'unsent', _dirty: true });
+    await close();
+  });
+
   it('purges one subject by index, and specific keys, keeping unsent rows unless forced', async () => {
     const { data, close } = make();
     await data.ingest('chats.messages', [...messages(7, 1, 3), ...messages(8, 1, 2)]);
@@ -416,6 +425,60 @@ describe.each([
   });
 });
 
+/** A memory store whose next read of `method` answers late: the value it read, after `release()`. */
+function lateStore(method) {
+  const inner = createMemoryStoreBackend();
+  let gate = null;
+  const backend = { ...inner, async [method](...args) {
+    const value = await inner[method](...args);
+    if (gate) { const wait = gate.promise; gate = null; await wait; }
+    return value;
+  } };
+  const store = createDataStore({ name: 'chats.messages', backend, indexes: INDEXES });
+  return {
+    store,
+    hold() { let release; gate = { promise: new Promise((resolve) => { release = resolve; }) }; return () => release(); },
+  };
+}
+
+describe('a memory store writes each row in turn', () => {
+  it('never lets a server row overwrite a local write that landed while it read', async () => {
+    const { store, hold } = lateStore('get');
+    const release = hold();
+    const server = store.reconcile([{ id: 'a', chat_id: 7, seq: 1, body: 'server' }], { prune: false, keepDirty: true });
+    const local = store.put({ id: 'a', chat_id: 7, seq: 1, body: 'unsent' });
+    await settle();
+    release();
+    await Promise.all([server, local]);
+    expect(await store.getRaw('a')).toMatchObject({ body: 'unsent', _dirty: true });
+  });
+
+  it('never deletes a revision written while the delete read the row', async () => {
+    const { store, hold } = lateStore('get');
+    await store.put({ id: 'a', chat_id: 7, seq: 1 });
+    const listed = (await store.getRaw('a'))._rev;
+    const release = hold();
+    const removal = store.delete('a', { expectedRevision: listed });
+    const local = store.put({ id: 'a', chat_id: 7, seq: 1, body: 'written since' });
+    await settle();
+    release();
+    await Promise.allSettled([removal, local]);
+    expect(await store.get('a')).toMatchObject({ body: 'written since' });
+  });
+
+  it('never prunes a row written while a reconcile read the set', async () => {
+    const { store, hold } = lateStore('getAll');
+    await store.reconcile([{ id: 'a', chat_id: 7, seq: 1 }]);
+    const release = hold();
+    const server = store.reconcile([]);
+    await settle();
+    await store.put({ id: 'a', chat_id: 7, seq: 1, body: 'unsent' });
+    release();
+    expect(await server).toMatchObject({ pruned: 0 });
+    expect(await store.getRaw('a')).toMatchObject({ body: 'unsent', _dirty: true });
+  });
+});
+
 describe('whole-range purge and trim, and the rows an ingest stored', () => {
   it('purges and trims an index range of any size, never stopping part-way', async () => {
     const data = memoryService();
@@ -434,6 +497,7 @@ describe('whole-range purge and trim, and the rows an ingest stored', () => {
     await data.ingest('chats.messages', messages(7, 1, 5));
     await expect(data.purge('chats.messages', { query: { index: 'byChat', prefix: [7], limit: 2 } })).rejects.toMatchObject({ code: 'DATA_INVALID' });
     await expect(data.purge('chats.messages', { query: { index: 'byChat', cursor: '7:1' } })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.purge('chats.messages', { query: { index: 'byChat', prefix: [7], keep: 2 } })).rejects.toMatchObject({ code: 'DATA_INVALID' });
     await expect(data.trim('chats.messages', { index: 'byChat', prefix: [7], keep: 1, where: () => true })).rejects.toMatchObject({ code: 'DATA_INVALID' });
     expect((await data.read('chats.messages'))).toHaveLength(5);
   });

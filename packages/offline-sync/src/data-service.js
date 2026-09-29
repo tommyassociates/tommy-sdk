@@ -63,8 +63,9 @@ async function queryPages(store, index, range, { limit = 50, cursor: start = nul
 }
 // The fields of an index range; a purge or trim acts on the whole range.
 const RANGE_FIELDS = new Set(['index', 'equals', 'prefix', 'lower', 'upper']);
+// `keep` belongs to a trim only: a purge refuses it rather than clear the range.
 function wholeRange(spec, operation) {
-  const extra = Object.keys(spec || {}).filter((field) => !RANGE_FIELDS.has(field) && field !== 'keep');
+  const extra = Object.keys(spec || {}).filter((field) => !RANGE_FIELDS.has(field) && !(field === 'keep' && operation === 'trim'));
   if (typeof spec?.index !== 'string' || extra.length) {
     throw serviceError(`${operation}: an index range only (${extra.join(', ') || 'index'} not accepted)`, 'DATA_INVALID');
   }
@@ -469,21 +470,28 @@ export function createDataService({
       const inScope = typeof scope === 'function' ? scope : () => true;
       // Only rows the store accepts count, once per key; a refused row never
       // keeps an older stored version alive through a replacement.
-      const accepted = rows.filter((row) => row && typeof row === 'object'
-        && !(typeof store.validateRecord === 'function' && store.validateRecord(row)));
-      const kept = new Set(accepted.map((row) => String(row[keyPath])));
-      let skipped = 0;
+      const isAccepted = (row) => row && typeof row === 'object'
+        && !(typeof store.validateRecord === 'function' && store.validateRecord(row));
+      const kept = new Set(rows.filter(isAccepted).map((row) => String(row[keyPath])));
+      // The distinct keys stored: accepted rows the store did not leave as an
+      // unsent local write.
+      const stored = new Set();
+      const upsert = async (chunk, options) => {
+        const result = await store.reconcile(chunk, { ...options, keepDirty: true });
+        const left = new Set((Array.isArray(result?.skipped) ? result.skipped : []).map(String));
+        chunk.filter(isAccepted).forEach((row) => { if (!left.has(String(row[keyPath]))) stored.add(String(row[keyPath])); });
+      };
       if (replace && rows.length <= INGEST_CHUNK) {
-        skipped += (await store.reconcile(rows, { scope: inScope, keepDirty: true }))?.skipped || 0;
+        await upsert(rows, { scope: inScope });
       } else {
         for (let start = 0; start < rows.length; start += INGEST_CHUNK) {
           // Chunks commit in order; each is a bounded complete set.
           // eslint-disable-next-line no-await-in-loop
-          skipped += (await store.reconcile(rows.slice(start, start + INGEST_CHUNK), { prune: false, keepDirty: true }))?.skipped || 0;
+          await upsert(rows.slice(start, start + INGEST_CHUNK), { prune: false });
         }
         if (replace) await store.reconcile([], { scope: (row) => inScope(row) && !kept.has(String(row[keyPath])) });
       }
-      const written = Math.max(0, kept.size - skipped);
+      const written = stored.size;
       if (replace) {
         const state = stateFor(targetKey({ collection: name }));
         state.state = 'fresh'; state.syncedAt = now(); state.error = null;
