@@ -104,6 +104,24 @@ describe('data service on memory stores', () => {
     expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['a']);
   });
 
+  it('keeps a push the server refused for access as access changed: unsent, listed, never sent again on its own', async () => {
+    const data = memoryService();
+    const push = vi.fn(async () => { throw Object.assign(new Error('Forbidden'), { status: 403 }); });
+    data.source('chats.messages', { fetch: async () => [], push });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 2 } });
+    await settle();
+    expect(data.pending()).toEqual([expect.objectContaining({ key: 'draft', state: 'access_changed', attempts: 1 })]);
+    expect((await data.read('chats.messages', 'draft'))._dirty).toBe(true);
+    // A refusal by code reads the same.
+    push.mockImplementationOnce(async () => { throw Object.assign(new Error('Denied'), { code: 'PermissionDenied' }); });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'other', chat_id: 7, seq: 3 } });
+    await settle();
+    expect(data.pending().map((entry) => [entry.key, entry.state]).sort()).toEqual([['draft', 'access_changed'], ['other', 'access_changed']]);
+    expect(push).toHaveBeenCalledTimes(2);
+    await data.discard('chats.messages', 'draft');
+    expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['other']);
+  });
+
   it('keeps dirty rows through a refresh and a purge, and tracks pushes until confirmed', async () => {
     const data = memoryService();
     let fail = true;

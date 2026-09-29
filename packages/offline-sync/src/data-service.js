@@ -160,6 +160,10 @@ export function createDataService({
   const bare = (row) => Object.fromEntries(Object.entries(row || {}).filter(([field]) => !field.startsWith('_')));
   const pushOf = (name, decl) => (sources.get(name) || decl?.source)?.push || decl?.push;
   const describeError = (error) => ({ code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) });
+  // The server refused the push for access (the account can no longer write
+  // it, e.g. after its role or scopes changed): the row stays unsent and is
+  // listed as access changed, never sent again on its own.
+  const refusedAccess = (error) => Number(error?.status) === 403 || error?.code === 'PermissionDenied';
 
   /** Runs `task` after every earlier task for the same id. */
   function serial(id, task) {
@@ -317,7 +321,7 @@ export function createDataService({
             });
           } catch (error) {
             if (!sent) {
-              entry.state = 'failed'; entry.lastError = describeError(error); emitStatus();
+              entry.state = refusedAccess(error) ? 'access_changed' : 'failed'; entry.lastError = describeError(error); emitStatus();
               entry.changes.forEach((queued) => queued.reject(error));
               throw error;
             }
@@ -546,7 +550,11 @@ export function createDataService({
       change.catch(() => {});
       return { key, pushed: false };
     },
-    /** Queued and failed pushes, one per row, for a pending-sync view. */
+    /**
+     * Queued and failed pushes, one per row, for a pending-sync view. `state`
+     * is queued, sending, failed (sent again on retry or reconnect) or
+     * access_changed (refused for access; sent again only when asked).
+     */
     pending(collection = null) {
       const wanted = collection === null ? null : local(collection).name;
       return [...outbox.values()].filter((entry) => wanted === null || entry.collection === wanted).map((entry) => ({
