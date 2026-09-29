@@ -173,7 +173,9 @@ export function createDataManager({
     source: (...args) => { live(); return service.source(...args); },
     refresh: (...args) => { live(); return service.refresh(...args); },
     mutate: (...args) => { live(); return service.mutate(...args); },
+    ingest: (...args) => { live(); return service.ingest(...args); },
     purge: (...args) => { live(); return service.purge(...args); },
+    trim: (...args) => { live(); return service.trim(...args); },
     status: (...args) => service.status(...args),
     pending: (...args) => service.pending(...args),
     /** DataApi.store — only manifest-declared stores exist. */

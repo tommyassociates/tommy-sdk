@@ -549,17 +549,31 @@ export interface DataApi {
   source?<Dto = unknown, Rec = unknown>(collection: string, spec: DataSource<Dto, Rec>): () => void;
   refresh?(target: DataTarget, options?: DataRefreshOptions): Promise<DataStatus>;
   mutate?<Rec = unknown>(collection: string, command: DataMutation<Rec>, options?: { wait?: boolean }): Promise<{ key: string; pushed: boolean }>;
-  purge?(collection: string, options?: { force?: boolean }): Promise<{ removed: string[] }>;
+  /** Server rows the MP received, stored synced; `replace` makes them the complete set for `scope`. */
+  ingest?<Rec = unknown>(collection: string, rows: readonly Rec[], options?: { replace?: boolean; scope?: (row: Rec) => boolean }): Promise<{ written: number }>;
+  /** All cached rows, or only `keys`, or every row of an index range; dirty rows only with `force`. */
+  purge?(collection: string, options?: { force?: boolean; keys?: readonly string[]; query?: DataIndexRange }): Promise<{ removed: string[] }>;
+  /** Keeps the newest `keep` rows of an index range; dirty rows are never removed. */
+  trim?(collection: string, options: DataIndexRange & { keep: number }): Promise<{ removed: string[] }>;
   status?(target: DataTarget): DataStatus;
 }
 
 export type DataTarget = string | { collection: string; key?: string; window?: Record<string, unknown>; query?: DataQuerySpec };
+/** A whole index range: no paging or filter fields. */
+export interface DataIndexRange {
+  readonly index: string;
+  readonly equals?: readonly unknown[];
+  readonly prefix?: readonly unknown[];
+  readonly lower?: unknown;
+  readonly upper?: unknown;
+}
 export interface DataQuerySpec<Rec = unknown> {
   readonly index?: string;
   readonly equals?: readonly unknown[];
   readonly prefix?: readonly unknown[];
   readonly lower?: unknown;
   readonly upper?: unknown;
+  /** Rows to return, 1 to 5000 (default 50); anything else is refused with `DATA_INVALID`. */
   readonly limit?: number;
   readonly cursor?: string | null;
   readonly where?: (row: Rec) => boolean;

@@ -5,8 +5,10 @@
  *   query(collection, spec)           rows by a declared index, in index order
  *   subscribe(target, callback)       the current value now, then on every change
  *   refresh(target, options)          a scheduled, coalesced background sync
+ *   ingest(collection, rows, options) server rows a domain received, stored synced
  *   mutate(collection, command)       an optimistic write, pushed when possible
  *   purge(collection, options)        clear cached rows (never dirty ones unless forced)
+ *   trim(collection, options)         keep a subject's newest rows by index order
  *   status(target)                    fresh | stale | refreshing | offline | error
  *
  * The host builds one over its domain collections (`<domain>.<collection>`);
@@ -35,6 +37,63 @@ export function createImmediateScheduler() {
 }
 
 const serviceError = (message, code) => Object.assign(new Error(message), { name: 'DataServiceError', code });
+// One reconcile carries a bounded complete set; larger ingests go in chunks.
+const INGEST_CHUNK = 500;
+// A physical index read returns at most this many rows per page.
+const PAGE_ROWS = 100;
+// The most rows one query or subscription returns, however it pages.
+export const MAX_QUERY_ROWS = 5000;
+function queryLimit(limit) {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_QUERY_ROWS) {
+    throw serviceError(`A query limit is a whole number from 1 to ${MAX_QUERY_ROWS}`, 'DATA_INVALID');
+  }
+  return limit;
+}
+
+/**
+ * Rows of an index range in index order, read in pages: up to `limit` from
+ * `cursor`. `raw` includes rows past the paint ceiling, with their dirty
+ * flags, for writers.
+ */
+async function queryPages(store, index, range, { limit = 50, cursor: start = null, raw = false } = {}) {
+  queryLimit(limit);
+  const rows = [];
+  let cursor = start;
+  let complete = false;
+  do {
+    // Each page continues from the cursor the previous one returned.
+    // eslint-disable-next-line no-await-in-loop
+    const page = await store.query(index, range, { limit: Math.min(PAGE_ROWS, limit - rows.length), cursor, ...(raw ? { raw: true } : {}) });
+    rows.push(...page.rows);
+    complete = page.complete;
+    cursor = page.complete ? null : page.nextCursor;
+  } while (cursor !== null && rows.length < limit);
+  return { rows, nextCursor: complete ? null : cursor, complete };
+}
+// The fields of an index range; a purge or trim acts on the whole range.
+const RANGE_FIELDS = new Set(['index', 'equals', 'prefix', 'lower', 'upper']);
+// `keep` belongs to a trim only: a purge refuses it rather than clear the range.
+function wholeRange(spec, operation) {
+  const extra = Object.keys(spec || {}).filter((field) => !RANGE_FIELDS.has(field) && !(field === 'keep' && operation === 'trim'));
+  if (typeof spec?.index !== 'string' || extra.length) {
+    throw serviceError(`${operation}: an index range only (${extra.join(', ') || 'index'} not accepted)`, 'DATA_INVALID');
+  }
+  const { index, keep: _keep, ...range } = spec;
+  return { index, range };
+}
+/** Every key of an index range in index order, with its dirty flag, page by page. */
+async function rangeKeys(store, keyPath, { index, range }) {
+  const keys = [];
+  let cursor = null;
+  do {
+    // Each page continues from the cursor the previous one returned.
+    // eslint-disable-next-line no-await-in-loop
+    const page = await store.query(index, range, { limit: PAGE_ROWS, cursor, raw: true });
+    page.rows.forEach((row) => keys.push({ key: String(row[keyPath]), dirty: !!row._dirty }));
+    cursor = page.complete ? null : page.nextCursor;
+  } while (cursor !== null);
+  return keys;
+}
 const same = (a, b) => {
   try { return JSON.stringify(a) === JSON.stringify(b); } catch (_) { return false; }
 };
@@ -88,7 +147,7 @@ export function createDataService({
     const { store } = local(target.collection);
     if (target.query) {
       const { index, limit = 50, cursor = null, ...range } = target.query;
-      return (await store.query(index, range, { limit, cursor })).rows;
+      return (await queryPages(store, index, range, { limit, cursor })).rows;
     }
     if (target.key !== undefined && target.key !== null) return (await store.get(String(target.key))) ?? null;
     return store.getAll();
@@ -111,6 +170,77 @@ export function createDataService({
     return next;
   }
 
+  /** Drops a row's unsent changes: the caller removed the row itself. */
+  function dropPending(label, key) {
+    const id = `${label}:${String(key)}`;
+    const entry = outbox.get(id);
+    if (!entry) return;
+    entry.discarded = true;
+    outbox.delete(id);
+    entry.changes.splice(0).forEach((change) => change.reject(serviceError('Change discarded', 'DATA_DISCARDED')));
+  }
+  /**
+   * Another tab removed rows here (a forced purge, a delete, an eviction): a
+   * change queued in this tab for a row that no longer exists is dropped, so
+   * it never brings the row back on the server. A queued delete is kept.
+   */
+  function dropOrphaned(event) {
+    if (!event?.remote || !outbox.size) return;
+    const touched = (entry) => event.label === entry.label || event.labels?.includes(entry.label) || (event.type === 'purge' && !event.label);
+    [...outbox.values()].filter(touched).forEach((entry) => {
+      serial(entry.id, async () => {
+        if (outbox.get(entry.id) !== entry || entry.changes.at(-1)?.command.op === 'delete') return;
+        const row = await entry.store.getRaw(entry.key);
+        if (row !== undefined && row !== null) return;
+        dropPending(entry.label, entry.key);
+        emitStatus();
+      }).catch(() => { /* kept: the next change event checks again */ });
+    });
+  }
+  const offOrphanFeed = feed?.subscribe((event) => dropOrphaned(event));
+  /**
+   * Removes one row as a purge or trim decided, in turn with local writes to
+   * it: a row written dirty since it was listed stays unless `force`, and a
+   * forced removal drops the row's unsent changes with it. Resolves whether
+   * the row was removed.
+   */
+  function removeRow({ label, store, key, force }) {
+    return serial(`${label}:${key}`, async () => {
+      const row = await store.getRaw(key);
+      if (!row || (!force && row._dirty)) return false;
+      try {
+        await store.delete(key, { silent: true, ...(Number.isSafeInteger(row._rev) ? { expectedRevision: row._rev } : {}) });
+      } catch (error) {
+        // Another tab wrote the row since: it stays.
+        if (error?.reason === 'conflict') return false;
+        throw error;
+      }
+      if (force) dropPending(label, key);
+      return true;
+    });
+  }
+  /**
+   * Removes the listed rows a purge or trim decided. On a store that commits
+   * many rows at once, up to 100 go per commit, each re-checked inside it (a
+   * row dirty by then stays). A forced removal, or a store without batch
+   * deletes, goes row by row in turn with local writes. Resolves the keys
+   * removed.
+   */
+  async function removeRows({ label, store, keys, force }) {
+    const removed = [];
+    if (force || typeof store.deleteMany !== 'function') {
+      for (const key of keys) {
+        // eslint-disable-next-line no-await-in-loop
+        if (await removeRow({ label, store, key, force })) removed.push(key);
+      }
+      return removed;
+    }
+    for (let start = 0; start < keys.length; start += PAGE_ROWS) {
+      // eslint-disable-next-line no-await-in-loop
+      removed.push(...await store.deleteMany(keys.slice(start, start + PAGE_ROWS), { keep: (row) => !!row._dirty, silent: true }));
+    }
+    return removed;
+  }
   function entryFor({ name, label, key, store, decl }) {
     const id = `${label}:${key}`;
     if (!outbox.has(id)) {
@@ -219,7 +349,8 @@ export function createDataService({
       live();
       const { store } = local(collection);
       const { index, limit = 50, cursor = null, where, ...range } = spec;
-      if (index) return store.query(index, range, { limit, cursor });
+      queryLimit(limit);
+      if (index) return queryPages(store, index, range, { limit, cursor });
       const rows = (await store.getAll()).filter((row) => (typeof where === 'function' ? where(row) : true));
       return { rows: rows.slice(0, limit), nextCursor: null, complete: rows.length <= limit };
     },
@@ -232,6 +363,7 @@ export function createDataService({
       live();
       const wanted = targetOf(target);
       const { store, label } = local(wanted.collection);
+      if (wanted.query) queryLimit(wanted.query.limit ?? 50);
       let active = true;
       let last;
       let seq = 0;
@@ -245,7 +377,8 @@ export function createDataService({
           callback(value);
         }).catch((error) => { if (active) { try { onError?.(error); } catch (_) { /* isolated */ } } });
       };
-      const offStore = store.subscribe(() => emit());
+      // A change listener reads only this target, however large the collection.
+      const offStore = typeof store.onChange === 'function' ? store.onChange(() => emit()) : store.subscribe(() => emit());
       const offFeed = feed?.subscribe((event) => {
         if (event.label === label || event.labels?.includes(label) || (event.type === 'purge' && !event.label)) emit();
       });
@@ -313,7 +446,7 @@ export function createDataService({
             return;
           }
           const record = (spec.toRecord || ((value) => value))(dto, prev ? bare(prev) : prev);
-          await store.reconcile([record], { scope: () => false });
+          await store.reconcile([record], { prune: false });
           return;
         }
         const scope = typeof spec.scope === 'function' ? spec.scope(wanted) : () => true;
@@ -330,6 +463,52 @@ export function createDataService({
         throw error;
       }).finally(() => { state.flight = null; emitStatus(); });
       return settle(state.flight);
+    },
+    /**
+     * Stores rows a domain received from the server (a page, an event, a
+     * detail read) as synced rows: views subscribed to them update, nothing is
+     * pushed. A row with an unsent local write keeps that write: the server's
+     * copy does not replace it. With `replace`, the rows are the complete set
+     * for `scope` (a row predicate; the whole collection without one): rows in
+     * scope that the set leaves out are removed, dirty rows never, and the
+     * collection is fresh. Resolves `{ written }`, the rows stored.
+     */
+    async ingest(collection, rows, { replace = false, scope = null } = {}) {
+      live();
+      const { name, store, decl } = local(collection);
+      if (!Array.isArray(rows)) throw serviceError('ingest: rows must be an array', 'DATA_INVALID');
+      const keyPath = decl?.keyPath || 'id';
+      const inScope = typeof scope === 'function' ? scope : () => true;
+      // Only rows the store accepts count, once per key; a refused row never
+      // keeps an older stored version alive through a replacement.
+      const isAccepted = (row) => row && typeof row === 'object'
+        && !(typeof store.validateRecord === 'function' && store.validateRecord(row));
+      const kept = new Set(rows.filter(isAccepted).map((row) => String(row[keyPath])));
+      // The distinct keys stored: accepted rows the store did not leave as an
+      // unsent local write.
+      const stored = new Set();
+      const upsert = async (chunk, options) => {
+        const result = await store.reconcile(chunk, { ...options, keepDirty: true });
+        const left = new Set((Array.isArray(result?.skipped) ? result.skipped : []).map(String));
+        chunk.filter(isAccepted).forEach((row) => { if (!left.has(String(row[keyPath]))) stored.add(String(row[keyPath])); });
+      };
+      if (replace && rows.length <= INGEST_CHUNK) {
+        await upsert(rows, { scope: inScope });
+      } else {
+        for (let start = 0; start < rows.length; start += INGEST_CHUNK) {
+          // Chunks commit in order; each is a bounded complete set.
+          // eslint-disable-next-line no-await-in-loop
+          await upsert(rows.slice(start, start + INGEST_CHUNK), { prune: false });
+        }
+        if (replace) await store.reconcile([], { scope: (row) => inScope(row) && !kept.has(String(row[keyPath])) });
+      }
+      const written = stored.size;
+      if (replace) {
+        const state = stateFor(targetKey({ collection: name }));
+        state.state = 'fresh'; state.syncedAt = now(); state.error = null;
+        emitStatus();
+      }
+      return { written };
     },
     /**
      * `{ op: 'put', record } | { op: 'patch', key, patch } | { op: 'delete', key }`.
@@ -401,26 +580,49 @@ export function createDataService({
     /** Drops a pending local change after an explicit confirm. */
     async discard(collection, key) {
       const { label, store } = local(collection);
-      const id = `${label}:${String(key)}`;
-      const entry = outbox.get(id);
-      if (entry) {
-        entry.discarded = true;
-        outbox.delete(id);
-        entry.changes.splice(0).forEach((change) => change.reject(serviceError('Change discarded', 'DATA_DISCARDED')));
-      }
+      dropPending(label, key);
       await store.delete(String(key));
       emitStatus();
     },
-    /** Clears a collection's cached rows. Dirty rows stay unless `force`. */
-    async purge(collection, { force = false } = {}) {
+    /**
+     * Clears a collection's cached rows, or only `keys`, or every row of an
+     * index range (`query: { index, prefix | equals | lower | upper }`; paging
+     * fields are refused). Dirty rows stay unless `force`; a forced removal
+     * drops their unsent changes, in this tab and in other tabs.
+     */
+    async purge(collection, { force = false, keys = null, query = null } = {}) {
       live();
-      const { store } = local(collection);
-      const rows = await (store.getAllRaw ? store.getAllRaw() : store.getAll());
-      const keyPath = local(collection).decl?.keyPath || 'id';
-      const doomed = rows.filter((row) => force || !row._dirty).map((row) => String(row[keyPath]));
-      for (const key of doomed) await store.delete(key, { silent: true });
+      const { store, decl } = local(collection);
+      const keyPath = decl?.keyPath || 'id';
+      let entries;
+      if (Array.isArray(keys)) {
+        entries = (await Promise.all(keys.map((key) => store.getRaw(String(key))))).filter(Boolean)
+          .map((row) => ({ key: String(row[keyPath]), dirty: !!row._dirty }));
+      } else if (query) entries = await rangeKeys(store, keyPath, wholeRange(query, 'purge'));
+      else {
+        entries = (await (store.getAllRaw ? store.getAllRaw() : store.getAll()))
+          .map((row) => ({ key: String(row[keyPath]), dirty: !!row._dirty }));
+      }
+      const { label } = local(collection);
+      const removed = await removeRows({ label, store, keys: entries.filter(({ dirty }) => force || !dirty).map(({ key }) => key), force });
       await store.revalidateSubscribers?.();
-      return { removed: doomed };
+      return { removed };
+    },
+    /**
+     * Keeps the newest `keep` rows of an index range (the last in index
+     * order) and removes the older ones. Dirty rows are never removed.
+     */
+    async trim(collection, spec = {}) {
+      live();
+      const { store, decl } = local(collection);
+      if (typeof spec.index !== 'string' || !Number.isSafeInteger(spec.keep) || spec.keep < 0) throw serviceError('trim: index and keep are required', 'DATA_INVALID');
+      const keyPath = decl?.keyPath || 'id';
+      const entries = await rangeKeys(store, keyPath, wholeRange(spec, 'trim'));
+      const { label } = local(collection);
+      const older = entries.slice(0, Math.max(0, entries.length - spec.keep)).filter(({ dirty }) => !dirty).map(({ key }) => key);
+      const removed = await removeRows({ label, store, keys: older, force: false });
+      if (removed.length) await store.revalidateSubscribers?.();
+      return { removed };
     },
     status(target) {
       const wanted = targetOf(target);
@@ -437,6 +639,7 @@ export function createDataService({
     onStatusChange(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     dispose() {
       disposed = true;
+      offOrphanFeed?.();
       listeners.clear();
       sources.clear();
       // Unsent rows stay dirty on disk; the next service sends them again.

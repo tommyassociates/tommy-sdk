@@ -32,6 +32,22 @@ export function assertCompleteSet(rows, { maxRows = 1000, maxBytes = 8 * 1024 * 
   }
 }
 const keyString = (key) => String(key);
+// One commit carries at most MAX_BATCH_ROWS rows and about MAX_BATCH_BYTES.
+const MAX_BATCH_ROWS = 100;
+const MAX_BATCH_BYTES = 6 * 1024 * 1024;
+function upsertBatches(incoming) {
+  const encoder = new TextEncoder();
+  const batches = [];
+  let batch = [];
+  let size = 0;
+  for (const entry of incoming) {
+    const length = encoder.encode(JSON.stringify(entry[1])).byteLength;
+    if (batch.length && (batch.length >= MAX_BATCH_ROWS || size + length > MAX_BATCH_BYTES)) { batches.push(batch); batch = []; size = 0; }
+    batch.push(entry); size += length;
+  }
+  if (batch.length) batches.push(batch);
+  return batches;
+}
 const nextRevision = (value = 0) => { if (!Number.isSafeInteger(value) || value < 0 || value >= Number.MAX_SAFE_INTEGER) throw new StorageReadError('write-failed'); return value + 1; };
 
 export function createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows, indexes = {}, queryRows = null }) {
@@ -39,6 +55,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
   let tail = Promise.resolve();
   const subscribers = new Set();
   const queries = new Set();
+  const changeListeners = new Set();
   let publication = 0;
   const cursors = new Map();
   let cursorSequence = 0;
@@ -77,6 +94,9 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
   async function notify() {
     live();
     publication += 1;
+    // Change listeners read only what they need (a key or an index range), so
+    // a collection too large for a complete read still tells them it changed.
+    for (const listener of changeListeners) { try { listener(); } catch (_) { /* isolated consumer */ } }
     if (!queries.size && !subscribers.size) return;
     let rows;
     try { rows = (await backend.getAll()).filter(paintable); } catch (error) {
@@ -148,6 +168,25 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         if (!silent) await notify();
       });
     },
+    /**
+     * Deletes `keys` (at most 100) in one commit, each only while
+     * `keep(row)` is false for the row as committed; rows already gone are
+     * skipped. A write that lands first makes the commit read again. Resolves
+     * the keys removed.
+     */
+    deleteMany(keys, { keep = () => false, silent = false } = {}) {
+      const wanted = [...new Set(keys.map(keyString))];
+      if (wanted.length > 100) return Promise.reject(new StorageReadError('payload-capacity'));
+      return exclusive(async () => {
+        let removed = [];
+        await mutation(wanted, (rows) => {
+          removed = wanted.filter((key) => rows.has(key) && !keep(rows.get(key)));
+          return removed.map((key) => ({ op: 'delete', key }));
+        }, { retry: true });
+        if (!silent && removed.length) await notify();
+        return removed;
+      });
+    },
     markSynced(key, { expectedRevision } = {}) {
       return exclusive(async () => {
         await mutation([keyString(key)], (rows) => {
@@ -159,7 +198,14 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         await notify();
       });
     },
-    async reconcile(records = [], { scope, windowKey, syncedAt = now() } = {}) {
+    /**
+     * Server rows, stored synced. `prune: false` only upserts; otherwise rows
+     * in `scope` (every row without one) that the set leaves out are removed,
+     * dirty rows never. Upserts commit in bounded batches, not one per row.
+     * `keepDirty: true` leaves a row with an unsent local write as it is
+     * (its key listed in `skipped`), decided inside the same commit.
+     */
+    async reconcile(records = [], { scope, windowKey, syncedAt = now(), prune = true, keepDirty = false } = {}) {
       assertCompleteSet(records);
       assertCompleteSet(records.map((row) => ({ ...row, _rev: Number.MAX_SAFE_INTEGER, _dirty: false,
         _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) })), {
@@ -170,11 +216,23 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       for (const row of records) { if (!validateRecord(row)) incoming.set(keyString(row[keyPath]), copy(row)); }
       return exclusive(async () => {
         let upserted = 0;
-        for (const [key, row] of incoming) {
-          await mutation([key], (rows) => [{ op: 'put', key, value: { ...row, _rev: nextRevision(rows.get(key)?._rev), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) } }], { syncedAt });
-          upserted += 1;
+        const skipped = new Set();
+        const stamp = (row, previous) => ({ ...row, _rev: nextRevision(previous?._rev), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) });
+        for (const batch of upsertBatches(incoming)) {
+          let left = [];
+          await mutation(batch.map(([key]) => key), (rows) => {
+            left = keepDirty ? batch.filter(([key]) => rows.get(key)?._dirty).map(([key]) => key) : [];
+            return batch.filter(([key]) => !left.includes(key)).map(([key, row]) => ({ op: 'put', key, value: stamp(row, rows.get(key)) }));
+          }, { syncedAt, retry: true });
+          upserted += batch.length - left.length;
+          left.forEach((key) => skipped.add(key));
         }
+        const counts = skipped.size ? { skipped: [...skipped] } : {};
         if (windowKey != null) { windows.delete(String(windowKey)); windows.set(String(windowKey), now()); }
+        if (!prune) {
+          await notify();
+          return { upserted, pruned: 0, ...counts };
+        }
         const retainedWindows = new Set([...windows.keys()].slice(-maxWindows));
         let afterKey = null;
         let pruned = 0;
@@ -191,23 +249,25 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
           afterKey = page.nextKey;
         } while (afterKey !== null);
         await notify();
-        return { upserted, pruned };
+        return { upserted, pruned, ...counts };
       });
     },
     // Rows by a secondary index, in index order: the physical index where the
     // store opened with it, else the declared index over the complete row set.
-    async query(index, range = {}, { limit = 50, cursor = null } = {}) {
+    // `raw: true` includes rows past the paint ceiling, for writers.
+    async query(index, range = {}, { limit = 50, cursor = null, raw = false } = {}) {
       live();
+      const visible = (row) => raw || paintable(row);
       const physical = typeof backend.query === 'function' && (!Array.isArray(backend.indexes) || backend.indexes.includes(index));
       if (physical) {
         const result = await backend.query({ index, ...range, limit, afterKey: cursor });
         live();
-        return { rows: result.rows.map((row) => row.value).filter(paintable).map(copy), nextCursor: result.nextKey, complete: result.nextKey === null };
+        return { rows: result.rows.map((row) => row.value).filter(visible).map(copy), nextCursor: result.nextKey, complete: result.nextKey === null };
       }
       const declared = indexes?.[index];
       if (!declared || typeof queryRows !== 'function') throw new StorageReadError(typeof backend.query === 'function' ? 'unserializable' : 'unavailable');
       const fields = Array.isArray(declared) ? declared : [declared];
-      const rows = queryRows(await api.getAll(), fields, range, (row) => row[keyPath]);
+      const rows = queryRows(raw ? await api.getAllRaw() : await api.getAll(), fields, range, (row) => row[keyPath]);
       const start = cursor === null ? 0 : rows.findIndex((row) => keyString(row[keyPath]) === keyString(cursor)) + 1;
       const page = rows.slice(start, start + limit);
       const more = start + limit < rows.length;
@@ -216,6 +276,8 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     // Another tab or handle changed this store: subscribers read it again.
     revalidateSubscribers() { return notify(); },
     subscribe(handler) { live(); subscribers.add(handler); return () => subscribers.delete(handler); },
+    /** Called after every change, with nothing read: the listener reads what it needs. */
+    onChange(listener) { live(); changeListeners.add(listener); return () => changeListeners.delete(listener); },
     subscribeQuery(selector, handler, { onError } = {}) {
       live();
       const query = { selector, handler, onError, previous: undefined };
@@ -233,6 +295,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       retired = true;
       subscribers.clear();
       queries.clear();
+      changeListeners.clear();
       cursors.clear();
       return backend.close({ purge });
     },

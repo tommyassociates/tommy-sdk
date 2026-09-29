@@ -7,6 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createDataService, createDataStore, createMemoryStoreBackend, createDataManager } from '../src/index.js';
 import { createHostStorePort, createHostStoreChangeFeed, observeHostStorePort } from '../src/host-store/index.js';
+import { COMPLETE_ROWS } from '../src/host-store/protocol.js';
 import { DATABASES, identity, createChannelBus } from './helpers/host-databases.js';
 
 const settle = () => new Promise((resolve) => { setTimeout(resolve, 0); });
@@ -188,6 +189,15 @@ describe('data service on memory stores', () => {
     expect(await data.read('chats.messages', 'a')).toMatchObject({ chat_id: 7, seq: 2 });
   });
 
+  it('reads a row by its key whether the key is given as a number or as text', async () => {
+    const stores = new Map([['chats.rows', createDataStore({ name: 'chats.rows', backend: createMemoryStoreBackend() })]]);
+    const data = createDataService({ resolve: (name) => (stores.has(name) ? { store: stores.get(name), decl: { keyPath: 'id' } } : null) });
+    await data.ingest('chats.rows', [{ id: 101, title: 'Numeric id' }]);
+    expect((await data.read('chats.rows', '101')).title).toBe('Numeric id');
+    expect((await data.read('chats.rows', 101)).title).toBe('Numeric id');
+    expect(await data.purge('chats.rows', { keys: [101] })).toEqual({ removed: ['101'] });
+  });
+
   it('subscribes to a later page of an indexed query', async () => {
     const data = memoryService();
     for (const [id, seq] of [['a', 1], ['b', 2], ['c', 3]]) await data.mutate('chats.messages', { op: 'put', record: { id, chat_id: 7, seq } });
@@ -220,6 +230,10 @@ describe('MP data API confinement', () => {
     await data.refresh('shifts');
     expect((await data.read('shifts')).map((row) => row.id)).toEqual(['1', '2']);
     expect(data.status('shifts').state).toBe('fresh');
+    await data.ingest('mp.scheduling.shifts', [{ id: '3', at: 'wed' }]);
+    expect((await data.read('shifts', '3'))._dirty).toBe(false);
+    await expect(data.ingest('chats.messages', [{ id: 'x' }])).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
+    await expect(data.trim('mp.time-clock.shifts', { index: 'by_day', keep: 1 })).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
   });
   it('queries the indexes its manifest declares', async () => {
     const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {
@@ -261,6 +275,32 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     feedA.close(); feedB.close(); await database.close();
   });
 
+  it('drops a change another tab queued for a row this tab force-purges', async () => {
+    const Channel = createChannelBus();
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+    const tab = (feed) => {
+      const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(observeHostStorePort(port, feed), null, options), indexes: INDEXES });
+      return createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null), feed });
+    };
+    const feedA = createHostStoreChangeFeed({ BroadcastChannelImpl: Channel });
+    const feedB = createHostStoreChangeFeed({ BroadcastChannelImpl: Channel });
+    const a = tab(feedA);
+    const b = tab(feedB);
+    const push = vi.fn(async () => { throw Object.assign(new Error('Offline'), { status: 0 }); });
+    a.source('chats.messages', { fetch: async () => [], push });
+    await a.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 1 } });
+    await a.mutate('chats.messages', { op: 'put', record: { id: 'other', chat_id: 8, seq: 1 } });
+    await vi.waitFor(() => expect(a.pending().map((entry) => [entry.key, entry.state]).sort()).toEqual([['draft', 'failed'], ['other', 'failed']]));
+    expect(await b.purge('chats.messages', { force: true, query: { index: 'byChat', prefix: [7] } })).toEqual({ removed: ['draft'] });
+    await vi.waitFor(() => expect(a.pending().map((entry) => entry.key)).toEqual(['other']));
+    await expect(a.retry('chats.messages', 'draft')).resolves.toEqual({ key: 'draft', pushed: false });
+    expect(push.mock.calls.map(([command]) => command.record.id).sort()).toEqual(['draft', 'other']);
+    feedA.close(); feedB.close(); await database.close();
+  });
+
   it('reads a declared index in memory where the store opened without it', async () => {
     const database = create();
     const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
@@ -275,5 +315,341 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     expect((await store.query('byDay', {}, { limit: 2, cursor: first.nextCursor })).rows.map((row) => row.id)).toEqual(['3']);
     await expect(store.query('undeclared')).rejects.toMatchObject({ reason: 'unserializable' });
     await database.close();
+  });
+});
+
+/** A host-store-backed data service over `chats.messages`, counting commits. */
+function hostService(create, { maxRows = 5000 } = {}) {
+  const database = create();
+  const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+  const commits = { count: 0 };
+  const counted = { ...port, commit: (input) => { commits.count += 1; return port.commit(input); } };
+  const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+    limits: { maxRows, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+  const backend = transactionalBackend(counted, null, options);
+  // The shell adapter refuses a complete read past COMPLETE_ROWS, as here.
+  const bounded = { ...backend, async getAll() {
+    const rows = await backend.getAll();
+    if (rows.length > COMPLETE_ROWS) throw Object.assign(new Error('scan-required'), { name: 'StorageReadError', reason: 'scan-required' });
+    return rows;
+  } };
+  const store = createDataStore({ name: 'chats.messages', backend: bounded, indexes: INDEXES });
+  const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+  return { data, store, commits, close: () => database.close() };
+}
+const messages = (chat, from, to) => Array.from({ length: to - from + 1 }, (_, index) => ({ id: `${chat}:${from + index}`, chat_id: chat, seq: from + index }));
+
+describe.each([
+  ['memory', () => ({ data: memoryService(), close: () => {} })],
+  ...DATABASES.map(([name, create]) => [`host store (${name})`, () => hostService(create)]),
+])('server rows written into a collection (%s)', (_name, make) => {
+  it('ingests server rows as synced, never pruning unless the set replaces a scope', async () => {
+    const { data, close } = make();
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 99 } });
+    await data.ingest('chats.messages', messages(7, 1, 3));
+    await data.ingest('chats.messages', messages(8, 1, 2));
+    expect((await data.read('chats.messages')).map((row) => [row.id, row._dirty]).sort()).toEqual([
+      ['7:1', false], ['7:2', false], ['7:3', false], ['8:1', false], ['8:2', false], ['draft', true],
+    ]);
+    expect(data.pending()).toEqual([]);
+    // A complete set for chat 7 prunes the chat-7 rows it leaves out; dirty rows stay.
+    await data.ingest('chats.messages', messages(7, 2, 3), { replace: true, scope: (row) => row.chat_id === 7 });
+    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['7:2', '7:3', '8:1', '8:2', 'draft']);
+    expect(data.status('chats.messages').state).toBe('fresh');
+    await close();
+  });
+
+  it('keeps an unsent local write when the server copy of its row arrives', async () => {
+    const { data, close } = make();
+    await data.mutate('chats.messages', { op: 'put', record: { id: '7:2', chat_id: 7, seq: 2, body: 'unsent' } });
+    expect(await data.ingest('chats.messages', messages(7, 1, 3))).toEqual({ written: 2 });
+    expect(await data.read('chats.messages', '7:2')).toMatchObject({ body: 'unsent', _dirty: true });
+    // A replacement, and one past a single chunk, keep it too.
+    expect(await data.ingest('chats.messages', messages(7, 1, 3), { replace: true, scope: (row) => row.chat_id === 7 })).toEqual({ written: 2 });
+    expect(await data.ingest('chats.messages', messages(7, 1, 600), { replace: true })).toEqual({ written: 599 });
+    expect(await data.read('chats.messages', '7:2')).toMatchObject({ body: 'unsent', _dirty: true });
+    expect(await data.read('chats.messages', '7:3')).toMatchObject({ _dirty: false });
+    await close();
+  });
+
+  it('counts an unsent row left in two chunks once', async () => {
+    const { data, close } = make();
+    await data.mutate('chats.messages', { op: 'put', record: { id: '7:1', chat_id: 7, seq: 1, body: 'unsent' } });
+    const rows = [...messages(7, 1, 500), { id: '7:1', chat_id: 7, seq: 1 }];
+    expect(await data.ingest('chats.messages', rows)).toEqual({ written: 499 });
+    expect(await data.read('chats.messages', '7:1')).toMatchObject({ body: 'unsent', _dirty: true });
+    await close();
+  });
+
+  it('purges one subject by index, and specific keys, keeping unsent rows unless forced', async () => {
+    const { data, close } = make();
+    await data.ingest('chats.messages', [...messages(7, 1, 3), ...messages(8, 1, 2)]);
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 99 } });
+    expect(await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] } })).toEqual({ removed: ['7:1', '7:2', '7:3'] });
+    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['8:1', '8:2', 'draft']);
+    expect(await data.purge('chats.messages', { keys: ['8:2', 'draft', 'missing'] })).toEqual({ removed: ['8:2'] });
+    expect(await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] }, force: true })).toEqual({ removed: ['draft'] });
+    expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['8:1']);
+    await close();
+  });
+
+  it('trims a subject to its newest rows in index order, never an unsent one', async () => {
+    const { data, close } = make();
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 0 } });
+    await data.ingest('chats.messages', [...messages(7, 1, 6), ...messages(8, 1, 2)]);
+    const seen = [];
+    data.subscribe({ collection: 'chats.messages', query: { index: 'byChat', prefix: [7], limit: 100 } }, (rows) => seen.push(rows.map((row) => row.seq)));
+    await vi.waitFor(() => expect(seen.at(-1)).toEqual([0, 1, 2, 3, 4, 5, 6]));
+    expect(await data.trim('chats.messages', { index: 'byChat', prefix: [7], keep: 3 })).toEqual({ removed: ['7:1', '7:2', '7:3'] });
+    await vi.waitFor(() => expect(seen.at(-1)).toEqual([0, 4, 5, 6]));
+    expect(await data.trim('chats.messages', { index: 'byChat', prefix: [8], keep: 3 })).toEqual({ removed: [] });
+    await expect(data.trim('chats.messages', { prefix: [7], keep: 3 })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await close();
+  });
+});
+
+describe.each([
+  ['memory', () => ({ store: createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES }), close: () => {} })],
+  ...DATABASES.map(([name, create]) => [`host store (${name})`, () => hostService(create)]),
+])('a delete at a known revision (%s)', (_name, make) => {
+  it('removes the row only while it is still that revision', async () => {
+    const { store, close } = make();
+    await store.put({ id: 'a', chat_id: 7, seq: 1 });
+    const listed = await store.getRaw('a');
+    await store.put({ id: 'a', chat_id: 7, seq: 1, body: 'written since' });
+    await expect(store.delete('a', { expectedRevision: listed._rev })).rejects.toMatchObject({ name: 'PersistError', reason: 'conflict' });
+    expect(await store.get('a')).toMatchObject({ body: 'written since' });
+    await store.delete('a', { expectedRevision: (await store.getRaw('a'))._rev });
+    expect(await store.get('a')).toBeUndefined();
+    await close();
+  });
+});
+
+/** A memory store whose next read of `method` answers late: the value it read, after `release()`. */
+function lateStore(method) {
+  const inner = createMemoryStoreBackend();
+  let gate = null;
+  const backend = { ...inner, async [method](...args) {
+    const value = await inner[method](...args);
+    if (gate) { const wait = gate.promise; gate = null; await wait; }
+    return value;
+  } };
+  const store = createDataStore({ name: 'chats.messages', backend, indexes: INDEXES });
+  return {
+    store,
+    backend,
+    hold() { let release; gate = { promise: new Promise((resolve) => { release = resolve; }) }; return () => release(); },
+  };
+}
+
+describe('a memory store writes each row in turn', () => {
+  it('never lets a server row overwrite a local write that landed while it read', async () => {
+    const { store, hold } = lateStore('get');
+    const release = hold();
+    const server = store.reconcile([{ id: 'a', chat_id: 7, seq: 1, body: 'server' }], { prune: false, keepDirty: true });
+    const local = store.put({ id: 'a', chat_id: 7, seq: 1, body: 'unsent' });
+    await settle();
+    release();
+    await Promise.all([server, local]);
+    expect(await store.getRaw('a')).toMatchObject({ body: 'unsent', _dirty: true });
+  });
+
+  it('never deletes a revision written while the delete read the row', async () => {
+    const { store, hold } = lateStore('get');
+    await store.put({ id: 'a', chat_id: 7, seq: 1 });
+    const listed = (await store.getRaw('a'))._rev;
+    const release = hold();
+    const removal = store.delete('a', { expectedRevision: listed });
+    const local = store.put({ id: 'a', chat_id: 7, seq: 1, body: 'written since' });
+    await settle();
+    release();
+    await Promise.allSettled([removal, local]);
+    expect(await store.get('a')).toMatchObject({ body: 'written since' });
+  });
+
+  it('takes turns with another store handle over the same backend', async () => {
+    const { store, backend, hold } = lateStore('get');
+    const other = createDataStore({ name: 'chats.messages', backend, indexes: INDEXES });
+    await store.put({ id: 'a', chat_id: 7, seq: 1 });
+    const listed = (await store.getRaw('a'))._rev;
+    const release = hold();
+    const removal = store.delete('a', { expectedRevision: listed });
+    const local = other.put({ id: 'a', chat_id: 7, seq: 1, body: 'from the other handle' });
+    await settle();
+    release();
+    await Promise.allSettled([removal, local]);
+    expect(await other.get('a')).toMatchObject({ body: 'from the other handle' });
+  });
+
+  it('never prunes a row written while a reconcile read the set', async () => {
+    const { store, hold } = lateStore('getAll');
+    await store.reconcile([{ id: 'a', chat_id: 7, seq: 1 }]);
+    const release = hold();
+    const server = store.reconcile([]);
+    await settle();
+    await store.put({ id: 'a', chat_id: 7, seq: 1, body: 'unsent' });
+    release();
+    expect(await server).toMatchObject({ pruned: 0 });
+    expect(await store.getRaw('a')).toMatchObject({ body: 'unsent', _dirty: true });
+  });
+});
+
+describe('whole-range purge and trim, and the rows an ingest stored', () => {
+  it('purges and trims an index range of any size, never stopping part-way', async () => {
+    const data = memoryService();
+    await data.ingest('chats.messages', messages(7, 1, 6000));
+    await data.ingest('chats.messages', messages(8, 1, 10));
+    expect((await data.trim('chats.messages', { index: 'byChat', prefix: [7], keep: 100 })).removed).toHaveLength(5900);
+    const kept = await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 1000 });
+    expect(kept.rows.map((row) => row.seq)).toEqual(messages(7, 5901, 6000).map((row) => row.seq));
+    await data.ingest('chats.messages', messages(7, 1, 5900));
+    expect((await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] } })).removed).toHaveLength(6000);
+    expect((await data.query('chats.messages', { index: 'byChat', limit: 1000 })).rows.map((row) => row.chat_id)).toEqual(Array(10).fill(8));
+  });
+
+  it('refuses a query limit that is not a whole number up to the platform maximum', async () => {
+    const data = memoryService();
+    await data.ingest('chats.messages', messages(7, 1, 3));
+    for (const limit of [Infinity, 5001, 0, 2.5]) {
+      // eslint-disable-next-line no-await-in-loop
+      await expect(data.query('chats.messages', { index: 'byChat', prefix: [7], limit })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+      expect(() => data.subscribe({ collection: 'chats.messages', query: { index: 'byChat', limit } }, () => {})).toThrow(expect.objectContaining({ code: 'DATA_INVALID' }));
+    }
+    await expect(data.query('chats.messages', { limit: Infinity })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    expect((await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 5000 })).rows).toHaveLength(3);
+  });
+
+  it('refuses paging or filter fields on a range it would otherwise over-purge', async () => {
+    const data = memoryService();
+    await data.ingest('chats.messages', messages(7, 1, 5));
+    await expect(data.purge('chats.messages', { query: { index: 'byChat', prefix: [7], limit: 2 } })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.purge('chats.messages', { query: { index: 'byChat', cursor: '7:1' } })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.purge('chats.messages', { query: { index: 'byChat', prefix: [7], keep: 2 } })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.trim('chats.messages', { index: 'byChat', prefix: [7], keep: 1, where: () => true })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    expect((await data.read('chats.messages'))).toHaveLength(5);
+  });
+
+  it('keeps a row written dirty after a purge or trim listed it', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES });
+    let data;
+    let edit = null;
+    // A local edit lands after the range was listed, before its rows are removed.
+    const listing = new Proxy(store, { get(target, property) {
+      if (property !== 'query') return typeof target[property] === 'function' ? target[property].bind(target) : target[property];
+      return async (...args) => {
+        const page = await target.query(...args);
+        if (edit) { data.mutate('chats.messages', { op: 'put', record: edit }); edit = null; }
+        return page;
+      };
+    } });
+    data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store: listing, decl: { keyPath: 'id' } } : null) });
+    await data.ingest('chats.messages', messages(7, 1, 4));
+    edit = { id: '7:1', chat_id: 7, seq: 1, body: 'unsent' };
+    expect((await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] } })).removed).toEqual(['7:2', '7:3', '7:4']);
+    expect(await data.read('chats.messages', '7:1')).toMatchObject({ body: 'unsent', _dirty: true });
+    await data.ingest('chats.messages', messages(7, 2, 4));
+    edit = { id: '7:2', chat_id: 7, seq: 2, body: 'unsent too' };
+    expect((await data.trim('chats.messages', { index: 'byChat', prefix: [7], keep: 1 })).removed).toEqual(['7:3']);
+    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['7:1', '7:2', '7:4']);
+  });
+
+  it('drops the unsent changes of a row it force-purges', async () => {
+    const data = memoryService();
+    const push = vi.fn(async () => { throw Object.assign(new Error('Offline'), { status: 0 }); });
+    data.source('chats.messages', { fetch: async () => [], push });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 1 } });
+    await vi.waitFor(() => expect(data.pending()).toEqual([expect.objectContaining({ key: 'draft', state: 'failed' })]));
+    expect(await data.purge('chats.messages', { force: true, query: { index: 'byChat', prefix: [7] } })).toEqual({ removed: ['draft'] });
+    expect(data.pending()).toEqual([]);
+    await expect(data.retry('chats.messages', 'draft')).resolves.toEqual({ key: 'draft', pushed: false });
+    expect(push).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts each accepted key once, and a refused row never keeps an old version through a replacement', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES, recordSchema: {
+      type: 'object', required: ['id', 'chat_id'], properties: { id: { type: 'string' }, chat_id: { type: 'number' }, seq: { type: 'number' } },
+    } });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    const many = messages(7, 1, 500);
+    // The last key of the first chunk comes again in the second.
+    expect(await data.ingest('chats.messages', [...many, { ...many[499], seq: 9999 }])).toEqual({ written: 500 });
+    await data.ingest('chats.messages', [{ id: 'old', chat_id: 7, seq: 0 }]);
+    const replacement = [...messages(8, 1, 500), { id: 'old', chat_id: 'not a number' }];
+    expect(await data.ingest('chats.messages', replacement, { replace: true })).toEqual({ written: 500 });
+    expect(await data.read('chats.messages', 'old')).toBeNull();
+  });
+
+  it('reports the rows an ingest stored, not the rows it was given', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES, recordSchema: {
+      type: 'object', required: ['id', 'chat_id'], properties: { id: { type: 'string' }, chat_id: { type: 'number' }, seq: { type: 'number' } },
+    } });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    const given = [{ id: 'a', chat_id: 7, seq: 1 }, { id: 'a', chat_id: 7, seq: 2 }, { id: 'b', chat_id: 'seven' }, { id: 'c', chat_id: 7, seq: 3 }];
+    expect(await data.ingest('chats.messages', given)).toEqual({ written: 2 });
+    expect(await data.ingest('chats.messages', given, { replace: true })).toEqual({ written: 2 });
+  });
+});
+
+describe.each(DATABASES)('large collections on the host store (%s)', (_name, create) => {
+  it('writes a page of server rows in bounded transactions, not one per row', async () => {
+    const { data, commits, close } = hostService(create);
+    await data.ingest('chats.messages', messages(7, 1, 250));
+    expect(commits.count).toBeLessThanOrEqual(3);
+    expect((await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 1 })).rows[0].seq).toBe(1);
+    await close();
+  });
+
+  it('purges and trims in bounded commits, keeping a row written dirty after it was listed', async () => {
+    const { data, store, commits, close } = hostService(create);
+    await data.ingest('chats.messages', [...messages(7, 1, 250), ...messages(8, 1, 250)]);
+    commits.count = 0;
+    expect((await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] } })).removed).toHaveLength(250);
+    expect(commits.count).toBeLessThanOrEqual(3);
+    commits.count = 0;
+    expect((await data.trim('chats.messages', { index: 'byChat', prefix: [8], keep: 20 })).removed).toHaveLength(230);
+    expect(commits.count).toBeLessThanOrEqual(3);
+    // A local write lands after the range was listed, before its rows go.
+    let edited;
+    const listing = new Proxy(store, { get(target, property) {
+      if (property !== 'query') return typeof target[property] === 'function' ? target[property].bind(target) : target[property];
+      return async (...args) => {
+        const page = await target.query(...args);
+        if (!edited) edited = target.put({ id: '8:240', chat_id: 8, seq: 240, body: 'unsent' });
+        await edited;
+        return page;
+      };
+    } });
+    const racing = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store: listing, decl: { keyPath: 'id' } } : null) });
+    expect((await racing.purge('chats.messages', { query: { index: 'byChat', prefix: [8] } })).removed).toHaveLength(19);
+    expect(await data.read('chats.messages', '8:240')).toMatchObject({ body: 'unsent', _dirty: true });
+    await close();
+  });
+
+  it('reads and subscribes to more rows than one index page holds', async () => {
+    const { data, close } = hostService(create);
+    await data.ingest('chats.messages', messages(7, 1, 250));
+    const all = await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 1000 });
+    expect(all).toMatchObject({ complete: true, nextCursor: null });
+    expect(all.rows.map((row) => row.seq)).toEqual(messages(7, 1, 250).map((row) => row.seq));
+    const first = await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 120 });
+    expect(first.rows).toHaveLength(120);
+    expect(first.complete).toBe(false);
+    const rest = await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 1000, cursor: first.nextCursor });
+    expect(rest.rows[0].seq).toBe(121);
+    const seen = [];
+    data.subscribe({ collection: 'chats.messages', query: { index: 'byChat', prefix: [7], limit: 200 } }, (rows) => seen.push(rows.length));
+    await vi.waitFor(() => expect(seen).toEqual([200]));
+    await close();
+  });
+
+  it('keeps a subscription live once the collection outgrows a complete read', async () => {
+    const { data, close } = hostService(create);
+    for (let chat = 1; chat <= 3; chat += 1) await data.ingest('chats.messages', messages(chat, 1, 400)); // eslint-disable-line no-await-in-loop
+    const seen = [];
+    data.subscribe({ collection: 'chats.messages', query: { index: 'byChat', prefix: [9], limit: 10 } }, (rows) => seen.push(rows.map((row) => row.seq)));
+    await vi.waitFor(() => expect(seen).toEqual([[]]));
+    await data.ingest('chats.messages', messages(9, 1, 2));
+    await vi.waitFor(() => expect(seen.at(-1)).toEqual([1, 2]));
+    await close();
   });
 });
