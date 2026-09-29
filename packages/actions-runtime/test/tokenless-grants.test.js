@@ -221,6 +221,19 @@ describe('grants are per tenant and per delivery', () => {
     expect(receiptB.suppressed).toBe(true);
   });
 
+  it("a subscription registered for one tenant never hears another tenant's emits", async () => {
+    const w = await twoTenants();
+    w.grants[TENANT_B].rostering = ['read:attendance'];
+    const heard = [];
+    w.broker.subscribe('rostering', 'time-clock.shift_marked_absent', (_payload, meta) => { heard.push(meta.emitId); }, { tenantId: TENANT });
+    await w.emitIn(TENANT_B);
+    await settle();
+    expect(heard).toHaveLength(0);
+    await w.emitIn(TENANT);
+    await settle();
+    expect(heard).toHaveLength(1);
+  });
+
   it('a subscription hears a payload only while its grant holds at delivery', async () => {
     const w = await twoTenants();
     const heard = [];

@@ -477,7 +477,7 @@ export function createBroker({
    * authority land (and flip) together.
    *
    * This is the registration check. Every delivery re-tests the grant for the
-   * emit's tenant (`triggerGranted`), so a grant that narrows later stops the
+   * emit's tenant (`subscriberHears`), so a grant that narrows later stops the
    * payloads without the subscriber unsubscribing.
    */
   function authorizeSubscribe(subscriberMpId, triggerQualified, tenantId) {
@@ -561,8 +561,18 @@ export function createBroker({
     return wired;
   }
 
+  /**
+   * Whether a stored subscription receives an emit in `tenantId`: one
+   * registered for a tenant hears only that tenant, and the subscriber must
+   * still hold the grant there.
+   */
+  function subscriberHears(sub, triggerQualified, tenantId) {
+    if (sub.tenantKey !== undefined && sub.tenantKey !== tenantStateKey(tenantId)) return false;
+    return triggerGranted(sub.mpId, triggerQualified, tenantId);
+  }
+
   function triggerIsActive(tenantId, triggerQualified, payload) {
-    return [...(subscribers.get(triggerQualified) || [])].some((sub) => triggerGranted(sub.mpId, triggerQualified, tenantId))
+    return [...(subscribers.get(triggerQualified) || [])].some((sub) => subscriberHears(sub, triggerQualified, tenantId))
       || actionsForTrigger(tenantId, triggerQualified, payload).length > 0;
   }
 
@@ -688,7 +698,7 @@ export function createBroker({
     const deliveries = [];
 
     for (const sub of subscribers.get(triggerQualified) || []) {
-      if (!triggerGranted(sub.mpId, triggerQualified, tenantId)) continue;
+      if (!subscriberHears(sub, triggerQualified, tenantId)) continue;
       const delivery = records.open({
         kind: 'delivery',
         parentRunId: record.runId,
@@ -1610,12 +1620,15 @@ export function createBroker({
      */
     evaluatePredicate: evaluateDeclaredPredicate,
 
-    /** `tenantId`: the subscribing instance's tenant, for the registration check. */
+    /**
+     * `tenantId`: the subscribing instance's tenant. The subscription then
+     * hears only that tenant's emits; without it, every tenant's.
+     */
     subscribe(mpId, trigger, handler, { tenantId } = {}) {
       const qualified = trigger.includes('.') ? trigger : qualify(mpId, trigger);
       authorizeSubscribe(mpId, qualified, tenantId);
       const set = subscribers.get(qualified) || new Set();
-      const entry = { mpId, handler };
+      const entry = { mpId, handler, ...(tenantId !== undefined ? { tenantKey: tenantStateKey(tenantId) } : {}) };
       set.add(entry);
       subscribers.set(qualified, set);
       return () => set.delete(entry);
