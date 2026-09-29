@@ -66,6 +66,18 @@ function defaultBackend(dbName, storeName, syncStrategy) {
 }
 
 /**
+ * A store's manifest `indexes` (`[{ name, keyPath }]`) as DataStore indexes
+ * (`{ name: field }`); the object form passes through.
+ */
+export function manifestIndexes(indexes) {
+  if (Array.isArray(indexes)) {
+    return Object.fromEntries(indexes.filter((entry) => typeof entry?.name === 'string' && entry.name && entry.keyPath)
+      .map((entry) => [entry.name, entry.keyPath]));
+  }
+  return indexes && typeof indexes === 'object' ? { ...indexes } : {};
+}
+
+/**
  * @param {object} opts
  * @param {object} opts.capabilityToken the ISSUED token record — tenantId is
  *   derived from it, never passed separately (offline-sync.md §1).
@@ -110,6 +122,7 @@ export function createDataManager({
       name: storeName,
       keyPath: decl.keyPath || 'id',
       recordSchema: decl.recordSchema,
+      indexes: manifestIndexes(decl.indexes),
       backend,
       now,
       ...(decl.maxRows ? { maxRows: decl.maxRows } : {}),

@@ -569,6 +569,11 @@ export interface DataSource<Dto = unknown, Rec = unknown> {
   toRecord?(dto: Dto, prev?: Rec): Rec;
   keyOf?(dto: Dto): string;
   scope?(target: { collection: string; window?: Record<string, unknown> }): (row: Rec) => boolean;
+  /**
+   * Sends one local change; changes to a row arrive in order. A change left
+   * unsent by an earlier page or reload arrives as a `put` of the stored row,
+   * and a change may arrive again after a failure, so a push must be idempotent.
+   */
   push?(command: DataMutation<Rec>, record: Rec | null): Promise<unknown>;
 }
 export interface DataRefreshOptions {

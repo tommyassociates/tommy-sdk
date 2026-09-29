@@ -122,6 +122,80 @@ describe('data service on memory stores', () => {
     expect(await data.read('chats.messages')).toEqual([]);
   });
 
+  it('sends every change to a row in order and marks it synced only at its latest write', async () => {
+    const data = memoryService();
+    const sent = [];
+    const releases = [];
+    const push = vi.fn((command) => {
+      sent.push(command.op === 'patch' ? command.patch.seq : command.record.seq);
+      return new Promise((resolve) => { releases.push(resolve); });
+    });
+    data.source('chats.messages', { fetch: async () => [], push });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'a', chat_id: 7, seq: 1 } });
+    await settle();
+    const second = data.mutate('chats.messages', { op: 'patch', key: 'a', patch: { seq: 2 } }, { wait: true });
+    await settle();
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(data.pending()).toEqual([expect.objectContaining({ key: 'a', changes: 2, state: 'sending', op: 'patch' })]);
+    releases[0]();
+    await vi.waitFor(() => expect(push).toHaveBeenCalledTimes(2));
+    // The first push is confirmed, but the row has a later local write.
+    expect((await data.read('chats.messages', 'a'))._dirty).toBe(true);
+    releases[1]();
+    await expect(second).resolves.toEqual({ key: 'a', pushed: true });
+    expect(sent).toEqual([1, 2]);
+    expect((await data.read('chats.messages', 'a'))._dirty).toBe(false);
+    expect(data.pending()).toEqual([]);
+  });
+
+  it('sends a change left unsent by a disposed service', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES });
+    const make = (decl = { keyPath: 'id' }) => createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl } : null) });
+    const first = make();
+    first.source('chats.messages', { fetch: async () => [], push: async () => { throw Object.assign(new Error('Offline'), { status: 0 }); } });
+    await first.mutate('chats.messages', { op: 'put', record: { id: 'a', chat_id: 7, seq: 3 } });
+    await settle();
+    expect(first.pending()).toEqual([expect.objectContaining({ key: 'a', state: 'failed' })]);
+    first.dispose();
+    // A rebuilt service sends it when its push is registered.
+    const push = vi.fn(async () => {});
+    const second = make();
+    second.source('chats.messages', { fetch: async () => [], push });
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith({ op: 'put', record: { id: 'a', chat_id: 7, seq: 3 } }, { id: 'a', chat_id: 7, seq: 3 }));
+    await vi.waitFor(async () => expect((await store.getRaw('a'))._dirty).toBe(false));
+    expect(second.pending()).toEqual([]);
+    second.dispose();
+    // A declared push with no registration is sent on retry.
+    await store.put({ id: 'b', chat_id: 7, seq: 4 });
+    const declared = vi.fn(async () => {});
+    const third = make({ keyPath: 'id', push: declared });
+    expect(third.pending()).toEqual([]);
+    await expect(third.retry('chats.messages', 'b')).resolves.toEqual({ key: 'b', pushed: true });
+    expect(declared).toHaveBeenCalledWith({ op: 'put', record: { id: 'b', chat_id: 7, seq: 4 } }, { id: 'b', chat_id: 7, seq: 4 });
+    expect((await store.getRaw('b'))._dirty).toBe(false);
+  });
+
+  it('hands a keyed refresh the previous row without storage metadata', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), recordSchema: {
+      type: 'object', additionalProperties: false, properties: { id: { type: 'string' }, chat_id: { type: 'number' }, seq: { type: 'number' } },
+    } });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    const toRecord = vi.fn((dto, prev) => ({ ...prev, ...dto }));
+    data.source('chats.messages', { fetch: async (target) => (target.key ? { id: 'a', seq: 2 } : [{ id: 'a', chat_id: 7, seq: 1 }]), toRecord });
+    await data.refresh('chats.messages');
+    await data.refresh({ collection: 'chats.messages', key: 'a' });
+    expect(Object.keys(toRecord.mock.calls.at(-1)[1]).filter((field) => field.startsWith('_'))).toEqual([]);
+    expect(await data.read('chats.messages', 'a')).toMatchObject({ chat_id: 7, seq: 2 });
+  });
+
+  it('subscribes to a later page of an indexed query', async () => {
+    const data = memoryService();
+    for (const [id, seq] of [['a', 1], ['b', 2], ['c', 3]]) await data.mutate('chats.messages', { op: 'put', record: { id, chat_id: 7, seq } });
+    const seen = [];
+    data.subscribe({ collection: 'chats.messages', query: { index: 'byChat', prefix: [7], limit: 1, cursor: 'a' } }, (rows) => seen.push(rows.map((row) => row.id)));
+    await vi.waitFor(() => expect(seen).toEqual([['b']]));
+  });
+
   it('reports offline without fetching', async () => {
     const data = memoryService({ isOnline: () => false });
     const fetch = vi.fn();
@@ -146,6 +220,15 @@ describe('MP data API confinement', () => {
     await data.refresh('shifts');
     expect((await data.read('shifts')).map((row) => row.id)).toEqual(['1', '2']);
     expect(data.status('shifts').state).toBe('fresh');
+  });
+  it('queries the indexes its manifest declares', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {
+      shifts: { keyPath: 'id', syncStrategy: 'server_authoritative', indexes: [{ name: 'by_day', keyPath: 'at' }] },
+    } });
+    await data.mutate('shifts', { op: 'put', record: { id: '1', at: 'tue' } });
+    await data.mutate('shifts', { op: 'put', record: { id: '2', at: 'mon' } });
+    expect((await data.query('shifts', { index: 'by_day' })).rows.map((row) => row.id)).toEqual(['2', '1']);
+    expect((await data.query('mp.scheduling.shifts', { index: 'by_day', equals: ['tue'] })).rows.map((row) => row.id)).toEqual(['1']);
   });
 });
 
@@ -176,5 +259,21 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     const listed = (await port.inspect({ op: 'stores', selector: { authorityOrigin: 'https://api.example.test', viewerId: '7' } })).stores[0];
     expect(listed.syncedAt).toEqual(expect.any(Number));
     feedA.close(); feedB.close(); await database.close();
+  });
+
+  it('reads a declared index in memory where the store opened without it', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity({ mpId: 'scheduling', tenantId: 'team-44' }), storeName: 'shifts', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null } };
+    const store = createDataStore({ name: 'shifts', backend: { ...transactionalBackend(port, null, options), indexes: [] }, indexes: { byDay: 'at' } });
+    await store.put({ id: '1', at: 'tue' });
+    await store.put({ id: '2', at: 'mon' });
+    await store.put({ id: '3', at: 'wed' });
+    const first = await store.query('byDay', {}, { limit: 2 });
+    expect(first.rows.map((row) => row.id)).toEqual(['2', '1']);
+    expect((await store.query('byDay', {}, { limit: 2, cursor: first.nextCursor })).rows.map((row) => row.id)).toEqual(['3']);
+    await expect(store.query('undeclared')).rejects.toMatchObject({ reason: 'unserializable' });
+    await database.close();
   });
 });

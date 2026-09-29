@@ -664,7 +664,7 @@ export function createDataStore({
     return !Number.isFinite(at) || at >= now() - PAINT_CEILING_MS;
   };
 
-  if (backend.transactional) return createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows });
+  if (backend.transactional) return createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows, indexes, queryRows });
 
 
   async function enforceWindowRetention({ current, changed, keep = maxWindows } = {}) {
@@ -954,10 +954,15 @@ export function createDataStore({
         throw new PersistError(name, persisted);
       }
     },
-    /** Sync engine hook: clear _dirty after a successful push. */
-    async markSynced(key) {
+    /**
+     * Sync engine hook: clear _dirty after a successful push. With
+     * `expectedRevision`, only while the row is still that revision: a later
+     * local write stays dirty until its own push.
+     */
+    async markSynced(key, { expectedRevision } = {}) {
       const record = await backend.get(key);
       if (!record) return;
+      if (expectedRevision !== undefined && record._rev !== expectedRevision) return;
       // Drop `_persistFailed` alongside `_dirty`: a row that reached the server
       // is no longer "saved on this device only", whatever happened to the local
       // copy on the way.

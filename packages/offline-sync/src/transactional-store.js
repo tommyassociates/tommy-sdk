@@ -34,7 +34,7 @@ export function assertCompleteSet(rows, { maxRows = 1000, maxBytes = 8 * 1024 * 
 const keyString = (key) => String(key);
 const nextRevision = (value = 0) => { if (!Number.isSafeInteger(value) || value < 0 || value >= Number.MAX_SAFE_INTEGER) throw new StorageReadError('write-failed'); return value + 1; };
 
-export function createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows }) {
+export function createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows, indexes = {}, queryRows = null }) {
   let retired = false;
   let tail = Promise.resolve();
   const subscribers = new Set();
@@ -194,13 +194,24 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         return { upserted, pruned };
       });
     },
-    // Rows by a secondary index declared when the store opened, in index order.
+    // Rows by a secondary index, in index order: the physical index where the
+    // store opened with it, else the declared index over the complete row set.
     async query(index, range = {}, { limit = 50, cursor = null } = {}) {
       live();
-      if (typeof backend.query !== 'function') throw new StorageReadError('unavailable');
-      const result = await backend.query({ index, ...range, limit, afterKey: cursor });
-      live();
-      return { rows: result.rows.map((row) => row.value).filter(paintable).map(copy), nextCursor: result.nextKey, complete: result.nextKey === null };
+      const physical = typeof backend.query === 'function' && (!Array.isArray(backend.indexes) || backend.indexes.includes(index));
+      if (physical) {
+        const result = await backend.query({ index, ...range, limit, afterKey: cursor });
+        live();
+        return { rows: result.rows.map((row) => row.value).filter(paintable).map(copy), nextCursor: result.nextKey, complete: result.nextKey === null };
+      }
+      const declared = indexes?.[index];
+      if (!declared || typeof queryRows !== 'function') throw new StorageReadError(typeof backend.query === 'function' ? 'unserializable' : 'unavailable');
+      const fields = Array.isArray(declared) ? declared : [declared];
+      const rows = queryRows(await api.getAll(), fields, range, (row) => row[keyPath]);
+      const start = cursor === null ? 0 : rows.findIndex((row) => keyString(row[keyPath]) === keyString(cursor)) + 1;
+      const page = rows.slice(start, start + limit);
+      const more = start + limit < rows.length;
+      return { rows: page, nextCursor: more ? keyString(page.at(-1)[keyPath]) : null, complete: !more };
     },
     // Another tab or handle changed this store: subscribers read it again.
     revalidateSubscribers() { return notify(); },
