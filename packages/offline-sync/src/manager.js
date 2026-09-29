@@ -100,10 +100,30 @@ export function manifestIndexes(indexes) {
  *   "saved on this device only"), so the host decides. Without a handler the
  *   write still rejects; it just goes unreported.
  */
+/**
+ * Every MP's own preferences store (`mp.<mpId>.prefs`): small UI choices a
+ * person makes (a layout, a filter, a toggle), kept per account on the
+ * device, never sent anywhere. A manifest that declares its own `prefs`
+ * store keeps its declaration.
+ */
+export const PREFS_STORE = 'prefs';
+export const PREFS_DECL = Object.freeze({
+  keyPath: 'key',
+  syncStrategy: 'last_write_wins',
+  recordSchema: Object.freeze({
+    type: 'object',
+    required: ['key'],
+    additionalProperties: false,
+    properties: { key: { type: 'string', minLength: 1, maxLength: 200 }, value: {} },
+  }),
+});
+const clone = (value) => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));
+
 export function createDataManager({
-  capabilityToken, mpId, localData = {}, backendFactory, now, onPersistError,
+  capabilityToken, mpId, localData: declaredData = {}, backendFactory, now, onPersistError,
   scheduler, feed = null, isOnline,
 }) {
+  const localData = Object.hasOwn(declaredData, PREFS_STORE) ? declaredData : { ...declaredData, [PREFS_STORE]: PREFS_DECL };
   const dbName = databaseName(capabilityToken, mpId);
   const stores = new Map();
   let disposed = false;
@@ -160,8 +180,38 @@ export function createDataManager({
     onPersistError,
   });
 
+  // tommy.prefs: read at once from what `ready()` loaded; written through.
+  // Preferences are the device's own, so they are stored as settled rows,
+  // never as changes waiting to be sent.
+  const prefValues = new Map();
+  let prefsLoaded = null;
+  const prefs = Object.freeze({
+    ready() {
+      prefsLoaded ||= service.read(PREFS_STORE).then((rows) => {
+        (rows || []).forEach((row) => { if (row && typeof row.key === 'string' && !prefValues.has(row.key)) prefValues.set(row.key, row.value); });
+      }).catch(() => {});
+      return prefsLoaded;
+    },
+    get(key, fallback = null) {
+      return prefValues.has(String(key)) ? clone(prefValues.get(String(key))) : fallback;
+    },
+    async set(key, value) {
+      live();
+      const name = String(key);
+      const stored = clone(value);
+      prefValues.set(name, stored);
+      await service.ingest(PREFS_STORE, [{ key: name, value: stored === undefined ? null : stored }]);
+    },
+    async remove(key) {
+      live();
+      prefValues.delete(String(key));
+      await service.purge(PREFS_STORE, { keys: [String(key)], force: true });
+    },
+  });
+
   return {
     databaseName: dbName,
+    prefs,
     async dispose(options) {
       disposed = true;
       service.dispose();

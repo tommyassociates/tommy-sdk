@@ -1362,8 +1362,25 @@ export interface NavigationApi {
 // Root SDK object — `tommy`
 // ============================================================================
 
+/**
+ * This MP's own small UI choices (a layout, a filter, a toggle), kept per
+ * account on the device by the host, never sent anywhere. Hosts from API
+ * level 4 (`init.hostApi >= 4`); older hosts have no such namespace.
+ */
+export interface PrefsApi {
+  /** Resolves once the stored preferences are loaded (the host loads them before `register`). */
+  ready(): Promise<void>;
+  /** The stored value (a copy), or `fallback` when none is stored. */
+  get<T = unknown>(key: string, fallback?: T): T;
+  /** Stores a JSON value; the next `get` returns it at once. */
+  set(key: string, value: unknown): Promise<void>;
+  remove(key: string): Promise<void>;
+}
+
 export interface TommySdk {
   readonly init: MpInit;
+  /** Per-account UI preferences kept by the host (API level 4). */
+  readonly prefs: PrefsApi;
   readonly actions: ActionsApi;
   readonly panels: PanelsApi;
   readonly data: DataApi;

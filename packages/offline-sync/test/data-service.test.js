@@ -235,6 +235,30 @@ describe('MP data API confinement', () => {
     await expect(data.ingest('chats.messages', [{ id: 'x' }])).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
     await expect(data.trim('mp.time-clock.shifts', { index: 'by_day', keep: 1 })).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
   });
+  it('gives every MP its own prefs, read at once once loaded and kept as settled rows', async () => {
+    const backends = new Map();
+    const factory = (_db, store) => { if (!backends.has(store)) backends.set(store, createMemoryStoreBackend()); return backends.get(store); };
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    await data.prefs.ready();
+    expect(data.prefs.get('layout', 'list')).toBe('list');
+    await data.prefs.set('layout', 'board');
+    await data.prefs.set('filters', { status: ['open'] });
+    const value = data.prefs.get('filters');
+    value.status.push('mutated');
+    expect(data.prefs.get('filters')).toEqual({ status: ['open'] });
+    // Stored per MP, not pending: a new manager over the same stores reads them back.
+    expect(data.pending()).toEqual([]);
+    const next = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    await next.prefs.ready();
+    expect(next.prefs.get('layout')).toBe('board');
+    await next.prefs.remove('layout');
+    const third = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    await third.prefs.ready();
+    expect(third.prefs.get('layout', 'list')).toBe('list');
+    // Other MPs cannot reach them.
+    await expect(next.read('mp.time-clock.prefs')).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
+  });
+
   it('queries the indexes its manifest declares', async () => {
     const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {
       shifts: { keyPath: 'id', syncStrategy: 'server_authoritative', indexes: [{ name: 'by_day', keyPath: 'at' }] },

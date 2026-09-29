@@ -7,7 +7,7 @@ export {
   createDataStore, createMemoryStoreBackend, createLocalStorageBackend, hasWebStorage,
   PersistError,
 } from './data-store.js';
-export { createDataManager, createReplayCoordinator } from './manager.js';
+export { createDataManager, createReplayCoordinator, PREFS_STORE } from './manager.js';
 export { createDataService, createImmediateScheduler, DATA_STATES, DEFAULT_STALE_AFTER_MS } from './data-service.js';
 export { reconcileFetched, windowKeyOf } from './reconcile.js';
 export { queryRows, recordSchemaCheck } from './data-store.js';
