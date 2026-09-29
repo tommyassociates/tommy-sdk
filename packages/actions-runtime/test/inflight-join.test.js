@@ -10,6 +10,7 @@
  * activity with its own key is rejected instead of waiting on itself.
  */
 import { describe, it, expect } from 'vitest';
+import { createDirectAdapter } from '@tommy/sdk';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 
 const TENANT = 'team-1';
@@ -192,5 +193,68 @@ describe('an invoke joins a run in flight with the same key', () => {
     const receipt = await settles(w.invoke('save', { id: 7 }), 1500, 'self-invoke');
     expect(calls).toBe(1);
     expect(receipt.result).toEqual({ innerCode: 'Timeout', innerRetryable: false });
+  });
+
+  it("through the SDK adapter, the join is refused before the caller's own RPC timeout fires", async () => {
+    const issuer = createFakeIssuer();
+    const broker = createBroker({ capabilityService: issuer });
+    const token = await issuer.issue('availability', '1.0.0', TENANT, [], 'i-1');
+    const adapter = createDirectAdapter({
+      broker,
+      init: { mpId: 'availability', instanceId: 'i-1', capabilityToken: token, tenant: { tenantId: TENANT } },
+      rpcTimeoutMs: 400,
+    });
+    let calls = 0;
+    broker.registerMp({
+      id: 'availability',
+      version: '1.0.0',
+      publisher: { type: 'first_party' },
+      triggers: {},
+      conditions: {},
+      activities: { save: activity() },
+      actions: {},
+    }, {
+      handlers: {
+        activities: {
+          save: async (args) => {
+            calls += 1;
+            const inner = await adapter.rpc({ kind: 'invoke', activity: 'availability.save', args }).catch((e) => e);
+            return { innerCode: inner.code, innerRule: inner.rule, innerRetryable: inner.retryable };
+          },
+        },
+      },
+    });
+
+    const receipt = await settles(adapter.rpc({ kind: 'invoke', activity: 'availability.save', args: { id: 7 } }), 1500, 'self-invoke via adapter');
+    expect(calls).toBe(1);
+    expect(receipt.result).toEqual({ innerCode: 'Timeout', innerRule: 'idempotency.inflight', innerRetryable: false });
+  });
+
+  it('a replay drained from the offline queue is not bound by the deadline of the call that queued it', async () => {
+    const started = deferred();
+    const release = deferred();
+    let calls = 0;
+    const w = await world({ save: activity({ sideEffect: 'server_write', offlineReplayable: true, idempotency: 'client_key' }) }, () => ({}), {
+      serverInvoke: async () => {
+        calls += 1;
+        started.resolve();
+        await release.promise;
+        return { status: 'succeeded', result: { saved: true } };
+      },
+    });
+    w.broker.setOnline(false);
+    const queued = await w.invoke('save', { id: 7 }, { idempotencyKey: 'k-7', rpcDeadlineAt: Date.now() - 1 });
+    expect(queued.status).toBe('queued_offline');
+    w.broker.setOnline(true);
+    const live = w.invoke('save', { id: 7 }, { idempotencyKey: 'k-7' });
+    await started.promise;
+    const drained = w.broker.drainOfflineQueue();
+    await tick();
+    release.resolve();
+    const [, results] = await settles(Promise.all([live, drained]), 1500, 'drain beside a live run');
+    expect(calls).toBe(1);
+    expect(results).toHaveLength(1);
+    expect(results[0].ok).toBe(true);
+    expect(results[0].result.idempotentReplay).toBe(true);
   });
 });

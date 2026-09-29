@@ -178,9 +178,11 @@ export function createBroker({
   /**
    * How long an invoke that joins a run already in flight with its idempotency
    * key waits for that run before rejecting with a non-retryable `Timeout`.
-   * Matches the SDK's own per-invoke timeout, so a join never outlives the
-   * call that made it; it also ends a handler invoking its own activity with
-   * its own key, which would otherwise wait on itself.
+   * An envelope carrying `rpcDeadlineAt` (the SDK adapter's own deadline) waits
+   * less: the join gives up JOIN_DEADLINE_MARGIN_MS before that deadline, so
+   * the caller receives this error rather than the adapter's generic timeout.
+   * The bound also ends a handler invoking its own activity with its own key,
+   * which would otherwise wait on itself.
    */
   inflightJoinTimeoutMs = DEFAULT_RPC_TIMEOUT_MS,
   /**
@@ -242,6 +244,8 @@ export function createBroker({
   const debouncePending = new Map();  // `${trigger}:${emitterMpId}` -> {timer, resolvers}
   const invokeChains = new Map();     // sourceMpId -> tail promise (FIFO per source MP)
   const inflightInvokes = new Map();  // processedKey -> promise of the run applying it
+  // A join rejects this long before the caller's `rpcDeadlineAt`.
+  const JOIN_DEADLINE_MARGIN_MS = 250;
   const executingChains = new Map();  // sourceMpId -> depth of handler execution ON that chain (F6)
   const txnSteps = new Map();         // txnId -> [{activity, args, idempotencyKey}]
   const chainBudget = new Map();      // rootRunId -> total run count
@@ -1278,7 +1282,7 @@ export function createBroker({
     // mid-handler, because an MP's invokes run inline while one of its handlers
     // is executing (see `dispatchInvokeInnerTracked`).
     const running = inflightInvokes.get(processedKey);
-    if (running) return joinInflightInvoke(running, envelope.activity);
+    if (running) return joinInflightInvoke(running, envelope);
     const run = runAdmittedInvoke(admitted);
     inflightInvokes.set(processedKey, run);
     const release = () => { if (inflightInvokes.get(processedKey) === run) inflightInvokes.delete(processedKey); };
@@ -1287,12 +1291,16 @@ export function createBroker({
   }
 
   /** Wait for the run in flight with this key: its result (as a replay) or its error, within the join bound. */
-  function joinInflightInvoke(running, activity) {
+  function joinInflightInvoke(running, envelope) {
+    const beforeCallerGivesUp = Number.isFinite(envelope.rpcDeadlineAt)
+      ? envelope.rpcDeadlineAt - now() - JOIN_DEADLINE_MARGIN_MS
+      : Infinity;
+    const waitMs = Math.max(0, Math.min(inflightJoinTimeoutMs, beforeCallerGivesUp));
     let timer;
     const bound = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(err('Timeout', `activity '${activity}' is already running with this idempotency key and did not settle within ${inflightJoinTimeoutMs}ms`, {
+      timer = setTimeout(() => reject(err('Timeout', `activity '${envelope.activity}' is already running with this idempotency key and did not settle within ${waitMs}ms`, {
         rule: 'idempotency.inflight', retryable: false,
-      })), inflightJoinTimeoutMs);
+      })), waitMs);
     });
     return Promise.race([running.then((final) => ({ ...final, idempotentReplay: true })), bound])
       .finally(() => clearTimeout(timer));
@@ -1485,7 +1493,7 @@ export function createBroker({
           // replayed write can carry about how long it waited, and the runtime
           // sets it here so no MP can forge it.
           : dispatchInvoke({
-            ...envelope, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
+            ...envelope, rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
           }))
           .then((result) => ({ ok: true, result }))
           .catch((error) => ({ ok: false, error }));
