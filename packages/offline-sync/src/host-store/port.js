@@ -303,9 +303,13 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
         } else if (store && (store.migration || (input.policy !== 'authored' && (store.fingerprint !== input.cacheFingerprint
           || versionChanged || reshaped || schemaChanged)))) {
           if (store.migration || (store.dirtyCount ?? 0) > 0) {
-            // Unsent rows are never dropped either: the caller carries them
-            // into the new shape and lets the cached rows go.
-            migration = { from: store.schemaVersion, to: input.schemaVersion, ...source };
+            // Unsent rows are never dropped either: the caller decides where
+            // they go and lets the cached rows go. A changed grant (the cache
+            // fingerprint) is named apart from a changed shape, so the caller
+            // can treat the two differently.
+            const grant = store.fingerprint !== input.cacheFingerprint
+              ? { cacheFingerprintChanged: true, fromCacheFingerprint: store.fingerprint ?? null } : {};
+            migration = { from: store.schemaVersion, to: input.schemaVersion, ...source, ...grant };
           } else {
             // A cache that changed shape, version or fingerprint starts empty.
             await tx.deletePrefix('rows', [identity.owner, identity.namespace]);

@@ -284,6 +284,36 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     expect(rows.rows.map((row) => row.key)).toEqual(['1', '2', '3']);
   });
 
+  it('tells the caller when a cache\'s grant changed, apart from a change of its schema', async () => {
+    const { port } = await setup(create);
+    const cacheInput = (cacheFingerprint, schemaFingerprint) => ({ ...openInput({ storeName: 'orders', schemaFingerprint }), cacheFingerprint });
+    const seed = async (input) => {
+      const opened = await port.open(input);
+      await port.commit({ handle: opened.handle, expectedEpoch: opened.epoch, expectedStoreRevision: opened.storeRevision,
+        changes: [{ op: 'put', key: '1', value: { id: 1, _dirty: true } }] });
+      return opened;
+    };
+    const finish = async (opened) => {
+      const step = (phase) => port.migration({ handle: opened.handle, expectedEpoch: opened.epoch, phase });
+      await step('begin');
+      return step('complete');
+    };
+    await seed(cacheInput('grant-a', 'schema-a'));
+    // The grant alone changed.
+    const grant = await port.open(cacheInput('grant-b', 'schema-a'));
+    expect(grant.migration).toEqual({ from: 1, to: 1, fromFingerprint: 'schema-a', cacheFingerprintChanged: true, fromCacheFingerprint: 'grant-a' });
+    await finish(grant);
+    await seed(cacheInput('grant-b', 'schema-a'));
+    // The schema alone changed: no grant signal.
+    const schema = await port.open(cacheInput('grant-b', 'schema-b'));
+    expect(schema.migration).toEqual({ from: 1, to: 1, fromFingerprint: 'schema-a' });
+    await finish(schema);
+    await seed(cacheInput('grant-b', 'schema-b'));
+    // Both changed: the grant signal is there.
+    const both = await port.open(cacheInput('grant-c', 'schema-c'));
+    expect(both.migration).toMatchObject({ cacheFingerprintChanged: true, fromCacheFingerprint: 'grant-b', fromFingerprint: 'schema-b' });
+  });
+
   it('takes a fingerprinted store back to an older version: a cache starts empty, authored rows go through the caller', async () => {
     const { port, open } = await setup(create);
     const cache = await open({ storeName: 'shifts', schemaVersion: 2, schemaFingerprint: 'v2' });
