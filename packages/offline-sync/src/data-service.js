@@ -170,6 +170,25 @@ export function createDataService({
     entry.changes.splice(0).forEach((change) => change.reject(serviceError('Change discarded', 'DATA_DISCARDED')));
   }
   /**
+   * Another tab removed rows here (a forced purge, a delete, an eviction): a
+   * change queued in this tab for a row that no longer exists is dropped, so
+   * it never brings the row back on the server. A queued delete is kept.
+   */
+  function dropOrphaned(event) {
+    if (!event?.remote || !outbox.size) return;
+    const touched = (entry) => event.label === entry.label || event.labels?.includes(entry.label) || (event.type === 'purge' && !event.label);
+    [...outbox.values()].filter(touched).forEach((entry) => {
+      serial(entry.id, async () => {
+        if (outbox.get(entry.id) !== entry || entry.changes.at(-1)?.command.op === 'delete') return;
+        const row = await entry.store.getRaw(entry.key);
+        if (row !== undefined && row !== null) return;
+        dropPending(entry.label, entry.key);
+        emitStatus();
+      }).catch(() => { /* kept: the next change event checks again */ });
+    });
+  }
+  const offOrphanFeed = feed?.subscribe((event) => dropOrphaned(event));
+  /**
    * Removes one row as a purge or trim decided, in turn with local writes to
    * it: a row written dirty since it was listed stays unless `force`, and a
    * forced removal drops the row's unsent changes with it. Resolves whether
@@ -414,9 +433,11 @@ export function createDataService({
     /**
      * Stores rows a domain received from the server (a page, an event, a
      * detail read) as synced rows: views subscribed to them update, nothing is
-     * pushed. With `replace`, the rows are the complete set for `scope` (a row
-     * predicate; the whole collection without one): rows in scope that the set
-     * leaves out are removed, dirty rows never, and the collection is fresh.
+     * pushed. A row with an unsent local write keeps that write: the server's
+     * copy does not replace it. With `replace`, the rows are the complete set
+     * for `scope` (a row predicate; the whole collection without one): rows in
+     * scope that the set leaves out are removed, dirty rows never, and the
+     * collection is fresh. Resolves `{ written }`, the rows stored.
      */
     async ingest(collection, rows, { replace = false, scope = null } = {}) {
       live();
@@ -429,17 +450,18 @@ export function createDataService({
       const accepted = rows.filter((row) => row && typeof row === 'object'
         && !(typeof store.validateRecord === 'function' && store.validateRecord(row)));
       const kept = new Set(accepted.map((row) => String(row[keyPath])));
+      let skipped = 0;
       if (replace && rows.length <= INGEST_CHUNK) {
-        await store.reconcile(rows, { scope: inScope });
+        skipped += (await store.reconcile(rows, { scope: inScope, keepDirty: true }))?.skipped || 0;
       } else {
         for (let start = 0; start < rows.length; start += INGEST_CHUNK) {
           // Chunks commit in order; each is a bounded complete set.
           // eslint-disable-next-line no-await-in-loop
-          await store.reconcile(rows.slice(start, start + INGEST_CHUNK), { prune: false });
+          skipped += (await store.reconcile(rows.slice(start, start + INGEST_CHUNK), { prune: false, keepDirty: true }))?.skipped || 0;
         }
         if (replace) await store.reconcile([], { scope: (row) => inScope(row) && !kept.has(String(row[keyPath])) });
       }
-      const written = kept.size;
+      const written = Math.max(0, kept.size - skipped);
       if (replace) {
         const state = stateFor(targetKey({ collection: name }));
         state.state = 'fresh'; state.syncedAt = now(); state.error = null;
@@ -524,7 +546,8 @@ export function createDataService({
     /**
      * Clears a collection's cached rows, or only `keys`, or every row of an
      * index range (`query: { index, prefix | equals | lower | upper }`; paging
-     * fields are refused). Dirty rows stay unless `force`.
+     * fields are refused). Dirty rows stay unless `force`; a forced removal
+     * drops their unsent changes, in this tab and in other tabs.
      */
     async purge(collection, { force = false, keys = null, query = null } = {}) {
       live();
@@ -584,6 +607,7 @@ export function createDataService({
     onStatusChange(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     dispose() {
       disposed = true;
+      offOrphanFeed?.();
       listeners.clear();
       sources.clear();
       // Unsent rows stay dirty on disk; the next service sends them again.

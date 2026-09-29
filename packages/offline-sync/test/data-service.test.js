@@ -275,6 +275,32 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     feedA.close(); feedB.close(); await database.close();
   });
 
+  it('drops a change another tab queued for a row this tab force-purges', async () => {
+    const Channel = createChannelBus();
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+    const tab = (feed) => {
+      const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(observeHostStorePort(port, feed), null, options), indexes: INDEXES });
+      return createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null), feed });
+    };
+    const feedA = createHostStoreChangeFeed({ BroadcastChannelImpl: Channel });
+    const feedB = createHostStoreChangeFeed({ BroadcastChannelImpl: Channel });
+    const a = tab(feedA);
+    const b = tab(feedB);
+    const push = vi.fn(async () => { throw Object.assign(new Error('Offline'), { status: 0 }); });
+    a.source('chats.messages', { fetch: async () => [], push });
+    await a.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 1 } });
+    await a.mutate('chats.messages', { op: 'put', record: { id: 'other', chat_id: 8, seq: 1 } });
+    await vi.waitFor(() => expect(a.pending().map((entry) => [entry.key, entry.state]).sort()).toEqual([['draft', 'failed'], ['other', 'failed']]));
+    expect(await b.purge('chats.messages', { force: true, query: { index: 'byChat', prefix: [7] } })).toEqual({ removed: ['draft'] });
+    await vi.waitFor(() => expect(a.pending().map((entry) => entry.key)).toEqual(['other']));
+    await expect(a.retry('chats.messages', 'draft')).resolves.toEqual({ key: 'draft', pushed: false });
+    expect(push.mock.calls.map(([command]) => command.record.id).sort()).toEqual(['draft', 'other']);
+    feedA.close(); feedB.close(); await database.close();
+  });
+
   it('reads a declared index in memory where the store opened without it', async () => {
     const database = create();
     const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
@@ -333,6 +359,19 @@ describe.each([
     await close();
   });
 
+  it('keeps an unsent local write when the server copy of its row arrives', async () => {
+    const { data, close } = make();
+    await data.mutate('chats.messages', { op: 'put', record: { id: '7:2', chat_id: 7, seq: 2, body: 'unsent' } });
+    expect(await data.ingest('chats.messages', messages(7, 1, 3))).toEqual({ written: 2 });
+    expect(await data.read('chats.messages', '7:2')).toMatchObject({ body: 'unsent', _dirty: true });
+    // A replacement, and one past a single chunk, keep it too.
+    expect(await data.ingest('chats.messages', messages(7, 1, 3), { replace: true, scope: (row) => row.chat_id === 7 })).toEqual({ written: 2 });
+    expect(await data.ingest('chats.messages', messages(7, 1, 600), { replace: true })).toEqual({ written: 599 });
+    expect(await data.read('chats.messages', '7:2')).toMatchObject({ body: 'unsent', _dirty: true });
+    expect(await data.read('chats.messages', '7:3')).toMatchObject({ _dirty: false });
+    await close();
+  });
+
   it('purges one subject by index, and specific keys, keeping unsent rows unless forced', async () => {
     const { data, close } = make();
     await data.ingest('chats.messages', [...messages(7, 1, 3), ...messages(8, 1, 2)]);
@@ -356,6 +395,23 @@ describe.each([
     await vi.waitFor(() => expect(seen.at(-1)).toEqual([0, 4, 5, 6]));
     expect(await data.trim('chats.messages', { index: 'byChat', prefix: [8], keep: 3 })).toEqual({ removed: [] });
     await expect(data.trim('chats.messages', { prefix: [7], keep: 3 })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await close();
+  });
+});
+
+describe.each([
+  ['memory', () => ({ store: createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES }), close: () => {} })],
+  ...DATABASES.map(([name, create]) => [`host store (${name})`, () => hostService(create)]),
+])('a delete at a known revision (%s)', (_name, make) => {
+  it('removes the row only while it is still that revision', async () => {
+    const { store, close } = make();
+    await store.put({ id: 'a', chat_id: 7, seq: 1 });
+    const listed = await store.getRaw('a');
+    await store.put({ id: 'a', chat_id: 7, seq: 1, body: 'written since' });
+    await expect(store.delete('a', { expectedRevision: listed._rev })).rejects.toMatchObject({ name: 'PersistError', reason: 'conflict' });
+    expect(await store.get('a')).toMatchObject({ body: 'written since' });
+    await store.delete('a', { expectedRevision: (await store.getRaw('a'))._rev });
+    expect(await store.get('a')).toBeUndefined();
     await close();
   });
 });

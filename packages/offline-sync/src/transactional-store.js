@@ -183,8 +183,10 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
      * Server rows, stored synced. `prune: false` only upserts; otherwise rows
      * in `scope` (every row without one) that the set leaves out are removed,
      * dirty rows never. Upserts commit in bounded batches, not one per row.
+     * `keepDirty: true` leaves a row with an unsent local write as it is
+     * (counted as `skipped`), decided inside the same commit.
      */
-    async reconcile(records = [], { scope, windowKey, syncedAt = now(), prune = true } = {}) {
+    async reconcile(records = [], { scope, windowKey, syncedAt = now(), prune = true, keepDirty = false } = {}) {
       assertCompleteSet(records);
       assertCompleteSet(records.map((row) => ({ ...row, _rev: Number.MAX_SAFE_INTEGER, _dirty: false,
         _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) })), {
@@ -195,15 +197,23 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       for (const row of records) { if (!validateRecord(row)) incoming.set(keyString(row[keyPath]), copy(row)); }
       return exclusive(async () => {
         let upserted = 0;
+        let skipped = 0;
         const stamp = (row, previous) => ({ ...row, _rev: nextRevision(previous?._rev), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) });
         for (const batch of upsertBatches(incoming)) {
-          await mutation(batch.map(([key]) => key), (rows) => batch.map(([key, row]) => ({ op: 'put', key, value: stamp(row, rows.get(key)) })), { syncedAt, retry: true });
-          upserted += batch.length;
+          let written = batch.length;
+          await mutation(batch.map(([key]) => key), (rows) => {
+            const writes = keepDirty ? batch.filter(([key]) => !rows.get(key)?._dirty) : batch;
+            written = writes.length;
+            return writes.map(([key, row]) => ({ op: 'put', key, value: stamp(row, rows.get(key)) }));
+          }, { syncedAt, retry: true });
+          upserted += written;
+          skipped += batch.length - written;
         }
+        const counts = skipped ? { skipped } : {};
         if (windowKey != null) { windows.delete(String(windowKey)); windows.set(String(windowKey), now()); }
         if (!prune) {
           await notify();
-          return { upserted, pruned: 0 };
+          return { upserted, pruned: 0, ...counts };
         }
         const retainedWindows = new Set([...windows.keys()].slice(-maxWindows));
         let afterKey = null;
@@ -221,7 +231,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
           afterKey = page.nextKey;
         } while (afterKey !== null);
         await notify();
-        return { upserted, pruned };
+        return { upserted, pruned, ...counts };
       });
     },
     // Rows by a secondary index, in index order: the physical index where the

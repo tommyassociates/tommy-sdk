@@ -843,7 +843,10 @@ export function createDataStore({
       if (keyOf(record) === undefined) return `record missing keyPath '${keyPath}'`;
       return null;
     },
-    async put(record, { dedupeKey, silent = false, deferCap = false } = {}) {
+    // `server: true` (reconcile with `keepDirty`) stores the row synced in the
+    // same write, and leaves a row with an unsent local write untouched:
+    // resolves undefined then.
+    async put(record, { dedupeKey, silent = false, deferCap = false, server = false } = {}) {
       if (validate && !validate(record)) {
         const detail = (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ');
         throw new Error(`store '${name}': record failed recordSchema: ${detail}`);
@@ -851,6 +854,7 @@ export function createDataStore({
       const key = keyOf(record);
       if (key === undefined) throw new Error(`store '${name}': record missing keyPath '${keyPath}'`);
       const previous = await backend.get(key);
+      if (server && previous?._dirty) return undefined;
       if (residentCount === null) {
         // `keys()` is the cheap route (both shipped backends answer it without
         // deserialising rows), but it is not part of the documented
@@ -873,9 +877,10 @@ export function createDataStore({
         ...(previous?._window != null ? { _window: previous._window } : {}),
         _rev: (previous?._rev || 0) + 1,
         _updatedAt: new Date(now()).toISOString(),
-        _dirty: true,
+        _dirty: !server,
         ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}),
       };
+      if (server) capSaturated = false;   // a clean row is an evictable row
       const persisted = await backend.put(key, stamped);
       if (previous === undefined) residentCount += 1;
       if (persisted && persisted.ok === false) {
@@ -945,9 +950,18 @@ export function createDataStore({
       if (!silent) await notify(displaced.length ? [key, ...displaced] : key);
       return key;
     },
-    async delete(key, { silent = false } = {}) {
+    /**
+     * With `expectedRevision`, only while the row is still that revision: a
+     * row written since is kept and the delete rejects with a `conflict`
+     * PersistError, as on the host store.
+     */
+    async delete(key, { silent = false, expectedRevision } = {}) {
+      const current = await backend.get(key);
+      if (current !== undefined && expectedRevision !== undefined && current._rev !== expectedRevision) {
+        throw new PersistError(name, { reason: 'conflict', retained: false });
+      }
       capSaturated = false;   // one fewer row: the cap may be able to act again
-      if (residentCount !== null && (await backend.get(key)) !== undefined) residentCount -= 1;
+      if (residentCount !== null && current !== undefined) residentCount -= 1;
       const persisted = await backend.delete(key);
       // `backend.delete` runs the same `save()` as a put, so it can byte-evict
       // on success and trip the retention bound on failure. This path read
@@ -1005,10 +1019,13 @@ export function createDataStore({
      * touched by it: a non-windowed store behaves exactly as before.
      *
      * `prune: false` only upserts: no row the set leaves out is removed.
+     * `keepDirty: true` leaves a row with an unsent local write as it is
+     * (counted as `skipped`) instead of overwriting it with the server's copy.
      */
-    async reconcile(records = [], { scope, windowKey, prune = true } = {}) {
+    async reconcile(records = [], { scope, windowKey, prune = true, keepDirty = false } = {}) {
       const existing = prune ? await backend.getAll() : [];
       const incoming = new Set();
+      let skipped = 0;
       // ONE notify for the whole merge, at the end. Per-record notifies made a
       // reconcile of N rows wake every subscriber N times, each with a
       // partially-merged snapshot — so an instant-data surface repainted N
@@ -1021,7 +1038,7 @@ export function createDataStore({
         let key;
         try {
           // eslint-disable-next-line no-await-in-loop
-          key = await api.put(record, { silent: true, deferCap: true });
+          key = await api.put(record, { silent: true, deferCap: true, ...(keepDirty ? { server: true } : {}) });
         } catch (e) {
           // ⚠ TWO DIFFERENT FAILURES ARRIVE HERE AND THEY ARE NOT THE SAME ROW.
           //
@@ -1068,8 +1085,15 @@ export function createDataStore({
           }
           continue;
         }
+        if (key === undefined) {
+          // An unsent local write (`keepDirty`): the row stays as the user left it.
+          incoming.add(String(keyOf(record)));
+          skipped += 1;
+          continue;
+        }
+        // A `server` put already stored the row synced.
         // eslint-disable-next-line no-await-in-loop
-        await api.markSynced(key);
+        if (!keepDirty) await api.markSynced(key);
         // Tag the row with the window it was fetched under, so retention can
         // drop whole windows later. Written straight to the backend rather than
         // through `put` so it costs no schema validation and no extra notify —
@@ -1113,8 +1137,9 @@ export function createDataStore({
       capSaturated = false;   // the merge changed both the row set and its dirtiness
       if (changed.size) await notify(changed);
       return {
-        upserted: incoming.size,
+        upserted: incoming.size - skipped,
         pruned,
+        ...(skipped ? { skipped } : {}),
         ...(dropped.length ? { windowsDropped: dropped.length } : {}),
         ...(evicted.length ? { evicted: evicted.length } : {}),
       };
