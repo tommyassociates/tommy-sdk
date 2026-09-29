@@ -146,6 +146,15 @@ export function createBroker({
   enforceConditionScopes = false,
   /** F3/F4: emit must own the trigger namespace; subscribe must be granted. */
   strictEmitOwnership = false,
+  /**
+   * `(mpId) => string[]`: the scopes that MP's install holds (its capability
+   * token's `effectiveScopes`, the authority invoke and query judge). The
+   * paths that carry no token read it: `subscribe()`, an Action's trigger
+   * binding, and the identity an Action's dispatches run under. An MP it
+   * returns no array for holds no scopes. Omitted, those paths read the
+   * registered manifest's declared `permissions.scopes`.
+   */
+  grantedScopes,
   /** C1/Option B: `{ mpId: 'domain' }` overrides for read-scope derivation. */
   domainScopeOverrides = {},
   /** C1/Option B: primitives derivation must not grant (defaults to the exported set). */
@@ -425,6 +434,13 @@ export function createBroker({
 
   const holdsReadGrant = (held, grant) => grant.accepts.some((s) => held.includes(s)) || held.includes('*');
 
+  /** The scopes a tokenless path judges `mpId` by — see `grantedScopes`. */
+  function tokenlessScopes(mpId) {
+    if (typeof grantedScopes !== 'function') return mps.get(mpId)?.manifest.permissions?.scopes || [];
+    const held = grantedScopes(mpId);
+    return Array.isArray(held) ? held : [];
+  }
+
   /**
    * F2 — condition reads were unmediated: no authz, no scope, no equivalent of
    * `authorizeInvoke`, so any MP could read any other MP's conditions
@@ -447,13 +463,13 @@ export function createBroker({
    * F4 — `subscribe()` was completely unauthorized: any MP could subscribe to
    * any trigger and receive its payload (passive cross-MP exfiltration).
    * Subscription is a REGISTRATION, not an RPC — there is no envelope and no
-   * capability token on this path — so the grant is read from the subscriber's
-   * REGISTERED MANIFEST `permissions.scopes` — which, under council C1's
-   * derived-scope resolution, is exactly the vocabulary that list already
-   * speaks: the owner's catalogue DOMAIN scope grants its triggers, with the
-   * explicit per-primitive form still accepted and SENSITIVE_CONDITIONS still
-   * excluded from derivation. Trigger ownership is the other way through,
-   * mirroring the same-MP exemption used by invoke/query.
+   * capability token on this path — so the grant is the subscriber's
+   * `tokenlessScopes`: its install's grants, or its declared manifest scopes
+   * when the host supplies none. Under council C1's derived-scope resolution
+   * the owner's catalogue DOMAIN scope grants its triggers, with the explicit
+   * per-primitive form still accepted and SENSITIVE_CONDITIONS still excluded
+   * from derivation. Trigger ownership is the other way through, mirroring the
+   * same-MP exemption used by invoke/query.
    *
    * Shares `strictEmitOwnership` with F3: emit-side and subscribe-side trigger
    * authority land (and flip) together.
@@ -462,9 +478,8 @@ export function createBroker({
     if (!strictEmitOwnership) return;
     const [ownerMpId, triggerName] = splitQualified(triggerQualified);
     if (ownerMpId === subscriberMpId) return; // an MP always hears its own triggers
-    const declared = mps.get(subscriberMpId)?.manifest.permissions?.scopes || [];
     const grant = readGrant(ownerMpId, triggerName);
-    if (!holdsReadGrant(declared, grant)) {
+    if (!holdsReadGrant(tokenlessScopes(subscriberMpId), grant)) {
       throw err('PermissionDenied', `mp '${subscriberMpId}' may not subscribe to '${triggerQualified}': ${grant.denialMessage}`, {
         rule: 'permissions', retryable: false,
       });
@@ -500,8 +515,8 @@ export function createBroker({
   /**
    * D.36 — `subscribe()` is grant-tested (F4) and the DECLARATIVE binding was
    * not, so an MP could consume another MP's trigger simply by naming it in an
-   * Action. Same test, same vocabulary, same source: the consumer's registered
-   * manifest scopes, since neither path carries a capability token.
+   * Action. Same test, same vocabulary, same source: the consumer's
+   * `tokenlessScopes`, since neither path carries a capability token.
    *
    * A binding that fails the test is DROPPED from the wiring rather than
    * throwing. The imperative path can reject at `subscribe()` because a caller
@@ -515,8 +530,7 @@ export function createBroker({
     if (!strictEmitOwnership) return true;
     const [ownerMpId, triggerName] = splitQualified(triggerQualified);
     if (ownerMpId === consumerMpId) return true;
-    const declared = mps.get(consumerMpId)?.manifest.permissions?.scopes || [];
-    return holdsReadGrant(declared, readGrant(ownerMpId, triggerName));
+    return holdsReadGrant(tokenlessScopes(consumerMpId), readGrant(ownerMpId, triggerName));
   }
 
   function actionsForTrigger(tenantId, triggerQualified, payload) {
@@ -558,8 +572,8 @@ export function createBroker({
    * same way: the run record carried B's capability token.
    *
    * There is no capability token on this path (nobody made an RPC — the broker
-   * is running a declared wiring), so the scopes come from the executing MP's
-   * REGISTERED MANIFEST, exactly as `authorizeSubscribe` reads them for the
+   * is running a declared wiring), so the scopes are the executing MP's
+   * `tokenlessScopes`, exactly as `authorizeSubscribe` reads them for the
    * other tokenless path. The emitter's token id is kept as `causedByTokenId`
    * so the chain is still traceable to the emit that caused it.
    */
@@ -567,7 +581,7 @@ export function createBroker({
     return {
       mpId: executingMpId,
       tenantId: emitterIdentity?.tenantId,
-      scopes: mps.get(executingMpId)?.manifest.permissions?.scopes || [],
+      scopes: tokenlessScopes(executingMpId),
       tokenId: undefined,
       causedByTokenId: emitterIdentity?.tokenId,
     };
