@@ -147,12 +147,14 @@ export function createBroker({
   /** F3/F4: emit must own the trigger namespace; subscribe must be granted. */
   strictEmitOwnership = false,
   /**
-   * `(mpId) => string[]`: the scopes that MP's install holds (its capability
-   * token's `effectiveScopes`, the authority invoke and query judge). The
-   * paths that carry no token read it: `subscribe()`, an Action's trigger
-   * binding, and the identity an Action's dispatches run under. An MP it
-   * returns no array for holds no scopes. Omitted, those paths read the
-   * registered manifest's declared `permissions.scopes`.
+   * `(mpId, tenantId) => string[]`: the scopes that MP's install holds in that
+   * tenant (its capability token's `effectiveScopes`, the authority invoke and
+   * query judge). The paths that carry no token read it: `subscribe()` when it
+   * registers and again at every delivery, an Action's trigger binding, and the
+   * identity an Action's dispatches run under. `tenantId` is the emit's tenant,
+   * or the subscription's own when it registers (undefined if the caller gave
+   * none). An MP it returns no array for holds no scopes. Omitted, those paths
+   * read the registered manifest's declared `permissions.scopes`.
    */
   grantedScopes,
   /** C1/Option B: `{ mpId: 'domain' }` overrides for read-scope derivation. */
@@ -434,10 +436,10 @@ export function createBroker({
 
   const holdsReadGrant = (held, grant) => grant.accepts.some((s) => held.includes(s)) || held.includes('*');
 
-  /** The scopes a tokenless path judges `mpId` by — see `grantedScopes`. */
-  function tokenlessScopes(mpId) {
+  /** The scopes a tokenless path judges `mpId` by in `tenantId` — see `grantedScopes`. */
+  function tokenlessScopes(mpId, tenantId) {
     if (typeof grantedScopes !== 'function') return mps.get(mpId)?.manifest.permissions?.scopes || [];
-    const held = grantedScopes(mpId);
+    const held = grantedScopes(mpId, tenantId);
     return Array.isArray(held) ? held : [];
   }
 
@@ -473,17 +475,18 @@ export function createBroker({
    *
    * Shares `strictEmitOwnership` with F3: emit-side and subscribe-side trigger
    * authority land (and flip) together.
+   *
+   * This is the registration check. Every delivery re-tests the grant for the
+   * emit's tenant (`triggerGranted`), so a grant that narrows later stops the
+   * payloads without the subscriber unsubscribing.
    */
-  function authorizeSubscribe(subscriberMpId, triggerQualified) {
-    if (!strictEmitOwnership) return;
+  function authorizeSubscribe(subscriberMpId, triggerQualified, tenantId) {
+    if (triggerGranted(subscriberMpId, triggerQualified, tenantId)) return;
     const [ownerMpId, triggerName] = splitQualified(triggerQualified);
-    if (ownerMpId === subscriberMpId) return; // an MP always hears its own triggers
     const grant = readGrant(ownerMpId, triggerName);
-    if (!holdsReadGrant(tokenlessScopes(subscriberMpId), grant)) {
-      throw err('PermissionDenied', `mp '${subscriberMpId}' may not subscribe to '${triggerQualified}': ${grant.denialMessage}`, {
-        rule: 'permissions', retryable: false,
-      });
-    }
+    throw err('PermissionDenied', `mp '${subscriberMpId}' may not subscribe to '${triggerQualified}': ${grant.denialMessage}`, {
+      rule: 'permissions', retryable: false,
+    });
   }
 
   // --- Active Trigger Index (D21) -------------------------------------------
@@ -513,10 +516,15 @@ export function createBroker({
   }
 
   /**
+   * Whether `mpId` may hear `triggerQualified` in `tenantId`: always for its own
+   * triggers, otherwise only with a read grant in its `tokenlessScopes`. One
+   * test for `subscribe()` (at registration and at each delivery) and for the
+   * DECLARATIVE binding.
+   *
    * D.36 — `subscribe()` is grant-tested (F4) and the DECLARATIVE binding was
    * not, so an MP could consume another MP's trigger simply by naming it in an
-   * Action. Same test, same vocabulary, same source: the consumer's
-   * `tokenlessScopes`, since neither path carries a capability token.
+   * Action. Same test, same vocabulary, same source, since neither path
+   * carries a capability token.
    *
    * A binding that fails the test is DROPPED from the wiring rather than
    * throwing. The imperative path can reject at `subscribe()` because a caller
@@ -526,11 +534,11 @@ export function createBroker({
    * `triggerIsActive` honest — an ungranted binding is not a consumer, so the
    * emit suppresses exactly as it would with no binding at all.
    */
-  function actionBindingAuthorized(consumerMpId, triggerQualified) {
+  function triggerGranted(mpId, triggerQualified, tenantId) {
     if (!strictEmitOwnership) return true;
     const [ownerMpId, triggerName] = splitQualified(triggerQualified);
-    if (ownerMpId === consumerMpId) return true;
-    return holdsReadGrant(tokenlessScopes(consumerMpId), readGrant(ownerMpId, triggerName));
+    if (ownerMpId === mpId) return true;
+    return holdsReadGrant(tokenlessScopes(mpId, tenantId), readGrant(ownerMpId, triggerName));
   }
 
   function actionsForTrigger(tenantId, triggerQualified, payload) {
@@ -541,7 +549,7 @@ export function createBroker({
       for (const [actionId, action] of Object.entries(actions)) {
         const srcMp = action.trigger.mp || mpId;
         if (qualify(srcMp, action.trigger.name) !== triggerQualified) continue;
-        if (!actionBindingAuthorized(mpId, triggerQualified)) continue;
+        if (!triggerGranted(mpId, triggerQualified, tenantId)) continue;
         const scopedState = locationId == null ? null : actionState.get(actionKey(tenantId, mpId, actionId, locationId));
         const local = scopedState?.inherited === true ? null : scopedState;
         if (local && action.locationOverridable !== true) continue;
@@ -554,7 +562,7 @@ export function createBroker({
   }
 
   function triggerIsActive(tenantId, triggerQualified, payload) {
-    return (subscribers.get(triggerQualified)?.size || 0) > 0
+    return [...(subscribers.get(triggerQualified) || [])].some((sub) => triggerGranted(sub.mpId, triggerQualified, tenantId))
       || actionsForTrigger(tenantId, triggerQualified, payload).length > 0;
   }
 
@@ -581,7 +589,7 @@ export function createBroker({
     return {
       mpId: executingMpId,
       tenantId: emitterIdentity?.tenantId,
-      scopes: tokenlessScopes(executingMpId),
+      scopes: tokenlessScopes(executingMpId, emitterIdentity?.tenantId),
       tokenId: undefined,
       causedByTokenId: emitterIdentity?.tokenId,
     };
@@ -680,6 +688,7 @@ export function createBroker({
     const deliveries = [];
 
     for (const sub of subscribers.get(triggerQualified) || []) {
+      if (!triggerGranted(sub.mpId, triggerQualified, tenantId)) continue;
       const delivery = records.open({
         kind: 'delivery',
         parentRunId: record.runId,
@@ -1601,9 +1610,10 @@ export function createBroker({
      */
     evaluatePredicate: evaluateDeclaredPredicate,
 
-    subscribe(mpId, trigger, handler) {
+    /** `tenantId`: the subscribing instance's tenant, for the registration check. */
+    subscribe(mpId, trigger, handler, { tenantId } = {}) {
       const qualified = trigger.includes('.') ? trigger : qualify(mpId, trigger);
-      authorizeSubscribe(mpId, qualified);
+      authorizeSubscribe(mpId, qualified, tenantId);
       const set = subscribers.get(qualified) || new Set();
       const entry = { mpId, handler };
       set.add(entry);

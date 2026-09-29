@@ -20,7 +20,7 @@ const nextRpcId = (instanceId) => `rpc-${instanceId}-${(rpcSeq += 1)}`;
 /**
  * @param {object} opts
  * @param {object} opts.broker host broker entry points:
- *   { emit(env), query(env), invoke(env), subscribe(mpId, trigger, handler),
+ *   { emit(env), query(env), invoke(env), subscribe(mpId, trigger, handler, { tenantId }),
  *     teardown(instanceId) } — all enforcement lives THERE, never here.
  * @param {object} opts.init the MpInit payload the loader hands over
  * @param {number} [opts.rpcTimeoutMs]
@@ -85,7 +85,8 @@ export function createDirectAdapter({ broker, init, rpcTimeoutMs = DEFAULT_RPC_T
   return {
     rpc,
     subscribe(trigger, handler) {
-      const unsubscribe = broker.subscribe(init.mpId, trigger, handler);
+      // The instance's tenant, so the broker checks that tenant's grant.
+      const unsubscribe = broker.subscribe(init.mpId, trigger, handler, { tenantId: init.tenant?.tenantId });
       subscriptions.add(unsubscribe);
       return () => { subscriptions.delete(unsubscribe); unsubscribe(); };
     },

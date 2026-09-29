@@ -181,3 +181,59 @@ describe("an Action's dispatches run under the install grant", () => {
     expect(w.noted).toHaveLength(1);
   });
 });
+
+describe('grants are per tenant and per delivery', () => {
+  const TENANT_B = 'team-2';
+
+  async function twoTenants() {
+    const issuer = createFakeIssuer();
+    const grants = { [TENANT]: { rostering: ['read:attendance'] }, [TENANT_B]: { rostering: [] } };
+    const broker = createBroker({
+      capabilityService: issuer,
+      strictEmitOwnership: true,
+      grantedScopes: (mpId, tenantId) => grants[tenantId]?.[mpId],
+    });
+    const noted = [];
+    broker.registerMp(timeClock, { handlers: {} });
+    broker.registerMp(consumer(), {
+      handlers: { activities: { note_absence: (args, { tenantId }) => { noted.push(tenantId); return { ok: true }; } } },
+    });
+    const tokens = {
+      [TENANT]: await issuer.issue('time-clock', '1.0.0', TENANT, [], 'i-tc-a'),
+      [TENANT_B]: await issuer.issue('time-clock', '1.0.0', TENANT_B, [], 'i-tc-b'),
+    };
+    const emitIn = (tenantId) => broker.emit({
+      sourceMpId: 'time-clock',
+      instanceId: tokens[tenantId].instanceId,
+      capabilityToken: tokens[tenantId],
+      trigger: 'time-clock.shift_marked_absent',
+      payload: {},
+    });
+    return { broker, grants, noted, emitIn };
+  }
+
+  it("an Action binding and its dispatch are judged by the emitting tenant's grant", async () => {
+    const w = await twoTenants();
+    await w.emitIn(TENANT);
+    const receiptB = await w.emitIn(TENANT_B);
+    await settle();
+    expect(w.noted).toEqual([TENANT]);
+    expect(receiptB.suppressed).toBe(true);
+  });
+
+  it('a subscription hears a payload only while its grant holds at delivery', async () => {
+    const w = await twoTenants();
+    const heard = [];
+    w.broker.subscribe('rostering', 'time-clock.shift_marked_absent', (_payload, meta) => { heard.push(meta.emitId); }, { tenantId: TENANT });
+    await w.emitIn(TENANT);
+    await settle();
+    expect(heard).toHaveLength(1);
+    // With the grant gone, the stored subscription no longer receives the
+    // payload and no longer keeps the trigger active.
+    w.grants[TENANT].rostering = [];
+    const receipt = await w.emitIn(TENANT);
+    await settle();
+    expect(heard).toHaveLength(1);
+    expect(receipt.suppressed).toBe(true);
+  });
+});
