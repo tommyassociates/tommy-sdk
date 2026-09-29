@@ -41,6 +41,14 @@ const serviceError = (message, code) => Object.assign(new Error(message), { name
 const INGEST_CHUNK = 500;
 // A physical index read returns at most this many rows per page.
 const PAGE_ROWS = 100;
+// The most rows one query or subscription returns, however it pages.
+export const MAX_QUERY_ROWS = 5000;
+function queryLimit(limit) {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_QUERY_ROWS) {
+    throw serviceError(`A query limit is a whole number from 1 to ${MAX_QUERY_ROWS}`, 'DATA_INVALID');
+  }
+  return limit;
+}
 
 /**
  * Rows of an index range in index order, read in pages: up to `limit` from
@@ -48,6 +56,7 @@ const PAGE_ROWS = 100;
  * flags, for writers.
  */
 async function queryPages(store, index, range, { limit = 50, cursor: start = null, raw = false } = {}) {
+  queryLimit(limit);
   const rows = [];
   let cursor = start;
   let complete = false;
@@ -340,6 +349,7 @@ export function createDataService({
       live();
       const { store } = local(collection);
       const { index, limit = 50, cursor = null, where, ...range } = spec;
+      queryLimit(limit);
       if (index) return queryPages(store, index, range, { limit, cursor });
       const rows = (await store.getAll()).filter((row) => (typeof where === 'function' ? where(row) : true));
       return { rows: rows.slice(0, limit), nextCursor: null, complete: rows.length <= limit };
@@ -353,6 +363,7 @@ export function createDataService({
       live();
       const wanted = targetOf(target);
       const { store, label } = local(wanted.collection);
+      if (wanted.query) queryLimit(wanted.query.limit ?? 50);
       let active = true;
       let last;
       let seq = 0;

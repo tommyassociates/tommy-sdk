@@ -573,6 +573,7 @@ export interface DataQuerySpec<Rec = unknown> {
   readonly prefix?: readonly unknown[];
   readonly lower?: unknown;
   readonly upper?: unknown;
+  /** Rows to return, 1 to 5000 (default 50); anything else is refused with `DATA_INVALID`. */
   readonly limit?: number;
   readonly cursor?: string | null;
   readonly where?: (row: Rec) => boolean;

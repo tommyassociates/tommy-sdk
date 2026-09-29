@@ -19,6 +19,20 @@ const ajv = new Ajv({ allErrors: true, strict: false });
 addFormats(ajv);
 
 /** Rows by key, keyed as strings like every other backend (a numeric id and its text find the same row). */
+// Per backend: the pending write turn of each row key (see `rowTurn`). A
+// backend over shared storage names it (`turnKey`), so every handle over that
+// storage in this page takes the same turns.
+const backendTurns = new WeakMap();
+const sharedTurns = new Map();
+function turnsFor(backend) {
+  if (typeof backend.turnKey === 'string') {
+    if (!sharedTurns.has(backend.turnKey)) sharedTurns.set(backend.turnKey, new Map());
+    return sharedTurns.get(backend.turnKey);
+  }
+  if (!backendTurns.has(backend)) backendTurns.set(backend, new Map());
+  return backendTurns.get(backend);
+}
+
 export function createMemoryStoreBackend() {
   const rows = new Map();
   return {
@@ -294,6 +308,7 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
     async delete(key) { const map = load(); map.delete(String(key)); return save(map); },
     keys() { return [...load().keys()]; },
     patchRetained,
+    turnKey: storeKey,
   };
 }
 
@@ -415,8 +430,12 @@ export function createDataStore({
   let capSaturated = false;
   // A write reads the row and writes it back as one step per key: `put`,
   // `delete` and `markSynced` on the same key take turns, so a check against
-  // the stored row (dirty, revision) still holds when the write lands.
-  const rowTurns = new Map();
+  // the stored row (dirty, revision) still holds when the write lands. The
+  // turns belong to the backend, so every store handle over it in this page
+  // takes turns with the others. Web Storage offers no compare-and-swap, so
+  // another tab writing the same Web Storage store is not fenced; durable
+  // collections use the transactional host store, which checks inside its commit.
+  const rowTurns = turnsFor(backend);
   function rowTurn(key, task) {
     const id = String(key);
     const next = (rowTurns.get(id) || Promise.resolve()).then(task);

@@ -437,6 +437,7 @@ function lateStore(method) {
   const store = createDataStore({ name: 'chats.messages', backend, indexes: INDEXES });
   return {
     store,
+    backend,
     hold() { let release; gate = { promise: new Promise((resolve) => { release = resolve; }) }; return () => release(); },
   };
 }
@@ -466,6 +467,20 @@ describe('a memory store writes each row in turn', () => {
     expect(await store.get('a')).toMatchObject({ body: 'written since' });
   });
 
+  it('takes turns with another store handle over the same backend', async () => {
+    const { store, backend, hold } = lateStore('get');
+    const other = createDataStore({ name: 'chats.messages', backend, indexes: INDEXES });
+    await store.put({ id: 'a', chat_id: 7, seq: 1 });
+    const listed = (await store.getRaw('a'))._rev;
+    const release = hold();
+    const removal = store.delete('a', { expectedRevision: listed });
+    const local = other.put({ id: 'a', chat_id: 7, seq: 1, body: 'from the other handle' });
+    await settle();
+    release();
+    await Promise.allSettled([removal, local]);
+    expect(await other.get('a')).toMatchObject({ body: 'from the other handle' });
+  });
+
   it('never prunes a row written while a reconcile read the set', async () => {
     const { store, hold } = lateStore('getAll');
     await store.reconcile([{ id: 'a', chat_id: 7, seq: 1 }]);
@@ -490,6 +505,18 @@ describe('whole-range purge and trim, and the rows an ingest stored', () => {
     await data.ingest('chats.messages', messages(7, 1, 5900));
     expect((await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] } })).removed).toHaveLength(6000);
     expect((await data.query('chats.messages', { index: 'byChat', limit: 1000 })).rows.map((row) => row.chat_id)).toEqual(Array(10).fill(8));
+  });
+
+  it('refuses a query limit that is not a whole number up to the platform maximum', async () => {
+    const data = memoryService();
+    await data.ingest('chats.messages', messages(7, 1, 3));
+    for (const limit of [Infinity, 5001, 0, 2.5]) {
+      // eslint-disable-next-line no-await-in-loop
+      await expect(data.query('chats.messages', { index: 'byChat', prefix: [7], limit })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+      expect(() => data.subscribe({ collection: 'chats.messages', query: { index: 'byChat', limit } }, () => {})).toThrow(expect.objectContaining({ code: 'DATA_INVALID' }));
+    }
+    await expect(data.query('chats.messages', { limit: Infinity })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    expect((await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 5000 })).rows).toHaveLength(3);
   });
 
   it('refuses paging or filter fields on a range it would otherwise over-purge', async () => {
