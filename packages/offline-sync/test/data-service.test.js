@@ -649,6 +649,18 @@ describe.each(DATABASES)('large collections on the host store (%s)', (_name, cre
     await close();
   });
 
+  it('reads a whole collection past one complete read, page by page', async () => {
+    const { data, store, close } = hostService(create);
+    await data.ingest('chats.messages', messages(7, 1, 1500));
+    expect(await store.getAll()).toHaveLength(1500);
+    expect(await data.read('chats.messages')).toHaveLength(1500);
+    const seen = [];
+    store.subscribe((rows) => seen.push(rows.length));
+    await data.ingest('chats.messages', messages(8, 1, 1));
+    await vi.waitFor(() => expect(seen.at(-1)).toBe(1501));
+    await close();
+  });
+
   it('reads and subscribes to more rows than one index page holds', async () => {
     const { data, close } = hostService(create);
     await data.ingest('chats.messages', messages(7, 1, 250));

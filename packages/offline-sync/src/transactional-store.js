@@ -1,4 +1,6 @@
 /** Durable branch of DataStore. The injected backend owns physical CAS/epochs. */
+// The most rows one whole-collection read returns, page by page.
+export const WHOLE_READ_ROWS = 20000;
 export class StorageReadError extends Error {
   constructor(reason) { super(`Storage read failed (${reason})`); this.name = 'StorageReadError'; this.reason = reason; }
 }
@@ -91,6 +93,34 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       if (result.reason !== 'conflict' || !retry || attempt === 2) failure(result, keys[0]);
     }
   }
+  // A whole-collection read: one complete read when the collection fits it,
+  // else page by page (100 rows a page) with every page checked against the
+  // first page's revision, starting over when a write lands in between.
+  // Past WHOLE_READ_ROWS a caller reads by index or scan instead.
+  async function wholeRows() {
+    try { return await backend.getAll(); } catch (error) {
+      if (error?.reason !== 'scan-required' || typeof backend.page !== 'function') throw error;
+    }
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const rows = [];
+      let afterKey = null;
+      let fence = null;
+      let moved = false;
+      do {
+        // Each page continues from the one before it.
+        // eslint-disable-next-line no-await-in-loop
+        const page = await backend.page({ afterKey, limit: 100 });
+        live();
+        if (fence && (page.epoch !== fence.epoch || page.storeRevision !== fence.revision)) { moved = true; break; }
+        fence = { epoch: page.epoch, revision: page.storeRevision };
+        rows.push(...page.rows.map((row) => row.value));
+        if (rows.length > WHOLE_READ_ROWS) throw new StorageReadError('scan-required');
+        afterKey = page.nextKey;
+      } while (afterKey !== null);
+      if (!moved) return rows;
+    }
+    throw new StorageReadError('conflict');
+  }
   async function notify() {
     live();
     publication += 1;
@@ -99,7 +129,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     for (const listener of changeListeners) { try { listener(); } catch (_) { /* isolated consumer */ } }
     if (!queries.size && !subscribers.size) return;
     let rows;
-    try { rows = (await backend.getAll()).filter(paintable); } catch (error) {
+    try { rows = (await wholeRows()).filter(paintable); } catch (error) {
       for (const query of queries) { try { query.onError?.(error); } catch (_) { /* isolated consumer */ } }
       return;
     }
@@ -139,8 +169,8 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     validateRecord,
     async get(key) { live(); const row = await backend.get(keyString(key)); live(); return paintable(row) ? copy(row) : undefined; },
     async getRaw(key) { live(); const row = await backend.get(keyString(key)); live(); return copy(row); },
-    async getAll() { live(); const rows = await backend.getAll(); live(); return rows.filter(paintable).map(copy); },
-    async getAllRaw() { live(); const rows = await backend.getAll(); live(); return rows.map(copy); },
+    async getAll() { live(); const rows = await wholeRows(); live(); return rows.filter(paintable).map(copy); },
+    async getAllRaw() { live(); const rows = await wholeRows(); live(); return rows.map(copy); },
     async readWhere(predicate = () => true) { return (await api.getAll()).filter(predicate).map(strip); },
     scan: (options) => scan(options, false),
     scanRaw: (options) => scan(options, true),
