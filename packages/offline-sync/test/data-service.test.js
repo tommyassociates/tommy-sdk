@@ -1,0 +1,180 @@
+// @vitest-environment node
+/**
+ * The data service surface over the DataStore layer, on memory and on the
+ * host store (both engines): read/query/subscribe/refresh/mutate/purge/status,
+ * cross-tab change notification, MP namespace confinement.
+ */
+import { describe, it, expect, vi } from 'vitest';
+import { createDataService, createDataStore, createMemoryStoreBackend, createDataManager } from '../src/index.js';
+import { createHostStorePort, createHostStoreChangeFeed, observeHostStorePort } from '../src/host-store/index.js';
+import { DATABASES, identity, createChannelBus } from './helpers/host-databases.js';
+
+const settle = () => new Promise((resolve) => { setTimeout(resolve, 0); });
+const INDEXES = { byChat: ['chat_id', 'seq'] };
+
+function memoryService(options = {}) {
+  const stores = new Map([['chats.messages', createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES })]]);
+  return createDataService({ resolve: (name) => (stores.has(name) ? { store: stores.get(name), decl: { keyPath: 'id' } } : null), ...options });
+}
+
+/** A host-store-backed collection the way the app opens one. */
+function transactionalBackend(port, opened, options) {
+  let handle;
+  const ready = () => (handle ||= port.open(options));
+  const read = async (input) => {
+    const h = await ready();
+    const result = await port.read({ handle: h.handle, expectedEpoch: h.epoch, ...input });
+    if (result.ok === false) throw Object.assign(new Error(result.reason), { name: 'StorageReadError', reason: result.reason });
+    return result;
+  };
+  return {
+    transactional: true, policy: options.policy, limits: options.limits,
+    snapshot: (keys) => read({ keys }),
+    page: ({ afterKey = null, limit = 100 } = {}) => read({ afterKey, limit }),
+    async get(key) { return (await read({ keys: [String(key)] })).rows[0]?.value; },
+    async getAll() {
+      const rows = []; let afterKey = null;
+      do { const page = await read({ afterKey, limit: 100 }); rows.push(...page.rows.map((row) => row.value)); afterKey = page.nextKey; } while (afterKey !== null);
+      return rows;
+    },
+    async query(input) {
+      const h = await ready();
+      const result = await port.query({ handle: h.handle, expectedEpoch: h.epoch, ...input });
+      if (result.ok === false) throw Object.assign(new Error(result.reason), { name: 'StorageReadError', reason: result.reason });
+      return result;
+    },
+    async commit(snapshot, changes, extra) {
+      const h = await ready();
+      return port.commit({ handle: h.handle, expectedEpoch: snapshot.epoch, expectedStoreRevision: snapshot.storeRevision, changes, ...(extra || {}) });
+    },
+    async close() {},
+    opened,
+  };
+}
+
+describe('data service on memory stores', () => {
+  it('reads, queries by index and subscribes with the current value first', async () => {
+    const data = memoryService();
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'a', chat_id: 7, seq: 10 } });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'b', chat_id: 7, seq: 2 } });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'c', chat_id: 12, seq: 1 } });
+    expect((await data.read('chats.messages', 'a')).seq).toBe(10);
+    const page = await data.query('chats.messages', { index: 'byChat', prefix: [7] });
+    expect(page.rows.map((row) => row.id)).toEqual(['b', 'a']);
+    const seen = [];
+    const off = data.subscribe({ collection: 'chats.messages', query: { index: 'byChat', prefix: [7] } }, (rows) => seen.push(rows.map((row) => row.id)));
+    await settle();
+    expect(seen).toEqual([['b', 'a']]);
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'd', chat_id: 7, seq: 5 } });
+    await settle();
+    expect(seen).toEqual([['b', 'a'], ['b', 'd', 'a']]);
+    // A change that leaves the value the same does not fire again.
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'e', chat_id: 12, seq: 9 } });
+    await settle();
+    expect(seen).toHaveLength(2);
+    off();
+    await expect(data.read('contacts.people')).rejects.toMatchObject({ code: 'DATA_UNDECLARED' });
+  });
+
+  it('refreshes through the scheduler: coalesced, skipped while fresh, silent errors in status', async () => {
+    const requests = [];
+    const scheduler = { request: vi.fn((job) => { requests.push(job); return Promise.resolve().then(() => job.run(() => true)); }) };
+    let clock = 0;
+    const data = memoryService({ scheduler, now: () => clock });
+    const fetch = vi.fn(async () => [{ id: 'a', chat_id: 7, seq: 1 }]);
+    data.source('chats.messages', { fetch, scope: () => (row) => row.chat_id === 7 });
+    expect(data.status('chats.messages').state).toBe('stale');
+    const [first, second] = [data.refresh('chats.messages'), data.refresh('chats.messages')];
+    await Promise.all([first, second]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(requests[0]).toMatchObject({ key: expect.stringContaining('chats.messages'), target: 'chats.messages', budgetKey: 'host', priority: 2, visible: false });
+    expect(data.status('chats.messages')).toMatchObject({ state: 'fresh', syncedAt: 0 });
+    await data.refresh('chats.messages', { maxAge: 60000 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    clock = 10 * 60000;
+    expect(data.status('chats.messages').state).toBe('stale');
+    fetch.mockRejectedValueOnce(Object.assign(new Error('Overloaded'), { status: 503 }));
+    await expect(data.refresh('chats.messages')).resolves.toMatchObject({ state: 'error', error: { status: 503 } });
+    fetch.mockRejectedValueOnce(Object.assign(new Error('Overloaded'), { status: 503 }));
+    await expect(data.refresh('chats.messages', { mode: 'visible', priority: 'visible' })).rejects.toMatchObject({ status: 503 });
+    expect(requests.at(-1)).toMatchObject({ visible: true, priority: 0 });
+    // Rows already shown stay through failed refreshes.
+    expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['a']);
+  });
+
+  it('keeps dirty rows through a refresh and a purge, and tracks pushes until confirmed', async () => {
+    const data = memoryService();
+    let fail = true;
+    const push = vi.fn(async () => { if (fail) throw Object.assign(new Error('Offline'), { status: 0 }); });
+    data.source('chats.messages', { fetch: async () => [{ id: 'server', chat_id: 7, seq: 1 }], push });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 2 } });
+    await settle();
+    expect(data.pending()).toEqual([expect.objectContaining({ key: 'draft', state: 'failed', attempts: 1, lastError: expect.objectContaining({ status: 0 }) })]);
+    await data.refresh('chats.messages');
+    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['draft', 'server']);
+    expect(await data.purge('chats.messages')).toEqual({ removed: ['server'] });
+    expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['draft']);
+    fail = false;
+    await data.retry('chats.messages', 'draft');
+    expect(data.pending()).toEqual([]);
+    expect((await data.read('chats.messages', 'draft'))._dirty).toBe(false);
+    await data.discard('chats.messages', 'draft');
+    expect(await data.read('chats.messages')).toEqual([]);
+  });
+
+  it('reports offline without fetching', async () => {
+    const data = memoryService({ isOnline: () => false });
+    const fetch = vi.fn();
+    data.source('chats.messages', { fetch });
+    await expect(data.refresh('chats.messages')).resolves.toMatchObject({ state: 'offline' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('MP data API confinement', () => {
+  const token = { tenantId: 'team-44', mpId: 'scheduling' };
+  const localData = { shifts: { keyPath: 'id', syncStrategy: 'server_authoritative' } };
+
+  it('offers the same surface over its own stores only', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    await data.mutate('shifts', { op: 'put', record: { id: '1', at: 'mon' } });
+    expect((await data.read('mp.scheduling.shifts', '1')).at).toBe('mon');
+    await expect(data.read('mp.time-clock.shifts')).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
+    await expect(data.read('chats.messages')).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
+    await expect(data.read('undeclared')).rejects.toMatchObject({ code: 'DATA_UNDECLARED' });
+    data.source('shifts', { fetch: async () => [{ id: '2', at: 'tue' }] });
+    await data.refresh('shifts');
+    expect((await data.read('shifts')).map((row) => row.id)).toEqual(['1', '2']);
+    expect(data.status('shifts').state).toBe('fresh');
+  });
+});
+
+describe.each(DATABASES)('data service on the host store (%s)', (_name, create) => {
+  it('queries physical indexes and hears writes from another tab', async () => {
+    const Channel = createChannelBus();
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+    const tab = (feed) => {
+      const observed = observeHostStorePort(port, feed);
+      const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(observed, null, options) });
+      return createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null), feed });
+    };
+    const feedA = createHostStoreChangeFeed({ BroadcastChannelImpl: Channel });
+    const feedB = createHostStoreChangeFeed({ BroadcastChannelImpl: Channel });
+    const a = tab(feedA);
+    const b = tab(feedB);
+    const seen = [];
+    b.subscribe({ collection: 'chats.messages', query: { index: 'byChat', prefix: [7] } }, (rows) => seen.push(rows.map((row) => row.id)));
+    await settle();
+    expect(seen).toEqual([[]]);
+    a.source('chats.messages', { fetch: async () => [{ id: 'x', chat_id: 7, seq: 3 }, { id: 'y', chat_id: 7, seq: 1 }] });
+    await a.refresh('chats.messages');
+    await vi.waitFor(() => expect(seen.at(-1)).toEqual(['y', 'x']));
+    expect((await a.query('chats.messages', { index: 'byChat', prefix: [7], lower: 2 })).rows.map((row) => row.id)).toEqual(['x']);
+    const listed = (await port.inspect({ op: 'stores', selector: { authorityOrigin: 'https://api.example.test', viewerId: '7' } })).stores[0];
+    expect(listed.syncedAt).toEqual(expect.any(Number));
+    feedA.close(); feedB.close(); await database.close();
+  });
+});

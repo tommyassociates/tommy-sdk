@@ -538,6 +538,55 @@ export interface DataApi {
     /** True when the namespace is serving stale cache because revalidation is failing/slow (distinct from offline). */
     stale?: boolean;
   };
+  /**
+   * The host data service surface, confined to this MP's stores. Collection
+   * names are the declared store names (or `mp.<mpId>.<store>`); any other
+   * namespace is refused.
+   */
+  read?<Rec = unknown>(collection: string, key?: string | readonly string[]): Promise<Rec | Rec[] | null>;
+  query?<Rec = unknown>(collection: string, spec?: DataQuerySpec<Rec>): Promise<{ rows: Rec[]; nextCursor: string | null; complete: boolean }>;
+  subscribe?<Value = unknown>(target: DataTarget, callback: (value: Value) => void, options?: { onError?: (error: unknown) => void }): () => void;
+  source?<Dto = unknown, Rec = unknown>(collection: string, spec: DataSource<Dto, Rec>): () => void;
+  refresh?(target: DataTarget, options?: DataRefreshOptions): Promise<DataStatus>;
+  mutate?<Rec = unknown>(collection: string, command: DataMutation<Rec>, options?: { wait?: boolean }): Promise<{ key: string; pushed: boolean }>;
+  purge?(collection: string, options?: { force?: boolean }): Promise<{ removed: string[] }>;
+  status?(target: DataTarget): DataStatus;
+}
+
+export type DataTarget = string | { collection: string; key?: string; window?: Record<string, unknown>; query?: DataQuerySpec };
+export interface DataQuerySpec<Rec = unknown> {
+  readonly index?: string;
+  readonly equals?: readonly unknown[];
+  readonly prefix?: readonly unknown[];
+  readonly lower?: unknown;
+  readonly upper?: unknown;
+  readonly limit?: number;
+  readonly cursor?: string | null;
+  readonly where?: (row: Rec) => boolean;
+}
+export interface DataSource<Dto = unknown, Rec = unknown> {
+  fetch(target: { collection: string; key?: string; window?: Record<string, unknown> }): Promise<Dto[] | Dto | null>;
+  toRecord?(dto: Dto, prev?: Rec): Rec;
+  keyOf?(dto: Dto): string;
+  scope?(target: { collection: string; window?: Record<string, unknown> }): (row: Rec) => boolean;
+  push?(command: DataMutation<Rec>, record: Rec | null): Promise<unknown>;
+}
+export interface DataRefreshOptions {
+  /** `silent` never rejects; `visible` rejects so a surface with nothing to show can say why. */
+  readonly mode?: 'silent' | 'visible';
+  readonly priority?: 'visible' | 'high' | 'normal' | 'background';
+  /** Skip the fetch while the last successful sync is younger than this (ms). */
+  readonly maxAge?: number;
+  readonly reason?: string;
+}
+export type DataMutation<Rec = unknown> =
+  | { op: 'put'; record: Rec }
+  | { op: 'patch'; key: string; patch: Partial<Rec> }
+  | { op: 'delete'; key: string };
+export interface DataStatus {
+  readonly state: 'fresh' | 'stale' | 'refreshing' | 'offline' | 'error';
+  readonly syncedAt: number | null;
+  readonly error: { code: string | null; status: number | null; message: string } | null;
 }
 
 // ============================================================================

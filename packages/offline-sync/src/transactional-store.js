@@ -60,7 +60,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     try { onPersistError?.({ event: 'persist_failed', store: name, key, ...result }); } catch (_) { /* reporting cannot change commit truth */ }
     throw new PersistError(name, { retained: false, ...result });
   }
-  async function mutation(keys, transform, { retry = false } = {}) {
+  async function mutation(keys, transform, { retry = false, syncedAt } = {}) {
     for (let attempt = 0; attempt < (retry ? 3 : 1); attempt += 1) {
       live();
       let snapshot;
@@ -68,7 +68,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       const previous = new Map(snapshot.rows.map((row) => [row.key, row.value]));
       const changes = transform(previous);
       if (!changes.length) return;
-      const result = await backend.commit(snapshot, changes);
+      const result = await backend.commit(snapshot, changes, syncedAt === undefined ? undefined : { syncedAt });
       live();
       if (result.ok !== false) return;
       if (result.reason !== 'conflict' || !retry || attempt === 2) failure(result, keys[0]);
@@ -159,7 +159,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         await notify();
       });
     },
-    async reconcile(records = [], { scope, windowKey } = {}) {
+    async reconcile(records = [], { scope, windowKey, syncedAt = now() } = {}) {
       assertCompleteSet(records);
       assertCompleteSet(records.map((row) => ({ ...row, _rev: Number.MAX_SAFE_INTEGER, _dirty: false,
         _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) })), {
@@ -171,7 +171,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       return exclusive(async () => {
         let upserted = 0;
         for (const [key, row] of incoming) {
-          await mutation([key], (rows) => [{ op: 'put', key, value: { ...row, _rev: nextRevision(rows.get(key)?._rev), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) } }]);
+          await mutation([key], (rows) => [{ op: 'put', key, value: { ...row, _rev: nextRevision(rows.get(key)?._rev), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) } }], { syncedAt });
           upserted += 1;
         }
         if (windowKey != null) { windows.delete(String(windowKey)); windows.set(String(windowKey), now()); }
@@ -194,6 +194,16 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         return { upserted, pruned };
       });
     },
+    // Rows by a secondary index declared when the store opened, in index order.
+    async query(index, range = {}, { limit = 50, cursor = null } = {}) {
+      live();
+      if (typeof backend.query !== 'function') throw new StorageReadError('unavailable');
+      const result = await backend.query({ index, ...range, limit, afterKey: cursor });
+      live();
+      return { rows: result.rows.map((row) => row.value).filter(paintable).map(copy), nextCursor: result.nextKey, complete: result.nextKey === null };
+    },
+    // Another tab or handle changed this store: subscribers read it again.
+    revalidateSubscribers() { return notify(); },
     subscribe(handler) { live(); subscribers.add(handler); return () => subscribers.delete(handler); },
     subscribeQuery(selector, handler, { onError } = {}) {
       live();
