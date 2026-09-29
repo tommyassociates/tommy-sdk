@@ -909,6 +909,10 @@ export function createDataStore({
     async readWhere(predicate = () => true) {
       return (await snapshot()).filter(paintable).filter(predicate).map(stripMeta);
     },
+    /** What `readWhere(predicate)` would answer, from rows a subscriber was just given. */
+    selectFrom(rows, predicate = () => true) {
+      return (rows || []).filter(paintable).filter(predicate).map(stripMeta);
+    },
     /**
      * Why a record would be REFUSED by `put`, or null if it would be accepted.
      *

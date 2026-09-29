@@ -321,3 +321,25 @@ describe('a revalidate reads the store once', () => {
     expect((await filtered.revalidate()).map((row) => row.id).sort()).toEqual(['1', '3', '4']);
   });
 });
+
+describe('liveQuery subscribers', () => {
+  it('repaint from the rows each change delivers, never reading the store again per subscriber', async () => {
+    const mgr = createDataManager({
+      capabilityToken: { tenantId: 'team-3', mpId: 'subs-mp' }, mpId: 'subs-mp',
+      localData: { rows: { keyPath: 'id' } },
+      backendFactory: () => createMemoryStoreBackend(),
+    });
+    const lq = mgr.liveQuery('rows', { scope: (row) => row.kind === 'shift', fetch: () => [] });
+    const seen = [[], []];
+    const offs = seen.map((list) => lq.subscribe((rows) => list.push(rows.map((row) => row.id))));
+    await vi.waitFor(() => expect(seen.every((list) => list.length === 1)).toBe(true));
+    const reads = vi.spyOn(lq.store, 'readWhere');
+    await lq.store.put({ id: 's1', kind: 'shift' });
+    await lq.store.put({ id: 'n1', kind: 'note' });
+    await vi.waitFor(() => expect(seen.map((list) => list.at(-1))).toEqual([['s1'], ['s1']]));
+    expect(reads).not.toHaveBeenCalled();
+    // What they paint is what a read would give: scoped, without store fields.
+    expect(await lq.read()).toEqual([{ id: 's1', kind: 'shift' }]);
+    offs.forEach((off) => off());
+  });
+});

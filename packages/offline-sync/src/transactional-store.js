@@ -183,6 +183,8 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     async getAll() { live(); const rows = await wholeRows(); live(); return rows.filter(paintable).map(copy); },
     async getAllRaw() { live(); const rows = await wholeRows(); live(); return rows.map(copy); },
     async readWhere(predicate = () => true) { return (await api.getAll()).filter(predicate).map(strip); },
+    /** What `readWhere(predicate)` would answer, from rows a subscriber was just given. */
+    selectFrom(rows, predicate = () => true) { return (rows || []).filter(paintable).filter(predicate).map(strip); },
     scan: (options) => scan(options, false),
     scanRaw: (options) => scan(options, true),
     async put(record, { dedupeKey, silent = false } = {}) {

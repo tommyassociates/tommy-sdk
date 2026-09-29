@@ -408,7 +408,13 @@ export function createDataManager({
               .then((rows) => { if (live) handler(rows); })
               .catch(() => { /* subscriber read error — skip this emit */ });
           };
-          const off = store.subscribe(() => emit());
+          // A change delivers the store's rows: each subscriber paints from
+          // them rather than reading the whole store again.
+          const off = store.subscribe((rows) => {
+            if (!live) return;
+            if (!Array.isArray(rows) || typeof store.selectFrom !== 'function') { emit(); return; }
+            try { handler(store.selectFrom(rows, predicate)); } catch (_) { /* subscriber errors are theirs */ }
+          });
           emit(); // instant first paint from the warm cache
           return () => { live = false; off(); };
         },
