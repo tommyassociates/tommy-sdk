@@ -705,10 +705,11 @@ export function createDataStore({
     return doomed;
   }
 
+  // Keys compare as text, as the backends store them.
   function trackedQuery(records, touched) {
-    const byKey = new Map(records.map((r) => [keyOf(r), r]));
+    const byKey = new Map(records.map((r) => [String(keyOf(r)), r]));
     return {
-      get(key) { touched.add(key); return byKey.get(key); },
+      get(key) { touched.add(String(key)); return byKey.get(String(key)); },
       getAll() { touched.add('*'); return records; },
     };
   }
@@ -719,9 +720,8 @@ export function createDataStore({
    * every subscriber exactly once instead of N times (see reconcile below).
    */
   async function notify(changed) {
-    const changedKeys = (changed && typeof changed !== 'string' && typeof changed[Symbol.iterator] === 'function')
-      ? new Set(changed)
-      : new Set([changed]);
+    const changedKeys = new Set([...((changed && typeof changed !== 'string' && typeof changed[Symbol.iterator] === 'function')
+      ? changed : [changed])].map(String));
     for (const listener of changeListeners) {
       try { listener(); } catch (_) { /* listener errors are theirs */ }
     }
