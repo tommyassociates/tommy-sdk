@@ -13,12 +13,13 @@ import {
 import { DATABASES, identity, createChannelBus } from './helpers/host-databases.js';
 
 const SELECTOR = { authorityOrigin: 'https://api.example.test', viewerId: '7' };
-function openInput({ storeName = 'chats.rows', policy = 'cache', schemaVersion = 1, indexes, limits = {}, who = identity() } = {}) {
+function openInput({ storeName = 'chats.rows', policy = 'cache', schemaVersion = 1, indexes, limits = {}, who = identity(), schemaFingerprint } = {}) {
   return {
     identity: who, storeName, policy, schemaVersion,
     cacheFingerprint: policy === 'authored' ? null : 'fp-1',
     limits: { maxRows: 1000, maxAgeMs: policy === 'authored' ? null : 86400000, maxBytes: null, ...limits },
     ...(indexes ? { indexes } : {}),
+    ...(schemaFingerprint !== undefined ? { schemaFingerprint } : {}),
   };
 }
 async function setup(create) {
@@ -145,6 +146,52 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     expect(listed).toMatchObject({ schemaVersion: 2, rowCount: 2, dirtyCount: 2, migrating: false });
     // The superseded handle is retired rather than writing the old shape.
     await expect(v2.put([{ id: 9, body: 'late' }])).resolves.toMatchObject({ ok: false });
+  });
+
+  it('rebuilds a store whose declared schema changed, carrying authored and unsent rows through the caller', async () => {
+    const { port, open } = await setup(create);
+    const migrate = async (opened, transform) => {
+      const step = (phase, extra = {}) => port.migration({ handle: opened.handle, expectedEpoch: opened.epoch, phase, ...extra });
+      await step('begin');
+      const changes = (await opened.all()).map((row) => transform(row)).filter(Boolean)
+        .map((value) => ({ op: 'put', key: String(value.id), value }));
+      if (changes.length) await step('write', { changes });
+      return step('complete');
+    };
+    // Authored: a new fingerprint, or a new index, migrates instead of refusing.
+    const drafts = await open({ storeName: 'drafts', policy: 'authored', schemaFingerprint: 'schema-a' });
+    await drafts.put([{ id: 1, title: 'Kept', _dirty: true }]);
+    const reshaped = await open({ storeName: 'drafts', policy: 'authored', schemaFingerprint: 'schema-b', indexes: { byTitle: 'title' } });
+    expect(reshaped.migration).toEqual({ from: 1, to: 1 });
+    await expect(migrate(reshaped, (row) => row)).resolves.toMatchObject({ ok: true });
+    const settled = await open({ storeName: 'drafts', policy: 'authored', schemaFingerprint: 'schema-b', indexes: { byTitle: 'title' } });
+    expect(settled.migration).toBeFalsy();
+    expect((await settled.query({ index: 'byTitle', equals: ['Kept'] })).rows.map((row) => row.key)).toEqual(['1']);
+    // A cache with nothing unsent starts empty; one with an unsent row migrates it.
+    const clean = await open({ storeName: 'shifts', schemaFingerprint: 'schema-a' });
+    await clean.put([{ id: 1 }]);
+    const cleanNext = await open({ storeName: 'shifts', schemaFingerprint: 'schema-b' });
+    expect(cleanNext.migration).toBeFalsy();
+    expect(await cleanNext.all()).toEqual([]);
+    const cached = await open({ storeName: 'orders', schemaFingerprint: 'schema-a' });
+    await cached.put([{ id: 1, v: 'server' }, { id: 2, v: 'unsent', _dirty: true }]);
+    const cachedNext = await open({ storeName: 'orders', schemaFingerprint: 'schema-b' });
+    expect(cachedNext.migration).toEqual({ from: 1, to: 1 });
+    await migrate(cachedNext, (row) => (row._dirty ? row : null));
+    const after = await open({ storeName: 'orders', schemaFingerprint: 'schema-b' });
+    expect(after.migration).toBeFalsy();
+    expect(await after.all()).toEqual([{ id: 2, v: 'unsent', _dirty: true }]);
+  });
+
+  it('adopts a schema fingerprint on a store opened before it had one, with no rebuild', async () => {
+    const { open } = await setup(create);
+    const before = await open({ storeName: 'drafts', policy: 'authored' });
+    await before.put([{ id: 1, _dirty: true }]);
+    const adopted = await open({ storeName: 'drafts', policy: 'authored', schemaFingerprint: 'schema-a' });
+    expect(adopted.migration).toBeFalsy();
+    expect(await adopted.all()).toEqual([{ id: 1, _dirty: true }]);
+    const changed = await open({ storeName: 'drafts', policy: 'authored', schemaFingerprint: 'schema-b' });
+    expect(changed.migration).toEqual({ from: 1, to: 1 });
   });
 
   it('evicts least recently written cache rows but never dirty rows, and refuses eviction on authored stores', async () => {

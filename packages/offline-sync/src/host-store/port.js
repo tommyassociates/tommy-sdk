@@ -277,19 +277,29 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
         let migration = null;
         if (store && (store.policy !== input.policy || store.schemaVersion > input.schemaVersion)) throw storageError('unavailable');
         const reshaped = store && (!same(store.indexes || {}, declared.indexes) || (store.evict || 'none') !== declared.evict);
-        if (store && input.policy === 'authored' && (store.schemaVersion < input.schemaVersion || store.migration)) {
+        // The declared schema (key, indexes, record schema) as the caller
+        // fingerprints it. A store opened before it had one adopts it.
+        const schemaFingerprint = input.schemaFingerprint ?? null;
+        const schemaChanged = !!store && schemaFingerprint !== null && (store.schemaFingerprint ?? null) !== null
+          && store.schemaFingerprint !== schemaFingerprint;
+        if (store && input.policy === 'authored' && (store.schemaVersion < input.schemaVersion || store.migration || schemaChanged || reshaped)) {
           // Authored rows are never dropped: the caller migrates them.
           migration = { from: store.schemaVersion, to: input.schemaVersion };
-        } else if (store && input.policy === 'authored' && reshaped) {
-          throw storageError('unavailable');
         } else if (store && (store.migration || (input.policy !== 'authored' && (store.fingerprint !== input.cacheFingerprint
-          || store.schemaVersion < input.schemaVersion || reshaped)))) {
-          // A cache that changed shape, version or fingerprint starts empty.
-          await tx.deletePrefix('rows', [identity.owner, identity.namespace]);
-          store = { ...store, generation: next(store.generation), revision: next(store.revision), rowCount: 0, bytes: 0, dirtyCount: 0,
-            fingerprint: input.cacheFingerprint, schemaVersion: input.schemaVersion, migration: null, ...declared };
+          || store.schemaVersion < input.schemaVersion || reshaped || schemaChanged)))) {
+          if (store.migration || (store.dirtyCount ?? 0) > 0) {
+            // Unsent rows are never dropped either: the caller carries them
+            // into the new shape and lets the cached rows go.
+            migration = { from: store.schemaVersion, to: input.schemaVersion };
+          } else {
+            // A cache that changed shape, version or fingerprint starts empty.
+            await tx.deletePrefix('rows', [identity.owner, identity.namespace]);
+            store = { ...store, generation: next(store.generation), revision: next(store.revision), rowCount: 0, bytes: 0, dirtyCount: 0,
+              fingerprint: input.cacheFingerprint, schemaVersion: input.schemaVersion, schemaFingerprint, migration: null, ...declared };
+          }
         }
-        if (!store) store = { key, generation: 0, revision: 0, rowCount: 0, bytes: 0, dirtyCount: 0, schemaVersion: input.schemaVersion, policy: input.policy, fingerprint: input.cacheFingerprint, ...declared };
+        if (store && !migration && schemaFingerprint !== null && store.schemaFingerprint !== schemaFingerprint) store.schemaFingerprint = schemaFingerprint;
+        if (!store) store = { key, generation: 0, revision: 0, rowCount: 0, bytes: 0, dirtyCount: 0, schemaVersion: input.schemaVersion, policy: input.policy, fingerprint: input.cacheFingerprint, schemaFingerprint, ...declared };
         else if (!migration) Object.assign(store, { domainMaxBytes: declared.domainMaxBytes, label, domain: declared.domain });
         if (store.dirtyCount === undefined) {
           let dirty = 0;
@@ -458,7 +468,8 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
       return database.transaction('readwrite', async (tx) => {
         const store = await current(tx, handle, input.expectedEpoch, { migrating: true });
         const [owner, namespace] = store.key;
-        const target = { ...store, indexes: validateOpen(handle.options).indexes };
+        const declaredShape = validateOpen(handle.options);
+        const target = { ...store, indexes: declaredShape.indexes, evict: declaredShape.evict };
         if (input.phase === 'begin') {
           const generation = next(Math.max(store.generation, store.migration?.generation ?? 0));
           if (store.migration) await tx.deletePrefix('rows', [owner, namespace, store.migration.generation]);
@@ -488,7 +499,10 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
         }
         await tx.deletePrefix('rows', [owner, namespace, store.generation]);
         const done = { ...store, generation, schemaVersion: store.migration.to, indexes: target.indexes, rowCount: store.migration.rowCount,
-          bytes: store.migration.bytes, dirtyCount: store.migration.dirtyCount, revision: next(store.revision), migration: null, touchedAt: now() };
+          bytes: store.migration.bytes, dirtyCount: store.migration.dirtyCount, revision: next(store.revision), migration: null, touchedAt: now(),
+          ...(store.policy === 'authored' ? {} : { fingerprint: handle.options.cacheFingerprint }),
+          ...(handle.options.schemaFingerprint != null ? { schemaFingerprint: handle.options.schemaFingerprint } : {}),
+          evict: target.evict };
         await tx.put('stores', done);
         for (const other of handleRegistry) { if (other !== handle && other.owner === handle.owner && other.namespace === handle.namespace) other.closed = true; }
         handle.generation = generation;

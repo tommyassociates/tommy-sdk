@@ -2,7 +2,7 @@
 export const HOST_STORE_VERSION = 1;
 // What this engine accepts beyond version 1's open/read/commit/retire. A port
 // without a feature (an older desktop engine) is never sent its inputs.
-export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at']);
+export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at', 'schema-fingerprint']);
 export const HOST_STORE_DATABASE = 'tommy-host-store-v2';
 export const MAX_ROWS = 100;
 export const MAX_READ_BYTES = 8 * 1024 * 1024;
@@ -126,7 +126,9 @@ export function ownerKey(identity) {
   return JSON.stringify([identity.authorityOrigin, identity.viewerId, identity.accountType, identity.accountId, identity.subjectKey]);
 }
 export function validateOpen(input) {
-  if (!closed(input, ['identity', 'storeName', 'policy', 'schemaVersion', 'cacheFingerprint', 'limits'], ['indexes'])
+  if (!closed(input, ['identity', 'storeName', 'policy', 'schemaVersion', 'cacheFingerprint', 'limits'], ['indexes', 'schemaFingerprint'])
+    || (input.schemaFingerprint !== undefined && input.schemaFingerprint !== null
+      && (typeof input.schemaFingerprint !== 'string' || !input.schemaFingerprint || input.schemaFingerprint.length > 128))
     || !storeNameValid(input.storeName)
     || !['authored', 'cache', 'ordinary_chat_fragments'].includes(input.policy)
     || !integer(input.schemaVersion) || input.schemaVersion < 1
