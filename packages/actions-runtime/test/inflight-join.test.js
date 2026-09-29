@@ -257,4 +257,63 @@ describe('an invoke joins a run in flight with the same key', () => {
     expect(results[0].ok).toBe(true);
     expect(results[0].result.idempotentReplay).toBe(true);
   });
+
+  async function adapterWorld({ rpcTimeoutMs, brokerOptions = {}, save }) {
+    const issuer = createFakeIssuer();
+    const broker = createBroker({ capabilityService: issuer, ...brokerOptions });
+    const token = await issuer.issue('availability', '1.0.0', TENANT, [], 'i-1');
+    const adapter = createDirectAdapter({
+      broker,
+      init: { mpId: 'availability', instanceId: 'i-1', capabilityToken: token, tenant: { tenantId: TENANT } },
+      rpcTimeoutMs,
+    });
+    broker.registerMp({
+      id: 'availability',
+      version: '1.0.0',
+      publisher: { type: 'first_party' },
+      triggers: {},
+      conditions: {},
+      activities: { save: activity() },
+      actions: {},
+    }, { handlers: { activities: { save: (args) => save(args, adapter) } } });
+    const call = (args) => adapter.rpc({ kind: 'invoke', activity: 'availability.save', args });
+    return { call };
+  }
+
+  it('under a short RPC timeout, a join still waits for a run that settles within the budget', async () => {
+    const started = deferred();
+    let calls = 0;
+    const w = await adapterWorld({
+      rpcTimeoutMs: 200,
+      save: async () => {
+        calls += 1;
+        started.resolve();
+        await tick(40);
+        return { saved: calls };
+      },
+    });
+    const first = w.call({ id: 7 });
+    await started.promise;
+    const second = w.call({ id: 7 });
+    const [a, b] = await settles(Promise.all([first, second]), 1500, 'short-timeout join');
+    expect(calls).toBe(1);
+    expect(a.result).toEqual({ saved: 1 });
+    expect(b.result).toEqual({ saved: 1 });
+  });
+
+  it("the caller's deadline is read from the wall clock, whatever clock the broker was given", async () => {
+    let calls = 0;
+    const w = await adapterWorld({
+      rpcTimeoutMs: 400,
+      brokerOptions: { now: () => Date.now() - 60_000 },
+      save: async (args, adapter) => {
+        calls += 1;
+        const inner = await adapter.rpc({ kind: 'invoke', activity: 'availability.save', args }).catch((e) => e);
+        return { innerRule: inner.rule, innerRetryable: inner.retryable };
+      },
+    });
+    const receipt = await settles(w.call({ id: 7 }), 1500, 'self-invoke under a lagging broker clock');
+    expect(calls).toBe(1);
+    expect(receipt.result).toEqual({ innerRule: 'idempotency.inflight', innerRetryable: false });
+  });
 });

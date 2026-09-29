@@ -179,8 +179,8 @@ export function createBroker({
    * How long an invoke that joins a run already in flight with its idempotency
    * key waits for that run before rejecting with a non-retryable `Timeout`.
    * An envelope carrying `rpcDeadlineAt` (the SDK adapter's own deadline) waits
-   * less: the join gives up JOIN_DEADLINE_MARGIN_MS before that deadline, so
-   * the caller receives this error rather than the adapter's generic timeout.
+   * less: the join gives up shortly before that deadline (`joinWaitMs`), so the
+   * caller receives this error rather than the adapter's generic timeout.
    * The bound also ends a handler invoking its own activity with its own key,
    * which would otherwise wait on itself.
    */
@@ -244,7 +244,8 @@ export function createBroker({
   const debouncePending = new Map();  // `${trigger}:${emitterMpId}` -> {timer, resolvers}
   const invokeChains = new Map();     // sourceMpId -> tail promise (FIFO per source MP)
   const inflightInvokes = new Map();  // processedKey -> promise of the run applying it
-  // A join rejects this long before the caller's `rpcDeadlineAt`.
+  // A join rejects this long before the caller's `rpcDeadlineAt` at most, and
+  // never more than a fifth of the time the caller has left.
   const JOIN_DEADLINE_MARGIN_MS = 250;
   const executingChains = new Map();  // sourceMpId -> depth of handler execution ON that chain (F6)
   const txnSteps = new Map();         // txnId -> [{activity, args, idempotencyKey}]
@@ -1290,12 +1291,20 @@ export function createBroker({
     return run;
   }
 
+  /**
+   * How long a join may wait. The adapter stamps `rpcDeadlineAt` from the wall
+   * clock, so the time left is read from the wall clock too, not from `now`.
+   */
+  function joinWaitMs(envelope) {
+    if (!Number.isFinite(envelope.rpcDeadlineAt)) return inflightJoinTimeoutMs;
+    const remaining = envelope.rpcDeadlineAt - Date.now();
+    const margin = Math.min(JOIN_DEADLINE_MARGIN_MS, remaining / 5);
+    return Math.max(0, Math.min(inflightJoinTimeoutMs, remaining - margin));
+  }
+
   /** Wait for the run in flight with this key: its result (as a replay) or its error, within the join bound. */
   function joinInflightInvoke(running, envelope) {
-    const beforeCallerGivesUp = Number.isFinite(envelope.rpcDeadlineAt)
-      ? envelope.rpcDeadlineAt - now() - JOIN_DEADLINE_MARGIN_MS
-      : Infinity;
-    const waitMs = Math.max(0, Math.min(inflightJoinTimeoutMs, beforeCallerGivesUp));
+    const waitMs = joinWaitMs(envelope);
     let timer;
     const bound = new Promise((_, reject) => {
       timer = setTimeout(() => reject(err('Timeout', `activity '${envelope.activity}' is already running with this idempotency key and did not settle within ${waitMs}ms`, {
