@@ -360,6 +360,39 @@ describe.each([
   });
 });
 
+describe('whole-range purge and trim, and the rows an ingest stored', () => {
+  it('purges and trims an index range of any size, never stopping part-way', async () => {
+    const data = memoryService();
+    await data.ingest('chats.messages', messages(7, 1, 6000));
+    await data.ingest('chats.messages', messages(8, 1, 10));
+    expect((await data.trim('chats.messages', { index: 'byChat', prefix: [7], keep: 100 })).removed).toHaveLength(5900);
+    const kept = await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 1000 });
+    expect(kept.rows.map((row) => row.seq)).toEqual(messages(7, 5901, 6000).map((row) => row.seq));
+    await data.ingest('chats.messages', messages(7, 1, 5900));
+    expect((await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] } })).removed).toHaveLength(6000);
+    expect((await data.query('chats.messages', { index: 'byChat', limit: 1000 })).rows.map((row) => row.chat_id)).toEqual(Array(10).fill(8));
+  });
+
+  it('refuses paging or filter fields on a range it would otherwise over-purge', async () => {
+    const data = memoryService();
+    await data.ingest('chats.messages', messages(7, 1, 5));
+    await expect(data.purge('chats.messages', { query: { index: 'byChat', prefix: [7], limit: 2 } })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.purge('chats.messages', { query: { index: 'byChat', cursor: '7:1' } })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.trim('chats.messages', { index: 'byChat', prefix: [7], keep: 1, where: () => true })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    expect((await data.read('chats.messages'))).toHaveLength(5);
+  });
+
+  it('reports the rows an ingest stored, not the rows it was given', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES, recordSchema: {
+      type: 'object', required: ['id', 'chat_id'], properties: { id: { type: 'string' }, chat_id: { type: 'number' }, seq: { type: 'number' } },
+    } });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    const given = [{ id: 'a', chat_id: 7, seq: 1 }, { id: 'a', chat_id: 7, seq: 2 }, { id: 'b', chat_id: 'seven' }, { id: 'c', chat_id: 7, seq: 3 }];
+    expect(await data.ingest('chats.messages', given)).toEqual({ written: 2 });
+    expect(await data.ingest('chats.messages', given, { replace: true })).toEqual({ written: 2 });
+  });
+});
+
 describe.each(DATABASES)('large collections on the host store (%s)', (_name, create) => {
   it('writes a page of server rows in bounded transactions, not one per row', async () => {
     const { data, commits, close } = hostService(create);

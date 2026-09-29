@@ -39,18 +39,15 @@ export function createImmediateScheduler() {
 const serviceError = (message, code) => Object.assign(new Error(message), { name: 'DataServiceError', code });
 // One reconcile carries a bounded complete set; larger ingests go in chunks.
 const INGEST_CHUNK = 500;
-// A subject read for purge or trim is bounded; the rest is left for the TTL.
-const SUBJECT_SCAN_LIMIT = 5000;
-
 // A physical index read returns at most this many rows per page.
 const PAGE_ROWS = 100;
 
 /**
- * Rows of an index range in index order, read in pages: up to `limit`
- * (`SUBJECT_SCAN_LIMIT` when absent) from `cursor`. `raw` includes rows past
- * the paint ceiling, with their dirty flags, for writers.
+ * Rows of an index range in index order, read in pages: up to `limit` from
+ * `cursor`. `raw` includes rows past the paint ceiling, with their dirty
+ * flags, for writers.
  */
-async function queryPages(store, index, range, { limit = SUBJECT_SCAN_LIMIT, cursor: start = null, raw = false } = {}) {
+async function queryPages(store, index, range, { limit = 50, cursor: start = null, raw = false } = {}) {
   const rows = [];
   let cursor = start;
   let complete = false;
@@ -64,7 +61,29 @@ async function queryPages(store, index, range, { limit = SUBJECT_SCAN_LIMIT, cur
   } while (cursor !== null && rows.length < limit);
   return { rows, nextCursor: complete ? null : cursor, complete };
 }
-const queryAll = (store, { index, limit: _limit, cursor: _cursor, ...range }) => queryPages(store, index, range, { raw: true }).then((page) => page.rows);
+// The fields of an index range; a purge or trim acts on the whole range.
+const RANGE_FIELDS = new Set(['index', 'equals', 'prefix', 'lower', 'upper']);
+function wholeRange(spec, operation) {
+  const extra = Object.keys(spec || {}).filter((field) => !RANGE_FIELDS.has(field) && field !== 'keep');
+  if (typeof spec?.index !== 'string' || extra.length) {
+    throw serviceError(`${operation}: an index range only (${extra.join(', ') || 'index'} not accepted)`, 'DATA_INVALID');
+  }
+  const { index, keep: _keep, ...range } = spec;
+  return { index, range };
+}
+/** Every key of an index range in index order, with its dirty flag, page by page. */
+async function rangeKeys(store, keyPath, { index, range }) {
+  const keys = [];
+  let cursor = null;
+  do {
+    // Each page continues from the cursor the previous one returned.
+    // eslint-disable-next-line no-await-in-loop
+    const page = await store.query(index, range, { limit: PAGE_ROWS, cursor, raw: true });
+    page.rows.forEach((row) => keys.push({ key: String(row[keyPath]), dirty: !!row._dirty }));
+    cursor = page.complete ? null : page.nextCursor;
+  } while (cursor !== null);
+  return keys;
+}
 const same = (a, b) => {
   try { return JSON.stringify(a) === JSON.stringify(b); } catch (_) { return false; }
 };
@@ -375,13 +394,15 @@ export function createDataService({
       if (!Array.isArray(rows)) throw serviceError('ingest: rows must be an array', 'DATA_INVALID');
       const keyPath = decl?.keyPath || 'id';
       const inScope = typeof scope === 'function' ? scope : () => true;
+      // Rows a store refuses (schema) or folds together (one key) do not count.
+      let written = 0;
       if (replace && rows.length <= INGEST_CHUNK) {
-        await store.reconcile(rows, { scope: inScope });
+        written += (await store.reconcile(rows, { scope: inScope }))?.upserted ?? 0;
       } else {
         for (let start = 0; start < rows.length; start += INGEST_CHUNK) {
           // Chunks commit in order; each is a bounded complete set.
           // eslint-disable-next-line no-await-in-loop
-          await store.reconcile(rows.slice(start, start + INGEST_CHUNK), { prune: false });
+          written += (await store.reconcile(rows.slice(start, start + INGEST_CHUNK), { prune: false }))?.upserted ?? 0;
         }
         if (replace) {
           const kept = new Set(rows.map((row) => String(row?.[keyPath])));
@@ -393,7 +414,7 @@ export function createDataService({
         state.state = 'fresh'; state.syncedAt = now(); state.error = null;
         emitStatus();
       }
-      return { written: rows.length };
+      return { written };
     },
     /**
      * `{ op: 'put', record } | { op: 'patch', key, patch } | { op: 'delete', key }`.
@@ -476,19 +497,24 @@ export function createDataService({
       emitStatus();
     },
     /**
-     * Clears a collection's cached rows, or only `keys`, or only the rows of
-     * an index range (`query: { index, prefix | equals | lower | upper }`).
-     * Dirty rows stay unless `force`.
+     * Clears a collection's cached rows, or only `keys`, or every row of an
+     * index range (`query: { index, prefix | equals | lower | upper }`; paging
+     * fields are refused). Dirty rows stay unless `force`.
      */
     async purge(collection, { force = false, keys = null, query = null } = {}) {
       live();
       const { store, decl } = local(collection);
       const keyPath = decl?.keyPath || 'id';
-      let rows;
-      if (Array.isArray(keys)) rows = (await Promise.all(keys.map((key) => store.getRaw(String(key))))).filter(Boolean);
-      else if (query) rows = await queryAll(store, query);
-      else rows = await (store.getAllRaw ? store.getAllRaw() : store.getAll());
-      const doomed = rows.filter((row) => force || !row._dirty).map((row) => String(row[keyPath]));
+      let entries;
+      if (Array.isArray(keys)) {
+        entries = (await Promise.all(keys.map((key) => store.getRaw(String(key))))).filter(Boolean)
+          .map((row) => ({ key: String(row[keyPath]), dirty: !!row._dirty }));
+      } else if (query) entries = await rangeKeys(store, keyPath, wholeRange(query, 'purge'));
+      else {
+        entries = (await (store.getAllRaw ? store.getAllRaw() : store.getAll()))
+          .map((row) => ({ key: String(row[keyPath]), dirty: !!row._dirty }));
+      }
+      const doomed = entries.filter((entry) => force || !entry.dirty).map((entry) => entry.key);
       for (const key of doomed) await store.delete(key, { silent: true });
       await store.revalidateSubscribers?.();
       return { removed: doomed };
@@ -497,13 +523,13 @@ export function createDataService({
      * Keeps the newest `keep` rows of an index range (the last in index
      * order) and removes the older ones. Dirty rows are never removed.
      */
-    async trim(collection, { index, keep, ...range } = {}) {
+    async trim(collection, spec = {}) {
       live();
       const { store, decl } = local(collection);
-      if (typeof index !== 'string' || !Number.isSafeInteger(keep) || keep < 0) throw serviceError('trim: index and keep are required', 'DATA_INVALID');
+      if (typeof spec.index !== 'string' || !Number.isSafeInteger(spec.keep) || spec.keep < 0) throw serviceError('trim: index and keep are required', 'DATA_INVALID');
       const keyPath = decl?.keyPath || 'id';
-      const rows = await queryAll(store, { index, ...range });
-      const doomed = rows.slice(0, Math.max(0, rows.length - keep)).filter((row) => !row._dirty).map((row) => String(row[keyPath]));
+      const entries = await rangeKeys(store, keyPath, wholeRange(spec, 'trim'));
+      const doomed = entries.slice(0, Math.max(0, entries.length - spec.keep)).filter((entry) => !entry.dirty).map((entry) => entry.key);
       for (const key of doomed) await store.delete(key, { silent: true });
       if (doomed.length) await store.revalidateSubscribers?.();
       return { removed: doomed };
