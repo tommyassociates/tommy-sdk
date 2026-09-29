@@ -508,6 +508,32 @@ describe.each(DATABASES)('large collections on the host store (%s)', (_name, cre
     await close();
   });
 
+  it('purges and trims in bounded commits, keeping a row written dirty after it was listed', async () => {
+    const { data, store, commits, close } = hostService(create);
+    await data.ingest('chats.messages', [...messages(7, 1, 250), ...messages(8, 1, 250)]);
+    commits.count = 0;
+    expect((await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] } })).removed).toHaveLength(250);
+    expect(commits.count).toBeLessThanOrEqual(3);
+    commits.count = 0;
+    expect((await data.trim('chats.messages', { index: 'byChat', prefix: [8], keep: 20 })).removed).toHaveLength(230);
+    expect(commits.count).toBeLessThanOrEqual(3);
+    // A local write lands after the range was listed, before its rows go.
+    let edited;
+    const listing = new Proxy(store, { get(target, property) {
+      if (property !== 'query') return typeof target[property] === 'function' ? target[property].bind(target) : target[property];
+      return async (...args) => {
+        const page = await target.query(...args);
+        if (!edited) edited = target.put({ id: '8:240', chat_id: 8, seq: 240, body: 'unsent' });
+        await edited;
+        return page;
+      };
+    } });
+    const racing = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store: listing, decl: { keyPath: 'id' } } : null) });
+    expect((await racing.purge('chats.messages', { query: { index: 'byChat', prefix: [8] } })).removed).toHaveLength(19);
+    expect(await data.read('chats.messages', '8:240')).toMatchObject({ body: 'unsent', _dirty: true });
+    await close();
+  });
+
   it('reads and subscribes to more rows than one index page holds', async () => {
     const { data, close } = hostService(create);
     await data.ingest('chats.messages', messages(7, 1, 250));

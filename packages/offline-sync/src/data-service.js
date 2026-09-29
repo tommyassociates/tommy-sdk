@@ -209,6 +209,28 @@ export function createDataService({
       return true;
     });
   }
+  /**
+   * Removes the listed rows a purge or trim decided. On a store that commits
+   * many rows at once, up to 100 go per commit, each re-checked inside it (a
+   * row dirty by then stays). A forced removal, or a store without batch
+   * deletes, goes row by row in turn with local writes. Resolves the keys
+   * removed.
+   */
+  async function removeRows({ label, store, keys, force }) {
+    const removed = [];
+    if (force || typeof store.deleteMany !== 'function') {
+      for (const key of keys) {
+        // eslint-disable-next-line no-await-in-loop
+        if (await removeRow({ label, store, key, force })) removed.push(key);
+      }
+      return removed;
+    }
+    for (let start = 0; start < keys.length; start += PAGE_ROWS) {
+      // eslint-disable-next-line no-await-in-loop
+      removed.push(...await store.deleteMany(keys.slice(start, start + PAGE_ROWS), { keep: (row) => !!row._dirty, silent: true }));
+    }
+    return removed;
+  }
   function entryFor({ name, label, key, store, decl }) {
     const id = `${label}:${key}`;
     if (!outbox.has(id)) {
@@ -563,12 +585,7 @@ export function createDataService({
           .map((row) => ({ key: String(row[keyPath]), dirty: !!row._dirty }));
       }
       const { label } = local(collection);
-      const removed = [];
-      for (const { key, dirty } of entries) {
-        if (!force && dirty) continue;
-        // eslint-disable-next-line no-await-in-loop
-        if (await removeRow({ label, store, key, force })) removed.push(key);
-      }
+      const removed = await removeRows({ label, store, keys: entries.filter(({ dirty }) => force || !dirty).map(({ key }) => key), force });
       await store.revalidateSubscribers?.();
       return { removed };
     },
@@ -583,12 +600,8 @@ export function createDataService({
       const keyPath = decl?.keyPath || 'id';
       const entries = await rangeKeys(store, keyPath, wholeRange(spec, 'trim'));
       const { label } = local(collection);
-      const removed = [];
-      for (const { key, dirty } of entries.slice(0, Math.max(0, entries.length - spec.keep))) {
-        if (dirty) continue;
-        // eslint-disable-next-line no-await-in-loop
-        if (await removeRow({ label, store, key, force: false })) removed.push(key);
-      }
+      const older = entries.slice(0, Math.max(0, entries.length - spec.keep)).filter(({ dirty }) => !dirty).map(({ key }) => key);
+      const removed = await removeRows({ label, store, keys: older, force: false });
       if (removed.length) await store.revalidateSubscribers?.();
       return { removed };
     },

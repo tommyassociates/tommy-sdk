@@ -168,6 +168,25 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         if (!silent) await notify();
       });
     },
+    /**
+     * Deletes `keys` (at most 100) in one commit, each only while
+     * `keep(row)` is false for the row as committed; rows already gone are
+     * skipped. A write that lands first makes the commit read again. Resolves
+     * the keys removed.
+     */
+    deleteMany(keys, { keep = () => false, silent = false } = {}) {
+      const wanted = [...new Set(keys.map(keyString))];
+      if (wanted.length > 100) return Promise.reject(new StorageReadError('payload-capacity'));
+      return exclusive(async () => {
+        let removed = [];
+        await mutation(wanted, (rows) => {
+          removed = wanted.filter((key) => rows.has(key) && !keep(rows.get(key)));
+          return removed.map((key) => ({ op: 'delete', key }));
+        }, { retry: true });
+        if (!silent && removed.length) await notify();
+        return removed;
+      });
+    },
     markSynced(key, { expectedRevision } = {}) {
       return exclusive(async () => {
         await mutation([keyString(key)], (rows) => {
