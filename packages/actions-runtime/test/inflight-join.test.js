@@ -350,4 +350,21 @@ describe('an invoke joins a run in flight with the same key', () => {
     }
     expect(w.broker.inflightStats()).toEqual({ runs: 1, waiting: 0 });
   });
+
+  it('the in-flight registry is bounded: runs that never settle stop being joinable, oldest first', async () => {
+    const started = deferred();
+    const w = await world({ save: activity() }, () => ({
+      save: async () => {
+        started.resolve();
+        await new Promise(() => {});
+      },
+    }), { throttleOverrides: { availability: { invokesPerMin: 1e6, burst: 1e6 } } });
+    const INFLIGHT_RUNS_MAX = 500;
+    w.invoke('save', { id: -1 }).catch(() => {});
+    await started.promise;
+    // Issued while a handler of the same MP is executing, so each runs inline.
+    for (let i = 0; i < INFLIGHT_RUNS_MAX + 20; i += 1) w.invoke('save', { id: i }).catch(() => {});
+    await tick(50);
+    expect(w.broker.inflightStats().runs).toBe(INFLIGHT_RUNS_MAX);
+  });
 });

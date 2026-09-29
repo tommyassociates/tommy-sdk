@@ -52,6 +52,10 @@ const PROCESSED_KEYS_MAX = 1000;
 /** Keys whose RESULT was released but whose already-applied fact must survive
  *  — far cheaper per entry, so it holds an order of magnitude more. */
 const APPLIED_KEYS_OVERFLOW_MAX = 10000;
+/** Idempotent runs still in flight that a repeat of their key can join. Past
+ *  it the oldest stops being joinable (a repeat then runs on its own); its
+ *  current joins still settle with it. */
+const INFLIGHT_RUNS_MAX = 500;
 
 // Server-write activities whose host adapter needs replay provenance (see
 // executeInvoke). Additive: an activity in neither set gets exactly the envelope
@@ -1289,6 +1293,11 @@ export function createBroker({
     // them all, and a join that times out removes itself.
     const entry = { deadlineAt: envelope.rpcDeadlineAt, waiters: new Set() };
     inflightInvokes.set(processedKey, entry);
+    while (inflightInvokes.size > INFLIGHT_RUNS_MAX) {
+      const oldest = inflightInvokes.keys().next();
+      if (oldest.done) break;
+      inflightInvokes.delete(oldest.value);
+    }
     const settle = (outcome) => {
       if (inflightInvokes.get(processedKey) === entry) inflightInvokes.delete(processedKey);
       for (const waiter of entry.waiters) waiter(outcome);
