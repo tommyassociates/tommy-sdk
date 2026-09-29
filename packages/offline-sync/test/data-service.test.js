@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { createDataService, createDataStore, createMemoryStoreBackend, createDataManager } from '../src/index.js';
+import { PREFS_DECL } from '../src/manager.js';
 import { createHostStorePort, createHostStoreChangeFeed, observeHostStorePort } from '../src/host-store/index.js';
 import { COMPLETE_ROWS } from '../src/host-store/protocol.js';
 import { DATABASES, identity, createChannelBus } from './helpers/host-databases.js';
@@ -259,6 +260,27 @@ describe('MP data API confinement', () => {
     await expect(next.read('mp.time-clock.prefs')).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
   });
 
+  it('opens an MP\'s prefs only when it reads one, and always with the host\'s declaration', async () => {
+    const reads = [];
+    const backends = new Map();
+    const factory = (_db, store, _strategy, decl) => {
+      if (!backends.has(store)) {
+        const inner = createMemoryStoreBackend();
+        backends.set(store, { ...inner, decl, async getAll() { reads.push(store); return inner.getAll(); } });
+      }
+      return backends.get(store);
+    };
+    const bogus = { keyPath: 'id', syncStrategy: 'server_authoritative', recordSchema: { type: 'object' } };
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: { prefs: bogus }, backendFactory: factory });
+    expect(backends.get('prefs').decl).toEqual(PREFS_DECL);
+    await new Promise((resolve) => { setTimeout(resolve, 5); });
+    expect(reads).toEqual([]);
+    // The first read starts the load and answers the fallback; ready() then has it.
+    expect(data.prefs.get('layout', 'list')).toBe('list');
+    await data.prefs.ready();
+    expect(reads).toEqual(['prefs']);
+  });
+
   it('queries the indexes its manifest declares', async () => {
     const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {
       shifts: { keyPath: 'id', syncStrategy: 'server_authoritative', indexes: [{ name: 'by_day', keyPath: 'at' }] },
@@ -352,14 +374,16 @@ function hostService(create, { maxRows = 5000 } = {}) {
     limits: { maxRows, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
   const backend = transactionalBackend(counted, null, options);
   // The shell adapter refuses a complete read past COMPLETE_ROWS, as here.
+  const completeReads = { count: 0 };
   const bounded = { ...backend, async getAll() {
+    completeReads.count += 1;
     const rows = await backend.getAll();
     if (rows.length > COMPLETE_ROWS) throw Object.assign(new Error('scan-required'), { name: 'StorageReadError', reason: 'scan-required' });
     return rows;
   } };
   const store = createDataStore({ name: 'chats.messages', backend: bounded, indexes: INDEXES });
   const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
-  return { data, store, commits, close: () => database.close() };
+  return { data, store, commits, completeReads, close: () => database.close() };
 }
 const messages = (chat, from, to) => Array.from({ length: to - from + 1 }, (_, index) => ({ id: `${chat}:${from + index}`, chat_id: chat, seq: from + index }));
 
@@ -658,6 +682,22 @@ describe.each(DATABASES)('large collections on the host store (%s)', (_name, cre
     store.subscribe((rows) => seen.push(rows.length));
     await data.ingest('chats.messages', messages(8, 1, 1));
     await vi.waitFor(() => expect(seen.at(-1)).toBe(1501));
+    await close();
+  });
+
+  it('stops trying one complete read on a collection that needed pages, until it fits one again', async () => {
+    const { data, store, completeReads, close } = hostService(create);
+    await data.ingest('chats.messages', messages(7, 1, 1500));
+    await store.getAll();
+    const after = completeReads.count;
+    await store.getAll();
+    await data.read('chats.messages');
+    expect(completeReads.count).toBe(after);
+    await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] }, force: true });
+    await data.ingest('chats.messages', messages(9, 1, 3));
+    expect(await store.getAll()).toHaveLength(3);
+    expect(await store.getAll()).toHaveLength(3);
+    expect(completeReads.count).toBe(after + 1);
     await close();
   });
 

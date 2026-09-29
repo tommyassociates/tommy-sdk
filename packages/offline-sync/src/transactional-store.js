@@ -1,6 +1,8 @@
 /** Durable branch of DataStore. The injected backend owns physical CAS/epochs. */
 // The most rows one whole-collection read returns, page by page.
 export const WHOLE_READ_ROWS = 20000;
+// The most rows the host store returns in one complete read.
+const COMPLETE_ROWS = 1000;
 export class StorageReadError extends Error {
   constructor(reason) { super(`Storage read failed (${reason})`); this.name = 'StorageReadError'; this.reason = reason; }
 }
@@ -96,11 +98,17 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
   // A whole-collection read: one complete read when the collection fits it,
   // else page by page (100 rows a page) with every page checked against the
   // first page's revision, starting over when a write lands in between.
-  // Past WHOLE_READ_ROWS a caller reads by index or scan instead.
+  // Once a collection needed pages, later reads go straight to pages until
+  // one returns at most half a complete read. Past WHOLE_READ_ROWS a caller
+  // reads by index or scan instead.
+  let paged = false;
   async function wholeRows() {
-    try { return await backend.getAll(); } catch (error) {
-      if (error?.reason !== 'scan-required' || typeof backend.page !== 'function') throw error;
+    if (!paged || typeof backend.page !== 'function') {
+      try { return await backend.getAll(); } catch (error) {
+        if (error?.reason !== 'scan-required' || typeof backend.page !== 'function') throw error;
+      }
     }
+    paged = true;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const rows = [];
       let afterKey = null;
@@ -117,7 +125,10 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         if (rows.length > WHOLE_READ_ROWS) throw new StorageReadError('scan-required');
         afterKey = page.nextKey;
       } while (afterKey !== null);
-      if (!moved) return rows;
+      if (!moved) {
+        if (rows.length <= COMPLETE_ROWS / 2) paged = false;
+        return rows;
+      }
     }
     throw new StorageReadError('conflict');
   }

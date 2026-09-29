@@ -103,8 +103,8 @@ export function manifestIndexes(indexes) {
 /**
  * Every MP's own preferences store (`mp.<mpId>.prefs`): small UI choices a
  * person makes (a layout, a filter, a toggle), kept per account on the
- * device, never sent anywhere. A manifest that declares its own `prefs`
- * store keeps its declaration.
+ * device, never sent anywhere. `prefs` is a host-owned name: a manifest
+ * cannot declare it, and this declaration is the one used.
  */
 export const PREFS_STORE = 'prefs';
 export const PREFS_DECL = Object.freeze({
@@ -123,7 +123,7 @@ export function createDataManager({
   capabilityToken, mpId, localData: declaredData = {}, backendFactory, now, onPersistError,
   scheduler, feed = null, isOnline,
 }) {
-  const localData = Object.hasOwn(declaredData, PREFS_STORE) ? declaredData : { ...declaredData, [PREFS_STORE]: PREFS_DECL };
+  const localData = { ...declaredData, [PREFS_STORE]: PREFS_DECL };
   const dbName = databaseName(capabilityToken, mpId);
   const stores = new Map();
   let disposed = false;
@@ -180,9 +180,11 @@ export function createDataManager({
     onPersistError,
   });
 
-  // tommy.prefs: read at once from what `ready()` loaded; written through.
-  // Preferences are the device's own, so they are stored as settled rows,
-  // never as changes waiting to be sent.
+  // tommy.prefs: the store opens on first use, so an MP that never reads a
+  // preference never opens it. `get` answers from what has loaded (the
+  // fallback until `ready()` resolves; an MP reads again then); `set` and
+  // `remove` write through. Preferences are the device's own, so they are
+  // stored as settled rows, never as changes waiting to be sent.
   const prefValues = new Map();
   let prefsLoaded = null;
   const prefs = Object.freeze({
@@ -193,6 +195,7 @@ export function createDataManager({
       return prefsLoaded;
     },
     get(key, fallback = null) {
+      if (!prefsLoaded) prefs.ready();
       return prefValues.has(String(key)) ? clone(prefValues.get(String(key))) : fallback;
     },
     async set(key, value) {
@@ -270,9 +273,10 @@ export function createDataManager({
         // scope below stays the caller's own, or an aged row would silently
         // escape pruning while still sitting in the store.
         read: (window) => store.readWhere(scopeFor(window)),
+        // The reconcile answers with its own read of the window's scope.
         sync: (window) => fetchAndReconcile(
           store, keyPath, { fetch, toRecord, keyOf }, scopeFor(window), window, windowKeyOf(window),
-        ).then(() => store.readWhere(scopeFor(window))),
+        ),
       };
     },
     /**
@@ -416,9 +420,11 @@ export function createDataManager({
         // use. The stores were bounded by `maxRows` alone, which is the backstop,
         // not the design. A whole-store cache still passes no window and so still
         // opts out, exactly as windowCache does.
+        // The reconcile answers with its read of the prune scope; a read whose
+        // paint scope differs reads that too.
         revalidate: (window) => fetchAndReconcile(
           store, keyPath, { fetch, toRecord, keyOf }, prunePredicate, window, windowKeyOf(window),
-        ).then(() => store.readWhere(predicate)),
+        ).then((rows) => (prunePredicate === predicate ? rows : store.readWhere(predicate))),
       };
     },
     /** DataApi.syncState — SWR UX inputs (offline-sync.md §6). */

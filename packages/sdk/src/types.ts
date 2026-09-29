@@ -1368,14 +1368,37 @@ export interface NavigationApi {
  * level 4 (`init.hostApi >= 4`); older hosts have no such namespace.
  */
 export interface PrefsApi {
-  /** Resolves once the stored preferences are loaded (the host loads them before `register`). */
+  /**
+   * Resolves once the stored preferences are loaded. The store opens on the
+   * MP's first use; read choices again when this resolves.
+   */
   ready(): Promise<void>;
-  /** The stored value (a copy), or `fallback` when none is stored. */
+  /** The stored value (a copy), or `fallback` when none is stored or none has loaded yet. */
   get<T = unknown>(key: string, fallback?: T): T;
   /** Stores a JSON value; the next `get` returns it at once. */
   set(key: string, value: unknown): Promise<void>;
   remove(key: string): Promise<void>;
 }
+
+/** What an MP bundle's optional `migrate` export is told about a store rebuild. */
+export interface StoreMigrationContext {
+  /** The store's `schemaVersion` its rows were written under. */
+  fromSchema: number;
+  /** The `schemaVersion` the published manifest declares now. */
+  toSchema: number;
+  /** The declared store name. */
+  store: string;
+}
+
+/**
+ * An MP bundle's optional `migrate` export: a pure function carrying one
+ * authored or unsent row into the store's new declared schema. Return the
+ * row in its new shape (keyed by the store's `keyPath`), or `null` to set it
+ * aside unsent (Settings → App Data → Pending sync). A row that does not fit
+ * the new `recordSchema`, or whose key another kept row already has, is set
+ * aside too.
+ */
+export type StoreMigrate = (row: Record<string, unknown>, context: StoreMigrationContext) => Record<string, unknown> | null;
 
 export interface TommySdk {
   readonly init: MpInit;
