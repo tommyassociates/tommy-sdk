@@ -236,6 +236,17 @@ describe('MP data API confinement', () => {
     await expect(data.ingest('chats.messages', [{ id: 'x' }])).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
     await expect(data.trim('mp.time-clock.shifts', { index: 'by_day', keep: 1 })).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
   });
+  it('reads a whole collection raw, past the paint ceiling', async () => {
+    let clock = Date.parse('2026-09-01T00:00:00Z');
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), now: () => clock });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null), now: () => clock });
+    await data.ingest('chats.messages', [{ id: 'old' }]);
+    clock += 8 * 24 * 60 * 60 * 1000;
+    await data.ingest('chats.messages', [{ id: 'new' }]);
+    expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['new']);
+    expect((await data.read('chats.messages', null, { raw: true })).map((row) => row.id).sort()).toEqual(['new', 'old']);
+  });
+
   it('gives every MP its own prefs, read at once once loaded and kept as settled rows', async () => {
     const backends = new Map();
     const factory = (_db, store) => { if (!backends.has(store)) backends.set(store, createMemoryStoreBackend()); return backends.get(store); };

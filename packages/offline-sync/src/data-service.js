@@ -338,12 +338,14 @@ export function createDataService({
 
   const service = {
     namespace,
-    async read(collection, key) {
+    // `raw` reads the whole collection past the paint ceiling (rows too old
+    // to paint included), for a caller checking what it painted.
+    async read(collection, key, { raw = false } = {}) {
       live();
       const { store } = local(collection);
       if (Array.isArray(key)) return Promise.all(key.map((item) => store.get(String(item))));
       if (key !== undefined && key !== null) return (await store.get(String(key))) ?? null;
-      return store.getAll();
+      return raw ? store.getAllRaw() : store.getAll();
     },
     async query(collection, spec = {}) {
       live();
