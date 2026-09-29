@@ -18,6 +18,16 @@ import addFormats from 'ajv-formats';
 const ajv = new Ajv({ allErrors: true, strict: false });
 addFormats(ajv);
 
+/**
+ * Why a row does not fit a declared record schema, or null when it fits (or
+ * there is no schema): the same check a store's `put` makes.
+ */
+export function recordSchemaCheck(recordSchema) {
+  const validate = recordSchema ? ajv.compile(recordSchema) : null;
+  return (row) => (validate && !validate(row)
+    ? (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ') : null);
+}
+
 /** Rows by key, keyed as strings like every other backend (a numeric id and its text find the same row). */
 // Per backend: the pending write turn of each row key (see `rowTurn`). A
 // backend over shared storage names it (`turnKey`), so every handle over that
