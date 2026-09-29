@@ -21,7 +21,8 @@ addFormats(ajv);
 /** Rows by key, keyed as strings like every other backend (a numeric id and its text find the same row). */
 // Per backend: the pending write turn of each row key (see `rowTurn`). A
 // backend over shared storage names it (`turnKey`), so every handle over that
-// storage in this page takes the same turns.
+// storage in this page takes the same turns, and every tab takes that
+// storage's Web Lock for each turn (see `acrossTabs`).
 const backendTurns = new WeakMap();
 const sharedTurns = new Map();
 function turnsFor(backend) {
@@ -31,6 +32,27 @@ function turnsFor(backend) {
   }
   if (!backendTurns.has(backend)) backendTurns.set(backend, new Map());
   return backendTurns.get(backend);
+}
+
+/** The origin's Web Locks, shared by every tab, or null where the runtime has none. */
+function webLocks() {
+  try {
+    const locks = globalThis.navigator?.locks;
+    return locks && typeof locks.request === 'function' ? locks : null;
+  } catch (_) {
+    return null;
+  }
+}
+/**
+ * Runs `task` holding the Web Lock for shared storage `name`, so a read-check-
+ * write in one tab never interleaves with a write to that storage from
+ * another. The storage is one blob per store, so the lock is per store.
+ * Without Web Locks the task runs as it is; the fenced delete then compares
+ * and deletes in one synchronous step on the storage (`deleteIf`).
+ */
+function acrossTabs(name, task) {
+  const locks = webLocks();
+  return locks ? locks.request(`offline-sync:${name}`, () => task()) : task();
 }
 
 export function createMemoryStoreBackend() {
@@ -306,6 +328,19 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
       return save(map, String(key));
     },
     async delete(key) { const map = load(); map.delete(String(key)); return save(map); },
+    /**
+     * Deletes the row unless `keep(stored)` says otherwise, reading and writing
+     * the storage in one synchronous step. Resolves `{ kept: true }` when the
+     * stored row was kept, otherwise the delete's result with `existed`.
+     */
+    async deleteIf(key, keep) {
+      const map = load();
+      const stored = map.get(String(key));
+      if (stored !== undefined && keep(stored)) return { kept: true };
+      if (stored === undefined) return { ok: true, existed: false };
+      map.delete(String(key));
+      return { ...save(map), existed: true };
+    },
     keys() { return [...load().keys()]; },
     patchRetained,
     turnKey: storeKey,
@@ -432,13 +467,16 @@ export function createDataStore({
   // `delete` and `markSynced` on the same key take turns, so a check against
   // the stored row (dirty, revision) still holds when the write lands. The
   // turns belong to the backend, so every store handle over it in this page
-  // takes turns with the others. Web Storage offers no compare-and-swap, so
-  // another tab writing the same Web Storage store is not fenced; durable
-  // collections use the transactional host store, which checks inside its commit.
+  // takes turns with the others; over shared storage (Web Storage) each turn
+  // also holds that storage's Web Lock, so other tabs' writes wait for it.
+  // Durable collections use the transactional host store, which checks inside
+  // its commit.
   const rowTurns = turnsFor(backend);
+  const sharedStorage = typeof backend.turnKey === 'string' ? backend.turnKey : null;
   function rowTurn(key, task) {
     const id = String(key);
-    const next = (rowTurns.get(id) || Promise.resolve()).then(task);
+    const run = sharedStorage ? () => acrossTabs(sharedStorage, task) : task;
+    const next = (rowTurns.get(id) || Promise.resolve()).then(run);
     const tail = next.then(() => {}, () => {});
     rowTurns.set(id, tail);
     tail.then(() => { if (rowTurns.get(id) === tail) rowTurns.delete(id); });
@@ -996,6 +1034,16 @@ export function createDataStore({
      */
     async delete(key, { silent = false, expectedRevision } = {}) {
       const persisted = await rowTurn(key, async () => {
+        if (expectedRevision !== undefined && typeof backend.deleteIf === 'function') {
+          // Compared and deleted in one step on the storage itself.
+          const result = await backend.deleteIf(key, (stored) => stored._rev !== expectedRevision);
+          if (result?.kept) throw new PersistError(name, { reason: 'conflict', retained: false });
+          if (result?.existed) {
+            capSaturated = false;
+            if (residentCount !== null) residentCount -= 1;
+          }
+          return result;
+        }
         const current = await backend.get(key);
         if (current !== undefined && expectedRevision !== undefined && current._rev !== expectedRevision) {
           throw new PersistError(name, { reason: 'conflict', retained: false });
