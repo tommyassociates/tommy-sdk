@@ -231,6 +231,24 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         return removed;
       });
     },
+    // The sync engine's markers on a stored row, written without validating
+    // or re-stamping the record (see the DataStore's `markRow`).
+    markRow(key, patch, { dirty = false } = {}) {
+      return exclusive(async () => {
+        let found = false;
+        await mutation([keyString(key)], (rows) => {
+          const row = rows.get(keyString(key));
+          if (!row) return [];
+          found = true;
+          const next = { ...row };
+          Object.entries(patch).forEach(([field, value]) => { if (value === null) delete next[field]; else next[field] = value; });
+          if (dirty) Object.assign(next, { _dirty: true, _rev: nextRevision(row._rev), _updatedAt: new Date(now()).toISOString() });
+          return [{ op: 'put', key: keyString(key), value: next }];
+        }, { retry: true });
+        if (found) await notify();
+        return found;
+      });
+    },
     markSynced(key, { expectedRevision } = {}) {
       return exclusive(async () => {
         await mutation([keyString(key)], (rows) => {

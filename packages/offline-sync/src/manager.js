@@ -244,6 +244,8 @@ export function createDataManager({
     trim: (...args) => { live(); return service.trim(...args); },
     status: (...args) => service.status(...args),
     pending: (...args) => service.pending(...args),
+    // Sends this MP's failed changes again (the host calls it on reconnect).
+    retryFailed: () => service.retryFailed(),
     /** DataApi.store — only manifest-declared stores exist. */
     store(name) {
       live();

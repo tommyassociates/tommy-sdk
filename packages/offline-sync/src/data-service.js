@@ -12,9 +12,10 @@
  *   status(target)                    fresh | stale | refreshing | offline | error
  *
  * `source`, `refresh` and `mutate` with a source's `push` are experimental:
- * no host collection or MP uses them yet, and their outbox (retries, refusals,
- * forced removals across services) is not finished. Use `ingest`, `read`,
- * `query`, `subscribe`, `purge` and `trim`.
+ * no host collection or MP uses them yet. Their outbox keeps every unsent
+ * change on the row (a delete as a hidden tombstone, a refusal for access as
+ * a marker), sends a restored change as the row is when it goes out, and drops
+ * queued changes on a forced removal or a principal switch.
  *
  * The host builds one over its domain collections (`<domain>.<collection>`);
  * an MP's DataApi builds one over its own manifest stores, confined to
@@ -102,6 +103,41 @@ async function rangeKeys(store, keyPath, { index, range }) {
 const same = (a, b) => {
   try { return JSON.stringify(a) === JSON.stringify(b); } catch (_) { return false; }
 };
+// A row as a caller gets it: a copy, without storage metadata (`_rev`, …).
+const clean = (row) => (row && typeof row === 'object'
+  ? JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(row).filter(([field]) => !field.startsWith('_'))))) : row ?? null);
+const copyRow = (row) => (row && typeof row === 'object' ? JSON.parse(JSON.stringify(row)) : row ?? null);
+/**
+ * A query: by a declared index (paged by the index cursor; a row filter is
+ * refused, since a page could not honour both it and the limit), or over the
+ * whole collection in key order (`where` filters it, `cursor` continues after
+ * the last key a page returned). `raw` answers as writers see the collection.
+ */
+/** Refuses, at once, a query spec a read could not honour. */
+function checkQuery(spec = {}) {
+  const { index, limit = 50, cursor = null, where, raw: _raw, ...range } = spec;
+  queryLimit(limit);
+  if (where !== undefined && typeof where !== 'function') throw serviceError('query: where must be a function', 'DATA_INVALID');
+  if (cursor !== null && typeof cursor !== 'string') throw serviceError('query: cursor must be a string', 'DATA_INVALID');
+  if (index && where) throw serviceError('query: where cannot filter an index read; filter the rows it returns', 'DATA_INVALID');
+  if (!index && Object.keys(range).length) throw serviceError(`query: ${Object.keys(range).join(', ')} needs an index`, 'DATA_INVALID');
+}
+async function runQuery(store, keyPath, spec = {}) {
+  checkQuery(spec);
+  const { index, limit = 50, cursor = null, where, raw = false, ...range } = spec;
+  if (index) {
+    const page = await queryPages(store, index, range, { limit, cursor, raw: raw === true });
+    return { ...page, rows: page.rows.map(raw === true ? copyRow : clean) };
+  }
+  const all = raw === true && store.getAllRaw ? await store.getAllRaw() : await store.getAll();
+  const keyOf = (row) => String(row[keyPath]);
+  const rows = all.filter((row) => (typeof where === 'function' ? where(row) : true)).sort((a, b) => (keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0));
+  const start = cursor === null ? 0 : rows.findIndex((row) => keyOf(row) > cursor);
+  const from = start === -1 ? rows.length : start;
+  const page = rows.slice(from, from + limit);
+  const more = from + limit < rows.length;
+  return { rows: page.map(raw === true ? copyRow : clean), nextCursor: more ? keyOf(page.at(-1)) : null, complete: !more };
+}
 
 export function createDataService({
   namespace = null,
@@ -149,13 +185,10 @@ export function createDataService({
   const emitStatus = () => { [...listeners].forEach((listener) => { try { listener(); } catch (_) { /* listener isolation */ } }); };
 
   async function valueOf(target) {
-    const { store } = local(target.collection);
-    if (target.query) {
-      const { index, limit = 50, cursor = null, ...range } = target.query;
-      return (await queryPages(store, index, range, { limit, cursor })).rows;
-    }
-    if (target.key !== undefined && target.key !== null) return (await store.get(String(target.key))) ?? null;
-    return store.getAll();
+    const { store, decl } = local(target.collection);
+    if (target.query) return (await runQuery(store, decl?.keyPath || 'id', target.query)).rows;
+    if (target.key !== undefined && target.key !== null) return clean(await store.get(String(target.key)));
+    return (await store.getAll()).map(clean);
   }
 
   // One entry per row with unsent changes, oldest change first.
@@ -194,7 +227,8 @@ export function createDataService({
    * it never brings the row back on the server. A queued delete is kept.
    */
   function dropOrphaned(event) {
-    if (!event?.remote || !outbox.size) return;
+    // Another tab's writes, and any service's removals in this tab.
+    if (!outbox.size || (!event?.remote && !['purge', 'evict'].includes(event?.type))) return;
     const touched = (entry) => event.label === entry.label || event.labels?.includes(entry.label) || (event.type === 'purge' && !event.label);
     [...outbox.values()].filter(touched).forEach((entry) => {
       serial(entry.id, async () => {
@@ -259,12 +293,12 @@ export function createDataService({
     }
     return outbox.get(id);
   }
-  function addChange(entry, { command, record, revision }) {
+  function addChange(entry, { command, record, revision, restored = false }) {
     let resolve;
     let reject;
     const done = new Promise((ok, fail) => { resolve = ok; reject = fail; });
     sequence += 1;
-    entry.changes.push({ seq: sequence, command, record, revision, resolve, reject });
+    entry.changes.push({ seq: sequence, command, record, revision, restored, resolve, reject });
     return done;
   }
   function enqueuePush(target, change) {
@@ -275,12 +309,18 @@ export function createDataService({
     drain(entry).catch(() => {});
     return done;
   }
-  /** A dirty row with no change in memory, sent again as a `put` of the stored row. */
+  /**
+   * A dirty row with no change in memory, sent again as the row is when it
+   * goes out: a `put` of the stored row, or a `delete` of a tombstone. A row
+   * whose push was refused for access waits as access changed.
+   */
   function restoreEntry(target, row) {
     const entry = entryFor(target);
     const record = bare(row);
-    addChange(entry, { command: { op: 'put', record }, record, revision: row._rev }).catch(() => {});
+    const command = row._deleted ? { op: 'delete', key: String(target.key) } : { op: 'put', record };
+    addChange(entry, { command, record: row._deleted ? null : record, revision: row._rev, restored: true }).catch(() => {});
     entry.restored = true;
+    if (row._pushRefused === 'access') entry.state = 'access_changed';
     emitStatus();
     return entry;
   }
@@ -292,7 +332,9 @@ export function createDataService({
     rows.filter((row) => row?._dirty).forEach((row) => {
       const key = String(row[keyPath]);
       if (outbox.has(`${target.label}:${key}`)) return;
-      drain(restoreEntry({ ...target, key }, row)).catch(() => {});
+      const entry = restoreEntry({ ...target, key }, row);
+      // A row refused for access is sent again only when a person asks.
+      if (entry.state !== 'access_changed') drain(entry).catch(() => {});
     });
   }
   /**
@@ -316,23 +358,39 @@ export function createDataService({
               run: async () => {
                 const push = pushOf(entry.collection, entry.decl);
                 if (typeof push !== 'function') throw serviceError(`'${entry.label}' has no push`, 'DATA_NO_SOURCE');
+                if (change.restored) {
+                  // Sent as the row is now: nothing when it is no longer an
+                  // unsent change (another tab sent it), else its latest state.
+                  const row = await entry.store.getRaw(entry.key);
+                  if (!row?._dirty) { sent = true; change.skipped = true; return; }
+                  change.command = row._deleted ? { op: 'delete', key: entry.key } : { op: 'put', record: bare(row) };
+                  change.record = row._deleted ? null : bare(row);
+                  change.revision = row._rev;
+                }
                 entry.state = 'sending'; entry.attempts += 1; emitStatus();
                 await push(change.command, change.record);
                 sent = true;
-                if (change.command.op === 'delete') return;
+                // A sent delete removes its tombstone, unless the row was written again since.
+                if (change.command.op === 'delete') {
+                  try { await entry.store.delete(entry.key, { expectedRevision: change.revision }); } catch (_) { /* written again: kept */ }
+                  return;
+                }
                 // A row that cannot be marked stays dirty and is sent again later.
                 try { await entry.store.markSynced(entry.key, { expectedRevision: change.revision }); } catch (_) { /* kept dirty */ }
               },
             });
           } catch (error) {
             if (!sent) {
-              entry.state = refusedAccess(error) ? 'access_changed' : 'failed'; entry.lastError = describeError(error); emitStatus();
+              const refused = refusedAccess(error);
+              entry.state = refused ? 'access_changed' : 'failed'; entry.lastError = describeError(error); emitStatus();
+              // The refusal stays with the row, so a restart does not send it again on its own.
+              if (refused) { try { await entry.store.markRow?.(entry.key, { _pushRefused: 'access' }); } catch (_) { /* kept in memory */ } }
               entry.changes.forEach((queued) => queued.reject(error));
               throw error;
             }
           }
           entry.changes.shift();
-          change.resolve({ key: entry.key, pushed: true });
+          change.resolve({ key: entry.key, pushed: !change.skipped });
         }
         if (entry.discarded) return { key: entry.key, pushed: false };
         if (outbox.get(entry.id) === entry) outbox.delete(entry.id);
@@ -350,24 +408,22 @@ export function createDataService({
     // `raw` reads the whole collection as writers see it: rows past the paint
     // ceiling and the store's age limit included, for a caller checking what
     // it painted or deciding what to remove.
+    // Rows come as copies without storage metadata; `raw` rows (the writers'
+    // view: unpainted and unsent rows too) keep it.
     async read(collection, key, { raw = false } = {}) {
       live();
       const { store } = local(collection);
-      if (Array.isArray(key)) return Promise.all(key.map((item) => store.get(String(item))));
-      if (key !== undefined && key !== null) return (await store.get(String(key))) ?? null;
-      return raw ? store.getAllRaw() : store.getAll();
+      const one = async (item) => (raw ? copyRow(await store.getRaw(String(item))) : clean(await store.get(String(item))));
+      if (Array.isArray(key)) return Promise.all(key.map(one));
+      if (key !== undefined && key !== null) return one(key);
+      return raw ? (await store.getAllRaw()).map(copyRow) : (await store.getAll()).map(clean);
     },
     // `raw: true` answers as writers see the collection (rows past the paint
     // ceiling and the age limit included), for a caller deciding what to remove.
     async query(collection, spec = {}) {
       live();
-      const { store } = local(collection);
-      const { index, limit = 50, cursor = null, where, raw = false, ...range } = spec;
-      queryLimit(limit);
-      if (index) return queryPages(store, index, range, { limit, cursor, raw: raw === true });
-      const all = raw === true && store.getAllRaw ? await store.getAllRaw() : await store.getAll();
-      const rows = all.filter((row) => (typeof where === 'function' ? where(row) : true));
-      return { rows: rows.slice(0, limit), nextCursor: null, complete: rows.length <= limit };
+      const { store, decl } = local(collection);
+      return runQuery(store, decl?.keyPath || 'id', spec);
     },
     /**
      * `target`: a collection name, `{ collection, key }` or
@@ -378,7 +434,7 @@ export function createDataService({
       live();
       const wanted = targetOf(target);
       const { store, label } = local(wanted.collection);
-      if (wanted.query) queryLimit(wanted.query.limit ?? 50);
+      if (wanted.query) checkQuery(wanted.query);
       let active = true;
       let last;
       let seq = 0;
@@ -451,22 +507,38 @@ export function createDataService({
       state.state = 'refreshing';
       emitStatus();
       const keyPath = decl?.keyPath || 'id';
+      // A server copy never replaces a row with an unsent local change.
       const run = async (isCurrent) => {
         if (wanted.key !== undefined && wanted.key !== null) {
+          const rowKey = String(wanted.key);
           const dto = await spec.fetch(wanted);
           if (!isCurrent()) return;
-          const prev = await store.getRaw?.(String(wanted.key));
+          const prev = await store.getRaw?.(rowKey);
           if (!dto) {
-            if (prev && !prev._dirty) await store.delete(String(wanted.key));
+            // Decided in turn with local writes to the row, on the row as it is then.
+            await serial(`${label}:${rowKey}`, async () => {
+              const current = await store.getRaw?.(rowKey);
+              if (!current || current._dirty) return;
+              try {
+                await store.delete(rowKey, Number.isSafeInteger(current._rev) ? { expectedRevision: current._rev } : {});
+              } catch (error) { if (error?.reason !== 'conflict') throw error; }
+            });
             return;
           }
           const record = (spec.toRecord || ((value) => value))(dto, prev ? bare(prev) : prev);
-          await store.reconcile([record], { prune: false });
+          await store.reconcile([record], { prune: false, keepDirty: true });
           return;
         }
-        const scope = typeof spec.scope === 'function' ? spec.scope(wanted) : () => true;
+        // A query target prunes only the rows of that query; a list or window
+        // target the source's scope (the whole collection without one).
+        let scope = typeof spec.scope === 'function' ? spec.scope(wanted) : () => true;
+        if (wanted.query && typeof spec.scope !== 'function') {
+          const { limit: _limit, cursor: _cursor, raw: _raw, ...range } = wanted.query;
+          const held = new Set((await rangeKeys(store, keyPath, wholeRange(range, 'refresh'))).map((entry) => entry.key));
+          scope = (row) => held.has(String(row[keyPath]));
+        }
         await reconcileFetched(store, keyPath, { fetch: () => spec.fetch(wanted), toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
-          scope, wanted.window, windowKeyOf(wanted.window), { onPersistError, rethrow: true });
+          scope, wanted.window, windowKeyOf(wanted.window), { onPersistError, rethrow: true, keepDirty: true });
       };
       state.flight = scheduler.request({
         key: `data:${label}:${key}`, target: label, budgetKey, reason,
@@ -551,8 +623,12 @@ export function createDataService({
         } else if (command.op === 'patch') {
           record = bare({ ...((await store.getRaw(key)) || {}), ...command.patch });
           await store.put(record);
+        } else if (typeof push === 'function' && typeof store.markRow === 'function' && await store.getRaw(key)) {
+          // A delete to send stays a hidden, unsent tombstone until it is sent,
+          // so a reload sends it again.
+          await store.markRow(key, { _deleted: true }, { dirty: true });
         } else await store.delete(key);
-        const revision = command.op === 'delete' || typeof push !== 'function' ? undefined : (await store.getRaw(key))?._rev;
+        const revision = typeof push !== 'function' ? undefined : (await store.getRaw(key))?._rev;
         return { record, revision };
       });
       if (typeof push !== 'function') return { key, pushed: false };
@@ -595,8 +671,32 @@ export function createDataService({
         if (!row?._dirty) return { key, pushed: false };
         entry = outbox.get(id) || restoreEntry({ name, label, key: String(key), store, decl }, row);
       }
-      if (!entry.draining && entry.state === 'failed') { entry.state = 'queued'; emitStatus(); }
+      if (!entry.draining && ['failed', 'access_changed'].includes(entry.state)) {
+        // A person asked: a refusal for access is cleared from the row and it is sent again.
+        if (entry.state === 'access_changed') { try { await store.markRow?.(String(key), { _pushRefused: null }); } catch (_) { /* sent anyway */ } }
+        entry.state = 'queued'; emitStatus();
+      }
       return drain(entry);
+    },
+    /** Sends again every change that failed (never one refused for access), e.g. on reconnect. */
+    retryFailed() {
+      return Promise.allSettled([...outbox.values()].filter((entry) => entry.state === 'failed' && !entry.draining).map((entry) => {
+        entry.state = 'queued';
+        return drain(entry);
+      }));
+    },
+    /**
+     * Drops every queued change from memory, e.g. when the signed-in principal
+     * changes: the rows stay unsent on disk, and that principal's next
+     * service sends them again.
+     */
+    fence() {
+      outbox.forEach((entry) => {
+        entry.discarded = true;
+        entry.changes.splice(0).forEach((change) => change.reject(serviceError('Change fenced', 'DATA_FENCED')));
+      });
+      outbox.clear();
+      emitStatus();
     },
     /** Drops a pending local change after an explicit confirm. */
     async discard(collection, key) {

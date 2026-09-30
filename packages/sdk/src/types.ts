@@ -543,20 +543,29 @@ export interface DataApi {
    * names are the declared store names (or `mp.<mpId>.<store>`); any other
    * namespace is refused.
    */
-  /** `raw: true` reads the whole collection as writers see it, rows too old to paint included. */
+  /**
+   * Rows as copies without storage metadata (`_rev`, `_dirty`, …). `raw: true`
+   * reads as writers see the collection: rows too old to paint and unsent
+   * tombstones included, with their metadata.
+   */
   read?<Rec = unknown>(collection: string, key?: string | readonly string[] | null, options?: { raw?: boolean }): Promise<Rec | Rec[] | null>;
   query?<Rec = unknown>(collection: string, spec?: DataQuerySpec<Rec>): Promise<{ rows: Rec[]; nextCursor: string | null; complete: boolean }>;
   subscribe?<Value = unknown>(target: DataTarget, callback: (value: Value) => void, options?: { onError?: (error: unknown) => void }): () => void;
   /**
-   * @experimental No MP uses a source yet and its outbox is unfinished
-   * (retries, refusals, forced removals across services). Use `ingest`.
+   * @experimental No MP uses a source yet. Rows with unsent changes keep them
+   * through a refresh; see `mutate` for how changes are sent.
    */
   source?<Dto = unknown, Rec = unknown>(collection: string, spec: DataSource<Dto, Rec>): () => void;
-  /** @experimental Runs a collection's `source`; see `source`. */
+  /**
+   * @experimental Runs a collection's `source`. A row with an unsent local
+   * change keeps it; a query target prunes only the rows of its query.
+   */
   refresh?(target: DataTarget, options?: DataRefreshOptions): Promise<DataStatus>;
   /**
-   * @experimental An optimistic write pushed through a source's `push`; its
-   * outbox is unfinished (see `source`). Write rows with `store(...).put`.
+   * @experimental An optimistic write pushed through a source's `push`. An
+   * unsent change stays on the row (a delete as a hidden tombstone) and is
+   * sent again after a reload; a change refused for access (403) waits,
+   * marked on the row, until `retry`; failed ones go again on reconnect.
    */
   mutate?<Rec = unknown>(collection: string, command: DataMutation<Rec>, options?: { wait?: boolean }): Promise<{ key: string; pushed: boolean }>;
   /**
@@ -574,6 +583,8 @@ export interface DataApi {
   /** Keeps the newest `keep` rows of an index range; dirty rows are never removed. */
   trim?(collection: string, options: DataIndexRange & { keep: number }): Promise<{ removed: string[] }>;
   status?(target: DataTarget): DataStatus;
+  /** Sends every change that failed again (never one refused for access). */
+  retryFailed?(): Promise<unknown>;
 }
 
 export type DataTarget = string | { collection: string; key?: string; window?: Record<string, unknown>; query?: DataQuerySpec };
@@ -593,7 +604,9 @@ export interface DataQuerySpec<Rec = unknown> {
   readonly upper?: unknown;
   /** Rows to return, 1 to 5000 (default 50); anything else is refused with `DATA_INVALID`. */
   readonly limit?: number;
+  /** An index read's cursor, or without an index the last key a page returned. */
   readonly cursor?: string | null;
+  /** Filters a read without an index; refused with an index (`DATA_INVALID`). */
   readonly where?: (row: Rec) => boolean;
   /** Answer as writers see the collection: rows too old to paint included. */
   readonly raw?: boolean;
@@ -607,7 +620,8 @@ export interface DataSource<Dto = unknown, Rec = unknown> {
    * @experimental Sends one local change; changes to a row arrive in order. A
    * change left unsent by an earlier page or reload arrives as a `put` of the
    * stored row, and a change may arrive again after a failure, so a push must
-   * be idempotent. Its outbox is unfinished; see `DataApi.source`.
+   * be idempotent. A change restored after a reload is sent as the row is
+   * when it goes out, or not at all once it was sent elsewhere.
    */
   push?(command: DataMutation<Rec>, record: Rec | null): Promise<unknown>;
 }

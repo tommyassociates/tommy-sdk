@@ -743,7 +743,9 @@ export function createDataStore({
    * client-owned (`last_write_wins`) rows never do — they are the only copy.
    */
   const ceilingApplies = syncStrategy !== 'last_write_wins';
+  // A local delete waiting to be sent (`_deleted`) never paints.
   const paintable = (row) => {
+    if (row?._deleted) return false;
     if (!ceilingApplies || !row || row._dirty) return true;
     const at = Date.parse(row._updatedAt || '');
     return !Number.isFinite(at) || at >= now() - PAINT_CEILING_MS;
@@ -1078,6 +1080,32 @@ export function createDataStore({
         reportPersistFailure(persisted, key);
         throw new PersistError(name, persisted);
       }
+    },
+    /**
+     * Sync engine hook: writes its markers onto a stored row without
+     * validating or re-stamping the record — `_deleted` (a local delete
+     * waiting to be sent, hidden from every read that paints) and
+     * `_pushRefused` (the server refused the row's push). A `null` value
+     * removes a marker; `dirty: true` makes the row an unsent change. Resolves
+     * whether the row was there.
+     */
+    async markRow(key, patch, { dirty = false } = {}) {
+      const persisted = await rowTurn(key, async () => {
+        const record = await backend.get(key);
+        if (!record) return null;
+        const next = { ...record };
+        Object.entries(patch).forEach(([field, value]) => { if (value === null) delete next[field]; else next[field] = value; });
+        if (dirty) Object.assign(next, { _dirty: true, _rev: (record._rev || 0) + 1, _updatedAt: new Date(now()).toISOString() });
+        return backend.put(key, next);
+      });
+      if (persisted === null) return false;
+      const gone = accountForGoneRows(persisted, key);
+      await notify(gone.length ? [key, ...gone] : key);
+      if (persisted && persisted.ok === false) {
+        reportPersistFailure(persisted, key);
+        throw new PersistError(name, persisted);
+      }
+      return true;
     },
     /**
      * Sync engine hook: clear _dirty after a successful push. With

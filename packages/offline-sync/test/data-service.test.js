@@ -112,7 +112,7 @@ describe('data service on memory stores', () => {
     await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 2 } });
     await settle();
     expect(data.pending()).toEqual([expect.objectContaining({ key: 'draft', state: 'access_changed', attempts: 1 })]);
-    expect((await data.read('chats.messages', 'draft'))._dirty).toBe(true);
+    expect((await data.read('chats.messages', 'draft', { raw: true }))._dirty).toBe(true);
     // A refusal by code reads the same.
     push.mockImplementationOnce(async () => { throw Object.assign(new Error('Denied'), { code: 'PermissionDenied' }); });
     await data.mutate('chats.messages', { op: 'put', record: { id: 'other', chat_id: 7, seq: 3 } });
@@ -138,7 +138,7 @@ describe('data service on memory stores', () => {
     fail = false;
     await data.retry('chats.messages', 'draft');
     expect(data.pending()).toEqual([]);
-    expect((await data.read('chats.messages', 'draft'))._dirty).toBe(false);
+    expect((await data.read('chats.messages', 'draft', { raw: true }))._dirty).toBe(false);
     await data.discard('chats.messages', 'draft');
     expect(await data.read('chats.messages')).toEqual([]);
   });
@@ -161,11 +161,11 @@ describe('data service on memory stores', () => {
     releases[0]();
     await vi.waitFor(() => expect(push).toHaveBeenCalledTimes(2));
     // The first push is confirmed, but the row has a later local write.
-    expect((await data.read('chats.messages', 'a'))._dirty).toBe(true);
+    expect((await data.read('chats.messages', 'a', { raw: true }))._dirty).toBe(true);
     releases[1]();
     await expect(second).resolves.toEqual({ key: 'a', pushed: true });
     expect(sent).toEqual([1, 2]);
-    expect((await data.read('chats.messages', 'a'))._dirty).toBe(false);
+    expect((await data.read('chats.messages', 'a', { raw: true }))._dirty).toBe(false);
     expect(data.pending()).toEqual([]);
   });
 
@@ -251,7 +251,7 @@ describe('MP data API confinement', () => {
     expect((await data.read('shifts')).map((row) => row.id)).toEqual(['1', '2']);
     expect(data.status('shifts').state).toBe('fresh');
     await data.ingest('mp.scheduling.shifts', [{ id: '3', at: 'wed' }]);
-    expect((await data.read('shifts', '3'))._dirty).toBe(false);
+    expect((await data.read('shifts', '3', { raw: true }))._dirty).toBe(false);
     await expect(data.ingest('chats.messages', [{ id: 'x' }])).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
     await expect(data.trim('mp.time-clock.shifts', { index: 'by_day', keep: 1 })).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
   });
@@ -491,7 +491,7 @@ describe.each([
     await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 99 } });
     await data.ingest('chats.messages', messages(7, 1, 3));
     await data.ingest('chats.messages', messages(8, 1, 2));
-    expect((await data.read('chats.messages')).map((row) => [row.id, row._dirty]).sort()).toEqual([
+    expect((await data.read('chats.messages', null, { raw: true })).map((row) => [row.id, row._dirty]).sort()).toEqual([
       ['7:1', false], ['7:2', false], ['7:3', false], ['8:1', false], ['8:2', false], ['draft', true],
     ]);
     expect(data.pending()).toEqual([]);
@@ -506,12 +506,12 @@ describe.each([
     const { data, close } = make();
     await data.mutate('chats.messages', { op: 'put', record: { id: '7:2', chat_id: 7, seq: 2, body: 'unsent' } });
     expect(await data.ingest('chats.messages', messages(7, 1, 3))).toEqual({ written: 2 });
-    expect(await data.read('chats.messages', '7:2')).toMatchObject({ body: 'unsent', _dirty: true });
+    expect(await data.read('chats.messages', '7:2', { raw: true })).toMatchObject({ body: 'unsent', _dirty: true });
     // A replacement, and one past a single chunk, keep it too.
     expect(await data.ingest('chats.messages', messages(7, 1, 3), { replace: true, scope: (row) => row.chat_id === 7 })).toEqual({ written: 2 });
     expect(await data.ingest('chats.messages', messages(7, 1, 600), { replace: true })).toEqual({ written: 599 });
-    expect(await data.read('chats.messages', '7:2')).toMatchObject({ body: 'unsent', _dirty: true });
-    expect(await data.read('chats.messages', '7:3')).toMatchObject({ _dirty: false });
+    expect(await data.read('chats.messages', '7:2', { raw: true })).toMatchObject({ body: 'unsent', _dirty: true });
+    expect(await data.read('chats.messages', '7:3', { raw: true })).toMatchObject({ _dirty: false });
     await close();
   });
 
@@ -520,7 +520,7 @@ describe.each([
     await data.mutate('chats.messages', { op: 'put', record: { id: '7:1', chat_id: 7, seq: 1, body: 'unsent' } });
     const rows = [...messages(7, 1, 500), { id: '7:1', chat_id: 7, seq: 1 }];
     expect(await data.ingest('chats.messages', rows)).toEqual({ written: 499 });
-    expect(await data.read('chats.messages', '7:1')).toMatchObject({ body: 'unsent', _dirty: true });
+    expect(await data.read('chats.messages', '7:1', { raw: true })).toMatchObject({ body: 'unsent', _dirty: true });
     await close();
   });
 
@@ -689,7 +689,7 @@ describe('whole-range purge and trim, and the rows an ingest stored', () => {
     await data.ingest('chats.messages', messages(7, 1, 4));
     edit = { id: '7:1', chat_id: 7, seq: 1, body: 'unsent' };
     expect((await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] } })).removed).toEqual(['7:2', '7:3', '7:4']);
-    expect(await data.read('chats.messages', '7:1')).toMatchObject({ body: 'unsent', _dirty: true });
+    expect(await data.read('chats.messages', '7:1', { raw: true })).toMatchObject({ body: 'unsent', _dirty: true });
     await data.ingest('chats.messages', messages(7, 2, 4));
     edit = { id: '7:2', chat_id: 7, seq: 2, body: 'unsent too' };
     expect((await data.trim('chats.messages', { index: 'byChat', prefix: [7], keep: 1 })).removed).toEqual(['7:3']);
@@ -764,7 +764,7 @@ describe.each(DATABASES)('large collections on the host store (%s)', (_name, cre
     } });
     const racing = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store: listing, decl: { keyPath: 'id' } } : null) });
     expect((await racing.purge('chats.messages', { query: { index: 'byChat', prefix: [8] } })).removed).toHaveLength(19);
-    expect(await data.read('chats.messages', '8:240')).toMatchObject({ body: 'unsent', _dirty: true });
+    expect(await data.read('chats.messages', '8:240', { raw: true })).toMatchObject({ body: 'unsent', _dirty: true });
     await close();
   });
 
