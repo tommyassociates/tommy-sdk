@@ -56,6 +56,29 @@ function transactionalBackend(port, opened, options) {
 }
 
 describe('data service on memory stores', () => {
+  it('sends each change and read as the principal it was asked under, and never joins a read asked as another form', async () => {
+    let form = { accountType: 'Team', accountId: '44' };
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend() });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null), principal: () => form });
+    const pushed = [];
+    const read = [];
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    data.source('chats.messages', {
+      fetch: async (target, context) => { read.push(context.principal.accountType); if (read.length === 1) await gate; return []; },
+      push: async (command, record, context) => { pushed.push([record.id, context.principal.accountType]); },
+    });
+    const change = data.mutate('chats.messages', { op: 'put', record: { id: 'a' } }, { wait: true });
+    const first = data.refresh('chats.messages', { mode: 'visible' });
+    await settle();
+    form = { accountType: 'TeamMember', accountId: '90' };
+    const second = data.refresh('chats.messages', { mode: 'visible' });
+    release();
+    await Promise.all([change, first, second]);
+    expect(pushed).toEqual([['a', 'Team']]);
+    expect(read).toEqual(['Team', 'TeamMember']);
+  });
+
   it('takes no refresh answer with an entry that is not a keyed row, and removes nothing', async () => {
     const data = memoryService();
     let answer = [null];

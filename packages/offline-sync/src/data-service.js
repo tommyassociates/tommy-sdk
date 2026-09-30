@@ -240,9 +240,11 @@ export function createDataService({
   onPersistError,
   budgetKey = namespace || 'host',
   // The account this service reads and sends for (opaque here), passed to
-  // every source's fetch and push; `lane` keeps its scheduler jobs apart from
-  // other accounts'; while `foreground()` is false, its work waits behind the
-  // displayed account's.
+  // every source's fetch and push: a value, or a function naming it now (a
+  // namespace one account reaches in several forms). Each read or change
+  // takes it when it is asked and keeps it until it is sent. `lane` keeps
+  // its scheduler jobs apart from other accounts'; while `foreground()` is
+  // false, its work waits behind the displayed account's.
   principal = null,
   lane = null,
   foreground = () => true,
@@ -253,7 +255,10 @@ export function createDataService({
   if (typeof resolve !== 'function') throw serviceError('createDataService: resolve(collection) is required', 'DATA_INVALID');
   // What a source's fetch and push are given: the principal to send with, and
   // that the request is background work (never reported by the request layer).
-  const jobContext = Object.freeze({ principal, background: true });
+  const principalNow = typeof principal === 'function' ? principal : () => principal;
+  const jobContextNow = () => Object.freeze({ principal: principalNow(), background: true });
+  // Which principal a context names, to tell two forms of one account apart.
+  const formOf = (context) => { try { return JSON.stringify(context.principal ?? null); } catch (_) { return null; } };
   const laned = (label) => (lane === null ? label : `${lane}|${label}`);
   const lanedKey = (kind, rest) => (lane === null ? `${kind}:${rest}` : `${kind}:${lane}:${rest}`);
   const inForeground = () => { try { return foreground() !== false; } catch (_) { return true; } };
@@ -541,12 +546,16 @@ export function createDataService({
     }
     return outbox.get(id);
   }
-  function addChange(entry, { command, record, revision, restored = false }) {
+  function addChange(entry, {
+    command, record, revision, restored = false, context = jobContextNow(),
+  }) {
     let resolve;
     let reject;
     const done = new Promise((ok, fail) => { resolve = ok; reject = fail; });
     sequence += 1;
-    entry.changes.push({ seq: sequence, command, record, revision, restored, resolve, reject });
+    entry.changes.push({
+      seq: sequence, command, record, revision, restored, context, resolve, reject,
+    });
     return done;
   }
   function enqueuePush(target, change) {
@@ -680,7 +689,7 @@ export function createDataService({
                 // Fenced, discarded or disposed while it waited: never sent.
                 if (entry.discarded || outbox.get(entry.id) !== entry) throw serviceError('Change fenced', 'DATA_FENCED');
                 entry.state = 'sending'; entry.attempts += 1; emitStatus();
-                await push(change.command, change.record, jobContext);
+                await push(change.command, change.record, change.context);
                 sent = true;
                 await settleSent(entry, change);
               },
@@ -768,7 +777,7 @@ export function createDataService({
    * stored in the collection's turn (commitDeclared). A refusal (403, 404)
    * purges the collection's rows, unsent ones kept.
    */
-  async function readDeclared(target, spec, wanted, isCurrent, { full = false } = {}) {
+  async function readDeclared(target, spec, wanted, isCurrent, { full = false, context = jobContextNow() } = {}) {
     const { name, store, keyPath } = target;
     const { cursor: keepsCursor = false, fullEveryMs = FULL_EVERY_MS, forbidden = 'purge' } = spec.read;
     for (let attempt = 0; attempt < DECLARED_READ_TRIES; attempt += 1) {
@@ -789,7 +798,7 @@ export function createDataService({
       let answer;
       try {
         // eslint-disable-next-line no-await-in-loop
-        answer = await spec.fetch(wanted, { ...jobContext, since });
+        answer = await spec.fetch(wanted, { ...context, since });
       } catch (error) {
         if (forbidden === 'purge' && [403, 404].includes(Number(error?.status)) && isCurrent()) {
           await service.purge(name, {}).catch(() => {}); // eslint-disable-line no-use-before-define, no-await-in-loop
@@ -1049,7 +1058,16 @@ export function createDataService({
         emitStatus();
         return settle(Promise.reject(serviceError('Offline', 'DATA_OFFLINE')));
       }
-      if (state.flight) return settle(state.flight);
+      // The principal it reads as, taken now. A read in flight as another
+      // form of the account is not joined: this one reads after it.
+      const context = jobContextNow();
+      const form = formOf(context);
+      if (state.flight && state.flightForm === form) return settle(state.flight);
+      if (state.flight) {
+        return settle(state.flight.catch(() => {}).then(() => service.refresh(target, {
+          mode: 'visible', priority, maxAge: 0, reason, full,
+        })));
+      }
       state.state = 'refreshing';
       emitStatus();
       const keyPath = decl?.keyPath || 'id';
@@ -1057,7 +1075,7 @@ export function createDataService({
       const run = async (isCurrent) => {
         if (wanted.key !== undefined && wanted.key !== null) {
           const rowKey = String(wanted.key);
-          const dto = await spec.fetch(wanted, jobContext);
+          const dto = await spec.fetch(wanted, context);
           if (!isCurrent()) return;
           // Stored in the collection's turn, through the store that records
           // what it changes: a declared read already on its way keeps it.
@@ -1082,7 +1100,7 @@ export function createDataService({
           return;
         }
         if (spec.read && !wanted.query && !wanted.window && typeof spec.scope !== 'function') {
-          return readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent, { full });
+          return readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent, { full, context });
         }
         // A query target prunes only the rows of that query; a list or window
         // target the source's scope (the whole collection without one).
@@ -1097,12 +1115,13 @@ export function createDataService({
         // Only a read of the whole collection marks it synced.
         const whole = !wanted.query && typeof spec.scope !== 'function';
         // Fetched first; stored in the collection's turn.
-        const dtos = snapshotRows(await spec.fetch(wanted, jobContext));
+        const dtos = snapshotRows(await spec.fetch(wanted, context));
         if (!isCurrent()) return undefined;
         if (dtos === null) return NO_SNAPSHOT;
         return inTurn(name, () => reconcileFetched(touching(name, store, keyPath), keyPath, { fetch: () => dtos, toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
           scope, wanted.window, windowKeyOf(wanted.window), { onPersistError, rethrow: true, keepDirty: true, ...(whole ? {} : { syncedAt: null }) }));
       };
+      state.flightForm = form;
       state.flight = scheduler.request({
         key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
         ...(inForeground()
@@ -1116,7 +1135,7 @@ export function createDataService({
       }, (error) => {
         state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
         throw error;
-      }).finally(() => { state.flight = null; emitStatus(); });
+      }).finally(() => { state.flight = null; state.flightForm = null; emitStatus(); });
       return settle(state.flight);
     },
     /**
