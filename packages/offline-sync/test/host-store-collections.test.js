@@ -422,6 +422,23 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     expect((await stores()).find((row) => row.label === 'drafts')).toMatchObject({ indexes: ['byCode'], unique: ['byCode'] });
   });
 
+  it('refuses a value a unique index cannot hold, rather than let it through unchecked', async () => {
+    const { port, open } = await setup(create);
+    const codes = await open({ storeName: 'drafts', policy: 'authored', indexes: { byCode: 'code' }, unique: ['byCode'] });
+    const long = 'x'.repeat(257);
+    const refused = { ok: false, reason: 'unserializable' };
+    await expect(codes.put([{ id: 'a', code: long, _dirty: true }])).resolves.toMatchObject(refused);
+    await expect(codes.put([{ id: 'a', code: 'a\u0000b', _dirty: true }])).resolves.toMatchObject(refused);
+    await expect(codes.put([{ id: 'a', code: { nested: 1 }, _dirty: true }])).resolves.toMatchObject(refused);
+    await expect(codes.put([{ id: 'a', code: 'x'.repeat(256), _dirty: true }])).resolves.toMatchObject({ ok: true });
+    expect((await codes.all()).map((row) => row.id)).toEqual(['a']);
+    // A rebuild is held to it too.
+    const next = await port.open(openInput({ storeName: 'drafts', policy: 'authored', schemaVersion: 2, indexes: { byCode: 'code' }, unique: ['byCode'] }));
+    const step = (phase, extra = {}) => port.migration({ handle: next.handle, expectedEpoch: next.epoch, phase, ...extra });
+    await expect(step('begin')).resolves.toMatchObject({ ok: true });
+    await expect(step('write', { changes: [{ op: 'put', key: 'a', value: { id: 'a', code: long, _dirty: true } }] })).resolves.toMatchObject({ ok: false, reason: 'unserializable' });
+  });
+
   it('refuses a rebuild write that would break a unique index the new shape adds', async () => {
     const { port, open } = await setup(create);
     const drafts = await open({ storeName: 'drafts', policy: 'authored', indexes: { byCode: 'code' } });

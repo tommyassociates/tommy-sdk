@@ -56,6 +56,10 @@ function upsertBatches(incoming) {
   return batches;
 }
 const nextRevision = (value = 0) => { if (!Number.isSafeInteger(value) || value < 0 || value >= Number.MAX_SAFE_INTEGER) throw new StorageReadError('write-failed'); return value + 1; };
+// A row's next revision: above its own and above the store's, which every
+// commit moves on, so a key written again after it was removed never takes a
+// revision it held before (a push still on its way cannot settle the new row).
+const rowRevision = (previous, storeRevision) => nextRevision(Math.max(previous?._rev || 0, Number.isSafeInteger(storeRevision) ? storeRevision : 0));
 
 export function createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows, indexes = {}, queryRows = null }) {
   let retired = false;
@@ -90,7 +94,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       let snapshot;
       try { snapshot = await backend.snapshot(keys, { aged: true }); } catch (error) { failure({ reason: error.reason || 'read-failed', retained: false }, keys[0]); }
       const previous = new Map(snapshot.rows.map((row) => [row.key, row.value]));
-      const changes = transform(previous);
+      const changes = transform(previous, snapshot.storeRevision);
       if (!changes.length) return;
       const result = await backend.commit(snapshot, changes, syncedAt === undefined || syncedAt === null ? undefined : { syncedAt });
       live();
@@ -198,9 +202,9 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       const submitted = copy(record);
       const key = keyString(record[keyPath]);
       return exclusive(async () => {
-        await mutation([key], (rows) => {
+        await mutation([key], (rows, storeRevision) => {
           const previous = rows.get(key);
-          const stamped = { ...submitted, ...(previous?._window != null ? { _window: previous._window } : {}), _rev: nextRevision(previous?._rev), _dirty: true, _updatedAt: new Date(now()).toISOString(), ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}) };
+          const stamped = { ...submitted, ...(previous?._window != null ? { _window: previous._window } : {}), _rev: rowRevision(previous, storeRevision), _dirty: true, _updatedAt: new Date(now()).toISOString(), ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}) };
           return [{ op: 'put', key, value: stamped }];
         }, { retry: true });
         if (!silent) await notify();
@@ -241,14 +245,14 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     markRow(key, patch, { dirty = false, body = null } = {}) {
       return exclusive(async () => {
         let found = false;
-        await mutation([keyString(key)], (rows) => {
+        await mutation([keyString(key)], (rows, storeRevision) => {
           const row = rows.get(keyString(key));
           if (!row) return [];
           found = true;
           const meta = Object.fromEntries(Object.entries(row).filter(([field]) => field.startsWith('_')));
           const next = body ? { ...body, ...meta } : { ...row };
           Object.entries(patch).forEach(([field, value]) => { if (value === null) delete next[field]; else next[field] = value; });
-          if (dirty) Object.assign(next, { _dirty: true, _rev: nextRevision(row._rev), _updatedAt: new Date(now()).toISOString() });
+          if (dirty) Object.assign(next, { _dirty: true, _rev: rowRevision(row, storeRevision), _updatedAt: new Date(now()).toISOString() });
           return [{ op: 'put', key: keyString(key), value: next }];
         }, { retry: true });
         if (found) await notify();
@@ -286,12 +290,12 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       return exclusive(async () => {
         let upserted = 0;
         const skipped = new Set();
-        const stamp = (row, previous) => ({ ...row, _rev: nextRevision(previous?._rev), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) });
+        const stamp = (row, previous, storeRevision) => ({ ...row, _rev: rowRevision(previous, storeRevision), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) });
         for (const batch of upsertBatches(incoming)) {
           let left = [];
-          await mutation(batch.map(([key]) => key), (rows) => {
+          await mutation(batch.map(([key]) => key), (rows, storeRevision) => {
             left = keepDirty ? batch.filter(([key]) => rows.get(key)?._dirty).map(([key]) => key) : [];
-            return batch.filter(([key]) => !left.includes(key)).map(([key, row]) => ({ op: 'put', key, value: stamp(row, rows.get(key)) }));
+            return batch.filter(([key]) => !left.includes(key)).map(([key, row]) => ({ op: 'put', key, value: stamp(row, rows.get(key), storeRevision) }));
           }, { syncedAt, retry: true });
           upserted += batch.length - left.length;
           left.forEach((key) => skipped.add(key));

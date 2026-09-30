@@ -27,6 +27,21 @@ function heldScheduler() {
     releaseAll() { held.splice(0).forEach((run) => run()); },
   };
 }
+/** A scheduler that holds every run until released, and runs a failed run once more, as the host's retries do. */
+function retryingScheduler() {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  return {
+    release: () => release(),
+    async request(job) {
+      await gate;
+      try { return await job.run(() => true); } catch (_) { return job.run(() => true); }
+    },
+  };
+}
+/** How `promise` settled within `ms`: `{ value }`, `{ error }`, or 'unsettled'. */
+const outcome = (promise, ms = 200) => Promise.race([promise.then((value) => ({ value }), (error) => ({ error })),
+  new Promise((resolve) => { setTimeout(() => resolve('unsettled'), ms); })]);
 
 describe('sources never overwrite or lose local changes', () => {
   it('keeps a row with an unsent local change through a list refresh and a keyed refresh', async () => {
@@ -397,6 +412,80 @@ describe('fencing, cleanup after a sent delete, and queued deletes', () => {
     scheduler.releaseAll();
     await expect(b).rejects.toMatchObject({ status: 500 });
     expect((await store.getRaw('a'))).toMatchObject({ v: 'B', _dirty: true });
+  });
+
+  it('never sends a change the row has moved past once another tab synced the newer state', async () => {
+    const { store } = service();
+    const scheduler = heldScheduler();
+    const { data: first } = service({ store, scheduler });
+    const firstSent = [];
+    first.source('items', { fetch: async () => [], push: async (command) => { firstSent.push(command.record?.v); } });
+    const queued = first.mutate('items', { op: 'put', record: { id: 'a', v: 'B' } }, { wait: true });
+    await vi.waitFor(() => expect(scheduler.held.length).toBe(1));
+    // Another tab sends that row, then a newer edit of its own.
+    const { data: second } = service({ store });
+    const secondSent = [];
+    second.source('items', { fetch: async () => [], push: async (command) => { secondSent.push(command.record?.v); } });
+    await vi.waitFor(async () => expect((await store.getRaw('a'))._dirty).toBe(false));
+    await second.mutate('items', { op: 'put', record: { id: 'a', v: 'C' } }, { wait: true });
+    expect(secondSent).toEqual(['B', 'C']);
+    scheduler.releaseAll();
+    expect(await outcome(queued)).toEqual({ value: { key: 'a', pushed: false } });
+    expect(firstSent).toEqual([]);
+    expect(await store.getRaw('a')).toMatchObject({ v: 'C', _dirty: false });
+  });
+
+  it('keeps the edits a restored change carries through a rerun of its send, and settles them with it', async () => {
+    const { store } = service();
+    await store.put({ id: 'a', v: 'A' });
+    const scheduler = retryingScheduler();
+    const { data } = service({ store, scheduler });
+    let attempts = 0;
+    const sent = [];
+    data.source('items', { fetch: async () => [], push: async (command) => {
+      attempts += 1;
+      if (attempts === 1) throw Object.assign(new Error('Busy'), { status: 503 });
+      sent.push(command.record?.v);
+    } });
+    await vi.waitFor(() => expect(data.pending()[0]?.restored).toBe(true));
+    const b = data.mutate('items', { op: 'put', record: { id: 'a', v: 'B' } }, { wait: true });
+    await settle();
+    scheduler.release();
+    expect(await outcome(b)).toEqual({ value: { key: 'a', pushed: true } });
+    expect(sent).toEqual(['B']);
+    expect(await store.getRaw('a')).toMatchObject({ v: 'B', _dirty: false });
+  });
+
+  it('rejects the edits a restored change carries when the outbox is fenced while it is sent', async () => {
+    const { store } = service();
+    await store.put({ id: 'a', v: 'A' });
+    const scheduler = heldScheduler();
+    const { data } = service({ store, scheduler });
+    let answer = null;
+    data.source('items', { fetch: async () => [], push: () => new Promise((resolve) => { answer = resolve; }) });
+    await vi.waitFor(() => expect(scheduler.held.length).toBe(1));
+    const b = data.mutate('items', { op: 'put', record: { id: 'a', v: 'B' } }, { wait: true });
+    await settle();
+    scheduler.releaseAll();
+    await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
+    data.fence();
+    answer();
+    expect(await outcome(b)).toEqual({ error: expect.objectContaining({ code: 'DATA_FENCED' }) });
+  });
+
+  it('rejects the changes still queued when the service is disposed, and leaves them unsent on disk', async () => {
+    const { data, store } = service();
+    let answer = null;
+    data.source('items', { fetch: async () => [], push: () => new Promise((resolve) => { answer = resolve; }) });
+    const first = data.mutate('items', { op: 'put', record: { id: 'a', v: 'A' } }, { wait: true });
+    await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
+    const second = data.mutate('items', { op: 'put', record: { id: 'a', v: 'B' } }, { wait: true });
+    await settle();
+    data.dispose();
+    answer();
+    expect(await outcome(second)).toEqual({ error: expect.objectContaining({ code: 'DATA_FENCED' }) });
+    await outcome(first);
+    expect(await store.getRaw('a')).toMatchObject({ v: 'B', _dirty: true });
   });
 
   it('never queues a change whose local write was still running when the outbox was fenced', async () => {

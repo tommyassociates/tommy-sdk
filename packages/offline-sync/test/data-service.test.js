@@ -5,7 +5,7 @@
  * cross-tab change notification, MP namespace confinement.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { createDataService, createDataStore, createMemoryStoreBackend, createDataManager } from '../src/index.js';
+import { createDataService, createDataStore, createMemoryStoreBackend, createLocalStorageBackend, createDataManager } from '../src/index.js';
 import { PREFS_DECL } from '../src/manager.js';
 import { createHostStorePort, createHostStoreChangeFeed, observeHostStorePort } from '../src/host-store/index.js';
 import { COMPLETE_ROWS } from '../src/host-store/protocol.js';
@@ -515,7 +515,7 @@ function hostService(create, { maxRows = 5000 } = {}) {
   } };
   const store = createDataStore({ name: 'chats.messages', backend: bounded, indexes: INDEXES });
   const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
-  return { data, store, commits, completeReads, close: () => database.close() };
+  return { data, store, port, commits, completeReads, close: () => database.close() };
 }
 const messages = (chat, from, to) => Array.from({ length: to - from + 1 }, (_, index) => ({ id: `${chat}:${from + index}`, chat_id: chat, seq: from + index }));
 
@@ -601,6 +601,86 @@ describe.each([
     expect(await store.get('a')).toMatchObject({ body: 'written since' });
     await store.delete('a', { expectedRevision: (await store.getRaw('a'))._rev });
     expect(await store.get('a')).toBeUndefined();
+    await close();
+  });
+});
+
+// A fake Web Storage for a store kept there (node has none).
+function webStorageStore() {
+  const saved = globalThis.localStorage;
+  const map = new Map();
+  globalThis.localStorage = { getItem: (k) => (map.has(k) ? map.get(k) : null), setItem: (k, v) => { map.set(k, String(v)); }, removeItem: (k) => { map.delete(k); } };
+  const store = createDataStore({ name: 'chats.messages', backend: createLocalStorageBackend('db-revisions', 'chats.messages'), indexes: INDEXES });
+  return { store, close: () => { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; } };
+}
+const memoryData = () => {
+  const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES });
+  const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+  return { data, store, close: () => {} };
+};
+
+describe.each([
+  ['memory', () => memoryData()],
+  ['web storage', () => webStorageStore()],
+  ...DATABASES.map(([name, create]) => [`host store (${name})`, () => hostService(create)]),
+])('a key removed and written again (%s)', (_name, make) => {
+  it('never takes a revision the key held before', async () => {
+    const { store, close } = make();
+    await store.put({ id: 'a', chat_id: 7, seq: 1 });
+    await store.put({ id: 'a', chat_id: 7, seq: 1, body: 'second' });
+    const before = (await store.getRaw('a'))._rev;
+    await store.put({ id: 'b', chat_id: 7, seq: 2 });
+    await store.delete('a');
+    await store.put({ id: 'a', chat_id: 7, seq: 1, body: 'new' });
+    const after = (await store.getRaw('a'))._rev;
+    expect(after).toBeGreaterThan(before);
+    // A delete at the old revision leaves the new row alone.
+    await expect(store.delete('a', { expectedRevision: before })).rejects.toMatchObject({ reason: 'conflict' });
+    expect(await store.get('a')).toMatchObject({ body: 'new' });
+    await close();
+  });
+});
+
+describe.each([
+  ['memory', () => memoryData()],
+  ...DATABASES.map(([name, create]) => [`host store (${name})`, () => hostService(create)]),
+])('a row force-purged and written again while its push is on the way (%s)', (_name, make) => {
+  it('never takes the old push\'s answer for the new row, which stays unsent until its own push lands', async () => {
+    const { data, store, close } = make();
+    const answers = [];
+    const push = vi.fn(() => new Promise((resolve, reject) => { answers.push({ resolve, reject }); }));
+    data.source('chats.messages', { fetch: async () => [], push });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'a', chat_id: 7, seq: 1, body: 'A' } });
+    await vi.waitFor(() => expect(push).toHaveBeenCalledTimes(1));
+    await data.purge('chats.messages', { force: true });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'a', chat_id: 7, seq: 1, body: 'B' } });
+    await vi.waitFor(() => expect(push).toHaveBeenCalledTimes(2));
+    answers[0].resolve();
+    await settle(); await settle();
+    expect(await store.getRaw('a')).toMatchObject({ body: 'B', _dirty: true });
+    // B's own push fails: B stays unsent, listed, and on the device.
+    answers[1].reject(Object.assign(new Error('Offline'), { status: 0 }));
+    await vi.waitFor(() => expect(data.pending()).toEqual([expect.objectContaining({ key: 'a', state: 'failed' })]));
+    expect(await store.getRaw('a')).toMatchObject({ body: 'B', _dirty: true });
+    await close();
+  });
+});
+
+describe.each(DATABASES)('a store cleared from Settings while a push is on the way (%s)', (_name, create) => {
+  it('never takes the old push\'s answer for a row written after the clear', async () => {
+    const { data, store, port, close } = hostService(create);
+    const answers = [];
+    const push = vi.fn(() => new Promise((resolve) => { answers.push(resolve); }));
+    data.source('chats.messages', { fetch: async () => [], push });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'a', chat_id: 7, seq: 1, body: 'A' } });
+    await vi.waitFor(() => expect(push).toHaveBeenCalledTimes(1));
+    const selector = { authorityOrigin: 'https://api.example.test', viewerId: '7' };
+    const listed = (await port.inspect({ op: 'stores', selector })).stores[0];
+    await expect(port.purge({ selector, store: listed.id, force: true })).resolves.toMatchObject({ ok: true });
+    await store.put({ id: 'a', chat_id: 7, seq: 1, body: 'B' });
+    answers[0]();
+    await settle(); await settle();
+    expect(await store.getRaw('a')).toMatchObject({ body: 'B', _dirty: true });
     await close();
   });
 });

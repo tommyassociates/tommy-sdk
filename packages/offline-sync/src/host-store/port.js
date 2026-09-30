@@ -89,7 +89,9 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
   }
   async function writeRow(tx, store, generation, { key, value, json }, old, { syncedAt } = {}) {
     const [owner, namespace] = store.key;
-    const revision = next(old?.revision || 0);
+    // Above the store's revision, which every write and removal moves on: a
+    // key written again after it was removed never takes a revision it held.
+    const revision = next(Math.max(old?.revision || 0, store.revision || 0));
     const valueBytes = bytes(json);
     const wireBytes = bytes({ key, value, revision, bytes: valueBytes });
     const updatedAt = now();
@@ -198,9 +200,10 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
     if (total > store.domainMaxBytes) throw storageError('quota');
   }
   // After a commit's writes: every value a written row holds in a unique
-  // index belongs to that row alone (a value no field of which is set is
-  // not held to it). Checked once all writes landed, so rows may trade
-  // values in one commit.
+  // index belongs to that row alone (a value with a field not set is not held
+  // to it; one the index cannot hold is refused, never let through
+  // unchecked). Checked once all writes landed, so rows may trade values in
+  // one commit.
   async function checkUnique(tx, store, plans, generation = store.generation) {
     const names = store.unique || [];
     if (!names.length) return;
@@ -211,7 +214,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
         const fields = storeIndexes(store)[name];
         if (!fields || fields.some((field) => change.value[field] === undefined || change.value[field] === null)) continue;
         const encoded = indexedValues(fields, change.value);
-        if (encoded === null) continue;
+        if (encoded === null) throw storageError('unserializable');
         const head = indexEntry(name, encoded, '');
         const entries = await tx.scan('rows', prefix(owner, namespace, generation, INDEX), { after: head, limit: 2 });
         if (entries.some((entry) => entry.key[4].startsWith(head) && entry.target !== change.key)) throw storageError('constraint');

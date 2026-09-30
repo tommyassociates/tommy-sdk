@@ -373,7 +373,14 @@ export function createDataService({
   /**
    * Sends one row's changes oldest first. A failure stops the row there and
    * keeps every change for a retry; the row is marked synced only when the
-   * change just sent is still its latest local write.
+   * change just sent is still its latest local write. A change the row
+   * holds synced already, or has moved past with that newer state synced
+   * (another tab sent it), is not sent: it would put an older state on the
+   * server. Edits queued behind a
+   * change that its send already holds (written at or before the revision it
+   * sends) settle with it; they stay queued until then, so a failed or
+   * repeated send, a fence, a discard or a dispose reaches them as it does
+   * any change.
    */
   function drain(entry) {
     if (entry.draining) return entry.draining;
@@ -391,20 +398,23 @@ export function createDataService({
               run: async () => {
                 const push = pushOf(entry.collection, entry.decl);
                 if (typeof push !== 'function') throw serviceError(`'${entry.label}' has no push`, 'DATA_NO_SOURCE');
+                const row = await entry.store.getRaw(entry.key);
+                const held = (revision) => entry.changes.slice(1)
+                  .filter((queued) => Number.isSafeInteger(queued.revision) && queued.revision <= revision);
+                const skip = () => { sent = true; change.skipped = true; change.carries = Number.isSafeInteger(row?._rev) ? held(row._rev) : []; };
                 if (change.restored) {
                   // Sent as the row is now: nothing when it is no longer an
-                  // unsent change (another tab sent it), else its latest
-                  // state, which carries every edit queued behind it; those
-                  // settle with this send.
-                  const row = await entry.store.getRaw(entry.key);
-                  if (!row?._dirty) { sent = true; change.skipped = true; return; }
+                  // unsent change (another tab sent it), else its latest state.
+                  if (!row?._dirty) { skip(); return; }
                   change.command = row._deleted ? { op: 'delete', key: entry.key } : { op: 'put', record: bare(row) };
                   change.record = row._deleted ? null : bare(row);
                   change.revision = row._rev;
-                  const behind = entry.changes.splice(1);
-                  change.carries = behind.filter((queued) => Number.isSafeInteger(queued.revision) && queued.revision <= row._rev);
-                  entry.changes.push(...behind.filter((queued) => !change.carries.includes(queued)));
+                } else if (row && !row._dirty && Number.isSafeInteger(row._rev) && Number.isSafeInteger(change.revision)
+                  && row._rev >= change.revision) {
+                  // The row holds this change, or a later state, synced already.
+                  skip(); return;
                 }
+                change.carries = Number.isSafeInteger(change.revision) ? held(change.revision) : [];
                 // Fenced, discarded or disposed while it waited: never sent.
                 if (entry.discarded || outbox.get(entry.id) !== entry) throw serviceError('Change fenced', 'DATA_FENCED');
                 entry.state = 'sending'; entry.attempts += 1; emitStatus();
@@ -414,8 +424,6 @@ export function createDataService({
               },
             });
           } catch (error) {
-            // Edits the failed send carried stay queued behind it.
-            if (change.carries?.length) { entry.changes.splice(1, 0, ...change.carries); change.carries = null; }
             if (!sent && entry.discarded) {
               entry.changes.forEach((queued) => queued.reject(error));
               throw error;
@@ -429,9 +437,9 @@ export function createDataService({
               throw error;
             }
           }
-          entry.changes.shift();
-          change.resolve({ key: entry.key, pushed: !change.skipped });
-          (change.carries || []).forEach((carried) => carried.resolve({ key: entry.key, pushed: !change.skipped }));
+          const settled = [change, ...(change.carries || [])];
+          entry.changes = entry.changes.filter((queued) => !settled.includes(queued));
+          settled.forEach((done) => done.resolve({ key: entry.key, pushed: !change.skipped }));
         }
         if (entry.discarded) return { key: entry.key, pushed: false };
         if (outbox.get(entry.id) === entry) outbox.delete(entry.id);
@@ -834,7 +842,10 @@ export function createDataService({
       sources.clear();
       // Unsent rows stay dirty on disk; the next service sends them again.
       fenceGeneration += 1;
-      outbox.forEach((entry) => { entry.discarded = true; });
+      outbox.forEach((entry) => {
+        entry.discarded = true;
+        entry.changes.splice(0).forEach((change) => change.reject(serviceError('Change fenced', 'DATA_FENCED')));
+      });
       outbox.clear();
       states.clear();
     },

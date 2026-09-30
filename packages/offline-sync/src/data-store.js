@@ -473,6 +473,13 @@ export function createDataStore({
   // can make a row evictable again — a delete, a markSynced clearing `_dirty` —
   // clears the latch.
   let capSaturated = false;
+  // The highest revision this store has written or removed. A row's next
+  // revision is above it, so a key written again after it was removed never
+  // takes a revision it held (a push still on its way cannot settle the new
+  // row).
+  let revisionTop = 0;
+  const noteRevision = (row) => { if (Number.isSafeInteger(row?._rev) && row._rev > revisionTop) revisionTop = row._rev; };
+  const nextRowRevision = (previous) => { revisionTop = Math.max(revisionTop, previous?._rev || 0) + 1; return revisionTop; };
   // A write reads the row and writes it back as one step per key: `put`,
   // `delete` and `markSynced` on the same key take turns, so a check against
   // the stored row (dirty, revision) still holds when the write lands. The
@@ -968,7 +975,7 @@ export function createDataStore({
           // reconcile that DOES carry a windowKey re-stamps the row afterwards,
           // so this preserves without ever pinning a row to a stale window.
           ...(previous?._window != null ? { _window: previous._window } : {}),
-          _rev: (previous?._rev || 0) + 1,
+          _rev: nextRowRevision(previous),
           _updatedAt: new Date(now()).toISOString(),
           _dirty: !server,
           ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}),
@@ -1056,7 +1063,7 @@ export function createDataStore({
       const persisted = await rowTurn(key, async () => {
         if (expectedRevision !== undefined && typeof backend.deleteIf === 'function') {
           // Compared and deleted in one step on the storage itself.
-          const result = await backend.deleteIf(key, (stored) => stored._rev !== expectedRevision);
+          const result = await backend.deleteIf(key, (stored) => { noteRevision(stored); return stored._rev !== expectedRevision; });
           if (result?.kept) throw new PersistError(name, { reason: 'conflict', retained: false });
           if (result?.existed) {
             capSaturated = false;
@@ -1065,6 +1072,7 @@ export function createDataStore({
           return result;
         }
         const current = await backend.get(key);
+        noteRevision(current);
         if (current !== undefined && expectedRevision !== undefined && current._rev !== expectedRevision) {
           throw new PersistError(name, { reason: 'conflict', retained: false });
         }
@@ -1099,7 +1107,7 @@ export function createDataStore({
         const meta = Object.fromEntries(Object.entries(record).filter(([field]) => field.startsWith('_')));
         const next = body ? { ...body, ...meta } : { ...record };
         Object.entries(patch).forEach(([field, value]) => { if (value === null) delete next[field]; else next[field] = value; });
-        if (dirty) Object.assign(next, { _dirty: true, _rev: (record._rev || 0) + 1, _updatedAt: new Date(now()).toISOString() });
+        if (dirty) Object.assign(next, { _dirty: true, _rev: nextRowRevision(record), _updatedAt: new Date(now()).toISOString() });
         return backend.put(key, next);
       });
       if (persisted === null) return false;
