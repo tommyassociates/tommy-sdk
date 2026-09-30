@@ -707,6 +707,24 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     feedA.close(); feedB.close(); await database.close();
   });
 
+  it('patches any number of rows, a store transaction at a time, and accounts for every key', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+    const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(port, null, options) });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    await data.ingest('chats.messages', Array.from({ length: 240 }, (_, at) => ({ id: `m${at}`, chat_id: 7, seq: at })));
+    const keys = Array.from({ length: 250 }, (_, at) => `m${at}`);
+    const result = await data.patchRows('chats.messages', keys, { seen: true });
+    expect(result.patched).toHaveLength(240);
+    expect(result.skipped).toEqual(keys.slice(240).map((key) => ({ key, reason: 'gone' })));
+    expect(result.refused).toEqual([]);
+    expect((await data.read('chats.messages')).every((row) => row.seen === true)).toBe(true);
+    data.dispose();
+    await database.close();
+  });
+
   it('patches rows as another tab left them: a row it removed stays gone, a change it made stays', async () => {
     const database = create();
     const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });

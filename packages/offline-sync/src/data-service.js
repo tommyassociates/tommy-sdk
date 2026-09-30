@@ -1205,9 +1205,17 @@ export function createDataService({
       if (typeof store.patchSynced !== 'function') throw serviceError(`patchRows: '${name}' cannot patch rows`, 'DATA_INVALID');
       const wanted = [...new Set((Array.isArray(keys) ? keys : [keys]).filter((key) => key !== null && key !== undefined).map(String))];
       if (!wanted.length) return { patched: [], unsaved: [], skipped: [], refused: [] };
-      // In the collection's turn, recorded as a change of these rows.
+      // In the collection's turn, recorded as a change of these rows, a
+      // store transaction's worth of keys at a time; every key is accounted for.
       return inTurn(name, async () => {
-        return touching(name, store, keyPath).patchSynced(wanted, { ...patch });
+        const writer = touching(name, store, keyPath);
+        const outcome = { patched: [], unsaved: [], skipped: [], refused: [] };
+        for (let start = 0; start < wanted.length; start += PAGE_ROWS) {
+          // eslint-disable-next-line no-await-in-loop
+          const part = await writer.patchSynced(wanted.slice(start, start + PAGE_ROWS), { ...patch });
+          Object.keys(outcome).forEach((field) => { outcome[field].push(...(part?.[field] || [])); });
+        }
+        return outcome;
       });
     },
     /**
