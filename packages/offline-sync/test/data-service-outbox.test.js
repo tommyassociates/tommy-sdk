@@ -452,6 +452,28 @@ describe('fencing, cleanup after a sent delete, and queued deletes', () => {
     expect(data.pending()).toEqual([]);
   });
 
+  it('never reports a push the server acknowledged as failed when its store was retired meanwhile, nor sends it again', async () => {
+    const store = createDataStore({ name: 'items', backend: createMemoryStoreBackend(), indexes: INDEXES });
+    const failures = [];
+    // A scheduler that runs a failed job again, as the host's does.
+    const scheduler = {
+      async request(job) {
+        try { return await job.run(() => true); } catch (error) { failures.push(error); return job.run(() => true); }
+      },
+    };
+    const { data } = service({ store, scheduler });
+    let answer;
+    const push = vi.fn(() => new Promise((resolve) => { answer = resolve; }));
+    data.source('items', { fetch: async () => [], push });
+    const sent = data.mutate('items', { op: 'put', record: { id: 'a', v: 'one' } }, { wait: true });
+    await vi.waitFor(() => expect(push).toHaveBeenCalledTimes(1));
+    await store.dispose();
+    answer();
+    expect(await outcome(sent)).toEqual({ value: { key: 'a', pushed: true } });
+    expect(failures).toEqual([]);
+    expect(push).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the edits a restored change carries through a rerun of its send, and settles them with it', async () => {
     const { store } = service();
     await store.put({ id: 'a', v: 'A' });

@@ -373,7 +373,7 @@ export function createDataManager({
           if (!rec) return undefined;
           // Stored as the server's row. In a store that sends its changes, a
           // row with an edit still waiting to go keeps it, and the read
-          // answers with it. A cache write must never fail the read it was
+          // answers with it: nothing when that edit is a delete. A cache write must never fail the read it was
           // serving: the record is returned either way, so a full/blocked
           // store degrades to fetch-every-time rather than to a blank surface.
           let kept = false;
@@ -381,7 +381,7 @@ export function createDataManager({
             const result = await store.reconcile([rec], { prune: false, ...(service.sends(storeName) ? { keepDirty: true } : {}) }); // eslint-disable-line no-use-before-define
             kept = (Array.isArray(result?.skipped) ? result.skipped : []).map(String).includes(key);
           } catch (_) { /* cache write is best-effort */ }
-          return kept ? ((await store.get(key)) ?? rec) : rec;
+          return kept ? store.get(key) : rec;
         },
       };
     },

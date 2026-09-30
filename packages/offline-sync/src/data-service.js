@@ -359,17 +359,19 @@ export function createDataService({
    * marked synced at the revision it wrote, recorded as acknowledged
    * (`_ackRev`): the evidence a later check needs that the server has it.
    */
+  // Best effort, whole: the server has the change whatever happens here, so
+  // no step of it (reading the row included) ever fails the send.
   async function settleSent(entry, change) {
     if (change.revision === undefined || change.revision === null) return;
-    const row = await entry.store.getRaw(entry.key);
-    if (!row || row._rev !== change.revision) return;
     try {
+      const row = await entry.store.getRaw(entry.key);
+      if (!row || row._rev !== change.revision) return;
       if (change.command.op === 'delete') {
         if (row._deleted) await entry.store.delete(entry.key, { expectedRevision: change.revision });
         return;
       }
       await entry.store.markSynced(entry.key, { expectedRevision: change.revision, pushed: true });
-    } catch (_) { /* written again since: it stays as written */ }
+    } catch (_) { /* written again since, or its store retired: it stays as it is */ }
   }
   /**
    * Sends one row's changes oldest first. A failure stops the row there and

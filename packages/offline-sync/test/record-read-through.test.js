@@ -122,6 +122,17 @@ describe('DataApi.record', () => {
     expect(await data.read('entries', '8', { raw: true })).toMatchObject({ hours: 2, _dirty: false });
   });
 
+  it('answers nothing for a record deleted here and waiting to be sent, however the server still answers', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData: { entries: { ...localData.entries, syncStrategy: 'server_authoritative' } } });
+    data.source('entries', { fetch: async () => [], push: async () => { throw Object.assign(new Error('Forbidden'), { status: 403 }); } });
+    await data.ingest('entries', [{ id: '9', shiftId: 's9', hours: 4 }]);
+    await data.mutate('entries', { op: 'delete', key: '9' });
+    const rec = data.record('entries', { fetch: async () => ({ id: '9', shiftId: 's9', hours: 4 }) });
+    expect(await rec.get('9', { refresh: true })).toBeUndefined();
+    expect(await rec.get('9')).toBeUndefined();
+    expect(await data.read('entries', '9')).toBeNull();
+  });
+
   it('null/undefined ids never reach the fetcher', async () => {
     const data = manager();
     const fetch = vi.fn();
