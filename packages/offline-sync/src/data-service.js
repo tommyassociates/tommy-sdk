@@ -612,7 +612,8 @@ export function createDataService({
      * for `scope` (a row predicate; the whole collection without one): rows in
      * scope that the set leaves out are removed, dirty rows never. After a
      * replacing or `complete` ingest the collection is fresh. Resolves
-     * `{ written }`, the rows stored.
+     * `{ written }`, the rows stored, and `unsaved`, the keys of rows a store
+     * could keep only in memory (its device storage refused them).
      */
     // A replacing ingest, or one of rows a complete read delivered
     // (`complete`), stamps the collection synced; any other does not.
@@ -630,10 +631,15 @@ export function createDataService({
       // The distinct keys stored: accepted rows the store did not leave as an
       // unsent local write.
       const stored = new Set();
+      const unsaved = new Set();
       const upsert = async (chunk, options) => {
         const result = await store.reconcile(chunk, { ...options, keepDirty: true, ...(replace || complete === true ? {} : { syncedAt: null }) });
         const left = new Set((Array.isArray(result?.skipped) ? result.skipped : []).map(String));
-        chunk.filter(isAccepted).forEach((row) => { if (!left.has(String(row[keyPath]))) stored.add(String(row[keyPath])); });
+        const notSaved = new Set((Array.isArray(result?.unsaved) ? result.unsaved : []).map(String));
+        chunk.filter(isAccepted).forEach((row) => {
+          const key = String(row[keyPath]);
+          if (notSaved.has(key)) { unsaved.add(key); stored.delete(key); } else if (!left.has(key)) { stored.add(key); unsaved.delete(key); }
+        });
       };
       if (replace && rows.length <= INGEST_CHUNK) {
         await upsert(rows, { scope: inScope });
@@ -652,7 +658,7 @@ export function createDataService({
         state.state = 'fresh'; state.syncedAt = now(); state.error = null;
         emitStatus();
       }
-      return { written };
+      return { written, ...(unsaved.size ? { unsaved: [...unsaved] } : {}) };
     },
     /**
      * `{ op: 'put', record } | { op: 'patch', key, patch } | { op: 'delete', key }`.

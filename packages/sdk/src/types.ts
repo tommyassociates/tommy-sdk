@@ -572,8 +572,10 @@ export interface DataApi {
    * Server rows the MP received, stored synced; `replace` makes them the
    * complete set for `scope`. Only a replacing ingest, or one marked
    * `complete` (rows a complete read delivered), stamps the collection synced.
+   * `written` counts the rows stored; `unsaved` names rows the store could
+   * keep only in memory (the device's storage refused them).
    */
-  ingest?<Rec = unknown>(collection: string, rows: readonly Rec[], options?: { replace?: boolean; complete?: boolean; scope?: (row: Rec) => boolean }): Promise<{ written: number }>;
+  ingest?<Rec = unknown>(collection: string, rows: readonly Rec[], options?: { replace?: boolean; complete?: boolean; scope?: (row: Rec) => boolean }): Promise<{ written: number; unsaved?: string[] }>;
   /**
    * All cached rows, or only `keys`, or every row of an index range; dirty
    * rows only with `force`. Any other option, or one of another shape, is
@@ -1410,7 +1412,11 @@ export interface PrefsApi {
   ready(): Promise<void>;
   /** The stored value (a copy), or `fallback` when none is stored or none has loaded yet. */
   get<T = unknown>(key: string, fallback?: T): T;
-  /** Stores a JSON value; the next `get` returns it at once. */
+  /**
+   * Stores a JSON value; the next `get` returns it at once. Rejects with
+   * `DATA_NOT_SAVED` when the device could not keep it (its storage full or
+   * gone): it would be lost on reload.
+   */
   set(key: string, value: unknown): Promise<void>;
   remove(key: string): Promise<void>;
 }

@@ -229,6 +229,11 @@ export function createDataManager({
       prefValues.set(name, stored);
       prefsChanged.add(name);
       const result = await inPrefOrder(name, () => service.ingest(PREFS_STORE, [{ key: name, value: stored === undefined ? null : stored }]));
+      // Saved only once the device holds it: a store that kept it in memory
+      // only (its storage full or gone) would lose it on reload.
+      if (result?.unsaved?.includes(name)) {
+        throw Object.assign(new Error(`tommy.prefs: '${name}' was not saved on this device`), { code: 'DATA_NOT_SAVED' });
+      }
       if (!result?.written) throw Object.assign(new Error(`tommy.prefs: '${name}' was not saved`), { code: 'DATA_INVALID' });
     },
     async remove(key) {

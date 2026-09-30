@@ -277,6 +277,27 @@ describe('MP data API confinement', () => {
     expect((await data.read('chats.messages', null, { raw: true })).map((row) => row.id).sort()).toEqual(['new', 'old']);
   });
 
+  it('rejects a pref the device could not save, rather than report it saved', async () => {
+    const saved = globalThis.localStorage;
+    globalThis.localStorage = { getItem: () => null, setItem: () => { throw Object.assign(new Error('full'), { name: 'QuotaExceededError' }); }, removeItem: () => {} };
+    try {
+      const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: (db, store) => createLocalStorageBackend(db, store) });
+      await expect(data.prefs.set('layout', 'board')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+    } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+
+  it('counts only rows a store saved as written, and names the ones it kept in memory only', async () => {
+    const saved = globalThis.localStorage;
+    globalThis.localStorage = { getItem: () => null, setItem: () => { throw Object.assign(new Error('full'), { name: 'QuotaExceededError' }); }, removeItem: () => {} };
+    try {
+      const store = createDataStore({ name: 'chats.messages', backend: createLocalStorageBackend('db-unsaved', 'chats.messages') });
+      const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+      expect(await data.ingest('chats.messages', [{ id: 'a', chat_id: 7, seq: 1 }])).toEqual({ written: 0, unsaved: ['a'] });
+      // Still shown: the store keeps it for the session.
+      expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['a']);
+    } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+
   it('gives every MP its own prefs, read at once once loaded and kept as settled rows', async () => {
     const backends = new Map();
     const factory = (_db, store) => { if (!backends.has(store)) backends.set(store, createMemoryStoreBackend()); return backends.get(store); };

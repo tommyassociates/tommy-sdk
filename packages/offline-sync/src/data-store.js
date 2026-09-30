@@ -1175,6 +1175,8 @@ export function createDataStore({
       const existing = prune ? await backend.getAll() : [];
       const incoming = new Set();
       const skipped = [];
+      // Rows kept in memory only: their device storage refused them.
+      const unsaved = [];
       // ONE notify for the whole merge, at the end. Per-record notifies made a
       // reconcile of N rows wake every subscriber N times, each with a
       // partially-merged snapshot — so an instant-data surface repainted N
@@ -1210,6 +1212,7 @@ export function createDataStore({
             if (failedKey !== undefined) {
               incoming.add(String(failedKey));
               changed.add(failedKey);
+              unsaved.push(String(failedKey));
               // ...and clear `_dirty`, which `put` stamped on the way in. This
               // row came from the SERVER; leaving it dirty misuses the flag that
               // means "unpushed user work" and makes the row untouchable — dirty
@@ -1289,6 +1292,7 @@ export function createDataStore({
         upserted: incoming.size - new Set(skipped).size,
         pruned,
         ...(skipped.length ? { skipped: [...new Set(skipped)] } : {}),
+        ...(unsaved.length ? { unsaved: [...new Set(unsaved)] } : {}),
         ...(dropped.length ? { windowsDropped: dropped.length } : {}),
         ...(evicted.length ? { evicted: evicted.length } : {}),
       };
