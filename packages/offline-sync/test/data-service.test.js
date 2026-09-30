@@ -31,7 +31,7 @@ function transactionalBackend(port, opened, options) {
     return result;
   };
   return {
-    transactional: true, policy: options.policy, limits: options.limits,
+    transactional: true, policy: options.policy, limits: options.limits, unique: options.unique || [],
     snapshot: (keys, { aged = false } = {}) => read({ keys, aged }),
     page: ({ afterKey = null, limit = 100, aged = false } = {}) => read({ afterKey, limit, aged }),
     async get(key, { aged = false } = {}) { return (await read({ keys: [String(key)], aged })).rows[0]?.value; },
@@ -341,6 +341,36 @@ describe('MP data API confinement', () => {
       expect((await second).code).toBe('DATA_NOT_SAVED');
       expect(data.prefs.get('layout')).toBe('grid');
     } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+
+  it('never takes a load\'s older value as saved once a later set saved another', async () => {
+    const inner = createMemoryStoreBackend();
+    let release;
+    let holdReads = false;
+    let refuse = false;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const held = {
+      ...inner,
+      getAll: async (...args) => {
+        const rows = await inner.getAll(...args);
+        // The load's read only: it answers the rows it read, once released.
+        if (holdReads) { holdReads = false; await gate; }
+        return rows;
+      },
+      put: async (key, record) => (refuse ? { ok: false, reason: 'quota', retained: false } : inner.put(key, record)),
+    };
+    await inner.put('layout', { key: 'layout', value: 'grid', _rev: 1, _dirty: false });
+    const data = createDataManager({ capabilityToken: { tenantId: 'team-52', mpId: 'scheduling' }, mpId: 'scheduling', localData: {},
+      backendFactory: (_db, storeName) => (storeName === 'prefs' ? held : createMemoryStoreBackend()) });
+    holdReads = true;
+    const loading = data.prefs.ready();
+    // A set saves while the load, which read 'grid', is still on its way.
+    await data.prefs.set('layout', 'list');
+    release();
+    await loading;
+    refuse = true;
+    await expect(data.prefs.set('layout', 'table')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+    expect(data.prefs.get('layout')).toBe('list');
   });
 
   it('refuses a pref with DATA_NOT_SAVED where the device has no storage to keep it', async () => {
@@ -736,6 +766,24 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     await store.reconcile([{ id: 'a', day: 'mon' }], { windowKey: 'mon', scope: (row) => row.day === 'mon' });
     await store.reconcile([{ id: 'b', day: 'tue' }], { windowKey: 'tue', scope: (row) => row.day === 'tue' });
     expect((await store.getAll()).map((row) => row.id).sort()).toEqual(['a', 'b']);
+    await database.close();
+  });
+
+  it('replaces a set in which a unique value moved to another row, and keeps an unsent holder a real conflict', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'codes', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: { byCode: 'code' }, unique: ['byCode'] };
+    const store = createDataStore({ name: 'codes', backend: transactionalBackend(port, null, options), indexes: { byCode: 'code' } });
+    await store.reconcile([{ id: 'a', code: 'X' }, { id: 'b', code: 'Y' }]);
+    // The server now gives code X to a new row c; a no longer exists.
+    await store.reconcile([{ id: 'c', code: 'X' }, { id: 'b', code: 'Y' }]);
+    expect((await store.getAll()).map((row) => `${row.id}:${row.code}`).sort()).toEqual(['b:Y', 'c:X']);
+    // An unsent local row holding a value is never pruned to make room for it.
+    await store.put({ id: 'd', code: 'Z' });
+    await expect(store.reconcile([{ id: 'e', code: 'Z' }, { id: 'b', code: 'Y' }, { id: 'c', code: 'X' }]))
+      .rejects.toMatchObject({ reason: 'constraint' });
+    expect((await store.getRaw('d'))._dirty).toBe(true);
     await database.close();
   });
 

@@ -215,9 +215,13 @@ export function createDataManager({
   const prefChanges = new Map();
   const prefsSaved = new Map();
   let prefsLoadedOnce = false;
+  // How many changes each key has been asked: a load applies only to keys no
+  // change was asked for since it began.
+  const prefCounts = new Map();
   function changePref(name, apply) {
     const change = {};
     prefChanges.set(name, change);
+    prefCounts.set(name, (prefCounts.get(name) || 0) + 1);
     apply();
     return {
       saved(value, present = true) {
@@ -253,10 +257,13 @@ export function createDataManager({
       prefsTried = true;
       if (disposed) return Promise.resolve();
       if (prefsLoaded) return prefsLoaded;
+      const countsAtStart = new Map(prefCounts);
       const loading = service.read(PREFS_STORE).then((rows) => {
         (rows || []).forEach((row) => {
           if (!row || typeof row.key !== 'string') return;
-          if (!prefWrites.has(row.key)) prefsSaved.set(row.key, row.value);
+          // A key changed since this load began keeps what that change left.
+          if ((prefCounts.get(row.key) || 0) !== (countsAtStart.get(row.key) || 0)) return;
+          prefsSaved.set(row.key, row.value);
           if (!prefValues.has(row.key) && !prefsChanged.has(row.key)) prefValues.set(row.key, row.value);
         });
         prefsLoadedOnce = true;
@@ -306,6 +313,7 @@ export function createDataManager({
       prefsChanged.clear();
       prefChanges.clear();
       prefsSaved.clear();
+      prefCounts.clear();
       service.dispose();
       await Promise.all([...stores.values()].map((store) => store.dispose?.(options)));
     },

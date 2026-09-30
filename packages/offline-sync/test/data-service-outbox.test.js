@@ -138,7 +138,8 @@ describe('whether a service is idle', () => {
       fetch: () => new Promise((resolve) => { answer = () => resolve([]); }),
       push: async () => {},
     });
-    expect(data.idle()).toBe(true);
+    // The restore of unsent rows the push started counts too, until it ends.
+    await vi.waitFor(() => expect(data.idle()).toBe(true));
     const read = data.refresh('items', { mode: 'visible' });
     expect(data.idle()).toBe(false);
     scheduler.releaseAll();
@@ -152,6 +153,31 @@ describe('whether a service is idle', () => {
     scheduler.releaseAll();
     await sent;
     expect(data.idle()).toBe(true);
+  });
+
+  it('is not idle while a local write, an ingest or a read is on its way', async () => {
+    const store = createDataStore({ name: 'items', backend: createMemoryStoreBackend(), indexes: INDEXES });
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const slow = new Proxy(store, {
+      get(target, property) {
+        if (['put', 'reconcile', 'getAll', 'getAllRaw'].includes(property)) {
+          return async (...args) => { await gate; return target[property](...args); };
+        }
+        const value = target[property];
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const { data } = service({ store: slow });
+    data.source('items', { fetch: async () => [], push: async () => {} });
+    await vi.waitFor(() => expect(data.idle()).toBe(false));
+    const write = data.mutate('items', { op: 'put', record: { id: 'a' } });
+    const ingest = data.ingest('items', [{ id: 'b' }]);
+    const read = data.read('items');
+    expect(data.idle()).toBe(false);
+    release();
+    await Promise.all([write, ingest, read]);
+    await vi.waitFor(() => expect(data.idle()).toBe(true));
   });
 });
 

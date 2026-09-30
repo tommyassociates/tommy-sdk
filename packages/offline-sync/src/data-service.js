@@ -219,6 +219,13 @@ export function createDataService({
   // One entry per row with unsent changes, oldest change first.
   const outbox = new Map();
   const writes = new Map();
+  // Calls still on their way (reads, writes, ingests, purges, the restore of
+  // unsent rows): a service with any of them is not idle.
+  let working = 0;
+  const tracked = (work) => {
+    working += 1;
+    return Promise.resolve(work).finally(() => { working -= 1; });
+  };
   let sequence = 0;
   // Bumped by fence(): work that began before it never queues a change after.
   let fenceGeneration = 0;
@@ -549,7 +556,7 @@ export function createDataService({
       // ones this service has no record of (it was rebuilt) are sent again.
       if (typeof spec.push === 'function') {
         const { label, store, decl } = local(collection);
-        restoreDirty({ name, label, store, decl });
+        tracked(restoreDirty({ name, label, store, decl })).catch(() => {});
       }
       return () => { if (sources.get(name) === spec) sources.delete(name); };
     },
@@ -880,8 +887,14 @@ export function createDataService({
       });
     },
     onStatusChange(listener) { listeners.add(listener); return () => listeners.delete(listener); },
-    /** Whether nothing is queued or running: no unsent change in memory and no read on its way. */
-    idle() { return outbox.size === 0 && ![...states.values()].some((state) => state.flight); },
+    /**
+     * Whether nothing is queued or running: no unsent change in memory, no
+     * local write, read, ingest or purge on its way, and no refresh flying.
+     */
+    idle() {
+      return outbox.size === 0 && writes.size === 0 && working === 0
+        && ![...states.values()].some((state) => state.flight);
+    },
     dispose() {
       disposed = true;
       offOrphanFeed?.();
@@ -897,5 +910,10 @@ export function createDataService({
       states.clear();
     },
   };
+  // Every asynchronous call counts as work until it settles.
+  ['read', 'query', 'refresh', 'ingest', 'mutate', 'purge', 'trim', 'retry', 'discard'].forEach((method) => {
+    const call = service[method];
+    service[method] = (...args) => tracked(call(...args));
+  });
   return service;
 }
