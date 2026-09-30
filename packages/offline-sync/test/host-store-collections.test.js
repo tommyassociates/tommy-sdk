@@ -437,6 +437,18 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     expect(rebuilt.rows.map((row) => row.key)).toEqual(['a']);
   });
 
+  it('opens for an expected epoch only while that epoch holds, creating nothing after a retirement', async () => {
+    const { port, stores } = await setup(create);
+    const first = await port.open(openInput({ storeName: 'drafts', policy: 'authored' }));
+    await expect(port.open(openInput({ storeName: 'drafts__unfit', policy: 'authored' }))).resolves.toMatchObject({ epoch: first.epoch });
+    const fenced = { ...openInput({ storeName: 'late__unfit', policy: 'authored' }), expectedEpoch: first.epoch };
+    await expect(port.open(fenced)).resolves.toMatchObject({ epoch: first.epoch });
+    await retireHostStorePrincipal(SELECTOR);
+    await expect(port.open({ ...fenced, storeName: 'later__unfit' })).rejects.toMatchObject({ reason: 'retired' });
+    expect(await stores()).toEqual([]);
+    await expect(port.open({ ...fenced, expectedEpoch: 'x' })).rejects.toMatchObject({ reason: 'unserializable' });
+  });
+
   it('forgets handles once they are closed or retired, however many opens came before', async () => {
     const { port } = await setup(create);
     for (let round = 0; round < 50; round += 1) {

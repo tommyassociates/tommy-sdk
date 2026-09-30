@@ -300,6 +300,10 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
       const handle = { ...identity, options: frozen, closed: false, port };
       const state = await database.transaction('readwrite', async (tx) => {
         let owner = await tx.get('owners', identity.owner);
+        // A caller continuing work it began under an epoch (a rebuild setting
+        // rows aside) opens only while that epoch holds: after a principal's
+        // retirement nothing is created again for it.
+        if (input.expectedEpoch !== undefined && owner?.epoch !== input.expectedEpoch) throw storageError('retired');
         if (!owner) { owner = { key: identity.owner, epoch: 0, principal: JSON.stringify([input.identity.authorityOrigin, input.identity.viewerId]), identity: clone(input.identity) }; await tx.put('owners', owner); }
         const key = [identity.owner, identity.namespace];
         if (input.policy === 'ordinary_chat_fragments') {
