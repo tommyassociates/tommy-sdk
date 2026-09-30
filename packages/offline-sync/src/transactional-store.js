@@ -90,6 +90,42 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     try { onPersistError?.({ event: 'persist_failed', store: name, key, ...result }); } catch (_) { /* reporting cannot change commit truth */ }
     throw new PersistError(name, { retained: false, ...result });
   }
+  // The collection's rows as last read whole or written here, with the
+  // store revision they are exact for (`epoch`, `revision`): a whole read that
+  // finds the store still at that revision answers from them after reading
+  // one metadata row, and this store's own commits keep them in step. Any
+  // other change (another tab, an eviction) moves the revision, and the next
+  // whole read reads the store again. Only a paged whole read, which carries
+  // each row's metadata, fills them.
+  let held = null;
+  // Whether the store's age limit keeps a row out of a reader's view. A row
+  // held from a read knows only its own last-written stamp (the store may
+  // have touched it since), so one that looks aged is not decided here.
+  const ageLimit = () => (backend.policy !== 'authored' && Number.isFinite(backend.limits?.maxAgeMs) ? backend.limits.maxAgeMs : null);
+  const looksAged = (entry, limit) => limit !== null && !entry.dirty && entry.updatedAt + limit <= now();
+  function track(snapshot, changes, result) {
+    if (!held) return;
+    if (result?.ok === false) return;
+    if (held.epoch !== snapshot.epoch || held.revision !== snapshot.storeRevision || result?.evicted?.length
+      || !Number.isSafeInteger(result?.storeRevision)) { held = null; return; }
+    const at = now();
+    changes.forEach((change) => {
+      if (change.op === 'delete') held.rows.delete(change.key);
+      else {
+        if (!held.rows.has(change.key)) held.sorted = false;
+        held.rows.set(change.key, {
+          value: JSON.parse(JSON.stringify(change.value)), updatedAt: at, exact: true, dirty: !!change.value?._dirty,
+        });
+      }
+    });
+    held.revision = result.storeRevision;
+    if (Number.isSafeInteger(result.epoch)) held.epoch = result.epoch;
+  }
+  async function commit(snapshot, changes, extra) {
+    const result = await backend.commit(snapshot, changes, extra);
+    track(snapshot, changes, result);
+    return result;
+  }
   async function mutation(keys, transform, { retry = false, syncedAt } = {}) {
     for (let attempt = 0; attempt < (retry ? 3 : 1); attempt += 1) {
       live();
@@ -98,7 +134,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       const previous = new Map(snapshot.rows.map((row) => [row.key, row.value]));
       const changes = transform(previous, snapshot.storeRevision);
       if (!changes.length) return;
-      const result = await backend.commit(snapshot, changes, syncedAt === undefined || syncedAt === null ? undefined : { syncedAt });
+      const result = await commit(snapshot, changes, syncedAt === undefined || syncedAt === null ? undefined : { syncedAt });
       live();
       if (result.ok !== false) return;
       if (result.reason !== 'conflict' || !retry || attempt === 2) failure(result, keys[0]);
@@ -112,7 +148,35 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
   // reads by index or scan instead.
   // `aged` (writers) includes rows past the backend's age limit.
   let paged = false;
+  // Rows served from `held` are fresh copies; callers need not copy them again.
+  const freshRows = new WeakSet();
+  // The held rows as a reader sees them (fresh copies), or null when the
+  // age limit may keep a held row out and only the store can say.
+  function heldRows(aged) {
+    if (!held.sorted) {
+      held.rows = new Map([...held.rows.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+      held.sorted = true;
+    }
+    const limit = aged ? null : ageLimit();
+    const rows = [];
+    for (const entry of held.rows.values()) {
+      if (looksAged(entry, limit)) {
+        if (!entry.exact) return null;
+      } else rows.push(entry.value);
+    }
+    const fresh = JSON.parse(JSON.stringify(rows));
+    freshRows.add(fresh);
+    return fresh;
+  }
   async function wholeRows({ aged = false } = {}) {
+    if (held && typeof backend.page === 'function') {
+      const head = await backend.page({ afterKey: null, limit: 1, aged: true, metadataOnly: true });
+      live();
+      if (held && head.epoch === held.epoch && head.storeRevision === held.revision) {
+        const rows = heldRows(aged);
+        if (rows) return rows;
+      } else held = null;
+    }
     if (!paged || typeof backend.page !== 'function') {
       try { return await backend.getAll({ aged }); } catch (error) {
         if (error?.reason !== 'scan-required' || typeof backend.page !== 'function') throw error;
@@ -125,6 +189,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       let afterKey = null;
       let fence = null;
       let moved = false;
+      const entries = [];
       do {
         // Each page continues from the one before it.
         // eslint-disable-next-line no-await-in-loop
@@ -133,12 +198,25 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         if (fence && (page.epoch !== fence.epoch || page.storeRevision !== fence.revision)) { moved = true; break; }
         fence = { epoch: page.epoch, revision: page.storeRevision };
         rows.push(...page.rows.map((row) => row.value));
+        if (aged) entries.push(...page.rows);
         size += page.rows.reduce((total, row) => total + (Number.isSafeInteger(row.bytes) ? row.bytes : JSON.stringify(row.value ?? null).length), 0);
         if (rows.length > WHOLE_READ_ROWS || size > WHOLE_READ_BYTES) throw new StorageReadError('scan-required');
         afterKey = page.nextKey;
       } while (afterKey !== null);
       if (!moved) {
         if (rows.length <= COMPLETE_ROWS / 2) paged = false;
+        // A complete writers' read with each row's metadata: held, for the
+        // revision it was read at.
+        if (aged && fence) {
+          held = {
+            epoch: fence.epoch,
+            revision: fence.revision,
+            sorted: true,
+            rows: new Map(entries.map((row) => [row.key, {
+              value: JSON.parse(JSON.stringify(row.value)), updatedAt: Date.parse(row.value?._updatedAt || '') || 0, exact: false, dirty: !!row.value?._dirty,
+            }])),
+          };
+        }
         return rows;
       }
     }
@@ -192,8 +270,8 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     validateRecord,
     async get(key) { live(); const row = await backend.get(keyString(key)); live(); return paintable(row) ? copy(row) : undefined; },
     async getRaw(key) { live(); const row = await backend.get(keyString(key), { aged: true }); live(); return copy(row); },
-    async getAll() { live(); const rows = await wholeRows(); live(); return rows.filter(paintable).map(copy); },
-    async getAllRaw() { live(); const rows = await wholeRows({ aged: true }); live(); return rows.map(copy); },
+    async getAll() { live(); const rows = await wholeRows(); live(); return freshRows.has(rows) ? rows.filter(paintable) : rows.filter(paintable).map(copy); },
+    async getAllRaw() { live(); const rows = await wholeRows({ aged: true }); live(); return freshRows.has(rows) ? rows : rows.map(copy); },
     async readWhere(predicate = () => true) { return (await api.getAll()).filter(predicate).map(strip); },
     /** What `readWhere(predicate)` would answer, from rows a subscriber was just given. */
     selectFrom(rows, predicate = () => true) { return (rows || []).filter(paintable).filter(predicate).map(strip); },
@@ -361,7 +439,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
             && ((!scope || scope(value)) || (value._window != null && !retainedWindows.has(value._window) && windows.has(value._window))))
             .map(({ key }) => ({ op: 'delete', key }));
           if (changes.length) {
-            const result = await backend.commit(page, changes);
+            const result = await commit(page, changes);
             if (result.ok === false) failure(result);
             pruned += changes.length;
           }
@@ -413,6 +491,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     },
     dispose({ purge = false } = {}) {
       retired = true;
+      held = null;
       subscribers.clear();
       queries.clear();
       changeListeners.clear();

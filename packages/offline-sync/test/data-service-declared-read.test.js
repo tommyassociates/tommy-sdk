@@ -198,6 +198,40 @@ describe('a declared read', () => {
     expect(data.status('members').state).not.toBe('fresh');
   });
 
+  it('writes only the rows a whole read changed, confirms rows not confirmed for a day, and removes what it left out', async () => {
+    let at = Date.UTC(2026, 9, 1);
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend(), now: () => at });
+    let written = 0;
+    const counted = new Proxy(store, { get(target, property) {
+      if (property === 'reconcile') return (records, ...rest) => { written += records.length; return target.reconcile(records, ...rest); };
+      const value = target[property];
+      return typeof value === 'function' ? value.bind(target) : value;
+    } });
+    const data = createDataService({ resolve: (name) => (name === 'members' ? { store: counted, decl: { keyPath: 'id' } } : null), now: () => at, sourceMeta: createMemorySourceMeta() });
+    let rows = Array.from({ length: 1000 }, (_, n) => ({ id: `m${n}`, name: `Member ${n}`, tags: [1, 2] }));
+    data.source('members', { fetch: async () => ({ rows: rows.map((row) => ({ ...row })) }), read: { cursor: false } });
+    await data.refresh('members', { mode: 'visible' });
+    expect(written).toBe(1000);
+    // One renamed, one gone: one row written, one removed.
+    written = 0;
+    at += 60 * 1000;
+    rows = rows.filter((row) => row.id !== 'm5').map((row) => (row.id === 'm7' ? { ...row, name: 'Renamed' } : row));
+    await data.refresh('members', { mode: 'visible' });
+    expect(written).toBe(1);
+    expect((await data.read('members')).length).toBe(999);
+    expect((await data.read('members', 'm7')).name).toBe('Renamed');
+    expect(await data.read('members', 'm5')).toBeNull();
+    // Nothing changed: one row is written, which stamps the collection synced.
+    written = 0;
+    await data.refresh('members', { mode: 'visible' });
+    expect(written).toBe(1);
+    // A day on, every row is confirmed again.
+    written = 0;
+    at += 25 * 60 * 60 * 1000;
+    await data.refresh('members', { mode: 'visible' });
+    expect(written).toBe(999);
+  });
+
   it('keys each answered row by its record, and never takes an answer with no keyed row for an empty collection', async () => {
     const { data } = service();
     let answer = { rows: [{ member_id: 'a' }, { member_id: 'b' }] };

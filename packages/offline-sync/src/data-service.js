@@ -119,6 +119,19 @@ function snapshotRows(answer) {
 }
 // One reconcile carries a bounded complete set; larger ingests go in chunks.
 const INGEST_CHUNK = 500;
+// A whole read writes the rows it changed, and confirms (writes again) an
+// unchanged row only once it was last written this long ago, so its age
+// limits count from a recent confirmation.
+const CONFIRM_AFTER_MS = 24 * 60 * 60 * 1000;
+// A row's content, whatever the order of its fields.
+function contentOf(value) {
+  if (Array.isArray(value)) return `[${value.map(contentOf).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).filter((field) => !field.startsWith('_') && value[field] !== undefined).sort()
+      .map((field) => `${JSON.stringify(field)}:${contentOf(value[field])}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
 // Keys whose last local change a read still on its way must keep, per collection.
 const TOUCHES_KEPT = 5000;
 // A declared read whose protection was dropped reads again at most this often.
@@ -896,26 +909,49 @@ export function createDataService({
     }
     if (halted()) return stop();
     const unchanged = (touched) => (row) => !touched.has(keyOf(row));
-    if (!changesOnly && records.length <= INGEST_CHUNK) {
-      // One commit: the answer replaces the rows it covers, as one set.
-      const touched = touchedAfter(name, startedAt);
-      const chunk = records.filter(unchanged(touched));
-      noteResult(chunk, await store.reconcile(chunk, { keepDirty: true, scope: unchanged(touched) }));
-    } else {
+    if (changesOnly) {
       for (let start = 0; start < records.length; start += INGEST_CHUNK) {
         if (halted()) return stop();
         const touched = touchedAfter(name, startedAt);
         const chunk = records.slice(start, start + INGEST_CHUNK).filter(unchanged(touched));
-        // Chunks commit in order; a complete read stamps the collection synced.
+        // Chunks commit in order.
         // eslint-disable-next-line no-await-in-loop
         if (chunk.length) noteResult(chunk, await store.reconcile(chunk, { prune: false, keepDirty: true }));
       }
-      if (!changesOnly) {
+    } else {
+      // A whole read writes the rows it changed (and the unchanged ones last
+      // written a day or more ago), keeps the rest as they are, and removes
+      // the rows it left out. One row is always written, which stamps the
+      // collection synced.
+      const touched = touchedAfter(name, startedAt);
+      const stored = new Map(rows.map((row) => [keyOf(row), row]));
+      const confirmBefore = now() - CONFIRM_AFTER_MS;
+      const toWrite = [];
+      let oldest = null;
+      records.forEach((record) => {
+        const key = keyOf(record);
+        if (touched.has(key)) return;
+        const row = stored.get(key);
+        if (!row || row._dirty || row._persistFailed || contentOf(record) !== contentOf(row)) { toWrite.push(record); return; }
+        const at = Date.parse(row._updatedAt || '');
+        if (!Number.isFinite(at) || at < confirmBefore) { toWrite.push(record); return; }
+        written.add(key);
+        if (!oldest || at < oldest.at) oldest = { record, at };
+      });
+      if (!toWrite.length && oldest) toWrite.push(oldest.record);
+      for (let start = 0; start < toWrite.length; start += INGEST_CHUNK) {
         if (halted()) return stop();
-        const answered = new Set(records.map(keyOf));
-        const touched = touchedAfter(name, startedAt);
-        await store.reconcile([], { scope: (row) => !answered.has(keyOf(row)) && unchanged(touched)(row) });
+        const touchedSince = touchedAfter(name, startedAt);
+        const chunk = toWrite.slice(start, start + INGEST_CHUNK).filter(unchanged(touchedSince));
+        // eslint-disable-next-line no-await-in-loop
+        if (chunk.length) noteResult(chunk, await store.reconcile(chunk, { prune: false, keepDirty: true }));
       }
+      if (halted()) return stop();
+      const answered = new Set(records.map(keyOf));
+      const touchedNow = touchedAfter(name, startedAt);
+      removed = await removeRows({
+        label, store, keys: rows.filter((row) => !row._dirty && !answered.has(keyOf(row)) && !touchedNow.has(keyOf(row))).map(keyOf), force: false,
+      });
     }
     if (halted()) return stop();
     if (!keepsCursor) return 'stored';
