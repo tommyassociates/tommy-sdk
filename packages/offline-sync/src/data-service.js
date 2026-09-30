@@ -1091,6 +1091,22 @@ export function createDataService({
       return reconcileWindow(name, store, decl?.keyPath || 'id', { ...options, context: jobContextNow() });
     },
     /**
+     * Calls `listener()` whenever the collection may have changed (a write
+     * here, another tab's, an eviction or a purge), without reading it: for a
+     * caller that keeps something derived from the rows and reads again only
+     * when told.
+     */
+    watch(collection, listener) {
+      live();
+      const { store, label } = local(collection);
+      const fire = () => { try { listener(); } catch (_) { /* isolated */ } };
+      const offStore = typeof store.onChange === 'function' ? store.onChange(fire) : store.subscribe(fire);
+      const offFeed = feed?.subscribe((event) => {
+        if (event.label === label || event.labels?.includes(label) || (event.type === 'purge' && !event.label)) fire();
+      });
+      return () => { offStore?.(); offFeed?.(); };
+    },
+    /**
      * `target`: a collection name, `{ collection, key }` or
      * `{ collection, query: { index, … } }`. Fires with the current value, then
      * whenever it changes — in this tab or another.

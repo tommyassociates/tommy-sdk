@@ -79,6 +79,18 @@ describe('data service on memory stores', () => {
     expect(read).toEqual(['Team', 'TeamMember']);
   });
 
+  it('tells a watcher when a collection may have changed, without reading it, until it stops', async () => {
+    const data = memoryService();
+    const calls = vi.fn();
+    const off = data.watch('chats.messages', calls);
+    await data.ingest('chats.messages', [{ id: 'a', chat_id: 7, seq: 1 }]);
+    expect(calls).toHaveBeenCalled();
+    calls.mockClear();
+    off();
+    await data.ingest('chats.messages', [{ id: 'b', chat_id: 7, seq: 2 }]);
+    expect(calls).not.toHaveBeenCalled();
+  });
+
   it('reads many rows by one index: each value asked, in order, each row once, and refuses what it cannot honour', async () => {
     const data = memoryService();
     await data.ingest('chats.messages', [

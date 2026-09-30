@@ -526,31 +526,43 @@ export interface DataStore<Rec = unknown> {
 }
 
 /**
- * A read-only view of a host collection (host API level 5): the MP world's
- * own account's rows, as the collection's projection shows them. Readable only
- * when the host exposes the collection and the MP declares and holds the scope
- * it names (`DATA_FORBIDDEN` otherwise, checked at every call, when an answer
- * settles and before every delivery); `DATA_UNDECLARED` for a collection the
- * host does not expose. While the world's account is not displayed, reads
- * refuse with `ACCOUNT_NOT_DISPLAYED` (retryable) and a subscription holds its
- * latest rows until the account is displayed again.
+ * A read-only view of a host collection (host API level 5), through a named
+ * profile: the MP world's own account's rows, projected (and joined with the
+ * account's other collections) by the host. Readable only when the host
+ * exposes the collection and profile and the MP declares and holds every
+ * scope the profile names (`DATA_FORBIDDEN` otherwise, checked at every call,
+ * when an answer settles and before every delivery); `DATA_UNDECLARED` for a
+ * collection or profile the host does not expose. Without a profile named,
+ * the MP gets the smallest its scopes allow. Rows are frozen: repeated reads
+ * with no change answer the same rows. While the world's account is not
+ * displayed, reads refuse with `ACCOUNT_NOT_DISPLAYED` (retryable) and a
+ * subscription holds its latest rows until the account is displayed again.
  */
 export interface HostCollection<Rec = unknown> {
   /** Every row, one by key, or several by keys (null where none). */
-  read(key?: string | readonly string[] | null): Promise<Rec | Rec[] | (Rec | null)[] | null>;
-  query(spec?: DataQuerySpec<Rec>): Promise<{ rows: Rec[]; nextCursor: string | null; complete: boolean }>;
-  /** The rows now, then on every change while the account is displayed. */
-  subscribe(callback: (rows: Rec[]) => void, options?: { onError?: (error: unknown) => void }): () => void;
-  status(): DataStatus;
-  /** Asks the host to read the collection again; never more often than the host's declared freshness. */
+  read(key?: string | readonly string[] | null): Promise<readonly Rec[] | Rec | readonly (Rec | null)[] | null>;
+  /** Several rows by key, in the order asked (null where none). */
+  getMany(keys: readonly string[]): Promise<readonly (Rec | null)[]>;
+  /**
+   * Rows by one of the view's lookups (`by_user`, `by_tag` for members;
+   * `by_context` for tags) with `equals` or `anyOf`, in the order asked, each
+   * row once; or every row in key order, paged by `cursor`.
+   */
+  query(spec?: { index?: string; equals?: readonly string[]; anyOf?: readonly string[]; limit?: number; cursor?: string | null }):
+    Promise<{ rows: readonly Rec[]; nextCursor: string | null; complete: boolean }>;
+  /** The rows now, then whenever any collection they read changes, while the account is displayed. */
+  subscribe(callback: (rows: readonly Rec[]) => void, options?: { onError?: (error: unknown) => void }): () => void;
+  /** The collection's status; `complete` only when every collection the profile reads has completed a read. */
+  status(): DataStatus & { complete: boolean };
+  /** Asks the host to read the collections again; never more often than each source's declared freshness. */
   refresh(options?: { maxAge?: number }): Promise<DataStatus>;
 }
 
 export interface DataApi {
   /** Open one of the object stores declared in manifest.localData. */
   store<Rec = unknown>(name: string): DataStore<Rec>;
-  /** Host API level 5: a host collection the host exposes to MPs (e.g. `workforce.members`, scope `read:team_members`). */
-  host?<Rec = unknown>(collection: string): HostCollection<Rec>;
+  /** Host API level 5: a host collection the host exposes to MPs, through a profile (e.g. `workforce.members`, `ref` or `team`). */
+  host?<Rec = unknown>(collection: string, options?: { profile?: string }): HostCollection<Rec>;
   /** Sync status for a store, for stale-while-revalidate UX + the brownout contract. */
   syncState(storeName: string): {
     lastSyncedAt: Iso8601 | null;
