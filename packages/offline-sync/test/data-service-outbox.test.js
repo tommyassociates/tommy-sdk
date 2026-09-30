@@ -129,6 +129,32 @@ describe('a service for one account among several', () => {
   });
 });
 
+describe('whether a service is idle', () => {
+  it('is idle only with no unsent change in memory and no read on its way', async () => {
+    const scheduler = heldScheduler();
+    const { data } = service({ scheduler });
+    let answer;
+    data.source('items', {
+      fetch: () => new Promise((resolve) => { answer = () => resolve([]); }),
+      push: async () => {},
+    });
+    expect(data.idle()).toBe(true);
+    const read = data.refresh('items', { mode: 'visible' });
+    expect(data.idle()).toBe(false);
+    scheduler.releaseAll();
+    await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
+    answer();
+    await read;
+    expect(data.idle()).toBe(true);
+    const sent = data.mutate('items', { op: 'put', record: { id: 'a' } }, { wait: true });
+    await vi.waitFor(() => expect(scheduler.held.length).toBe(1));
+    expect(data.idle()).toBe(false);
+    scheduler.releaseAll();
+    await sent;
+    expect(data.idle()).toBe(true);
+  });
+});
+
 describe('a change restored after a restart', () => {
   it('is sent as the row is when it goes out, and not at all once another tab sent it', async () => {
     const { store } = service();

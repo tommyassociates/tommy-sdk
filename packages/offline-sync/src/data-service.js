@@ -880,6 +880,8 @@ export function createDataService({
       });
     },
     onStatusChange(listener) { listeners.add(listener); return () => listeners.delete(listener); },
+    /** Whether nothing is queued or running: no unsent change in memory and no read on its way. */
+    idle() { return outbox.size === 0 && ![...states.values()].some((state) => state.flight); },
     dispose() {
       disposed = true;
       offOrphanFeed?.();
