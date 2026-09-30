@@ -33,7 +33,7 @@ const STUB_NAMESPACES = [
   // `tommy.prefs` — this MP's own small UI choices (a layout, a filter, a
   // toggle), kept per account on the device by the host instead of browser
   // storage: `get(key, fallback)` reads at once once `ready()` resolved,
-  // `set(key, value)` / `remove(key)` write through. Hosts from API level 4.
+  // `set(key, value)` / `remove(key)` write through. Hosts from API level 5.
   'prefs',
   // PARKED A.1 — `tommy.tours.start(id)` / `.available()`, a handle on the HOST's
   // existing tour runtime (tommy-core/src/tour). REGISTRATION IS NOT HERE, on

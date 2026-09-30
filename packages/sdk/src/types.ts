@@ -1460,7 +1460,7 @@ export interface NavigationApi {
 /**
  * This MP's own small UI choices (a layout, a filter, a toggle), kept per
  * account on the device by the host, never sent anywhere. Hosts from API
- * level 4 (`init.hostApi >= 4`); older hosts have no such namespace.
+ * level 5 (`init.hostApi >= 5`); older hosts have no such namespace.
  */
 export interface PrefsApi {
   /**
@@ -1507,7 +1507,7 @@ export type StoreMigrate = (row: Record<string, unknown>, context: StoreMigratio
 
 export interface TommySdk {
   readonly init: MpInit;
-  /** Per-account UI preferences kept by the host (API level 4). */
+  /** Per-account UI preferences kept by the host (API level 5). */
   readonly prefs: PrefsApi;
   readonly actions: ActionsApi;
   readonly panels: PanelsApi;
