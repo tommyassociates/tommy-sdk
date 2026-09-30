@@ -51,8 +51,10 @@ export function reportRejected(store, reasons, onPersistError) {
  * The fetch → reconcile step shared by windowCache.sync, liveQuery.revalidate
  * and the data service's refresh.
  */
+// `skip`: keys the answer must not write or remove (changed since the read
+// began; the data service's guard names them).
 export async function reconcileFetched(store, keyPath, { fetch, toRecord, keyOf }, scope, window, windowKey, {
-  onPersistError, rethrow = false, keepDirty = false, syncedAt,
+  onPersistError, rethrow = false, keepDirty = false, syncedAt, skip = null,
 } = {}) {
   let dtos = null;
   try {
@@ -122,7 +124,9 @@ export async function reconcileFetched(store, keyPath, { fetch, toRecord, keyOf 
     // path free of throw/catch churn AND gives the rejects somewhere to go.
     const valid = [];
     const rejected = [];
+    const skipped = (row) => !!skip && skip.has(String(row?.[keyPath]));
     for (const record of records) {
+      if (skipped(record)) continue; // eslint-disable-line no-continue
       const why = typeof store.validateRecord === 'function' ? store.validateRecord(record) : null;
       if (why) rejected.push(why); else valid.push(record);
     }
@@ -132,8 +136,9 @@ export async function reconcileFetched(store, keyPath, { fetch, toRecord, keyOf 
     try {
       // `syncedAt: null` for a read of part of the collection: it leaves the
       // collection's synced stamp as it was.
+      const pruned = skip && skip.size && typeof scope === 'function' ? (row) => scope(row) && !skipped(row) : scope;
       await store.reconcile(valid, {
-        scope, ...(windowKey != null ? { windowKey } : {}), ...(keepDirty ? { keepDirty: true } : {}), ...(syncedAt !== undefined ? { syncedAt } : {}),
+        scope: pruned, ...(windowKey != null ? { windowKey } : {}), ...(keepDirty ? { keepDirty: true } : {}), ...(syncedAt !== undefined ? { syncedAt } : {}),
       });
     } catch (error) {
       // A failed durable write or incomplete read cannot certify the cache

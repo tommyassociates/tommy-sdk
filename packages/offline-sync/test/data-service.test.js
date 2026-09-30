@@ -339,6 +339,22 @@ describe('MP data API confinement', () => {
     }
   });
 
+  it.each(['windowCache', 'liveQuery'])('never lets a %s read begun before a newer change undo it', async (kind) => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    await data.ingest('shifts', [{ id: '1', at: 'mon' }, { id: '2', at: 'tue' }]);
+    let answer;
+    const fetch = () => new Promise((resolve) => { answer = resolve; });
+    const reading = kind === 'liveQuery' ? data.liveQuery('shifts', { fetch }).revalidate() : data.windowCache('shifts', { fetch }).sync('week');
+    await settle();
+    // Newer than the read: an ingest of row 1, and a removal of row 2.
+    await data.ingest('shifts', [{ id: '1', at: 'moved' }]);
+    await data.purge('shifts', { keys: ['2'] });
+    answer([{ id: '1', at: 'mon' }, { id: '2', at: 'tue' }]);
+    await reading;
+    expect(await data.read('shifts', '1')).toMatchObject({ at: 'moved' });
+    expect(await data.read('shifts', '2')).toBeNull();
+  });
+
   it('never evicts a saved pref to make room for another: a pref that does not fit is refused', async () => {
     const saved = globalThis.localStorage;
     const kept = new Map();

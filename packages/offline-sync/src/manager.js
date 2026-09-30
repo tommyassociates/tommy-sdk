@@ -179,8 +179,13 @@ export function createDataManager({
   // A store's name as the data service knows it: the manager's namespace
   // before it, so a declared name with a dot of its own stays this MP's.
   const qualified = (storeName) => `mp.${mpId}.${storeName}`;
-  const fetchAndReconcile = (store, keyPath, spec, scope, window, windowKey, storeName, complete) => reconcileFetched(
-    store, keyPath, spec, scope, window, windowKey, { onPersistError, keepDirty: service.sends(qualified(storeName)), ...(complete ? {} : { syncedAt: null }) }, // eslint-disable-line no-use-before-define
+  // Through the data service's one read guard, in the store's turn: a read
+  // begun before a newer change (an ingest, a removal, a local write) never
+  // undoes it.
+  const fetchAndReconcile = (store, keyPath, spec, scope, window, windowKey, storeName, complete) => service.reconcileWindow( // eslint-disable-line no-use-before-define
+    qualified(storeName), {
+      fetch: spec.fetch, toRecord: spec.toRecord, keyOf: spec.keyOf, scope, window, windowKey, complete, keepDirty: service.sends(qualified(storeName)), // eslint-disable-line no-use-before-define
+    },
   );
 
   // The same small surface the host uses, confined to this MP's own stores

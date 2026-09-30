@@ -135,7 +135,7 @@ function contentOf(value) {
 // Keys whose last local change a read still on its way must keep, per collection.
 const TOUCHES_KEPT = 5000;
 // A declared read whose protection was dropped reads again at most this often.
-const DECLARED_READ_TRIES = 3;
+const READ_TRIES = 3;
 // A physical index read returns at most this many rows per page.
 const PAGE_ROWS = 100;
 // The most rows one query or subscription returns, however it pages.
@@ -790,52 +790,97 @@ export function createDataService({
    * stored in the collection's turn (commitDeclared). A refusal (403, 404)
    * purges the collection's rows, unsent ones kept.
    */
+  /**
+   * The one guard every read of the server goes through when it stores what
+   * it read, declared or not: in the collection's turn, a replacement of the
+   * collection since the read began drops its answer, a read that lost its
+   * protection (too many changes to track) reads again, and rows changed
+   * since it began are neither written nor removed by it.
+   */
+  // A commit that lost its protection part way asks for the read again.
+  const READ_AGAIN = Symbol('read again');
+  async function guardedRead(name, read, commit, { isCurrent = () => true } = {}) {
+    for (let attempt = 0; attempt < READ_TRIES; attempt += 1) {
+      const startedAt = touchSequence;
+      // eslint-disable-next-line no-await-in-loop
+      const answer = await read(startedAt);
+      if (!isCurrent()) return undefined;
+      // eslint-disable-next-line no-await-in-loop
+      const outcome = await inTurn(name, async () => {
+        if (replacedAfter(name, startedAt)) return { dropped: true };
+        if (protectionLost(name, startedAt)) return null;
+        const value = await commit(answer, touchedAfter(name, startedAt), startedAt);
+        return value === READ_AGAIN ? null : { value };
+      });
+      if (outcome) return outcome.dropped ? undefined : outcome.value;
+    }
+    throw serviceError(`'${name}' changed on this device faster than it could be read`, 'DATA_BUSY');
+  }
+  /**
+   * A read of part or all of a collection by a caller's own fetch (an MP's
+   * window cache or live query), stored through the one guard. A failed fetch
+   * leaves the collection as it was. Resolves the stored rows in `scope`.
+   */
+  async function reconcileWindow(name, store, keyPath, {
+    fetch, toRecord = (dto) => dto, keyOf, scope = () => true, window, windowKey, complete = false, keepDirty = false, rethrow = false, context,
+  }) {
+    // No fetch (a store its own writer fills), or a failed one: the rows as they are.
+    if (typeof fetch !== 'function') return store.readWhere(scope);
+    let failed = false;
+    const stored = await guardedRead(name, async () => {
+      try { return await fetch(window, context); } catch (error) {
+        if (rethrow) throw error;
+        failed = true;
+        return null;
+      }
+    }, (dtos, touched) => (failed ? null : reconcileFetched(store, keyPath, { fetch: () => dtos, toRecord, keyOf }, scope, window, windowKey, {
+      onPersistError, rethrow, keepDirty, skip: touched, ...(complete ? {} : { syncedAt: null }),
+    })));
+    // The reconcile answers with its own read of the scope.
+    return Array.isArray(stored) ? stored : store.readWhere(scope);
+  }
   async function readDeclared(target, spec, wanted, isCurrent, { full = false, context = jobContextNow() } = {}) {
     const { name, store, keyPath } = target;
     const { cursor: keepsCursor = false, fullEveryMs = FULL_EVERY_MS, forbidden = 'purge' } = spec.read;
-    for (let attempt = 0; attempt < DECLARED_READ_TRIES; attempt += 1) {
-      const startedAt = touchSequence;
+    // Through the one read guard; each attempt decides afresh from the
+    // stored rows and their meta whether it may ask only for what changed.
+    const outcome = await guardedRead(name, async () => {
       let since = null;
       let read = null;
       if (keepsCursor && !full) {
-        // Each attempt decides afresh from the stored rows and their meta.
         watchChanges(name, store);
         const generation = generationOf(name);
-        // eslint-disable-next-line no-await-in-loop
         const [meta, rows] = await Promise.all([metaOf(name), rawRows(store)]);
         read = { rows, generation };
         const keys = rows.map((row) => String(row[keyPath]));
         const whole = !!meta && typeof meta.digest === 'string' && meta.count === keys.length && meta.digest === keysDigest(keys);
         if (whole && typeof meta.cursor === 'string' && meta.cursor && Number.isFinite(meta.fullAt) && now() - meta.fullAt < fullEveryMs) since = meta.cursor;
       }
-      let answer;
       try {
-        // eslint-disable-next-line no-await-in-loop
-        answer = await spec.fetch(wanted, { ...context, since });
+        return { answer: await spec.fetch(wanted, { ...context, since }), since, read };
       } catch (error) {
         if (forbidden === 'purge' && [403, 404].includes(Number(error?.status)) && isCurrent()) {
-          await service.purge(name, {}).catch(() => {}); // eslint-disable-line no-use-before-define, no-await-in-loop
+          await service.purge(name, {}).catch(() => {}); // eslint-disable-line no-use-before-define
         }
         throw error;
       }
-      if (!isCurrent()) return undefined;
+    }, async ({ answer, since, read }, _touched, startedAt) => {
       if (snapshotRows(answer) === null) return NO_SNAPSHOT;
-      // eslint-disable-next-line no-await-in-loop
-      const outcome = await inTurn(name, () => commitDeclared(target, spec, answer, {
+      const stored = await commitDeclared(target, spec, answer, {
         startedAt, since, isCurrent, read,
-      }));
-      if (outcome !== 'read_again') return undefined;
-    }
-    throw serviceError(`'${name}' changed on this device faster than it could be read`, 'DATA_BUSY');
+      });
+      return stored === 'read_again' ? READ_AGAIN : undefined;
+    }, { isCurrent });
+    return outcome === NO_SNAPSHOT ? NO_SNAPSHOT : undefined;
   }
 
   /**
-   * Stores a declared read's answer, in the collection's turn, deciding then
-   * what it keeps: a key stored or removed by anything else after the read
-   * began keeps that change (checked again before each chunk and the prune),
-   * a replacement of the collection since the read began drops the answer,
-   * and a read whose protection was dropped (more keys touched meanwhile than
-   * are kept) stops and answers `read_again`. Each answered row becomes its
+   * Stores a declared read's answer, in the collection's turn, after the read
+   * guard's checks, deciding then what it keeps: a key stored or removed by
+   * anything else after the read began keeps that change (checked again
+   * before each chunk and the removals), and a read whose protection was
+   * dropped part way (more keys touched meanwhile than are kept) stops and
+   * answers `read_again`. Each answered row becomes its
    * record with the stored row as `prev` (the same keyed lookup a refresh
    * uses), and its record's key decides. A read of changes removes the rows
    * `removedField` marks and stores the rest; a whole read stores every row,
@@ -852,8 +897,7 @@ export function createDataService({
     startedAt, since, isCurrent, read = null,
   }) {
     const { cursor: keepsCursor = false, removedField = null } = spec.read;
-    if (!isCurrent() || replacedAfter(name, startedAt)) return 'dropped';
-    if (protectionLost(name, startedAt)) return 'read_again';
+    if (!isCurrent()) return 'dropped';
     const keyOf = (row) => String(row[keyPath]);
     // The rows read before fetching, while nothing has changed them since.
     const rows = read && generationOf(name) === read.generation ? read.rows : await rawRows(store);
@@ -1002,6 +1046,18 @@ export function createDataService({
       return runQuery(store, decl?.keyPath || 'id', spec);
     },
     /**
+     * A read of part or all of a collection by the caller's own `fetch(window,
+     * context)` (a window cache, a live query), stored through the one read
+     * guard every read uses: rows changed since it began are kept. A failed
+     * fetch leaves the collection as it was (`rethrow` to hear it). Resolves
+     * the stored rows in `scope`.
+     */
+    async reconcileWindow(collection, options = {}) {
+      live();
+      const { name, store, decl } = local(collection);
+      return reconcileWindow(name, store, decl?.keyPath || 'id', { ...options, context: jobContextNow() });
+    },
+    /**
      * `target`: a collection name, `{ collection, key }` or
      * `{ collection, query: { index, … } }`. Fires with the current value, then
      * whenever it changes — in this tab or another.
@@ -1111,12 +1167,12 @@ export function createDataService({
       const run = async (isCurrent) => {
         if (wanted.key !== undefined && wanted.key !== null) {
           const rowKey = String(wanted.key);
-          const dto = await spec.fetch(wanted, context);
-          if (!isCurrent()) return;
-          // Stored in the collection's turn, through the store that records
-          // what it changes: a declared read already on its way keeps it.
+          // Stored through the one read guard (a change to the row since the
+          // read began is kept), and recorded as a change of the row: a
+          // declared read already on its way keeps it.
           const writer = touching(name, store, keyPath);
-          await inTurn(name, async () => {
+          await guardedRead(name, () => spec.fetch(wanted, context), async (dto, touched) => {
+            if (touched.has(rowKey)) return;
             if (!dto) {
               // Decided in turn with local writes to the row, on the row as it is then.
               await serial(`${label}:${rowKey}`, async () => {
@@ -1132,7 +1188,7 @@ export function createDataService({
             const record = (spec.toRecord || ((value) => value))(dto, prev ? previousByKey([prev], keyPath).get(rowKey) : prev);
             // One record leaves the collection's synced stamp as it was.
             await writer.reconcile([record], { prune: false, keepDirty: true, syncedAt: null });
-          });
+          }, { isCurrent });
           return;
         }
         if (spec.read && !wanted.query && !wanted.window && typeof spec.scope !== 'function') {
@@ -1150,12 +1206,12 @@ export function createDataService({
         }
         // Only a read of the whole collection marks it synced.
         const whole = !wanted.query && typeof spec.scope !== 'function';
-        // Fetched first; stored in the collection's turn.
-        const dtos = snapshotRows(await spec.fetch(wanted, context));
-        if (!isCurrent()) return undefined;
-        if (dtos === null) return NO_SNAPSHOT;
-        return inTurn(name, () => reconcileFetched(touching(name, store, keyPath), keyPath, { fetch: () => dtos, toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
-          scope, wanted.window, windowKeyOf(wanted.window), { onPersistError, rethrow: true, keepDirty: true, ...(whole ? {} : { syncedAt: null }) }));
+        // Fetched first; stored through the one read guard.
+        return guardedRead(name, async () => snapshotRows(await spec.fetch(wanted, context)), (dtos, touched) => (dtos === null ? NO_SNAPSHOT
+          : reconcileFetched(store, keyPath, { fetch: () => dtos, toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
+            scope, wanted.window, windowKeyOf(wanted.window), {
+              onPersistError, rethrow: true, keepDirty: true, skip: touched, ...(whole ? {} : { syncedAt: null }),
+            })), { isCurrent });
       };
       state.flightForm = form;
       state.flight = scheduler.request({
