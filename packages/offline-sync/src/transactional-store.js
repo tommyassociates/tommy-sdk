@@ -248,19 +248,34 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       await inParts(keys.slice(half), write);
     }
   }
+  // Reads of the rows back after a change that another writer's commit
+  // interrupted (a conflict) are tried again this many times in all.
+  const NOTIFY_READS = 3;
   async function notify() {
     live();
     publication += 1;
+    const mine = publication;
     // Change listeners read only what they need (a key or an index range), so
     // a collection too large for a complete read still tells them it changed.
     for (const listener of changeListeners) { try { listener(); } catch (_) { /* isolated consumer */ } }
     if (!queries.size && !subscribers.size) return;
     let rows;
-    try { rows = (await wholeRows()).filter(paintable); } catch (error) {
-      for (const query of queries) { try { query.onError?.(error); } catch (_) { /* isolated consumer */ } }
-      return;
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        rows = (await wholeRows()).filter(paintable);
+        break;
+      } catch (error) {
+        // Another writer committed while the rows were read: read them again,
+        // with its change, unless a later change is telling them already.
+        if (error?.reason === 'conflict' && attempt < NOTIFY_READS && !retired && publication === mine) continue; // eslint-disable-line no-continue
+        if (publication !== mine) return;
+        for (const query of queries) { try { query.onError?.(error); } catch (_) { /* isolated consumer */ } }
+        return;
+      }
     }
-    if (retired) return;
+    // A later change's own read tells them; this older one never follows it.
+    if (retired || publication !== mine) return;
     // Keep the existing complete-array callback. A failed bounded read skips
     // publication and never turns the committed operation into a failed write.
     for (const handler of subscribers) { try { handler(rows.map(copy)); } catch (_) { /* isolated consumer */ } }

@@ -1553,3 +1553,37 @@ describe.each(DATABASES)('large collections on the host store (%s)', (_name, cre
     await close();
   });
 });
+
+describe.each(DATABASES)('two stores open on one host store (%s)', (_name, create) => {
+  function twoStores() {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 5000, maxAgeMs: 86400000, maxBytes: null } };
+    const backendA = transactionalBackend(port, null, options);
+    const a = createDataStore({ name: 'chats.messages', backend: backendA });
+    const b = createDataStore({ name: 'chats.messages', backend: transactionalBackend(port, null, options) });
+    return { a, b, backendA, close: () => database.close() };
+  }
+
+  it('tells its subscribers of its own write when another store writes while it reads the rows back', async () => {
+    const { a, b, backendA, close } = twoStores();
+    const heard = [];
+    a.subscribeQuery((query) => query.getAll().map((row) => row.id).sort(), (ids) => heard.push(ids));
+    await settle();
+    // The other store commits while this one reads its rows back after a write.
+    const read = backendA.getAll.bind(backendA);
+    let interleave = true;
+    backendA.getAll = async (...args) => {
+      if (interleave) {
+        interleave = false;
+        await b.put({ id: 'b' });
+        throw Object.assign(new Error('Storage read failed (conflict)'), { name: 'StorageReadError', reason: 'conflict' });
+      }
+      return read(...args);
+    };
+    await a.put({ id: 'a' });
+    await vi.waitFor(() => expect(heard.at(-1)).toEqual(['a', 'b']));
+    await close();
+  });
+});
