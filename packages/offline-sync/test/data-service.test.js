@@ -787,6 +787,23 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     await database.close();
   });
 
+  it('replaces a full batch of rows whose unique values all moved to new rows, within the commit size', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'codes', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: { byCode: 'code' }, unique: ['byCode'] };
+    const store = createDataStore({ name: 'codes', backend: transactionalBackend(port, null, options), indexes: { byCode: 'code' } });
+    const codes = Array.from({ length: 150 }, (_, i) => `C${i}`);
+    await store.reconcile(codes.map((code, i) => ({ id: `old-${i}`, code })));
+    // Every code now belongs to a new row: each old holder goes in the commit that gives its code away.
+    await store.reconcile(codes.map((code, i) => ({ id: `new-${i}`, code })));
+    const rows = await store.getAll();
+    expect(rows).toHaveLength(150);
+    expect(rows.every((row) => row.id.startsWith('new-'))).toBe(true);
+    expect(new Set(rows.map((row) => row.code)).size).toBe(150);
+    await database.close();
+  });
+
   it('reads a declared index in memory where the store opened without it', async () => {
     const database = create();
     const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });

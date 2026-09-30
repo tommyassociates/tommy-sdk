@@ -194,49 +194,37 @@ export function createDataManager({
   });
 
   // tommy.prefs: the store opens on first use, so an MP that never reads a
-  // preference never opens it. `get` answers from what has loaded (the
-  // fallback until `ready()` resolves; an MP reads again then); `set` and
-  // `remove` write through, and what they changed is never undone by a load
-  // still running. A failed load is not remembered: the next `ready()` loads
-  // again. Preferences are the device's own, so they are stored as settled
-  // rows, never as changes waiting to be sent; a `set` the store refused
-  // rejects.
-  const prefValues = new Map();
-  const prefsChanged = new Set();
+  // preference never opens it. `get` answers the change on its way when there
+  // is one, else what the device holds once a load or a save has said (the
+  // fallback before that; an MP reads again after `ready()`). `set` and
+  // `remove` write through; a change the device refused never counts as saved.
+  // A failed load is not remembered: the next `ready()` loads again.
+  // Preferences are the device's own, so they are stored as settled rows,
+  // never as changes waiting to be sent; a `set` the store refused rejects.
+  //
+  // Per key: `held`, what the device holds (`{ present, value }`, null until
+  // a load or a save says); `saves`, how many changes the device saved; and
+  // `changes`, the changes on their way, in the order they were asked.
+  const prefKeys = new Map();
   let prefsLoaded = null;
   let prefsTried = false;
+  const prefKey = (name) => {
+    if (!prefKeys.has(name)) prefKeys.set(name, { held: null, saves: 0, changes: [] });
+    return prefKeys.get(name);
+  };
+  function changePref(name, present, value) {
+    const state = prefKey(name);
+    const change = { present, value };
+    state.changes.push(change);
+    const settle = () => { state.changes.splice(state.changes.indexOf(change), 1); };
+    return {
+      saved() { settle(); state.held = { present, value }; state.saves += 1; },
+      refused() { settle(); },
+    };
+  }
   // One key's writes and removals reach the store in the order they were
   // made, so what is stored follows what `get` answers.
   const prefWrites = new Map();
-  // Per key, the latest change asked, and what the device holds (the last
-  // value loaded or saved; absent when none). A change the device refused puts
-  // back what it holds, unless a later change came meanwhile; a key not loaded
-  // yet is left for the load to fill.
-  const prefChanges = new Map();
-  const prefsSaved = new Map();
-  let prefsLoadedOnce = false;
-  // How many changes each key has been asked: a load applies only to keys no
-  // change was asked for since it began.
-  const prefCounts = new Map();
-  function changePref(name, apply) {
-    const change = {};
-    prefChanges.set(name, change);
-    prefCounts.set(name, (prefCounts.get(name) || 0) + 1);
-    apply();
-    return {
-      saved(value, present = true) {
-        if (present) prefsSaved.set(name, value); else prefsSaved.delete(name);
-      },
-      refused() {
-        if (prefChanges.get(name) !== change) return;
-        if (prefsSaved.has(name)) prefValues.set(name, prefsSaved.get(name));
-        else {
-          prefValues.delete(name);
-          if (!prefsLoadedOnce) prefsChanged.delete(name);
-        }
-      },
-    };
-  }
   function inPrefOrder(name, task) {
     const next = (prefWrites.get(name) || Promise.resolve()).then(task);
     const tail = next.then(() => {}, () => {});
@@ -257,16 +245,17 @@ export function createDataManager({
       prefsTried = true;
       if (disposed) return Promise.resolve();
       if (prefsLoaded) return prefsLoaded;
-      const countsAtStart = new Map(prefCounts);
+      const savesAtStart = new Map([...prefKeys].map(([name, state]) => [name, state.saves]));
       const loading = service.read(PREFS_STORE).then((rows) => {
-        (rows || []).forEach((row) => {
-          if (!row || typeof row.key !== 'string') return;
-          // A key changed since this load began keeps what that change left.
-          if ((prefCounts.get(row.key) || 0) !== (countsAtStart.get(row.key) || 0)) return;
-          prefsSaved.set(row.key, row.value);
-          if (!prefValues.has(row.key) && !prefsChanged.has(row.key)) prefValues.set(row.key, row.value);
+        if (disposed) return;
+        const found = new Map();
+        (rows || []).forEach((row) => { if (row && typeof row.key === 'string') found.set(row.key, row.value); });
+        // What the device held when read, for every key no save has changed since.
+        new Set([...found.keys(), ...prefKeys.keys()]).forEach((name) => {
+          const state = prefKey(name);
+          if (state.saves !== (savesAtStart.get(name) || 0)) return;
+          state.held = found.has(name) ? { present: true, value: found.get(name) } : { present: false };
         });
-        prefsLoadedOnce = true;
       }).catch(() => { if (prefsLoaded === loading) prefsLoaded = null; });
       prefsLoaded = loading;
       return loading;
@@ -274,33 +263,34 @@ export function createDataManager({
     get(key, fallback = null) {
       if (disposed) return fallback;
       if (!prefsTried) prefs.ready();
-      return prefValues.has(String(key)) ? clone(prefValues.get(String(key))) : fallback;
+      const state = prefKeys.get(String(key));
+      const shown = state && (state.changes[state.changes.length - 1] || state.held);
+      return shown && shown.present ? clone(shown.value) : fallback;
     },
     async set(key, value) {
       live();
       const name = String(key);
-      const stored = clone(value);
-      const change = changePref(name, () => prefValues.set(name, stored));
-      prefsChanged.add(name);
+      const copied = clone(value);
+      const stored = copied === undefined ? null : copied;
+      const change = changePref(name, true, stored);
       // A device with no storage to keep prefs keeps none.
       if (!durableStores.has(PREFS_STORE)) { change.refused(); throw notSaved(name); }
-      const result = await inPrefOrder(name, () => service.ingest(PREFS_STORE, [{ key: name, value: stored === undefined ? null : stored }]))
+      const result = await inPrefOrder(name, () => service.ingest(PREFS_STORE, [{ key: name, value: stored }]))
         .catch((error) => { change.refused(); throw notSaved(name, error); });
       // Saved only once the device holds it: a store that kept it in memory
       // only (its storage full or gone) would lose it on reload.
       if (result?.unsaved?.includes(name)) { change.refused(); throw notSaved(name); }
       if (!result?.written) { change.refused(); throw Object.assign(new Error(`tommy.prefs: '${name}' was not saved`), { code: 'DATA_INVALID' }); }
-      change.saved(stored === undefined ? null : stored);
+      change.saved();
     },
     async remove(key) {
       live();
       const name = String(key);
-      const change = changePref(name, () => prefValues.delete(name));
-      prefsChanged.add(name);
+      const change = changePref(name, false);
       if (!durableStores.has(PREFS_STORE)) { change.refused(); throw notSaved(name); }
       await inPrefOrder(name, () => service.purge(PREFS_STORE, { keys: [name], force: true }))
         .catch((error) => { change.refused(); throw notSaved(name, error); });
-      change.saved(undefined, false);
+      change.saved();
     },
   });
 
@@ -309,11 +299,7 @@ export function createDataManager({
     prefs,
     async dispose(options) {
       disposed = true;
-      prefValues.clear();
-      prefsChanged.clear();
-      prefChanges.clear();
-      prefsSaved.clear();
-      prefCounts.clear();
+      prefKeys.clear();
       service.dispose();
       await Promise.all([...stores.values()].map((store) => store.dispose?.(options)));
     },

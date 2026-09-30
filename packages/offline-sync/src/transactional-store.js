@@ -90,21 +90,46 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     try { onPersistError?.({ event: 'persist_failed', store: name, key, ...result }); } catch (_) { /* reporting cannot change commit truth */ }
     throw new PersistError(name, { retained: false, ...result });
   }
-  // Rows outside `incoming` (and in `scope`) that hold a value one of the
-  // batch's rows takes in a unique index the store keeps.
+  // Per row of the batch, the rows outside `incoming` (and in `scope`) that
+  // hold a value it takes in a unique index the store keeps.
   async function uniqueHolders(batch, incoming, scope) {
     const names = Array.isArray(backend.unique) ? backend.unique.filter((name) => indexes[name]) : [];
-    if (!names.length || typeof backend.query !== 'function') return [];
+    const holders = new Map();
+    if (!names.length || typeof backend.query !== 'function') return holders;
     const lookups = batch.flatMap(([key, row]) => names.map((name) => {
       const values = [].concat(indexes[name]).map((field) => row[field]);
       return values.some((value) => value === undefined || value === null) ? null : { key, name, values };
     })).filter(Boolean);
     const found = await Promise.all(lookups.map(async ({ key, name, values }) => {
       const result = await backend.query({ index: name, equals: values, limit: 5, aged: true });
-      return (result.rows || []).filter((held) => held.key !== key && !incoming.has(held.key)
-        && (!scope || scope(held.value))).map((held) => held.key);
+      return [key, (result.rows || []).filter((held) => held.key !== key && !incoming.has(held.key)
+        && (!scope || scope(held.value))).map((held) => held.key)];
     }));
-    return [...new Set(found.flat())];
+    for (const [key, keys] of found) holders.set(key, [...new Set([...(holders.get(key) || []), ...keys])]);
+    return holders;
+  }
+  // The batch in commits of at most MAX_BATCH_ROWS keys, counting the rows
+  // each upsert takes a unique value from: a row and the holders it replaces
+  // always share a commit, and a holder already removed is not counted again.
+  function transferCommits(batch, holders, vacated) {
+    const commits = [];
+    let current = { rows: [], vacating: new Set() };
+    const needs = (key) => (holders.get(key) || []).filter((held) => !vacated.has(held) && !current.vacating.has(held));
+    for (const entry of batch) {
+      if (current.rows.length && current.rows.length + current.vacating.size + 1 + needs(entry[0]).length > MAX_BATCH_ROWS) {
+        commits.push(current);
+        current.vacating.forEach((key) => vacated.add(key));
+        current = { rows: [], vacating: new Set() };
+      }
+      const { vacating } = current;
+      needs(entry[0]).forEach((key) => vacating.add(key));
+      current.rows.push(entry);
+    }
+    if (current.rows.length) {
+      commits.push(current);
+      current.vacating.forEach((key) => vacated.add(key));
+    }
+    return commits;
   }
   async function mutation(keys, transform, { retry = false, syncedAt } = {}) {
     for (let attempt = 0; attempt < (retry ? 3 : 1); attempt += 1) {
@@ -310,22 +335,26 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         let upserted = 0;
         const skipped = new Set();
         const stamp = (row, previous, storeRevision) => ({ ...row, ...acknowledged(previous), _rev: rowRevision(previous, storeRevision), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) });
-        for (const batch of upsertBatches(incoming)) {
-          let left = [];
+        const vacated = new Set();
+        for (const chunk of upsertBatches(incoming)) {
           // A replacing read may give a unique value to another row than the
           // one holding it now: that clean, obsolete row goes in the same
           // commit, so the store's unique check sees the final set. An unsent
           // row holding it stays, a real conflict.
           // eslint-disable-next-line no-await-in-loop
-          const vacating = prune ? await uniqueHolders(batch, incoming, scope) : [];
-          await mutation([...batch.map(([key]) => key), ...vacating], (rows, storeRevision) => {
-            left = keepDirty ? batch.filter(([key]) => rows.get(key)?._dirty).map(([key]) => key) : [];
-            const clean = (key) => rows.has(key) && !rows.get(key)?._dirty;
-            const gone = vacating.filter(clean).map((key) => ({ op: 'delete', key }));
-            return [...gone, ...batch.filter(([key]) => !left.includes(key)).map(([key, row]) => ({ op: 'put', key, value: stamp(row, rows.get(key), storeRevision) }))];
-          }, { syncedAt, retry: true });
-          upserted += batch.length - left.length;
-          left.forEach((key) => skipped.add(key));
+          const holders = prune ? await uniqueHolders(chunk, incoming, scope) : new Map();
+          for (const { rows: batch, vacating } of transferCommits(chunk, holders, vacated)) {
+            let left = [];
+            // eslint-disable-next-line no-await-in-loop
+            await mutation([...batch.map(([key]) => key), ...vacating], (rows, storeRevision) => {
+              left = keepDirty ? batch.filter(([key]) => rows.get(key)?._dirty).map(([key]) => key) : [];
+              const clean = (key) => rows.has(key) && !rows.get(key)?._dirty;
+              const gone = [...vacating].filter(clean).map((key) => ({ op: 'delete', key }));
+              return [...gone, ...batch.filter(([key]) => !left.includes(key)).map(([key, row]) => ({ op: 'put', key, value: stamp(row, rows.get(key), storeRevision) }))];
+            }, { syncedAt, retry: true });
+            upserted += batch.length - left.length;
+            left.forEach((key) => skipped.add(key));
+          }
         }
         const counts = skipped.size ? { skipped: [...skipped] } : {};
         if (windowKey != null) { windows.delete(String(windowKey)); windows.set(String(windowKey), now()); }
