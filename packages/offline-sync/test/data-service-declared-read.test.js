@@ -289,6 +289,40 @@ describe('writes that land while a declared read is on its way', () => {
   });
 });
 
+describe('a read that answers no list', () => {
+  it('removes nothing and leaves the collection not fresh, declared or not', async () => {
+    const { data } = service();
+    await data.ingest('members', [{ id: 'a' }, { id: 'b' }], { replace: true });
+    data.source('members', { fetch: async () => null, read: { cursor: false } });
+    await data.refresh('members', { mode: 'visible' });
+    expect(await ids(data)).toEqual(['a', 'b']);
+    expect(data.status('members').state).not.toBe('fresh');
+    // A source with no declared read, answering nothing.
+    const plain = service();
+    await plain.data.ingest('members', [{ id: 'a' }], { replace: true });
+    plain.data.source('members', { fetch: async () => undefined });
+    await plain.data.refresh('members', { mode: 'visible' });
+    expect(await ids(plain.data)).toEqual(['a']);
+    expect(plain.data.status('members').state).not.toBe('fresh');
+  });
+});
+
+describe('a read of changes that only removes', () => {
+  it('tells its subscribers, even when it removes the only row', async () => {
+    const { data } = service();
+    const api = server([{ id: 'a', updated: 'c0' }]);
+    data.source('members', { fetch: api.fetch, read: { cursor: true, removedField: 'deleted_at' } });
+    await data.refresh('members', { mode: 'visible' });
+    const seen = [];
+    data.subscribe('members', (rows) => seen.push(rows.map((row) => row.id)));
+    await vi.waitFor(() => expect(seen).toEqual([['a']]));
+    api.set([{ id: 'a', updated: 'c2', deleted_at: '2026-10-01' }]);
+    await data.refresh('members', { mode: 'visible' });
+    expect(api.asked).toEqual([null, 'c1']);
+    await vi.waitFor(() => expect(seen.at(-1)).toEqual([]));
+  });
+});
+
 describe('a source\'s budget', () => {
   it('runs its refreshes in the budget and circuit it names, and refuses a budget that is not a name', async () => {
     const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });

@@ -10,7 +10,9 @@
 import {
   describe, it, expect, beforeEach, afterEach, vi,
 } from 'vitest';
-import { createLocalStorageBackend, hasWebStorage, createDataManager } from '../src/index.js';
+import {
+  createLocalStorageBackend, hasWebStorage, createDataManager, createMemoryStoreBackend,
+} from '../src/index.js';
 import { databaseName } from '../src/names.js';
 
 /**
@@ -186,6 +188,18 @@ describe('a pref removed while storage cannot be read', () => {
       await reloaded.prefs.ready();
       expect(reloaded.prefs.get('layout')).toBe('grid');
     } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+});
+
+describe('prefs on a store whose reads fail', () => {
+  it('answer a removal and a save the store could not read for as not saved, alike', async () => {
+    const unreadable = () => { throw Object.assign(new Error('Storage read failed (unavailable)'), { name: 'StorageReadError', reason: 'unavailable' }); };
+    const inner = createMemoryStoreBackend();
+    const failing = { ...inner, getAll: async () => unreadable(), get: async () => unreadable(), put: async () => unreadable() };
+    const data = createDataManager({ capabilityToken: { tenantId: 'team-53', mpId: 'scheduling' }, mpId: 'scheduling', localData: {},
+      backendFactory: (_db, storeName) => (storeName === 'prefs' ? failing : createMemoryStoreBackend()) });
+    await expect(data.prefs.remove('layout')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+    await expect(data.prefs.set('layout', 'grid')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
   });
 });
 

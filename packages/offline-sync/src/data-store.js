@@ -999,10 +999,10 @@ export function createDataStore({
     async put(record, { dedupeKey, silent = false, deferCap = false, server = false } = {}) {
       if (validate && !validate(record)) {
         const detail = (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ');
-        throw new Error(`store '${name}': record failed recordSchema: ${detail}`);
+        throw Object.assign(new Error(`store '${name}': record failed recordSchema: ${detail}`), { code: 'DATA_INVALID' });
       }
       const key = keyOf(record);
-      if (key === undefined) throw new Error(`store '${name}': record missing keyPath '${keyPath}'`);
+      if (key === undefined) throw Object.assign(new Error(`store '${name}': record missing keyPath '${keyPath}'`), { code: 'DATA_INVALID' });
       const turn = await rowTurn(key, async () => {
         const previous = await backend.get(key);
         if (server && previous?._dirty) return null;
@@ -1252,9 +1252,10 @@ export function createDataStore({
           // eslint-disable-next-line no-await-in-loop
           key = await api.put(record, { silent: true, deferCap: true, ...(keepDirty ? { server: true } : {}) });
         } catch (e) {
-          // Storage that cannot be reached fails the whole merge: nothing of it
-          // is known, and skipping rows would report an ingest that stored none.
-          if (e?.code === 'DATA_UNAVAILABLE') throw e;
+          // Only a record the store refused as a record (DATA_INVALID) or kept
+          // in memory (PersistError) is handled here; any other failure is the
+          // storage's, and fails the whole merge rather than be counted stored.
+          if (e?.name !== 'PersistError' && e?.code !== 'DATA_INVALID') throw e;
           // ⚠ TWO DIFFERENT FAILURES ARRIVE HERE AND THEY ARE NOT THE SAME ROW.
           //
           // A `PersistError` means the row IS in the store — the backend kept it

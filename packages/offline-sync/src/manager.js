@@ -232,11 +232,15 @@ export function createDataManager({
     tail.then(() => { if (prefWrites.get(name) === tail) prefWrites.delete(name); });
     return next;
   }
-  // A change the device's storage refused (full or gone) or could not read
-  // for (unavailable) is DATA_NOT_SAVED whatever the backend; any other error
-  // is passed on as it is.
+  // The one mapping every prefs write and removal answers through: a change
+  // the device's storage refused (full or gone) or could not read for, on
+  // any backend (a PersistError, DATA_UNAVAILABLE, or a host store's
+  // StorageReadError other than a retired store), is DATA_NOT_SAVED; any
+  // other error is passed on as it is.
+  const storageRefusal = (error) => error?.name === 'PersistError' || error?.code === 'DATA_UNAVAILABLE'
+    || (error?.name === 'StorageReadError' && error.reason !== 'retired');
   function notSaved(name, error) {
-    if (error && error.name !== 'PersistError' && error.code !== 'DATA_UNAVAILABLE') return error;
+    if (error && !storageRefusal(error)) return error;
     return Object.assign(new Error(`tommy.prefs: '${name}' was not saved on this device`), { code: 'DATA_NOT_SAVED', ...(error ? { cause: error } : {}) });
   }
   // Once disposed, prefs answer nothing held (never the previous account's

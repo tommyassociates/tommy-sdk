@@ -104,6 +104,19 @@ function keysDigest(keys) {
 }
 /* eslint-enable no-bitwise */
 const rawRows = (store) => (store.getAllRaw ? store.getAllRaw() : store.getAll());
+// A read that answered no list: nothing of the collection is removed or
+// stamped for it.
+const NO_SNAPSHOT = Symbol('no snapshot');
+/**
+ * The rows a list or declared read answered, or null when it answered no
+ * list (`null`, `undefined`, an object without `rows`): the one check every
+ * read's answer passes through, so only an explicit list may replace rows.
+ */
+function snapshotRows(answer) {
+  if (Array.isArray(answer)) return answer;
+  if (answer && typeof answer === 'object' && Array.isArray(answer.rows)) return answer.rows;
+  return null;
+}
 // One reconcile carries a bounded complete set; larger ingests go in chunks.
 const INGEST_CHUNK = 500;
 // Keys whose last local change a read still on its way must keep, per collection.
@@ -489,12 +502,15 @@ export function createDataService({
         // eslint-disable-next-line no-await-in-loop
         if (await removeRow({ label, store, key, force })) removed.push(key);
       }
-      return removed;
+    } else {
+      for (let start = 0; start < keys.length; start += PAGE_ROWS) {
+        // eslint-disable-next-line no-await-in-loop
+        removed.push(...await store.deleteMany(keys.slice(start, start + PAGE_ROWS), { keep: (row) => !!row._dirty, silent: true }));
+      }
     }
-    for (let start = 0; start < keys.length; start += PAGE_ROWS) {
-      // eslint-disable-next-line no-await-in-loop
-      removed.push(...await store.deleteMany(keys.slice(start, start + PAGE_ROWS), { keep: (row) => !!row._dirty, silent: true }));
-    }
+    // The removals go out together, once: every subscriber hears of them,
+    // whichever path removed the rows (a purge, a trim, a read of changes).
+    if (removed.length) await store.revalidateSubscribers?.();
     return removed;
   }
   function entryFor({ name, label, key, store, decl }) {
@@ -757,10 +773,11 @@ export function createDataService({
         }
         throw error;
       }
-      if (!isCurrent()) return;
+      if (!isCurrent()) return undefined;
+      if (snapshotRows(answer) === null) return NO_SNAPSHOT;
       // eslint-disable-next-line no-await-in-loop
       const outcome = await inTurn(name, () => commitDeclared(target, spec, answer, { startedAt, since, isCurrent }));
-      if (outcome !== 'read_again') return;
+      if (outcome !== 'read_again') return undefined;
     }
     throw serviceError(`'${name}' changed on this device faster than it could be read`, 'DATA_BUSY');
   }
@@ -791,7 +808,7 @@ export function createDataService({
     const keyOf = (row) => String(row[keyPath]);
     const rows = await rawRows(store);
     const present = new Set(rows.map(keyOf));
-    const dtos = (Array.isArray(answer) ? answer : (answer?.rows || [])).filter((dto) => dto && typeof dto === 'object');
+    const dtos = (snapshotRows(answer) || []).filter((dto) => dto && typeof dto === 'object');
     const toRecord = spec.toRecord || ((dto) => dto);
     const dtoKey = typeof spec.keyOf === 'function' ? spec.keyOf : (dto) => dto[keyPath];
     const previous = previousByKey(rows, keyPath);
@@ -1035,8 +1052,7 @@ export function createDataService({
           return;
         }
         if (spec.read && !wanted.query && !wanted.window && typeof spec.scope !== 'function') {
-          await readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent, { full });
-          return;
+          return readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent, { full });
         }
         // A query target prunes only the rows of that query; a list or window
         // target the source's scope (the whole collection without one).
@@ -1051,9 +1067,10 @@ export function createDataService({
         // Only a read of the whole collection marks it synced.
         const whole = !wanted.query && typeof spec.scope !== 'function';
         // Fetched first; stored in the collection's turn.
-        const dtos = await spec.fetch(wanted, jobContext);
-        if (!isCurrent()) return;
-        await inTurn(name, () => reconcileFetched(touching(name, store, keyPath), keyPath, { fetch: () => dtos, toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
+        const dtos = snapshotRows(await spec.fetch(wanted, jobContext));
+        if (!isCurrent()) return undefined;
+        if (dtos === null) return NO_SNAPSHOT;
+        return inTurn(name, () => reconcileFetched(touching(name, store, keyPath), keyPath, { fetch: () => dtos, toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
           scope, wanted.window, windowKeyOf(wanted.window), { onPersistError, rethrow: true, keepDirty: true, ...(whole ? {} : { syncedAt: null }) }));
       };
       state.flight = scheduler.request({
@@ -1062,7 +1079,9 @@ export function createDataService({
           ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
           : { priority: PRIORITIES.background, visible: false }),
         run,
-      }).then(() => {
+      }).then((outcome) => {
+        // A read that answered no list leaves the collection as it was, not fresh.
+        if (outcome === NO_SNAPSHOT) { if (state.state === 'refreshing') state.state = 'stale'; return; }
         state.state = 'fresh'; state.syncedAt = now(); state.error = null;
       }, (error) => {
         state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
@@ -1275,7 +1294,6 @@ export function createDataService({
           label, store: touching(name, store, keyPath), keys: entries.filter(({ dirty }) => force || !dirty).map(({ key }) => key), force,
         });
         await adjustMeta(name, whole ? null : { added: [], removed });
-        await store.revalidateSubscribers?.();
         return { removed };
       });
     },
@@ -1297,7 +1315,6 @@ export function createDataService({
         const older = entries.slice(0, Math.max(0, entries.length - spec.keep)).filter(({ dirty }) => !dirty).map(({ key }) => key);
         const removed = await removeRows({ label, store: touching(name, store, keyPath), keys: older, force: false });
         await adjustMeta(name, { added: [], removed });
-        if (removed.length) await store.revalidateSubscribers?.();
         return { removed };
       });
     },
