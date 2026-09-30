@@ -127,6 +127,48 @@ describe('a declared read', () => {
     expect(await ids(data)).toEqual(['a', 'c']);
   });
 
+  it('patches rows as they are now: nothing else changes, a gone row stays gone, and a read begun before never undoes it', async () => {
+    const { data } = service();
+    let answer;
+    data.source('members', {
+      fetch: () => new Promise((resolve) => { answer = resolve; }),
+      read: { cursor: false },
+    });
+    await data.ingest('members', [{ id: 'a', name: 'Ana', member: false }, { id: 'b', name: 'Ben', member: false }], { replace: true });
+    const reading = data.refresh('members', { mode: 'visible' });
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    // Renamed meanwhile; then the server's change is patched on.
+    await data.ingest('members', [{ id: 'a', name: 'Ana Maria', member: false }]);
+    await expect(data.patchRows('members', ['a', 'gone'], { member: true })).resolves.toEqual({ patched: ['a'] });
+    answer({ rows: [{ id: 'a', name: 'Ana', member: false }, { id: 'b', name: 'Ben', member: false }] });
+    await reading;
+    expect(await data.read('members', 'a')).toEqual({ id: 'a', name: 'Ana Maria', member: true });
+    expect(await data.read('members', 'gone')).toBeNull();
+    expect(await ids(data)).toEqual(['a', 'b']);
+    // A row with an unsent local write keeps that write.
+    await data.mutate('members', { op: 'patch', key: 'b', patch: { name: 'Benny' } });
+    await expect(data.patchRows('members', ['b'], { member: true })).resolves.toEqual({ patched: [] });
+    expect(await data.read('members', 'b')).toEqual({ id: 'b', name: 'Benny', member: false });
+    await expect(data.patchRows('members', ['a'], { id: 'z' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.patchRows('members', ['a'], null)).rejects.toMatchObject({ code: 'DATA_INVALID' });
+  });
+
+  it('adopts rows only into an empty collection, decided in its turn, and a read begun before replaces them', async () => {
+    const { data } = service();
+    let answer;
+    data.source('members', {
+      fetch: () => new Promise((resolve) => { answer = resolve; }),
+      read: { cursor: false },
+    });
+    const reading = data.refresh('members', { mode: 'visible' });
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    await expect(data.ingest('members', [{ id: 'a', name: 'Old Ana' }], { ifEmpty: true })).resolves.toMatchObject({ written: 1 });
+    await expect(data.ingest('members', [{ id: 'z', name: 'Old Zed' }], { ifEmpty: true })).resolves.toEqual({ written: 0 });
+    answer({ rows: [{ id: 'a', name: 'Ana' }, { id: 'b', name: 'Ben' }] });
+    await reading;
+    expect(await data.read('members')).toEqual([{ id: 'a', name: 'Ana' }, { id: 'b', name: 'Ben' }]);
+  });
+
   it('keys each answered row by its record, and never takes an answer with no keyed row for an empty collection', async () => {
     const { data } = service();
     let answer = { rows: [{ member_id: 'a' }, { member_id: 'b' }] };

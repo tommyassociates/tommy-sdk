@@ -1098,7 +1098,10 @@ export function createDataService({
      * scope that the set leaves out are removed, dirty rows never. After a
      * replacing or `complete` ingest the collection is fresh. Resolves
      * `{ written }`, the rows stored, and `unsaved`, the keys of rows a store
-     * could keep only in memory (its device storage refused them).
+     * could keep only in memory (its device storage refused them). With
+     * `ifEmpty`, the rows (an earlier copy, such as a restored snapshot) are
+     * stored only while the collection holds none, decided in its turn, and
+     * as rows no newer than any read: a read already on its way replaces them.
      */
     // A replacing ingest, or one of rows a complete read delivered
     // (`complete`), stamps the collection synced; any other does not.
@@ -1113,6 +1116,12 @@ export function createDataService({
         // A replacement ends what a declared read's cursor describes; a few
         // rows keep the source meta in step with the keys they add.
         const tracksMeta = !!(sources.get(name) || decl?.source)?.read?.cursor;
+        if (options?.ifEmpty === true) {
+          if ((await store.getAllRaw()).length) return { written: 0 };
+          const adopted = await ingestRows(collection, rows, { complete: false }, store);
+          if (tracksMeta) await adjustMeta(name, null);
+          return adopted;
+        }
         const small = tracksMeta && !options?.replace && Array.isArray(rows) && rows.length <= PAGE_ROWS;
         const keys = small ? [...new Set(rows.filter((row) => row && typeof row === 'object').map((row) => String(row[keyPath])))] : [];
         const before = small ? await Promise.all(keys.map(async (key) => !!(await store.getRaw(key)))) : [];
@@ -1124,6 +1133,30 @@ export function createDataService({
           });
         } else if (tracksMeta) await adjustMeta(name, null);
         return result;
+      });
+    },
+    /**
+     * Applies a change the server made (`patch`, the fields it set) to the
+     * rows of `keys` as they are now, in the collection's turn: nothing else
+     * in a row changes, a row that is gone stays gone, nothing is pushed, and
+     * a read already on its way never undoes it. A row with an unsent local
+     * write keeps that write. Resolves `{ patched }`, the keys changed.
+     */
+    async patchRows(collection, keys, patch) {
+      live();
+      const { name, store, decl } = local(collection);
+      const keyPath = decl?.keyPath || 'id';
+      if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw serviceError('patchRows: patch must be an object of fields', 'DATA_INVALID');
+      if (Object.hasOwn(patch, keyPath)) throw serviceError('patchRows: a patch never changes a row\'s key', 'DATA_INVALID');
+      const wanted = [...new Set((Array.isArray(keys) ? keys : [keys]).filter((key) => key !== null && key !== undefined).map(String))];
+      return inTurn(name, async () => {
+        const current = await Promise.all(wanted.map((key) => store.getRaw(key)));
+        // eslint-disable-next-line no-underscore-dangle
+        const rows = current.filter((row) => row && !row._deleted && !row._dirty).map((row) => ({ ...bare(row), ...patch }));
+        if (!rows.length) return { patched: [] };
+        const result = await ingestRows(collection, rows, {}, touching(name, store, keyPath));
+        const unsaved = new Set(result.unsaved || []);
+        return { patched: rows.map((row) => String(row[keyPath])).filter((key) => !unsaved.has(key)) };
       });
     },
     /**
