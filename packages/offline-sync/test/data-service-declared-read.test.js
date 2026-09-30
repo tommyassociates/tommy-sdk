@@ -394,6 +394,35 @@ describe('a read of changes that only removes', () => {
   });
 });
 
+describe('a declared read\'s reads of the stored rows', () => {
+  it('reads the collection once when nothing changed it before the commit, and again when something did', async () => {
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
+    let reads = 0;
+    const counted = new Proxy(store, { get(target, property) {
+      if (property === 'getAllRaw') return (...args) => { reads += 1; return target.getAllRaw(...args); };
+      const value = target[property];
+      return typeof value === 'function' ? value.bind(target) : value;
+    } });
+    const data = createDataService({ resolve: (name) => (name === 'members' ? { store: counted, decl: { keyPath: 'id' } } : null), sourceMeta: createMemorySourceMeta() });
+    const api = server([{ id: 'a', updated: 'c0' }]);
+    let during = null;
+    data.source('members', {
+      fetch: async (target, context) => { if (during) await during(); return api.fetch(target, context); },
+      read: { cursor: true },
+    });
+    await data.refresh('members', { mode: 'visible' });
+    reads = 0;
+    await data.refresh('members', { mode: 'visible' });
+    expect(reads).toBe(1);
+    // A row arrives while the next read is on its way: the commit reads again.
+    reads = 0;
+    during = () => data.ingest('members', [{ id: 'b', updated: 'c0' }]);
+    await data.refresh('members', { mode: 'visible' });
+    expect(reads).toBe(2);
+    expect(await ids(data)).toEqual(['a', 'b']);
+  });
+});
+
 describe('a source\'s budget', () => {
   it('runs its refreshes in the budget and circuit it names, and refuses a budget that is not a name', async () => {
     const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });

@@ -336,6 +336,24 @@ export function createDataService({
     return touching(name, store, decl?.keyPath || 'id');
   };
   const metaOf = async (name) => { try { return await sourceMeta.get(name); } catch (_) { return null; } };
+  // Per collection, a count of changes to its rows as this page hears of
+  // them (its store's own notices, and the change feed's for other tabs,
+  // evictions and purges): a declared read reuses the rows it read before
+  // fetching when nothing changed by its commit.
+  const generations = new Map();
+  const watchedStores = new Map();
+  const generationOf = (name) => generations.get(name) || 0;
+  const bump = (name) => generations.set(name, generationOf(name) + 1);
+  function watchChanges(name, store) {
+    if (watchedStores.has(name) || typeof store.onChange !== 'function') return;
+    try { watchedStores.set(name, store.onChange(() => bump(name))); } catch (_) { /* no notices: rows are read again */ }
+  }
+  const offGenerationFeed = feed?.subscribe((event) => {
+    [...watchedStores.keys()].forEach((name) => {
+      const label = labelOf(name);
+      if (event?.label === label || event?.labels?.includes(label) || (event?.type === 'purge' && !event.label)) bump(name);
+    });
+  });
   /**
    * Keeps a collection's source meta in step with keys a write added or
    * removed (`toggled`: keys whose presence changed), or forgets it
@@ -756,10 +774,14 @@ export function createDataService({
     for (let attempt = 0; attempt < DECLARED_READ_TRIES; attempt += 1) {
       const startedAt = touchSequence;
       let since = null;
+      let read = null;
       if (keepsCursor && !full) {
         // Each attempt decides afresh from the stored rows and their meta.
+        watchChanges(name, store);
+        const generation = generationOf(name);
         // eslint-disable-next-line no-await-in-loop
         const [meta, rows] = await Promise.all([metaOf(name), rawRows(store)]);
+        read = { rows, generation };
         const keys = rows.map((row) => String(row[keyPath]));
         const whole = !!meta && typeof meta.digest === 'string' && meta.count === keys.length && meta.digest === keysDigest(keys);
         if (whole && typeof meta.cursor === 'string' && meta.cursor && Number.isFinite(meta.fullAt) && now() - meta.fullAt < fullEveryMs) since = meta.cursor;
@@ -777,7 +799,9 @@ export function createDataService({
       if (!isCurrent()) return undefined;
       if (snapshotRows(answer) === null) return NO_SNAPSHOT;
       // eslint-disable-next-line no-await-in-loop
-      const outcome = await inTurn(name, () => commitDeclared(target, spec, answer, { startedAt, since, isCurrent }));
+      const outcome = await inTurn(name, () => commitDeclared(target, spec, answer, {
+        startedAt, since, isCurrent, read,
+      }));
       if (outcome !== 'read_again') return undefined;
     }
     throw serviceError(`'${name}' changed on this device faster than it could be read`, 'DATA_BUSY');
@@ -802,12 +826,15 @@ export function createDataService({
    *     leaves no digest, so the refused change is asked for again.
    * A record the collection's schema refuses is reported and never stored.
    */
-  async function commitDeclared({ name, label, store, keyPath }, spec, answer, { startedAt, since, isCurrent }) {
+  async function commitDeclared({ name, label, store, keyPath }, spec, answer, {
+    startedAt, since, isCurrent, read = null,
+  }) {
     const { cursor: keepsCursor = false, removedField = null } = spec.read;
     if (!isCurrent() || replacedAfter(name, startedAt)) return 'dropped';
     if (protectionLost(name, startedAt)) return 'read_again';
     const keyOf = (row) => String(row[keyPath]);
-    const rows = await rawRows(store);
+    // The rows read before fetching, while nothing has changed them since.
+    const rows = read && generationOf(name) === read.generation ? read.rows : await rawRows(store);
     const present = new Set(rows.map(keyOf));
     const dtos = snapshotRows(answer) || [];
     const toRecord = spec.toRecord || ((dto) => dto);
@@ -1380,6 +1407,9 @@ export function createDataService({
     dispose() {
       disposed = true;
       offOrphanFeed?.();
+      offGenerationFeed?.();
+      watchedStores.forEach((off) => { try { off?.(); } catch (_) { /* gone */ } });
+      watchedStores.clear();
       listeners.clear();
       sources.clear();
       // Unsent rows stay dirty on disk; the next service sends them again.
