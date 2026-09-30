@@ -565,7 +565,9 @@ export interface DataApi {
    * @experimental An optimistic write pushed through a source's `push`. An
    * unsent change stays on the row (a delete as a hidden tombstone) and is
    * sent again after a reload; a change refused for access (403) waits,
-   * marked on the row, until `retry`; failed ones go again on reconnect.
+   * marked on the row, until `retry`, and later changes to that row wait with
+   * it (with `wait`, they reject `DATA_ACCESS_CHANGED`); a retry sends the row
+   * once, as it is then. Failed ones go again on reconnect.
    */
   mutate?<Rec = unknown>(collection: string, command: DataMutation<Rec>, options?: { wait?: boolean }): Promise<{ key: string; pushed: boolean }>;
   /**

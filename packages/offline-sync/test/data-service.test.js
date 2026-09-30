@@ -782,6 +782,21 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     await database.close();
   });
 
+  it('keeps a row\'s refusal for access through a later local write, and drops it when the row is synced', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'drafts', policy: 'authored', schemaVersion: 1, cacheFingerprint: null,
+      limits: { maxRows: 1000, maxAgeMs: null, maxBytes: null } };
+    const store = createDataStore({ name: 'drafts', backend: transactionalBackend(port, null, options) });
+    await store.put({ id: 'd1', v: 'first' });
+    await store.markRow('d1', { _pushRefused: 'access' });
+    await store.put({ id: 'd1', v: 'second' });
+    expect(await store.getRaw('d1')).toMatchObject({ v: 'second', _dirty: true, _pushRefused: 'access' });
+    await store.markSynced('d1');
+    expect(await store.getRaw('d1')).not.toHaveProperty('_pushRefused');
+    await database.close();
+  });
+
   it('reads a declared index in memory where the store opened without it', async () => {
     const database = create();
     const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });

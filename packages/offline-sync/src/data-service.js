@@ -341,6 +341,13 @@ export function createDataService({
   function enqueuePush(target, change) {
     const entry = entryFor(target);
     const done = addChange(entry, change);
+    // A row refused for access stays refused: a later change joins it, unsent,
+    // until a person retries.
+    if (entry.state === 'access_changed') {
+      entry.changes.at(-1).reject(serviceError('Access changed: kept on this device until retried', 'DATA_ACCESS_CHANGED'));
+      emitStatus();
+      return done;
+    }
     if (entry.state !== 'sending') entry.state = 'queued';
     emitStatus();
     drain(entry).catch(() => {});
@@ -786,8 +793,18 @@ export function createDataService({
         entry = outbox.get(id) || restoreEntry({ name, label, key: String(key), store, decl }, row);
       }
       if (!entry.draining && ['failed', 'access_changed'].includes(entry.state)) {
-        // A person asked: a refusal for access is cleared from the row and it is sent again.
-        if (entry.state === 'access_changed') { try { await store.markRow?.(String(key), { _pushRefused: null }); } catch (_) { /* sent anyway */ } }
+        // A person asked: a refusal for access is cleared from the row, and the
+        // row is sent once, as it is now, whatever edits joined it meanwhile.
+        if (entry.state === 'access_changed') {
+          try { await store.markRow?.(String(key), { _pushRefused: null }); } catch (_) { /* sent anyway */ }
+          const row = await store.getRaw?.(String(key));
+          if (row?._dirty) {
+            entry.changes.splice(0);
+            const record = bare(row);
+            const command = row._deleted ? { op: 'delete', key: String(key) } : { op: 'put', record };
+            addChange(entry, { command, record: row._deleted ? null : record, revision: row._rev, restored: true }).catch(() => {});
+          }
+        }
         entry.state = 'queued'; emitStatus();
       }
       return drain(entry);

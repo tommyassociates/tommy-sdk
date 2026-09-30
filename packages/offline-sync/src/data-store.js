@@ -996,6 +996,8 @@ export function createDataStore({
           ...(previous?._window != null ? { _window: previous._window } : {}),
           // What a push acknowledged of this row stays known through later writes.
           ...(Number.isSafeInteger(previous?._ackRev) ? { _ackRev: previous._ackRev } : {}),
+          // A local write keeps a refusal for access: the row stays refused until a retry.
+          ...(!server && previous?._pushRefused != null ? { _pushRefused: previous._pushRefused } : {}),
           _rev: nextRowRevision(previous),
           _updatedAt: new Date(now()).toISOString(),
           _dirty: !server,

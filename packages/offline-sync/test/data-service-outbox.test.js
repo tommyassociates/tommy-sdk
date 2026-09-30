@@ -245,6 +245,60 @@ describe('a push refused for access', () => {
     await vi.waitFor(async () => expect((await store.getRaw('a'))._dirty).toBe(false));
   });
 
+  it('stays refused through later edits: they stay unsent until a retry, which sends the latest state once', async () => {
+    const { data, store } = service();
+    const pushes = [];
+    let refuse = true;
+    data.source('items', {
+      fetch: async () => [],
+      push: async (command) => {
+        pushes.push(command);
+        if (refuse) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      },
+    });
+    await data.mutate('items', { op: 'put', record: { id: 'a', v: 'first' } });
+    await vi.waitFor(() => expect(data.pending()[0]?.state).toBe('access_changed'));
+    // A later edit of the refused row is kept on the device, unsent, with it.
+    const later = data.mutate('items', { op: 'patch', key: 'a', patch: { v: 'second' } }, { wait: true });
+    await expect(later).rejects.toBeTruthy();
+    await settle();
+    expect(pushes).toHaveLength(1);
+    expect(data.pending().map((entry) => [entry.key, entry.state])).toEqual([['a', 'access_changed']]);
+    expect(await store.getRaw('a')).toMatchObject({ v: 'second', _dirty: true, _pushRefused: 'access' });
+    // A restart lists it as refused and sends nothing.
+    data.dispose();
+    const next = service({ store }).data;
+    next.source('items', { fetch: async () => [], push: async (command) => { pushes.push(command); } });
+    await vi.waitFor(() => expect(next.pending().map((entry) => entry.state)).toEqual(['access_changed']));
+    expect(pushes).toHaveLength(1);
+    // Asked: one push, of the latest state.
+    refuse = false;
+    await next.retry('items', 'a');
+    expect(pushes).toHaveLength(2);
+    expect(pushes[1]).toMatchObject({ op: 'put', record: { id: 'a', v: 'second' } });
+  });
+
+  it('sends a refused row once, as it is now, when retried in the same session after later edits', async () => {
+    const { data } = service();
+    const pushes = [];
+    let refuse = true;
+    data.source('items', {
+      fetch: async () => [],
+      push: async (command) => { pushes.push(command); if (refuse) throw Object.assign(new Error('Forbidden'), { status: 403 }); },
+    });
+    await data.mutate('items', { op: 'put', record: { id: 'a', v: 'first' } });
+    await vi.waitFor(() => expect(data.pending()[0]?.state).toBe('access_changed'));
+    await data.mutate('items', { op: 'patch', key: 'a', patch: { v: 'second' } });
+    await data.mutate('items', { op: 'patch', key: 'a', patch: { v: 'third' } });
+    await settle();
+    expect(pushes).toHaveLength(1);
+    refuse = false;
+    await data.retry('items', 'a');
+    expect(pushes).toHaveLength(2);
+    expect(pushes[1]).toMatchObject({ op: 'put', record: { id: 'a', v: 'third' } });
+    expect(data.pending()).toEqual([]);
+  });
+
   it('retries only failed changes when asked to retry failures', async () => {
     const { data } = service();
     let fail = true;

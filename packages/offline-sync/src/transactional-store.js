@@ -206,7 +206,10 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       return exclusive(async () => {
         await mutation([key], (rows, storeRevision) => {
           const previous = rows.get(key);
-          const stamped = { ...submitted, ...(previous?._window != null ? { _window: previous._window } : {}), ...acknowledged(previous), _rev: rowRevision(previous, storeRevision), _dirty: true, _updatedAt: new Date(now()).toISOString(), ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}) };
+          // A local write keeps the row's window, what a push acknowledged,
+          // and a refusal for access: the row stays refused until a retry.
+          const refusal = previous?._pushRefused != null ? { _pushRefused: previous._pushRefused } : {};
+          const stamped = { ...submitted, ...(previous?._window != null ? { _window: previous._window } : {}), ...acknowledged(previous), ...refusal, _rev: rowRevision(previous, storeRevision), _dirty: true, _updatedAt: new Date(now()).toISOString(), ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}) };
           return [{ op: 'put', key, value: stamped }];
         }, { retry: true });
         if (!silent) await notify();
