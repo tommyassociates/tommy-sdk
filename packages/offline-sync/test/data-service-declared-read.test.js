@@ -139,7 +139,9 @@ describe('a declared read', () => {
     await new Promise((resolve) => { setTimeout(resolve, 0); });
     // Renamed meanwhile; then the server's change is patched on.
     await data.ingest('members', [{ id: 'a', name: 'Ana Maria', member: false }]);
-    await expect(data.patchRows('members', ['a', 'gone'], { member: true })).resolves.toEqual({ patched: ['a'] });
+    await expect(data.patchRows('members', ['a', 'gone'], { member: true })).resolves.toEqual({
+      patched: ['a'], unsaved: [], skipped: [{ key: 'gone', reason: 'gone' }], refused: [],
+    });
     answer({ rows: [{ id: 'a', name: 'Ana', member: false }, { id: 'b', name: 'Ben', member: false }] });
     await reading;
     expect(await data.read('members', 'a')).toEqual({ id: 'a', name: 'Ana Maria', member: true });
@@ -147,7 +149,9 @@ describe('a declared read', () => {
     expect(await ids(data)).toEqual(['a', 'b']);
     // A row with an unsent local write keeps that write.
     await data.mutate('members', { op: 'patch', key: 'b', patch: { name: 'Benny' } });
-    await expect(data.patchRows('members', ['b'], { member: true })).resolves.toEqual({ patched: [] });
+    await expect(data.patchRows('members', ['b'], { member: true })).resolves.toEqual({
+      patched: [], unsaved: [], skipped: [{ key: 'b', reason: 'unsent' }], refused: [],
+    });
     expect(await data.read('members', 'b')).toEqual({ id: 'b', name: 'Benny', member: false });
     await expect(data.patchRows('members', ['a'], { id: 'z' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
     await expect(data.patchRows('members', ['a'], null)).rejects.toMatchObject({ code: 'DATA_INVALID' });
@@ -167,6 +171,31 @@ describe('a declared read', () => {
     answer({ rows: [{ id: 'a', name: 'Ana' }, { id: 'b', name: 'Ben' }] });
     await reading;
     expect(await data.read('members')).toEqual([{ id: 'a', name: 'Ana' }, { id: 'b', name: 'Ben' }]);
+  });
+
+  it('names a patched row its schema refuses, and never counts it patched', async () => {
+    const store = createDataStore({
+      name: 'members', backend: createMemoryStoreBackend(),
+      recordSchema: { type: 'object', properties: { member: { type: 'boolean' } } },
+    });
+    const { data } = service({ store });
+    await data.ingest('members', [{ id: 'a', member: false }]);
+    const result = await data.patchRows('members', ['a'], { member: 'yes' });
+    expect(result.patched).toEqual([]);
+    expect(result.refused).toEqual([{ key: 'a', reason: expect.stringContaining('member') }]);
+    expect(await data.read('members', 'a')).toEqual({ id: 'a', member: false });
+  });
+
+  it('takes no answer with an entry that is not a keyed row: nothing is removed and the collection is not fresh', async () => {
+    const { data } = service();
+    let answer = { rows: [null] };
+    data.source('members', { fetch: async () => answer, read: { cursor: false } });
+    await data.ingest('members', [{ id: 'a' }, { id: 'b' }]);
+    await expect(data.refresh('members', { mode: 'visible' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    answer = { rows: [{ id: 'a' }, { name: 'no key' }] };
+    await expect(data.refresh('members', { mode: 'visible' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    expect(await ids(data)).toEqual(['a', 'b']);
+    expect(data.status('members').state).not.toBe('fresh');
   });
 
   it('keys each answered row by its record, and never takes an answer with no keyed row for an empty collection', async () => {

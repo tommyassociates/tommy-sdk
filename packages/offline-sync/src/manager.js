@@ -121,9 +121,13 @@ export const PREFS_DECL = Object.freeze({
 });
 const clone = (value) => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));
 
+// `lane`: what keeps this world's scheduler jobs (its reads and pushes) apart
+// from another world's of the same MP on a shared scheduler; the host names
+// the world (its viewer and account). Without one, the MP's database for its
+// tenant does.
 export function createDataManager({
   capabilityToken, mpId, localData: declaredData = {}, backendFactory, now, onPersistError,
-  scheduler, feed = null, isOnline,
+  scheduler, feed = null, isOnline, lane = null,
 }) {
   const localData = { ...declaredData, [PREFS_STORE]: PREFS_DECL };
   const dbName = databaseName(capabilityToken, mpId);
@@ -186,6 +190,7 @@ export function createDataManager({
     resolve: (name) => (stores.has(name) ? { store: stores.get(name), decl: localData[name] } : null),
     labelOf: (name) => `mp.${mpId}.${name}`,
     budgetKey: `mp.${mpId}`,
+    lane: typeof lane === 'string' && lane ? lane : dbName,
     ...(scheduler ? { scheduler } : {}),
     ...(now ? { now } : {}),
     ...(typeof isOnline === 'function' ? { isOnline } : {}),

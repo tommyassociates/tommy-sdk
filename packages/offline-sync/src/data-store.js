@@ -1207,6 +1207,52 @@ export function createDataStore({
 
     },
     /**
+     * Sets `patch`'s fields on the stored rows of `keys` as a server change:
+     * each row is read and written in one turn (other handles in this page,
+     * and other tabs over shared storage, wait for it), so a write or delete
+     * that lands first is what the patch applies to. A row that is gone or
+     * holds an unsent local write is left as it is; a row the record schema
+     * refuses once patched is not written. Resolves `{ patched, unsaved,
+     * skipped: [{ key, reason: 'gone' | 'unsent' }], refused: [{ key, reason }] }`;
+     * `unsaved` rows are patched in memory but not on the device.
+     */
+    async patchSynced(keys, patch) {
+      const patched = [];
+      const unsaved = [];
+      const skipped = [];
+      const refused = [];
+      const changed = [];
+      for (const key of [...new Set((keys || []).map(String))]) {
+        // eslint-disable-next-line no-await-in-loop
+        const outcome = await rowTurn(key, async () => {
+          const previous = await backend.get(key);
+          if (!previous || previous._deleted) return { skip: 'gone' };
+          if (previous._dirty) return { skip: 'unsent' };
+          const record = { ...stripMeta(previous), ...patch };
+          if (validate && !validate(record)) {
+            return { refuse: (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ') || 'invalid' };
+          }
+          const { _persistFailed: _pf, ...meta } = Object.fromEntries(Object.entries(previous).filter(([field]) => field.startsWith('_')));
+          const persisted = await backend.put(key, {
+            ...record, ...meta, _rev: nextRowRevision(previous), _updatedAt: new Date(now()).toISOString(), _dirty: false,
+          });
+          return { persisted };
+        });
+        if (outcome.skip) skipped.push({ key, reason: outcome.skip });
+        else if (outcome.refuse) refused.push({ key, reason: outcome.refuse });
+        else {
+          changed.push(key, ...accountForGoneRows(outcome.persisted, key));
+          if (outcome.persisted && outcome.persisted.ok === false) {
+            if (outcome.persisted.retained === false) refused.push({ key, reason: outcome.persisted.reason || 'not-saved' });
+            else unsaved.push(key);
+            reportPersistFailure(outcome.persisted, key);
+          } else patched.push(key);
+        }
+      }
+      if (changed.length) await notify(changed);
+      return { patched, unsaved, skipped, refused };
+    },
+    /**
      * SWR reconcile — merge a fresh AUTHORITATIVE set of records into the store,
      * the read-through pattern every windowed MP grid needs: upsert each record
      * and mark it synced (it came from the server, not a local edit), then prune

@@ -264,6 +264,39 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         return found;
       });
     },
+    /**
+     * Sets `patch`'s fields on the stored rows of `keys` (at most 100) as a
+     * server change, in one revision-checked commit: a write that lands first
+     * makes it read the rows again, so the patch applies to them as they are.
+     * A row that is gone or holds an unsent local write is left as it is; a
+     * row the record schema refuses once patched is not written. Resolves
+     * `{ patched, unsaved: [], skipped: [{ key, reason }], refused: [{ key, reason }] }`.
+     */
+    patchSynced(keys, patch) {
+      const wanted = [...new Set((keys || []).map(keyString))];
+      if (wanted.length > 100) return Promise.reject(new StorageReadError('payload-capacity'));
+      return exclusive(async () => {
+        let outcome = { patched: [], unsaved: [], skipped: [], refused: [] };
+        await mutation(wanted, (rows, storeRevision) => {
+          outcome = { patched: [], unsaved: [], skipped: [], refused: [] };
+          const changes = [];
+          wanted.forEach((key) => {
+            const row = rows.get(key);
+            if (!row || row._deleted) { outcome.skipped.push({ key, reason: 'gone' }); return; }
+            if (row._dirty) { outcome.skipped.push({ key, reason: 'unsent' }); return; }
+            const meta = Object.fromEntries(Object.entries(row).filter(([field]) => field.startsWith('_')));
+            const record = { ...Object.fromEntries(Object.entries(row).filter(([field]) => !field.startsWith('_'))), ...patch };
+            const why = validateRecord(record);
+            if (why) { outcome.refused.push({ key, reason: why }); return; }
+            outcome.patched.push(key);
+            changes.push({ op: 'put', key, value: { ...record, ...meta, _rev: rowRevision(row, storeRevision), _dirty: false, _updatedAt: new Date(now()).toISOString() } });
+          });
+          return changes;
+        }, { retry: true, syncedAt: null });
+        if (outcome.patched.length) await notify();
+        return outcome;
+      });
+    },
     // `pushed` records the revision as one a push acknowledged (`_ackRev`).
     markSynced(key, { expectedRevision, pushed = false } = {}) {
       return exclusive(async () => {

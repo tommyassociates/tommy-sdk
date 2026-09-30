@@ -315,6 +315,7 @@ export function createDataService({
       delete: (key, ...rest) => { noted([key]); return store.delete(key, ...rest); },
       deleteMany: (keys, ...rest) => { noted(keys || []); return store.deleteMany(keys, ...rest); },
       markRow: (key, ...rest) => { noted([key]); return store.markRow(key, ...rest); },
+      patchSynced: (keys, ...rest) => { noted(keys || []); return store.patchSynced(keys, ...rest); },
       reconcile: (records = [], options = {}) => {
         noted(records.map(keyOf));
         if (options.prune !== false) noteReplaced(name);
@@ -808,18 +809,20 @@ export function createDataService({
     const keyOf = (row) => String(row[keyPath]);
     const rows = await rawRows(store);
     const present = new Set(rows.map(keyOf));
-    const dtos = (snapshotRows(answer) || []).filter((dto) => dto && typeof dto === 'object');
+    const dtos = snapshotRows(answer) || [];
     const toRecord = spec.toRecord || ((dto) => dto);
     const dtoKey = typeof spec.keyOf === 'function' ? spec.keyOf : (dto) => dto[keyPath];
     const previous = previousByKey(rows, keyPath);
+    // An answer counts only when every entry of it is a row with a key: one
+    // that is not fails the whole answer, which removes nothing and leaves
+    // the collection not fresh.
+    const invalid = () => Object.assign(new Error(`'${name}': an answered entry is not a row with a key`), { name: 'DataServiceError', code: 'DATA_INVALID' });
+    if (dtos.some((dto) => !dto || typeof dto !== 'object')) throw invalid();
     const mapped = dtos.map((dto) => {
       const key = dtoKey(dto);
       return { dto, record: toRecord(dto, key === undefined || key === null ? undefined : previous.get(String(key))) };
-    }).filter(({ record }) => record && typeof record === 'object' && record[keyPath] !== undefined && record[keyPath] !== null);
-    // Rows answered that none of could be stored: never taken for an empty collection.
-    if (dtos.length && !mapped.length) {
-      throw Object.assign(new Error(`'${name}': no answered row has a key`), { name: 'DataServiceError', code: 'DATA_INVALID' });
-    }
+    });
+    if (mapped.some(({ record }) => !record || typeof record !== 'object' || record[keyPath] === undefined || record[keyPath] === null)) throw invalid();
     const changesOnly = since !== null && answer?.since === true;
     const removedKeys = new Set(removedField
       ? mapped.filter(({ dto }) => dto[removedField] !== undefined && dto[removedField] !== null).map(({ record }) => keyOf(record)) : []);
@@ -1137,26 +1140,28 @@ export function createDataService({
     },
     /**
      * Applies a change the server made (`patch`, the fields it set) to the
-     * rows of `keys` as they are now, in the collection's turn: nothing else
-     * in a row changes, a row that is gone stays gone, nothing is pushed, and
-     * a read already on its way never undoes it. A row with an unsent local
-     * write keeps that write. Resolves `{ patched }`, the keys changed.
+     * rows of `keys` as they are when it is written: the store reads and
+     * writes each row as one step (a revision-checked commit on the host
+     * store), so a change or removal by another service or tab that lands
+     * first is kept. Nothing else in a row changes, a row that is gone stays
+     * gone, a row with an unsent local write keeps it, nothing is pushed, and
+     * a read already on its way never undoes it. Resolves the store's account
+     * of it: `{ patched, unsaved, skipped: [{ key, reason }], refused: [{ key, reason }] }`.
      */
     async patchRows(collection, keys, patch) {
       live();
       const { name, store, decl } = local(collection);
       const keyPath = decl?.keyPath || 'id';
       if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw serviceError('patchRows: patch must be an object of fields', 'DATA_INVALID');
-      if (Object.hasOwn(patch, keyPath)) throw serviceError('patchRows: a patch never changes a row\'s key', 'DATA_INVALID');
+      if (Object.keys(patch).some((field) => field === keyPath || field.startsWith('_'))) {
+        throw serviceError('patchRows: a patch sets fields, never a row\'s key or storage fields', 'DATA_INVALID');
+      }
+      if (typeof store.patchSynced !== 'function') throw serviceError(`patchRows: '${name}' cannot patch rows`, 'DATA_INVALID');
       const wanted = [...new Set((Array.isArray(keys) ? keys : [keys]).filter((key) => key !== null && key !== undefined).map(String))];
+      if (!wanted.length) return { patched: [], unsaved: [], skipped: [], refused: [] };
+      // In the collection's turn, recorded as a change of these rows.
       return inTurn(name, async () => {
-        const current = await Promise.all(wanted.map((key) => store.getRaw(key)));
-        // eslint-disable-next-line no-underscore-dangle
-        const rows = current.filter((row) => row && !row._deleted && !row._dirty).map((row) => ({ ...bare(row), ...patch }));
-        if (!rows.length) return { patched: [] };
-        const result = await ingestRows(collection, rows, {}, touching(name, store, keyPath));
-        const unsaved = new Set(result.unsaved || []);
-        return { patched: rows.map((row) => String(row[keyPath])).filter((key) => !unsaved.has(key)) };
+        return touching(name, store, keyPath).patchSynced(wanted, { ...patch });
       });
     },
     /**

@@ -63,6 +63,13 @@ export async function reconcileFetched(store, keyPath, { fetch, toRecord, keyOf 
     if (rethrow) throw error;
     dtos = null;
   }
+  // An answer counts only when every entry of it is a row with a key: one
+  // that is not fails the whole answer (the cache stays as it was).
+  const invalidAnswer = () => Object.assign(new Error('An answered entry is not a row with a key'), { name: 'DataServiceError', code: 'DATA_INVALID' });
+  if (Array.isArray(dtos) && dtos.some((dto) => !dto || typeof dto !== 'object')) {
+    if (rethrow) throw invalidAnswer();
+    dtos = null;
+  }
   if (Array.isArray(dtos)) {
     assertCompleteSet(dtos);
     let prevByKey = null;
@@ -95,6 +102,10 @@ export async function reconcileFetched(store, keyPath, { fetch, toRecord, keyOf 
     const records = dtos.map(
       (dto) => toRecord(dto, prevByKey ? prevByKey.get(String(keyOf(dto))) : undefined),
     );
+    if (records.some((record) => !record || typeof record !== 'object' || record[keyPath] === undefined || record[keyPath] === null)) {
+      if (rethrow) throw invalidAnswer();
+      return store.readWhere(scope);
+    }
 
     // ⚠ THE MISSING HALF WAS THE REPORT, NOT THE SURVIVAL. The spec inherited
     // a claim from sdk commit e7b4cbe that one malformed DTO left the store

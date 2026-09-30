@@ -56,6 +56,17 @@ function transactionalBackend(port, opened, options) {
 }
 
 describe('data service on memory stores', () => {
+  it('takes no refresh answer with an entry that is not a keyed row, and removes nothing', async () => {
+    const data = memoryService();
+    let answer = [null];
+    data.source('chats.messages', { fetch: async () => answer });
+    await data.ingest('chats.messages', [{ id: 'a' }, { id: 'b' }], { replace: true });
+    await expect(data.refresh('chats.messages', { mode: 'visible' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    answer = [{ id: 'a' }, { chat_id: 7 }];
+    await expect(data.refresh('chats.messages', { mode: 'visible' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['a', 'b']);
+  });
+
   it('reads, queries by index and subscribes with the current value first', async () => {
     const data = memoryService();
     await data.mutate('chats.messages', { op: 'put', record: { id: 'a', chat_id: 7, seq: 10 } });
@@ -273,6 +284,36 @@ describe('MP data API confinement', () => {
     release();
     await expect(second).resolves.toEqual({ key: '1', pushed: true });
     expect(pushed).toEqual(['mon', 'tue']);
+  });
+
+  it('keeps each world\'s changes apart on a shared scheduler: the same store and key in two accounts both send', async () => {
+    // A scheduler that joins a job to one already queued under the same key, as the host's does.
+    const queued = new Map();
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const scheduler = {
+      request(job) {
+        if (queued.has(job.key)) return queued.get(job.key);
+        const run = gate.then(() => job.run(() => true)).finally(() => queued.delete(job.key));
+        queued.set(job.key, run);
+        return run;
+      },
+    };
+    const worlds = ['team-44', 'team-45'].map((tenantId) => createDataManager({
+      capabilityToken: { tenantId, mpId: 'scheduling' }, mpId: 'scheduling', scheduler,
+      localData: { drafts: { keyPath: 'id', syncStrategy: 'last_write_wins' } },
+    }));
+    const sent = [];
+    worlds.forEach((data, at) => data.source('drafts', { fetch: async () => [], push: async (command) => { sent.push([at, command.record.v]); } }));
+    const changes = worlds.map((data, at) => data.mutate('drafts', { op: 'put', record: { id: 'settings', v: `world ${at}` } }, { wait: true }));
+    await settle();
+    release();
+    await expect(Promise.all(changes)).resolves.toEqual([{ key: 'settings', pushed: true }, { key: 'settings', pushed: true }]);
+    expect(sent.sort()).toEqual([[0, 'world 0'], [1, 'world 1']]);
+    for (const data of worlds) {
+      // eslint-disable-next-line no-await-in-loop, no-underscore-dangle
+      expect((await data.read('drafts', 'settings', { raw: true }))._dirty).toBe(false);
+    }
   });
 
   it('never evicts a saved pref to make room for another: a pref that does not fit is refused', async () => {
@@ -641,6 +682,34 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     const listed = (await port.inspect({ op: 'stores', selector: { authorityOrigin: 'https://api.example.test', viewerId: '7' } })).stores[0];
     expect(listed.syncedAt).toEqual(expect.any(Number));
     feedA.close(); feedB.close(); await database.close();
+  });
+
+  it('patches rows as another tab left them: a row it removed stays gone, a change it made stays', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+    const other = createDataService({
+      resolve: (name) => (name === 'chats.messages' ? { store: createDataStore({ name, backend: transactionalBackend(port, null, options) }), decl: { keyPath: 'id' } } : null),
+    });
+    const backend = transactionalBackend(port, null, options);
+    let meddle = null;
+    const commit = backend.commit.bind(backend);
+    // The other tab writes after this tab read the rows and before it commits.
+    backend.commit = async (...args) => { if (meddle) { const run = meddle; meddle = null; await run(); } return commit(...args); };
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store: createDataStore({ name, backend }), decl: { keyPath: 'id' } } : null) });
+    await data.ingest('chats.messages', [{ id: 'a', chat_id: 7, seq: 1, name: 'Ana' }, { id: 'b', chat_id: 7, seq: 2, name: 'Ben' }]);
+    meddle = async () => {
+      await other.purge('chats.messages', { keys: ['a'] });
+      await other.ingest('chats.messages', [{ id: 'b', chat_id: 7, seq: 2, name: 'Benny' }]);
+    };
+    await expect(data.patchRows('chats.messages', ['a', 'b'], { seen: true })).resolves.toEqual({
+      patched: ['b'], unsaved: [], skipped: [{ key: 'a', reason: 'gone' }], refused: [],
+    });
+    expect(await data.read('chats.messages', 'a')).toBeNull();
+    expect(await data.read('chats.messages', 'b')).toEqual({ id: 'b', chat_id: 7, seq: 2, name: 'Benny', seen: true });
+    other.dispose(); data.dispose();
+    await database.close();
   });
 
   it('stamps a collection synced only when a complete set arrives, never on a partial one', async () => {
