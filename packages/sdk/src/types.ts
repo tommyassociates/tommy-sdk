@@ -623,13 +623,18 @@ export interface DataSource<Dto = unknown, Rec = unknown> {
    */
   fetch(target: { collection: string; key?: string; window?: Record<string, unknown> }, context?: { since?: string | null; principal?: unknown; background?: boolean }): Promise<Dto[] | Dto | { rows: Dto[]; cursor?: string | null; since?: boolean } | null>;
   /**
-   * @experimental A declared read: the service keeps its cursor with the rows
-   * (`cursor`), reads whole at least every `fullEveryMs`, removes rows whose
+   * @experimental A declared read: the service keeps its cursor (`cursor`) in
+   * the collection's source meta, never among its rows, and asks only for
+   * what changed while the stored rows are still the whole set the last read
+   * left; it reads whole at least every `fullEveryMs`, removes rows whose
    * `removedField` is set, and purges the collection when the server refuses
-   * the read (`forbidden: 'purge'`, the default).
+   * the read (`forbidden: 'purge'`, the default). A row the store cannot keep
+   * leaves the cursor where it was. Any other field is refused (`DATA_INVALID`).
    */
   read?: { cursor?: boolean; removedField?: string; fullEveryMs?: number; forbidden?: 'purge' | 'keep' };
+  /** A record from an answered row; `prev` is the stored row it replaces (found by `keyOf`), without sync metadata. */
   toRecord?(dto: Dto, prev?: Rec): Rec;
+  /** The stored key of an answered row (for `prev`); a declared read defaults to the row's key field. */
   keyOf?(dto: Dto): string;
   scope?(target: { collection: string; window?: Record<string, unknown> }): (row: Rec) => boolean;
   /**

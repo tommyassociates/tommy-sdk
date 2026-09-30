@@ -1,21 +1,27 @@
 // @vitest-environment node
 /**
  * A source that declares its read (`read`): the service keeps the read's
- * cursor with the rows (a `~meta` row, written last and never handed to a
- * reader), asks only for what changed while the stored rows are the whole
- * set and a whole read ran within `fullEveryMs`, removes rows the server
- * marks removed, stamps the collection synced only for a read that
- * completed, purges an account's rows when the server refuses the read, and
- * never lets a read undo a change stored after it began.
+ * cursor in the collection's source meta (never among its rows), asks only
+ * for what changed while the stored rows are still the whole set the last
+ * read left (their key digest) and a whole read ran within `fullEveryMs`,
+ * removes rows the server marks removed, stamps the collection synced only
+ * for a read that completed, purges an account's rows when the server
+ * refuses the read, and never lets a read undo a change stored after it
+ * began. Writes to the collection take turns with the read's commit.
  */
-import { describe, it, expect } from 'vitest';
-import { createDataService, createDataStore, createMemoryStoreBackend, SOURCE_META_KEY } from '../src/index.js';
+import {
+  describe, it, expect, vi, afterEach,
+} from 'vitest';
+import {
+  createDataService, createDataStore, createMemoryStoreBackend, createMemorySourceMeta, createLocalStorageBackend,
+} from '../src/index.js';
 
 const DAY = 86400000;
-function service({ at = () => 1_000_000 } = {}) {
-  const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
-  const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: at });
-  return { data, store };
+function service({ at = () => 1_000_000, store: given = null } = {}) {
+  const store = given || createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
+  const sourceMeta = createMemorySourceMeta();
+  const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: at, sourceMeta });
+  return { data, store, sourceMeta };
 }
 /** A server answering from `rows`, recording the `since` each read asked with. */
 function server(initial) {
@@ -34,19 +40,20 @@ function server(initial) {
 const ids = async (data) => (await data.read('members')).map((row) => row.id).sort();
 
 describe('a declared read', () => {
-  it('reads whole, keeps its cursor unseen by readers, then asks only for what changed', async () => {
-    const { data, store } = service();
+  it('reads whole, keeps its cursor outside the rows, then asks only for what changed', async () => {
+    const { data, store, sourceMeta } = service();
     const api = server([{ id: 'a', updated: 'c0' }, { id: 'b', updated: 'c0' }]);
     data.source('members', { fetch: api.fetch, read: { cursor: true, removedField: 'deleted_at', fullEveryMs: DAY } });
     await data.refresh('members', { mode: 'visible' });
     expect(await ids(data)).toEqual(['a', 'b']);
-    expect(await store.getRaw(SOURCE_META_KEY)).toMatchObject({ cursor: 'c2', count: 2 });
+    expect(await sourceMeta.get('members')).toMatchObject({ cursor: 'c2', count: 2 });
+    expect((await store.getAllRaw()).map((row) => row.id).sort()).toEqual(['a', 'b']);
     api.set([{ id: 'a', updated: 'c0' }, { id: 'b', updated: 'c3', deleted_at: '2026-09-30' }, { id: 'c', updated: 'c3' }]);
     await data.refresh('members', { mode: 'visible' });
     expect(api.asked).toEqual([null, 'c2']);
     // The removed row went, the new one came, and the cursor moved with them.
     expect(await ids(data)).toEqual(['a', 'c']);
-    expect(await store.getRaw(SOURCE_META_KEY)).toMatchObject({ cursor: 'c3', count: 2 });
+    expect(await sourceMeta.get('members')).toMatchObject({ cursor: 'c3', count: 2 });
     expect((await data.query('members', { limit: 50 })).rows.map((row) => row.id)).toEqual(['a', 'c']);
   });
 
@@ -153,12 +160,134 @@ describe('a declared read', () => {
   it('keeps its cursor in a collection whose records a strict schema checks', async () => {
     const schema = { type: 'object', required: ['id', 'name'], additionalProperties: false, properties: { id: { type: 'string' }, name: { type: 'string' }, updated: { type: 'string' } } };
     const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend(), recordSchema: schema });
-    const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: () => 1_000_000 });
+    const { data, sourceMeta } = service({ store });
     const api = server([{ id: 'a', name: 'Ada', updated: 'c0' }]);
     data.source('members', { fetch: api.fetch, read: { cursor: true } });
     await data.refresh('members', { mode: 'visible' });
-    expect(await store.getRaw(SOURCE_META_KEY)).toMatchObject({ cursor: 'c1', count: 1 });
+    expect(await sourceMeta.get('members')).toMatchObject({ cursor: 'c1', count: 1 });
     await data.refresh('members', { mode: 'visible' });
     expect(api.asked).toEqual([null, 'c1']);
   });
+
+  it('reads whole after a row was swapped out of the set, though the count is unchanged', async () => {
+    const { data, store } = service();
+    const api = server([{ id: 'a', updated: 'c0' }, { id: 'b', updated: 'c0' }]);
+    data.source('members', { fetch: api.fetch, read: { cursor: true } });
+    await data.refresh('members', { mode: 'visible' });
+    // The device dropped a (an eviction) and holds c from elsewhere: still two rows.
+    await store.delete('a');
+    await store.put({ id: 'c', updated: 'c0' });
+    await store.markSynced('c');
+    await data.refresh('members', { mode: 'visible' });
+    expect(api.asked).toEqual([null, null]);
+    expect(await ids(data)).toEqual(['a', 'b']);
+  });
+
+  it('keeps asking only for what changed after its own writes: a small ingest and a purge of keys', async () => {
+    const { data } = service();
+    const api = server([{ id: 'a', updated: 'c0' }, { id: 'b', updated: 'c0' }]);
+    data.source('members', { fetch: api.fetch, read: { cursor: true } });
+    await data.refresh('members', { mode: 'visible' });
+    // A write-back adds a member and removes another.
+    await data.ingest('members', [{ id: 'c', updated: 'c0' }]);
+    await data.purge('members', { keys: ['b'] });
+    await data.refresh('members', { mode: 'visible' });
+    expect(api.asked).toEqual([null, 'c2']);
+  });
+
+  it('hands query predicates and pages only records', async () => {
+    const { data } = service();
+    const api = server([{ id: 'a', name: 'Ada', updated: 'c0' }, { id: 'b', name: 'Ben', updated: 'c0' }]);
+    data.source('members', { fetch: api.fetch, read: { cursor: true } });
+    await data.refresh('members', { mode: 'visible' });
+    const page = await data.query('members', { where: (row) => row.name.startsWith('A'), limit: 1 });
+    expect(page.rows.map((row) => row.id)).toEqual(['a']);
+    const all = await data.query('members', { limit: 2 });
+    expect(all).toMatchObject({ complete: true });
+    expect(all.rows.map((row) => row.id)).toEqual(['a', 'b']);
+  });
+
+  it('keeps an ingest asked while a large read commits: it waits its turn, and the read never prunes it', async () => {
+    const { data, store } = service();
+    const rows = Array.from({ length: 501 }, (_, at) => ({ id: `m${String(at).padStart(3, '0')}`, updated: 'c0' }));
+    data.source('members', { fetch: async () => ({ rows }), read: { cursor: false } });
+    // The first chunk's commit waits until the ingest has been asked.
+    const reconcile = store.reconcile.bind(store);
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    let first = true;
+    store.reconcile = async (...args) => {
+      if (first) { first = false; await held; }
+      return reconcile(...args);
+    };
+    const reading = data.refresh('members', { mode: 'visible' });
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    const ingesting = data.ingest('members', [{ id: 'added', updated: 'c1' }]);
+    release();
+    await Promise.all([reading, ingesting]);
+    const stored = await ids(data);
+    expect(stored).toContain('added');
+    expect(stored.length).toBe(502);
+  });
+
+  it('keeps the fields a thin answer leaves out, from the row it replaces', async () => {
+    const { data } = service();
+    await data.ingest('members', [{ id: 'a', name: 'Ada', detail: 'rich' }], { replace: true });
+    data.source('members', {
+      fetch: async () => ({ rows: [{ id: 'a', name: 'Ada Lovelace' }] }),
+      toRecord: (dto, prev) => ({ ...(prev || {}), ...dto }),
+      read: { cursor: false },
+    });
+    await data.refresh('members', { mode: 'visible' });
+    expect(await data.read('members', 'a')).toEqual({ id: 'a', name: 'Ada Lovelace', detail: 'rich' });
+  });
+
+  it('never lets a read overwrite a newer change, however many keys were touched while it ran: it reads again', async () => {
+    const { data } = service();
+    await data.ingest('members', [{ id: 'x', v: 1 }], { replace: true });
+    const answers = [];
+    data.source('members', { fetch: () => new Promise((resolve) => { answers.push(resolve); }), read: { cursor: false } });
+    const reading = data.refresh('members', { mode: 'visible' });
+    await vi.waitFor(() => expect(answers).toHaveLength(1));
+    // x changes on the device, then more keys are touched than are kept.
+    await data.ingest('members', [{ id: 'x', v: 2 }]);
+    await data.ingest('members', Array.from({ length: 5000 }, (_, at) => ({ id: `t${at}`, v: 1 })));
+    // The read answers what the server had before x changed.
+    answers[0]({ rows: [{ id: 'x', v: 1 }] });
+    await vi.waitFor(() => expect(answers).toHaveLength(2));
+    expect((await data.read('members', 'x')).v).toBe(2);
+    answers[1]({ rows: [{ id: 'x', v: 2 }] });
+    await reading;
+    expect((await data.read('members', 'x')).v).toBe(2);
+  });
 });
+
+describe('a declared read on a store that cannot keep a row', () => {
+  const storage = new Map();
+  afterEach(() => { storage.clear(); delete globalThis.localStorage; });
+
+  it('keeps the old cursor when the store refused a changed row, so the next read asks for it again', async () => {
+    globalThis.localStorage = {
+      getItem: (key) => (storage.has(key) ? storage.get(key) : null),
+      setItem: (key, value) => { storage.set(key, String(value)); },
+      removeItem: (key) => { storage.delete(key); },
+    };
+    // A store that never evicts, with room for a few small rows.
+    const store = createDataStore({
+      name: 'members', backend: createLocalStorageBackend('declared-read', 'members', { maxBytes: 1200, evict: false }), syncStrategy: 'last_write_wins',
+    });
+    const { data, sourceMeta } = service({ store });
+    const api = server([{ id: 'a', updated: 'c0' }, { id: 'b', updated: 'c0' }]);
+    data.source('members', { fetch: api.fetch, read: { cursor: true } });
+    await data.refresh('members', { mode: 'visible' });
+    expect(await sourceMeta.get('members')).toMatchObject({ cursor: 'c2' });
+    // b grows past what the store can hold (the store refuses it), and c is added.
+    api.set([{ id: 'a', updated: 'c0' }, { id: 'b', updated: 'c3', note: 'x'.repeat(2000) }, { id: 'c', updated: 'c3' }]);
+    await data.refresh('members', { mode: 'visible' });
+    expect(api.asked).toEqual([null, 'c2']);
+    expect(await sourceMeta.get('members')).toMatchObject({ cursor: 'c2' });
+    await data.refresh('members', { mode: 'visible' });
+    expect(api.asked).toEqual([null, 'c2', 'c2']);
+  });
+});
+

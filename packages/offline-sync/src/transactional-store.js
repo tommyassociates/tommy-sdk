@@ -1,4 +1,3 @@
-import { SOURCE_META_KEY } from './meta-key.js';
 /** Durable branch of DataStore. The injected backend owns physical CAS/epochs. */
 // The most rows one whole-collection read returns, page by page.
 export const WHOLE_READ_ROWS = 20000;
@@ -82,8 +81,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     return result;
   };
   function validateRecord(row) {
-    // A declared read's cursor row is the service's own, never the collection's record.
-    if (validate && row?.[keyPath] !== SOURCE_META_KEY && !validate(row)) return (validate.errors || []).map((error) => `${error.instancePath || '$'} ${error.message}`).join('; ');
+    if (validate && !validate(row)) return (validate.errors || []).map((error) => `${error.instancePath || '$'} ${error.message}`).join('; ');
     if (row?.[keyPath] === undefined) return `record missing keyPath '${keyPath}'`;
     return null;
   }

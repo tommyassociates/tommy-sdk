@@ -23,8 +23,18 @@ const stripMeta = (row) => Object.fromEntries(
   Object.entries(row).filter(([k]) => !k.startsWith('_')),
 );
 
+/**
+ * The stored rows by key, without sync metadata: the `prev` a source's
+ * `toRecord(dto, prev)` receives, so a thin answer keeps the rich fields of
+ * the row it replaces. Callers pass raw rows (past the paint ceiling too).
+ */
+export function previousByKey(rows, keyPath) {
+  return new Map((rows || []).filter((row) => row && typeof row === 'object')
+    .map((row) => [String(row[keyPath]), stripMeta(row)]));
+}
+
 /** Tell the host a fetched DTO could not be cached, and why. */
-function reportRejected(store, reasons, onPersistError) {
+export function reportRejected(store, reasons, onPersistError) {
   if (typeof onPersistError !== 'function') return;
   try {
     onPersistError({
@@ -80,7 +90,7 @@ export async function reconcileFetched(store, keyPath, { fetch, toRecord, keyOf 
         if (bytes > 8 * 1024 * 1024) throw new StorageReadError('scan-required');
         existing.push(row);
       }
-      prevByKey = new Map(existing.map((row) => [String(row[keyPath]), stripMeta(row)]));
+      prevByKey = previousByKey(existing, keyPath);
     }
     const records = dtos.map(
       (dto) => toRecord(dto, prevByKey ? prevByKey.get(String(keyOf(dto))) : undefined),
