@@ -91,6 +91,45 @@ describe('data service on memory stores', () => {
     expect(calls).not.toHaveBeenCalled();
   });
 
+  it('sends a change and a read as the principal named when each was asked, whatever it names by the time they go', async () => {
+    let form = { accountType: 'Team', accountId: '44' };
+    const base = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend() });
+    let releasePut;
+    const putGate = new Promise((resolve) => { releasePut = resolve; });
+    let slowPut = true;
+    const store = new Proxy(base, { get(target, property) {
+      if (property === 'put') return async (...args) => { if (slowPut) { slowPut = false; await putGate; } return target.put(...args); };
+      const value = target[property];
+      return typeof value === 'function' ? value.bind(target) : value;
+    } });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null), principal: () => form });
+    const pushed = [];
+    const read = [];
+    let releaseRead;
+    const readGate = new Promise((resolve) => { releaseRead = resolve; });
+    data.source('chats.messages', {
+      fetch: async (target, context) => { read.push(context.principal.accountType); if (read.length === 1) await readGate; return []; },
+      push: async (command, record, context) => { pushed.push(context.principal.accountType); },
+    });
+    // A change asked as the team; the form changes while its row is written.
+    const change = data.mutate('chats.messages', { op: 'put', record: { id: 'a' } }, { wait: true });
+    await settle();
+    form = { accountType: 'TeamMember', accountId: '90' };
+    releasePut();
+    await change;
+    expect(pushed).toEqual(['Team']);
+    // A read asked as the member while one as the team is in flight; the form changes again before it goes.
+    form = { accountType: 'Team', accountId: '44' };
+    const first = data.refresh('chats.messages', { mode: 'visible' });
+    await settle();
+    form = { accountType: 'TeamMember', accountId: '90' };
+    const second = data.refresh('chats.messages', { mode: 'visible' });
+    form = { accountType: 'User', accountId: '31' };
+    releaseRead();
+    await Promise.all([first, second]);
+    expect(read).toEqual(['Team', 'TeamMember']);
+  });
+
   it('reads many rows by one index: each value asked, in order, each row once, and refuses what it cannot honour', async () => {
     const data = memoryService();
     await data.ingest('chats.messages', [

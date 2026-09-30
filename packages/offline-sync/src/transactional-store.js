@@ -110,16 +110,22 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       || !Number.isSafeInteger(result?.storeRevision)) { held = null; return; }
     const at = now();
     changes.forEach((change) => {
+      held.bytes -= held.rows.get(change.key)?.bytes || 0;
       if (change.op === 'delete') held.rows.delete(change.key);
       else {
         if (!held.rows.has(change.key)) held.sorted = false;
+        const json = JSON.stringify(change.value);
         held.rows.set(change.key, {
-          value: JSON.parse(JSON.stringify(change.value)), updatedAt: at, exact: true, dirty: !!change.value?._dirty,
+          value: JSON.parse(json), updatedAt: at, exact: true, dirty: !!change.value?._dirty, bytes: json.length,
         });
+        held.bytes += json.length;
       }
     });
     held.revision = result.storeRevision;
     if (Number.isSafeInteger(result.epoch)) held.epoch = result.epoch;
+    // Held rows answer only what a whole read of the store would: past its
+    // limits they go, and the next whole read is refused as it would be.
+    if (held.rows.size > WHOLE_READ_ROWS || held.bytes > WHOLE_READ_BYTES) held = null;
   }
   async function commit(snapshot, changes, extra) {
     const result = await backend.commit(snapshot, changes, extra);
@@ -208,14 +214,21 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         // A complete writers' read with each row's metadata: held, for the
         // revision it was read at.
         if (aged && fence) {
+          let bytes = 0;
           held = {
             epoch: fence.epoch,
             revision: fence.revision,
             sorted: true,
-            rows: new Map(entries.map((row) => [row.key, {
-              value: JSON.parse(JSON.stringify(row.value)), updatedAt: Date.parse(row.value?._updatedAt || '') || 0, exact: false, dirty: !!row.value?._dirty,
-            }])),
+            rows: new Map(entries.map((row) => {
+              const json = JSON.stringify(row.value);
+              bytes += json.length;
+              return [row.key, {
+                value: JSON.parse(json), updatedAt: Date.parse(row.value?._updatedAt || '') || 0, exact: false, dirty: !!row.value?._dirty, bytes: json.length,
+              }];
+            })),
+            bytes: 0,
           };
+          held.bytes = bytes;
         }
         return rows;
       }

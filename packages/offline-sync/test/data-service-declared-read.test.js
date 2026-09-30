@@ -242,6 +242,54 @@ describe('a declared read', () => {
     expect(data.status('members')).toMatchObject({ state: 'error', error: expect.objectContaining({ code: 'DATA_TOO_LARGE' }) });
   });
 
+  it('reads the rows again at its commit when its store tells no changes: a row changed during the read is its prev', async () => {
+    const base = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
+    const store = new Proxy(base, { get(target, property) {
+      if (property === 'onChange') return undefined;
+      const value = target[property];
+      return typeof value === 'function' ? value.bind(target) : value;
+    } });
+    const { data } = service({ store });
+    let answer;
+    let turn = 0;
+    data.source('members', {
+      fetch: (target, context) => {
+        turn += 1;
+        if (turn === 1) return Promise.resolve({ rows: [{ id: 'a', updated: 'c1' }], cursor: 'c1' });
+        return new Promise((resolve) => { answer = () => resolve({ rows: [{ id: 'a', updated: 'c2' }], cursor: 'c2', since: context.since !== null }); });
+      },
+      toRecord: (dto, prev) => ({ ...dto, note: prev?.note ?? null }),
+      read: { cursor: true, fullEveryMs: DAY },
+    });
+    await data.refresh('members', { mode: 'visible' });
+    const reading = data.refresh('members', { mode: 'visible' });
+    await vi.waitFor(() => expect(typeof answer).toBe('function'));
+    // Changed underneath, with no notice.
+    await base.reconcile([{ id: 'a', updated: 'c1', note: 'kept' }], { prune: false });
+    answer();
+    await reading;
+    expect(await data.read('members', 'a')).toMatchObject({ updated: 'c2', note: 'kept' });
+  });
+
+  it('compares every nested field of a row, storage fields only at its root', async () => {
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
+    let written = 0;
+    const counted = new Proxy(store, { get(target, property) {
+      if (property === 'reconcile') return (records, ...rest) => { written += records.length; return target.reconcile(records, ...rest); };
+      const value = target[property];
+      return typeof value === 'function' ? value.bind(target) : value;
+    } });
+    const data = createDataService({ resolve: (name) => (name === 'members' ? { store: counted, decl: { keyPath: 'id' } } : null), sourceMeta: createMemorySourceMeta() });
+    let rows = [{ id: 'a', payload: { _code: 1 } }, { id: 'b', payload: { _code: 1 } }];
+    data.source('members', { fetch: async () => ({ rows: rows.map((row) => JSON.parse(JSON.stringify(row))) }), read: { cursor: false } });
+    await data.refresh('members', { mode: 'visible' });
+    written = 0;
+    rows = [{ id: 'a', payload: { _code: 1 } }, { id: 'b', payload: { _code: 2 } }];
+    await data.refresh('members', { mode: 'visible' });
+    expect(written).toBe(1);
+    expect((await data.read('members', 'b')).payload).toEqual({ _code: 2 });
+  });
+
   it('keys each answered row by its record, and never takes an answer with no keyed row for an empty collection', async () => {
     const { data } = service();
     let answer = { rows: [{ member_id: 'a' }, { member_id: 'b' }] };

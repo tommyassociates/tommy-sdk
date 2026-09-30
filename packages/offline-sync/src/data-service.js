@@ -123,15 +123,18 @@ const INGEST_CHUNK = 500;
 // unchanged row only once it was last written this long ago, so its age
 // limits count from a recent confirmation.
 const CONFIRM_AFTER_MS = 24 * 60 * 60 * 1000;
-// A row's content, whatever the order of its fields.
-function contentOf(value) {
-  if (Array.isArray(value)) return `[${value.map(contentOf).join(',')}]`;
+// A value's content, whatever the order of its fields.
+function contentValue(value) {
+  if (Array.isArray(value)) return `[${value.map(contentValue).join(',')}]`;
   if (value && typeof value === 'object') {
-    return `{${Object.keys(value).filter((field) => !field.startsWith('_') && value[field] !== undefined).sort()
-      .map((field) => `${JSON.stringify(field)}:${contentOf(value[field])}`).join(',')}}`;
+    return `{${Object.keys(value).filter((field) => value[field] !== undefined).sort()
+      .map((field) => `${JSON.stringify(field)}:${contentValue(value[field])}`).join(',')}}`;
   }
   return JSON.stringify(value) ?? 'null';
 }
+// A row's content: every field, nested ones included, but the storage
+// fields at its root.
+const contentOf = (row) => contentValue(Object.fromEntries(Object.entries(row || {}).filter(([field]) => !field.startsWith('_'))));
 // Keys whose last local change a read still on its way must keep, per collection.
 const TOUCHES_KEPT = 5000;
 // A declared read whose protection was dropped reads again at most this often.
@@ -389,9 +392,12 @@ export function createDataService({
   const watchedStores = new Map();
   const generationOf = (name) => generations.get(name) || 0;
   const bump = (name) => generations.set(name, generationOf(name) + 1);
+  // Whether the collection's changes are heard (its store tells them): only
+  // then may rows read earlier stand in for a read now.
   function watchChanges(name, store) {
-    if (watchedStores.has(name) || typeof store.onChange !== 'function') return;
-    try { watchedStores.set(name, store.onChange(() => bump(name))); } catch (_) { /* no notices: rows are read again */ }
+    if (watchedStores.has(name)) return true;
+    if (typeof store.onChange !== 'function') return false;
+    try { watchedStores.set(name, store.onChange(() => bump(name))); return true; } catch (_) { return false; }
   }
   const offGenerationFeed = feed?.subscribe((event) => {
     [...watchedStores.keys()].forEach((name) => {
@@ -875,10 +881,10 @@ export function createDataService({
       let since = null;
       let read = null;
       if (keepsCursor && !full) {
-        watchChanges(name, store);
+        const observed = watchChanges(name, store);
         const generation = generationOf(name);
         const [meta, rows] = await Promise.all([metaOf(name), rawRows(store)]);
-        read = { rows, generation };
+        read = observed ? { rows, generation } : null;
         const keys = rows.map((row) => String(row[keyPath]));
         const whole = !!meta && typeof meta.digest === 'string' && meta.count === keys.length && meta.digest === keysDigest(keys);
         if (whole && typeof meta.cursor === 'string' && meta.cursor && Number.isFinite(meta.fullAt) && now() - meta.fullAt < fullEveryMs) since = meta.cursor;
@@ -1057,6 +1063,103 @@ export function createDataService({
     return 'stored';
   }
 
+  /** A refresh of `target` as the principal in `context` (taken when it was asked). */
+  function refreshAs(target, { mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false } = {}, context) {
+    live();
+    const wanted = targetOf(target);
+    const { name, label, store, decl } = local(wanted.collection);
+    if (wanted.query) checkQuery(wanted.query);
+    const spec = sources.get(name) || decl?.source;
+    const key = targetKey({ ...wanted, collection: name });
+    const state = stateFor(key);
+    const settle = (promise) => (mode === 'visible' ? promise : promise.then(() => service.status(target), () => service.status(target)));
+    if (!spec) return settle(Promise.reject(serviceError(`'${wanted.collection}' has no source`, 'DATA_NO_SOURCE')));
+    if (maxAge > 0 && state.syncedAt !== null && now() - state.syncedAt < maxAge && state.state !== 'error') return settle(Promise.resolve());
+    if (!isOnline()) {
+      state.state = 'offline';
+      emitStatus();
+      return settle(Promise.reject(serviceError('Offline', 'DATA_OFFLINE')));
+    }
+    // A read in flight as another form of the account is not joined: this
+    // one reads after it, as the principal it was asked as.
+    const form = formOf(context);
+    if (state.flight && state.flightForm === form) return settle(state.flight);
+    if (state.flight) {
+      return settle(state.flight.catch(() => {}).then(() => refreshAs(target, {
+        mode: 'visible', priority, maxAge: 0, reason, full,
+      }, context)));
+    }
+    state.state = 'refreshing';
+    emitStatus();
+    const keyPath = decl?.keyPath || 'id';
+    // A server copy never replaces a row with an unsent local change.
+    const run = async (isCurrent) => {
+      if (wanted.key !== undefined && wanted.key !== null) {
+        const rowKey = String(wanted.key);
+        // Stored through the one read guard (a change to the row since the
+        // read began is kept), and recorded as a change of the row: a
+        // declared read already on its way keeps it.
+        const writer = touching(name, store, keyPath);
+        await guardedRead(name, () => spec.fetch(wanted, context), async (dto, touched) => {
+          if (touched.has(rowKey)) return;
+          if (!dto) {
+            // Decided in turn with local writes to the row, on the row as it is then.
+            await serial(`${label}:${rowKey}`, async () => {
+              const current = await store.getRaw?.(rowKey);
+              if (!current || current._dirty) return;
+              try {
+                await writer.delete(rowKey, Number.isSafeInteger(current._rev) ? { expectedRevision: current._rev } : {});
+              } catch (error) { if (error?.reason !== 'conflict') throw error; }
+            });
+            return;
+          }
+          const prev = await store.getRaw?.(rowKey);
+          const record = (spec.toRecord || ((value) => value))(dto, prev ? previousByKey([prev], keyPath).get(rowKey) : prev);
+          // One record leaves the collection's synced stamp as it was.
+          await writer.reconcile([record], { prune: false, keepDirty: true, syncedAt: null });
+        }, { isCurrent });
+        return;
+      }
+      if (spec.read && !wanted.query && !wanted.window && typeof spec.scope !== 'function') {
+        return readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent, { full, context });
+      }
+      // A query target prunes only the rows of that query; a list or window
+      // target the source's scope (the whole collection without one).
+      let scope = typeof spec.scope === 'function' ? spec.scope(wanted) : () => true;
+      if (wanted.query && typeof spec.scope !== 'function') {
+        const { limit: _limit, cursor: _cursor, raw: _raw, where, ...range } = wanted.query;
+        if (range.index) {
+          const held = new Set((await rangeKeys(store, keyPath, wholeRange(range, 'refresh'))).map((entry) => entry.key));
+          scope = (row) => held.has(String(row[keyPath]));
+        } else if (typeof where === 'function') scope = (row) => where(row);
+      }
+      // Only a read of the whole collection marks it synced.
+      const whole = !wanted.query && typeof spec.scope !== 'function';
+      // Fetched first; stored through the one read guard.
+      return guardedRead(name, async () => snapshotRows(await spec.fetch(wanted, context)), (dtos, touched) => (dtos === null ? NO_SNAPSHOT
+        : reconcileFetched(store, keyPath, { fetch: () => dtos, toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
+          scope, wanted.window, windowKeyOf(wanted.window), {
+            onPersistError, rethrow: true, keepDirty: true, skip: touched, ...(whole ? {} : { syncedAt: null }),
+          })), { isCurrent });
+    };
+    state.flightForm = form;
+    state.flight = scheduler.request({
+      key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
+      ...(inForeground()
+        ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
+        : { priority: PRIORITIES.background, visible: false }),
+      run,
+    }).then((outcome) => {
+      // A read that answered no list leaves the collection as it was, not fresh.
+      if (outcome === NO_SNAPSHOT) { if (state.state === 'refreshing') state.state = 'stale'; return; }
+      state.state = 'fresh'; state.syncedAt = now(); state.error = null;
+    }, (error) => {
+      state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
+      throw error;
+    }).finally(() => { state.flight = null; state.flightForm = null; emitStatus(); });
+    return settle(state.flight);
+  }
+
   const service = {
     namespace,
     // Rows come as copies without storage metadata. `raw` reads as writers
@@ -1183,103 +1286,10 @@ export function createDataService({
      * `maxAge` and coalescing belong to that `where` function. `full` makes a
      * declared read read the whole collection whatever its cursor.
      */
-    refresh(target, { mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false } = {}) {
-      live();
-      const wanted = targetOf(target);
-      const { name, label, store, decl } = local(wanted.collection);
-      if (wanted.query) checkQuery(wanted.query);
-      const spec = sources.get(name) || decl?.source;
-      const key = targetKey({ ...wanted, collection: name });
-      const state = stateFor(key);
-      const settle = (promise) => (mode === 'visible' ? promise : promise.then(() => service.status(target), () => service.status(target)));
-      if (!spec) return settle(Promise.reject(serviceError(`'${wanted.collection}' has no source`, 'DATA_NO_SOURCE')));
-      if (maxAge > 0 && state.syncedAt !== null && now() - state.syncedAt < maxAge && state.state !== 'error') return settle(Promise.resolve());
-      if (!isOnline()) {
-        state.state = 'offline';
-        emitStatus();
-        return settle(Promise.reject(serviceError('Offline', 'DATA_OFFLINE')));
-      }
-      // The principal it reads as, taken now. A read in flight as another
-      // form of the account is not joined: this one reads after it.
-      const context = jobContextNow();
-      const form = formOf(context);
-      if (state.flight && state.flightForm === form) return settle(state.flight);
-      if (state.flight) {
-        return settle(state.flight.catch(() => {}).then(() => service.refresh(target, {
-          mode: 'visible', priority, maxAge: 0, reason, full,
-        })));
-      }
-      state.state = 'refreshing';
-      emitStatus();
-      const keyPath = decl?.keyPath || 'id';
-      // A server copy never replaces a row with an unsent local change.
-      const run = async (isCurrent) => {
-        if (wanted.key !== undefined && wanted.key !== null) {
-          const rowKey = String(wanted.key);
-          // Stored through the one read guard (a change to the row since the
-          // read began is kept), and recorded as a change of the row: a
-          // declared read already on its way keeps it.
-          const writer = touching(name, store, keyPath);
-          await guardedRead(name, () => spec.fetch(wanted, context), async (dto, touched) => {
-            if (touched.has(rowKey)) return;
-            if (!dto) {
-              // Decided in turn with local writes to the row, on the row as it is then.
-              await serial(`${label}:${rowKey}`, async () => {
-                const current = await store.getRaw?.(rowKey);
-                if (!current || current._dirty) return;
-                try {
-                  await writer.delete(rowKey, Number.isSafeInteger(current._rev) ? { expectedRevision: current._rev } : {});
-                } catch (error) { if (error?.reason !== 'conflict') throw error; }
-              });
-              return;
-            }
-            const prev = await store.getRaw?.(rowKey);
-            const record = (spec.toRecord || ((value) => value))(dto, prev ? previousByKey([prev], keyPath).get(rowKey) : prev);
-            // One record leaves the collection's synced stamp as it was.
-            await writer.reconcile([record], { prune: false, keepDirty: true, syncedAt: null });
-          }, { isCurrent });
-          return;
-        }
-        if (spec.read && !wanted.query && !wanted.window && typeof spec.scope !== 'function') {
-          return readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent, { full, context });
-        }
-        // A query target prunes only the rows of that query; a list or window
-        // target the source's scope (the whole collection without one).
-        let scope = typeof spec.scope === 'function' ? spec.scope(wanted) : () => true;
-        if (wanted.query && typeof spec.scope !== 'function') {
-          const { limit: _limit, cursor: _cursor, raw: _raw, where, ...range } = wanted.query;
-          if (range.index) {
-            const held = new Set((await rangeKeys(store, keyPath, wholeRange(range, 'refresh'))).map((entry) => entry.key));
-            scope = (row) => held.has(String(row[keyPath]));
-          } else if (typeof where === 'function') scope = (row) => where(row);
-        }
-        // Only a read of the whole collection marks it synced.
-        const whole = !wanted.query && typeof spec.scope !== 'function';
-        // Fetched first; stored through the one read guard.
-        return guardedRead(name, async () => snapshotRows(await spec.fetch(wanted, context)), (dtos, touched) => (dtos === null ? NO_SNAPSHOT
-          : reconcileFetched(store, keyPath, { fetch: () => dtos, toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
-            scope, wanted.window, windowKeyOf(wanted.window), {
-              onPersistError, rethrow: true, keepDirty: true, skip: touched, ...(whole ? {} : { syncedAt: null }),
-            })), { isCurrent });
-      };
-      state.flightForm = form;
-      state.flight = scheduler.request({
-        key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
-        ...(inForeground()
-          ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
-          : { priority: PRIORITIES.background, visible: false }),
-        run,
-      }).then((outcome) => {
-        // A read that answered no list leaves the collection as it was, not fresh.
-        if (outcome === NO_SNAPSHOT) { if (state.state === 'refreshing') state.state = 'stale'; return; }
-        state.state = 'fresh'; state.syncedAt = now(); state.error = null;
-      }, (error) => {
-        state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
-        throw error;
-      }).finally(() => { state.flight = null; state.flightForm = null; emitStatus(); });
-      return settle(state.flight);
-    },
-    /**
+    refresh(target, options = {}) {
+      // The principal it reads as, taken when it is asked.
+      return refreshAs(target, options, jobContextNow());
+    },    /**
      * Stores rows a domain received from the server (a page, an event, a
      * detail read) as synced rows: views subscribed to them update, nothing is
      * pushed. A row with an unsent local write keeps that write: the server's
@@ -1369,6 +1379,8 @@ export function createDataService({
      */
     async mutate(collection, command, { wait = false } = {}) {
       live();
+      // The principal it is sent as, taken when it is asked.
+      const context = jobContextNow();
       const generation = fenceGeneration;
       const { name, label, store, decl } = local(collection);
       const keyPath = decl?.keyPath || 'id';
@@ -1401,7 +1413,9 @@ export function createDataService({
       // Fenced while the local write ran: the row stays unsent on disk for
       // the principal it was written under.
       if (generation !== fenceGeneration || disposed) return { key, pushed: false };
-      const change = enqueuePush({ name, label, key, store, decl }, { command, record: written.record, revision: written.revision });
+      const change = enqueuePush({ name, label, key, store, decl }, {
+        command, record: written.record, revision: written.revision, context,
+      });
       if (wait) return change;
       change.catch(() => {});
       return { key, pushed: false };
