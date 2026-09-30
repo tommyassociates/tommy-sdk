@@ -232,6 +232,16 @@ describe('a declared read', () => {
     expect(written).toBe(999);
   });
 
+  it('refuses a whole answer larger than the collection may hold: the error says so, and nothing is written or removed', async () => {
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
+    const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id', maxRows: 3 } } : null), sourceMeta: createMemorySourceMeta() });
+    await data.ingest('members', [{ id: 'a' }, { id: 'b' }]);
+    data.source('members', { fetch: async () => ({ rows: [{ id: 'a' }, { id: 'c' }, { id: 'd' }, { id: 'e' }] }), read: { cursor: false } });
+    await expect(data.refresh('members', { mode: 'visible' })).rejects.toMatchObject({ code: 'DATA_TOO_LARGE' });
+    expect(await ids(data)).toEqual(['a', 'b']);
+    expect(data.status('members')).toMatchObject({ state: 'error', error: expect.objectContaining({ code: 'DATA_TOO_LARGE' }) });
+  });
+
   it('keys each answered row by its record, and never takes an answer with no keyed row for an empty collection', async () => {
     const { data } = service();
     let answer = { rows: [{ member_id: 'a' }, { member_id: 'b' }] };

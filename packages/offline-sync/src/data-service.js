@@ -927,6 +927,12 @@ export function createDataService({
       return !why;
     });
     if (refusals.length) reportRejected(store, refusals, onPersistError);
+    // A whole answer larger than the collection may hold is refused whole:
+    // storing part of it would look like the whole list.
+    const limit = local(name).decl?.maxRows;
+    if (!changesOnly && Number.isSafeInteger(limit) && records.length > limit) {
+      throw serviceError(`'${name}' answered ${records.length} rows; this device keeps at most ${limit}`, 'DATA_TOO_LARGE');
+    }
     // A job no longer current, or whose protection was dropped, stops between
     // commits: the rows it wrote stay, and the collection's source meta is
     // forgotten, so the next read is whole.
