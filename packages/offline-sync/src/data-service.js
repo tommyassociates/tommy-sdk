@@ -216,9 +216,19 @@ function checkRead(read) {
   if (invalid) throw serviceError(`source.read: ${known.join(', ')} only (cursor a boolean, removedField a field name, fullEveryMs a positive number, forbidden 'purge' or 'keep')`, 'DATA_INVALID');
 }
 /** Refuses, at once, a query spec a read could not honour. */
+// The most values one `anyOf` query may ask for.
+export const MAX_ANY_OF = 500;
 function checkQuery(spec = {}) {
   const { index, limit = 50, cursor = null, where, raw: _raw, ...range } = spec;
   queryLimit(limit);
+  if (range.anyOf !== undefined) {
+    if (!Array.isArray(range.anyOf) || range.anyOf.length > MAX_ANY_OF
+      || range.anyOf.some((value) => value === null || value === undefined || (typeof value === 'object' && !Array.isArray(value)))) {
+      throw serviceError(`query: anyOf must be a list of at most ${MAX_ANY_OF} index values`, 'DATA_INVALID');
+    }
+    if (Object.keys(range).some((field) => field !== 'anyOf')) throw serviceError('query: anyOf cannot be combined with another range', 'DATA_INVALID');
+    if (cursor !== null) throw serviceError('query: anyOf answers at most one page; it takes no cursor', 'DATA_INVALID');
+  }
   if (where !== undefined && typeof where !== 'function') throw serviceError('query: where must be a function', 'DATA_INVALID');
   if (cursor !== null && typeof cursor !== 'string') throw serviceError('query: cursor must be a string', 'DATA_INVALID');
   if (index && where) throw serviceError('query: where cannot filter an index read; filter the rows it returns', 'DATA_INVALID');
@@ -227,6 +237,23 @@ function checkQuery(spec = {}) {
 async function runQuery(store, keyPath, spec = {}) {
   checkQuery(spec);
   const { index, limit = 50, cursor = null, where, raw = false, ...range } = spec;
+  if (index && Array.isArray(range.anyOf)) {
+    // Many rows by one declared index: the rows of each value asked for, in
+    // the order asked, each row once, up to `limit` in all.
+    const keyOf = (row) => String(row[keyPath]);
+    const seen = new Set();
+    const rows = [];
+    let complete = true;
+    const values = [...new Map(range.anyOf.map((value) => [JSON.stringify(value), value])).values()];
+    for (const value of values) {
+      if (rows.length >= limit) { complete = false; break; }
+      // eslint-disable-next-line no-await-in-loop
+      const page = await queryPages(store, index, { equals: Array.isArray(value) ? value : [value] }, { limit: limit - rows.length, cursor: null, raw: raw === true });
+      page.rows.forEach((row) => { if (!seen.has(keyOf(row))) { seen.add(keyOf(row)); rows.push(row); } });
+      if (!page.complete) complete = false;
+    }
+    return { rows: rows.map(raw === true ? copyRow : clean), nextCursor: null, complete };
+  }
   if (index) {
     const page = await queryPages(store, index, range, { limit, cursor, raw: raw === true });
     return { ...page, rows: page.rows.map(raw === true ? copyRow : clean) };

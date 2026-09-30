@@ -79,6 +79,24 @@ describe('data service on memory stores', () => {
     expect(read).toEqual(['Team', 'TeamMember']);
   });
 
+  it('reads many rows by one index: each value asked, in order, each row once, and refuses what it cannot honour', async () => {
+    const data = memoryService();
+    await data.ingest('chats.messages', [
+      { id: 'a', chat_id: 7, seq: 1 }, { id: 'b', chat_id: 8, seq: 1 }, { id: 'c', chat_id: 7, seq: 2 }, { id: 'd', chat_id: 9, seq: 1 },
+    ]);
+    const page = await data.query('chats.messages', { index: 'byChat', anyOf: [9, 7, 7, 42] });
+    expect(page.rows.map((row) => row.id)).toEqual(['d', 'a', 'c']);
+    expect(page).toMatchObject({ nextCursor: null, complete: true });
+    expect((await data.query('chats.messages', { index: 'byChat', anyOf: [[7, 2]] })).rows.map((row) => row.id)).toEqual(['c']);
+    const capped = await data.query('chats.messages', { index: 'byChat', anyOf: [7, 8, 9], limit: 2 });
+    expect(capped.rows.map((row) => row.id)).toEqual(['a', 'c']);
+    expect(capped.complete).toBe(false);
+    await expect(data.query('chats.messages', { index: 'byChat', anyOf: 'x' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.query('chats.messages', { index: 'byChat', anyOf: [7], cursor: 'a' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.query('chats.messages', { index: 'byChat', anyOf: [7], lower: 1 })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.query('chats.messages', { anyOf: [7] })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+  });
+
   it('takes no refresh answer with an entry that is not a keyed row, and removes nothing', async () => {
     const data = memoryService();
     let answer = [null];
