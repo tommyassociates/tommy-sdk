@@ -1415,9 +1415,15 @@ export interface PrefsApi {
   /**
    * Stores a JSON value; the next `get` returns it at once. Rejects with
    * `DATA_NOT_SAVED` when the device could not keep it (its storage full or
-   * gone): it would be lost on reload.
+   * gone, or no room for it): it would be lost on reload. A saved choice is
+   * never dropped to make room for another.
    */
   set(key: string, value: unknown): Promise<void>;
+  /**
+   * Removes a stored value; the next `get` answers the fallback at once.
+   * Rejects with `DATA_NOT_SAVED` when the device could not record the
+   * removal: the value would return on reload.
+   */
   remove(key: string): Promise<void>;
 }
 

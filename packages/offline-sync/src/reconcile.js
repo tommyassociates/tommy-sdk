@@ -41,7 +41,9 @@ function reportRejected(store, reasons, onPersistError) {
  * The fetch → reconcile step shared by windowCache.sync, liveQuery.revalidate
  * and the data service's refresh.
  */
-export async function reconcileFetched(store, keyPath, { fetch, toRecord, keyOf }, scope, window, windowKey, { onPersistError, rethrow = false, keepDirty = false } = {}) {
+export async function reconcileFetched(store, keyPath, { fetch, toRecord, keyOf }, scope, window, windowKey, {
+  onPersistError, rethrow = false, keepDirty = false, syncedAt,
+} = {}) {
   let dtos = null;
   try {
     dtos = typeof fetch === 'function' ? await fetch(window) : null;
@@ -107,7 +109,11 @@ export async function reconcileFetched(store, keyPath, { fetch, toRecord, keyOf 
     // not. The rejects go out the same channel as every other data loss.
     if (rejected.length) reportRejected(store, rejected, onPersistError);
     try {
-      await store.reconcile(valid, { scope, ...(windowKey != null ? { windowKey } : {}), ...(keepDirty ? { keepDirty: true } : {}) });
+      // `syncedAt: null` for a read of part of the collection: it leaves the
+      // collection's synced stamp as it was.
+      await store.reconcile(valid, {
+        scope, ...(windowKey != null ? { windowKey } : {}), ...(keepDirty ? { keepDirty: true } : {}), ...(syncedAt !== undefined ? { syncedAt } : {}),
+      });
     } catch (error) {
       // A failed durable write or incomplete read cannot certify the cache
       // as the complete fresh result. Consumers must retain their error path.

@@ -273,6 +273,53 @@ describe('MP data API confinement', () => {
     expect(pushed).toEqual(['mon', 'tue']);
   });
 
+  it('never evicts a saved pref to make room for another: a pref that does not fit is refused', async () => {
+    const saved = globalThis.localStorage;
+    const kept = new Map();
+    globalThis.localStorage = { getItem: (k) => (kept.has(k) ? kept.get(k) : null), setItem: (k, v) => { kept.set(k, String(v)); }, removeItem: (k) => { kept.delete(k); } };
+    try {
+      const data = createDataManager({ capabilityToken: { tenantId: 'team-45', mpId: 'scheduling' }, mpId: 'scheduling', localData: {} });
+      await data.prefs.set('a', 'x'.repeat(200000));
+      await data.prefs.set('b', 'x'.repeat(200000));
+      await expect(data.prefs.set('c', 'x'.repeat(200000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+      const [storeKey] = [...kept.keys()].filter((key) => key.endsWith(':prefs'));
+      expect(Object.keys(JSON.parse(kept.get(storeKey))).sort()).toEqual(['a', 'b']);
+    } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+
+  it('never evicts a client-owned row in memory: only cached rows go past the row cap', async () => {
+    const own = createDataStore({ name: 'drafts', backend: createMemoryStoreBackend(), syncStrategy: 'last_write_wins', maxRows: 2 });
+    await own.reconcile([{ id: '1' }, { id: '2' }], { prune: false });
+    await own.reconcile([{ id: '3' }], { prune: false });
+    expect((await own.getAll()).map((row) => row.id).sort()).toEqual(['1', '2', '3']);
+    const cache = createDataStore({ name: 'rows', backend: createMemoryStoreBackend(), maxRows: 2 });
+    await cache.reconcile([{ id: '1' }, { id: '2' }], { prune: false });
+    await cache.reconcile([{ id: '3' }], { prune: false });
+    expect(await cache.getAll()).toHaveLength(2);
+    // Nor does window retention: an older window's rows stay.
+    const paged = createDataStore({ name: 'notes', backend: createMemoryStoreBackend(), syncStrategy: 'last_write_wins', maxWindows: 1 });
+    await paged.reconcile([{ id: 'a' }], { prune: false, windowKey: 'mon' });
+    await paged.reconcile([{ id: 'b' }], { prune: false, windowKey: 'tue' });
+    expect((await paged.getAll()).map((row) => row.id).sort()).toEqual(['a', 'b']);
+  });
+
+  it('refuses a pref removal the device could not keep with DATA_NOT_SAVED', async () => {
+    const saved = globalThis.localStorage;
+    const kept = new Map();
+    let full = false;
+    globalThis.localStorage = {
+      getItem: (k) => (kept.has(k) ? kept.get(k) : null),
+      setItem: (k, v) => { if (full) throw Object.assign(new Error('full'), { name: 'QuotaExceededError' }); kept.set(k, String(v)); },
+      removeItem: (k) => { kept.delete(k); },
+    };
+    try {
+      const data = createDataManager({ capabilityToken: { tenantId: 'team-46', mpId: 'scheduling' }, mpId: 'scheduling', localData: {} });
+      await data.prefs.set('a', 1);
+      full = true;
+      await expect(data.prefs.remove('a')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+    } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+
   it('refuses purge options it does not know or cannot read, removing nothing', async () => {
     const data = memoryService();
     await data.ingest('chats.messages', [{ id: 'a', chat_id: 7, seq: 1 }, { id: 'b', chat_id: 7, seq: 2 }]);
@@ -516,6 +563,91 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     await expect(a.retry('chats.messages', 'draft')).resolves.toEqual({ key: 'draft', pushed: false });
     expect(push.mock.calls.map(([command]) => command.record.id).sort()).toEqual(['draft', 'other']);
     feedA.close(); feedB.close(); await database.close();
+  });
+
+  it('stamps a collection synced only for a read of all of it, never for one record, a query or a scoped read', async () => {
+    const selector = { authorityOrigin: 'https://api.example.test', viewerId: '7' };
+    const open = () => {
+      const database = create();
+      const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+      const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+        limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+      const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(port, null, options), indexes: INDEXES });
+      const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+      const syncedAt = async () => (await port.inspect({ op: 'stores', selector })).stores[0]?.syncedAt ?? null;
+      return { data, syncedAt, close: () => database.close() };
+    };
+    const fetch = async (target) => (target.key ? { id: String(target.key), chat_id: 7, seq: 1 } : [{ id: 'a', chat_id: 7, seq: 1 }]);
+    const whole = open();
+    whole.data.source('chats.messages', { fetch });
+    await whole.data.refresh({ collection: 'chats.messages', key: 'a' }, { mode: 'visible' });
+    expect(await whole.syncedAt()).toBeNull();
+    await whole.data.refresh({ collection: 'chats.messages', query: { index: 'byChat', prefix: [7] } }, { mode: 'visible' });
+    expect(await whole.syncedAt()).toBeNull();
+    await whole.data.refresh('chats.messages', { mode: 'visible' });
+    expect(await whole.syncedAt()).toEqual(expect.any(Number));
+    await whole.close();
+    // A source whose reads each cover a part of the collection (its scope).
+    const scoped = open();
+    scoped.data.source('chats.messages', { fetch, scope: (target) => (row) => row.chat_id === target.window?.chat });
+    await scoped.data.refresh({ collection: 'chats.messages', window: { chat: 7 } }, { mode: 'visible' });
+    await scoped.data.refresh('chats.messages', { mode: 'visible' });
+    expect(await scoped.syncedAt()).toBeNull();
+    await scoped.close();
+  });
+
+  it('keeps an MP\'s collection unstamped by a record read-through or a window, and stamps it for a read of all of it', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const who = identity({ mpId: 'scheduling', tenantId: 'team-44' });
+    const factory = (_db, storeName, syncStrategy) => transactionalBackend(port, null, {
+      identity: who, storeName, policy: syncStrategy === 'last_write_wins' ? 'authored' : 'cache', schemaVersion: 1,
+      cacheFingerprint: syncStrategy === 'last_write_wins' ? null : 'fp',
+      limits: { maxRows: 1000, maxAgeMs: syncStrategy === 'last_write_wins' ? null : 86400000, maxBytes: null },
+    });
+    const data = createDataManager({ capabilityToken: { tenantId: 'team-44', mpId: 'scheduling' }, mpId: 'scheduling',
+      localData: { shifts: { keyPath: 'id', syncStrategy: 'server_authoritative' } }, backendFactory: factory });
+    const syncedAt = async () => (await port.inspect({ op: 'stores', selector: { authorityOrigin: 'https://api.example.test', viewerId: '7' } }))
+      .stores.find((row) => row.label === 'mp.scheduling.shifts')?.syncedAt ?? null;
+    await data.record('shifts', { fetch: async (id) => ({ id: String(id), at: 'mon' }) }).get('1', { refresh: true });
+    expect(await syncedAt()).toBeNull();
+    await data.windowCache('shifts', { fetch: async () => [{ id: '2', at: 'tue' }], scopeOf: () => (row) => row.at === 'tue' }).sync('week');
+    expect(await syncedAt()).toBeNull();
+    await data.liveQuery('shifts', { fetch: async () => [{ id: '1', at: 'mon' }, { id: '2', at: 'tue' }] }).revalidate();
+    expect(await syncedAt()).toEqual(expect.any(Number));
+    await database.close();
+  });
+
+  it('refuses a pref the host store could not save with DATA_NOT_SAVED, and a value it cannot store as before', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const who = identity({ mpId: 'scheduling', tenantId: 'team-44' });
+    const factory = (_db, storeName) => transactionalBackend(port, null, {
+      identity: who, storeName, policy: 'authored', schemaVersion: 1, cacheFingerprint: null,
+      limits: { maxRows: 1, maxAgeMs: null, maxBytes: null },
+    });
+    const data = createDataManager({ capabilityToken: { tenantId: 'team-44', mpId: 'scheduling' }, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    await data.prefs.set('first', 'ok');
+    // The store holds one row: a second pref cannot be saved.
+    await expect(data.prefs.set('second', 'ok')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+    const refused = await data.prefs.set('cycle', { toJSON() { throw new Error('unserializable'); } }).catch((error) => error);
+    expect(refused).toBeInstanceOf(Error);
+    expect(refused.code).not.toBe('DATA_NOT_SAVED');
+    await database.close();
+  });
+
+  it('keeps a client-owned store\'s older windows when a read of a newer one prunes', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const backend = transactionalBackend(port, null, {
+      identity: identity({ mpId: 'scheduling', tenantId: 'team-44' }), storeName: 'notes', policy: 'authored', schemaVersion: 1, cacheFingerprint: null,
+      limits: { maxRows: 1000, maxAgeMs: null, maxBytes: null },
+    });
+    const store = createDataStore({ name: 'notes', backend, syncStrategy: 'last_write_wins', maxWindows: 1 });
+    await store.reconcile([{ id: 'a', day: 'mon' }], { windowKey: 'mon', scope: (row) => row.day === 'mon' });
+    await store.reconcile([{ id: 'b', day: 'tue' }], { windowKey: 'tue', scope: (row) => row.day === 'tue' });
+    expect((await store.getAll()).map((row) => row.id).sort()).toEqual(['a', 'b']);
+    await database.close();
   });
 
   it('reads a declared index in memory where the store opened without it', async () => {

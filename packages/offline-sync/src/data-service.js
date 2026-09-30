@@ -587,7 +587,8 @@ export function createDataService({
             return;
           }
           const record = (spec.toRecord || ((value) => value))(dto, prev ? bare(prev) : prev);
-          await store.reconcile([record], { prune: false, keepDirty: true });
+          // One record leaves the collection's synced stamp as it was.
+          await store.reconcile([record], { prune: false, keepDirty: true, syncedAt: null });
           return;
         }
         // A query target prunes only the rows of that query; a list or window
@@ -600,8 +601,10 @@ export function createDataService({
             scope = (row) => held.has(String(row[keyPath]));
           } else if (typeof where === 'function') scope = (row) => where(row);
         }
+        // Only a read of the whole collection marks it synced.
+        const whole = !wanted.query && typeof spec.scope !== 'function';
         await reconcileFetched(store, keyPath, { fetch: () => spec.fetch(wanted), toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
-          scope, wanted.window, windowKeyOf(wanted.window), { onPersistError, rethrow: true, keepDirty: true });
+          scope, wanted.window, windowKeyOf(wanted.window), { onPersistError, rethrow: true, keepDirty: true, ...(whole ? {} : { syncedAt: null }) });
       };
       state.flight = scheduler.request({
         key: `data:${label}:${key}`, target: label, budgetKey, reason,

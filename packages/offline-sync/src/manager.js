@@ -52,7 +52,9 @@ import {
  */
 function defaultBackend(dbName, storeName, syncStrategy) {
   if (syncStrategy === 'last_write_wins' && hasWebStorage()) {
-    return createLocalStorageBackend(dbName, storeName);
+    // Its rows are the only copy: a write that does not fit is refused, never
+    // made room for by dropping another.
+    return createLocalStorageBackend(dbName, storeName, { evict: false });
   }
   // ⚠ A `persist: true` SERVER-AUTHORITATIVE STORE STILL LANDS IN MEMORY HERE,
   // and that is deliberate. Durable caching needs a store far larger than Web
@@ -164,8 +166,10 @@ export function createDataManager({
   // In a store that sends its changes, a row with an unsent change keeps it:
   // the server's copy never replaces an edit still waiting to go.
   // Returns the reconciled, scope-filtered cache read.
-  const fetchAndReconcile = (store, keyPath, spec, scope, window, windowKey, storeName) => reconcileFetched(
-    store, keyPath, spec, scope, window, windowKey, { onPersistError, keepDirty: service.sends(storeName) }, // eslint-disable-line no-use-before-define
+  // Only a read whose reconcile covers the whole store (`complete`) marks the
+  // collection synced; a scoped read leaves its stamp as it was.
+  const fetchAndReconcile = (store, keyPath, spec, scope, window, windowKey, storeName, complete) => reconcileFetched(
+    store, keyPath, spec, scope, window, windowKey, { onPersistError, keepDirty: service.sends(storeName), ...(complete ? {} : { syncedAt: null }) }, // eslint-disable-line no-use-before-define
   );
 
   // The same small surface the host uses, confined to this MP's own stores
@@ -204,6 +208,12 @@ export function createDataManager({
     tail.then(() => { if (prefWrites.get(name) === tail) prefWrites.delete(name); });
     return next;
   }
+  // A change the device's storage refused (full or gone) is DATA_NOT_SAVED
+  // whatever the backend; any other error is passed on as it is.
+  function notSaved(name, error) {
+    if (error && error.name !== 'PersistError') return error;
+    return Object.assign(new Error(`tommy.prefs: '${name}' was not saved on this device`), { code: 'DATA_NOT_SAVED', ...(error ? { cause: error } : {}) });
+  }
   // Once disposed, prefs answer nothing held (never the previous account's
   // choices), load nothing, and refuse writes.
   const prefs = Object.freeze({
@@ -230,12 +240,11 @@ export function createDataManager({
       const stored = clone(value);
       prefValues.set(name, stored);
       prefsChanged.add(name);
-      const result = await inPrefOrder(name, () => service.ingest(PREFS_STORE, [{ key: name, value: stored === undefined ? null : stored }]));
+      const result = await inPrefOrder(name, () => service.ingest(PREFS_STORE, [{ key: name, value: stored === undefined ? null : stored }]))
+        .catch((error) => { throw notSaved(name, error); });
       // Saved only once the device holds it: a store that kept it in memory
       // only (its storage full or gone) would lose it on reload.
-      if (result?.unsaved?.includes(name)) {
-        throw Object.assign(new Error(`tommy.prefs: '${name}' was not saved on this device`), { code: 'DATA_NOT_SAVED' });
-      }
+      if (result?.unsaved?.includes(name)) throw notSaved(name);
       if (!result?.written) throw Object.assign(new Error(`tommy.prefs: '${name}' was not saved`), { code: 'DATA_INVALID' });
     },
     async remove(key) {
@@ -243,7 +252,8 @@ export function createDataManager({
       const name = String(key);
       prefValues.delete(name);
       prefsChanged.add(name);
-      await inPrefOrder(name, () => service.purge(PREFS_STORE, { keys: [name], force: true }));
+      await inPrefOrder(name, () => service.purge(PREFS_STORE, { keys: [name], force: true }))
+        .catch((error) => { throw notSaved(name, error); });
     },
   });
 
@@ -314,7 +324,7 @@ export function createDataManager({
         read: (window) => store.readWhere(scopeFor(window)),
         // The reconcile answers with its own read of the window's scope.
         sync: (window) => fetchAndReconcile(
-          store, keyPath, { fetch, toRecord, keyOf }, scopeFor(window), window, windowKeyOf(window), storeName,
+          store, keyPath, { fetch, toRecord, keyOf }, scopeFor(window), window, windowKeyOf(window), storeName, !scopeOf,
         ),
       };
     },
@@ -378,7 +388,8 @@ export function createDataManager({
           // store degrades to fetch-every-time rather than to a blank surface.
           let kept = false;
           try {
-            const result = await store.reconcile([rec], { prune: false, ...(service.sends(storeName) ? { keepDirty: true } : {}) }); // eslint-disable-line no-use-before-define
+            // One record says nothing about the rest: the collection's synced stamp stays.
+            const result = await store.reconcile([rec], { prune: false, syncedAt: null, ...(service.sends(storeName) ? { keepDirty: true } : {}) }); // eslint-disable-line no-use-before-define
             kept = (Array.isArray(result?.skipped) ? result.skipped : []).map(String).includes(key);
           } catch (_) { /* cache write is best-effort */ }
           return kept ? store.get(key) : rec;
@@ -443,6 +454,8 @@ export function createDataManager({
        * unchanged — the scope governs both, as before.
        */
       const prunePredicate = typeof pruneScope === 'function' ? pruneScope : scopePredicate;
+      // A revalidate with neither scope reads the whole store.
+      const wholeRead = typeof scope !== 'function' && typeof pruneScope !== 'function';
       return {
         store,
         read: () => store.readWhere(predicate),
@@ -475,7 +488,7 @@ export function createDataManager({
         // The reconcile answers with its read of the prune scope; a read whose
         // paint scope differs reads that too.
         revalidate: (window) => fetchAndReconcile(
-          store, keyPath, { fetch, toRecord, keyOf }, prunePredicate, window, windowKeyOf(window), storeName,
+          store, keyPath, { fetch, toRecord, keyOf }, prunePredicate, window, windowKeyOf(window), storeName, wholeRead,
         ).then((rows) => (prunePredicate === predicate ? rows : store.readWhere(predicate))),
       };
     },

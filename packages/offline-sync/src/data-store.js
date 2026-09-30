@@ -155,7 +155,7 @@ const entryBytes = (key, record) => JSON.stringify(String(key)).length
  * the blob is corrupt: there is nothing useful to tell a caller who asked what
  * is in an unreadable store, and the answer "nothing" is true.
  */
-export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAULT_MAX_BYTES } = {}) {
+export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAULT_MAX_BYTES, evict = true } = {}) {
   const storeKey = `mp-store:${dbName}:${storeName}`;
   function load() {
     if (memoryFallback.has(storeKey)) return new Map(memoryFallback.get(storeKey));
@@ -177,6 +177,10 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
    * Which means an all-dirty store cannot be shrunk at all — and that is the
    * point. A drafts store over budget FAILS THE WRITE rather than deleting
    * somebody's unsent work to make room for the next one.
+   *
+   * With `evict: false` (a store the device authors, such as preferences) no
+   * row is evictable: each is the only copy, so a write that does not fit is
+   * refused instead.
    */
   function evictToFit(map, protect) {
     let total = 0;
@@ -184,7 +188,7 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
     for (const [key, record] of map) {
       const bytes = entryBytes(key, record);
       total += bytes;
-      if (record && record._dirty) continue;
+      if (!evict || (record && record._dirty)) continue;
       if (protect !== undefined && String(key) === String(protect)) continue;
       rows.push({ key, bytes, at: record && record._updatedAt ? String(record._updatedAt) : '' });
     }
@@ -443,6 +447,9 @@ export function createDataStore({
   syncStrategy = 'server_authoritative', indexes = {},
 }) {
   const validate = recordSchema ? ajv.compile(recordSchema) : null;
+  // A client-owned (`last_write_wins`) store holds the only copy of its rows:
+  // neither the row cap nor window retention removes them.
+  const evictsRows = syncStrategy !== 'last_write_wins';
   const wholeStoreSubscribers = new Set();
   const selectorSubscribers = new Set(); // {selector, handler, touched:Set, last}
   const changeListeners = new Set();
@@ -650,6 +657,8 @@ export function createDataStore({
    *     spent on the only candidates available, which are the freshest ones:
    *     a store holding many dirty rows strip-mined the CURRENT window and the
    *     grid silently painted half of it (adversarial review 2026-08-31).
+   *   · every row of a client-owned (`last_write_wins`) store — each is the
+   *     only copy, so such a store has no row cap at all.
    *
    * Rows lacking `_updatedAt` sort as UNKNOWN age, not as epoch-zero, so they
    * are evicted only after genuinely-older stamped rows.
@@ -689,7 +698,7 @@ export function createDataStore({
   }
 
   async function enforceRowCap({ protect, changed } = {}) {
-    if (!Number.isFinite(maxRows) || maxRows <= 0) return [];
+    if (!evictsRows || !Number.isFinite(maxRows) || maxRows <= 0) return [];
     const rows = await backend.getAll();
     if (rows.length <= maxRows) return [];
     const evictable = rows.filter((row) => !row._dirty
@@ -749,7 +758,7 @@ export function createDataStore({
    * Whether a row may be PAINTED. Caches age out at the platform ceiling;
    * client-owned (`last_write_wins`) rows never do — they are the only copy.
    */
-  const ceilingApplies = syncStrategy !== 'last_write_wins';
+  const ceilingApplies = evictsRows;
   // A local delete waiting to be sent (`_deleted`) never paints.
   const paintable = (row) => {
     if (row?._deleted) return false;
@@ -758,11 +767,11 @@ export function createDataStore({
     return !Number.isFinite(at) || at >= now() - PAINT_CEILING_MS;
   };
 
-  if (backend.transactional) return createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows, indexes, queryRows });
+  if (backend.transactional) return createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows: evictsRows ? maxWindows : Infinity, indexes, queryRows });
 
 
   async function enforceWindowRetention({ current, changed, keep = maxWindows } = {}) {
-    if (!Number.isFinite(keep) || keep <= 0) return [];
+    if (!evictsRows || !Number.isFinite(keep) || keep <= 0) return [];
     const rows = await backend.getAll();
     const lastTouched = new Map();
     for (const row of rows) {
@@ -1042,7 +1051,7 @@ export function createDataStore({
       // and the host heard nothing about storage pressure that HAD cost data.
       const byteEvicted = accountForGoneRows(persisted, key);
       let evicted = [];
-      if (!deferCap && residentCount > maxRows && !capSaturated) {
+      if (!deferCap && evictsRows && residentCount > maxRows && !capSaturated) {
         // `protect` the row just written — it is the newest thing in the store,
         // and eviction spending its budget on it would undo the write.
         evicted = await enforceRowCap({ protect: new Set([String(key)]) });
