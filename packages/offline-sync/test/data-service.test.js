@@ -711,6 +711,19 @@ describe('MP data API confinement', () => {
     await expect(data.prefs.set('layout', 'grid')).rejects.toMatchObject({ reason: 'retired' });
   });
 
+  it('refuses a store handle held across dispose as retired, its writes as its reads', async () => {
+    const backends = new Map();
+    const factory = (_db, store) => { if (!backends.has(store)) backends.set(store, createMemoryStoreBackend()); return backends.get(store); };
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: { drafts: { keyPath: 'id', syncStrategy: 'last_write_wins' } }, backendFactory: factory });
+    const held = data.store('drafts');
+    await held.put({ id: 'a' });
+    await data.dispose();
+    await expect(Promise.resolve().then(() => held.get('a'))).rejects.toMatchObject({ name: 'StorageReadError', reason: 'retired' });
+    for (const write of [() => held.put({ id: 'b' }), () => held.delete('a'), () => held.markSynced('a'), () => held.reconcile([], {})]) {
+      await expect(Promise.resolve().then(write)).rejects.toMatchObject({ name: 'StorageReadError', reason: 'retired' }); // eslint-disable-line no-await-in-loop
+    }
+  });
+
   it('stores a preference set then removed before the first write landed as removed', async () => {
     let gate = null;
     const backends = new Map();

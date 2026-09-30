@@ -1212,7 +1212,8 @@ export function createDataService({
      * A collection's store for a caller that writes it directly (an MP's own
      * store handle): reads go straight to the store, and every write goes in
      * the collection's turn, recorded as a change of its rows, so a read
-     * already on its way never undoes it.
+     * already on its way never undoes it. Once the service is disposed a
+     * write rejects as a retired store's does (`reason: 'retired'`).
      */
     writer(collection) {
       live();
@@ -1224,7 +1225,10 @@ export function createDataService({
           const value = target[property];
           if (typeof value !== 'function') return value;
           if (!writes.has(property)) return value.bind(target);
-          return (...args) => inTurn(name, () => touching(name, target, keyPath)[property](...args));
+          // Once the service is retired its handle refuses as a retired store does.
+          return (...args) => (disposed
+            ? Promise.reject(Object.assign(new Error('Data store retired'), { name: 'StorageReadError', reason: 'retired', code: 'DATA_RETIRED' }))
+            : inTurn(name, () => touching(name, target, keyPath)[property](...args)));
         },
       });
     },
