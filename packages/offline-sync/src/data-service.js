@@ -830,6 +830,20 @@ export function createDataService({
    * protection (too many changes to track) reads again, and rows changed
    * since it began are neither written nor removed by it.
    */
+  // Every listener this service installed (its subscriptions and watches):
+  // disposing the service removes them, including those on the shared feed.
+  const installed = new Set();
+  function held(off) {
+    let done = false;
+    const stop = () => {
+      if (done) return;
+      done = true;
+      installed.delete(stop);
+      try { off(); } catch (_) { /* gone */ }
+    };
+    installed.add(stop);
+    return stop;
+  }
   // A commit that lost its protection part way asks for the read again.
   const READ_AGAIN = Symbol('read again');
   async function guardedRead(name, read, commit, { isCurrent = () => true } = {}) {
@@ -1207,7 +1221,7 @@ export function createDataService({
       const offFeed = feed?.subscribe((event) => {
         if (event.label === label || event.labels?.includes(label) || (event.type === 'purge' && !event.label)) fire();
       });
-      return () => { offStore?.(); offFeed?.(); };
+      return held(() => { offStore?.(); offFeed?.(); });
     },
     /**
      * `target`: a collection name, `{ collection, key }` or
@@ -1238,7 +1252,7 @@ export function createDataService({
         if (event.label === label || event.labels?.includes(label) || (event.type === 'purge' && !event.label)) emit();
       });
       emit();
-      return () => { active = false; offStore?.(); offFeed?.(); };
+      return held(() => { active = false; offStore?.(); offFeed?.(); });
     },
     /**
      * Registers how a collection syncs: `fetch(target) → DTO[] | DTO | null`,
@@ -1588,6 +1602,7 @@ export function createDataService({
     },
     dispose() {
       disposed = true;
+      [...installed].forEach((stop) => stop());
       offOrphanFeed?.();
       offGenerationFeed?.();
       watchedStores.forEach((off) => { try { off?.(); } catch (_) { /* gone */ } });

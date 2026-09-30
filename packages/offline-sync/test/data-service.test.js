@@ -79,6 +79,25 @@ describe('data service on memory stores', () => {
     expect(read).toEqual(['Team', 'TeamMember']);
   });
 
+  it('removes every listener it installed when disposed, those on the shared change feed too', async () => {
+    const feed = createHostStoreChangeFeed({ BroadcastChannelImpl: null });
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend() });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null), feed });
+    const watched = vi.fn();
+    const subscribed = vi.fn();
+    data.watch('chats.messages', watched);
+    data.subscribe('chats.messages', subscribed);
+    await settle();
+    data.dispose();
+    watched.mockClear();
+    subscribed.mockClear();
+    feed.publish({ type: 'purge', principal: 'p', store: 's', keys: ['a'] });
+    await settle();
+    expect(watched).not.toHaveBeenCalled();
+    expect(subscribed).not.toHaveBeenCalled();
+    feed.close();
+  });
+
   it('tells a watcher when a collection may have changed, without reading it, until it stops', async () => {
     const data = memoryService();
     const calls = vi.fn();
