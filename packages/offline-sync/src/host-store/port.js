@@ -578,7 +578,10 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
     },
     // Clears a store's cached rows, or just `keys`. Dirty rows and authored
     // stores (drafts, outbox, settings) stay unless `force` is set by an
-    // explicit confirm.
+    // explicit confirm. A forced clear of the whole store keeps its
+    // generation, so open handles stay usable and see it empty; the new
+    // revision makes their in-flight snapshots conflict and read again. A
+    // rebuild in progress is dropped, and its opener's next step conflicts.
     async purge(input) {
       validatePurge(input);
       try {
@@ -601,7 +604,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
             const keys = [];
             await scanMetadata(tx, store, (metadata) => { keys.push(metadata.id); });
             await tx.deletePrefix('rows', [owner, namespace]);
-            await tx.put('stores', { ...store, generation: next(store.generation), revision: next(store.revision), rowCount: 0, bytes: 0, dirtyCount: 0, touchedAt: now() });
+            await tx.put('stores', { ...store, migration: null, revision: next(store.revision), rowCount: 0, bytes: 0, dirtyCount: 0, touchedAt: now() });
             return keys;
           }
           const doomed = [];
@@ -612,13 +615,6 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
           await tx.put('stores', store);
           return doomed.map((metadata) => metadata.id);
         });
-        if (input.force && !input.keys) {
-          let wanted;
-          try { wanted = JSON.parse(input.store); } catch (_) { wanted = null; }
-          for (const handle of handleRegistry) {
-            if (wanted && handle.owner === wanted[0] && handle.namespace === wanted[1]) handle.closed = true;
-          }
-        }
         return { ok: true, removed };
       } catch (error) { return fail(failureReason(error)); }
     },

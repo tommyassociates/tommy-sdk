@@ -393,6 +393,29 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     expect((await stores()).find((row) => row.policy === 'authored').rowCount).toBe(0);
   });
 
+  it('keeps open handles usable after a forced clear, and drops a rebuild in progress', async () => {
+    const { port, open, stores } = await setup(create);
+    const drafts = await open({ storeName: 'drafts', policy: 'authored' });
+    await drafts.put([{ id: 'd1', _dirty: true }, { id: 'd2', _dirty: true }]);
+    const listed = (await stores()).find((row) => row.label === 'drafts');
+    await expect(port.purge({ selector: SELECTOR, store: listed.id, force: true })).resolves.toEqual({ ok: true, removed: ['d1', 'd2'] });
+    expect(await drafts.all()).toEqual([]);
+    // The handle's snapshot is stale: its write conflicts, then succeeds on the new revision.
+    await expect(drafts.put([{ id: 'd3', _dirty: true }])).resolves.toMatchObject({ ok: false, reason: 'conflict' });
+    const fresh = await port.read({ handle: drafts.handle, expectedEpoch: drafts.epoch, afterKey: null, limit: 10 });
+    drafts.refresh(fresh);
+    await expect(drafts.put([{ id: 'd3', _dirty: true }])).resolves.toMatchObject({ ok: true });
+    expect(await drafts.all()).toEqual([{ id: 'd3', _dirty: true }]);
+
+    // A rebuild under way when the clear lands: its opener's next step conflicts.
+    const rebuilding = await port.open(openInput({ storeName: 'drafts', policy: 'authored', schemaVersion: 2 }));
+    const step = (phase, extra = {}) => port.migration({ handle: rebuilding.handle, expectedEpoch: rebuilding.epoch, phase, ...extra });
+    await expect(step('begin')).resolves.toMatchObject({ ok: true });
+    await expect(port.purge({ selector: SELECTOR, store: listed.id, force: true })).resolves.toEqual({ ok: true, removed: ['d3'] });
+    await expect(step('write', { changes: [{ op: 'put', key: 'd3', value: { id: 'd3', _dirty: true } }] })).resolves.toMatchObject({ ok: false, reason: 'conflict' });
+    expect((await stores()).find((row) => row.label === 'drafts')).toMatchObject({ rowCount: 0, dirtyCount: 0 });
+  });
+
   it('purges every namespace of a principal on logout', async () => {
     const { port, open } = await setup(create);
     const rows = await open();
