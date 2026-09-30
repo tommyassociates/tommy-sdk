@@ -308,6 +308,26 @@ describe('MP data API confinement', () => {
     } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
   });
 
+  it('holds nothing of a refused pref: it reads as saved, and later prefs save normally', async () => {
+    const saved = globalThis.localStorage;
+    const kept = new Map();
+    globalThis.localStorage = { getItem: (k) => (kept.has(k) ? kept.get(k) : null), setItem: (k, v) => { kept.set(k, String(v)); }, removeItem: (k) => { kept.delete(k); } };
+    const token = { tenantId: 'team-48', mpId: 'scheduling' };
+    try {
+      const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {} });
+      await data.prefs.set('layout', 'grid');
+      await expect(data.prefs.set('big', 'x'.repeat(600000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+      await expect(data.prefs.set('layout', 'x'.repeat(600000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+      // Each reads as it was saved: nothing, and the earlier choice.
+      expect(data.prefs.get('big', 'none')).toBe('none');
+      expect(data.prefs.get('layout')).toBe('grid');
+      await data.prefs.set('theme', 'dark');
+      const reloaded = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {} });
+      await reloaded.prefs.ready();
+      expect([reloaded.prefs.get('layout'), reloaded.prefs.get('theme'), reloaded.prefs.get('big', 'none')]).toEqual(['grid', 'dark', 'none']);
+    } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+
   it('never evicts a client-owned row in memory: only cached rows go past the row cap', async () => {
     const own = createDataStore({ name: 'drafts', backend: createMemoryStoreBackend(), syncStrategy: 'last_write_wins', maxRows: 2 });
     await own.reconcile([{ id: '1' }, { id: '2' }], { prune: false });
@@ -338,6 +358,8 @@ describe('MP data API confinement', () => {
       await data.prefs.set('a', 1);
       full = true;
       await expect(data.prefs.remove('a')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+      // Still there, as saved.
+      expect(data.prefs.get('a')).toBe(1);
     } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
   });
 

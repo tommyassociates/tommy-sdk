@@ -201,6 +201,20 @@ export function createDataManager({
   // One key's writes and removals reach the store in the order they were
   // made, so what is stored follows what `get` answers.
   const prefWrites = new Map();
+  // Per key, the latest change asked: a change the device refused puts back
+  // what `get` answered before it, unless a later change came meanwhile.
+  const prefChanges = new Map();
+  function changePref(name, apply) {
+    const change = {};
+    prefChanges.set(name, change);
+    const had = prefValues.has(name);
+    const before = prefValues.get(name);
+    apply();
+    return () => {
+      if (prefChanges.get(name) !== change) return;
+      if (had) prefValues.set(name, before); else prefValues.delete(name);
+    };
+  }
   function inPrefOrder(name, task) {
     const next = (prefWrites.get(name) || Promise.resolve()).then(task);
     const tail = next.then(() => {}, () => {});
@@ -238,22 +252,22 @@ export function createDataManager({
       live();
       const name = String(key);
       const stored = clone(value);
-      prefValues.set(name, stored);
+      const undo = changePref(name, () => prefValues.set(name, stored));
       prefsChanged.add(name);
       const result = await inPrefOrder(name, () => service.ingest(PREFS_STORE, [{ key: name, value: stored === undefined ? null : stored }]))
-        .catch((error) => { throw notSaved(name, error); });
+        .catch((error) => { undo(); throw notSaved(name, error); });
       // Saved only once the device holds it: a store that kept it in memory
       // only (its storage full or gone) would lose it on reload.
-      if (result?.unsaved?.includes(name)) throw notSaved(name);
-      if (!result?.written) throw Object.assign(new Error(`tommy.prefs: '${name}' was not saved`), { code: 'DATA_INVALID' });
+      if (result?.unsaved?.includes(name)) { undo(); throw notSaved(name); }
+      if (!result?.written) { undo(); throw Object.assign(new Error(`tommy.prefs: '${name}' was not saved`), { code: 'DATA_INVALID' }); }
     },
     async remove(key) {
       live();
       const name = String(key);
-      prefValues.delete(name);
+      const undo = changePref(name, () => prefValues.delete(name));
       prefsChanged.add(name);
       await inPrefOrder(name, () => service.purge(PREFS_STORE, { keys: [name], force: true }))
-        .catch((error) => { throw notSaved(name, error); });
+        .catch((error) => { undo(); throw notSaved(name, error); });
     },
   });
 
@@ -264,6 +278,7 @@ export function createDataManager({
       disposed = true;
       prefValues.clear();
       prefsChanged.clear();
+      prefChanges.clear();
       service.dispose();
       await Promise.all([...stores.values()].map((store) => store.dispose?.(options)));
     },
