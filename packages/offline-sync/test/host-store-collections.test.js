@@ -449,6 +449,41 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     await expect(port.open({ ...fenced, expectedEpoch: 'x' })).rejects.toMatchObject({ reason: 'unserializable' });
   });
 
+  it('keeps a rebuilt cache within its byte budget, keeping the old rows when the new ones would not fit', async () => {
+    const { port, open } = await setup(create);
+    const small = { storeName: 'chats.rows', limits: { maxBytes: 400 } };
+    const rows = await open(small);
+    await rows.put([{ id: 1, n: 'x', _dirty: true }]);
+    const next = await port.open(openInput({ ...small, schemaVersion: 2 }));
+    expect(next.migration).toBeTruthy();
+    const step = (phase, extra = {}) => port.migration({ handle: next.handle, expectedEpoch: next.epoch, phase, ...extra });
+    await expect(step('begin')).resolves.toMatchObject({ ok: true });
+    await expect(step('write', { changes: [{ op: 'put', key: '1', value: { id: 1, n: 'y'.repeat(2000), _dirty: true } }] }))
+      .resolves.toMatchObject({ ok: false, reason: 'quota' });
+    await expect(step('abort')).resolves.toMatchObject({ ok: true });
+    expect(await rows.all()).toEqual([{ id: 1, n: 'x', _dirty: true }]);
+  });
+
+  it('keeps a rebuilt cache within its domain budget as that budget stands when the rebuild completes', async () => {
+    const { port, open } = await setup(create);
+    const limits = { evict: 'lru', domainMaxBytes: 400 };
+    const threads = await open({ storeName: 'chats.threads', limits });
+    const messages = await open({ storeName: 'chats.messages', limits });
+    await threads.put([{ id: 't1', body: 'x'.repeat(50), _dirty: true }]);
+    await messages.put([{ id: 'm1', body: 'x'.repeat(200) }]);
+    const next = await port.open(openInput({ storeName: 'chats.threads', limits, schemaVersion: 2 }));
+    expect(next.migration).toBeTruthy();
+    const step = (phase, extra = {}) => port.migration({ handle: next.handle, expectedEpoch: next.epoch, phase, ...extra });
+    const write = (length) => step('write', { changes: [{ op: 'put', key: 't1', value: { id: 't1', body: 'x'.repeat(length), _dirty: true } }] });
+    await expect(step('begin')).resolves.toMatchObject({ ok: true });
+    await expect(write(250)).resolves.toMatchObject({ ok: false, reason: 'quota' });
+    await expect(write(100)).resolves.toMatchObject({ ok: true });
+    await messages.put([{ id: 'm2', body: 'x'.repeat(100), _dirty: true }]);
+    await expect(step('complete')).resolves.toMatchObject({ ok: false, reason: 'quota' });
+    await expect(step('abort')).resolves.toMatchObject({ ok: true });
+    expect(await threads.all()).toEqual([{ id: 't1', body: 'x'.repeat(50), _dirty: true }]);
+  });
+
   it('forgets handles once they are closed or retired, however many opens came before', async () => {
     const { port } = await setup(create);
     for (let round = 0; round < 50; round += 1) {

@@ -171,7 +171,16 @@ export function createDataService({
     return { name: bare, label: labelOf(bare), ...found };
   }
   const targetOf = (target) => (typeof target === 'string' ? { collection: target } : { ...target });
-  const targetKey = (target) => JSON.stringify([target.collection, target.key ?? null, target.window ?? null, target.query ?? null]);
+  // A query's `where` is known by the function itself: two predicates are two
+  // targets, each refreshed and reported on its own.
+  const predicates = new WeakMap();
+  let predicateCount = 0;
+  const predicateId = (where) => {
+    if (!predicates.has(where)) { predicateCount += 1; predicates.set(where, `where#${predicateCount}`); }
+    return predicates.get(where);
+  };
+  const queryKey = (query) => (query && typeof query.where === 'function' ? { ...query, where: predicateId(query.where) } : query ?? null);
+  const targetKey = (target) => JSON.stringify([target.collection, target.key ?? null, target.window ?? null, queryKey(target.query)]);
   function stateFor(key) {
     if (!states.has(key)) states.set(key, { state: 'stale', syncedAt: null, error: null, flight: null });
     return states.get(key);
@@ -517,12 +526,15 @@ export function createDataService({
      * A background sync of `target` through the scheduler, coalesced by target.
      * `mode: 'silent'` never rejects (status carries the error); `'visible'`
      * rejects so a surface with nothing to show can say why. `maxAge` skips
-     * the fetch while the last successful sync is younger than it.
+     * the fetch while the last successful sync is younger than it. A query
+     * target without an index prunes the rows its `where` selects; its status,
+     * `maxAge` and coalescing belong to that `where` function.
      */
     refresh(target, { mode = 'silent', priority = 'normal', maxAge = 0, reason = null } = {}) {
       live();
       const wanted = targetOf(target);
       const { name, label, store, decl } = local(wanted.collection);
+      if (wanted.query) checkQuery(wanted.query);
       const spec = sources.get(name) || decl?.source;
       const key = targetKey({ ...wanted, collection: name });
       const state = stateFor(key);
@@ -564,9 +576,11 @@ export function createDataService({
         // target the source's scope (the whole collection without one).
         let scope = typeof spec.scope === 'function' ? spec.scope(wanted) : () => true;
         if (wanted.query && typeof spec.scope !== 'function') {
-          const { limit: _limit, cursor: _cursor, raw: _raw, ...range } = wanted.query;
-          const held = new Set((await rangeKeys(store, keyPath, wholeRange(range, 'refresh'))).map((entry) => entry.key));
-          scope = (row) => held.has(String(row[keyPath]));
+          const { limit: _limit, cursor: _cursor, raw: _raw, where, ...range } = wanted.query;
+          if (range.index) {
+            const held = new Set((await rangeKeys(store, keyPath, wholeRange(range, 'refresh'))).map((entry) => entry.key));
+            scope = (row) => held.has(String(row[keyPath]));
+          } else if (typeof where === 'function') scope = (row) => where(row);
         }
         await reconcileFetched(store, keyPath, { fetch: () => spec.fetch(wanted), toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
           scope, wanted.window, windowKeyOf(wanted.window), { onPersistError, rethrow: true, keepDirty: true });
@@ -588,8 +602,9 @@ export function createDataService({
      * pushed. A row with an unsent local write keeps that write: the server's
      * copy does not replace it. With `replace`, the rows are the complete set
      * for `scope` (a row predicate; the whole collection without one): rows in
-     * scope that the set leaves out are removed, dirty rows never, and the
-     * collection is fresh. Resolves `{ written }`, the rows stored.
+     * scope that the set leaves out are removed, dirty rows never. After a
+     * replacing or `complete` ingest the collection is fresh. Resolves
+     * `{ written }`, the rows stored.
      */
     // A replacing ingest, or one of rows a complete read delivered
     // (`complete`), stamps the collection synced; any other does not.
@@ -623,7 +638,8 @@ export function createDataService({
         if (replace) await store.reconcile([], { scope: (row) => inScope(row) && !kept.has(String(row[keyPath])) });
       }
       const written = stored.size;
-      if (replace) {
+      // A replacing or complete ingest is a whole read: the collection is fresh.
+      if (replace || complete === true) {
         const state = stateFor(targetKey({ collection: name }));
         state.state = 'fresh'; state.syncedAt = now(); state.error = null;
         emitStatus();

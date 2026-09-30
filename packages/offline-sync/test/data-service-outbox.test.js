@@ -191,6 +191,59 @@ describe('queries', () => {
   });
 });
 
+describe('an unsent delete in a memory or browser-storage store', () => {
+  it('reaches subscribers as the row gone, never as a key-only row', async () => {
+    const { data, store } = service();
+    await store.reconcile([{ id: 'a', v: 'server' }, { id: 'b', v: 'server' }], { prune: false });
+    data.source('items', { fetch: async () => [], push: async () => { throw Object.assign(new Error('Offline'), { status: 0 }); } });
+    const whole = [];
+    store.subscribe((rows) => whole.push(rows.map((row) => row.id)));
+    const picked = [];
+    store.subscribeQuery((q) => q.get('a')?.v ?? null, (value) => picked.push(value));
+    await settle();
+    await data.mutate('items', { op: 'delete', key: 'a' });
+    await settle();
+    expect(whole.at(-1)).toEqual(['b']);
+    expect(picked.at(-1)).toBeNull();
+    expect((await store.getAll()).map((row) => row.id)).toEqual(['b']);
+  });
+});
+
+describe('refreshing a query target without an index', () => {
+  it('fetches, and prunes only the rows the query selects', async () => {
+    const { data } = service();
+    await data.ingest('items', [{ id: 'x', chat_id: 7, seq: 1 }, { id: 'y', chat_id: 8, seq: 1 }]);
+    data.source('items', { fetch: async () => [{ id: 'z', chat_id: 7, seq: 2 }] });
+    const target = { collection: 'items', query: { where: (row) => row.chat_id === 7 } };
+    await data.refresh(target, { mode: 'visible' });
+    expect((await data.read('items')).map((row) => row.id).sort()).toEqual(['y', 'z']);
+  });
+
+  it('keeps queries with different predicates apart: each fetches, each has its own status', async () => {
+    const { data } = service();
+    const fetched = [];
+    data.source('items', { fetch: async (target) => { fetched.push(target.query.where({ chat_id: 7 })); return []; } });
+    const seven = { collection: 'items', query: { where: (row) => row.chat_id === 7 } };
+    const eight = { collection: 'items', query: { where: (row) => row.chat_id === 8 } };
+    await Promise.all([data.refresh(seven, { mode: 'visible' }), data.refresh(eight, { mode: 'visible' })]);
+    expect(fetched.sort()).toEqual([false, true]);
+    expect(data.status(seven).state).toBe('fresh');
+    expect(data.status({ collection: 'items', query: { where: (row) => row.chat_id === 9 } }).state).toBe('stale');
+  });
+});
+
+describe('a complete ingest', () => {
+  it('marks the collection fresh, as a replacing one does', async () => {
+    const { data } = service();
+    expect(data.status('items').state).toBe('stale');
+    await data.ingest('items', [{ id: 'a', chat_id: 7, seq: 1 }], { complete: true });
+    expect(data.status('items')).toMatchObject({ state: 'fresh', syncedAt: expect.any(Number) });
+    const partial = service().data;
+    await partial.ingest('items', [{ id: 'a', chat_id: 7, seq: 1 }]);
+    expect(partial.status('items')).toMatchObject({ state: 'stale', syncedAt: null });
+  });
+});
+
 describe('a whole-collection read', () => {
   it('stops at its byte budget when it has to page, as a complete read does', async () => {
     const MiB = 1024 * 1024;

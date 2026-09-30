@@ -184,6 +184,19 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
     if (total > store.domainMaxBytes) throw storageError('quota');
     return own;
   }
+  // A rebuild's new generation is held to the budgets a commit is: the
+  // store's maxBytes and its domain's shared budget. It evicts nothing (the
+  // old generation still stands); over budget, the rebuild fails as 'quota'
+  // and its opener keeps the old rows.
+  async function migrationCapacity(tx, store, projectedBytes, maxBytes) {
+    if (maxBytes !== null && maxBytes !== undefined && projectedBytes > maxBytes) throw storageError('quota');
+    if (store.evict !== 'lru' || store.domainMaxBytes === null || store.domainMaxBytes === undefined) return;
+    const [owner] = store.key;
+    const members = (await tx.scan('stores', [owner], { limit: 1001 }))
+      .filter((row) => row.evict === 'lru' && row.policy === 'cache' && row.domain === store.domain && !row.migration && !same(row.key, store.key));
+    const total = members.reduce((sum, row) => sum + row.bytes, 0) + projectedBytes;
+    if (total > store.domainMaxBytes) throw storageError('quota');
+  }
   // After a commit's writes: every value a written row holds in a unique
   // index belongs to that row alone (a value no field of which is set is
   // not held to it). Checked once all writes landed, so rows may trade
@@ -525,7 +538,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
         const store = await current(tx, handle, input.expectedEpoch, { migrating: true });
         const [owner, namespace] = store.key;
         const declaredShape = validateOpen(handle.options);
-        const target = { ...store, indexes: declaredShape.indexes, unique: declaredShape.unique, evict: declaredShape.evict };
+        const target = { ...store, indexes: declaredShape.indexes, unique: declaredShape.unique, evict: declaredShape.evict, domainMaxBytes: declaredShape.domainMaxBytes };
         if (input.phase === 'begin') {
           const held = store.migration;
           if (held && held.token !== handle.migrationToken && (held.leaseUntil ?? 0) > now()) throw storageError('busy');
@@ -559,15 +572,19 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
           // row reaches it through a write, so completing needs no scan.
           await checkUnique(tx, target, changes.map((change) => ({ change })), generation);
           if (store.migration.rowCount > handle.options.limits.maxRows) throw storageError('row-capacity');
+          await migrationCapacity(tx, target, store.migration.bytes, handle.options.limits.maxBytes);
           await tx.put('stores', store);
           return { ok: true };
         }
+        // The new generation fits the store's and its domain's byte budgets as
+        // they stand now, before it replaces the old one.
+        await migrationCapacity(tx, target, store.migration.bytes, handle.options.limits.maxBytes);
         await tx.deletePrefix('rows', [owner, namespace, store.generation]);
         const done = { ...store, generation, schemaVersion: store.migration.to, indexes: target.indexes, unique: target.unique, rowCount: store.migration.rowCount,
           bytes: store.migration.bytes, dirtyCount: store.migration.dirtyCount, revision: next(store.revision), migration: null, touchedAt: now(),
           ...(store.policy === 'authored' ? {} : { fingerprint: handle.options.cacheFingerprint }),
           ...(handle.options.schemaFingerprint != null ? { schemaFingerprint: handle.options.schemaFingerprint } : {}),
-          evict: target.evict };
+          evict: target.evict, domainMaxBytes: target.domainMaxBytes };
         await tx.put('stores', done);
         for (const other of handleRegistry) { if (other !== handle && other.owner === handle.owner && other.namespace === handle.namespace) other.closed = true; }
         handle.generation = generation;

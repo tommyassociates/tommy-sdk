@@ -809,7 +809,9 @@ export function createDataStore({
     for (const listener of changeListeners) {
       try { listener(); } catch (_) { /* listener errors are theirs */ }
     }
-    const records = await snapshot();
+    // Subscribers see what a read would: rows that paint (never an unsent
+    // delete's tombstone, never a row past the paint ceiling).
+    const records = (await snapshot()).filter(paintable);
     for (const handler of wholeStoreSubscribers) {
       try { handler(records); } catch (_) { /* subscriber errors are theirs */ }
     }
@@ -1297,7 +1299,7 @@ export function createDataStore({
       // Prime: compute initial value + touched set without firing the handler.
       snapshot().then((records) => {
         const touched = new Set();
-        sub.last = selector(trackedQuery(records, touched));
+        sub.last = selector(trackedQuery(records.filter(paintable), touched));
         sub.touched = touched;
       });
       selectorSubscribers.add(sub);
