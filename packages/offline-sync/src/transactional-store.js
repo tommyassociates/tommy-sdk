@@ -293,7 +293,12 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       return exclusive(async () => {
         let upserted = 0;
         const skipped = new Set();
-        const stamp = (row, previous, storeRevision) => ({ ...row, ...acknowledged(previous), _rev: rowRevision(previous, storeRevision), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) });
+        // A row keeps the window it was loaded in unless this read names one.
+        const windowOf = (previous) => {
+          if (windowKey != null) return { _window: String(windowKey) };
+          return previous?._window != null ? { _window: previous._window } : {};
+        };
+        const stamp = (row, previous, storeRevision) => ({ ...row, ...acknowledged(previous), _rev: rowRevision(previous, storeRevision), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...windowOf(previous) });
         for (const batch of upsertBatches(incoming)) {
           let left = [];
           // eslint-disable-next-line no-await-in-loop

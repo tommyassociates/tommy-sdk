@@ -769,6 +769,19 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     await database.close();
   });
 
+  it('keeps a row\'s window when a record read refreshes it without one, so window retention still reaches it', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'shifts', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null } };
+    const store = createDataStore({ name: 'shifts', backend: transactionalBackend(port, null, options) });
+    await store.reconcile([{ id: 's1', title: 'Early' }], { windowKey: 'week-40' });
+    // A detail read of the same shift: no window of its own.
+    await store.reconcile([{ id: 's1', title: 'Early (edited)' }], { prune: false, syncedAt: null });
+    expect(await store.getRaw('s1')).toMatchObject({ title: 'Early (edited)', _window: 'week-40' });
+    await database.close();
+  });
+
   it('reads a declared index in memory where the store opened without it', async () => {
     const database = create();
     const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
