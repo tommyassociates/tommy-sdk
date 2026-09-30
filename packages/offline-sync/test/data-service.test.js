@@ -182,7 +182,8 @@ describe('data service on memory stores', () => {
     const push = vi.fn(async () => {});
     const second = make();
     second.source('chats.messages', { fetch: async () => [], push });
-    await vi.waitFor(() => expect(push).toHaveBeenCalledWith({ op: 'put', record: { id: 'a', chat_id: 7, seq: 3 } }, { id: 'a', chat_id: 7, seq: 3 }));
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith({ op: 'put', record: { id: 'a', chat_id: 7, seq: 3 } }, { id: 'a', chat_id: 7, seq: 3 },
+      { principal: null, background: true }));
     await vi.waitFor(async () => expect((await store.getRaw('a'))._dirty).toBe(false));
     expect(second.pending()).toEqual([]);
     second.dispose();
@@ -192,7 +193,8 @@ describe('data service on memory stores', () => {
     const third = make({ keyPath: 'id', push: declared });
     expect(third.pending()).toEqual([]);
     await expect(third.retry('chats.messages', 'b')).resolves.toEqual({ key: 'b', pushed: true });
-    expect(declared).toHaveBeenCalledWith({ op: 'put', record: { id: 'b', chat_id: 7, seq: 4 } }, { id: 'b', chat_id: 7, seq: 4 });
+    expect(declared).toHaveBeenCalledWith({ op: 'put', record: { id: 'b', chat_id: 7, seq: 4 } }, { id: 'b', chat_id: 7, seq: 4 },
+      { principal: null, background: true });
     expect((await store.getRaw('b'))._dirty).toBe(false);
   });
 

@@ -151,8 +151,21 @@ export function createDataService({
   staleAfterMs = DEFAULT_STALE_AFTER_MS,
   onPersistError,
   budgetKey = namespace || 'host',
+  // The account this service reads and sends for (opaque here), passed to
+  // every source's fetch and push; `lane` keeps its scheduler jobs apart from
+  // other accounts'; while `foreground()` is false, its work waits behind the
+  // displayed account's.
+  principal = null,
+  lane = null,
+  foreground = () => true,
 } = {}) {
   if (typeof resolve !== 'function') throw serviceError('createDataService: resolve(collection) is required', 'DATA_INVALID');
+  // What a source's fetch and push are given: the principal to send with, and
+  // that the request is background work (never reported by the request layer).
+  const jobContext = Object.freeze({ principal, background: true });
+  const laned = (label) => (lane === null ? label : `${lane}|${label}`);
+  const lanedKey = (kind, rest) => (lane === null ? `${kind}:${rest}` : `${kind}:${lane}:${rest}`);
+  const inForeground = () => { try { return foreground() !== false; } catch (_) { return true; } };
   const sources = new Map();
   const states = new Map();
   const listeners = new Set();
@@ -400,7 +413,8 @@ export function createDataService({
             // Changes to one row go out one at a time, in order.
             // eslint-disable-next-line no-await-in-loop
             await scheduler.request({
-              key: `push:${entry.id}:${change.seq}`, target: `push:${entry.label}`, budgetKey, priority: PRIORITIES.high, visible: false,
+              key: lanedKey('push', `${entry.id}:${change.seq}`), target: `push:${laned(entry.label)}`, budgetKey,
+              priority: inForeground() ? PRIORITIES.high : PRIORITIES.background, visible: false,
               run: async () => {
                 const push = pushOf(entry.collection, entry.decl);
                 if (typeof push !== 'function') throw serviceError(`'${entry.label}' has no push`, 'DATA_NO_SOURCE');
@@ -430,7 +444,7 @@ export function createDataService({
                 // Fenced, discarded or disposed while it waited: never sent.
                 if (entry.discarded || outbox.get(entry.id) !== entry) throw serviceError('Change fenced', 'DATA_FENCED');
                 entry.state = 'sending'; entry.attempts += 1; emitStatus();
-                await push(change.command, change.record);
+                await push(change.command, change.record, jobContext);
                 sent = true;
                 await settleSent(entry, change);
               },
@@ -579,7 +593,7 @@ export function createDataService({
       const run = async (isCurrent) => {
         if (wanted.key !== undefined && wanted.key !== null) {
           const rowKey = String(wanted.key);
-          const dto = await spec.fetch(wanted);
+          const dto = await spec.fetch(wanted, jobContext);
           if (!isCurrent()) return;
           const prev = await store.getRaw?.(rowKey);
           if (!dto) {
@@ -610,12 +624,15 @@ export function createDataService({
         }
         // Only a read of the whole collection marks it synced.
         const whole = !wanted.query && typeof spec.scope !== 'function';
-        await reconcileFetched(store, keyPath, { fetch: () => spec.fetch(wanted), toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
+        await reconcileFetched(store, keyPath, { fetch: () => spec.fetch(wanted, jobContext), toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
           scope, wanted.window, windowKeyOf(wanted.window), { onPersistError, rethrow: true, keepDirty: true, ...(whole ? {} : { syncedAt: null }) });
       };
       state.flight = scheduler.request({
-        key: `data:${label}:${key}`, target: label, budgetKey, reason,
-        priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible', run,
+        key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey, reason,
+        ...(inForeground()
+          ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
+          : { priority: PRIORITIES.background, visible: false }),
+        run,
       }).then(() => {
         state.state = 'fresh'; state.syncedAt = now(); state.error = null;
       }, (error) => {

@@ -104,6 +104,31 @@ describe('a local delete waiting to be sent', () => {
   });
 });
 
+describe('a service for one account among several', () => {
+  it('reads and sends with its own principal, in its own lane, and behind the displayed account when it is not displayed', async () => {
+    const principal = { viewerId: '7', accountType: 'Team', accountId: '44', partnerId: null, partnerCode: null };
+    const jobs = [];
+    let displayed = true;
+    const scheduler = { request(job) { jobs.push(job); return Promise.resolve(job.run(() => true)); } };
+    const { data } = service({ principal, lane: 'team-44', foreground: () => displayed, scheduler });
+    const contexts = [];
+    data.source('items', {
+      fetch: async (target, context) => { contexts.push(['fetch', context]); return [{ id: 'a', v: 'server' }]; },
+      push: async (command, record, context) => { contexts.push(['push', context]); },
+    });
+    await data.refresh('items', { mode: 'visible' });
+    await data.mutate('items', { op: 'put', record: { id: 'b', v: 'local' } }, { wait: true });
+    expect(contexts).toEqual([['fetch', { principal, background: true }], ['push', { principal, background: true }]]);
+    expect(jobs.map((job) => [job.key.split(':')[1], job.target])).toEqual([['team-44', 'team-44|items'], ['team-44', 'push:team-44|items']]);
+    expect(jobs[0]).toMatchObject({ visible: true, priority: 2 });
+    // Another account is displayed now: this one's work waits behind it.
+    displayed = false;
+    jobs.length = 0;
+    await data.refresh('items', { mode: 'visible' });
+    expect(jobs[0]).toMatchObject({ visible: false, priority: 3 });
+  });
+});
+
 describe('a change restored after a restart', () => {
   it('is sent as the row is when it goes out, and not at all once another tab sent it', async () => {
     const { store } = service();
