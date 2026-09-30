@@ -44,6 +44,16 @@ import {
 } from './reconcile.js';
 
 export const DATA_STATES = Object.freeze(['fresh', 'stale', 'refreshing', 'offline', 'error']);
+// A store's methods that change its rows: called only on the handles a
+// collection's turn gives (see inTurn), never on the store `local()` answers.
+const WRITE_METHODS = new Set(['put', 'delete', 'deleteMany', 'markRow', 'markSynced', 'reconcile', 'patchSynced']);
+/**
+ * The service's public methods that answer at once; every other one is
+ * tracked from its call to its end (`idle()` is false meanwhile).
+ */
+export const DATA_SERVICE_SYNC_METHODS = Object.freeze([
+  'writer', 'watch', 'subscribe', 'source', 'sends', 'hasSource', 'pending', 'fence', 'status', 'statuses', 'onStatusChange', 'idle', 'dispose',
+]);
 const PRIORITIES = { visible: 0, high: 1, normal: 2, background: 3 };
 export const DEFAULT_STALE_AFTER_MS = 5 * 60000;
 // A declared read with a cursor reads the whole collection at least this often.
@@ -340,10 +350,18 @@ export function createDataService({
   function noteReplaced(name) { touchSequence += 1; replaced.set(name, touchSequence); }
   const replacedAfter = (name, since) => (replaced.get(name) || 0) > since;
   // One writer at a time per collection (see the module note); a task queued
-  // after the service retired is refused.
+  // after the service retired is refused. The task is given the only handles
+  // that write the collection: `store`, which records each change it makes
+  // (touching), and `raw`, for a declared read's own commit.
   const turns = new Map();
   function inTurn(name, task) {
-    const next = (turns.get(name) || Promise.resolve()).then(() => { live(); return task(); });
+    const next = (turns.get(name) || Promise.resolve()).then(() => {
+      live();
+      const found = resolve(name);
+      if (!found?.store) throw serviceError(`Collection '${name}' is not declared`, 'DATA_UNDECLARED');
+      const raw = found.store;
+      return task({ store: touching(name, raw, found.decl?.keyPath || 'id'), raw });
+    });
     const tail = next.then(() => {}, () => {});
     turns.set(name, tail);
     tail.then(() => { if (turns.get(name) === tail) turns.delete(name); });
@@ -378,11 +396,6 @@ export function createDataService({
       },
     });
   }
-  /** A collection's store for a local write, in its turn, recording what it changes. */
-  const writerStore = (collection) => {
-    const { name, store, decl } = local(collection);
-    return touching(name, store, decl?.keyPath || 'id');
-  };
   const metaOf = async (name) => { try { return await sourceMeta.get(name); } catch (_) { return null; } };
   // Per collection, a count of changes to its rows as this page hears of
   // them (its store's own notices, and the change feed's for other tabs,
@@ -442,7 +455,25 @@ export function createDataService({
     }
     const found = resolve(bare);
     if (!found?.store) throw serviceError(`Collection '${name}' is not declared`, 'DATA_UNDECLARED');
-    return { name: bare, label: labelOf(bare), ...found };
+    return { name: bare, label: labelOf(bare), ...found, store: readOnly(bare, found.store) };
+  }
+  // A collection's store as every reader sees it: a write through it is
+  // refused (writes take the handles its turn gives).
+  const readOnlyStores = new WeakMap();
+  function readOnly(name, store) {
+    if (!readOnlyStores.has(store)) {
+      readOnlyStores.set(store, new Proxy(store, {
+        get(target, property) {
+          const value = target[property];
+          if (typeof value !== 'function') return value;
+          if (WRITE_METHODS.has(property)) {
+            return () => { throw serviceError(`'${name}' written outside its turn`, 'DATA_INVALID'); };
+          }
+          return value.bind(target);
+        },
+      }));
+    }
+    return readOnlyStores.get(store);
   }
   const targetOf = (target) => (typeof target === 'string' ? { collection: target } : { ...target });
   // A query's `where` is known by the function itself: two predicates are two
@@ -667,12 +698,11 @@ export function createDataService({
         // The sent delete's tombstone goes in the collection's turn, recorded
         // as a change, so a read already on its way never brings the row back.
         if (row._deleted) {
-          const writer = touching(entry.collection, entry.store, entry.decl?.keyPath || 'id');
-          await inTurn(entry.collection, () => writer.delete(entry.key, { expectedRevision: change.revision }));
+          await inTurn(entry.collection, ({ store }) => store.delete(entry.key, { expectedRevision: change.revision }));
         }
         return;
       }
-      await entry.store.markSynced(entry.key, { expectedRevision: change.revision, pushed: true });
+      await inTurn(entry.collection, ({ store }) => store.markSynced(entry.key, { expectedRevision: change.revision, pushed: true }));
     } catch (_) { /* written again since, or its store retired: it stays as it is */ }
   }
   /**
@@ -750,7 +780,11 @@ export function createDataService({
               const refused = refusedAccess(error);
               entry.state = refused ? 'access_changed' : 'failed'; entry.lastError = describeError(error); emitStatus();
               // The refusal stays with the row, so a restart does not send it again on its own.
-              if (refused) { try { await entry.store.markRow?.(entry.key, { _pushRefused: 'access' }); } catch (_) { /* kept in memory */ } }
+              if (refused) {
+                try {
+                  await inTurn(entry.collection, ({ store }) => store.markRow?.(entry.key, { _pushRefused: 'access' }));
+                } catch (_) { /* kept in memory */ }
+              }
               entry.changes.forEach((queued) => queued.reject(error));
               throw error;
             }
@@ -771,7 +805,7 @@ export function createDataService({
   }
 
   /** Stores server rows (see `ingest`), noting nothing as a change of its own. */
-  async function ingestRows(collection, rows, { replace = false, scope = null, complete = false } = {}, store = local(collection).store) {
+  async function ingestRows(collection, rows, { replace = false, scope = null, complete = false } = {}, store) {
     live();
     const { name, decl } = local(collection);
     if (!Array.isArray(rows)) throw serviceError('ingest: rows must be an array', 'DATA_INVALID');
@@ -854,10 +888,12 @@ export function createDataService({
       const answer = await read(startedAt);
       if (!isCurrent()) return undefined;
       // eslint-disable-next-line no-await-in-loop
-      const outcome = await inTurn(name, async () => {
+      const outcome = await inTurn(name, async (turn) => {
+        // Still wanted, checked again in the turn, just before it commits.
+        if (!isCurrent()) return { dropped: true };
         if (replacedAfter(name, startedAt)) return { dropped: true };
         if (protectionLost(name, startedAt)) return null;
-        const value = await commit(answer, touchedAfter(name, startedAt), startedAt);
+        const value = await commit(answer, touchedAfter(name, startedAt), startedAt, turn);
         return value === READ_AGAIN ? null : { value };
       });
       if (outcome) return outcome.dropped ? undefined : outcome.value;
@@ -881,7 +917,7 @@ export function createDataService({
         failed = true;
         return null;
       }
-    }, (dtos, touched) => (failed ? null : reconcileFetched(store, keyPath, { fetch: () => dtos, toRecord, keyOf }, scope, window, windowKey, {
+    }, (dtos, touched, _startedAt, turn) => (failed ? null : reconcileFetched(turn.store, keyPath, { fetch: () => dtos, toRecord, keyOf }, scope, window, windowKey, {
       onPersistError, rethrow, keepDirty, skip: touched, ...(complete ? {} : { syncedAt: null }),
     })));
     // The reconcile answers with its own read of the scope.
@@ -912,10 +948,10 @@ export function createDataService({
         }
         throw error;
       }
-    }, async ({ answer, since, read }, _touched, startedAt) => {
+    }, async ({ answer, since, read }, _touched, startedAt, turn) => {
       if (snapshotRows(answer) === null) return NO_SNAPSHOT;
       const stored = await commitDeclared(target, spec, answer, {
-        startedAt, since, isCurrent, read,
+        startedAt, since, isCurrent, read, turn,
       });
       return stored === 'read_again' ? READ_AGAIN : undefined;
     }, { isCurrent });
@@ -942,8 +978,11 @@ export function createDataService({
    * A record the collection's schema refuses is reported and never stored.
    */
   async function commitDeclared({ name, label, store, keyPath }, spec, answer, {
-    startedAt, since, isCurrent, read = null,
+    startedAt, since, isCurrent, read = null, turn,
   }) {
+    // A declared read's own commit writes through the turn's raw store: it is
+    // the read the others' recorded changes are kept from.
+    const { raw } = turn;
     const { cursor: keepsCursor = false, removedField = null } = spec.read;
     if (!isCurrent()) return 'dropped';
     const keyOf = (row) => String(row[keyPath]);
@@ -1003,7 +1042,7 @@ export function createDataService({
     let removed = [];
     if (changesOnly) {
       const touched = touchedAfter(name, startedAt);
-      removed = await removeRows({ label, store, keys: [...removedKeys].filter((key) => !touched.has(key) && present.has(key)), force: false });
+      removed = await removeRows({ label, store: raw, keys: [...removedKeys].filter((key) => !touched.has(key) && present.has(key)), force: false });
     }
     if (halted()) return stop();
     const unchanged = (touched) => (row) => !touched.has(keyOf(row));
@@ -1014,7 +1053,7 @@ export function createDataService({
         const chunk = records.slice(start, start + INGEST_CHUNK).filter(unchanged(touched));
         // Chunks commit in order.
         // eslint-disable-next-line no-await-in-loop
-        if (chunk.length) noteResult(chunk, await store.reconcile(chunk, { prune: false, keepDirty: true }));
+        if (chunk.length) noteResult(chunk, await raw.reconcile(chunk, { prune: false, keepDirty: true }));
       }
     } else {
       // A whole read writes the rows it changed (and the unchanged ones last
@@ -1042,13 +1081,13 @@ export function createDataService({
         const touchedSince = touchedAfter(name, startedAt);
         const chunk = toWrite.slice(start, start + INGEST_CHUNK).filter(unchanged(touchedSince));
         // eslint-disable-next-line no-await-in-loop
-        if (chunk.length) noteResult(chunk, await store.reconcile(chunk, { prune: false, keepDirty: true }));
+        if (chunk.length) noteResult(chunk, await raw.reconcile(chunk, { prune: false, keepDirty: true }));
       }
       if (halted()) return stop();
       const answered = new Set(records.map(keyOf));
       const touchedNow = touchedAfter(name, startedAt);
       removed = await removeRows({
-        label, store, keys: rows.filter((row) => !row._dirty && !answered.has(keyOf(row)) && !touchedNow.has(keyOf(row))).map(keyOf), force: false,
+        label, store: raw, keys: rows.filter((row) => !row._dirty && !answered.has(keyOf(row)) && !touchedNow.has(keyOf(row))).map(keyOf), force: false,
       });
     }
     if (halted()) return stop();
@@ -1114,8 +1153,7 @@ export function createDataService({
         // Stored through the one read guard (a change to the row since the
         // read began is kept), and recorded as a change of the row: a
         // declared read already on its way keeps it.
-        const writer = touching(name, store, keyPath);
-        await guardedRead(name, () => spec.fetch(wanted, context), async (dto, touched) => {
+        await guardedRead(name, () => spec.fetch(wanted, context), async (dto, touched, _startedAt, { store: writer }) => {
           if (touched.has(rowKey)) return;
           if (!dto) {
             // Decided in turn with local writes to the row, on the row as it is then.
@@ -1151,8 +1189,8 @@ export function createDataService({
       // Only a read of the whole collection marks it synced.
       const whole = !wanted.query && typeof spec.scope !== 'function';
       // Fetched first; stored through the one read guard.
-      return guardedRead(name, async () => snapshotRows(await spec.fetch(wanted, context)), (dtos, touched) => (dtos === null ? NO_SNAPSHOT
-        : reconcileFetched(store, keyPath, { fetch: () => dtos, toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
+      return guardedRead(name, async () => snapshotRows(await spec.fetch(wanted, context)), (dtos, touched, _startedAt, turn) => (dtos === null ? NO_SNAPSHOT
+        : reconcileFetched(turn.store, keyPath, { fetch: () => dtos, toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
           scope, wanted.window, windowKeyOf(wanted.window), {
             onPersistError, rethrow: true, keepDirty: true, skip: touched, ...(whole ? {} : { syncedAt: null }),
           })), { isCurrent });
@@ -1217,18 +1255,16 @@ export function createDataService({
      */
     writer(collection) {
       live();
-      const { name, store, decl } = local(collection);
-      const keyPath = decl?.keyPath || 'id';
-      const writes = new Set(['put', 'delete', 'deleteMany', 'markRow', 'markSynced', 'reconcile', 'patchSynced']);
+      const { name, store } = local(collection);
       return new Proxy(store, {
         get(target, property) {
           const value = target[property];
           if (typeof value !== 'function') return value;
-          if (!writes.has(property)) return value.bind(target);
+          if (!WRITE_METHODS.has(property)) return value;
           // Once the service is retired its handle refuses as a retired store does.
           return (...args) => (disposed
             ? Promise.reject(Object.assign(new Error('Data store retired'), { name: 'StorageReadError', reason: 'retired', code: 'DATA_RETIRED' }))
-            : inTurn(name, () => touching(name, target, keyPath)[property](...args)));
+            : tracked(inTurn(name, (turn) => turn.store[property](...args))));
         },
       });
     },
@@ -1351,20 +1387,20 @@ export function createDataService({
       // In the collection's turn, through the store that records what it
       // changes: a replacement removes rows it leaves out, and a read already
       // on its way never brings them back.
-      return inTurn(name, async () => {
+      return inTurn(name, async (turn) => {
         // A replacement ends what a declared read's cursor describes; a few
         // rows keep the source meta in step with the keys they add.
         const tracksMeta = !!(sources.get(name) || decl?.source)?.read?.cursor;
         if (options?.ifEmpty === true) {
           if ((await store.getAllRaw()).length) return { written: 0 };
-          const adopted = await ingestRows(collection, rows, { complete: false }, store);
+          const adopted = await ingestRows(collection, rows, { complete: false }, turn.raw);
           if (tracksMeta) await adjustMeta(name, null);
           return adopted;
         }
         const small = tracksMeta && !options?.replace && Array.isArray(rows) && rows.length <= PAGE_ROWS;
         const keys = small ? [...new Set(rows.filter((row) => row && typeof row === 'object').map((row) => String(row[keyPath])))] : [];
         const before = small ? await Promise.all(keys.map(async (key) => !!(await store.getRaw(key)))) : [];
-        const result = await ingestRows(collection, rows, options, touching(name, store, keyPath));
+        const result = await ingestRows(collection, rows, options, turn.store);
         if (small) {
           const after = await Promise.all(keys.map(async (key) => !!(await store.getRaw(key))));
           await adjustMeta(name, {
@@ -1397,8 +1433,7 @@ export function createDataService({
       if (!wanted.length) return { patched: [], unsaved: [], skipped: [], refused: [] };
       // In the collection's turn, recorded as a change of these rows, a
       // store transaction's worth of keys at a time; every key is accounted for.
-      return inTurn(name, async () => {
-        const writer = touching(name, store, keyPath);
+      return inTurn(name, async ({ store: writer }) => {
         const outcome = { patched: [], unsaved: [], skipped: [], refused: [] };
         for (let start = 0; start < wanted.length; start += PAGE_ROWS) {
           // eslint-disable-next-line no-await-in-loop
@@ -1429,8 +1464,7 @@ export function createDataService({
       // In the collection's turn, through the store that records what it
       // changes; one local write per row at a time, so each push knows the
       // revision it wrote.
-      const writer = touching(name, store, keyPath);
-      const written = await inTurn(name, () => serial(`${label}:${key}`, async () => {
+      const written = await inTurn(name, ({ store: writer }) => serial(`${label}:${key}`, async () => {
         let record = null;
         let held = null;
         if (command.op === 'put') {
@@ -1498,7 +1532,7 @@ export function createDataService({
         // A person asked: a refusal for access is cleared from the row, and the
         // row is sent once, as it is now, whatever edits joined it meanwhile.
         if (entry.state === 'access_changed') {
-          try { await store.markRow?.(String(key), { _pushRefused: null }); } catch (_) { /* sent anyway */ }
+          try { await inTurn(name, ({ store: writer }) => writer.markRow?.(String(key), { _pushRefused: null })); } catch (_) { /* sent anyway */ }
           const row = await store.getRaw?.(String(key));
           if (row?._dirty) {
             entry.changes.splice(0);
@@ -1537,9 +1571,8 @@ export function createDataService({
      * local writes to the row, so a change made just before is dropped too.
      */
     async discard(collection, key) {
-      const { name, label, store, decl } = local(collection);
-      const writer = touching(name, store, decl?.keyPath || 'id');
-      await inTurn(name, () => serial(`${label}:${String(key)}`, async () => {
+      const { name, label } = local(collection);
+      await inTurn(name, ({ store: writer }) => serial(`${label}:${String(key)}`, async () => {
         dropPending(label, key);
         await writer.delete(String(key));
       }));
@@ -1569,7 +1602,7 @@ export function createDataService({
       const range = query ? wholeRange(query, 'purge') : null;
       const whole = !Array.isArray(keys) && !query;
       // Listed and removed in the collection's turn.
-      return inTurn(name, async () => {
+      return inTurn(name, async (turn) => {
         let entries;
         if (Array.isArray(keys)) {
           entries = (await Promise.all(keys.map((key) => store.getRaw(String(key))))).filter(Boolean)
@@ -1577,7 +1610,7 @@ export function createDataService({
         } else if (range) entries = await rangeKeys(store, keyPath, range);
         else entries = (await rawRows(store)).map((row) => ({ key: String(row[keyPath]), dirty: !!row._dirty }));
         const removed = await removeRows({
-          label, store: touching(name, store, keyPath), keys: entries.filter(({ dirty }) => force || !dirty).map(({ key }) => key), force,
+          label, store: turn.store, keys: entries.filter(({ dirty }) => force || !dirty).map(({ key }) => key), force,
         });
         await adjustMeta(name, whole ? null : { added: [], removed });
         return { removed };
@@ -1596,10 +1629,10 @@ export function createDataService({
       const keyPath = decl?.keyPath || 'id';
       const range = wholeRange(spec, 'trim');
       // Listed and removed in the collection's turn.
-      return inTurn(name, async () => {
+      return inTurn(name, async (turn) => {
         const entries = await rangeKeys(store, keyPath, range);
         const older = entries.slice(0, Math.max(0, entries.length - spec.keep)).filter(({ dirty }) => !dirty).map(({ key }) => key);
-        const removed = await removeRows({ label, store: touching(name, store, keyPath), keys: older, force: false });
+        const removed = await removeRows({ label, store: turn.store, keys: older, force: false });
         await adjustMeta(name, { added: [], removed });
         return { removed };
       });
@@ -1644,10 +1677,13 @@ export function createDataService({
       states.clear();
     },
   };
-  // Every asynchronous call counts as work until it settles.
-  ['read', 'query', 'refresh', 'ingest', 'mutate', 'purge', 'trim', 'retry', 'discard'].forEach((method) => {
+  // Every call but the synchronous ones counts as work until it settles.
+  Object.keys(service).forEach((method) => {
     const call = service[method];
-    service[method] = (...args) => tracked(call(...args));
+    if (typeof call !== 'function' || DATA_SERVICE_SYNC_METHODS.includes(method)) return;
+    const wrapped = (...args) => tracked(call(...args));
+    wrapped.tracked = true;
+    service[method] = wrapped;
   });
   return service;
 }

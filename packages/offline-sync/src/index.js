@@ -9,7 +9,7 @@ export {
 } from './data-store.js';
 export { createDataManager, createReplayCoordinator, PREFS_STORE } from './manager.js';
 export {
-  createDataService, createImmediateScheduler, createMemorySourceMeta, DATA_STATES, DEFAULT_STALE_AFTER_MS,
+  createDataService, createImmediateScheduler, createMemorySourceMeta, DATA_STATES, DEFAULT_STALE_AFTER_MS, DATA_SERVICE_SYNC_METHODS,
 } from './data-service.js';
 export { reconcileFetched, windowKeyOf } from './reconcile.js';
 export { queryRows, recordSchemaCheck } from './data-store.js';
