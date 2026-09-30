@@ -443,6 +443,31 @@ describe('MP data API confinement', () => {
     expect(await data.read('shifts', '2')).toBeNull();
   });
 
+  it('keeps a row a record read stored while a list revalidation was on its way', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    await data.ingest('shifts', [{ id: '1', at: 'mon' }]);
+    let answer;
+    const revalidating = data.liveQuery('shifts', { fetch: () => new Promise((resolve) => { answer = resolve; }) }).revalidate();
+    await settle();
+    // A detail read fetches a row the list did not have yet.
+    await data.record('shifts', { fetch: async (id) => ({ id, at: 'tue' }) }).get('2');
+    answer([{ id: '1', at: 'mon' }]);
+    await revalidating;
+    expect(await data.read('shifts', '2')).toMatchObject({ at: 'tue' });
+  });
+
+  it('writes an MP\'s own store handle in the collection\'s turn: a revalidation begun before keeps what it wrote', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    await data.ingest('shifts', [{ id: '1', at: 'mon' }]);
+    let answer;
+    const revalidating = data.liveQuery('shifts', { fetch: () => new Promise((resolve) => { answer = resolve; }) }).revalidate();
+    await settle();
+    await data.store('shifts').reconcile([{ id: '3', at: 'wed' }], { prune: false });
+    answer([{ id: '1', at: 'mon' }]);
+    await revalidating;
+    expect(await data.read('shifts', '3')).toMatchObject({ at: 'wed' });
+  });
+
   it('never evicts a saved pref to make room for another: a pref that does not fit is refused', async () => {
     const saved = globalThis.localStorage;
     const kept = new Map();

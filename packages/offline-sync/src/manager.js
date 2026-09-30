@@ -132,6 +132,8 @@ export function createDataManager({
   const localData = { ...declaredData, [PREFS_STORE]: PREFS_DECL };
   const dbName = databaseName(capabilityToken, mpId);
   const stores = new Map();
+  // Each store's handle for the MP: its writes go in the store's turn.
+  const writers = new Map();
   let disposed = false;
   const live = () => { if (disposed) throw Object.assign(new Error('Data manager retired'), { name: 'StorageReadError', reason: 'retired' }); };
   const syncMeta = new Map(); // storeName -> { lastSyncedAt, pending, online }
@@ -331,12 +333,17 @@ export function createDataManager({
     pending: (...args) => service.pending(...args),
     // Sends this MP's failed changes again (the host calls it on reconnect).
     retryFailed: () => service.retryFailed(),
-    /** DataApi.store — only manifest-declared stores exist. */
+    /**
+     * DataApi.store — only manifest-declared stores exist. Its writes go in
+     * the store's turn with the data service's own, so a read already on its
+     * way never undoes them.
+     */
     store(name) {
       live();
       const store = stores.get(name);
       if (!store) throw new Error(`tommy.data.store('${name}'): store not declared in manifest.localData`);
-      return store;
+      if (!writers.has(name)) writers.set(name, service.writer(qualified(name)));
+      return writers.get(name);
     },
     /**
      * DataApi.windowCache — the reusable "instant data" (SWR) combinator every
@@ -440,7 +447,7 @@ export function createDataManager({
           let kept = false;
           try {
             // One record says nothing about the rest: the collection's synced stamp stays.
-            const result = await store.reconcile([rec], { prune: false, syncedAt: null, ...(service.sends(qualified(storeName)) ? { keepDirty: true } : {}) }); // eslint-disable-line no-use-before-define
+            const result = await service.writer(qualified(storeName)).reconcile([rec], { prune: false, syncedAt: null, ...(service.sends(qualified(storeName)) ? { keepDirty: true } : {}) }); // eslint-disable-line no-use-before-define
             kept = (Array.isArray(result?.skipped) ? result.skipped : []).map(String).includes(key);
           } catch (_) { /* cache write is best-effort */ }
           return kept ? store.get(key) : rec;

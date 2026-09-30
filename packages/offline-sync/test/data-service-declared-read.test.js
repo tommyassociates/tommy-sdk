@@ -290,6 +290,20 @@ describe('a declared read', () => {
     expect((await data.read('members', 'b')).payload).toEqual({ _code: 2 });
   });
 
+  it('tells a subscriber watching one row when a read removes it', async () => {
+    const { data, store } = service();
+    let rows = [{ id: 'a' }, { id: 'b' }];
+    data.source('members', { fetch: async () => ({ rows: rows.map((row) => ({ ...row })) }), read: { cursor: false } });
+    await data.refresh('members', { mode: 'visible' });
+    const seen = [];
+    store.subscribeQuery((q) => q.get('b')?.id ?? null, (value) => seen.push(value));
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    rows = [{ id: 'a' }];
+    await data.refresh('members', { mode: 'visible' });
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    expect(seen).toEqual([null]);
+  });
+
   it('keys each answered row by its record, and never takes an answer with no keyed row for an empty collection', async () => {
     const { data } = service();
     let answer = { rows: [{ member_id: 'a' }, { member_id: 'b' }] };

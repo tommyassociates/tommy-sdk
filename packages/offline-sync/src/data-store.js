@@ -903,7 +903,8 @@ export function createDataStore({
       return { rows: page, nextCursor: more ? String(keyOf(page.at(-1))) : null, complete: !more };
     },
     /** Subscribers read the store again after a change made elsewhere. */
-    async revalidateSubscribers() { await notify([...(backend.keys?.() || [])]); },
+    /** Subscribers read the store again; `removed` names rows that went, so a subscriber watching one hears it. */
+    async revalidateSubscribers(removed = []) { await notify([...(backend.keys?.() || []), ...removed.map(String)]); },
     dispose(options) {
       disposed = true;
       wholeStoreSubscribers.clear();

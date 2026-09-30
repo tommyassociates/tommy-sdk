@@ -579,8 +579,9 @@ export function createDataService({
       }
     }
     // The removals go out together, once: every subscriber hears of them,
-    // whichever path removed the rows (a purge, a trim, a read of changes).
-    if (removed.length) await store.revalidateSubscribers?.();
+    // those watching a removed row included, whichever path removed the rows
+    // (a purge, a trim, a read).
+    if (removed.length) await store.revalidateSubscribers?.(removed);
     return removed;
   }
   function entryFor({ name, label, key, store, decl }) {
@@ -1206,6 +1207,26 @@ export function createDataService({
       live();
       const { name, store, decl } = local(collection);
       return reconcileWindow(name, store, decl?.keyPath || 'id', { ...options, context: jobContextNow() });
+    },
+    /**
+     * A collection's store for a caller that writes it directly (an MP's own
+     * store handle): reads go straight to the store, and every write goes in
+     * the collection's turn, recorded as a change of its rows, so a read
+     * already on its way never undoes it.
+     */
+    writer(collection) {
+      live();
+      const { name, store, decl } = local(collection);
+      const keyPath = decl?.keyPath || 'id';
+      const writes = new Set(['put', 'delete', 'deleteMany', 'markRow', 'markSynced', 'reconcile', 'patchSynced']);
+      return new Proxy(store, {
+        get(target, property) {
+          const value = target[property];
+          if (typeof value !== 'function') return value;
+          if (!writes.has(property)) return value.bind(target);
+          return (...args) => inTurn(name, () => touching(name, target, keyPath)[property](...args));
+        },
+      });
     },
     /**
      * Calls `listener()` whenever the collection may have changed (a write
