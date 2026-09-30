@@ -147,17 +147,26 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
     }
     return victims;
   }
+  // The other LRU cache stores of a store's domain within its owner, and the
+  // bytes each holds against the domain's budget: a store being rebuilt
+  // counts the larger of its old rows (still the ones read) and its new ones.
+  async function domainSiblings(tx, store) {
+    const [owner] = store.key;
+    return (await tx.scan('stores', [owner], { limit: 1001 }))
+      .filter((row) => row.evict === 'lru' && row.policy === 'cache' && row.domain === store.domain && !same(row.key, store.key));
+  }
+  const heldBytes = (row) => (row.migration ? Math.max(row.bytes, row.migration.bytes || 0) : row.bytes);
   // Within one owner, every LRU cache store of the same domain shares a byte
   // budget; the oldest rows across them go first. Authored stores and dirty
-  // rows are never candidates, so drafts and the outbox are never evicted.
+  // rows are never candidates, so drafts and the outbox are never evicted,
+  // and nor are the rows of a store being rebuilt (it counts all the same).
   // Returns what left the target store itself, whose totals the caller owns.
   async function domainCapacity(tx, store, projectedBytes, protect, evicted) {
     const own = { rows: 0, bytes: 0 };
     if (store.evict !== 'lru' || store.domainMaxBytes === null || store.domainMaxBytes === undefined) return own;
-    const [owner] = store.key;
-    const members = (await tx.scan('stores', [owner], { limit: 1001 }))
-      .filter((row) => row.evict === 'lru' && row.policy === 'cache' && row.domain === store.domain && !row.migration && !same(row.key, store.key));
-    let total = members.reduce((sum, row) => sum + row.bytes, 0) + projectedBytes;
+    const siblings = await domainSiblings(tx, store);
+    const members = siblings.filter((row) => !row.migration);
+    let total = siblings.reduce((sum, row) => sum + heldBytes(row), 0) + projectedBytes;
     const touched = new Set();
     const removed = new Set();
     for (let round = 0; total > store.domainMaxBytes && round < 20; round += 1) {
@@ -193,10 +202,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
   async function migrationCapacity(tx, store, projectedBytes, maxBytes) {
     if (maxBytes !== null && maxBytes !== undefined && projectedBytes > maxBytes) throw storageError('quota');
     if (store.evict !== 'lru' || store.domainMaxBytes === null || store.domainMaxBytes === undefined) return;
-    const [owner] = store.key;
-    const members = (await tx.scan('stores', [owner], { limit: 1001 }))
-      .filter((row) => row.evict === 'lru' && row.policy === 'cache' && row.domain === store.domain && !row.migration && !same(row.key, store.key));
-    const total = members.reduce((sum, row) => sum + row.bytes, 0) + projectedBytes;
+    const total = (await domainSiblings(tx, store)).reduce((sum, row) => sum + heldBytes(row), 0) + projectedBytes;
     if (total > store.domainMaxBytes) throw storageError('quota');
   }
   // After a commit's writes: every value a written row holds in a unique

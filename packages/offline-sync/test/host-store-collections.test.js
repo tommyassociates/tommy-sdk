@@ -481,11 +481,42 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     expect(await rows.all()).toEqual([{ id: 1, n: 'x', _dirty: true }]);
   });
 
-  it('keeps a rebuilt cache within its domain budget as that budget stands when the rebuild completes', async () => {
+  it('counts a sibling rebuilding at the same time toward the domain budget, by the larger of its old and new rows', async () => {
     const { port, open } = await setup(create);
     const limits = { evict: 'lru', domainMaxBytes: 400 };
     const threads = await open({ storeName: 'chats.threads', limits });
     const messages = await open({ storeName: 'chats.messages', limits });
+    await threads.put([{ id: 't1', body: 'x'.repeat(100), _dirty: true }]);
+    await messages.put([{ id: 'm1', body: 'x'.repeat(100), _dirty: true }]);
+    const rebuild = async (storeName) => {
+      const next = await port.open(openInput({ storeName, limits, schemaVersion: 2 }));
+      const step = (phase, extra = {}) => port.migration({ handle: next.handle, expectedEpoch: next.epoch, phase, ...extra });
+      await expect(step('begin')).resolves.toMatchObject({ ok: true });
+      return step;
+    };
+    const threadsStep = await rebuild('chats.threads');
+    const messagesStep = await rebuild('chats.messages');
+    const grown = (id) => ({ changes: [{ op: 'put', key: id, value: { id, body: 'x'.repeat(180), _dirty: true } }] });
+    await expect(threadsStep('write', grown('t1'))).resolves.toMatchObject({ ok: true });
+    // The threads rebuild now holds more than its old rows: the messages
+    // rebuild counts it at that size, whichever of the two completes.
+    await expect(messagesStep('write', grown('m1'))).resolves.toMatchObject({ ok: false, reason: 'quota' });
+    await expect(threadsStep('complete')).resolves.toMatchObject({ ok: true });
+    await expect(messagesStep('abort')).resolves.toMatchObject({ ok: true });
+    // A commit beside a rebuild counts it too.
+    const plain = await open({ storeName: 'chats.rows', limits });
+    const rebuilding = await rebuild('chats.messages');
+    await expect(rebuilding('write', grown('m1'))).resolves.toMatchObject({ ok: false, reason: 'quota' });
+    await expect(rebuilding('write', { changes: [{ op: 'put', key: 'm1', value: { id: 'm1', body: 'x'.repeat(150), _dirty: true } }] })).resolves.toMatchObject({ ok: true });
+    await expect(plain.put([{ id: 'r1', body: 'x'.repeat(60), _dirty: true }])).resolves.toMatchObject({ ok: false, reason: 'quota' });
+  });
+
+  it('keeps a rebuilt cache within its domain budget as that budget stands when the rebuild completes', async () => {
+    const { port, open } = await setup(create);
+    const limits = { evict: 'lru', domainMaxBytes: 400 };
+    const threads = await open({ storeName: 'chats.threads', limits });
+    // A sibling that declares a larger budget for itself grows past this one's.
+    const messages = await open({ storeName: 'chats.messages', limits: { ...limits, domainMaxBytes: 1000 } });
     await threads.put([{ id: 't1', body: 'x'.repeat(50), _dirty: true }]);
     await messages.put([{ id: 'm1', body: 'x'.repeat(200) }]);
     const next = await port.open(openInput({ storeName: 'chats.threads', limits, schemaVersion: 2 }));
