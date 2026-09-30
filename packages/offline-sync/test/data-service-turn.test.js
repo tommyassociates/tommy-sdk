@@ -127,3 +127,15 @@ describe('tracked calls', () => {
     DATA_SERVICE_SYNC_METHODS.forEach((name) => expect(methods).toContain(name));
   });
 });
+
+describe('the jobs a service asks its scheduler for', () => {
+  it('asks for a push as a write, and a refresh as a read', async () => {
+    const jobs = [];
+    const scheduler = { request: (job) => { jobs.push(job); return Promise.resolve().then(() => job.run(() => true)); } };
+    const { data } = service({ scheduler });
+    data.source('members', { fetch: async () => [], push: async (command, record) => record });
+    await data.mutate('members', { op: 'put', record: { id: 'a' } }, { wait: true });
+    await data.refresh('members', { mode: 'visible' });
+    expect(jobs.map((job) => [job.key.split(':')[0], job.kind ?? 'read'])).toEqual([['push', 'write'], ['data', 'read']]);
+  });
+});

@@ -730,8 +730,9 @@ export function createDataService({
           try {
             // Changes to one row go out one at a time, in order.
             // eslint-disable-next-line no-await-in-loop
+            // A write: the scheduler never gives up its ownership before it settles.
             await scheduler.request({
-              key: lanedKey('push', `${entry.id}:${change.seq}`), target: `push:${laned(entry.label)}`, budgetKey,
+              key: lanedKey('push', `${entry.id}:${change.seq}`), target: `push:${laned(entry.label)}`, budgetKey, kind: 'write',
               priority: inForeground() ? PRIORITIES.high : PRIORITIES.background, visible: false,
               run: async () => {
                 const push = pushOf(entry.collection, entry.decl);
