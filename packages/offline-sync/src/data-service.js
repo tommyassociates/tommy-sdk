@@ -735,7 +735,7 @@ export function createDataService({
         } else if (typeof push === 'function' && typeof store.markRow === 'function' && (held = await store.getRaw(key))) {
           // A delete to send stays a hidden, unsent tombstone until it is sent,
           // so a reload sends it again. It keeps only its key, so it holds no
-          // indexed value (a unique one stays free for a new row).
+          // indexed value.
           await store.markRow(key, { _deleted: true }, { dirty: true, body: { [keyPath]: held[keyPath] } });
         } else await store.delete(key);
         const revision = typeof push !== 'function' ? undefined : (await store.getRaw(key))?._rev;

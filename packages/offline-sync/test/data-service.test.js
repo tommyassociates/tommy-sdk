@@ -31,7 +31,7 @@ function transactionalBackend(port, opened, options) {
     return result;
   };
   return {
-    transactional: true, policy: options.policy, limits: options.limits, unique: options.unique || [],
+    transactional: true, policy: options.policy, limits: options.limits,
     snapshot: (keys, { aged = false } = {}) => read({ keys, aged }),
     page: ({ afterKey = null, limit = 100, aged = false } = {}) => read({ afterKey, limit, aged }),
     async get(key, { aged = false } = {}) { return (await read({ keys: [String(key)], aged })).rows[0]?.value; },
@@ -766,41 +766,6 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     await store.reconcile([{ id: 'a', day: 'mon' }], { windowKey: 'mon', scope: (row) => row.day === 'mon' });
     await store.reconcile([{ id: 'b', day: 'tue' }], { windowKey: 'tue', scope: (row) => row.day === 'tue' });
     expect((await store.getAll()).map((row) => row.id).sort()).toEqual(['a', 'b']);
-    await database.close();
-  });
-
-  it('replaces a set in which a unique value moved to another row, and keeps an unsent holder a real conflict', async () => {
-    const database = create();
-    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
-    const options = { identity: identity(), storeName: 'codes', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
-      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: { byCode: 'code' }, unique: ['byCode'] };
-    const store = createDataStore({ name: 'codes', backend: transactionalBackend(port, null, options), indexes: { byCode: 'code' } });
-    await store.reconcile([{ id: 'a', code: 'X' }, { id: 'b', code: 'Y' }]);
-    // The server now gives code X to a new row c; a no longer exists.
-    await store.reconcile([{ id: 'c', code: 'X' }, { id: 'b', code: 'Y' }]);
-    expect((await store.getAll()).map((row) => `${row.id}:${row.code}`).sort()).toEqual(['b:Y', 'c:X']);
-    // An unsent local row holding a value is never pruned to make room for it.
-    await store.put({ id: 'd', code: 'Z' });
-    await expect(store.reconcile([{ id: 'e', code: 'Z' }, { id: 'b', code: 'Y' }, { id: 'c', code: 'X' }]))
-      .rejects.toMatchObject({ reason: 'constraint' });
-    expect((await store.getRaw('d'))._dirty).toBe(true);
-    await database.close();
-  });
-
-  it('replaces a full batch of rows whose unique values all moved to new rows, within the commit size', async () => {
-    const database = create();
-    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
-    const options = { identity: identity(), storeName: 'codes', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
-      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: { byCode: 'code' }, unique: ['byCode'] };
-    const store = createDataStore({ name: 'codes', backend: transactionalBackend(port, null, options), indexes: { byCode: 'code' } });
-    const codes = Array.from({ length: 150 }, (_, i) => `C${i}`);
-    await store.reconcile(codes.map((code, i) => ({ id: `old-${i}`, code })));
-    // Every code now belongs to a new row: each old holder goes in the commit that gives its code away.
-    await store.reconcile(codes.map((code, i) => ({ id: `new-${i}`, code })));
-    const rows = await store.getAll();
-    expect(rows).toHaveLength(150);
-    expect(rows.every((row) => row.id.startsWith('new-'))).toBe(true);
-    expect(new Set(rows.map((row) => row.code)).size).toBe(150);
     await database.close();
   });
 

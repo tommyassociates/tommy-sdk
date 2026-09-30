@@ -11,16 +11,16 @@ import {
   HOST_DATA_MP_ID, collectionName, storeNameValid,
 } from '../src/host-store/index.js';
 import { MIGRATION_LEASE_MS } from '../src/host-store/port.js';
+import { HOST_STORE_FEATURES } from '../src/host-store/protocol.js';
 import { DATABASES, identity, createChannelBus } from './helpers/host-databases.js';
 
 const SELECTOR = { authorityOrigin: 'https://api.example.test', viewerId: '7' };
-function openInput({ storeName = 'chats.rows', policy = 'cache', schemaVersion = 1, indexes, unique, limits = {}, who = identity(), schemaFingerprint } = {}) {
+function openInput({ storeName = 'chats.rows', policy = 'cache', schemaVersion = 1, indexes, limits = {}, who = identity(), schemaFingerprint } = {}) {
   return {
     identity: who, storeName, policy, schemaVersion,
     cacheFingerprint: policy === 'authored' ? null : 'fp-1',
     limits: { maxRows: 1000, maxAgeMs: policy === 'authored' ? null : 86400000, maxBytes: null, ...limits },
     ...(indexes ? { indexes } : {}),
-    ...(unique ? { unique } : {}),
     ...(schemaFingerprint !== undefined ? { schemaFingerprint } : {}),
   };
 }
@@ -409,49 +409,17 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     await expect(port.read({ handle: rows.handle, expectedEpoch: rows.epoch, afterKey: null, limit: 10, includeAged: 'yes' })).resolves.toMatchObject({ ok: false, reason: 'unserializable' });
   });
 
-  it('keeps a unique index unique: a second row with the same value is refused, a swap in one commit is not', async () => {
-    const { open, stores } = await setup(create);
-    const codes = await open({ storeName: 'drafts', policy: 'authored', indexes: { byCode: 'code' }, unique: ['byCode'] });
-    await expect(codes.put([{ id: 'a', code: 'X1', _dirty: true }, { id: 'b', code: 'X2', _dirty: true }])).resolves.toMatchObject({ ok: true });
-    await expect(codes.put([{ id: 'c', code: 'X1', _dirty: true }])).resolves.toMatchObject({ ok: false, reason: 'constraint' });
-    // A row keeps its own value, and two rows can trade theirs in one commit.
-    await expect(codes.put([{ id: 'a', code: 'X1', note: 'edited', _dirty: true }])).resolves.toMatchObject({ ok: true });
-    await expect(codes.put([{ id: 'a', code: 'X2', _dirty: true }, { id: 'b', code: 'X1', _dirty: true }])).resolves.toMatchObject({ ok: true });
-    // Rows without the value are not held to it.
-    await expect(codes.put([{ id: 'd', _dirty: true }, { id: 'e', _dirty: true }])).resolves.toMatchObject({ ok: true });
-    expect((await stores()).find((row) => row.label === 'drafts')).toMatchObject({ indexes: ['byCode'], unique: ['byCode'] });
-  });
-
-  it('refuses a value a unique index cannot hold, rather than let it through unchecked', async () => {
-    const { port, open } = await setup(create);
-    const codes = await open({ storeName: 'drafts', policy: 'authored', indexes: { byCode: 'code' }, unique: ['byCode'] });
-    const long = 'x'.repeat(257);
-    const refused = { ok: false, reason: 'unserializable' };
-    await expect(codes.put([{ id: 'a', code: long, _dirty: true }])).resolves.toMatchObject(refused);
-    await expect(codes.put([{ id: 'a', code: 'a\u0000b', _dirty: true }])).resolves.toMatchObject(refused);
-    await expect(codes.put([{ id: 'a', code: { nested: 1 }, _dirty: true }])).resolves.toMatchObject(refused);
-    await expect(codes.put([{ id: 'a', code: 'x'.repeat(256), _dirty: true }])).resolves.toMatchObject({ ok: true });
-    expect((await codes.all()).map((row) => row.id)).toEqual(['a']);
-    // A rebuild is held to it too.
-    const next = await port.open(openInput({ storeName: 'drafts', policy: 'authored', schemaVersion: 2, indexes: { byCode: 'code' }, unique: ['byCode'] }));
-    const step = (phase, extra = {}) => port.migration({ handle: next.handle, expectedEpoch: next.epoch, phase, ...extra });
-    await expect(step('begin')).resolves.toMatchObject({ ok: true });
-    await expect(step('write', { changes: [{ op: 'put', key: 'a', value: { id: 'a', code: long, _dirty: true } }] })).resolves.toMatchObject({ ok: false, reason: 'unserializable' });
-  });
-
-  it('refuses a rebuild write that would break a unique index the new shape adds', async () => {
-    const { port, open } = await setup(create);
-    const drafts = await open({ storeName: 'drafts', policy: 'authored', indexes: { byCode: 'code' } });
-    await drafts.put([{ id: 'a', code: 'X1', _dirty: true }, { id: 'b', code: 'X1', _dirty: true }]);
-    const next = await port.open(openInput({ storeName: 'drafts', policy: 'authored', indexes: { byCode: 'code' }, unique: ['byCode'] }));
-    expect(next.migration).toBeTruthy();
-    const step = (phase, extra = {}) => port.migration({ handle: next.handle, expectedEpoch: next.epoch, phase, ...extra });
-    await expect(step('begin')).resolves.toMatchObject({ ok: true });
-    await expect(step('write', { changes: [{ op: 'put', key: 'a', value: { id: 'a', code: 'X1', _dirty: true } }] })).resolves.toMatchObject({ ok: true });
-    await expect(step('write', { changes: [{ op: 'put', key: 'b', value: { id: 'b', code: 'X1', _dirty: true } }] })).resolves.toMatchObject({ ok: false, reason: 'constraint' });
-    await expect(step('complete')).resolves.toMatchObject({ ok: true });
-    const rebuilt = await port.read({ handle: next.handle, expectedEpoch: next.epoch, afterKey: null, limit: 10 });
-    expect(rebuilt.rows.map((row) => row.key)).toEqual(['a']);
+  it('keeps no unique indexes: an open that names one is refused, and a store lists only its indexes', async () => {
+    const { port, open, stores } = await setup(create);
+    await expect(port.open({ ...openInput({ storeName: 'drafts', policy: 'authored', indexes: { byCode: 'code' } }), unique: ['byCode'] }))
+      .rejects.toMatchObject({ reason: 'unserializable' });
+    const codes = await open({ storeName: 'drafts', policy: 'authored', indexes: { byCode: 'code' } });
+    // Two rows may hold the same indexed value: uniqueness is the server's to enforce.
+    await expect(codes.put([{ id: 'a', code: 'X1', _dirty: true }, { id: 'b', code: 'X1', _dirty: true }])).resolves.toMatchObject({ ok: true });
+    const listed = (await stores()).find((row) => row.label === 'drafts');
+    expect(listed.indexes).toEqual(['byCode']);
+    expect(listed).not.toHaveProperty('unique');
+    expect(HOST_STORE_FEATURES).not.toContain('unique-indexes');
   });
 
   it('opens for an expected epoch only while that epoch holds, creating nothing after a retirement', async () => {

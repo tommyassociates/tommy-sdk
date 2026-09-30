@@ -1432,6 +1432,7 @@ export default {
           },
           "indexes": {
             "type": "array",
+            "description": "Secondary indexes the host keeps for this store. They are never unique: uniqueness is the server's to enforce, and an index that declares unique is refused.",
             "items": {
               "type": "object",
               "additionalProperties": false,
@@ -1445,10 +1446,6 @@ export default {
                 },
                 "keyPath": {
                   "type": "string"
-                },
-                "unique": {
-                  "type": "boolean",
-                  "default": false
                 }
               }
             }

@@ -1008,10 +1008,12 @@ recordSchema: JsonSchema1
  * Optional version of this store's schema. The host rebuilds the store on the device when it changes, or when keyPath, indexes or recordSchema change: cached server rows sync again, and authored and unsent rows go through the bundle's optional migrate(row, { fromSchema, toSchema, store }) and are kept when they fit, else set aside unsent (Settings → App Data → Pending sync). A lower version (a rolled-back MP) starts caches empty and sets authored rows aside. A bundle that declares any localData schemaVersion, or changes keyPath, indexes or recordSchema on any store, is published with min_host_api 4 or higher: a level-3 host refuses the field and closes a changed authored store. Desktop builds rebuild stores only once their storage bridge advertises 'schema-fingerprint'; until then, publish no authored-store shape change.
  */
 schemaVersion?: number
+/**
+ * Secondary indexes the host keeps for this store. They are never unique: uniqueness is the server's to enforce, and an index that declares unique is refused.
+ */
 indexes?: {
 name: string
 keyPath: string
-unique?: boolean
 }[]
 syncStrategy: ("server_authoritative" | "last_write_wins" | "custom")
 /**
