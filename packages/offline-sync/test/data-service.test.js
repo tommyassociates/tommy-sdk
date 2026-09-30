@@ -310,6 +310,50 @@ describe('MP data API confinement', () => {
     } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
   });
 
+  it('reads, syncs and revalidates a declared store whose name has a dot', async () => {
+    const data = createDataManager({ capabilityToken: { tenantId: 'team-49', mpId: 'reports' }, mpId: 'reports',
+      localData: { 'cache.rows': { keyPath: 'id', syncStrategy: 'server_authoritative' } } });
+    await expect(data.windowCache('cache.rows', { fetch: async () => [{ id: '1' }] }).sync('week')).resolves.toEqual([{ id: '1' }]);
+    await expect(data.liveQuery('cache.rows', { fetch: async () => [{ id: '2' }] }).revalidate()).resolves.toEqual([{ id: '2' }]);
+    await expect(data.record('cache.rows', { fetch: async (id) => ({ id: String(id) }) }).get('3', { refresh: true })).resolves.toMatchObject({ id: '3' });
+    // Read by its declared name, and by its full one; another namespace's name stays refused.
+    expect((await data.read('cache.rows')).map((row) => row.id).sort()).toEqual(['2', '3']);
+    expect((await data.read('mp.reports.cache.rows')).map((row) => row.id).sort()).toEqual(['2', '3']);
+    await expect(data.read('chats.rows')).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
+  });
+
+  it('puts a pref back to its saved value when overlapping writes to it are all refused', async () => {
+    const saved = globalThis.localStorage;
+    const kept = new Map();
+    let full = false;
+    globalThis.localStorage = {
+      getItem: (k) => (kept.has(k) ? kept.get(k) : null),
+      setItem: (k, v) => { if (full) throw Object.assign(new Error('full'), { name: 'QuotaExceededError' }); kept.set(k, String(v)); },
+      removeItem: (k) => { kept.delete(k); },
+    };
+    try {
+      const data = createDataManager({ capabilityToken: { tenantId: 'team-50', mpId: 'scheduling' }, mpId: 'scheduling', localData: {} });
+      await data.prefs.set('layout', 'grid');
+      full = true;
+      const first = data.prefs.set('layout', 'list').catch((error) => error);
+      const second = data.prefs.set('layout', 'table').catch((error) => error);
+      expect((await first).code).toBe('DATA_NOT_SAVED');
+      expect((await second).code).toBe('DATA_NOT_SAVED');
+      expect(data.prefs.get('layout')).toBe('grid');
+    } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+
+  it('refuses a pref with DATA_NOT_SAVED where the device has no storage to keep it', async () => {
+    const saved = globalThis.localStorage;
+    delete globalThis.localStorage;
+    try {
+      const data = createDataManager({ capabilityToken: { tenantId: 'team-51', mpId: 'scheduling' }, mpId: 'scheduling', localData: {} });
+      await expect(data.prefs.set('layout', 'grid')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+      expect(data.prefs.get('layout', 'none')).toBe('none');
+      await expect(data.prefs.remove('layout')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+    } finally { if (saved !== undefined) globalThis.localStorage = saved; }
+  });
+
   it('holds nothing of a refused pref: it reads as saved, and later prefs save normally', async () => {
     const saved = globalThis.localStorage;
     const kept = new Map();

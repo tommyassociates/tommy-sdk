@@ -177,8 +177,10 @@ export function createDataService({
     if (typeof name !== 'string' || !name) throw serviceError('A collection name is required', 'DATA_INVALID');
     let bare = name;
     if (namespace) {
+      // A name is this namespace's own when it carries the namespace, or is a
+      // name it declares (one may hold a dot); any other dotted name is not.
       if (name.startsWith(`${namespace}.`)) bare = name.slice(namespace.length + 1);
-      else if (name.includes('.')) throw serviceError(`'${name}' is outside ${namespace}`, 'DATA_FORBIDDEN');
+      else if (name.includes('.') && !resolve(name)?.store) throw serviceError(`'${name}' is outside ${namespace}`, 'DATA_FORBIDDEN');
     }
     const found = resolve(bare);
     if (!found?.store) throw serviceError(`Collection '${name}' is not declared`, 'DATA_UNDECLARED');

@@ -132,6 +132,9 @@ export function createDataManager({
   const live = () => { if (disposed) throw Object.assign(new Error('Data manager retired'), { name: 'StorageReadError', reason: 'retired' }); };
   const syncMeta = new Map(); // storeName -> { lastSyncedAt, pending, online }
 
+  // Stores whose rows outlive a reload: the host's, or Web Storage for a
+  // client-owned store. Prefs promise the device keeps them.
+  const durableStores = new Set();
   for (const [storeName, decl] of Object.entries(localData)) {
     // The 4th argument is the store DECLARATION, added for `persist` (spec
     // mp-durable-instant-surfaces). Positional 1-3 are unchanged, so an existing
@@ -140,6 +143,7 @@ export function createDataManager({
     const backend = backendFactory
       ? backendFactory(dbName, storeName, decl.syncStrategy, decl)
       : defaultBackend(dbName, storeName, decl.syncStrategy);
+    if (backendFactory || (decl.syncStrategy === 'last_write_wins' && hasWebStorage())) durableStores.add(storeName);
     stores.set(storeName, createDataStore({
       name: storeName,
       keyPath: decl.keyPath || 'id',
@@ -168,8 +172,11 @@ export function createDataManager({
   // Returns the reconciled, scope-filtered cache read.
   // Only a read whose reconcile covers the whole store (`complete`) marks the
   // collection synced; a scoped read leaves its stamp as it was.
+  // A store's name as the data service knows it: the manager's namespace
+  // before it, so a declared name with a dot of its own stays this MP's.
+  const qualified = (storeName) => `mp.${mpId}.${storeName}`;
   const fetchAndReconcile = (store, keyPath, spec, scope, window, windowKey, storeName, complete) => reconcileFetched(
-    store, keyPath, spec, scope, window, windowKey, { onPersistError, keepDirty: service.sends(storeName), ...(complete ? {} : { syncedAt: null }) }, // eslint-disable-line no-use-before-define
+    store, keyPath, spec, scope, window, windowKey, { onPersistError, keepDirty: service.sends(qualified(storeName)), ...(complete ? {} : { syncedAt: null }) }, // eslint-disable-line no-use-before-define
   );
 
   // The same small surface the host uses, confined to this MP's own stores
@@ -201,18 +208,29 @@ export function createDataManager({
   // One key's writes and removals reach the store in the order they were
   // made, so what is stored follows what `get` answers.
   const prefWrites = new Map();
-  // Per key, the latest change asked: a change the device refused puts back
-  // what `get` answered before it, unless a later change came meanwhile.
+  // Per key, the latest change asked, and what the device holds (the last
+  // value loaded or saved; absent when none). A change the device refused puts
+  // back what it holds, unless a later change came meanwhile; a key not loaded
+  // yet is left for the load to fill.
   const prefChanges = new Map();
+  const prefsSaved = new Map();
+  let prefsLoadedOnce = false;
   function changePref(name, apply) {
     const change = {};
     prefChanges.set(name, change);
-    const had = prefValues.has(name);
-    const before = prefValues.get(name);
     apply();
-    return () => {
-      if (prefChanges.get(name) !== change) return;
-      if (had) prefValues.set(name, before); else prefValues.delete(name);
+    return {
+      saved(value, present = true) {
+        if (present) prefsSaved.set(name, value); else prefsSaved.delete(name);
+      },
+      refused() {
+        if (prefChanges.get(name) !== change) return;
+        if (prefsSaved.has(name)) prefValues.set(name, prefsSaved.get(name));
+        else {
+          prefValues.delete(name);
+          if (!prefsLoadedOnce) prefsChanged.delete(name);
+        }
+      },
     };
   }
   function inPrefOrder(name, task) {
@@ -237,8 +255,11 @@ export function createDataManager({
       if (prefsLoaded) return prefsLoaded;
       const loading = service.read(PREFS_STORE).then((rows) => {
         (rows || []).forEach((row) => {
-          if (row && typeof row.key === 'string' && !prefValues.has(row.key) && !prefsChanged.has(row.key)) prefValues.set(row.key, row.value);
+          if (!row || typeof row.key !== 'string') return;
+          if (!prefWrites.has(row.key)) prefsSaved.set(row.key, row.value);
+          if (!prefValues.has(row.key) && !prefsChanged.has(row.key)) prefValues.set(row.key, row.value);
         });
+        prefsLoadedOnce = true;
       }).catch(() => { if (prefsLoaded === loading) prefsLoaded = null; });
       prefsLoaded = loading;
       return loading;
@@ -252,22 +273,27 @@ export function createDataManager({
       live();
       const name = String(key);
       const stored = clone(value);
-      const undo = changePref(name, () => prefValues.set(name, stored));
+      const change = changePref(name, () => prefValues.set(name, stored));
       prefsChanged.add(name);
+      // A device with no storage to keep prefs keeps none.
+      if (!durableStores.has(PREFS_STORE)) { change.refused(); throw notSaved(name); }
       const result = await inPrefOrder(name, () => service.ingest(PREFS_STORE, [{ key: name, value: stored === undefined ? null : stored }]))
-        .catch((error) => { undo(); throw notSaved(name, error); });
+        .catch((error) => { change.refused(); throw notSaved(name, error); });
       // Saved only once the device holds it: a store that kept it in memory
       // only (its storage full or gone) would lose it on reload.
-      if (result?.unsaved?.includes(name)) { undo(); throw notSaved(name); }
-      if (!result?.written) { undo(); throw Object.assign(new Error(`tommy.prefs: '${name}' was not saved`), { code: 'DATA_INVALID' }); }
+      if (result?.unsaved?.includes(name)) { change.refused(); throw notSaved(name); }
+      if (!result?.written) { change.refused(); throw Object.assign(new Error(`tommy.prefs: '${name}' was not saved`), { code: 'DATA_INVALID' }); }
+      change.saved(stored === undefined ? null : stored);
     },
     async remove(key) {
       live();
       const name = String(key);
-      const undo = changePref(name, () => prefValues.delete(name));
+      const change = changePref(name, () => prefValues.delete(name));
       prefsChanged.add(name);
+      if (!durableStores.has(PREFS_STORE)) { change.refused(); throw notSaved(name); }
       await inPrefOrder(name, () => service.purge(PREFS_STORE, { keys: [name], force: true }))
-        .catch((error) => { undo(); throw notSaved(name, error); });
+        .catch((error) => { change.refused(); throw notSaved(name, error); });
+      change.saved(undefined, false);
     },
   });
 
@@ -279,6 +305,7 @@ export function createDataManager({
       prefValues.clear();
       prefsChanged.clear();
       prefChanges.clear();
+      prefsSaved.clear();
       service.dispose();
       await Promise.all([...stores.values()].map((store) => store.dispose?.(options)));
     },
@@ -404,7 +431,7 @@ export function createDataManager({
           let kept = false;
           try {
             // One record says nothing about the rest: the collection's synced stamp stays.
-            const result = await store.reconcile([rec], { prune: false, syncedAt: null, ...(service.sends(storeName) ? { keepDirty: true } : {}) }); // eslint-disable-line no-use-before-define
+            const result = await store.reconcile([rec], { prune: false, syncedAt: null, ...(service.sends(qualified(storeName)) ? { keepDirty: true } : {}) }); // eslint-disable-line no-use-before-define
             kept = (Array.isArray(result?.skipped) ? result.skipped : []).map(String).includes(key);
           } catch (_) { /* cache write is best-effort */ }
           return kept ? store.get(key) : rec;
