@@ -90,15 +90,6 @@ function describeShape(err) {
         message: `missing required field '${err.params.missingProperty}' at ${display}.`,
       };
     case 'additionalProperties':
-      if (err.params.additionalProperty === 'unique' && path[0] === 'localData' && path[2] === 'indexes') {
-        return {
-          path,
-          key: 'unique',
-          display: pathToDisplay([...path, 'unique']),
-          rule: 'unique-index-unsupported',
-          message: `localData store '${path[1]}' declares a unique index — unique indexes are not supported on device stores; the server enforces uniqueness. Remove 'unique'.`,
-        };
-      }
       return {
         path,
         key: err.params.additionalProperty,
@@ -132,6 +123,13 @@ function describeShape(err) {
     case 'uniqueItems':
       return { path, rule: 'duplicate-item', message: `${display} contains duplicate items.` };
     case 'const':
+      if (path[0] === 'localData' && path[2] === 'indexes' && path[path.length - 1] === 'unique') {
+        return {
+          path,
+          rule: 'unique-index-unsupported',
+          message: `localData store '${path[1]}' declares a unique index — unique indexes are not supported on device stores; the server enforces uniqueness. Remove 'unique: true'.`,
+        };
+      }
       return { path, rule: 'invalid-const', message: `${display} must be ${JSON.stringify(err.params.allowedValue)}.` };
     default:
       return { path, rule: err.keyword, message: `${display} ${err.message}.` };

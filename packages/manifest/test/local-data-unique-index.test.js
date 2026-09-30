@@ -1,6 +1,7 @@
 // A device store's indexes are never unique: uniqueness is the server's to
-// enforce. A manifest whose localData index declares `unique` is refused with
-// a message saying so, and no device-store code reads a `unique` declaration.
+// enforce. A localData index may still say `unique: false`, which changes
+// nothing; `unique: true` is refused with a message saying so, and no
+// device-store code reads a `unique` declaration.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -19,15 +20,17 @@ describe('localData indexes on device stores', () => {
     expect(validateManifest(withIndex('{ name: by_code, keyPath: code }')).ok).toBe(true);
   });
 
-  it('refuses an index that declares unique, saying the server enforces uniqueness', () => {
-    for (const value of ['true', 'false']) {
-      const result = validateManifest(withIndex(`{ name: by_code, keyPath: code, unique: ${value} }`));
-      expect(result.ok).toBe(false);
-      expect(result.errors).toEqual([expect.objectContaining({
-        rule: 'unique-index-unsupported',
-        message: expect.stringContaining('unique indexes are not supported on device stores; the server enforces uniqueness'),
-      })]);
-    }
+  it('accepts unique: false, which changes nothing', () => {
+    expect(validateManifest(withIndex('{ name: by_code, keyPath: code, unique: false }')).ok).toBe(true);
+  });
+
+  it('refuses unique: true, saying the server enforces uniqueness', () => {
+    const result = validateManifest(withIndex('{ name: by_code, keyPath: code, unique: true }'));
+    expect(result.ok).toBe(false);
+    expect(result.errors).toEqual([expect.objectContaining({
+      rule: 'unique-index-unsupported',
+      message: expect.stringContaining('unique indexes are not supported on device stores; the server enforces uniqueness'),
+    })]);
   });
 
   it('leaves no device-store code reading a unique declaration', () => {

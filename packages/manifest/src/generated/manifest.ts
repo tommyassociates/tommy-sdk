@@ -1009,11 +1009,15 @@ recordSchema: JsonSchema1
  */
 schemaVersion?: number
 /**
- * Secondary indexes the host keeps for this store. They are never unique: uniqueness is the server's to enforce, and an index that declares unique is refused.
+ * Secondary indexes the host keeps for this store. They are never unique: uniqueness is the server's to enforce.
  */
 indexes?: {
 name: string
 keyPath: string
+/**
+ * Device indexes are never unique; the server enforces uniqueness. false is accepted and changes nothing; true is refused.
+ */
+unique?: false
 }[]
 syncStrategy: ("server_authoritative" | "last_write_wins" | "custom")
 /**
