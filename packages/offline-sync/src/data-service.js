@@ -11,6 +11,14 @@
  *   trim(collection, options)         keep a subject's newest rows by index order
  *   status(target)                    fresh | stale | refreshing | offline | error
  *
+ * A source may declare its read (`read`): the service then keeps the read's
+ * cursor with the rows (a `~meta` row, `SOURCE_META_KEY`, written last and
+ * never handed to a reader), asks only for what changed while the stored rows
+ * are the whole set and a whole read ran within `fullEveryMs`, removes rows a
+ * read marks removed (`removedField`), purges the collection's rows when the
+ * server refuses the read (403, 404), and never lets a read undo a change
+ * stored after it began.
+ *
  * `source`, `refresh` and `mutate` with a source's `push` are experimental:
  * no host collection or MP uses them yet. Their outbox keeps every unsent
  * change on the row (a delete as a hidden tombstone, a refusal for access as
@@ -29,6 +37,10 @@ import { reconcileFetched, windowKeyOf } from './reconcile.js';
 export const DATA_STATES = Object.freeze(['fresh', 'stale', 'refreshing', 'offline', 'error']);
 const PRIORITIES = { visible: 0, high: 1, normal: 2, background: 3 };
 export const DEFAULT_STALE_AFTER_MS = 5 * 60000;
+/** The row a declared read keeps its cursor in, in its own collection. */
+export const SOURCE_META_KEY = '~meta';
+// A declared read with a cursor reads the whole collection at least this often.
+const FULL_EVERY_MS = 24 * 60 * 60000;
 
 /** Runs work at once, one flight per key. Hosts inject their scheduler instead. */
 export function createImmediateScheduler() {
@@ -171,6 +183,22 @@ export function createDataService({
   const listeners = new Set();
   let disposed = false;
   const live = () => { if (disposed) throw serviceError('Data service retired', 'DATA_RETIRED'); };
+  // Per collection, when each key was last stored or removed by anything but
+  // a declared read: a read that began before never undoes it.
+  const touches = new Map();
+  let touchSequence = 0;
+  function noteTouched(name, keys) {
+    if (!touches.has(name)) touches.set(name, new Map());
+    const seen = touches.get(name);
+    keys.forEach((key) => { touchSequence += 1; seen.set(String(key), touchSequence); });
+    // Only reads still on their way need these; keep the newest few thousand.
+    if (seen.size > 5000) [...seen.keys()].slice(0, seen.size - 5000).forEach((key) => seen.delete(key));
+  }
+  const touchedAfter = (name, since) => new Set([...(touches.get(name) || new Map())].filter(([, at]) => at > since).map(([key]) => key));
+  // A declared read's collection hides its cursor row from every reader.
+  const declaredRead = (name, decl) => (sources.get(name) || decl?.source)?.read || null;
+  const visible = (name, decl, keyPath) => (declaredRead(name, decl)
+    ? (row) => !(row && String(row[keyPath]) === SOURCE_META_KEY) : () => true);
 
   /** A collection name within this service's namespace, or a thrown refusal. */
   function local(name) {
@@ -210,10 +238,15 @@ export function createDataService({
   const emitStatus = () => { [...listeners].forEach((listener) => { try { listener(); } catch (_) { /* listener isolation */ } }); };
 
   async function valueOf(target) {
-    const { store, decl } = local(target.collection);
-    if (target.query) return (await runQuery(store, decl?.keyPath || 'id', target.query)).rows;
-    if (target.key !== undefined && target.key !== null) return clean(await store.get(String(target.key)));
-    return (await store.getAll()).map(clean);
+    const { name, store, decl } = local(target.collection);
+    const keyPath = decl?.keyPath || 'id';
+    const shown = visible(name, decl, keyPath);
+    if (target.query) return (await runQuery(store, keyPath, target.query)).rows.filter(shown);
+    if (target.key !== undefined && target.key !== null) {
+      const row = clean(await store.get(String(target.key)));
+      return row && shown(row) ? row : null;
+    }
+    return (await store.getAll()).map(clean).filter(shown);
   }
 
   // One entry per row with unsent changes, oldest change first.
@@ -494,6 +527,108 @@ export function createDataService({
     return entry.draining;
   }
 
+  /** Stores server rows (see `ingest`), noting nothing as a change of its own. */
+  async function ingestRows(collection, rows, { replace = false, scope = null, complete = false } = {}) {
+    live();
+    const { name, store, decl } = local(collection);
+    if (!Array.isArray(rows)) throw serviceError('ingest: rows must be an array', 'DATA_INVALID');
+    const keyPath = decl?.keyPath || 'id';
+    const inScope = typeof scope === 'function' ? scope : () => true;
+    // Only rows the store accepts count, once per key; a refused row never
+    // keeps an older stored version alive through a replacement.
+    const isAccepted = (row) => row && typeof row === 'object'
+      && !(typeof store.validateRecord === 'function' && store.validateRecord(row));
+    const kept = new Set(rows.filter(isAccepted).map((row) => String(row[keyPath])));
+    // The distinct keys stored: accepted rows the store did not leave as an
+    // unsent local write.
+    const stored = new Set();
+    const unsaved = new Set();
+    const upsert = async (chunk, options) => {
+      const result = await store.reconcile(chunk, { ...options, keepDirty: true, ...(replace || complete === true ? {} : { syncedAt: null }) });
+      const left = new Set((Array.isArray(result?.skipped) ? result.skipped : []).map(String));
+      const notSaved = new Set((Array.isArray(result?.unsaved) ? result.unsaved : []).map(String));
+      chunk.filter(isAccepted).forEach((row) => {
+        const key = String(row[keyPath]);
+        if (notSaved.has(key)) { unsaved.add(key); stored.delete(key); } else if (!left.has(key)) { stored.add(key); unsaved.delete(key); }
+      });
+    };
+    if (replace && rows.length <= INGEST_CHUNK) {
+      await upsert(rows, { scope: inScope });
+    } else {
+      for (let start = 0; start < rows.length; start += INGEST_CHUNK) {
+        // Chunks commit in order; each is a bounded complete set.
+        // eslint-disable-next-line no-await-in-loop
+        await upsert(rows.slice(start, start + INGEST_CHUNK), { prune: false });
+      }
+      if (replace) await store.reconcile([], { scope: (row) => inScope(row) && !kept.has(String(row[keyPath])) });
+    }
+    const written = stored.size;
+    // A replacing or complete ingest is a whole read: the collection is fresh.
+    if (replace || complete === true) {
+      const state = stateFor(targetKey({ collection: name }));
+      state.state = 'fresh'; state.syncedAt = now(); state.error = null;
+      emitStatus();
+    }
+    return { written, ...(unsaved.size ? { unsaved: [...unsaved] } : {}) };
+  }
+
+  /**
+   * A declared read of a whole collection. With `read.cursor`, it asks only
+   * for what changed since the stored cursor while the stored rows are the
+   * whole set (the cursor row counts them) and a whole read ran within
+   * `fullEveryMs`; `fetch` answers `{ rows, cursor, since }` (`since`: it used
+   * the cursor) or the rows alone. A whole read replaces the collection; a read
+   * of changes stores them and removes the rows `removedField` marks. The
+   * cursor row goes last, with the rows it describes. Keys stored or removed by
+   * anything else after the read began keep that change. A refusal (403, 404)
+   * purges the collection's rows, unsent ones kept.
+   */
+  async function readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent) {
+    const { cursor: keepsCursor = false, removedField = null, fullEveryMs = FULL_EVERY_MS, forbidden = 'purge' } = spec.read;
+    const startedAt = touchSequence;
+    const all = await (store.getAllRaw ? store.getAllRaw() : store.getAll());
+    const meta = all.find((row) => row && String(row[keyPath]) === SOURCE_META_KEY) || null;
+    const storedKeys = new Set(all.filter((row) => row && String(row[keyPath]) !== SOURCE_META_KEY).map((row) => String(row[keyPath])));
+    const whole = !!meta && Number.isSafeInteger(meta.count) && meta.count === storedKeys.size;
+    const since = keepsCursor && whole && typeof meta.cursor === 'string' && meta.cursor
+      && Number.isFinite(meta.fullAt) && now() - meta.fullAt < fullEveryMs ? meta.cursor : null;
+    let answer;
+    try {
+      answer = await spec.fetch(wanted, { ...jobContext, since });
+    } catch (error) {
+      if (forbidden === 'purge' && [403, 404].includes(Number(error?.status)) && isCurrent()) {
+        await service.purge(name, {}).catch(() => {}); // eslint-disable-line no-use-before-define
+      }
+      throw error;
+    }
+    if (!isCurrent()) return;
+    const rows = (Array.isArray(answer) ? answer : (answer?.rows || []))
+      .filter((row) => row && typeof row === 'object' && row[keyPath] !== undefined && row[keyPath] !== null
+        && String(row[keyPath]) !== SOURCE_META_KEY);
+    const changesOnly = since !== null && answer?.since === true;
+    const cursor = keepsCursor ? (typeof answer?.cursor === 'string' && answer.cursor ? answer.cursor : null) : null;
+    // What was stored or removed since this read began stays as it is.
+    const kept = touchedAfter(name, startedAt);
+    const keyOf = (row) => String(row[keyPath]);
+    const removed = removedField ? rows.filter((row) => row[removedField] !== undefined && row[removedField] !== null) : [];
+    const removedKeys = new Set(removed.map(keyOf));
+    const toRecord = spec.toRecord || ((dto) => dto);
+    const records = rows.filter((row) => !removedKeys.has(keyOf(row)) && !kept.has(keyOf(row))).map((row) => toRecord(row));
+    const gone = [...removedKeys].filter((key) => !kept.has(key));
+    if (changesOnly) {
+      if (gone.length) await removeRows({ label, store, keys: gone, force: false });
+      if (!isCurrent()) return;
+      const count = new Set([...storedKeys, ...records.map(keyOf)]);
+      gone.forEach((key) => count.delete(key));
+      const metaRow = { [keyPath]: SOURCE_META_KEY, cursor: cursor ?? meta.cursor, fullAt: meta.fullAt, count: count.size };
+      await ingestRows(name, [...records, metaRow], { complete: true });
+      return;
+    }
+    const scope = (row) => !kept.has(keyOf(row));
+    const metaRow = keepsCursor ? [{ [keyPath]: SOURCE_META_KEY, cursor, fullAt: now(), count: records.length }] : [];
+    await ingestRows(name, [...records, ...metaRow], { replace: true, scope });
+  }
+
   const service = {
     namespace,
     // Rows come as copies without storage metadata. `raw` reads as writers
@@ -502,18 +637,24 @@ export function createDataService({
     // it painted or deciding what to remove.
     async read(collection, key, { raw = false } = {}) {
       live();
-      const { store } = local(collection);
-      const one = async (item) => (raw ? copyRow(await store.getRaw(String(item))) : clean(await store.get(String(item))));
+      const { name, store, decl } = local(collection);
+      const shown = visible(name, decl, decl?.keyPath || 'id');
+      const one = async (item) => {
+        const row = raw ? copyRow(await store.getRaw(String(item))) : clean(await store.get(String(item)));
+        return row && shown(row) ? row : null;
+      };
       if (Array.isArray(key)) return Promise.all(key.map(one));
       if (key !== undefined && key !== null) return one(key);
-      return raw ? (await store.getAllRaw()).map(copyRow) : (await store.getAll()).map(clean);
+      return (raw ? (await store.getAllRaw()).map(copyRow) : (await store.getAll()).map(clean)).filter(shown);
     },
     // `raw: true` answers as writers see the collection (rows past the paint
     // ceiling and the age limit included), for a caller deciding what to remove.
     async query(collection, spec = {}) {
       live();
-      const { store, decl } = local(collection);
-      return runQuery(store, decl?.keyPath || 'id', spec);
+      const { name, store, decl } = local(collection);
+      const keyPath = decl?.keyPath || 'id';
+      const page = await runQuery(store, keyPath, spec);
+      return { ...page, rows: page.rows.filter(visible(name, decl, keyPath)) };
     },
     /**
      * `target`: a collection name, `{ collection, key }` or
@@ -628,6 +769,10 @@ export function createDataService({
           await store.reconcile([record], { prune: false, keepDirty: true, syncedAt: null });
           return;
         }
+        if (spec.read && !wanted.query && !wanted.window && typeof spec.scope !== 'function') {
+          await readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent);
+          return;
+        }
         // A query target prunes only the rows of that query; a list or window
         // target the source's scope (the whole collection without one).
         let scope = typeof spec.scope === 'function' ? spec.scope(wanted) : () => true;
@@ -670,48 +815,12 @@ export function createDataService({
      */
     // A replacing ingest, or one of rows a complete read delivered
     // (`complete`), stamps the collection synced; any other does not.
-    async ingest(collection, rows, { replace = false, scope = null, complete = false } = {}) {
+    async ingest(collection, rows, options = {}) {
       live();
-      const { name, store, decl } = local(collection);
-      if (!Array.isArray(rows)) throw serviceError('ingest: rows must be an array', 'DATA_INVALID');
+      const { name, decl } = local(collection);
       const keyPath = decl?.keyPath || 'id';
-      const inScope = typeof scope === 'function' ? scope : () => true;
-      // Only rows the store accepts count, once per key; a refused row never
-      // keeps an older stored version alive through a replacement.
-      const isAccepted = (row) => row && typeof row === 'object'
-        && !(typeof store.validateRecord === 'function' && store.validateRecord(row));
-      const kept = new Set(rows.filter(isAccepted).map((row) => String(row[keyPath])));
-      // The distinct keys stored: accepted rows the store did not leave as an
-      // unsent local write.
-      const stored = new Set();
-      const unsaved = new Set();
-      const upsert = async (chunk, options) => {
-        const result = await store.reconcile(chunk, { ...options, keepDirty: true, ...(replace || complete === true ? {} : { syncedAt: null }) });
-        const left = new Set((Array.isArray(result?.skipped) ? result.skipped : []).map(String));
-        const notSaved = new Set((Array.isArray(result?.unsaved) ? result.unsaved : []).map(String));
-        chunk.filter(isAccepted).forEach((row) => {
-          const key = String(row[keyPath]);
-          if (notSaved.has(key)) { unsaved.add(key); stored.delete(key); } else if (!left.has(key)) { stored.add(key); unsaved.delete(key); }
-        });
-      };
-      if (replace && rows.length <= INGEST_CHUNK) {
-        await upsert(rows, { scope: inScope });
-      } else {
-        for (let start = 0; start < rows.length; start += INGEST_CHUNK) {
-          // Chunks commit in order; each is a bounded complete set.
-          // eslint-disable-next-line no-await-in-loop
-          await upsert(rows.slice(start, start + INGEST_CHUNK), { prune: false });
-        }
-        if (replace) await store.reconcile([], { scope: (row) => inScope(row) && !kept.has(String(row[keyPath])) });
-      }
-      const written = stored.size;
-      // A replacing or complete ingest is a whole read: the collection is fresh.
-      if (replace || complete === true) {
-        const state = stateFor(targetKey({ collection: name }));
-        state.state = 'fresh'; state.syncedAt = now(); state.error = null;
-        emitStatus();
-      }
-      return { written, ...(unsaved.size ? { unsaved: [...unsaved] } : {}) };
+      if (Array.isArray(rows)) noteTouched(name, rows.filter((row) => row && typeof row === 'object').map((row) => row[keyPath]));
+      return ingestRows(collection, rows, options);
     },
     /**
      * `{ op: 'put', record } | { op: 'patch', key, patch } | { op: 'delete', key }`.
@@ -728,6 +837,7 @@ export function createDataService({
       const keyPath = decl?.keyPath || 'id';
       if (!['put', 'patch', 'delete'].includes(command?.op)) throw serviceError('mutate: op must be put, patch or delete', 'DATA_INVALID');
       const key = String(command.op === 'put' ? command.record?.[keyPath] : command.key);
+      noteTouched(name, [key]);
       const push = pushOf(name, decl);
       // One local write per row at a time, so each push knows the revision it wrote.
       const written = await serial(`${label}:${key}`, async () => {
@@ -835,7 +945,8 @@ export function createDataService({
      * local writes to the row, so a change made just before is dropped too.
      */
     async discard(collection, key) {
-      const { label, store } = local(collection);
+      const { name, label, store } = local(collection);
+      noteTouched(name, [key]);
       await serial(`${label}:${String(key)}`, async () => {
         dropPending(label, key);
         await store.delete(String(key));
@@ -872,6 +983,7 @@ export function createDataService({
       }
       const { label } = local(collection);
       const removed = await removeRows({ label, store, keys: entries.filter(({ dirty }) => force || !dirty).map(({ key }) => key), force });
+      noteTouched(local(collection).name, removed);
       await store.revalidateSubscribers?.();
       return { removed };
     },

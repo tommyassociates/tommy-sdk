@@ -616,7 +616,19 @@ export interface DataQuerySpec<Rec = unknown> {
   readonly raw?: boolean;
 }
 export interface DataSource<Dto = unknown, Rec = unknown> {
-  fetch(target: { collection: string; key?: string; window?: Record<string, unknown> }): Promise<Dto[] | Dto | null>;
+  /**
+   * With `read` declared, a whole-collection fetch is given `context.since`
+   * (the stored cursor, or null for a whole read) and may answer
+   * `{ rows, cursor, since }` (`since`: it read only what changed).
+   */
+  fetch(target: { collection: string; key?: string; window?: Record<string, unknown> }, context?: { since?: string | null; principal?: unknown; background?: boolean }): Promise<Dto[] | Dto | { rows: Dto[]; cursor?: string | null; since?: boolean } | null>;
+  /**
+   * @experimental A declared read: the service keeps its cursor with the rows
+   * (`cursor`), reads whole at least every `fullEveryMs`, removes rows whose
+   * `removedField` is set, and purges the collection when the server refuses
+   * the read (`forbidden: 'purge'`, the default).
+   */
+  read?: { cursor?: boolean; removedField?: string; fullEveryMs?: number; forbidden?: 'purge' | 'keep' };
   toRecord?(dto: Dto, prev?: Rec): Rec;
   keyOf?(dto: Dto): string;
   scope?(target: { collection: string; window?: Record<string, unknown> }): (row: Rec) => boolean;
