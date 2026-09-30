@@ -408,6 +408,25 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     await expect(port.read({ handle: rows.handle, expectedEpoch: rows.epoch, afterKey: null, limit: 10, includeAged: 'yes' })).resolves.toMatchObject({ ok: false, reason: 'unserializable' });
   });
 
+  it('forgets handles once they are closed or retired, however many opens came before', async () => {
+    const { port } = await setup(create);
+    for (let round = 0; round < 50; round += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const opened = await port.open(openInput({ storeName: 'drafts', policy: 'authored' }));
+      // eslint-disable-next-line no-await-in-loop
+      await port.retire({ handle: opened.handle, mode: 'close' });
+    }
+    expect(port.openHandles()).toBe(0);
+    // A handle another opener's rebuild retired is forgotten on its next use.
+    const stale = await port.open(openInput({ storeName: 'drafts', policy: 'authored', schemaFingerprint: 'schema-a' }));
+    const rebuilding = await port.open(openInput({ storeName: 'drafts', policy: 'authored', schemaFingerprint: 'schema-b' }));
+    const step = (phase) => port.migration({ handle: rebuilding.handle, expectedEpoch: rebuilding.epoch, phase });
+    await step('begin');
+    await step('complete');
+    await expect(port.read({ handle: stale.handle, expectedEpoch: stale.epoch, afterKey: null, limit: 1 })).resolves.toMatchObject({ ok: false, reason: 'retired' });
+    expect(port.openHandles()).toBe(1);
+  });
+
   it('keeps open handles usable after a forced clear, and drops a rebuild in progress', async () => {
     const { port, open, stores } = await setup(create);
     const drafts = await open({ storeName: 'drafts', policy: 'authored' });

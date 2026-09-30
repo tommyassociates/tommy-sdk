@@ -27,9 +27,16 @@ const LRU = 't';
 /** A host-local port. Database transactions, not handle queues, serialize other tabs. */
 export function createHostStorePort({ database, backend = 'indexeddb', now = () => Date.now(), randomId = () => globalThis.crypto.randomUUID() } = {}) {
   if (!database?.transaction || !['indexeddb', 'capacitor_sqlite', 'electron_sqlite', 'volatile'].includes(backend)) throw storageError('unavailable');
+  // Open handles by id. A closed or retired handle is forgotten when its
+  // owner closes it, or on its next use, so the map holds only live ones.
   const handles = new Map();
+  function forget(id, handle) {
+    handles.delete(id);
+    handleRegistry.delete(handle);
+  }
   function getHandle(id) {
     const handle = typeof id === 'string' && handles.get(id);
+    if (handle?.closed) forget(id, handle);
     if (!handle || handle.closed) throw storageError('retired');
     return handle;
   }
@@ -264,6 +271,8 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
   const port = {
     version: HOST_STORE_VERSION,
     features: HOST_STORE_FEATURES,
+    /** How many handles this port holds (a diagnostic). */
+    openHandles() { return handles.size; },
     async open(input) {
       const identity = validateOpen(input);
       const frozen = clone(input);
@@ -465,12 +474,13 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
       if (!closed(input, ['handle', 'mode']) || !['close', 'purge_owner'].includes(input.mode)) throw storageError('unserializable');
       const handle = handles.get(input.handle);
       if (!handle) throw storageError('retired');
-      if (input.mode === 'close') { handle.closed = true; handleRegistry.delete(handle); return { retired: true, purged: false }; }
+      if (input.mode === 'close') { handle.closed = true; forget(input.handle, handle); return { retired: true, purged: false }; }
       for (const other of handleRegistry) { if (other.owner === handle.owner) other.closed = true; }
       await database.transaction('readwrite', async (tx) => {
         await purgeOwner(tx, handle.owner);
       });
       for (const other of handleRegistry) { if (other.owner === handle.owner) handleRegistry.delete(other); }
+      handles.forEach((entry, id) => { if (entry.closed) handles.delete(id); });
       return { retired: true, purged: true };
     },
     // Copy-on-write: `begin` claims the next generation under a lease held by
