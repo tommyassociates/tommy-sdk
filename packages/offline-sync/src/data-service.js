@@ -195,6 +195,8 @@ export function createDataService({
   const outbox = new Map();
   const writes = new Map();
   let sequence = 0;
+  // Bumped by fence(): work that began before it never queues a change after.
+  let fenceGeneration = 0;
   const bare = (row) => Object.fromEntries(Object.entries(row || {}).filter(([field]) => !field.startsWith('_')));
   const pushOf = (name, decl) => (sources.get(name) || decl?.source)?.push || decl?.push;
   const describeError = (error) => ({ code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) });
@@ -328,9 +330,10 @@ export function createDataService({
     return entry;
   }
   async function restoreDirty(target) {
+    const generation = fenceGeneration;
     let rows;
     try { rows = await (target.store.getAllRaw ? target.store.getAllRaw() : target.store.getAll()); } catch (_) { return; }
-    if (disposed) return;
+    if (disposed || generation !== fenceGeneration) return;
     const keyPath = target.decl?.keyPath || 'id';
     rows.filter((row) => row?._dirty).forEach((row) => {
       const key = String(row[keyPath]);
@@ -381,12 +384,17 @@ export function createDataService({
                 if (typeof push !== 'function') throw serviceError(`'${entry.label}' has no push`, 'DATA_NO_SOURCE');
                 if (change.restored) {
                   // Sent as the row is now: nothing when it is no longer an
-                  // unsent change (another tab sent it), else its latest state.
+                  // unsent change (another tab sent it), else its latest
+                  // state, which carries every edit queued behind it; those
+                  // settle with this send.
                   const row = await entry.store.getRaw(entry.key);
                   if (!row?._dirty) { sent = true; change.skipped = true; return; }
                   change.command = row._deleted ? { op: 'delete', key: entry.key } : { op: 'put', record: bare(row) };
                   change.record = row._deleted ? null : bare(row);
                   change.revision = row._rev;
+                  const behind = entry.changes.splice(1);
+                  change.carries = behind.filter((queued) => Number.isSafeInteger(queued.revision) && queued.revision <= row._rev);
+                  entry.changes.push(...behind.filter((queued) => !change.carries.includes(queued)));
                 }
                 // Fenced, discarded or disposed while it waited: never sent.
                 if (entry.discarded || outbox.get(entry.id) !== entry) throw serviceError('Change fenced', 'DATA_FENCED');
@@ -397,6 +405,8 @@ export function createDataService({
               },
             });
           } catch (error) {
+            // Edits the failed send carried stay queued behind it.
+            if (change.carries?.length) { entry.changes.splice(1, 0, ...change.carries); change.carries = null; }
             if (!sent && entry.discarded) {
               entry.changes.forEach((queued) => queued.reject(error));
               throw error;
@@ -412,6 +422,7 @@ export function createDataService({
           }
           entry.changes.shift();
           change.resolve({ key: entry.key, pushed: !change.skipped });
+          (change.carries || []).forEach((carried) => carried.resolve({ key: entry.key, pushed: !change.skipped }));
         }
         if (entry.discarded) return { key: entry.key, pushed: false };
         if (outbox.get(entry.id) === entry) outbox.delete(entry.id);
@@ -629,6 +640,7 @@ export function createDataService({
      */
     async mutate(collection, command, { wait = false } = {}) {
       live();
+      const generation = fenceGeneration;
       const { name, label, store, decl } = local(collection);
       const keyPath = decl?.keyPath || 'id';
       if (!['put', 'patch', 'delete'].includes(command?.op)) throw serviceError('mutate: op must be put, patch or delete', 'DATA_INVALID');
@@ -654,6 +666,9 @@ export function createDataService({
         return { record, revision };
       });
       if (typeof push !== 'function') return { key, pushed: false };
+      // Fenced while the local write ran: the row stays unsent on disk for
+      // the principal it was written under.
+      if (generation !== fenceGeneration || disposed) return { key, pushed: false };
       const change = enqueuePush({ name, label, key, store, decl }, { command, record: written.record, revision: written.revision });
       if (wait) return change;
       change.catch(() => {});
@@ -688,9 +703,10 @@ export function createDataService({
       const id = `${label}:${String(key)}`;
       let entry = outbox.get(id);
       if (!entry) {
+        const generation = fenceGeneration;
         const push = pushOf(name, decl);
         const row = typeof push === 'function' ? await store.getRaw?.(String(key)) : null;
-        if (!row?._dirty) return { key, pushed: false };
+        if (!row?._dirty || generation !== fenceGeneration || disposed) return { key, pushed: false };
         entry = outbox.get(id) || restoreEntry({ name, label, key: String(key), store, decl }, row);
       }
       if (!entry.draining && ['failed', 'access_changed'].includes(entry.state)) {
@@ -713,6 +729,7 @@ export function createDataService({
      * service sends them again.
      */
     fence() {
+      fenceGeneration += 1;
       outbox.forEach((entry) => {
         entry.discarded = true;
         entry.changes.splice(0).forEach((change) => change.reject(serviceError('Change fenced', 'DATA_FENCED')));
@@ -800,8 +817,10 @@ export function createDataService({
       listeners.clear();
       sources.clear();
       // Unsent rows stay dirty on disk; the next service sends them again.
+      fenceGeneration += 1;
       outbox.forEach((entry) => { entry.discarded = true; });
       outbox.clear();
+      states.clear();
     },
   };
   return service;

@@ -1,6 +1,9 @@
 /** Durable branch of DataStore. The injected backend owns physical CAS/epochs. */
 // The most rows one whole-collection read returns, page by page.
 export const WHOLE_READ_ROWS = 20000;
+// A whole read that has to page stops at this many bytes too (a domain's
+// largest budget), so large rows are never all held in memory at once.
+export const WHOLE_READ_BYTES = 32 * 1024 * 1024;
 // The most rows the host store returns in one complete read.
 const COMPLETE_ROWS = 1000;
 export class StorageReadError extends Error {
@@ -112,6 +115,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     paged = true;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const rows = [];
+      let size = 0;
       let afterKey = null;
       let fence = null;
       let moved = false;
@@ -123,7 +127,8 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         if (fence && (page.epoch !== fence.epoch || page.storeRevision !== fence.revision)) { moved = true; break; }
         fence = { epoch: page.epoch, revision: page.storeRevision };
         rows.push(...page.rows.map((row) => row.value));
-        if (rows.length > WHOLE_READ_ROWS) throw new StorageReadError('scan-required');
+        size += page.rows.reduce((total, row) => total + (Number.isSafeInteger(row.bytes) ? row.bytes : JSON.stringify(row.value ?? null).length), 0);
+        if (rows.length > WHOLE_READ_ROWS || size > WHOLE_READ_BYTES) throw new StorageReadError('scan-required');
         afterKey = page.nextKey;
       } while (afterKey !== null);
       if (!moved) {

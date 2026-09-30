@@ -301,6 +301,18 @@ describe('MP data API confinement', () => {
     await expect(next.read('mp.time-clock.prefs')).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
   });
 
+  it('answers no preference once the manager is disposed, never the previous account\'s', async () => {
+    const backends = new Map();
+    const factory = (_db, store) => { if (!backends.has(store)) backends.set(store, createMemoryStoreBackend()); return backends.get(store); };
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    await data.prefs.ready();
+    await data.prefs.set('layout', 'board');
+    expect(data.prefs.get('layout', 'list')).toBe('board');
+    await data.dispose();
+    expect(data.prefs.get('layout', 'list')).toBe('list');
+    await expect(data.prefs.set('layout', 'grid')).rejects.toMatchObject({ reason: 'retired' });
+  });
+
   it('stores a preference set then removed before the first write landed as removed', async () => {
     let gate = null;
     const backends = new Map();

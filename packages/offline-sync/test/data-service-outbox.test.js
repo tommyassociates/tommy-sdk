@@ -191,6 +191,31 @@ describe('queries', () => {
   });
 });
 
+describe('a whole-collection read', () => {
+  it('stops at its byte budget when it has to page, as a complete read does', async () => {
+    const MiB = 1024 * 1024;
+    const rows = Array.from({ length: 40 }, (_, index) => ({ key: `r${index}`, value: { id: `r${index}` }, revision: 1, bytes: MiB }));
+    // A backend whose complete read refuses (too large) and pages 10 rows at a time.
+    const backend = {
+      transactional: true, policy: 'authored', limits: { maxRows: 50000 },
+      async getAll() { throw Object.assign(new Error('scan-required'), { name: 'StorageReadError', reason: 'scan-required' }); },
+      async page({ afterKey = null }) {
+        const start = afterKey === null ? 0 : rows.findIndex((row) => row.key === afterKey) + 1;
+        const slice = rows.slice(start, start + 10);
+        return { epoch: 1, storeRevision: 1, rows: slice, nextKey: start + 10 < rows.length ? slice.at(-1).key : null };
+      },
+      async get() { return undefined; },
+      async snapshot() { return { epoch: 1, storeRevision: 1, rows: [], nextKey: null }; },
+      async commit() { return { ok: true, epoch: 1, storeRevision: 2 }; },
+      async close() {},
+    };
+    const store = createDataStore({ name: 'items', backend });
+    await expect(store.getAll()).rejects.toMatchObject({ reason: 'scan-required' });
+    rows.splice(20);
+    expect(await store.getAll()).toHaveLength(20);
+  });
+});
+
 describe('results', () => {
   it('carry no storage metadata and are copies, never the stored rows', async () => {
     const { data } = service();
@@ -285,6 +310,53 @@ describe('fencing, cleanup after a sent delete, and queued deletes', () => {
     expect(push).not.toHaveBeenCalled();
     expect(await store.getRaw('a')).toBeUndefined();
     expect(data.pending()).toEqual([]);
+  });
+
+  it('sends a restored change as the row is, and settles the edits queued behind it with that one send', async () => {
+    const { store } = service();
+    await store.put({ id: 'a', v: 'A' });
+    const scheduler = heldScheduler();
+    const { data } = service({ store, scheduler });
+    const sent = [];
+    data.source('items', { fetch: async () => [], push: async (command) => { sent.push(command.record?.v); } });
+    await vi.waitFor(() => expect(scheduler.held.length).toBe(1));
+    // Two newer edits are queued behind the restored change.
+    const b = data.mutate('items', { op: 'put', record: { id: 'a', v: 'B' } }, { wait: true });
+    const c = data.mutate('items', { op: 'put', record: { id: 'a', v: 'C' } }, { wait: true });
+    await settle();
+    scheduler.releaseAll();
+    await vi.waitFor(async () => expect(await Promise.all([b, c])).toEqual([{ key: 'a', pushed: true }, { key: 'a', pushed: true }]));
+    scheduler.releaseAll();
+    await settle(); await settle();
+    expect(sent).toEqual(['C']);
+    expect((await store.getRaw('a'))).toMatchObject({ v: 'C', _dirty: false });
+  });
+
+  it('keeps every edit queued behind a restored change unsent when that send fails', async () => {
+    const { store } = service();
+    await store.put({ id: 'a', v: 'A' });
+    const scheduler = heldScheduler();
+    const { data } = service({ store, scheduler });
+    data.source('items', { fetch: async () => [], push: async () => { throw Object.assign(new Error('Server'), { status: 500 }); } });
+    await vi.waitFor(() => expect(scheduler.held.length).toBe(1));
+    const b = data.mutate('items', { op: 'put', record: { id: 'a', v: 'B' } }, { wait: true });
+    await settle();
+    scheduler.releaseAll();
+    await expect(b).rejects.toMatchObject({ status: 500 });
+    expect((await store.getRaw('a'))).toMatchObject({ v: 'B', _dirty: true });
+  });
+
+  it('never queues a change whose local write was still running when the outbox was fenced', async () => {
+    const { data, store } = service();
+    const push = vi.fn(async () => {});
+    data.source('items', { fetch: async () => [], push });
+    const writing = data.mutate('items', { op: 'put', record: { id: 'a', v: 'local' } });
+    data.fence();
+    await writing;
+    await settle(); await settle();
+    expect(push).not.toHaveBeenCalled();
+    expect(data.pending()).toEqual([]);
+    expect((await store.getRaw('a'))._dirty).toBe(true);
   });
 
   it('keeps a queued delete for a key that never had a row when an unrelated purge lands', async () => {

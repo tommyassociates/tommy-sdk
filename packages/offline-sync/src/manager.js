@@ -202,9 +202,12 @@ export function createDataManager({
     tail.then(() => { if (prefWrites.get(name) === tail) prefWrites.delete(name); });
     return next;
   }
+  // Once disposed, prefs answer nothing held (never the previous account's
+  // choices), load nothing, and refuse writes.
   const prefs = Object.freeze({
     ready() {
       prefsTried = true;
+      if (disposed) return Promise.resolve();
       if (prefsLoaded) return prefsLoaded;
       const loading = service.read(PREFS_STORE).then((rows) => {
         (rows || []).forEach((row) => {
@@ -215,6 +218,7 @@ export function createDataManager({
       return loading;
     },
     get(key, fallback = null) {
+      if (disposed) return fallback;
       if (!prefsTried) prefs.ready();
       return prefValues.has(String(key)) ? clone(prefValues.get(String(key))) : fallback;
     },
@@ -241,6 +245,8 @@ export function createDataManager({
     prefs,
     async dispose(options) {
       disposed = true;
+      prefValues.clear();
+      prefsChanged.clear();
       service.dispose();
       await Promise.all([...stores.values()].map((store) => store.dispose?.(options)));
     },
