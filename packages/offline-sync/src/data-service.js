@@ -637,16 +637,18 @@ export function createDataService({
       // One local write per row at a time, so each push knows the revision it wrote.
       const written = await serial(`${label}:${key}`, async () => {
         let record = null;
+        let held = null;
         if (command.op === 'put') {
           record = command.record;
           await store.put(record);
         } else if (command.op === 'patch') {
           record = bare({ ...((await store.getRaw(key)) || {}), ...command.patch });
           await store.put(record);
-        } else if (typeof push === 'function' && typeof store.markRow === 'function' && await store.getRaw(key)) {
+        } else if (typeof push === 'function' && typeof store.markRow === 'function' && (held = await store.getRaw(key))) {
           // A delete to send stays a hidden, unsent tombstone until it is sent,
-          // so a reload sends it again.
-          await store.markRow(key, { _deleted: true }, { dirty: true });
+          // so a reload sends it again. It keeps only its key, so it holds no
+          // indexed value (a unique one stays free for a new row).
+          await store.markRow(key, { _deleted: true }, { dirty: true, body: { [keyPath]: held[keyPath] } });
         } else await store.delete(key);
         const revision = typeof push !== 'function' ? undefined : (await store.getRaw(key))?._rev;
         return { record, revision };

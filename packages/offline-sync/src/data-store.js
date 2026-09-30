@@ -1086,14 +1086,16 @@ export function createDataStore({
      * validating or re-stamping the record — `_deleted` (a local delete
      * waiting to be sent, hidden from every read that paints) and
      * `_pushRefused` (the server refused the row's push). A `null` value
-     * removes a marker; `dirty: true` makes the row an unsent change. Resolves
-     * whether the row was there.
+     * removes a marker; `dirty: true` makes the row an unsent change; `body`
+     * replaces the row's fields (a tombstone keeps only its key, so it holds
+     * no indexed value). Resolves whether the row was there.
      */
-    async markRow(key, patch, { dirty = false } = {}) {
+    async markRow(key, patch, { dirty = false, body = null } = {}) {
       const persisted = await rowTurn(key, async () => {
         const record = await backend.get(key);
         if (!record) return null;
-        const next = { ...record };
+        const meta = Object.fromEntries(Object.entries(record).filter(([field]) => field.startsWith('_')));
+        const next = body ? { ...body, ...meta } : { ...record };
         Object.entries(patch).forEach(([field, value]) => { if (value === null) delete next[field]; else next[field] = value; });
         if (dirty) Object.assign(next, { _dirty: true, _rev: (record._rev || 0) + 1, _updatedAt: new Date(now()).toISOString() });
         return backend.put(key, next);
