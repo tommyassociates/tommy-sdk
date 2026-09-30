@@ -14,6 +14,7 @@ import { createTransactionalDataStore } from './transactional-store.js';
  */
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
+import { SOURCE_META_KEY } from './meta-key.js';
 
 const ajv = new Ajv({ allErrors: true, strict: false });
 addFormats(ajv);
@@ -955,7 +956,7 @@ export function createDataStore({
      * the schema is compiled in here and deliberately not exposed.
      */
     validateRecord(record) {
-      if (validate && !validate(record)) {
+      if (validate && keyOf(record) !== SOURCE_META_KEY && !validate(record)) {
         return (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ');
       }
       if (keyOf(record) === undefined) return `record missing keyPath '${keyPath}'`;
@@ -965,7 +966,8 @@ export function createDataStore({
     // same write, and leaves a row with an unsent local write untouched:
     // resolves undefined then.
     async put(record, { dedupeKey, silent = false, deferCap = false, server = false } = {}) {
-      if (validate && !validate(record)) {
+      // A declared read's cursor row is the service's own, never the collection's record.
+      if (validate && keyOf(record) !== SOURCE_META_KEY && !validate(record)) {
         const detail = (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ');
         throw new Error(`store '${name}': record failed recordSchema: ${detail}`);
       }

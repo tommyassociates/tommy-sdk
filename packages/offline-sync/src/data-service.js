@@ -33,12 +33,12 @@
  * results are written into the stores first and observed from there.
  */
 import { reconcileFetched, windowKeyOf } from './reconcile.js';
+import { SOURCE_META_KEY } from './meta-key.js';
 
 export const DATA_STATES = Object.freeze(['fresh', 'stale', 'refreshing', 'offline', 'error']);
 const PRIORITIES = { visible: 0, high: 1, normal: 2, background: 3 };
 export const DEFAULT_STALE_AFTER_MS = 5 * 60000;
-/** The row a declared read keeps its cursor in, in its own collection. */
-export const SOURCE_META_KEY = '~meta';
+export { SOURCE_META_KEY };
 // A declared read with a cursor reads the whole collection at least this often.
 const FULL_EVERY_MS = 24 * 60 * 60000;
 
@@ -195,6 +195,10 @@ export function createDataService({
     if (seen.size > 5000) [...seen.keys()].slice(0, seen.size - 5000).forEach((key) => seen.delete(key));
   }
   const touchedAfter = (name, since) => new Set([...(touches.get(name) || new Map())].filter(([, at]) => at > since).map(([key]) => key));
+  // When a replacing ingest from outside a declared read last ran, by collection.
+  const replaced = new Map();
+  function noteReplaced(name) { touchSequence += 1; replaced.set(name, touchSequence); }
+  const replacedAfter = (name, since) => (replaced.get(name) || 0) > since;
   // A declared read's collection hides its cursor row from every reader.
   const declaredRead = (name, decl) => (sources.get(name) || decl?.source)?.read || null;
   const visible = (name, decl, keyPath) => (declaredRead(name, decl)
@@ -602,22 +606,31 @@ export function createDataService({
       throw error;
     }
     if (!isCurrent()) return;
-    const rows = (Array.isArray(answer) ? answer : (answer?.rows || []))
-      .filter((row) => row && typeof row === 'object' && row[keyPath] !== undefined && row[keyPath] !== null
-        && String(row[keyPath]) !== SOURCE_META_KEY);
+    // A whole replacement of the collection since this read began is newer
+    // than this answer: the answer is dropped.
+    if (replacedAfter(name, startedAt)) return;
+    const dtos = (Array.isArray(answer) ? answer : (answer?.rows || [])).filter((dto) => dto && typeof dto === 'object');
+    // Each answer row becomes its record first; the record's key decides.
+    const toRecord = spec.toRecord || ((dto) => dto);
+    const keyOf = (row) => String(row[keyPath]);
+    const mapped = dtos.map((dto) => ({ dto, record: toRecord(dto) }))
+      .filter(({ record }) => record && typeof record === 'object' && record[keyPath] !== undefined && record[keyPath] !== null
+        && String(record[keyPath]) !== SOURCE_META_KEY);
+    // Rows answered that none of could be stored: never taken for an empty collection.
+    if (dtos.length && !mapped.length) {
+      throw Object.assign(new Error(`'${name}': no answered row has a key`), { name: 'DataServiceError', code: 'DATA_INVALID' });
+    }
     const changesOnly = since !== null && answer?.since === true;
     const cursor = keepsCursor ? (typeof answer?.cursor === 'string' && answer.cursor ? answer.cursor : null) : null;
     // What was stored or removed since this read began stays as it is.
     const kept = touchedAfter(name, startedAt);
-    const keyOf = (row) => String(row[keyPath]);
-    const removed = removedField ? rows.filter((row) => row[removedField] !== undefined && row[removedField] !== null) : [];
-    const removedKeys = new Set(removed.map(keyOf));
-    const toRecord = spec.toRecord || ((dto) => dto);
-    const records = rows.filter((row) => !removedKeys.has(keyOf(row)) && !kept.has(keyOf(row))).map((row) => toRecord(row));
+    const removedKeys = new Set(removedField
+      ? mapped.filter(({ dto }) => dto[removedField] !== undefined && dto[removedField] !== null).map(({ record }) => keyOf(record)) : []);
+    const records = mapped.map(({ record }) => record).filter((record) => !removedKeys.has(keyOf(record)) && !kept.has(keyOf(record)));
     const gone = [...removedKeys].filter((key) => !kept.has(key));
     if (changesOnly) {
       if (gone.length) await removeRows({ label, store, keys: gone, force: false });
-      if (!isCurrent()) return;
+      if (!isCurrent() || replacedAfter(name, startedAt)) return;
       const count = new Set([...storedKeys, ...records.map(keyOf)]);
       gone.forEach((key) => count.delete(key));
       const metaRow = { [keyPath]: SOURCE_META_KEY, cursor: cursor ?? meta.cursor, fullAt: meta.fullAt, count: count.size };
@@ -821,6 +834,8 @@ export function createDataService({
       const { name, decl } = local(collection);
       const keyPath = decl?.keyPath || 'id';
       if (Array.isArray(rows)) noteTouched(name, rows.filter((row) => row && typeof row === 'object').map((row) => row[keyPath]));
+      // A replacement removes rows it leaves out: a read already on its way never brings them back.
+      if (options?.replace) noteReplaced(name);
       return ingestRows(collection, rows, options);
     },
     /**

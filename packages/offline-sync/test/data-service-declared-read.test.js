@@ -119,4 +119,46 @@ describe('a declared read', () => {
     await reading;
     expect(await ids(data)).toEqual(['a', 'c']);
   });
+
+  it('keys each answered row by its record, and never takes an answer with no keyed row for an empty collection', async () => {
+    const { data } = service();
+    let answer = { rows: [{ member_id: 'a' }, { member_id: 'b' }] };
+    data.source('members', {
+      fetch: async () => answer,
+      toRecord: (dto) => ({ id: dto.member_id }),
+      read: { cursor: false },
+    });
+    await data.refresh('members', { mode: 'visible' });
+    expect(await ids(data)).toEqual(['a', 'b']);
+    // Rows that cannot be keyed: the read fails and the stored rows stay.
+    answer = { rows: [{ nothing: 1 }] };
+    await expect(data.refresh('members', { mode: 'visible' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    expect(await ids(data)).toEqual(['a', 'b']);
+  });
+
+  it('drops a read\'s answer once a replacement of the collection landed after it began', async () => {
+    const { data } = service();
+    let answer;
+    data.source('members', { fetch: () => new Promise((resolve) => { answer = resolve; }), read: { cursor: false } });
+    await data.ingest('members', [{ id: 'a' }, { id: 'b' }], { replace: true });
+    const reading = data.refresh('members', { mode: 'visible' });
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    // A whole answer from elsewhere replaces the set, leaving b out.
+    await data.ingest('members', [{ id: 'a' }], { replace: true });
+    answer({ rows: [{ id: 'a' }, { id: 'b' }] });
+    await reading;
+    expect(await ids(data)).toEqual(['a']);
+  });
+
+  it('keeps its cursor in a collection whose records a strict schema checks', async () => {
+    const schema = { type: 'object', required: ['id', 'name'], additionalProperties: false, properties: { id: { type: 'string' }, name: { type: 'string' }, updated: { type: 'string' } } };
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend(), recordSchema: schema });
+    const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: () => 1_000_000 });
+    const api = server([{ id: 'a', name: 'Ada', updated: 'c0' }]);
+    data.source('members', { fetch: api.fetch, read: { cursor: true } });
+    await data.refresh('members', { mode: 'visible' });
+    expect(await store.getRaw(SOURCE_META_KEY)).toMatchObject({ cursor: 'c1', count: 1 });
+    await data.refresh('members', { mode: 'visible' });
+    expect(api.asked).toEqual([null, 'c1']);
+  });
 });
