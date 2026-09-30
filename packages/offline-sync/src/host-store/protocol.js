@@ -1,6 +1,4 @@
 /** Closed host storage boundary; no physical names or handles cross into an MP. */
-import { utf8Bytes } from '../bytes.js';
-
 export const HOST_STORE_VERSION = 1;
 // What this engine accepts beyond version 1's open/read/commit/retire. A port
 // without a feature (an older desktop engine) is never sent its inputs.
@@ -10,6 +8,23 @@ export const MAX_ROWS = 100;
 export const MAX_READ_BYTES = 8 * 1024 * 1024;
 export const MAX_ROW_BYTES = 4 * 1024 * 1024;
 export const COMPLETE_ROWS = 1000;
+// The one UTF-8 measure every store byte budget uses (offline-sync's
+// bytes.js re-exports it): kept here, since the desktop shell vendors only
+// this directory's index, port, protocol and sqlite modules.
+const encoder = new TextEncoder();
+// Reused for the text that fits (at most three bytes a UTF-16 code unit).
+const SCRATCH_LIMIT = 1024 * 1024;
+let scratch = new Uint8Array(64 * 1024);
+/** The UTF-8 size of `text`, in bytes. */
+export function utf8Bytes(text) {
+  const string = String(text);
+  const most = string.length * 3;
+  if (most > scratch.length) {
+    if (most > SCRATCH_LIMIT) return encoder.encode(string).byteLength;
+    scratch = new Uint8Array(most);
+  }
+  return encoder.encodeInto(string, scratch).written;
+}
 // A value's UTF-8 size as stored: a string as it is, anything else as its JSON.
 export const bytes = (value) => utf8Bytes(typeof value === 'string' ? value : (JSON.stringify(value) ?? ''));
 export const integer = (value) => Number.isSafeInteger(value) && value >= 0;

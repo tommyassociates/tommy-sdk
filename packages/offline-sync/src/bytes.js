@@ -2,23 +2,13 @@
  * The one measure every byte budget of the host and MP stores uses: the size
  * of text in UTF-8, as the stores keep it and as a whole read, a held-rows
  * cache, a commit batch or a quota counts it. (Web Storage is the exception:
- * the browser charges it in UTF-16 code units, `utf16Units`.)
+ * the browser charges it in UTF-16 code units, `utf16Units`.) The UTF-8
+ * measure lives with the host store protocol, which the desktop shell
+ * vendors on its own.
  */
-const encoder = new TextEncoder();
-// Reused for the text that fits (at most three bytes a UTF-16 code unit).
-const SCRATCH_LIMIT = 1024 * 1024;
-let scratch = new Uint8Array(64 * 1024);
+import { utf8Bytes } from './host-store/protocol.js';
 
-/** The UTF-8 size of `text`, in bytes. */
-export function utf8Bytes(text) {
-  const string = String(text);
-  const most = string.length * 3;
-  if (most > scratch.length) {
-    if (most > SCRATCH_LIMIT) return encoder.encode(string).byteLength;
-    scratch = new Uint8Array(most);
-  }
-  return encoder.encodeInto(string, scratch).written;
-}
+export { utf8Bytes };
 
 /** The UTF-8 size of a value's JSON (a string is taken as JSON already). */
 export function jsonBytes(value) {
