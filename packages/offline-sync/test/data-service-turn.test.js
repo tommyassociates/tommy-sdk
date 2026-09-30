@@ -111,6 +111,51 @@ describe('scoped writes', () => {
   });
 });
 
+describe('a declared read\'s commit', () => {
+  it('keeps every row it answered in a full collection: the rows it left out go before the new ones come', async () => {
+    let clock = 1_000_000;
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend(), maxRows: 3, now: () => clock });
+    const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: () => clock, sourceMeta: createMemorySourceMeta() });
+    for (const id of ['a', 'b', 'c']) { await data.ingest('members', [{ id, v: 1 }]); clock += 1000; } // eslint-disable-line no-await-in-loop
+    data.source('members', { read: {}, fetch: async () => [{ id: 'a', v: 1 }, { id: 'b', v: 2 }, { id: 'd', v: 1 }] });
+    await data.refresh('members', { mode: 'visible' });
+    expect((await data.read('members')).map((row) => row.id).sort()).toEqual(['a', 'b', 'd']);
+  });
+
+  it('is never undone by an older window read: its rows stay, and the ones it added stay', async () => {
+    const { data } = service();
+    await data.ingest('members', [{ id: 'x', v: 1 }]);
+    let answerWindow;
+    const windowRead = data.reconcileWindow('members', { fetch: () => new Promise((resolve) => { answerWindow = resolve; }), scope: () => true });
+    await vi.waitFor(() => expect(answerWindow).toBeTypeOf('function'));
+    data.source('members', { read: {}, fetch: async () => [{ id: 'x', v: 2 }, { id: 'y', v: 1 }] });
+    await data.refresh('members', { mode: 'visible' });
+    answerWindow([{ id: 'x', v: 1 }]);
+    await windowRead;
+    const rows = await data.read('members');
+    expect(rows.map((row) => [row.id, row.v]).sort()).toEqual([['x', 2], ['y', 1]]);
+  });
+
+  it('never brings back a row an unscoped replacing ingest removed after it began', async () => {
+    const { data } = service();
+    let release = null;
+    data.source('members', {
+      read: {},
+      fetch: async () => {
+        await new Promise((resolve) => { release = resolve; });
+        return [{ id: 'a' }, { id: 'b' }];
+      },
+    });
+    const declared = data.refresh('members', { mode: 'visible' });
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+    await data.ingest('members', [{ id: 'a' }, { id: 'b' }]);
+    await data.ingest('members', [{ id: 'a' }], { replace: true });
+    release();
+    await declared;
+    expect((await data.read('members')).map((row) => row.id)).toEqual(['a']);
+  });
+});
+
 describe('a queued refresh', () => {
   it('re-checks that it is still wanted inside the turn, and commits nothing once it is not', async () => {
     let wanted = true;

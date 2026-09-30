@@ -334,13 +334,17 @@ export function createDataService({
   const touches = new Map();
   const lostTouches = new Map();
   let touchSequence = 0;
-  function noteTouched(name, keys) {
+  // `at`: the point its data is from (a declared read's start), else now.
+  function noteTouched(name, keys, at = null) {
     if (!touches.has(name)) touches.set(name, new Map());
     const seen = touches.get(name);
     keys.forEach((key) => {
-      touchSequence += 1;
+      let stamp = at;
+      if (stamp === null) { touchSequence += 1; stamp = touchSequence; }
+      // A key touched later than this keeps its later mark.
+      if ((seen.get(String(key)) || 0) > stamp) return;
       seen.delete(String(key));
-      seen.set(String(key), touchSequence);
+      seen.set(String(key), stamp);
     });
     while (seen.size > TOUCHES_KEPT) {
       const [oldest, at] = seen.entries().next().value;
@@ -353,8 +357,27 @@ export function createDataService({
   const protectionLost = (name, since) => (lostTouches.get(name) || 0) > since;
   // When a replacing ingest from outside a declared read last ran, by collection.
   const replaced = new Map();
-  function noteReplaced(name) { touchSequence += 1; replaced.set(name, touchSequence); }
+  function noteReplaced(name, at = null) {
+    let stamp = at;
+    if (stamp === null) { touchSequence += 1; stamp = touchSequence; }
+    replaced.set(name, Math.max(replaced.get(name) || 0, stamp));
+  }
   const replacedAfter = (name, since) => (replaced.get(name) || 0) > since;
+  /**
+   * What a write through a collection's turn did, recorded at its width, so
+   * a read that began before (a declared read, a keyed, query or window
+   * refresh) never undoes it: a replacement of the whole collection raises
+   * the collection-wide barrier; any other write marks the keys it changed
+   * and removed. `at`: the point its data is from (a declared read's start;
+   * a local write's is now). Every commit path records here, a declared
+   * read's own included.
+   */
+  function recordEffect(name, {
+    whole = false, changedKeys = [], removedKeys = [], at = null,
+  } = {}) {
+    if (whole) { noteReplaced(name, at); return; }
+    noteTouched(name, [...changedKeys, ...removedKeys].filter((key) => key !== undefined && key !== null), at);
+  }
   // One writer at a time per collection (see the module note); a task queued
   // after the service retired is refused. The task is given the only handles
   // that write the collection: `store`, which records each change it makes
@@ -381,21 +404,22 @@ export function createDataService({
    */
   function touching(name, store, keyPath) {
     const keyOf = (row) => (row && typeof row === 'object' ? row[keyPath] : undefined);
-    const noted = (keys) => noteTouched(name, keys.filter((key) => key !== undefined && key !== null));
+    const changed = (keys) => recordEffect(name, { changedKeys: keys });
     const writers = {
-      put: (record, ...rest) => { noted([keyOf(record)]); return store.put(record, ...rest); },
-      delete: (key, ...rest) => { noted([key]); return store.delete(key, ...rest); },
-      deleteMany: (keys, ...rest) => { noted(keys || []); return store.deleteMany(keys, ...rest); },
-      markRow: (key, ...rest) => { noted([key]); return store.markRow(key, ...rest); },
-      patchSynced: (keys, ...rest) => { noted(keys || []); return store.patchSynced(keys, ...rest); },
-      // A prune of the whole collection replaces it; a scoped one (a window,
-      // a query) records the rows it removed, and nothing else.
-      reconcile: async (records = [], options = {}) => {
-        noted(records.map(keyOf));
-        const whole = options.prune !== false && typeof options.scope !== 'function';
-        if (whole) noteReplaced(name);
+      put: (record, ...rest) => { changed([keyOf(record)]); return store.put(record, ...rest); },
+      delete: (key, ...rest) => { changed([key]); return store.delete(key, ...rest); },
+      deleteMany: (keys, ...rest) => { changed(keys || []); return store.deleteMany(keys, ...rest); },
+      markRow: (key, ...rest) => { changed([key]); return store.markRow(key, ...rest); },
+      patchSynced: (keys, ...rest) => { changed(keys || []); return store.patchSynced(keys, ...rest); },
+      // A prune with no scope (or one marked `whole`: a replacement of the
+      // whole collection) replaces it; a scoped one (a window, a query)
+      // records the rows it wrote and removed, and nothing else.
+      reconcile: async (records = [], { whole: replacesAll = false, ...options } = {}) => {
+        const whole = replacesAll === true || (options.prune !== false && typeof options.scope !== 'function');
+        changed(records.map(keyOf));
+        if (whole) recordEffect(name, { whole: true });
         const result = await store.reconcile(records, options);
-        if (!whole && Array.isArray(result?.prunedKeys)) noted(result.prunedKeys);
+        if (!whole && Array.isArray(result?.prunedKeys)) recordEffect(name, { removedKeys: result.prunedKeys });
         return result;
       },
     };
@@ -832,6 +856,8 @@ export function createDataService({
     // unsent local write.
     const stored = new Set();
     const unsaved = new Set();
+    // A replacement with no scope is of the whole collection.
+    const scoped = typeof scope === 'function';
     const upsert = async (chunk, options) => {
       const result = await store.reconcile(chunk, { ...options, keepDirty: true, ...(replace || complete === true ? {} : { syncedAt: null }) });
       const left = new Set((Array.isArray(result?.skipped) ? result.skipped : []).map(String));
@@ -842,14 +868,14 @@ export function createDataService({
       });
     };
     if (replace && rows.length <= INGEST_CHUNK) {
-      await upsert(rows, { scope: inScope });
+      await upsert(rows, scoped ? { scope: inScope } : {});
     } else {
       for (let start = 0; start < rows.length; start += INGEST_CHUNK) {
         // Chunks commit in order; each is a bounded complete set.
         // eslint-disable-next-line no-await-in-loop
         await upsert(rows.slice(start, start + INGEST_CHUNK), { prune: false });
       }
-      if (replace) await store.reconcile([], { scope: (row) => inScope(row) && !kept.has(String(row[keyPath])) });
+      if (replace) await store.reconcile([], { scope: (row) => inScope(row) && !kept.has(String(row[keyPath])), whole: !scoped });
     }
     const written = stored.size;
     // A replacing or complete ingest is a whole read: the collection is fresh.
@@ -895,6 +921,10 @@ export function createDataService({
   const READ_AGAIN = Symbol('read again');
   async function guardedRead(name, read, commit, { isCurrent = () => true } = {}) {
     for (let attempt = 0; attempt < READ_TRIES; attempt += 1) {
+      // Each read begins at its own point: what a read that began later
+      // records is later than it, and what one that began earlier records
+      // is earlier.
+      touchSequence += 1;
       const startedAt = touchSequence;
       // eslint-disable-next-line no-await-in-loop
       const answer = await read(startedAt);
@@ -1042,6 +1072,11 @@ export function createDataService({
     };
     const written = new Set();
     const unsaved = new Set();
+    // What this commit did, recorded as of the read's start (recordEffect):
+    // its written and removed keys; a whole read that completed, the whole
+    // collection.
+    const recordCommit = (whole) => recordEffect(name, whole
+      ? { whole: true, at: startedAt } : { changedKeys: [...written], removedKeys: removed, at: startedAt });
     const noteResult = (chunk, result) => {
       const left = new Set((Array.isArray(result?.skipped) ? result.skipped : []).map(String));
       const notSaved = new Set((Array.isArray(result?.unsaved) ? result.unsaved : []).map(String));
@@ -1052,15 +1087,16 @@ export function createDataService({
       });
     };
     let removed = [];
+    const stopHere = () => { recordCommit(false); return stop(); };
     if (changesOnly) {
       const touched = touchedAfter(name, startedAt);
       removed = await removeRows({ label, store: raw, keys: [...removedKeys].filter((key) => !touched.has(key) && present.has(key)), force: false });
     }
-    if (halted()) return stop();
+    if (halted()) return stopHere();
     const unchanged = (touched) => (row) => !touched.has(keyOf(row));
     if (changesOnly) {
       for (let start = 0; start < records.length; start += INGEST_CHUNK) {
-        if (halted()) return stop();
+        if (halted()) return stopHere();
         const touched = touchedAfter(name, startedAt);
         const chunk = records.slice(start, start + INGEST_CHUNK).filter(unchanged(touched));
         // Chunks commit in order.
@@ -1068,6 +1104,14 @@ export function createDataService({
         if (chunk.length) noteResult(chunk, await raw.reconcile(chunk, { prune: false, keepDirty: true }));
       }
     } else {
+      // The rows it left out go first, so the rows it answered fit beside
+      // the ones it adds, and none it answered is evicted for them.
+      const answered = new Set(records.map(keyOf));
+      const touchedBefore = touchedAfter(name, startedAt);
+      removed = await removeRows({
+        label, store: raw, keys: rows.filter((row) => !row._dirty && !answered.has(keyOf(row)) && !touchedBefore.has(keyOf(row))).map(keyOf), force: false,
+      });
+      if (halted()) return stopHere();
       // A whole read writes the rows it changed (and the unchanged ones last
       // written a day or more ago, or half the store's age limit), keeps the
       // rest as they are, and removes the rows it left out. One row is always
@@ -1089,20 +1133,15 @@ export function createDataService({
       });
       if (!toWrite.length && oldest) toWrite.push(oldest.record);
       for (let start = 0; start < toWrite.length; start += INGEST_CHUNK) {
-        if (halted()) return stop();
+        if (halted()) return stopHere();
         const touchedSince = touchedAfter(name, startedAt);
         const chunk = toWrite.slice(start, start + INGEST_CHUNK).filter(unchanged(touchedSince));
         // eslint-disable-next-line no-await-in-loop
-        if (chunk.length) noteResult(chunk, await raw.reconcile(chunk, { prune: false, keepDirty: true }));
+        if (chunk.length) noteResult(chunk, await raw.reconcile(chunk, { prune: false, keepDirty: true, protect: [...answered] }));
       }
-      if (halted()) return stop();
-      const answered = new Set(records.map(keyOf));
-      const touchedNow = touchedAfter(name, startedAt);
-      removed = await removeRows({
-        label, store: raw, keys: rows.filter((row) => !row._dirty && !answered.has(keyOf(row)) && !touchedNow.has(keyOf(row))).map(keyOf), force: false,
-      });
     }
-    if (halted()) return stop();
+    if (halted()) return stopHere();
+    recordCommit(!changesOnly);
     if (!keepsCursor) return 'stored';
     // The keys the read leaves: what it stored, and the rows it kept as
     // they were (unsent, or changed by anything else since it began); a row

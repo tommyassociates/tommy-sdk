@@ -1280,7 +1280,9 @@ export function createDataStore({
      * (its key listed in `skipped`) instead of overwriting it with the
      * server's copy.
      */
-    async reconcile(records = [], { scope, windowKey, prune = true, keepDirty = false } = {}) {
+    // `protect`: keys the row cap never evicts for this reconcile (rows a
+    // whole read answered that it did not write again).
+    async reconcile(records = [], { scope, windowKey, prune = true, keepDirty = false, protect = [] } = {}) {
       const existing = prune ? await backend.getAll() : [];
       const incoming = new Set();
       const skipped = [];
@@ -1402,7 +1404,7 @@ export function createDataStore({
       const dropped = windowKey != null
         ? await enforceWindowRetention({ current: String(windowKey), changed })
         : [];
-      const evicted = await enforceRowCap({ protect: incoming, changed });
+      const evicted = await enforceRowCap({ protect: new Set([...incoming, ...protect.map(String)]), changed });
       capSaturated = false;   // the merge changed both the row set and its dirtiness
       if (changed.size) await notify(changed);
       return {
