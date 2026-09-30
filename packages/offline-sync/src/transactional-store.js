@@ -89,7 +89,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       const previous = new Map(snapshot.rows.map((row) => [row.key, row.value]));
       const changes = transform(previous);
       if (!changes.length) return;
-      const result = await backend.commit(snapshot, changes, syncedAt === undefined ? undefined : { syncedAt });
+      const result = await backend.commit(snapshot, changes, syncedAt === undefined || syncedAt === null ? undefined : { syncedAt });
       live();
       if (result.ok !== false) return;
       if (result.reason !== 'conflict' || !retry || attempt === 2) failure(result, keys[0]);
@@ -243,7 +243,8 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       });
     },
     /**
-     * Server rows, stored synced. `prune: false` only upserts; otherwise rows
+     * Server rows, stored synced (`syncedAt: null` stores them without
+     * stamping the collection synced). `prune: false` only upserts; otherwise rows
      * in `scope` (every row without one) that the set leaves out are removed,
      * dirty rows never. Upserts commit in bounded batches, not one per row.
      * `keepDirty: true` leaves a row with an unsent local write as it is

@@ -543,15 +543,33 @@ export interface DataApi {
    * names are the declared store names (or `mp.<mpId>.<store>`); any other
    * namespace is refused.
    */
-  read?<Rec = unknown>(collection: string, key?: string | readonly string[]): Promise<Rec | Rec[] | null>;
+  /** `raw: true` reads the whole collection as writers see it, rows too old to paint included. */
+  read?<Rec = unknown>(collection: string, key?: string | readonly string[] | null, options?: { raw?: boolean }): Promise<Rec | Rec[] | null>;
   query?<Rec = unknown>(collection: string, spec?: DataQuerySpec<Rec>): Promise<{ rows: Rec[]; nextCursor: string | null; complete: boolean }>;
   subscribe?<Value = unknown>(target: DataTarget, callback: (value: Value) => void, options?: { onError?: (error: unknown) => void }): () => void;
+  /**
+   * @experimental No MP uses a source yet and its outbox is unfinished
+   * (retries, refusals, forced removals across services). Use `ingest`.
+   */
   source?<Dto = unknown, Rec = unknown>(collection: string, spec: DataSource<Dto, Rec>): () => void;
+  /** @experimental Runs a collection's `source`; see `source`. */
   refresh?(target: DataTarget, options?: DataRefreshOptions): Promise<DataStatus>;
+  /**
+   * @experimental An optimistic write pushed through a source's `push`; its
+   * outbox is unfinished (see `source`). Write rows with `store(...).put`.
+   */
   mutate?<Rec = unknown>(collection: string, command: DataMutation<Rec>, options?: { wait?: boolean }): Promise<{ key: string; pushed: boolean }>;
-  /** Server rows the MP received, stored synced; `replace` makes them the complete set for `scope`. */
-  ingest?<Rec = unknown>(collection: string, rows: readonly Rec[], options?: { replace?: boolean; scope?: (row: Rec) => boolean }): Promise<{ written: number }>;
-  /** All cached rows, or only `keys`, or every row of an index range; dirty rows only with `force`. */
+  /**
+   * Server rows the MP received, stored synced; `replace` makes them the
+   * complete set for `scope`. Only a replacing ingest, or one marked
+   * `complete` (rows a complete read delivered), stamps the collection synced.
+   */
+  ingest?<Rec = unknown>(collection: string, rows: readonly Rec[], options?: { replace?: boolean; complete?: boolean; scope?: (row: Rec) => boolean }): Promise<{ written: number }>;
+  /**
+   * All cached rows, or only `keys`, or every row of an index range; dirty
+   * rows only with `force`. Any other option, or one of another shape, is
+   * refused with `DATA_INVALID`.
+   */
   purge?(collection: string, options?: { force?: boolean; keys?: readonly string[]; query?: DataIndexRange }): Promise<{ removed: string[] }>;
   /** Keeps the newest `keep` rows of an index range; dirty rows are never removed. */
   trim?(collection: string, options: DataIndexRange & { keep: number }): Promise<{ removed: string[] }>;
@@ -577,6 +595,8 @@ export interface DataQuerySpec<Rec = unknown> {
   readonly limit?: number;
   readonly cursor?: string | null;
   readonly where?: (row: Rec) => boolean;
+  /** Answer as writers see the collection: rows too old to paint included. */
+  readonly raw?: boolean;
 }
 export interface DataSource<Dto = unknown, Rec = unknown> {
   fetch(target: { collection: string; key?: string; window?: Record<string, unknown> }): Promise<Dto[] | Dto | null>;
@@ -584,9 +604,10 @@ export interface DataSource<Dto = unknown, Rec = unknown> {
   keyOf?(dto: Dto): string;
   scope?(target: { collection: string; window?: Record<string, unknown> }): (row: Rec) => boolean;
   /**
-   * Sends one local change; changes to a row arrive in order. A change left
-   * unsent by an earlier page or reload arrives as a `put` of the stored row,
-   * and a change may arrive again after a failure, so a push must be idempotent.
+   * @experimental Sends one local change; changes to a row arrive in order. A
+   * change left unsent by an earlier page or reload arrives as a `put` of the
+   * stored row, and a change may arrive again after a failure, so a push must
+   * be idempotent. Its outbox is unfinished; see `DataApi.source`.
    */
   push?(command: DataMutation<Rec>, record: Rec | null): Promise<unknown>;
 }

@@ -4,12 +4,17 @@
  *   read(collection, key?)            rows as stored (the paint ceiling applies)
  *   query(collection, spec)           rows by a declared index, in index order
  *   subscribe(target, callback)       the current value now, then on every change
- *   refresh(target, options)          a scheduled, coalesced background sync
+ *   refresh(target, options)          a scheduled, coalesced background sync (experimental)
  *   ingest(collection, rows, options) server rows a domain received, stored synced
- *   mutate(collection, command)       an optimistic write, pushed when possible
+ *   mutate(collection, command)       an optimistic write, pushed when possible (experimental)
  *   purge(collection, options)        clear cached rows (never dirty ones unless forced)
  *   trim(collection, options)         keep a subject's newest rows by index order
  *   status(target)                    fresh | stale | refreshing | offline | error
+ *
+ * `source`, `refresh` and `mutate` with a source's `push` are experimental:
+ * no host collection or MP uses them yet, and their outbox (retries, refusals,
+ * forced removals across services) is not finished. Use `ingest`, `read`,
+ * `query`, `subscribe`, `purge` and `trim`.
  *
  * The host builds one over its domain collections (`<domain>.<collection>`);
  * an MP's DataApi builds one over its own manifest stores, confined to
@@ -483,7 +488,9 @@ export function createDataService({
      * scope that the set leaves out are removed, dirty rows never, and the
      * collection is fresh. Resolves `{ written }`, the rows stored.
      */
-    async ingest(collection, rows, { replace = false, scope = null } = {}) {
+    // A replacing ingest, or one of rows a complete read delivered
+    // (`complete`), stamps the collection synced; any other does not.
+    async ingest(collection, rows, { replace = false, scope = null, complete = false } = {}) {
       live();
       const { name, store, decl } = local(collection);
       if (!Array.isArray(rows)) throw serviceError('ingest: rows must be an array', 'DATA_INVALID');
@@ -498,7 +505,7 @@ export function createDataService({
       // unsent local write.
       const stored = new Set();
       const upsert = async (chunk, options) => {
-        const result = await store.reconcile(chunk, { ...options, keepDirty: true });
+        const result = await store.reconcile(chunk, { ...options, keepDirty: true, ...(replace || complete === true ? {} : { syncedAt: null }) });
         const left = new Set((Array.isArray(result?.skipped) ? result.skipped : []).map(String));
         chunk.filter(isAccepted).forEach((row) => { if (!left.has(String(row[keyPath]))) stored.add(String(row[keyPath])); });
       };
@@ -604,8 +611,17 @@ export function createDataService({
      * fields are refused). Dirty rows stay unless `force`; a forced removal
      * drops their unsent changes, in this tab and in other tabs.
      */
-    async purge(collection, { force = false, keys = null, query = null } = {}) {
+    async purge(collection, options = {}) {
       live();
+      // Only the options it knows, in the shapes it reads: a misspelt or
+      // malformed option is refused rather than clear the whole collection.
+      const invalid = !options || typeof options !== 'object' || Array.isArray(options)
+        || Object.keys(options).some((field) => !['force', 'keys', 'query'].includes(field))
+        || (options.force !== undefined && typeof options.force !== 'boolean')
+        || (options.keys !== undefined && options.keys !== null && !Array.isArray(options.keys))
+        || (options.query !== undefined && options.query !== null && (typeof options.query !== 'object' || Array.isArray(options.query)));
+      if (invalid) throw serviceError('purge: options are force, keys (an array) and query (an index range)', 'DATA_INVALID');
+      const { force = false, keys = null, query = null } = options;
       const { store, decl } = local(collection);
       const keyPath = decl?.keyPath || 'id';
       let entries;

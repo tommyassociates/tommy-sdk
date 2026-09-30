@@ -255,6 +255,17 @@ describe('MP data API confinement', () => {
     await expect(data.ingest('chats.messages', [{ id: 'x' }])).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
     await expect(data.trim('mp.time-clock.shifts', { index: 'by_day', keep: 1 })).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
   });
+  it('refuses purge options it does not know or cannot read, removing nothing', async () => {
+    const data = memoryService();
+    await data.ingest('chats.messages', [{ id: 'a', chat_id: 7, seq: 1 }, { id: 'b', chat_id: 7, seq: 2 }]);
+    await expect(data.purge('chats.messages', { key: 'a' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.purge('chats.messages', { keys: 'a' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.purge('chats.messages', { query: 'byChat' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.purge('chats.messages', { force: 'yes' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['a', 'b']);
+    await expect(data.purge('chats.messages', { keys: ['a'] })).resolves.toEqual({ removed: ['a'] });
+  });
+
   it('reads a whole collection raw, past the paint ceiling', async () => {
     let clock = Date.parse('2026-09-01T00:00:00Z');
     const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), now: () => clock });
@@ -388,6 +399,21 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     const listed = (await port.inspect({ op: 'stores', selector: { authorityOrigin: 'https://api.example.test', viewerId: '7' } })).stores[0];
     expect(listed.syncedAt).toEqual(expect.any(Number));
     feedA.close(); feedB.close(); await database.close();
+  });
+
+  it('stamps a collection synced only when a complete set arrives, never on a partial one', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+    const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(port, null, options) });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    const syncedAt = async () => (await port.inspect({ op: 'stores', selector: { authorityOrigin: 'https://api.example.test', viewerId: '7' } })).stores[0]?.syncedAt ?? null;
+    await data.ingest('chats.messages', [{ id: 'a', chat_id: 7, seq: 1 }]);
+    expect(await syncedAt()).toBeNull();
+    await data.ingest('chats.messages', [{ id: 'b', chat_id: 7, seq: 2 }], { replace: true });
+    expect(await syncedAt()).toEqual(expect.any(Number));
+    await database.close();
   });
 
   it('drops a change another tab queued for a row this tab force-purges', async () => {
