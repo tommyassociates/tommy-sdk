@@ -1663,6 +1663,12 @@ export function createDataService({
       const whole = !Array.isArray(keys) && !query;
       // Listed and removed in the collection's turn.
       return inTurn(name, async (turn) => {
+        // A barrier as wide as the purge, whatever it finds to remove: every
+        // read begun before it stores nothing of the keys it names, or (a
+        // whole or range purge) nothing at all, so a row it purged, or one
+        // not held yet, never arrives after it.
+        if (Array.isArray(keys)) recordEffect(name, { changedKeys: keys.map(String) });
+        else recordEffect(name, { whole: true });
         let entries;
         if (Array.isArray(keys)) {
           entries = (await Promise.all(keys.map((key) => store.getRaw(String(key))))).filter(Boolean)

@@ -108,6 +108,32 @@ describe('a declared read', () => {
     expect(data.status('members').state).toBe('error');
   });
 
+  it.each([
+    ['a keyed read of a row not held', { collection: 'members', key: 'x' }],
+    ['a window read', null],
+  ])('stores and tells nothing of %s begun before the server refused the collection', async (_label, target) => {
+    const { data } = service();
+    let answer;
+    const pending = () => new Promise((resolve) => { answer = resolve; });
+    data.source('members', {
+      fetch: (wanted) => (wanted?.key ? pending() : Promise.reject(Object.assign(new Error('Forbidden'), { status: 403 }))),
+      read: {},
+    });
+    const heard = [];
+    data.subscribe({ collection: 'members', key: 'x' }, (row) => heard.push(row));
+    const older = target
+      ? data.refresh(target, { mode: 'visible' })
+      : data.reconcileWindow('members', { fetch: pending, scope: () => true });
+    await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
+    // Another read is refused: the account lost the collection.
+    await data.refresh('members', { mode: 'visible' }).catch(() => {});
+    answer(target ? { id: 'x', name: 'Not theirs' } : [{ id: 'x', name: 'Not theirs' }]);
+    await Promise.resolve(older).catch(() => {});
+    await new Promise((resolve) => { setTimeout(resolve, 10); });
+    expect(await data.read('members', 'x')).toBeNull();
+    expect(heard.filter(Boolean)).toEqual([]);
+  });
+
   it('never undoes a change stored after the read began: an added row stays, a removed row stays removed', async () => {
     const { data } = service();
     let answer;
