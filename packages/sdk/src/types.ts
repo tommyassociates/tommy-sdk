@@ -525,9 +525,32 @@ export interface DataStore<Rec = unknown> {
   subscribeQuery<V>(selector: Selector<Rec, V>, handler: (value: V) => void): Unsubscribe;
 }
 
+/**
+ * A read-only view of a host collection (host API level 5): the MP world's
+ * own account's rows, as the collection's projection shows them. Readable only
+ * when the host exposes the collection and the MP declares and holds the scope
+ * it names (`DATA_FORBIDDEN` otherwise, checked at every call, when an answer
+ * settles and before every delivery); `DATA_UNDECLARED` for a collection the
+ * host does not expose. While the world's account is not displayed, reads
+ * refuse with `ACCOUNT_NOT_DISPLAYED` (retryable) and a subscription holds its
+ * latest rows until the account is displayed again.
+ */
+export interface HostCollection<Rec = unknown> {
+  /** Every row, one by key, or several by keys (null where none). */
+  read(key?: string | readonly string[] | null): Promise<Rec | Rec[] | (Rec | null)[] | null>;
+  query(spec?: DataQuerySpec<Rec>): Promise<{ rows: Rec[]; nextCursor: string | null; complete: boolean }>;
+  /** The rows now, then on every change while the account is displayed. */
+  subscribe(callback: (rows: Rec[]) => void, options?: { onError?: (error: unknown) => void }): () => void;
+  status(): DataStatus;
+  /** Asks the host to read the collection again; never more often than the host's declared freshness. */
+  refresh(options?: { maxAge?: number }): Promise<DataStatus>;
+}
+
 export interface DataApi {
   /** Open one of the object stores declared in manifest.localData. */
   store<Rec = unknown>(name: string): DataStore<Rec>;
+  /** Host API level 5: a host collection the host exposes to MPs (e.g. `workforce.members`, scope `read:team_members`). */
+  host?<Rec = unknown>(collection: string): HostCollection<Rec>;
   /** Sync status for a store, for stale-while-revalidate UX + the brownout contract. */
   syncState(storeName: string): {
     lastSyncedAt: Iso8601 | null;
