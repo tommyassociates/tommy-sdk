@@ -2,7 +2,7 @@
 export const HOST_STORE_VERSION = 1;
 // What this engine accepts beyond version 1's open/read/commit/retire. A port
 // without a feature (an older desktop engine) is never sent its inputs.
-export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at', 'schema-fingerprint', 'aged-reads']);
+export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at', 'schema-fingerprint', 'aged-reads', 'unique-indexes']);
 export const HOST_STORE_DATABASE = 'tommy-host-store-v2';
 export const MAX_ROWS = 100;
 export const MAX_READ_BYTES = 8 * 1024 * 1024;
@@ -127,7 +127,7 @@ export function ownerKey(identity) {
   return JSON.stringify([identity.authorityOrigin, identity.viewerId, identity.accountType, identity.accountId, identity.subjectKey]);
 }
 export function validateOpen(input) {
-  if (!closed(input, ['identity', 'storeName', 'policy', 'schemaVersion', 'cacheFingerprint', 'limits'], ['indexes', 'schemaFingerprint'])
+  if (!closed(input, ['identity', 'storeName', 'policy', 'schemaVersion', 'cacheFingerprint', 'limits'], ['indexes', 'unique', 'schemaFingerprint'])
     || (input.schemaFingerprint !== undefined && input.schemaFingerprint !== null
       && (typeof input.schemaFingerprint !== 'string' || !input.schemaFingerprint || input.schemaFingerprint.length > 128))
     || !storeNameValid(input.storeName)
@@ -144,8 +144,13 @@ export function validateOpen(input) {
   const evict = input.limits.evict || 'none';
   if (evict === 'lru' && input.policy !== 'cache') throw storageError('unserializable');
   if ((input.limits.domainMaxBytes ?? null) !== null && (evict !== 'lru' || !input.storeName.includes('.'))) throw storageError('unserializable');
+  const indexes = validateIndexes(input.indexes);
+  // Unique indexes name declared indexes: no two rows hold the same value.
+  const unique = input.unique === undefined || input.unique === null ? [] : input.unique;
+  if (!Array.isArray(unique) || !unique.every((name) => typeof name === 'string' && Object.hasOwn(indexes, name))
+    || new Set(unique).size !== unique.length) throw storageError('unserializable');
   return { namespace: JSON.stringify([identityKey(input.identity), input.storeName]), owner: ownerKey(input.identity),
-    indexes: validateIndexes(input.indexes), evict, domainMaxBytes: input.limits.domainMaxBytes ?? null };
+    indexes, unique: [...unique].sort(), evict, domainMaxBytes: input.limits.domainMaxBytes ?? null };
 }
 export function validateRead(input) {
   if (!closed(input, ['handle', 'expectedEpoch'], ['keys', 'afterKey', 'limit', 'metadataOnly', 'includeAged'])

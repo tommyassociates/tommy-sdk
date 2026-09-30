@@ -14,12 +14,13 @@ import { MIGRATION_LEASE_MS } from '../src/host-store/port.js';
 import { DATABASES, identity, createChannelBus } from './helpers/host-databases.js';
 
 const SELECTOR = { authorityOrigin: 'https://api.example.test', viewerId: '7' };
-function openInput({ storeName = 'chats.rows', policy = 'cache', schemaVersion = 1, indexes, limits = {}, who = identity(), schemaFingerprint } = {}) {
+function openInput({ storeName = 'chats.rows', policy = 'cache', schemaVersion = 1, indexes, unique, limits = {}, who = identity(), schemaFingerprint } = {}) {
   return {
     identity: who, storeName, policy, schemaVersion,
     cacheFingerprint: policy === 'authored' ? null : 'fp-1',
     limits: { maxRows: 1000, maxAgeMs: policy === 'authored' ? null : 86400000, maxBytes: null, ...limits },
     ...(indexes ? { indexes } : {}),
+    ...(unique ? { unique } : {}),
     ...(schemaFingerprint !== undefined ? { schemaFingerprint } : {}),
   };
 }
@@ -406,6 +407,19 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     expect((await rows.query({ index: 'byN', includeAged: true })).rows.map((row) => row.key)).toEqual(['1', '2']);
     expect((await rows.query({ index: 'byN' })).rows.map((row) => row.key)).toEqual(['2']);
     await expect(port.read({ handle: rows.handle, expectedEpoch: rows.epoch, afterKey: null, limit: 10, includeAged: 'yes' })).resolves.toMatchObject({ ok: false, reason: 'unserializable' });
+  });
+
+  it('keeps a unique index unique: a second row with the same value is refused, a swap in one commit is not', async () => {
+    const { open, stores } = await setup(create);
+    const codes = await open({ storeName: 'drafts', policy: 'authored', indexes: { byCode: 'code' }, unique: ['byCode'] });
+    await expect(codes.put([{ id: 'a', code: 'X1', _dirty: true }, { id: 'b', code: 'X2', _dirty: true }])).resolves.toMatchObject({ ok: true });
+    await expect(codes.put([{ id: 'c', code: 'X1', _dirty: true }])).resolves.toMatchObject({ ok: false, reason: 'constraint' });
+    // A row keeps its own value, and two rows can trade theirs in one commit.
+    await expect(codes.put([{ id: 'a', code: 'X1', note: 'edited', _dirty: true }])).resolves.toMatchObject({ ok: true });
+    await expect(codes.put([{ id: 'a', code: 'X2', _dirty: true }, { id: 'b', code: 'X1', _dirty: true }])).resolves.toMatchObject({ ok: true });
+    // Rows without the value are not held to it.
+    await expect(codes.put([{ id: 'd', _dirty: true }, { id: 'e', _dirty: true }])).resolves.toMatchObject({ ok: true });
+    expect((await stores()).find((row) => row.label === 'drafts')).toMatchObject({ indexes: ['byCode'], unique: ['byCode'] });
   });
 
   it('forgets handles once they are closed or retired, however many opens came before', async () => {

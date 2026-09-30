@@ -184,6 +184,27 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
     if (total > store.domainMaxBytes) throw storageError('quota');
     return own;
   }
+  // After a commit's writes: every value a written row holds in a unique
+  // index belongs to that row alone (a value no field of which is set is
+  // not held to it). Checked once all writes landed, so rows may trade
+  // values in one commit.
+  async function checkUnique(tx, store, plans) {
+    const names = store.unique || [];
+    if (!names.length) return;
+    const [owner, namespace] = store.key;
+    for (const { change } of plans) {
+      if (change.op !== 'put') continue;
+      for (const name of names) {
+        const fields = storeIndexes(store)[name];
+        if (!fields || fields.some((field) => change.value[field] === undefined || change.value[field] === null)) continue;
+        const encoded = indexedValues(fields, change.value);
+        if (encoded === null) continue;
+        const head = indexEntry(name, encoded, '');
+        const entries = await tx.scan('rows', prefix(owner, namespace, store.generation, INDEX), { after: head, limit: 2 });
+        if (entries.some((entry) => entry.key[4].startsWith(head) && entry.target !== change.key)) throw storageError('constraint');
+      }
+    }
+  }
   // Cache rows older than the store's age limit are left out, unless the
   // reader is a writer deciding what to remove (`includeAged`).
   async function readRows(tx, handle, store, metadata, { limit, keyed, metadataOnly, cursorOf, includeAged = false }) {
@@ -265,7 +286,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
       accountType: identity.accountType, accountId: identity.accountId, tenantId: identity.tenantId,
       schemaVersion: store.schemaVersion, rowCount: store.rowCount, bytes: store.bytes,
       dirtyCount: store.dirtyCount ?? null, touchedAt: store.touchedAt ?? null, syncedAt: store.syncedAt ?? null,
-      evict: store.evict || 'none', indexes: Object.keys(store.indexes || {}), migrating: !!store.migration,
+      evict: store.evict || 'none', indexes: Object.keys(store.indexes || {}), unique: [...(store.unique || [])], migrating: !!store.migration,
     };
   }
   const port = {
@@ -286,7 +307,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
           if (siblings.some((row) => JSON.stringify(row.key) !== JSON.stringify(key))) throw storageError('unserializable');
         }
         const label = namespaceLabel({ mpId: input.identity.mpId, storeName: input.storeName, policy: input.policy });
-        const declared = { indexes: identity.indexes, evict: identity.evict, domainMaxBytes: identity.domainMaxBytes, label, domain: labelDomain(label) };
+        const declared = { indexes: identity.indexes, unique: identity.unique, evict: identity.evict, domainMaxBytes: identity.domainMaxBytes, label, domain: labelDomain(label) };
         let store = await tx.get('stores', key);
         let migration = null;
         // The declared schema (key, indexes, record schema, version) as the
@@ -302,7 +323,8 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
           await scanMetadata(tx, store, (metadata) => { if (metadata.dirty) dirty += 1; });
           store.dirtyCount = dirty;
         }
-        const reshaped = store && (!same(store.indexes || {}, declared.indexes) || (store.evict || 'none') !== declared.evict);
+        const reshaped = store && (!same(store.indexes || {}, declared.indexes) || !same(store.unique || [], declared.unique)
+          || (store.evict || 'none') !== declared.evict);
         const schemaChanged = !!store && schemaFingerprint !== null && (store.schemaFingerprint ?? null) !== null
           && store.schemaFingerprint !== schemaFingerprint;
         const versionChanged = !!store && store.schemaVersion !== input.schemaVersion;
@@ -458,6 +480,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
             const { dirty } = await writeRow(tx, store, store.generation, change, old, { syncedAt: input.syncedAt });
             dirtyCount += (dirty ? 1 : 0) - (old?.dirty ? 1 : 0);
           }
+          await checkUnique(tx, store, plans);
           if (handle.closed) throw storageError('retired');
           store.rowCount = rowCount;
           store.bytes = totalBytes;
@@ -498,7 +521,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
         const store = await current(tx, handle, input.expectedEpoch, { migrating: true });
         const [owner, namespace] = store.key;
         const declaredShape = validateOpen(handle.options);
-        const target = { ...store, indexes: declaredShape.indexes, evict: declaredShape.evict };
+        const target = { ...store, indexes: declaredShape.indexes, unique: declaredShape.unique, evict: declaredShape.evict };
         if (input.phase === 'begin') {
           const held = store.migration;
           if (held && held.token !== handle.migrationToken && (held.leaseUntil ?? 0) > now()) throw storageError('busy');
@@ -533,7 +556,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
           return { ok: true };
         }
         await tx.deletePrefix('rows', [owner, namespace, store.generation]);
-        const done = { ...store, generation, schemaVersion: store.migration.to, indexes: target.indexes, rowCount: store.migration.rowCount,
+        const done = { ...store, generation, schemaVersion: store.migration.to, indexes: target.indexes, unique: target.unique, rowCount: store.migration.rowCount,
           bytes: store.migration.bytes, dirtyCount: store.migration.dirtyCount, revision: next(store.revision), migration: null, touchedAt: now(),
           ...(store.policy === 'authored' ? {} : { fingerprint: handle.options.cacheFingerprint }),
           ...(handle.options.schemaFingerprint != null ? { schemaFingerprint: handle.options.schemaFingerprint } : {}),
