@@ -393,6 +393,21 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     expect((await stores()).find((row) => row.policy === 'authored').rowCount).toBe(0);
   });
 
+  it('leaves rows past the age limit out of reads, and gives them to a writer that asks', async () => {
+    const { port, open, tick } = await setup(create);
+    const rows = await open({ indexes: { byN: 'n' } });
+    await rows.put([{ id: 1, n: 1 }, { id: 2, n: 2, _dirty: true }]);
+    tick(86400000 + 1);
+    expect(await rows.all()).toEqual([{ id: 2, n: 2, _dirty: true }]);
+    const aged = await port.read({ handle: rows.handle, expectedEpoch: rows.epoch, afterKey: null, limit: 10, includeAged: true });
+    expect(aged.rows.map((row) => row.key)).toEqual(['1', '2']);
+    const keyed = await port.read({ handle: rows.handle, expectedEpoch: rows.epoch, keys: ['1'], includeAged: true });
+    expect(keyed.rows.map((row) => row.key)).toEqual(['1']);
+    expect((await rows.query({ index: 'byN', includeAged: true })).rows.map((row) => row.key)).toEqual(['1', '2']);
+    expect((await rows.query({ index: 'byN' })).rows.map((row) => row.key)).toEqual(['2']);
+    await expect(port.read({ handle: rows.handle, expectedEpoch: rows.epoch, afterKey: null, limit: 10, includeAged: 'yes' })).resolves.toMatchObject({ ok: false, reason: 'unserializable' });
+  });
+
   it('keeps open handles usable after a forced clear, and drops a rebuild in progress', async () => {
     const { port, open, stores } = await setup(create);
     const drafts = await open({ storeName: 'drafts', policy: 'authored' });

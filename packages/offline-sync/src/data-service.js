@@ -342,8 +342,9 @@ export function createDataService({
 
   const service = {
     namespace,
-    // `raw` reads the whole collection past the paint ceiling (rows too old
-    // to paint included), for a caller checking what it painted.
+    // `raw` reads the whole collection as writers see it: rows past the paint
+    // ceiling and the store's age limit included, for a caller checking what
+    // it painted or deciding what to remove.
     async read(collection, key, { raw = false } = {}) {
       live();
       const { store } = local(collection);

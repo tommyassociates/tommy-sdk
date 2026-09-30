@@ -371,8 +371,9 @@ export function createDataManager({
        * would otherwise reopen and paint a confident, wrong fortnight-old
        * surface — which on a compliance or roster screen is worse than an empty
        * one, because nothing on it says it is old. Rows past the ceiling are not
-       * PAINTED; they are still stored, and the store's own TTL evicts them at
-       * open. A `_dirty` row is exempt: it is a local write that has not reached
+       * PAINTED; they are still stored until a sync replaces or prunes them,
+       * a purge removes them or the store evicts them, and writers still see
+       * them. A `_dirty` row is exempt: it is a local write that has not reached
        * the server, and its age is not a reason to hide it from its author.
        *
        * ⚠ THE CEILING IS APPLIED BY `DataStore.readWhere`, NOT HERE. The manager

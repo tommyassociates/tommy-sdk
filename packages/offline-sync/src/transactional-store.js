@@ -85,7 +85,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     for (let attempt = 0; attempt < (retry ? 3 : 1); attempt += 1) {
       live();
       let snapshot;
-      try { snapshot = await backend.snapshot(keys); } catch (error) { failure({ reason: error.reason || 'read-failed', retained: false }, keys[0]); }
+      try { snapshot = await backend.snapshot(keys, { aged: true }); } catch (error) { failure({ reason: error.reason || 'read-failed', retained: false }, keys[0]); }
       const previous = new Map(snapshot.rows.map((row) => [row.key, row.value]));
       const changes = transform(previous);
       if (!changes.length) return;
@@ -101,10 +101,11 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
   // Once a collection needed pages, later reads go straight to pages until
   // one returns at most half a complete read. Past WHOLE_READ_ROWS a caller
   // reads by index or scan instead.
+  // `aged` (writers) includes rows past the backend's age limit.
   let paged = false;
-  async function wholeRows() {
+  async function wholeRows({ aged = false } = {}) {
     if (!paged || typeof backend.page !== 'function') {
-      try { return await backend.getAll(); } catch (error) {
+      try { return await backend.getAll({ aged }); } catch (error) {
         if (error?.reason !== 'scan-required' || typeof backend.page !== 'function') throw error;
       }
     }
@@ -117,7 +118,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       do {
         // Each page continues from the one before it.
         // eslint-disable-next-line no-await-in-loop
-        const page = await backend.page({ afterKey, limit: 100 });
+        const page = await backend.page({ afterKey, limit: 100, aged });
         live();
         if (fence && (page.epoch !== fence.epoch || page.storeRevision !== fence.revision)) { moved = true; break; }
         fence = { epoch: page.epoch, revision: page.storeRevision };
@@ -162,7 +163,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       || !Object.hasOwn(options, 'cursor') || !Number.isInteger(options.limit) || options.limit < 1 || options.limit > 100) throw new StorageReadError('unserializable');
     const held = options.cursor === null ? null : cursors.get(options.cursor);
     if (options.cursor !== null && (!held || held.raw !== raw)) throw new StorageReadError('retired');
-    const result = await backend.page({ afterKey: held?.afterKey || null, limit: options.limit });
+    const result = await backend.page({ afterKey: held?.afterKey || null, limit: options.limit, aged: raw });
     live();
     if (held && (result.epoch !== held.epoch || result.storeRevision !== held.revision)) { cursors.delete(options.cursor); throw new StorageReadError('conflict'); }
     if (options.cursor !== null) cursors.delete(options.cursor);
@@ -179,9 +180,9 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     name,
     validateRecord,
     async get(key) { live(); const row = await backend.get(keyString(key)); live(); return paintable(row) ? copy(row) : undefined; },
-    async getRaw(key) { live(); const row = await backend.get(keyString(key)); live(); return copy(row); },
+    async getRaw(key) { live(); const row = await backend.get(keyString(key), { aged: true }); live(); return copy(row); },
     async getAll() { live(); const rows = await wholeRows(); live(); return rows.filter(paintable).map(copy); },
-    async getAllRaw() { live(); const rows = await wholeRows(); live(); return rows.map(copy); },
+    async getAllRaw() { live(); const rows = await wholeRows({ aged: true }); live(); return rows.map(copy); },
     async readWhere(predicate = () => true) { return (await api.getAll()).filter(predicate).map(strip); },
     /** What `readWhere(predicate)` would answer, from rows a subscriber was just given. */
     selectFrom(rows, predicate = () => true) { return (rows || []).filter(paintable).filter(predicate).map(strip); },
@@ -280,7 +281,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         let afterKey = null;
         let pruned = 0;
         do {
-          const page = await backend.page({ afterKey, limit: 100 });
+          const page = await backend.page({ afterKey, limit: 100, aged: true });
           const changes = page.rows.filter(({ key, value }) => !value._dirty && !incoming.has(key)
             && ((!scope || scope(value)) || (value._window != null && !retainedWindows.has(value._window) && windows.has(value._window))))
             .map(({ key }) => ({ op: 'delete', key }));
@@ -297,13 +298,14 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     },
     // Rows by a secondary index, in index order: the physical index where the
     // store opened with it, else the declared index over the complete row set.
-    // `raw: true` includes rows past the paint ceiling, for writers.
+    // `raw: true` includes rows past the paint ceiling and the backend's age
+    // limit, for writers.
     async query(index, range = {}, { limit = 50, cursor = null, raw = false } = {}) {
       live();
       const visible = (row) => raw || paintable(row);
       const physical = typeof backend.query === 'function' && (!Array.isArray(backend.indexes) || backend.indexes.includes(index));
       if (physical) {
-        const result = await backend.query({ index, ...range, limit, afterKey: cursor });
+        const result = await backend.query({ index, ...range, limit, afterKey: cursor, ...(raw ? { aged: true } : {}) });
         live();
         return { rows: result.rows.map((row) => row.value).filter(visible).map(copy), nextCursor: result.nextKey, complete: result.nextKey === null };
       }

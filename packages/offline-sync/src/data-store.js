@@ -875,9 +875,11 @@ export function createDataStore({
       return (await snapshot()).filter(paintable);
     },
     /**
-     * The WRITERS' view: every row, ceiling and all. A writer building a merge
-     * map (`prevById`) or reconciling must see rows it may not paint, or it will
-     * delete or duplicate what it cannot see.
+     * The WRITERS' view: every row, past the paint ceiling and the host
+     * store's age limit too. A writer building a merge map (`prevById`),
+     * reconciling or deciding what to purge must see rows it may not paint, or
+     * it will delete or duplicate what it cannot see, or leave behind what it
+     * reports removed.
      */
     async getAllRaw() {
       return snapshot();

@@ -177,7 +177,9 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
     if (total > store.domainMaxBytes) throw storageError('quota');
     return own;
   }
-  async function readRows(tx, handle, store, metadata, { limit, keyed, metadataOnly, cursorOf }) {
+  // Cache rows older than the store's age limit are left out, unless the
+  // reader is a writer deciding what to remove (`includeAged`).
+  async function readRows(tx, handle, store, metadata, { limit, keyed, metadataOnly, cursorOf, includeAged = false }) {
     const result = { epoch: handle.epoch, storeRevision: store.revision, rows: [], nextKey: null };
     const included = [];
     let scanned = 0;
@@ -186,7 +188,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
     for (const row of metadata) {
       if (scanned >= limit) break;
       if (!row) { scanned += 1; continue; }
-      if (handle.options.policy !== 'authored' && !row.dirty && handle.options.limits.maxAgeMs !== null
+      if (!includeAged && handle.options.policy !== 'authored' && !row.dirty && handle.options.limits.maxAgeMs !== null
         && row.updatedAt + handle.options.limits.maxAgeMs <= now()) {
         scanned += 1;
         lastScanned = cursorOf(row);
@@ -342,7 +344,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
           const metadata = input.keys ? (await getMany(tx, 'rows', input.keys.map((key) => rowKey(handle.owner, handle.namespace, store.generation, META, key)))).filter(Boolean)
             : await tx.scan('rows', prefix(handle.owner, handle.namespace, store.generation, META), { after: input.afterKey, limit: input.limit + 1 });
           const result = await readRows(tx, handle, store, metadata, { limit: input.keys ? MAX_ROWS : input.limit, keyed: !!input.keys,
-            metadataOnly: !!input.metadataOnly, cursorOf: (row) => row.id });
+            metadataOnly: !!input.metadataOnly, cursorOf: (row) => row.id, includeAged: input.includeAged === true });
           if (handle.closed) throw storageError('retired');
           return result;
         });
@@ -394,7 +396,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
           const metadata = await getMany(tx, 'rows', entries.map((entry) => rowKey(handle.owner, handle.namespace, store.generation, META, entry.target)));
           const ordered = entries.map((entry, index) => metadata[index] && { ...metadata[index], cursor: entry.key[4] });
           const result = await readRows(tx, handle, store, ordered, { limit: input.limit, keyed: false, metadataOnly: false,
-            cursorOf: (row) => row.cursor });
+            cursorOf: (row) => row.cursor, includeAged: input.includeAged === true });
           if (handle.closed) throw storageError('retired');
           return result;
         });

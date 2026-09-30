@@ -2,7 +2,7 @@
 export const HOST_STORE_VERSION = 1;
 // What this engine accepts beyond version 1's open/read/commit/retire. A port
 // without a feature (an older desktop engine) is never sent its inputs.
-export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at', 'schema-fingerprint']);
+export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at', 'schema-fingerprint', 'aged-reads']);
 export const HOST_STORE_DATABASE = 'tommy-host-store-v2';
 export const MAX_ROWS = 100;
 export const MAX_READ_BYTES = 8 * 1024 * 1024;
@@ -103,7 +103,8 @@ export function indexedValues(fields, row) {
 export const LRU_WIDTH = 16;
 export const lruEntry = (updatedAt, key) => `${String(updatedAt).padStart(LRU_WIDTH, '0')}\u0000${key}`;
 export function validateQuery(input) {
-  if (!closed(input, ['handle', 'expectedEpoch', 'index', 'limit'], ['equals', 'prefix', 'lower', 'upper', 'afterKey'])
+  if (!closed(input, ['handle', 'expectedEpoch', 'index', 'limit'], ['equals', 'prefix', 'lower', 'upper', 'afterKey', 'includeAged'])
+    || (input.includeAged !== undefined && typeof input.includeAged !== 'boolean')
     || !integer(input.expectedEpoch) || !INDEX_NAME.test(input.index)
     || !Number.isInteger(input.limit) || input.limit < 1 || input.limit > MAX_ROWS
     || (input.afterKey !== undefined && input.afterKey !== null && (typeof input.afterKey !== 'string' || input.afterKey.length > 2048))
@@ -147,8 +148,9 @@ export function validateOpen(input) {
     indexes: validateIndexes(input.indexes), evict, domainMaxBytes: input.limits.domainMaxBytes ?? null };
 }
 export function validateRead(input) {
-  if (!closed(input, ['handle', 'expectedEpoch'], ['keys', 'afterKey', 'limit', 'metadataOnly'])
-    || !integer(input.expectedEpoch) || (input.metadataOnly !== undefined && typeof input.metadataOnly !== 'boolean')) return false;
+  if (!closed(input, ['handle', 'expectedEpoch'], ['keys', 'afterKey', 'limit', 'metadataOnly', 'includeAged'])
+    || !integer(input.expectedEpoch) || (input.metadataOnly !== undefined && typeof input.metadataOnly !== 'boolean')
+    || (input.includeAged !== undefined && typeof input.includeAged !== 'boolean')) return false;
   if (Object.hasOwn(input, 'keys')) return !Object.hasOwn(input, 'afterKey') && !Object.hasOwn(input, 'limit')
     && Array.isArray(input.keys) && input.keys.length <= MAX_ROWS && input.keys.every(keyValid) && new Set(input.keys).size === input.keys.length;
   return (input.afterKey === null || keyValid(input.afterKey)) && Number.isInteger(input.limit) && input.limit > 0 && input.limit <= MAX_ROWS;

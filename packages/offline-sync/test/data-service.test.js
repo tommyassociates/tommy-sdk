@@ -23,25 +23,26 @@ function memoryService(options = {}) {
 function transactionalBackend(port, opened, options) {
   let handle;
   const ready = () => (handle ||= port.open(options));
-  const read = async (input) => {
+  // A writer's read (`aged`) includes rows past the age limit, as the app's backend asks.
+  const read = async ({ aged = false, ...input }) => {
     const h = await ready();
-    const result = await port.read({ handle: h.handle, expectedEpoch: h.epoch, ...input });
+    const result = await port.read({ handle: h.handle, expectedEpoch: h.epoch, ...input, ...(aged ? { includeAged: true } : {}) });
     if (result.ok === false) throw Object.assign(new Error(result.reason), { name: 'StorageReadError', reason: result.reason });
     return result;
   };
   return {
     transactional: true, policy: options.policy, limits: options.limits,
-    snapshot: (keys) => read({ keys }),
-    page: ({ afterKey = null, limit = 100 } = {}) => read({ afterKey, limit }),
-    async get(key) { return (await read({ keys: [String(key)] })).rows[0]?.value; },
-    async getAll() {
+    snapshot: (keys, { aged = false } = {}) => read({ keys, aged }),
+    page: ({ afterKey = null, limit = 100, aged = false } = {}) => read({ afterKey, limit, aged }),
+    async get(key, { aged = false } = {}) { return (await read({ keys: [String(key)], aged })).rows[0]?.value; },
+    async getAll({ aged = false } = {}) {
       const rows = []; let afterKey = null;
-      do { const page = await read({ afterKey, limit: 100 }); rows.push(...page.rows.map((row) => row.value)); afterKey = page.nextKey; } while (afterKey !== null);
+      do { const page = await read({ afterKey, limit: 100, aged }); rows.push(...page.rows.map((row) => row.value)); afterKey = page.nextKey; } while (afterKey !== null);
       return rows;
     },
-    async query(input) {
+    async query({ aged = false, ...input }) {
       const h = await ready();
-      const result = await port.query({ handle: h.handle, expectedEpoch: h.epoch, ...input });
+      const result = await port.query({ handle: h.handle, expectedEpoch: h.epoch, ...input, ...(aged ? { includeAged: true } : {}) });
       if (result.ok === false) throw Object.assign(new Error(result.reason), { name: 'StorageReadError', reason: result.reason });
       return result;
     },
