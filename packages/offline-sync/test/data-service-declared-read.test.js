@@ -289,6 +289,19 @@ describe('writes that land while a declared read is on its way', () => {
   });
 });
 
+describe('a source\'s budget', () => {
+  it('runs its refreshes in the budget and circuit it names, and refuses a budget that is not a name', async () => {
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
+    const asked = [];
+    const scheduler = { request: (job) => { asked.push(job.budgetKey); return Promise.resolve().then(() => job.run(() => true)); } };
+    const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), scheduler, budgetKey: 'host' });
+    expect(() => data.source('members', { fetch: async () => [], budgetKey: '' })).toThrow(expect.objectContaining({ code: 'DATA_INVALID' }));
+    data.source('members', { fetch: async () => ({ rows: [{ id: 'a' }] }), read: { cursor: false }, budgetKey: 'host.members' });
+    await data.refresh('members', { mode: 'visible' });
+    expect(asked).toEqual(['host.members']);
+  });
+});
+
 describe('a declared read on a store that cannot keep a row', () => {
   const storage = new Map();
   afterEach(() => { storage.clear(); delete globalThis.localStorage; });

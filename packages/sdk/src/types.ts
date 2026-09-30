@@ -632,6 +632,8 @@ export interface DataSource<Dto = unknown, Rec = unknown> {
    * leaves the cursor where it was. Any other field is refused (`DATA_INVALID`).
    */
   read?: { cursor?: boolean; removedField?: string; fullEveryMs?: number; forbidden?: 'purge' | 'keep' };
+  /** The scheduler budget and circuit this source's refreshes run in (the service's own when absent). */
+  budgetKey?: string;
   /** A record from an answered row; `prev` is the stored row it replaces (found by `keyOf`), without sync metadata. */
   toRecord?(dto: Dto, prev?: Rec): Rec;
   /** The stored key of an answered row (for `prev`); a declared read defaults to the row's key field. */

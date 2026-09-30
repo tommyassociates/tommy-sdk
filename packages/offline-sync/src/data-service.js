@@ -942,6 +942,8 @@ export function createDataService({
     },
     /**
      * Registers how a collection syncs: `fetch(target) → DTO[] | DTO | null`,
+     * with `budgetKey` (optional) the scheduler budget and circuit its
+     * refreshes run in (the service's own without one),
      * `toRecord(dto, prev)`, optional `keyOf(dto)` and `scope(target) →
      * row predicate` for list targets (rows in scope that the server no longer
      * returns are pruned; dirty rows never are). With `push(command, record)`,
@@ -953,6 +955,9 @@ export function createDataService({
       const { name } = local(collection);
       if (typeof spec?.fetch !== 'function') throw serviceError('source.fetch is required', 'DATA_INVALID');
       if (spec.read !== undefined) checkRead(spec.read);
+      if (spec.budgetKey !== undefined && (typeof spec.budgetKey !== 'string' || !spec.budgetKey)) {
+        throw serviceError('source.budgetKey must be a name', 'DATA_INVALID');
+      }
       sources.set(name, spec);
       // With a push, every dirty row in the collection is an unsent change:
       // ones this service has no record of (it was rebuilt) are sent again.
@@ -1052,7 +1057,7 @@ export function createDataService({
           scope, wanted.window, windowKeyOf(wanted.window), { onPersistError, rethrow: true, keepDirty: true, ...(whole ? {} : { syncedAt: null }) }));
       };
       state.flight = scheduler.request({
-        key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey, reason,
+        key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
         ...(inForeground()
           ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
           : { priority: PRIORITIES.background, visible: false }),
