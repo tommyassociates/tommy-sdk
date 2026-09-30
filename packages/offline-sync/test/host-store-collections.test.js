@@ -580,4 +580,30 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     expect(JSON.stringify([...local, ...remote])).not.toContain('secret');
     feed.close(); otherTab.close(); await database.close();
   });
+
+  it('names no keys when it cannot name them all: every row of the store may have changed', async () => {
+    const Channel = createChannelBus();
+    const { port, database } = await setup(create);
+    const feed = createHostStoreChangeFeed({ BroadcastChannelImpl: Channel });
+    const otherTab = createHostStoreChangeFeed({ BroadcastChannelImpl: Channel });
+    const observed = observeHostStorePort(port, feed);
+    const local = [];
+    const remote = [];
+    feed.subscribe((event) => local.push(event));
+    otherTab.subscribe((event) => remote.push(event));
+    const opened = await observed.open(openInput());
+    const many = Array.from({ length: 150 }, (_, index) => ({ op: 'put', key: String(index), value: { id: index } }));
+    await observed.commit({ handle: opened.handle, expectedEpoch: opened.epoch, expectedStoreRevision: opened.storeRevision, changes: many.slice(0, 100) });
+    const listed = (await observed.inspect({ op: 'stores', selector: SELECTOR })).stores[0];
+    await observed.commit({ handle: opened.handle, expectedEpoch: opened.epoch, expectedStoreRevision: listed.revision ?? 1, changes: many.slice(100) });
+    const cache = (await observed.inspect({ op: 'stores', selector: SELECTOR })).stores[0];
+    await observed.purge({ selector: SELECTOR, store: cache.id });
+    // A principal's purge names no store and no keys.
+    feed.publish({ type: 'purge', principal: 'p' });
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    const shape = (event) => [event.type, event.keys === undefined ? 'every row' : event.keys.length, event.truncated === true];
+    expect(local.map(shape)).toEqual([['commit', 100, false], ['commit', 50, false], ['purge', 'every row', true], ['purge', 'every row', false]]);
+    expect(remote.map(shape)).toEqual(local.map(shape));
+    feed.close(); otherTab.close(); await database.close();
+  });
 });

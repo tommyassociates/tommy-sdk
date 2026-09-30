@@ -744,8 +744,13 @@ export function createHostStoreChangeFeed({
   return {
     origin,
     crossTab: !!channel,
+    // An event names the keys it changed only when it can name them all
+    // (at most MAX_KEYS). Without `keys`, every row of the store(s) it names
+    // may have changed; `truncated` says a list was too long to carry.
     publish(event) {
-      const stamped = { ...event, keys: (event.keys || []).slice(0, MAX_KEYS), origin, at: now() };
+      const { keys, truncated: _truncated, ...rest } = event;
+      const listed = Array.isArray(keys) ? (keys.length <= MAX_KEYS ? { keys: [...keys] } : { truncated: true }) : {};
+      const stamped = { ...rest, ...listed, origin, at: now() };
       if (!eventValid(stamped)) return;
       deliver({ ...stamped, remote: false });
       try { channel?.postMessage(stamped); } catch (_) { /* another tab can refresh on focus */ }
