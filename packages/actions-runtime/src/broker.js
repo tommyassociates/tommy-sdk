@@ -125,6 +125,9 @@ function stableHash(value) {
   return (hash >>> 0).toString(36);
 }
 
+// A text's size in UTF-16 code units, as Web Storage quotas charge it.
+const utf16Units = (text) => String(text).length;
+
 export function createBroker({
   capabilityService,
   recordBackend,
@@ -1532,7 +1535,9 @@ export function createBroker({
   // --- offline queue (broker-owned store; FIFO per source MP) ----------------
 
   function enqueueOffline(sourceMpId, envelope) {
-    const bytes = JSON.stringify(envelope.args || envelope.payload || {}).length;
+    // The queue is kept in Web Storage, whose quota the browser charges in
+    // UTF-16 code units: its caps count those, not UTF-8 bytes.
+    const bytes = utf16Units(JSON.stringify(envelope.args || envelope.payload || {}));
     const partition = queueStore.all().filter((row) => row.sourceMpId === sourceMpId);
     const partitionBytes = partition.reduce((sum, row) => sum + row.bytes, 0);
     if (partition.length >= QUEUE_MAX_ENTRIES || partitionBytes + bytes > QUEUE_MAX_BYTES) {
