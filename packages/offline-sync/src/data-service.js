@@ -131,8 +131,14 @@ function snapshotRows(answer) {
 const INGEST_CHUNK = 500;
 // A whole read writes the rows it changed, and confirms (writes again) an
 // unchanged row only once it was last written this long ago, so its age
-// limits count from a recent confirmation.
+// limits count from a recent confirmation; in a store whose rows stop being
+// visible sooner (its age limit), once it was written half that limit ago.
 const CONFIRM_AFTER_MS = 24 * 60 * 60 * 1000;
+const confirmAfterMs = (store) => {
+  let limit = null;
+  try { limit = typeof store?.ageLimitMs === 'function' ? store.ageLimitMs() : null; } catch (_) { limit = null; }
+  return Number.isFinite(limit) && limit > 0 ? Math.min(CONFIRM_AFTER_MS, limit / 2) : CONFIRM_AFTER_MS;
+};
 // A value's content, whatever the order of its fields.
 function contentValue(value) {
   if (Array.isArray(value)) return `[${value.map(contentValue).join(',')}]`;
@@ -382,10 +388,15 @@ export function createDataService({
       deleteMany: (keys, ...rest) => { noted(keys || []); return store.deleteMany(keys, ...rest); },
       markRow: (key, ...rest) => { noted([key]); return store.markRow(key, ...rest); },
       patchSynced: (keys, ...rest) => { noted(keys || []); return store.patchSynced(keys, ...rest); },
-      reconcile: (records = [], options = {}) => {
+      // A prune of the whole collection replaces it; a scoped one (a window,
+      // a query) records the rows it removed, and nothing else.
+      reconcile: async (records = [], options = {}) => {
         noted(records.map(keyOf));
-        if (options.prune !== false) noteReplaced(name);
-        return store.reconcile(records, options);
+        const whole = options.prune !== false && typeof options.scope !== 'function';
+        if (whole) noteReplaced(name);
+        const result = await store.reconcile(records, options);
+        if (!whole && Array.isArray(result?.prunedKeys)) noted(result.prunedKeys);
+        return result;
       },
     };
     return new Proxy(store, {
@@ -1058,12 +1069,12 @@ export function createDataService({
       }
     } else {
       // A whole read writes the rows it changed (and the unchanged ones last
-      // written a day or more ago), keeps the rest as they are, and removes
-      // the rows it left out. One row is always written, which stamps the
-      // collection synced.
+      // written a day or more ago, or half the store's age limit), keeps the
+      // rest as they are, and removes the rows it left out. One row is always
+      // written, which stamps the collection synced.
       const touched = touchedAfter(name, startedAt);
       const stored = new Map(rows.map((row) => [keyOf(row), row]));
-      const confirmBefore = now() - CONFIRM_AFTER_MS;
+      const confirmBefore = now() - confirmAfterMs(store);
       const toWrite = [];
       let oldest = null;
       records.forEach((record) => {

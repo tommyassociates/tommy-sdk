@@ -283,6 +283,8 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
   const api = {
     name,
     validateRecord,
+    /** How long a row stays visible without being written again (null: always). */
+    ageLimitMs: () => ageLimit(),
     async get(key) { live(); const row = await backend.get(keyString(key)); live(); return paintable(row) ? copy(row) : undefined; },
     async getRaw(key) { live(); const row = await backend.get(keyString(key), { aged: true }); live(); return copy(row); },
     async getAll() { live(); const rows = await wholeRows(); live(); return freshRows.has(rows) ? rows.filter(paintable) : rows.filter(paintable).map(copy); },
@@ -448,6 +450,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         const retainedWindows = new Set([...windows.keys()].slice(-maxWindows));
         let afterKey = null;
         let pruned = 0;
+        const prunedKeys = [];
         do {
           const page = await backend.page({ afterKey, limit: 100, aged: true });
           const changes = page.rows.filter(({ key, value }) => !value._dirty && !incoming.has(key)
@@ -457,11 +460,12 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
             const result = await commit(page, changes);
             if (result.ok === false) failure(result);
             pruned += changes.length;
+            prunedKeys.push(...changes.map(({ key }) => key));
           }
           afterKey = page.nextKey;
         } while (afterKey !== null);
         await notify();
-        return { upserted, pruned, ...counts };
+        return { upserted, pruned, ...(prunedKeys.length ? { prunedKeys } : {}), ...counts };
       });
     },
     // Rows by a secondary index, in index order: the physical index where the

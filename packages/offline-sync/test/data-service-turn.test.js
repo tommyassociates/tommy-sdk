@@ -74,6 +74,43 @@ describe('writes in the collection\'s turn', () => {
   });
 });
 
+describe('scoped writes', () => {
+  it('keeps both of two concurrent window reads of disjoint scopes: a scoped write is no whole replacement', async () => {
+    const { data } = service();
+    let answerA;
+    let answerB;
+    const inScope = (group) => (row) => row.group === group;
+    const a = data.reconcileWindow('members', { fetch: () => new Promise((resolve) => { answerA = resolve; }), scope: inScope('a') });
+    const b = data.reconcileWindow('members', { fetch: () => new Promise((resolve) => { answerB = resolve; }), scope: inScope('b') });
+    await vi.waitFor(() => { expect(answerA).toBeTypeOf('function'); expect(answerB).toBeTypeOf('function'); });
+    answerA([{ id: 'a1', group: 'a' }]);
+    await a;
+    answerB([{ id: 'b1', group: 'b' }]);
+    await b;
+    expect((await data.read('members')).map((row) => row.id).sort()).toEqual(['a1', 'b1']);
+  });
+
+  it('keeps a declared read from undoing a row a scoped write removed after it began', async () => {
+    const { data } = service();
+    let release = null;
+    data.source('members', {
+      read: {},
+      fetch: async () => {
+        await new Promise((resolve) => { release = resolve; });
+        return [{ id: 'gone', group: 'a' }, { id: 'kept', group: 'b' }];
+      },
+    });
+    await data.ingest('members', [{ id: 'gone', group: 'a' }, { id: 'kept', group: 'b' }]);
+    const declared = data.refresh('members', { mode: 'visible' });
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+    // A window read of group a finds 'gone' removed on the server.
+    await data.reconcileWindow('members', { fetch: async () => [], scope: (row) => row.group === 'a' });
+    release();
+    await declared;
+    expect((await data.read('members')).map((row) => row.id)).toEqual(['kept']);
+  });
+});
+
 describe('a queued refresh', () => {
   it('re-checks that it is still wanted inside the turn, and commits nothing once it is not', async () => {
     let wanted = true;

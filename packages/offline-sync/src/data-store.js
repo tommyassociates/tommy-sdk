@@ -1378,6 +1378,7 @@ export function createDataStore({
         changed.add(key);
       }
       let pruned = 0;
+      const prunedKeys = [];
       for (const row of existing) {
         const key = keyOf(row);
         if (incoming.has(String(key)) || row._dirty) continue; // kept: fresh or optimistic
@@ -1387,6 +1388,7 @@ export function createDataStore({
         if (!(await evict(key, row._rev))) continue;
         changed.add(key);
         pruned += 1;
+        prunedKeys.push(String(key));
       }
       // Out-of-scope rows survive the prune above BY DESIGN (that is what
       // scoped reconcile means), so the cap is the only thing standing
@@ -1406,6 +1408,8 @@ export function createDataStore({
       return {
         upserted: incoming.size - new Set(skipped).size,
         pruned,
+        // The keys it removed, when it removed any.
+        ...(prunedKeys.length ? { prunedKeys } : {}),
         ...(skipped.length ? { skipped: [...new Set(skipped)] } : {}),
         ...(unsaved.length ? { unsaved: [...new Set(unsaved)] } : {}),
         ...(dropped.length ? { windowsDropped: dropped.length } : {}),
