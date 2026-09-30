@@ -1120,7 +1120,7 @@ export function createDataStore({
         // Drop `_persistFailed` alongside `_dirty`: a row that reached the server
         // is no longer "saved on this device only", whatever happened to the local
         // copy on the way.
-        const { _persistFailed: _pf, ...rest } = record;
+        const { _persistFailed: _pf, _pushRefused: _refused, ...rest } = record;
         // ⚠ THIS WRITE CAN DISPLACE ROWS TOO. Marking a row synced makes it
         // evictable, which is exactly when the byte guard can act — and this path
         // discarded the result unconditionally, so those keys were never counted,

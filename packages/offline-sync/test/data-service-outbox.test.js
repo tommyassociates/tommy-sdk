@@ -212,3 +212,90 @@ describe('results', () => {
     expect(raw).toHaveProperty('_rev');
   });
 });
+
+describe('fencing, cleanup after a sent delete, and queued deletes', () => {
+  it('never sends a change the scheduler held once the outbox is fenced', async () => {
+    const scheduler = heldScheduler();
+    const { data } = service({ scheduler });
+    const push = vi.fn(async () => {});
+    data.source('items', { fetch: async () => [], push });
+    await data.mutate('items', { op: 'put', record: { id: 'a', v: 'local' } });
+    await vi.waitFor(() => expect(scheduler.held.length).toBe(1));
+    data.fence();
+    scheduler.releaseAll();
+    await settle(); await settle();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('never removes a newer row after sending a delete of a key it held no row for', async () => {
+    const { data, store } = service();
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    data.source('items', { fetch: async () => [], push: async (command) => { if (command.op === 'delete') await gate; } });
+    const sent = data.mutate('items', { op: 'delete', key: 'k' }, { wait: true });
+    await settle();
+    // A new row for the key lands while the delete is on its way.
+    await store.put({ id: 'k', v: 'new' });
+    release();
+    await sent;
+    expect(await store.getRaw('k')).toMatchObject({ v: 'new', _dirty: true });
+  });
+
+  it('leaves a newer row in place after a delete whose tombstone was replaced', async () => {
+    const { data, store } = service();
+    await store.reconcile([{ id: 'a', v: 'server' }], { prune: false });
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    data.source('items', { fetch: async () => [], push: async (command) => { if (command.op === 'delete') await gate; } });
+    const sent = data.mutate('items', { op: 'delete', key: 'a' }, { wait: true });
+    await settle();
+    await store.put({ id: 'a', v: 'again' });
+    release();
+    await sent;
+    expect(await store.getRaw('a')).toMatchObject({ v: 'again', _dirty: true });
+  });
+
+  it('drops a queued delete whose tombstone was force-removed, so no retry sends it', async () => {
+    const feed = createHostStoreChangeFeed({ BroadcastChannelImpl: null });
+    const store = createDataStore({ name: 'items', backend: createMemoryStoreBackend(), indexes: INDEXES });
+    await store.reconcile([{ id: 'a', v: 'server' }], { prune: false });
+    const host = service({ store, feed }).data;
+    const mp = service({ store, feed }).data;
+    const push = vi.fn(async () => { throw Object.assign(new Error('Server'), { status: 500 }); });
+    mp.source('items', { fetch: async () => [], push });
+    await mp.mutate('items', { op: 'delete', key: 'a' });
+    await vi.waitFor(() => expect(mp.pending()[0]?.state).toBe('failed'));
+    await host.purge('items', { keys: ['a'], force: true });
+    feed.publish({ type: 'purge', principal: 'p', store: 's', keys: ['a'] });
+    await vi.waitFor(() => expect(mp.pending()).toEqual([]));
+    push.mockClear();
+    await mp.retryFailed();
+    expect(push).not.toHaveBeenCalled();
+    feed.close();
+  });
+
+  it('discards a change made just before the discard, in turn with it, and never sends it', async () => {
+    const { data, store } = service();
+    const push = vi.fn(async () => {});
+    data.source('items', { fetch: async () => [], push });
+    const writing = data.mutate('items', { op: 'put', record: { id: 'a', v: 'local' } });
+    const discarding = data.discard('items', 'a');
+    await Promise.all([writing, discarding]);
+    await settle(); await settle();
+    expect(push).not.toHaveBeenCalled();
+    expect(await store.getRaw('a')).toBeUndefined();
+    expect(data.pending()).toEqual([]);
+  });
+
+  it('keeps a queued delete for a key that never had a row when an unrelated purge lands', async () => {
+    const feed = createHostStoreChangeFeed({ BroadcastChannelImpl: null });
+    const { data } = service({ feed });
+    data.source('items', { fetch: async () => [], push: async () => { throw Object.assign(new Error('Server'), { status: 500 }); } });
+    await data.mutate('items', { op: 'delete', key: 'never-held' });
+    await vi.waitFor(() => expect(data.pending()[0]?.state).toBe('failed'));
+    feed.publish({ type: 'purge', principal: 'p', store: 's', keys: ['other'] });
+    await settle(); await settle();
+    expect(data.pending().map((entry) => entry.key)).toEqual(['never-held']);
+    feed.close();
+  });
+});

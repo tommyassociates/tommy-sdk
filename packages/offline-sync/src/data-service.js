@@ -232,7 +232,10 @@ export function createDataService({
     const touched = (entry) => event.label === entry.label || event.labels?.includes(entry.label) || (event.type === 'purge' && !event.label);
     [...outbox.values()].filter(touched).forEach((entry) => {
       serial(entry.id, async () => {
-        if (outbox.get(entry.id) !== entry || entry.changes.at(-1)?.command.op === 'delete') return;
+        if (outbox.get(entry.id) !== entry) return;
+        // A delete of a key that held no row has nothing on the device to lose.
+        const last = entry.changes.at(-1);
+        if (last?.command.op === 'delete' && (last.revision === undefined || last.revision === null)) return;
         const row = await entry.store.getRaw(entry.key);
         if (row !== undefined && row !== null) return;
         dropPending(entry.label, entry.key);
@@ -338,6 +341,24 @@ export function createDataService({
     });
   }
   /**
+   * After a change was sent, the row it came from settles, only while it is
+   * still that change: a sent delete removes its tombstone (never a row
+   * written since, and never a row when it held none), and a sent put is
+   * marked synced at the revision it wrote.
+   */
+  async function settleSent(entry, change) {
+    if (change.revision === undefined || change.revision === null) return;
+    const row = await entry.store.getRaw(entry.key);
+    if (!row || row._rev !== change.revision) return;
+    try {
+      if (change.command.op === 'delete') {
+        if (row._deleted) await entry.store.delete(entry.key, { expectedRevision: change.revision });
+        return;
+      }
+      await entry.store.markSynced(entry.key, { expectedRevision: change.revision });
+    } catch (_) { /* written again since: it stays as written */ }
+  }
+  /**
    * Sends one row's changes oldest first. A failure stops the row there and
    * keeps every change for a retry; the row is marked synced only when the
    * change just sent is still its latest local write.
@@ -367,19 +388,19 @@ export function createDataService({
                   change.record = row._deleted ? null : bare(row);
                   change.revision = row._rev;
                 }
+                // Fenced, discarded or disposed while it waited: never sent.
+                if (entry.discarded || outbox.get(entry.id) !== entry) throw serviceError('Change fenced', 'DATA_FENCED');
                 entry.state = 'sending'; entry.attempts += 1; emitStatus();
                 await push(change.command, change.record);
                 sent = true;
-                // A sent delete removes its tombstone, unless the row was written again since.
-                if (change.command.op === 'delete') {
-                  try { await entry.store.delete(entry.key, { expectedRevision: change.revision }); } catch (_) { /* written again: kept */ }
-                  return;
-                }
-                // A row that cannot be marked stays dirty and is sent again later.
-                try { await entry.store.markSynced(entry.key, { expectedRevision: change.revision }); } catch (_) { /* kept dirty */ }
+                await settleSent(entry, change);
               },
             });
           } catch (error) {
+            if (!sent && entry.discarded) {
+              entry.changes.forEach((queued) => queued.reject(error));
+              throw error;
+            }
             if (!sent) {
               const refused = refusedAccess(error);
               entry.state = refused ? 'access_changed' : 'failed'; entry.lastError = describeError(error); emitStatus();
@@ -405,11 +426,10 @@ export function createDataService({
 
   const service = {
     namespace,
-    // `raw` reads the whole collection as writers see it: rows past the paint
-    // ceiling and the store's age limit included, for a caller checking what
+    // Rows come as copies without storage metadata. `raw` reads as writers
+    // see the collection (rows past the paint ceiling and the store's age
+    // limit, and unsent tombstones), metadata kept, for a caller checking what
     // it painted or deciding what to remove.
-    // Rows come as copies without storage metadata; `raw` rows (the writers'
-    // view: unpainted and unsent rows too) keep it.
     async read(collection, key, { raw = false } = {}) {
       live();
       const { store } = local(collection);
@@ -698,11 +718,16 @@ export function createDataService({
       outbox.clear();
       emitStatus();
     },
-    /** Drops a pending local change after an explicit confirm. */
+    /**
+     * Drops a pending local change after an explicit confirm, in turn with
+     * local writes to the row, so a change made just before is dropped too.
+     */
     async discard(collection, key) {
       const { label, store } = local(collection);
-      dropPending(label, key);
-      await store.delete(String(key));
+      await serial(`${label}:${String(key)}`, async () => {
+        dropPending(label, key);
+        await store.delete(String(key));
+      });
       emitStatus();
     },
     /**

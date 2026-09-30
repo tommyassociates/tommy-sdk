@@ -188,7 +188,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
   // index belongs to that row alone (a value no field of which is set is
   // not held to it). Checked once all writes landed, so rows may trade
   // values in one commit.
-  async function checkUnique(tx, store, plans) {
+  async function checkUnique(tx, store, plans, generation = store.generation) {
     const names = store.unique || [];
     if (!names.length) return;
     const [owner, namespace] = store.key;
@@ -200,7 +200,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
         const encoded = indexedValues(fields, change.value);
         if (encoded === null) continue;
         const head = indexEntry(name, encoded, '');
-        const entries = await tx.scan('rows', prefix(owner, namespace, store.generation, INDEX), { after: head, limit: 2 });
+        const entries = await tx.scan('rows', prefix(owner, namespace, generation, INDEX), { after: head, limit: 2 });
         if (entries.some((entry) => entry.key[4].startsWith(head) && entry.target !== change.key)) throw storageError('constraint');
       }
     }
@@ -551,6 +551,9 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
             store.migration.bytes += valueBytes - (old?.bytes || 0);
             store.migration.dirtyCount += (dirty ? 1 : 0) - (old?.dirty ? 1 : 0);
           }
+          // The new shape's unique indexes hold in the new generation: every
+          // row reaches it through a write, so completing needs no scan.
+          await checkUnique(tx, target, changes.map((change) => ({ change })), generation);
           if (store.migration.rowCount > handle.options.limits.maxRows) throw storageError('row-capacity');
           await tx.put('stores', store);
           return { ok: true };

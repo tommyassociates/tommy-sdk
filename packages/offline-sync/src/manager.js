@@ -192,6 +192,16 @@ export function createDataManager({
   const prefsChanged = new Set();
   let prefsLoaded = null;
   let prefsTried = false;
+  // One key's writes and removals reach the store in the order they were
+  // made, so what is stored follows what `get` answers.
+  const prefWrites = new Map();
+  function inPrefOrder(name, task) {
+    const next = (prefWrites.get(name) || Promise.resolve()).then(task);
+    const tail = next.then(() => {}, () => {});
+    prefWrites.set(name, tail);
+    tail.then(() => { if (prefWrites.get(name) === tail) prefWrites.delete(name); });
+    return next;
+  }
   const prefs = Object.freeze({
     ready() {
       prefsTried = true;
@@ -214,14 +224,15 @@ export function createDataManager({
       const stored = clone(value);
       prefValues.set(name, stored);
       prefsChanged.add(name);
-      const result = await service.ingest(PREFS_STORE, [{ key: name, value: stored === undefined ? null : stored }]);
+      const result = await inPrefOrder(name, () => service.ingest(PREFS_STORE, [{ key: name, value: stored === undefined ? null : stored }]));
       if (!result?.written) throw Object.assign(new Error(`tommy.prefs: '${name}' was not saved`), { code: 'DATA_INVALID' });
     },
     async remove(key) {
       live();
-      prefValues.delete(String(key));
-      prefsChanged.add(String(key));
-      await service.purge(PREFS_STORE, { keys: [String(key)], force: true });
+      const name = String(key);
+      prefValues.delete(name);
+      prefsChanged.add(name);
+      await inPrefOrder(name, () => service.purge(PREFS_STORE, { keys: [name], force: true }));
     },
   });
 

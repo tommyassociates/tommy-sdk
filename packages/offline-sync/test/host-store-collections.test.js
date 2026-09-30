@@ -422,6 +422,21 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     expect((await stores()).find((row) => row.label === 'drafts')).toMatchObject({ indexes: ['byCode'], unique: ['byCode'] });
   });
 
+  it('refuses a rebuild write that would break a unique index the new shape adds', async () => {
+    const { port, open } = await setup(create);
+    const drafts = await open({ storeName: 'drafts', policy: 'authored', indexes: { byCode: 'code' } });
+    await drafts.put([{ id: 'a', code: 'X1', _dirty: true }, { id: 'b', code: 'X1', _dirty: true }]);
+    const next = await port.open(openInput({ storeName: 'drafts', policy: 'authored', indexes: { byCode: 'code' }, unique: ['byCode'] }));
+    expect(next.migration).toBeTruthy();
+    const step = (phase, extra = {}) => port.migration({ handle: next.handle, expectedEpoch: next.epoch, phase, ...extra });
+    await expect(step('begin')).resolves.toMatchObject({ ok: true });
+    await expect(step('write', { changes: [{ op: 'put', key: 'a', value: { id: 'a', code: 'X1', _dirty: true } }] })).resolves.toMatchObject({ ok: true });
+    await expect(step('write', { changes: [{ op: 'put', key: 'b', value: { id: 'b', code: 'X1', _dirty: true } }] })).resolves.toMatchObject({ ok: false, reason: 'constraint' });
+    await expect(step('complete')).resolves.toMatchObject({ ok: true });
+    const rebuilt = await port.read({ handle: next.handle, expectedEpoch: next.epoch, afterKey: null, limit: 10 });
+    expect(rebuilt.rows.map((row) => row.key)).toEqual(['a']);
+  });
+
   it('forgets handles once they are closed or retired, however many opens came before', async () => {
     const { port } = await setup(create);
     for (let round = 0; round < 50; round += 1) {

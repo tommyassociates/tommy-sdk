@@ -301,6 +301,31 @@ describe('MP data API confinement', () => {
     await expect(next.read('mp.time-clock.prefs')).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
   });
 
+  it('stores a preference set then removed before the first write landed as removed', async () => {
+    let gate = null;
+    const backends = new Map();
+    const factory = (_db, store) => {
+      if (!backends.has(store)) {
+        const inner = createMemoryStoreBackend();
+        backends.set(store, { ...inner, async put(...args) { if (gate) { const wait = gate; gate = null; await wait; } return inner.put(...args); } });
+      }
+      return backends.get(store);
+    };
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    await data.prefs.ready();
+    let open;
+    gate = new Promise((resolve) => { open = resolve; });
+    const setting = data.prefs.set('layout', 'board');
+    const removing = data.prefs.remove('layout');
+    await new Promise((resolve) => { setTimeout(resolve, 5); });
+    open();
+    await Promise.all([setting, removing]);
+    expect(data.prefs.get('layout', 'list')).toBe('list');
+    const next = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    await next.prefs.ready();
+    expect(next.prefs.get('layout', 'list')).toBe('list');
+  });
+
   it('opens an MP\'s prefs only when it reads one, and always with the host\'s declaration', async () => {
     const reads = [];
     const backends = new Map();
