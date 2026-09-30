@@ -2,7 +2,7 @@
 export const HOST_STORE_VERSION = 1;
 // What this engine accepts beyond version 1's open/read/commit/retire. A port
 // without a feature (an older desktop engine) is never sent its inputs.
-export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at', 'schema-fingerprint', 'aged-reads', 'open-epoch']);
+export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at', 'schema-fingerprint', 'aged-reads', 'open-epoch', 'subject-retire']);
 export const HOST_STORE_DATABASE = 'tommy-host-store-v2';
 export const MAX_ROWS = 100;
 export const MAX_READ_BYTES = 8 * 1024 * 1024;
@@ -35,10 +35,19 @@ export function closed(value, required, optional = []) {
 }
 export function fail(reason) { return { ok: false, reason, retained: false }; }
 export function readFailure(reason) { return { ok: false, reason }; }
+// A retirement's selector: the viewer at an origin, all of it; or one
+// session's chat fragments (`cacheSession`); or one subject's namespace
+// (`subjectKey`, an MP opened for a client whose access was revoked).
 export function retirementMatcher(selector) {
-  if (!closed(selector, ['authorityOrigin', 'viewerId'], ['cacheSession'])
-    || typeof selector.viewerId !== 'string' || !/^[1-9][0-9]*$/.test(selector.viewerId)) throw storageError('unserializable');
+  if (!closed(selector, ['authorityOrigin', 'viewerId'], ['cacheSession', 'subjectKey'])
+    || typeof selector.viewerId !== 'string' || !/^[1-9][0-9]*$/.test(selector.viewerId)
+    || (Object.hasOwn(selector, 'cacheSession') && Object.hasOwn(selector, 'subjectKey'))) throw storageError('unserializable');
   try { if (new URL(selector.authorityOrigin).origin !== selector.authorityOrigin || !/^https?:/.test(selector.authorityOrigin)) throw new Error(); } catch (_) { throw storageError('unserializable'); }
+  if (Object.hasOwn(selector, 'subjectKey')) {
+    const wanted = selector.subjectKey;
+    if (typeof wanted !== 'string' || !wanted || wanted.length > 512) throw storageError('unserializable');
+    return (subjectKey) => subjectKey === wanted;
+  }
   if (!Object.hasOwn(selector, 'cacheSession')) return () => true;
   const session = selector.cacheSession;
   if (!closed(session, ['id', 'generation']) || typeof session.id !== 'string' || !/^[1-9][0-9]*$/.test(session.id)
