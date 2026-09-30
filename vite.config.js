@@ -44,6 +44,11 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     plugins: [vue(), pluginWatchNodeModules(['tommy-core'])],
+    test: {
+      // The retiring-path monitor (core/src/retiring), in a run from the SDK root.
+      setupFiles: ['./vitest.retiring-setup.js'],
+      globalSetup: ['./vitest.retiring-global-setup.js'],
+    },
     envPrefix: 'TOMMY_',
     define: {
       'import.meta.env.SDK_PRIVATE_PATH': JSON.stringify(`/@fs${path.resolve(__dirname, '../sdk-private')}`),
