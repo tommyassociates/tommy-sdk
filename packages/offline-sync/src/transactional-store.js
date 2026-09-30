@@ -1,5 +1,5 @@
 /** Durable branch of DataStore. The injected backend owns physical CAS/epochs. */
-import { jsonBytes, utf8Bytes } from './bytes.js';
+import { jsonBytes, utf8Bytes, boundedBatches, WRITE_BATCH_BYTES } from './bytes.js';
 // The most rows one whole-collection read returns, page by page.
 export const WHOLE_READ_ROWS = 20000;
 // A whole read that has to page stops at this many bytes too (a domain's
@@ -39,21 +39,12 @@ export function assertCompleteSet(rows, { maxRows = 1000, maxBytes = 8 * 1024 * 
   }
 }
 const keyString = (key) => String(key);
-// One commit carries at most MAX_BATCH_ROWS rows and about MAX_BATCH_BYTES.
+// One commit carries at most MAX_BATCH_ROWS rows and about WRITE_BATCH_BYTES.
 const MAX_BATCH_ROWS = 100;
-const MAX_BATCH_BYTES = 6 * 1024 * 1024;
-function upsertBatches(incoming) {
-  const batches = [];
-  let batch = [];
-  let size = 0;
-  for (const entry of incoming) {
-    const length = jsonBytes(entry[1]);
-    if (batch.length && (batch.length >= MAX_BATCH_ROWS || size + length > MAX_BATCH_BYTES)) { batches.push(batch); batch = []; size = 0; }
-    batch.push(entry); size += length;
-  }
-  if (batch.length) batches.push(batch);
-  return batches;
-}
+const upsertBatches = (incoming) => boundedBatches([...incoming], { maxItems: MAX_BATCH_ROWS, sizeOf: (entry) => jsonBytes(entry[1]) });
+// A write of several keys whose stored rows, or whose changes, would not fit
+// one keyed read or one commit: it is split before anything is sent.
+const TOO_LARGE = Symbol('too large for one commit');
 const nextRevision = (value = 0) => { if (!Number.isSafeInteger(value) || value < 0 || value >= Number.MAX_SAFE_INTEGER) throw new StorageReadError('write-failed'); return value + 1; };
 // A row's next revision: above its own and above the store's, which every
 // commit moves on, so a key written again after it was removed never takes a
@@ -132,14 +123,21 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     track(snapshot, changes, result);
     return result;
   }
+  // A write of more than one key throws TOO_LARGE, before it commits, when
+  // its keys' stored rows are past one keyed read or its changes past about
+  // WRITE_BATCH_BYTES (see `inParts`).
   async function mutation(keys, transform, { retry = false, syncedAt } = {}) {
     for (let attempt = 0; attempt < (retry ? 3 : 1); attempt += 1) {
       live();
       let snapshot;
-      try { snapshot = await backend.snapshot(keys, { aged: true }); } catch (error) { failure({ reason: error.reason || 'read-failed', retained: false }, keys[0]); }
+      try { snapshot = await backend.snapshot(keys, { aged: true }); } catch (error) {
+        if (error?.reason === 'payload-capacity' && keys.length > 1) throw TOO_LARGE;
+        failure({ reason: error.reason || 'read-failed', retained: false }, keys[0]);
+      }
       const previous = new Map(snapshot.rows.map((row) => [row.key, row.value]));
       const changes = transform(previous, snapshot.storeRevision);
       if (!changes.length) return;
+      if (keys.length > 1 && jsonBytes(changes) > WRITE_BATCH_BYTES) throw TOO_LARGE;
       const result = await commit(snapshot, changes, syncedAt === undefined || syncedAt === null ? undefined : { syncedAt });
       live();
       if (result.ok !== false) return;
@@ -237,6 +235,19 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     }
     throw new StorageReadError('conflict');
   }
+  /**
+   * Runs `write(part)` over `keys`, as one part while it fits: a part whose
+   * mutation is TOO_LARGE is split in two, each written in turn, until every
+   * part fits or is a single key. A part writes nothing before it fits.
+   */
+  async function inParts(keys, write) {
+    try { await write(keys); } catch (error) {
+      if (error !== TOO_LARGE) throw error;
+      const half = Math.ceil(keys.length / 2);
+      await inParts(keys.slice(0, half), write);
+      await inParts(keys.slice(half), write);
+    }
+  }
   async function notify() {
     live();
     publication += 1;
@@ -331,11 +342,15 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       const wanted = [...new Set(keys.map(keyString))];
       if (wanted.length > 100) return Promise.reject(new StorageReadError('payload-capacity'));
       return exclusive(async () => {
-        let removed = [];
-        await mutation(wanted, (rows) => {
-          removed = wanted.filter((key) => rows.has(key) && !keep(rows.get(key)));
-          return removed.map((key) => ({ op: 'delete', key }));
-        }, { retry: true });
+        const removed = [];
+        await inParts(wanted, async (part) => {
+          let gone = [];
+          await mutation(part, (rows) => {
+            gone = part.filter((key) => rows.has(key) && !keep(rows.get(key)));
+            return gone.map((key) => ({ op: 'delete', key }));
+          }, { retry: true });
+          removed.push(...gone);
+        });
         if (!silent && removed.length) await notify();
         return removed;
       });
@@ -371,23 +386,27 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       const wanted = [...new Set((keys || []).map(keyString))];
       if (wanted.length > 100) return Promise.reject(new StorageReadError('payload-capacity'));
       return exclusive(async () => {
-        let outcome = { patched: [], unsaved: [], skipped: [], refused: [] };
-        await mutation(wanted, (rows, storeRevision) => {
-          outcome = { patched: [], unsaved: [], skipped: [], refused: [] };
-          const changes = [];
-          wanted.forEach((key) => {
-            const row = rows.get(key);
-            if (!row || row._deleted) { outcome.skipped.push({ key, reason: 'gone' }); return; }
-            if (row._dirty) { outcome.skipped.push({ key, reason: 'unsent' }); return; }
-            const meta = Object.fromEntries(Object.entries(row).filter(([field]) => field.startsWith('_')));
-            const record = { ...Object.fromEntries(Object.entries(row).filter(([field]) => !field.startsWith('_'))), ...patch };
-            const why = validateRecord(record);
-            if (why) { outcome.refused.push({ key, reason: why }); return; }
-            outcome.patched.push(key);
-            changes.push({ op: 'put', key, value: { ...record, ...meta, _rev: rowRevision(row, storeRevision), _dirty: false, _updatedAt: new Date(now()).toISOString() } });
-          });
-          return changes;
-        }, { retry: true, syncedAt: null });
+        const outcome = { patched: [], unsaved: [], skipped: [], refused: [] };
+        await inParts(wanted, async (part) => {
+          let partOutcome;
+          await mutation(part, (rows, storeRevision) => {
+            partOutcome = { patched: [], unsaved: [], skipped: [], refused: [] };
+            const changes = [];
+            part.forEach((key) => {
+              const row = rows.get(key);
+              if (!row || row._deleted) { partOutcome.skipped.push({ key, reason: 'gone' }); return; }
+              if (row._dirty) { partOutcome.skipped.push({ key, reason: 'unsent' }); return; }
+              const meta = Object.fromEntries(Object.entries(row).filter(([field]) => field.startsWith('_')));
+              const record = { ...Object.fromEntries(Object.entries(row).filter(([field]) => !field.startsWith('_'))), ...patch };
+              const why = validateRecord(record);
+              if (why) { partOutcome.refused.push({ key, reason: why }); return; }
+              partOutcome.patched.push(key);
+              changes.push({ op: 'put', key, value: { ...record, ...meta, _rev: rowRevision(row, storeRevision), _dirty: false, _updatedAt: new Date(now()).toISOString() } });
+            });
+            return changes;
+          }, { retry: true, syncedAt: null });
+          Object.keys(outcome).forEach((field) => { outcome[field].push(...partOutcome[field]); });
+        });
         if (outcome.patched.length) await notify();
         return outcome;
       });
@@ -432,14 +451,17 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         };
         const stamp = (row, previous, storeRevision) => ({ ...row, ...acknowledged(previous), _rev: rowRevision(previous, storeRevision), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...windowOf(previous) });
         for (const batch of upsertBatches(incoming)) {
-          let left = [];
           // eslint-disable-next-line no-await-in-loop
-          await mutation(batch.map(([key]) => key), (rows, storeRevision) => {
-            left = keepDirty ? batch.filter(([key]) => rows.get(key)?._dirty).map(([key]) => key) : [];
-            return batch.filter(([key]) => !left.includes(key)).map(([key, row]) => ({ op: 'put', key, value: stamp(row, rows.get(key), storeRevision) }));
-          }, { syncedAt, retry: true });
-          upserted += batch.length - left.length;
-          left.forEach((key) => skipped.add(key));
+          await inParts(batch.map(([key]) => key), async (keys) => {
+            const part = batch.filter(([key]) => keys.includes(key));
+            let left = [];
+            await mutation(keys, (rows, storeRevision) => {
+              left = keepDirty ? part.filter(([key]) => rows.get(key)?._dirty).map(([key]) => key) : [];
+              return part.filter(([key]) => !left.includes(key)).map(([key, row]) => ({ op: 'put', key, value: stamp(row, rows.get(key), storeRevision) }));
+            }, { syncedAt, retry: true });
+            upserted += part.length - left.length;
+            left.forEach((key) => skipped.add(key));
+          });
         }
         const counts = skipped.size ? { skipped: [...skipped] } : {};
         if (windowKey != null) { windows.delete(String(windowKey)); windows.set(String(windowKey), now()); }

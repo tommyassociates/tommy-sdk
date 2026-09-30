@@ -74,6 +74,52 @@ describe('writes in the collection\'s turn', () => {
   });
 });
 
+describe('a fetched write', () => {
+  it('is recorded as of its read\'s start: a newer window read that answers last stores its rows over an older one\'s', async () => {
+    const { data } = service();
+    let answerA;
+    let answerB;
+    const a = data.reconcileWindow('members', { fetch: () => new Promise((resolve) => { answerA = resolve; }), scope: (row) => row.id === 'k' });
+    await vi.waitFor(() => expect(answerA).toBeTypeOf('function'));
+    const b = data.reconcileWindow('members', { fetch: () => new Promise((resolve) => { answerB = resolve; }), scope: (row) => row.id === 'k' });
+    await vi.waitFor(() => expect(answerB).toBeTypeOf('function'));
+    answerA([{ id: 'k', v: 1 }]);
+    await a;
+    answerB([{ id: 'k', v: 2 }]);
+    await b;
+    expect((await data.read('members', 'k')).v).toBe(2);
+  });
+
+  it('is recorded as of its read\'s start for keyed and query refreshes too', async () => {
+    const { data } = service();
+    const answers = [];
+    data.source('members', {
+      read: {},
+      fetch: (target) => new Promise((resolve) => { answers.push({ target, resolve }); }),
+    });
+    const older = data.refresh({ collection: 'members', key: 'k' }, { mode: 'visible' });
+    await vi.waitFor(() => expect(answers).toHaveLength(1));
+    const newer = data.refresh({ collection: 'members', query: { where: (row) => row.id === 'k' } }, { mode: 'visible' });
+    await vi.waitFor(() => expect(answers).toHaveLength(2));
+    answers[0].resolve({ id: 'k', v: 1 });
+    await older;
+    answers[1].resolve([{ id: 'k', v: 2 }]);
+    await newer;
+    expect((await data.read('members', 'k')).v).toBe(2);
+  });
+
+  it('still yields to a local edit made after its read began', async () => {
+    const { data } = service();
+    let answer;
+    const read = data.reconcileWindow('members', { fetch: () => new Promise((resolve) => { answer = resolve; }), scope: (row) => row.id === 'k' });
+    await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
+    await data.writer('members').put({ id: 'k', v: 'local' });
+    answer([{ id: 'k', v: 1 }]);
+    await read;
+    expect((await data.read('members', 'k')).v).toBe('local');
+  });
+});
+
 describe('scoped writes', () => {
   it('keeps both of two concurrent window reads of disjoint scopes: a scoped write is no whole replacement', async () => {
     const { data } = service();

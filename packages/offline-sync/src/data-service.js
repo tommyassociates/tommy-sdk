@@ -42,6 +42,7 @@
 import {
   reconcileFetched, windowKeyOf, previousByKey, reportRejected,
 } from './reconcile.js';
+import { boundedBatches } from './bytes.js';
 
 export const DATA_STATES = Object.freeze(['fresh', 'stale', 'refreshing', 'offline', 'error']);
 // A store's methods that change its rows: called only on the handles a
@@ -127,8 +128,10 @@ function snapshotRows(answer) {
   if (answer && typeof answer === 'object' && Array.isArray(answer.rows)) return answer.rows;
   return null;
 }
-// One reconcile carries a bounded complete set; larger ingests go in chunks.
+// One reconcile carries a bounded complete set: at most this many rows and
+// about WRITE_BATCH_BYTES (bytes.js); larger ingests go in chunks.
 const INGEST_CHUNK = 500;
+const ingestChunks = (rows) => boundedBatches(rows, { maxItems: INGEST_CHUNK });
 // A whole read writes the rows it changed, and confirms (writes again) an
 // unchanged row only once it was last written this long ago, so its age
 // limits count from a recent confirmation; in a store whose rows stop being
@@ -381,15 +384,17 @@ export function createDataService({
   // One writer at a time per collection (see the module note); a task queued
   // after the service retired is refused. The task is given the only handles
   // that write the collection: `store`, which records each change it makes
-  // (touching), and `raw`, for a declared read's own commit.
+  // (touching), and `raw`, for a declared read's own commit. `at`: for a
+  // fetched write, its read's start, which every change it makes is recorded
+  // as of; a local write's is now.
   const turns = new Map();
-  function inTurn(name, task) {
+  function inTurn(name, task, { at = null } = {}) {
     const next = (turns.get(name) || Promise.resolve()).then(() => {
       live();
       const found = resolve(name);
       if (!found?.store) throw serviceError(`Collection '${name}' is not declared`, 'DATA_UNDECLARED');
       const raw = found.store;
-      return task({ store: touching(name, raw, found.decl?.keyPath || 'id'), raw });
+      return task({ store: touching(name, raw, found.decl?.keyPath || 'id', at), raw });
     });
     const tail = next.then(() => {}, () => {});
     turns.set(name, tail);
@@ -400,11 +405,12 @@ export function createDataService({
    * A collection's store as every writer but a declared read's commit uses
    * it, inside its turn: each put, removal, row mark and reconcile records
    * the keys it changes (a pruning reconcile records the collection as
-   * replaced), so a declared read that began before never undoes them.
+   * replaced), as of `at` (a fetched write's read start, else now), so a
+   * read that began before never undoes them.
    */
-  function touching(name, store, keyPath) {
+  function touching(name, store, keyPath, at = null) {
     const keyOf = (row) => (row && typeof row === 'object' ? row[keyPath] : undefined);
-    const changed = (keys) => recordEffect(name, { changedKeys: keys });
+    const changed = (keys) => recordEffect(name, { changedKeys: keys, at });
     const writers = {
       put: (record, ...rest) => { changed([keyOf(record)]); return store.put(record, ...rest); },
       delete: (key, ...rest) => { changed([key]); return store.delete(key, ...rest); },
@@ -417,9 +423,9 @@ export function createDataService({
       reconcile: async (records = [], { whole: replacesAll = false, ...options } = {}) => {
         const whole = replacesAll === true || (options.prune !== false && typeof options.scope !== 'function');
         changed(records.map(keyOf));
-        if (whole) recordEffect(name, { whole: true });
+        if (whole) recordEffect(name, { whole: true, at });
         const result = await store.reconcile(records, options);
-        if (!whole && Array.isArray(result?.prunedKeys)) recordEffect(name, { removedKeys: result.prunedKeys });
+        if (!whole && Array.isArray(result?.prunedKeys)) recordEffect(name, { removedKeys: result.prunedKeys, at });
         return result;
       },
     };
@@ -867,13 +873,14 @@ export function createDataService({
         if (notSaved.has(key)) { unsaved.add(key); stored.delete(key); } else if (!left.has(key)) { stored.add(key); unsaved.delete(key); }
       });
     };
-    if (replace && rows.length <= INGEST_CHUNK) {
+    const chunks = ingestChunks(rows);
+    if (replace && chunks.length <= 1) {
       await upsert(rows, scoped ? { scope: inScope } : {});
     } else {
-      for (let start = 0; start < rows.length; start += INGEST_CHUNK) {
+      for (const chunk of chunks) {
         // Chunks commit in order; each is a bounded complete set.
         // eslint-disable-next-line no-await-in-loop
-        await upsert(rows.slice(start, start + INGEST_CHUNK), { prune: false });
+        await upsert(chunk, { prune: false });
       }
       if (replace) await store.reconcile([], { scope: (row) => inScope(row) && !kept.has(String(row[keyPath])), whole: !scoped });
     }
@@ -929,6 +936,8 @@ export function createDataService({
       // eslint-disable-next-line no-await-in-loop
       const answer = await read(startedAt);
       if (!isCurrent()) return undefined;
+      // What it stores is recorded as of the read's start: a read that began
+      // later and answers after it is not taken for a local edit.
       // eslint-disable-next-line no-await-in-loop
       const outcome = await inTurn(name, async (turn) => {
         // Still wanted, checked again in the turn, just before it commits.
@@ -937,7 +946,7 @@ export function createDataService({
         if (protectionLost(name, startedAt)) return null;
         const value = await commit(answer, touchedAfter(name, startedAt), startedAt, turn);
         return value === READ_AGAIN ? null : { value };
-      });
+      }, { at: startedAt });
       if (outcome) return outcome.dropped ? undefined : outcome.value;
     }
     throw serviceError(`'${name}' changed on this device faster than it could be read`, 'DATA_BUSY');
@@ -1095,10 +1104,10 @@ export function createDataService({
     if (halted()) return stopHere();
     const unchanged = (touched) => (row) => !touched.has(keyOf(row));
     if (changesOnly) {
-      for (let start = 0; start < records.length; start += INGEST_CHUNK) {
+      for (const batch of ingestChunks(records)) {
         if (halted()) return stopHere();
         const touched = touchedAfter(name, startedAt);
-        const chunk = records.slice(start, start + INGEST_CHUNK).filter(unchanged(touched));
+        const chunk = batch.filter(unchanged(touched));
         // Chunks commit in order.
         // eslint-disable-next-line no-await-in-loop
         if (chunk.length) noteResult(chunk, await raw.reconcile(chunk, { prune: false, keepDirty: true }));
@@ -1132,10 +1141,10 @@ export function createDataService({
         if (!oldest || at < oldest.at) oldest = { record, at };
       });
       if (!toWrite.length && oldest) toWrite.push(oldest.record);
-      for (let start = 0; start < toWrite.length; start += INGEST_CHUNK) {
+      for (const batch of ingestChunks(toWrite)) {
         if (halted()) return stopHere();
         const touchedSince = touchedAfter(name, startedAt);
-        const chunk = toWrite.slice(start, start + INGEST_CHUNK).filter(unchanged(touchedSince));
+        const chunk = batch.filter(unchanged(touchedSince));
         // eslint-disable-next-line no-await-in-loop
         if (chunk.length) noteResult(chunk, await raw.reconcile(chunk, { prune: false, keepDirty: true, protect: [...answered] }));
       }

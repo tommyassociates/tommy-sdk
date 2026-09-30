@@ -1513,4 +1513,43 @@ describe.each(DATABASES)('large collections on the host store (%s)', (_name, cre
     await vi.waitFor(() => expect(seen.at(-1)).toEqual([1, 2]));
     await close();
   });
+
+  // Three rows that each fit one commit, and together are past its 8 MiB.
+  const MIB = 1024 * 1024;
+  const wide = (id) => ({ id, chat_id: 5, seq: Number(id.slice(1)), body: id.repeat(3 * MIB / id.length) });
+
+  it('patches rows whose patched sizes together pass one commit, in commits that each fit', async () => {
+    const { data, close } = hostService(create);
+    await data.ingest('chats.messages', [{ id: 'p1', chat_id: 5, seq: 1 }, { id: 'p2', chat_id: 5, seq: 2 }, { id: 'p3', chat_id: 5, seq: 3 }]);
+    const outcome = await data.patchRows('chats.messages', ['p1', 'p2', 'p3'], { body: 'x'.repeat(3 * MIB) });
+    expect(outcome).toMatchObject({ patched: ['p1', 'p2', 'p3'], refused: [], skipped: [] });
+    for (const key of ['p1', 'p2', 'p3']) expect((await data.read('chats.messages', key)).body).toHaveLength(3 * MIB); // eslint-disable-line no-await-in-loop
+    await close();
+  });
+
+  it('patches rows whose stored sizes together pass one read, in commits that each fit', async () => {
+    const { data, close } = hostService(create);
+    for (const id of ['s1', 's2', 's3']) await data.ingest('chats.messages', [wide(id)]); // eslint-disable-line no-await-in-loop
+    const outcome = await data.patchRows('chats.messages', ['s1', 's2', 's3'], { note: 'seen' });
+    expect(outcome.patched).toEqual(['s1', 's2', 's3']);
+    expect((await data.read('chats.messages', 's3')).note).toBe('seen');
+    await close();
+  });
+
+  it('ingests rows that together pass one commit, whether or not they replace', async () => {
+    const { data, close } = hostService(create);
+    await expect(data.ingest('chats.messages', [wide('i1'), wide('i2'), wide('i3')])).resolves.toMatchObject({ written: 3 });
+    await expect(data.ingest('chats.messages', [wide('r1'), wide('r2'), wide('r3')], { replace: true })).resolves.toMatchObject({ written: 3 });
+    expect(await data.read('chats.messages', 'i1')).toBeNull();
+    expect((await data.read('chats.messages', 'r3')).body).toHaveLength(3 * MIB);
+    await close();
+  });
+
+  it('stores a declared read whose rows together pass one commit', async () => {
+    const { data, close } = hostService(create);
+    data.source('chats.messages', { read: {}, fetch: async () => [wide('d1'), wide('d2'), wide('d3')] });
+    await data.refresh('chats.messages', { mode: 'visible' });
+    for (const key of ['d1', 'd2', 'd3']) expect((await data.read('chats.messages', key)).body).toHaveLength(3 * MIB); // eslint-disable-line no-await-in-loop
+    await close();
+  });
 });
