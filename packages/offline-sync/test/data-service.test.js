@@ -287,6 +287,27 @@ describe('MP data API confinement', () => {
     } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
   });
 
+  it('never drops a saved pref to bound what refused ones hold: the pref over the bound is refused instead', async () => {
+    const saved = globalThis.localStorage;
+    const kept = new Map();
+    globalThis.localStorage = { getItem: (k) => (kept.has(k) ? kept.get(k) : null), setItem: (k, v) => { kept.set(k, String(v)); }, removeItem: (k) => { kept.delete(k); } };
+    const token = { tenantId: 'team-47', mpId: 'scheduling' };
+    try {
+      const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {} });
+      await data.prefs.set('layout', 'grid');
+      // Each too big to save; the second past what the refused ones may hold.
+      await expect(data.prefs.set('big1', 'x'.repeat(600000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+      await expect(data.prefs.set('big2', 'x'.repeat(600000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+      await data.prefs.remove('big1');
+      await data.prefs.remove('big2');
+      const [storeKey] = [...kept.keys()].filter((key) => key.endsWith(':prefs'));
+      expect(Object.keys(JSON.parse(kept.get(storeKey)))).toEqual(['layout']);
+      const reloaded = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {} });
+      await reloaded.prefs.ready();
+      expect(reloaded.prefs.get('layout')).toBe('grid');
+    } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+
   it('never evicts a client-owned row in memory: only cached rows go past the row cap', async () => {
     const own = createDataStore({ name: 'drafts', backend: createMemoryStoreBackend(), syncStrategy: 'last_write_wins', maxRows: 2 });
     await own.reconcile([{ id: '1' }, { id: '2' }], { prune: false });

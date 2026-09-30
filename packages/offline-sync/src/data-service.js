@@ -14,8 +14,9 @@
  * `source`, `refresh` and `mutate` with a source's `push` are experimental:
  * no host collection or MP uses them yet. Their outbox keeps every unsent
  * change on the row (a delete as a hidden tombstone, a refusal for access as
- * a marker), sends a restored change as the row is when it goes out, and drops
- * queued changes on a forced removal or a principal switch.
+ * a marker), sends a restored change as the row is when it goes out (as it
+ * was restored once a server read replaced the row), and drops queued
+ * changes on a forced removal or a principal switch.
  *
  * The host builds one over its domain collections (`<domain>.<collection>`);
  * an MP's DataApi builds one over its own manifest stores, confined to
@@ -380,7 +381,8 @@ export function createDataService({
    * already acknowledged (the row's `_ackRev` is at or past its revision:
    * this tab or another sent it, or a later state) is not sent: it would put
    * an older state on the server. A row a server read overwrote is no such
-   * acknowledgement, so the change still goes. Edits queued behind a
+   * acknowledgement, so the change still goes (a restored one as it was
+   * restored). Edits queued behind a
    * change that its send already holds (written at or before the revision it
    * sends) settle with it; they stay queued until then, so a failed or
    * repeated send, a fence, a discard or a dispose reaches them as it does
@@ -408,14 +410,19 @@ export function createDataService({
                 // The highest revision of this row a push acknowledged.
                 const acked = Number.isSafeInteger(row?._ackRev) ? row._ackRev : null;
                 const skip = () => { sent = true; change.skipped = true; change.carries = acked === null ? [] : held(acked); };
+                const acknowledged = row && !row._dirty && acked !== null && Number.isSafeInteger(change.revision) && acked >= change.revision;
                 if (change.restored) {
-                  // Sent as the row is now: nothing when it is no longer an
-                  // unsent change (another tab sent it), else its latest state.
-                  if (!row?._dirty) { skip(); return; }
-                  change.command = row._deleted ? { op: 'delete', key: entry.key } : { op: 'put', record: bare(row) };
-                  change.record = row._deleted ? null : bare(row);
-                  change.revision = row._rev;
-                } else if (row && !row._dirty && acked !== null && Number.isSafeInteger(change.revision) && acked >= change.revision) {
+                  // Sent as the row is now while it is still an unsent change.
+                  // Once it is not, it is skipped only when a push acknowledged
+                  // it, or (a delete) its tombstone is gone, which happens only
+                  // after one; a server read that replaced or a purge that
+                  // removed the row sends the change as it was restored.
+                  if (row?._dirty) {
+                    change.command = row._deleted ? { op: 'delete', key: entry.key } : { op: 'put', record: bare(row) };
+                    change.record = row._deleted ? null : bare(row);
+                    change.revision = row._rev;
+                  } else if (acknowledged || (!row && change.command.op === 'delete')) { skip(); return; }
+                } else if (acknowledged) {
                   // A push acknowledged this change, or a later state of the row.
                   skip(); return;
                 }

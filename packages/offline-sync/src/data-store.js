@@ -267,11 +267,26 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
     return discarded;
   }
 
-  /** Retain `map` for the session, bounded, and report what the bound cost. */
-  function retain(map, protect) {
+  /**
+   * Retain `map` for the session, bounded, and report what the bound cost.
+   *
+   * With `evict: false` the bound never trims a row: one over it refuses the
+   * row being written instead, put back as it was (`before`, or absent), so
+   * the map held is the one before this write. `refused` says so.
+   */
+  function retain(map, protect, before) {
+    if (!evict) {
+      const bytes = [...map].reduce((sum, [key, record]) => sum + entryBytes(key, record), 0);
+      if (protect !== undefined && bytes > maxBytes * RETAINED_BUDGET_MULTIPLE) {
+        if (before === undefined) map.delete(protect); else map.set(protect, before);
+        return { discarded: [], refused: true };
+      }
+      memoryFallback.set(storeKey, new Map(map));
+      return { discarded: [], refused: false };
+    }
     const discarded = boundRetained(map, protect);
     memoryFallback.set(storeKey, new Map(map));
-    return discarded;
+    return { discarded, refused: false };
   }
 
   /**
@@ -292,8 +307,11 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
     return true;
   }
 
-  /** Persist `map`. Returns the same result shape as put/delete. */
-  function save(map, protect) {
+  /**
+   * Persist `map`. Returns the same result shape as put/delete; a write
+   * refused and not held anywhere (see `retain`) says `retained: false`.
+   */
+  function save(map, protect, before) {
     const store = webStorage();
     if (!store) {
       // NOT `{ ok: true }`. This backend is only ever chosen because Web Storage
@@ -303,18 +321,18 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
       // store's quota path was written to end (review finding F4). Retain the
       // rows for the session and tell the caller, the same way the quota branch
       // does.
-      const discarded = retain(map, protect);
+      const { discarded, refused } = retain(map, protect, before);
       return {
-        ok: false, reason: 'unavailable', budget: maxBytes, evicted: [], discarded,
+        ok: false, reason: 'unavailable', budget: maxBytes, evicted: [], discarded, ...(refused ? { retained: false } : {}),
       };
     }
     const { total, evicted } = evictToFit(map, protect);
     if (total > maxBytes) {
       // Over budget with nothing left to give — every remaining row is either
       // dirty or the row being written. Refuse rather than drop a draft.
-      const discarded = retain(map, protect);
+      const { discarded, refused } = retain(map, protect, before);
       return {
-        ok: false, reason: 'budget', bytes: total, budget: maxBytes, evicted, discarded,
+        ok: false, reason: 'budget', bytes: total, budget: maxBytes, evicted, discarded, ...(refused ? { retained: false } : {}),
       };
     }
     try {
@@ -326,9 +344,9 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
       // The ORIGIN quota, not our own budget — some other key filled the 5MB, or
       // storage is disabled. Keep the rows for the session so the write is not
       // simply lost, and tell the caller it did not reach disk.
-      const discarded = retain(map, protect);
+      const { discarded, refused } = retain(map, protect, before);
       return {
-        ok: false, reason: 'quota', bytes: total, budget: maxBytes, evicted, discarded, error: e?.name || 'Error',
+        ok: false, reason: 'quota', bytes: total, budget: maxBytes, evicted, discarded, error: e?.name || 'Error', ...(refused ? { retained: false } : {}),
       };
     }
   }
@@ -338,8 +356,9 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
     async getAll() { return [...load().values()]; },
     async put(key, record) {
       const map = load();
+      const before = map.get(String(key));
       map.set(String(key), record);
-      return save(map, String(key));
+      return save(map, String(key), before);
     },
     async delete(key) { const map = load(); map.delete(String(key)); return save(map); },
     /**
@@ -993,7 +1012,8 @@ export function createDataStore({
         };
         if (server) capSaturated = false;   // a clean row is an evictable row
         const written = await backend.put(key, stamped);
-        if (previous === undefined) residentCount += 1;
+        // A write refused and not held (`retained: false`) left the row as it was.
+        if (previous === undefined && !(written?.ok === false && written.retained === false)) residentCount += 1;
         return { stamped, persisted: written };
       });
       if (turn === null) return undefined;
@@ -1010,13 +1030,13 @@ export function createDataStore({
         // backend without it keeps the old behaviour rather than losing the flag.
         // The re-put fallback runs the whole save path again, so its result can
         // carry gone rows of its own — dropped on the floor until BSC-5.
+        // A write the backend did not hold (`retained: false`) left the row
+        // as it was: there is nothing to flag.
         let reput = null;
-        if (typeof backend.patchRetained === 'function') {
-          if (!backend.patchRetained(key, { _persistFailed: true })) {
+        if (persisted.retained !== false) {
+          if (typeof backend.patchRetained !== 'function' || !backend.patchRetained(key, { _persistFailed: true })) {
             reput = await backend.put(key, { ...stamped, _persistFailed: true });
           }
-        } else {
-          reput = await backend.put(key, { ...stamped, _persistFailed: true });
         }
         // ⚠ ITS KEYS JOIN THE BATCH TOO. Counting and reporting them while
         // leaving them out of the notify meant a selector subscriber watching a

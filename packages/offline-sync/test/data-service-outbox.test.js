@@ -113,8 +113,8 @@ describe('a change restored after a restart', () => {
     const push = vi.fn(async () => {});
     data.source('items', { fetch: async () => [], push });
     await vi.waitFor(() => expect(scheduler.held.length).toBe(1));
-    // Another tab sends it first.
-    await store.markSynced('a');
+    // Another tab sends it first: its push acknowledges the row.
+    await store.markSynced('a', { pushed: true });
     scheduler.releaseAll();
     await settle(); await settle();
     expect(push).not.toHaveBeenCalled();
@@ -450,6 +450,27 @@ describe('fencing, cleanup after a sent delete, and queued deletes', () => {
     expect(await outcome(second)).toEqual({ value: { key: 'a', pushed: true } });
     expect(sent).toEqual(['one', 'two']);
     expect(data.pending()).toEqual([]);
+  });
+
+  it('sends a restored change whose row a server read overwrote or a purge removed, and skips one a push acknowledged', async () => {
+    const { store } = service();
+    // Unsent changes from an earlier session.
+    await store.put({ id: 'a', v: 'A' });
+    await store.put({ id: 'b', v: 'B' });
+    await store.put({ id: 'c', v: 'C' });
+    const scheduler = heldScheduler();
+    const { data } = service({ store, scheduler });
+    const sent = [];
+    data.source('items', { fetch: async () => [], push: async (command) => { sent.push(command.record?.v); } });
+    await vi.waitFor(() => expect(scheduler.held.length).toBe(3));
+    // A server read stores its copy over a and c (acknowledging neither), c is
+    // then removed as a clean row, and another tab's push acknowledges b.
+    await store.reconcile([{ id: 'a', v: 'server' }, { id: 'c', v: 'server' }], { prune: false });
+    await store.delete('c');
+    await store.markSynced('b', { pushed: true });
+    scheduler.releaseAll();
+    await vi.waitFor(() => expect(data.pending()).toEqual([]));
+    expect(sent.sort()).toEqual(['A', 'C']);
   });
 
   it('never reports a push the server acknowledged as failed when its store was retired meanwhile, nor sends it again', async () => {
