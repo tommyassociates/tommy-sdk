@@ -46,8 +46,8 @@ export default defineConfig(({ command, mode }) => {
     plugins: [vue(), pluginWatchNodeModules(['tommy-core'])],
     test: {
       // The retiring-path monitor (core/src/retiring), in a run from the SDK root.
-      setupFiles: ['./vitest.retiring-setup.js'],
-      globalSetup: ['./vitest.retiring-global-setup.js'],
+      setupFiles: [path.resolve(__dirname, 'vitest.retiring-setup.js')],
+      globalSetup: [path.resolve(__dirname, 'vitest.retiring-global-setup.js')],
     },
     envPrefix: 'TOMMY_',
     define: {
