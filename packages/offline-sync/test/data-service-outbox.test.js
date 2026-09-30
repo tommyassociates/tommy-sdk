@@ -435,6 +435,23 @@ describe('fencing, cleanup after a sent delete, and queued deletes', () => {
     expect(await store.getRaw('a')).toMatchObject({ v: 'C', _dirty: false });
   });
 
+  it('sends an edit whose row a server read overwrote, never taking the overwrite for its acknowledgement', async () => {
+    const { data, store } = service();
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const sent = [];
+    data.source('items', { fetch: async () => [], push: async (command) => { if (!sent.length) await gate; sent.push(command.record?.v); } });
+    await data.mutate('items', { op: 'put', record: { id: 'a', v: 'one' } });
+    const second = data.mutate('items', { op: 'put', record: { id: 'a', v: 'two' } }, { wait: true });
+    await settle();
+    // An MP's own reconcile stores the server's row over the unsent edit.
+    await store.reconcile([{ id: 'a', v: 'server' }], { prune: false });
+    release();
+    expect(await outcome(second)).toEqual({ value: { key: 'a', pushed: true } });
+    expect(sent).toEqual(['one', 'two']);
+    expect(data.pending()).toEqual([]);
+  });
+
   it('keeps the edits a restored change carries through a rerun of its send, and settles them with it', async () => {
     const { store } = service();
     await store.put({ id: 'a', v: 'A' });

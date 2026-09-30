@@ -161,9 +161,11 @@ export function createDataManager({
   // `toRecord` (with a `prev` lookup when `keyOf` is supplied, for rich-field
   // preservation across a thin DTO), and reconcile them into the store under
   // `scope`. A failed fetch is swallowed so the SWR paint holds (cache intact).
+  // In a store that sends its changes, a row with an unsent change keeps it:
+  // the server's copy never replaces an edit still waiting to go.
   // Returns the reconciled, scope-filtered cache read.
-  const fetchAndReconcile = (store, keyPath, spec, scope, window, windowKey) => reconcileFetched(
-    store, keyPath, spec, scope, window, windowKey, { onPersistError },
+  const fetchAndReconcile = (store, keyPath, spec, scope, window, windowKey, storeName) => reconcileFetched(
+    store, keyPath, spec, scope, window, windowKey, { onPersistError, keepDirty: service.sends(storeName) }, // eslint-disable-line no-use-before-define
   );
 
   // The same small surface the host uses, confined to this MP's own stores
@@ -312,7 +314,7 @@ export function createDataManager({
         read: (window) => store.readWhere(scopeFor(window)),
         // The reconcile answers with its own read of the window's scope.
         sync: (window) => fetchAndReconcile(
-          store, keyPath, { fetch, toRecord, keyOf }, scopeFor(window), window, windowKeyOf(window),
+          store, keyPath, { fetch, toRecord, keyOf }, scopeFor(window), window, windowKeyOf(window), storeName,
         ),
       };
     },
@@ -369,11 +371,17 @@ export function createDataManager({
           const prev = await store.get(key);
           const rec = toRecord(dto, prev);
           if (!rec) return undefined;
-          // A cache write must never fail the read it was serving: the record is
-          // returned either way, so a full/blocked store degrades to
-          // fetch-every-time rather than to a blank surface.
-          try { await store.put(rec); } catch (_) { /* cache write is best-effort */ }
-          return rec;
+          // Stored as the server's row. In a store that sends its changes, a
+          // row with an edit still waiting to go keeps it, and the read
+          // answers with it. A cache write must never fail the read it was
+          // serving: the record is returned either way, so a full/blocked
+          // store degrades to fetch-every-time rather than to a blank surface.
+          let kept = false;
+          try {
+            const result = await store.reconcile([rec], { prune: false, ...(service.sends(storeName) ? { keepDirty: true } : {}) }); // eslint-disable-line no-use-before-define
+            kept = (Array.isArray(result?.skipped) ? result.skipped : []).map(String).includes(key);
+          } catch (_) { /* cache write is best-effort */ }
+          return kept ? ((await store.get(key)) ?? rec) : rec;
         },
       };
     },
@@ -467,7 +475,7 @@ export function createDataManager({
         // The reconcile answers with its read of the prune scope; a read whose
         // paint scope differs reads that too.
         revalidate: (window) => fetchAndReconcile(
-          store, keyPath, { fetch, toRecord, keyOf }, prunePredicate, window, windowKeyOf(window),
+          store, keyPath, { fetch, toRecord, keyOf }, prunePredicate, window, windowKeyOf(window), storeName,
         ).then((rows) => (prunePredicate === predicate ? rows : store.readWhere(predicate))),
       };
     },

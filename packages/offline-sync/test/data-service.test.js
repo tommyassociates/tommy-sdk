@@ -255,6 +255,24 @@ describe('MP data API confinement', () => {
     await expect(data.ingest('chats.messages', [{ id: 'x' }])).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
     await expect(data.trim('mp.time-clock.shifts', { index: 'by_day', keep: 1 })).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
   });
+  it.each(['liveQuery', 'windowCache'])('keeps an edit waiting to be sent through a %s revalidation, and sends it', async (kind) => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const pushed = [];
+    data.source('shifts', { fetch: async () => [], push: async (command) => { if (!pushed.length) await gate; pushed.push(command.record?.at); } });
+    await data.mutate('shifts', { op: 'put', record: { id: '1', at: 'mon' } });
+    const second = data.mutate('shifts', { op: 'put', record: { id: '1', at: 'tue' } }, { wait: true });
+    await settle();
+    const fetch = async () => [{ id: '1', at: 'server' }];
+    if (kind === 'liveQuery') await data.liveQuery('shifts', { fetch }).revalidate();
+    else await data.windowCache('shifts', { fetch }).sync('week');
+    expect(await data.read('shifts', '1', { raw: true })).toMatchObject({ at: 'tue', _dirty: true });
+    release();
+    await expect(second).resolves.toEqual({ key: '1', pushed: true });
+    expect(pushed).toEqual(['mon', 'tue']);
+  });
+
   it('refuses purge options it does not know or cannot read, removing nothing', async () => {
     const data = memoryService();
     await data.ingest('chats.messages', [{ id: 'a', chat_id: 7, seq: 1 }, { id: 'b', chat_id: 7, seq: 2 }]);

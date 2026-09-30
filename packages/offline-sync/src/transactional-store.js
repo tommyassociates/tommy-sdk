@@ -59,6 +59,8 @@ const nextRevision = (value = 0) => { if (!Number.isSafeInteger(value) || value 
 // A row's next revision: above its own and above the store's, which every
 // commit moves on, so a key written again after it was removed never takes a
 // revision it held before (a push still on its way cannot settle the new row).
+// What a push acknowledged of a row (`_ackRev`) stays known through later writes.
+const acknowledged = (previous) => (Number.isSafeInteger(previous?._ackRev) ? { _ackRev: previous._ackRev } : {});
 const rowRevision = (previous, storeRevision) => nextRevision(Math.max(previous?._rev || 0, Number.isSafeInteger(storeRevision) ? storeRevision : 0));
 
 export function createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows, indexes = {}, queryRows = null }) {
@@ -204,7 +206,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       return exclusive(async () => {
         await mutation([key], (rows, storeRevision) => {
           const previous = rows.get(key);
-          const stamped = { ...submitted, ...(previous?._window != null ? { _window: previous._window } : {}), _rev: rowRevision(previous, storeRevision), _dirty: true, _updatedAt: new Date(now()).toISOString(), ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}) };
+          const stamped = { ...submitted, ...(previous?._window != null ? { _window: previous._window } : {}), ...acknowledged(previous), _rev: rowRevision(previous, storeRevision), _dirty: true, _updatedAt: new Date(now()).toISOString(), ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}) };
           return [{ op: 'put', key, value: stamped }];
         }, { retry: true });
         if (!silent) await notify();
@@ -259,13 +261,14 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         return found;
       });
     },
-    markSynced(key, { expectedRevision } = {}) {
+    // `pushed` records the revision as one a push acknowledged (`_ackRev`).
+    markSynced(key, { expectedRevision, pushed = false } = {}) {
       return exclusive(async () => {
         await mutation([keyString(key)], (rows) => {
           const row = rows.get(keyString(key));
           if (!row || (expectedRevision !== undefined && row._rev !== expectedRevision)) return [];
           const { _persistFailed, _pushRefused, ...rest } = row;
-          return [{ op: 'put', key: keyString(key), value: { ...rest, _dirty: false } }];
+          return [{ op: 'put', key: keyString(key), value: { ...rest, _dirty: false, ...(pushed ? { _ackRev: row._rev } : {}) } }];
         });
         await notify();
       });
@@ -290,7 +293,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       return exclusive(async () => {
         let upserted = 0;
         const skipped = new Set();
-        const stamp = (row, previous, storeRevision) => ({ ...row, _rev: rowRevision(previous, storeRevision), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) });
+        const stamp = (row, previous, storeRevision) => ({ ...row, ...acknowledged(previous), _rev: rowRevision(previous, storeRevision), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) });
         for (const batch of upsertBatches(incoming)) {
           let left = [];
           await mutation(batch.map(([key]) => key), (rows, storeRevision) => {

@@ -975,6 +975,8 @@ export function createDataStore({
           // reconcile that DOES carry a windowKey re-stamps the row afterwards,
           // so this preserves without ever pinning a row to a stale window.
           ...(previous?._window != null ? { _window: previous._window } : {}),
+          // What a push acknowledged of this row stays known through later writes.
+          ...(Number.isSafeInteger(previous?._ackRev) ? { _ackRev: previous._ackRev } : {}),
           _rev: nextRowRevision(previous),
           _updatedAt: new Date(now()).toISOString(),
           _dirty: !server,
@@ -1122,9 +1124,11 @@ export function createDataStore({
     /**
      * Sync engine hook: clear _dirty after a successful push. With
      * `expectedRevision`, only while the row is still that revision: a later
-     * local write stays dirty until its own push.
+     * local write stays dirty until its own push. `pushed` records the
+     * revision as one a push acknowledged (`_ackRev`); a server row marked
+     * synced is not one.
      */
-    async markSynced(key, { expectedRevision } = {}) {
+    async markSynced(key, { expectedRevision, pushed = false } = {}) {
       const persisted = await rowTurn(key, async () => {
         const record = await backend.get(key);
         if (!record) return null;
@@ -1137,7 +1141,7 @@ export function createDataStore({
         // evictable, which is exactly when the byte guard can act — and this path
         // discarded the result unconditionally, so those keys were never counted,
         // never notified and never reported (review BSC-5).
-        return backend.put(key, { ...rest, _dirty: false });
+        return backend.put(key, { ...rest, _dirty: false, ...(pushed ? { _ackRev: record._rev } : {}) });
       });
       if (persisted === null) return;
       const gone = accountForGoneRows(persisted, key);

@@ -101,6 +101,27 @@ describe('DataApi.record', () => {
     expect(row).toMatchObject({ hours: 2 });
   });
 
+  it('stores a fetched record as the server\'s row, and keeps an edit still waiting to be sent', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData: { entries: { ...localData.entries, syncStrategy: 'server_authoritative' } } });
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const pushed = [];
+    data.source('entries', { fetch: async () => [], push: async (command) => { if (!pushed.length) await gate; pushed.push(command.record?.hours); } });
+    await data.mutate('entries', { op: 'put', record: { id: '5', shiftId: 's5', hours: 1 } });
+    const second = data.mutate('entries', { op: 'put', record: { id: '5', shiftId: 's5', hours: 7 } }, { wait: true });
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    const rec = data.record('entries', { fetch: async () => ({ id: '5', shiftId: 's5', hours: 3 }) });
+    expect(await rec.get('5', { refresh: true })).toMatchObject({ hours: 7 });
+    expect(await data.read('entries', '5', { raw: true })).toMatchObject({ hours: 7, _dirty: true });
+    release();
+    await expect(second).resolves.toEqual({ key: '5', pushed: true });
+    expect(pushed).toEqual([1, 7]);
+    // A record fetched where nothing waits to be sent is stored synced.
+    const fetched = data.record('entries', { fetch: async () => ({ id: '8', shiftId: 's8', hours: 2 }) });
+    await fetched.get('8');
+    expect(await data.read('entries', '8', { raw: true })).toMatchObject({ hours: 2, _dirty: false });
+  });
+
   it('null/undefined ids never reach the fetcher', async () => {
     const data = manager();
     const fetch = vi.fn();

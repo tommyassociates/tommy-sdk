@@ -356,7 +356,8 @@ export function createDataService({
    * After a change was sent, the row it came from settles, only while it is
    * still that change: a sent delete removes its tombstone (never a row
    * written since, and never a row when it held none), and a sent put is
-   * marked synced at the revision it wrote.
+   * marked synced at the revision it wrote, recorded as acknowledged
+   * (`_ackRev`): the evidence a later check needs that the server has it.
    */
   async function settleSent(entry, change) {
     if (change.revision === undefined || change.revision === null) return;
@@ -367,16 +368,17 @@ export function createDataService({
         if (row._deleted) await entry.store.delete(entry.key, { expectedRevision: change.revision });
         return;
       }
-      await entry.store.markSynced(entry.key, { expectedRevision: change.revision });
+      await entry.store.markSynced(entry.key, { expectedRevision: change.revision, pushed: true });
     } catch (_) { /* written again since: it stays as written */ }
   }
   /**
    * Sends one row's changes oldest first. A failure stops the row there and
    * keeps every change for a retry; the row is marked synced only when the
-   * change just sent is still its latest local write. A change the row
-   * holds synced already, or has moved past with that newer state synced
-   * (another tab sent it), is not sent: it would put an older state on the
-   * server. Edits queued behind a
+   * change just sent is still its latest local write. A change a push
+   * already acknowledged (the row's `_ackRev` is at or past its revision:
+   * this tab or another sent it, or a later state) is not sent: it would put
+   * an older state on the server. A row a server read overwrote is no such
+   * acknowledgement, so the change still goes. Edits queued behind a
    * change that its send already holds (written at or before the revision it
    * sends) settle with it; they stay queued until then, so a failed or
    * repeated send, a fence, a discard or a dispose reaches them as it does
@@ -401,7 +403,9 @@ export function createDataService({
                 const row = await entry.store.getRaw(entry.key);
                 const held = (revision) => entry.changes.slice(1)
                   .filter((queued) => Number.isSafeInteger(queued.revision) && queued.revision <= revision);
-                const skip = () => { sent = true; change.skipped = true; change.carries = Number.isSafeInteger(row?._rev) ? held(row._rev) : []; };
+                // The highest revision of this row a push acknowledged.
+                const acked = Number.isSafeInteger(row?._ackRev) ? row._ackRev : null;
+                const skip = () => { sent = true; change.skipped = true; change.carries = acked === null ? [] : held(acked); };
                 if (change.restored) {
                   // Sent as the row is now: nothing when it is no longer an
                   // unsent change (another tab sent it), else its latest state.
@@ -409,9 +413,8 @@ export function createDataService({
                   change.command = row._deleted ? { op: 'delete', key: entry.key } : { op: 'put', record: bare(row) };
                   change.record = row._deleted ? null : bare(row);
                   change.revision = row._rev;
-                } else if (row && !row._dirty && Number.isSafeInteger(row._rev) && Number.isSafeInteger(change.revision)
-                  && row._rev >= change.revision) {
-                  // The row holds this change, or a later state, synced already.
+                } else if (row && !row._dirty && acked !== null && Number.isSafeInteger(change.revision) && acked >= change.revision) {
+                  // A push acknowledged this change, or a later state of the row.
                   skip(); return;
                 }
                 change.carries = Number.isSafeInteger(change.revision) ? held(change.revision) : [];
@@ -524,6 +527,11 @@ export function createDataService({
         restoreDirty({ name, label, store, decl });
       }
       return () => { if (sources.get(name) === spec) sources.delete(name); };
+    },
+    /** Whether `collection` sends its local changes (a push is registered or declared). */
+    sends(collection) {
+      const { name, decl } = local(collection);
+      return typeof pushOf(name, decl) === 'function';
     },
     /** Whether `collection` can refresh (a source is registered or declared). */
     hasSource(collection) {
