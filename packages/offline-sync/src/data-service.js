@@ -352,13 +352,16 @@ export function createDataService({
       if (key !== undefined && key !== null) return (await store.get(String(key))) ?? null;
       return raw ? store.getAllRaw() : store.getAll();
     },
+    // `raw: true` answers as writers see the collection (rows past the paint
+    // ceiling and the age limit included), for a caller deciding what to remove.
     async query(collection, spec = {}) {
       live();
       const { store } = local(collection);
-      const { index, limit = 50, cursor = null, where, ...range } = spec;
+      const { index, limit = 50, cursor = null, where, raw = false, ...range } = spec;
       queryLimit(limit);
-      if (index) return queryPages(store, index, range, { limit, cursor });
-      const rows = (await store.getAll()).filter((row) => (typeof where === 'function' ? where(row) : true));
+      if (index) return queryPages(store, index, range, { limit, cursor, raw: raw === true });
+      const all = raw === true && store.getAllRaw ? await store.getAllRaw() : await store.getAll();
+      const rows = all.filter((row) => (typeof where === 'function' ? where(row) : true));
       return { rows: rows.slice(0, limit), nextCursor: null, complete: rows.length <= limit };
     },
     /**
