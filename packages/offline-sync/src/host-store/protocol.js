@@ -1,4 +1,6 @@
 /** Closed host storage boundary; no physical names or handles cross into an MP. */
+import { utf8Bytes } from '../bytes.js';
+
 export const HOST_STORE_VERSION = 1;
 // What this engine accepts beyond version 1's open/read/commit/retire. A port
 // without a feature (an older desktop engine) is never sent its inputs.
@@ -8,8 +10,8 @@ export const MAX_ROWS = 100;
 export const MAX_READ_BYTES = 8 * 1024 * 1024;
 export const MAX_ROW_BYTES = 4 * 1024 * 1024;
 export const COMPLETE_ROWS = 1000;
-const encoder = new TextEncoder();
-export const bytes = (value) => encoder.encode(typeof value === 'string' ? value : JSON.stringify(value)).byteLength;
+// A value's UTF-8 size as stored: a string as it is, anything else as its JSON.
+export const bytes = (value) => utf8Bytes(typeof value === 'string' ? value : (JSON.stringify(value) ?? ''));
 export const integer = (value) => Number.isSafeInteger(value) && value >= 0;
 export const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 export function closed(value, required, optional = []) {

@@ -1,4 +1,5 @@
 import { createTransactionalDataStore } from './transactional-store.js';
+import { utf16Units } from './bytes.js';
 /**
  * data-store.js — the DataStore behind `tommy.data.store(name)`
  * (sdk-types.ts DataStore/DataApi; offline-sync.md §1/§4).
@@ -141,10 +142,10 @@ export function storageUnavailable(storeKey, cause) {
   });
 }
 
-/** Approximate the bytes one entry costs in the serialised blob. Quota is
- *  charged in UTF-16 code units, which is what `.length` counts. */
-const entryBytes = (key, record) => JSON.stringify(String(key)).length
-  + JSON.stringify(record).length + 1;
+/** What one entry costs in the serialised blob: Web Storage charges its
+ *  quota in UTF-16 code units, so this store's budget counts those. */
+const entryBytes = (key, record) => utf16Units(JSON.stringify(String(key)))
+  + utf16Units(JSON.stringify(record)) + 1;
 
 /**
  * A localStorage-backed store backend — the same async contract as

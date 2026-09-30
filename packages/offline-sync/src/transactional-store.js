@@ -1,4 +1,5 @@
 /** Durable branch of DataStore. The injected backend owns physical CAS/epochs. */
+import { jsonBytes, utf8Bytes } from './bytes.js';
 // The most rows one whole-collection read returns, page by page.
 export const WHOLE_READ_ROWS = 20000;
 // A whole read that has to page stops at this many bytes too (a domain's
@@ -30,11 +31,10 @@ const copy = (row) => {
 export function assertCompleteSet(rows, { maxRows = 1000, maxBytes = 8 * 1024 * 1024 } = {}) {
   if (!Array.isArray(rows) || rows.length > maxRows) throw new StorageReadError('scan-required');
   let bytes = 2;
-  const encoder = new TextEncoder();
   for (const row of rows) {
     const json = JSON.stringify(row);
     if (typeof json !== 'string') throw new StorageReadError('unserializable');
-    bytes += encoder.encode(json).byteLength + 1;
+    bytes += utf8Bytes(json) + 1;
     if (bytes > maxBytes) throw new StorageReadError('scan-required');
   }
 }
@@ -43,12 +43,11 @@ const keyString = (key) => String(key);
 const MAX_BATCH_ROWS = 100;
 const MAX_BATCH_BYTES = 6 * 1024 * 1024;
 function upsertBatches(incoming) {
-  const encoder = new TextEncoder();
   const batches = [];
   let batch = [];
   let size = 0;
   for (const entry of incoming) {
-    const length = encoder.encode(JSON.stringify(entry[1])).byteLength;
+    const length = jsonBytes(entry[1]);
     if (batch.length && (batch.length >= MAX_BATCH_ROWS || size + length > MAX_BATCH_BYTES)) { batches.push(batch); batch = []; size = 0; }
     batch.push(entry); size += length;
   }
@@ -115,10 +114,11 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       else {
         if (!held.rows.has(change.key)) held.sorted = false;
         const json = JSON.stringify(change.value);
+        const size = utf8Bytes(json);
         held.rows.set(change.key, {
-          value: JSON.parse(json), updatedAt: at, exact: true, dirty: !!change.value?._dirty, bytes: json.length,
+          value: JSON.parse(json), updatedAt: at, exact: true, dirty: !!change.value?._dirty, bytes: size,
         });
-        held.bytes += json.length;
+        held.bytes += size;
       }
     });
     held.revision = result.storeRevision;
@@ -205,7 +205,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         fence = { epoch: page.epoch, revision: page.storeRevision };
         rows.push(...page.rows.map((row) => row.value));
         if (aged) entries.push(...page.rows);
-        size += page.rows.reduce((total, row) => total + (Number.isSafeInteger(row.bytes) ? row.bytes : JSON.stringify(row.value ?? null).length), 0);
+        size += page.rows.reduce((total, row) => total + (Number.isSafeInteger(row.bytes) ? row.bytes : jsonBytes(row.value)), 0);
         if (rows.length > WHOLE_READ_ROWS || size > WHOLE_READ_BYTES) throw new StorageReadError('scan-required');
         afterKey = page.nextKey;
       } while (afterKey !== null);
@@ -221,9 +221,11 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
             sorted: true,
             rows: new Map(entries.map((row) => {
               const json = JSON.stringify(row.value);
-              bytes += json.length;
+              // As the page measured it (the store's own count), else its UTF-8 size.
+              const size = Number.isSafeInteger(row.bytes) ? row.bytes : utf8Bytes(json);
+              bytes += size;
               return [row.key, {
-                value: JSON.parse(json), updatedAt: Date.parse(row.value?._updatedAt || '') || 0, exact: false, dirty: !!row.value?._dirty, bytes: json.length,
+                value: JSON.parse(json), updatedAt: Date.parse(row.value?._updatedAt || '') || 0, exact: false, dirty: !!row.value?._dirty, bytes: size,
               }];
             })),
             bytes: 0,

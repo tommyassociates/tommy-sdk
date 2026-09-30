@@ -6,6 +6,7 @@
  * `scope`. Dirty rows are never pruned.
  */
 import { assertCompleteSet, StorageReadError } from './transactional-store.js';
+import { jsonBytes } from './bytes.js';
 
 export function windowKeyOf(window) {
   if (window == null || typeof window !== 'object') return undefined;
@@ -95,7 +96,7 @@ export async function reconcileFetched(store, keyPath, { fetch, toRecord, keyOf 
       for (const key of keys) {
         const row = await store.getRaw(key);
         if (!row) continue;
-        bytes += new TextEncoder().encode(JSON.stringify(row)).byteLength + 1;
+        bytes += jsonBytes(row) + 1;
         if (bytes > 8 * 1024 * 1024) throw new StorageReadError('scan-required');
         existing.push(row);
       }
