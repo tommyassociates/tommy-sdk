@@ -311,6 +311,45 @@ describe('MP data API confinement', () => {
     expect(reads).toEqual(['prefs']);
   });
 
+  it('loads prefs again after a failed load, never undoes a remove made while loading, and fails a set nothing stored', async () => {
+    let failRead = false;
+    let gate = null;
+    const backends = new Map();
+    const factory = (_db, store) => {
+      if (!backends.has(store)) {
+        const inner = createMemoryStoreBackend();
+        backends.set(store, { ...inner, async getAll() {
+          if (failRead) { failRead = false; throw Object.assign(new Error('busy'), { name: 'StorageReadError', reason: 'busy' }); }
+          if (gate) await gate;
+          return inner.getAll();
+        } });
+      }
+      return backends.get(store);
+    };
+    const first = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    await first.prefs.set('layout', 'board');
+    await first.prefs.set('columns', ['name']);
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    failRead = true;
+    // The first load fails; the next ready() loads.
+    await data.prefs.ready();
+    expect(data.prefs.get('layout', 'list')).toBe('list');
+    await data.prefs.ready();
+    expect(data.prefs.get('layout', 'list')).toBe('board');
+    // A remove made while a load runs stays removed.
+    const again = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    let open;
+    gate = new Promise((resolve) => { open = resolve; });
+    const loading = again.prefs.ready();
+    const removing = again.prefs.remove('columns');
+    open();
+    await Promise.all([loading, removing]);
+    gate = null;
+    expect(again.prefs.get('columns', 'none')).toBe('none');
+    // A value the store refuses is not reported as saved.
+    await expect(again.prefs.set('cycle', { toJSON() { throw new Error('unserializable'); } })).rejects.toThrow();
+  });
+
   it('queries the indexes its manifest declares', async () => {
     const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {
       shifts: { keyPath: 'id', syncStrategy: 'server_authoritative', indexes: [{ name: 'by_day', keyPath: 'at' }] },

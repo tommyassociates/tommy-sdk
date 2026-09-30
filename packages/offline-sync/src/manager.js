@@ -183,19 +183,29 @@ export function createDataManager({
   // tommy.prefs: the store opens on first use, so an MP that never reads a
   // preference never opens it. `get` answers from what has loaded (the
   // fallback until `ready()` resolves; an MP reads again then); `set` and
-  // `remove` write through. Preferences are the device's own, so they are
-  // stored as settled rows, never as changes waiting to be sent.
+  // `remove` write through, and what they changed is never undone by a load
+  // still running. A failed load is not remembered: the next `ready()` loads
+  // again. Preferences are the device's own, so they are stored as settled
+  // rows, never as changes waiting to be sent; a `set` the store refused
+  // rejects.
   const prefValues = new Map();
+  const prefsChanged = new Set();
   let prefsLoaded = null;
+  let prefsTried = false;
   const prefs = Object.freeze({
     ready() {
-      prefsLoaded ||= service.read(PREFS_STORE).then((rows) => {
-        (rows || []).forEach((row) => { if (row && typeof row.key === 'string' && !prefValues.has(row.key)) prefValues.set(row.key, row.value); });
-      }).catch(() => {});
-      return prefsLoaded;
+      prefsTried = true;
+      if (prefsLoaded) return prefsLoaded;
+      const loading = service.read(PREFS_STORE).then((rows) => {
+        (rows || []).forEach((row) => {
+          if (row && typeof row.key === 'string' && !prefValues.has(row.key) && !prefsChanged.has(row.key)) prefValues.set(row.key, row.value);
+        });
+      }).catch(() => { if (prefsLoaded === loading) prefsLoaded = null; });
+      prefsLoaded = loading;
+      return loading;
     },
     get(key, fallback = null) {
-      if (!prefsLoaded) prefs.ready();
+      if (!prefsTried) prefs.ready();
       return prefValues.has(String(key)) ? clone(prefValues.get(String(key))) : fallback;
     },
     async set(key, value) {
@@ -203,11 +213,14 @@ export function createDataManager({
       const name = String(key);
       const stored = clone(value);
       prefValues.set(name, stored);
-      await service.ingest(PREFS_STORE, [{ key: name, value: stored === undefined ? null : stored }]);
+      prefsChanged.add(name);
+      const result = await service.ingest(PREFS_STORE, [{ key: name, value: stored === undefined ? null : stored }]);
+      if (!result?.written) throw Object.assign(new Error(`tommy.prefs: '${name}' was not saved`), { code: 'DATA_INVALID' });
     },
     async remove(key) {
       live();
       prefValues.delete(String(key));
+      prefsChanged.add(String(key));
       await service.purge(PREFS_STORE, { keys: [String(key)], force: true });
     },
   });
