@@ -232,10 +232,11 @@ export function createDataManager({
     tail.then(() => { if (prefWrites.get(name) === tail) prefWrites.delete(name); });
     return next;
   }
-  // A change the device's storage refused (full or gone) is DATA_NOT_SAVED
-  // whatever the backend; any other error is passed on as it is.
+  // A change the device's storage refused (full or gone) or could not read
+  // for (unavailable) is DATA_NOT_SAVED whatever the backend; any other error
+  // is passed on as it is.
   function notSaved(name, error) {
-    if (error && error.name !== 'PersistError') return error;
+    if (error && error.name !== 'PersistError' && error.code !== 'DATA_UNAVAILABLE') return error;
     return Object.assign(new Error(`tommy.prefs: '${name}' was not saved on this device`), { code: 'DATA_NOT_SAVED', ...(error ? { cause: error } : {}) });
   }
   // Once disposed, prefs answer nothing held (never the previous account's

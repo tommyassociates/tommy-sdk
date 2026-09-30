@@ -262,6 +262,33 @@ describe('a declared read', () => {
   });
 });
 
+describe('writes that land while a declared read is on its way', () => {
+  it('keeps a row a keyed refresh stored, and a row a trim removed, after the read began', async () => {
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend(), indexes: { bySeq: 'seq' } });
+    const sourceMeta = createMemorySourceMeta();
+    const data = createDataService({
+      resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id', indexes: { bySeq: 'seq' } } } : null), sourceMeta,
+    });
+    await data.ingest('members', [{ id: 'a', seq: 1, v: 1 }, { id: 'b', seq: 2, v: 1 }, { id: 'c', seq: 3, v: 1 }], { replace: true });
+    let answer;
+    const fetch = vi.fn((target) => {
+      if (target.key === 'a') return Promise.resolve({ id: 'a', seq: 1, v: 2 });
+      return new Promise((resolve) => { answer = resolve; });
+    });
+    data.source('members', { fetch, read: { cursor: false } });
+    const reading = data.refresh('members', { mode: 'visible' });
+    await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
+    // A keyed refresh stores a newer a; a trim removes the oldest (a) of the range.
+    await data.refresh({ collection: 'members', key: 'a' }, { mode: 'visible' });
+    expect((await data.read('members', 'a')).v).toBe(2);
+    await data.trim('members', { index: 'bySeq', keep: 2 });
+    // The read answers what the server had before both.
+    answer({ rows: [{ id: 'a', seq: 1, v: 1 }, { id: 'b', seq: 2, v: 1 }, { id: 'c', seq: 3, v: 1 }] });
+    await reading;
+    expect(await ids(data)).toEqual(['b', 'c']);
+  });
+});
+
 describe('a declared read on a store that cannot keep a row', () => {
   const storage = new Map();
   afterEach(() => { storage.clear(); delete globalThis.localStorage; });

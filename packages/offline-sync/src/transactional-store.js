@@ -270,7 +270,8 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         await mutation([keyString(key)], (rows) => {
           const row = rows.get(keyString(key));
           if (!row || (expectedRevision !== undefined && row._rev !== expectedRevision)) return [];
-          const { _persistFailed, _pushRefused, ...rest } = row;
+          // A refusal for access set meanwhile stays: only a person's retry clears it.
+          const { _persistFailed, ...rest } = row;
           return [{ op: 'put', key: keyString(key), value: { ...rest, _dirty: false, ...(pushed ? { _ackRev: row._rev } : {}) } }];
         });
         await notify();

@@ -704,3 +704,32 @@ describe('fencing, cleanup after a sent delete, and queued deletes', () => {
     feed.close();
   });
 });
+
+describe('a restored change refused for access while it waited', () => {
+  it('is not sent, stays refused through its wait, and goes only when a person retries', async () => {
+    const store = createDataStore({ name: 'items', backend: createMemoryStoreBackend(), indexes: INDEXES });
+    // An unsent row from before this service (a reload): restored as a change.
+    await store.put({ id: 'd1', chat_id: 7, seq: 1, v: 'draft' });
+    const scheduler = heldScheduler();
+    const push = vi.fn(async () => ({}));
+    const { data } = service({ store, scheduler });
+    data.source('items', { fetch: async () => [], push });
+    await vi.waitFor(() => expect(scheduler.held).toHaveLength(1));
+    // Another tab's push of the row was refused meanwhile.
+    await store.markRow('d1', { _pushRefused: 'access' });
+    scheduler.releaseAll();
+    await settle();
+    await settle();
+    expect(push).not.toHaveBeenCalled();
+    expect(data.pending()).toEqual([expect.objectContaining({ key: 'd1', state: 'access_changed' })]);
+    expect(await store.getRaw('d1')).toMatchObject({ _pushRefused: 'access', _dirty: true });
+    // A person retries: the refusal is cleared and the row goes once.
+    const retrying = data.retry('items', 'd1');
+    await vi.waitFor(() => expect(scheduler.held).toHaveLength(1));
+    scheduler.releaseAll();
+    await retrying;
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(await store.getRaw('d1')).not.toHaveProperty('_pushRefused');
+  });
+});
+

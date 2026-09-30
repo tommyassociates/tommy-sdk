@@ -782,7 +782,7 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     await database.close();
   });
 
-  it('keeps a row\'s refusal for access through a later local write, and drops it when the row is synced', async () => {
+  it('keeps a row\'s refusal for access through a later local write and through a sync, until a retry clears it', async () => {
     const database = create();
     const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
     const options = { identity: identity(), storeName: 'drafts', policy: 'authored', schemaVersion: 1, cacheFingerprint: null,
@@ -793,6 +793,8 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     await store.put({ id: 'd1', v: 'second' });
     expect(await store.getRaw('d1')).toMatchObject({ v: 'second', _dirty: true, _pushRefused: 'access' });
     await store.markSynced('d1');
+    expect(await store.getRaw('d1')).toMatchObject({ _pushRefused: 'access' });
+    await store.markRow('d1', { _pushRefused: null });
     expect(await store.getRaw('d1')).not.toHaveProperty('_pushRefused');
     await database.close();
   });
@@ -1107,7 +1109,7 @@ describe('whole-range purge and trim, and the rows an ingest stored', () => {
     expect((await data.read('chats.messages'))).toHaveLength(5);
   });
 
-  it('keeps a row written dirty after a purge or trim listed it', async () => {
+  it('keeps a local edit made while a purge or trim is listing: it is written after the removal, in its own turn', async () => {
     const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES });
     let data;
     let edit = null;
@@ -1123,12 +1125,13 @@ describe('whole-range purge and trim, and the rows an ingest stored', () => {
     data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store: listing, decl: { keyPath: 'id' } } : null) });
     await data.ingest('chats.messages', messages(7, 1, 4));
     edit = { id: '7:1', chat_id: 7, seq: 1, body: 'unsent' };
-    expect((await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] } })).removed).toEqual(['7:2', '7:3', '7:4']);
-    expect(await data.read('chats.messages', '7:1', { raw: true })).toMatchObject({ body: 'unsent', _dirty: true });
+    await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] } });
+    await vi.waitFor(async () => expect(await data.read('chats.messages', '7:1', { raw: true })).toMatchObject({ body: 'unsent', _dirty: true }));
     await data.ingest('chats.messages', messages(7, 2, 4));
     edit = { id: '7:2', chat_id: 7, seq: 2, body: 'unsent too' };
-    expect((await data.trim('chats.messages', { index: 'byChat', prefix: [7], keep: 1 })).removed).toEqual(['7:3']);
-    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['7:1', '7:2', '7:4']);
+    await data.trim('chats.messages', { index: 'byChat', prefix: [7], keep: 1 });
+    await vi.waitFor(async () => expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['7:1', '7:2', '7:4']));
+    expect(await data.read('chats.messages', '7:2', { raw: true })).toMatchObject({ body: 'unsent too', _dirty: true });
   });
 
   it('drops the unsent changes of a row it force-purges', async () => {

@@ -288,6 +288,39 @@ export function createDataService({
     tail.then(() => { if (turns.get(name) === tail) turns.delete(name); });
     return next;
   }
+  /**
+   * A collection's store as every writer but a declared read's commit uses
+   * it, inside its turn: each put, removal, row mark and reconcile records
+   * the keys it changes (a pruning reconcile records the collection as
+   * replaced), so a declared read that began before never undoes them.
+   */
+  function touching(name, store, keyPath) {
+    const keyOf = (row) => (row && typeof row === 'object' ? row[keyPath] : undefined);
+    const noted = (keys) => noteTouched(name, keys.filter((key) => key !== undefined && key !== null));
+    const writers = {
+      put: (record, ...rest) => { noted([keyOf(record)]); return store.put(record, ...rest); },
+      delete: (key, ...rest) => { noted([key]); return store.delete(key, ...rest); },
+      deleteMany: (keys, ...rest) => { noted(keys || []); return store.deleteMany(keys, ...rest); },
+      markRow: (key, ...rest) => { noted([key]); return store.markRow(key, ...rest); },
+      reconcile: (records = [], options = {}) => {
+        noted(records.map(keyOf));
+        if (options.prune !== false) noteReplaced(name);
+        return store.reconcile(records, options);
+      },
+    };
+    return new Proxy(store, {
+      get(target, property) {
+        if (Object.hasOwn(writers, property) && typeof target[property] === 'function') return writers[property];
+        const value = target[property];
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+  }
+  /** A collection's store for a local write, in its turn, recording what it changes. */
+  const writerStore = (collection) => {
+    const { name, store, decl } = local(collection);
+    return touching(name, store, decl?.keyPath || 'id');
+  };
   const metaOf = async (name) => { try { return await sourceMeta.get(name); } catch (_) { return null; } };
   /**
    * Keeps a collection's source meta in step with keys a write added or
@@ -296,6 +329,9 @@ export function createDataService({
    * meta has nothing to keep.
    */
   async function adjustMeta(name, toggled) {
+    // Only a collection whose declared read keeps a cursor has source meta.
+    const spec = sources.get(name) || resolve(name)?.decl?.source;
+    if (!spec?.read?.cursor) return;
     const meta = await metaOf(name);
     if (!meta) return;
     if (toggled === null || meta.digest === null) { await sourceMeta.set(name, null); return; }
@@ -375,7 +411,7 @@ export function createDataService({
   // The server refused the push for access (the account can no longer write
   // it, e.g. after its role or scopes changed): the row stays unsent and is
   // listed as access changed, never sent again on its own.
-  const refusedAccess = (error) => Number(error?.status) === 403 || error?.code === 'PermissionDenied';
+  const refusedAccess = (error) => Number(error?.status) === 403 || error?.code === 'PermissionDenied' || error?.code === 'DATA_ACCESS_CHANGED';
 
   /** Runs `task` after every earlier task for the same id. */
   function serial(id, task) {
@@ -537,7 +573,12 @@ export function createDataService({
       const row = await entry.store.getRaw(entry.key);
       if (!row || row._rev !== change.revision) return;
       if (change.command.op === 'delete') {
-        if (row._deleted) await entry.store.delete(entry.key, { expectedRevision: change.revision });
+        // The sent delete's tombstone goes in the collection's turn, recorded
+        // as a change, so a read already on its way never brings the row back.
+        if (row._deleted) {
+          const writer = touching(entry.collection, entry.store, entry.decl?.keyPath || 'id');
+          await inTurn(entry.collection, () => writer.delete(entry.key, { expectedRevision: change.revision }));
+        }
         return;
       }
       await entry.store.markSynced(entry.key, { expectedRevision: change.revision, pushed: true });
@@ -574,7 +615,11 @@ export function createDataService({
               run: async () => {
                 const push = pushOf(entry.collection, entry.decl);
                 if (typeof push !== 'function') throw serviceError(`'${entry.label}' has no push`, 'DATA_NO_SOURCE');
+                // The row as it is now, just before it is sent: one refused for
+                // access meanwhile (by another service or tab) is not sent, and
+                // waits, refused, until a person retries.
                 const row = await entry.store.getRaw(entry.key);
+                if (row?._pushRefused === 'access') throw serviceError('Access changed: kept on this device until retried', 'DATA_ACCESS_CHANGED');
                 const held = (revision) => entry.changes.slice(1)
                   .filter((queued) => Number.isSafeInteger(queued.revision) && queued.revision <= revision);
                 // The highest revision of this row a push acknowledged.
@@ -635,9 +680,9 @@ export function createDataService({
   }
 
   /** Stores server rows (see `ingest`), noting nothing as a change of its own. */
-  async function ingestRows(collection, rows, { replace = false, scope = null, complete = false } = {}) {
+  async function ingestRows(collection, rows, { replace = false, scope = null, complete = false } = {}, store = local(collection).store) {
     live();
-    const { name, store, decl } = local(collection);
+    const { name, decl } = local(collection);
     if (!Array.isArray(rows)) throw serviceError('ingest: rows must be an array', 'DATA_INVALID');
     const keyPath = decl?.keyPath || 'id';
     const inScope = typeof scope === 'function' ? scope : () => true;
@@ -962,6 +1007,9 @@ export function createDataService({
           const rowKey = String(wanted.key);
           const dto = await spec.fetch(wanted, jobContext);
           if (!isCurrent()) return;
+          // Stored in the collection's turn, through the store that records
+          // what it changes: a declared read already on its way keeps it.
+          const writer = touching(name, store, keyPath);
           await inTurn(name, async () => {
             if (!dto) {
               // Decided in turn with local writes to the row, on the row as it is then.
@@ -969,7 +1017,7 @@ export function createDataService({
                 const current = await store.getRaw?.(rowKey);
                 if (!current || current._dirty) return;
                 try {
-                  await store.delete(rowKey, Number.isSafeInteger(current._rev) ? { expectedRevision: current._rev } : {});
+                  await writer.delete(rowKey, Number.isSafeInteger(current._rev) ? { expectedRevision: current._rev } : {});
                 } catch (error) { if (error?.reason !== 'conflict') throw error; }
               });
               return;
@@ -977,7 +1025,7 @@ export function createDataService({
             const prev = await store.getRaw?.(rowKey);
             const record = (spec.toRecord || ((value) => value))(dto, prev ? previousByKey([prev], keyPath).get(rowKey) : prev);
             // One record leaves the collection's synced stamp as it was.
-            await store.reconcile([record], { prune: false, keepDirty: true, syncedAt: null });
+            await writer.reconcile([record], { prune: false, keepDirty: true, syncedAt: null });
           });
           return;
         }
@@ -1000,7 +1048,7 @@ export function createDataService({
         // Fetched first; stored in the collection's turn.
         const dtos = await spec.fetch(wanted, jobContext);
         if (!isCurrent()) return;
-        await inTurn(name, () => reconcileFetched(store, keyPath, { fetch: () => dtos, toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
+        await inTurn(name, () => reconcileFetched(touching(name, store, keyPath), keyPath, { fetch: () => dtos, toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
           scope, wanted.window, windowKeyOf(wanted.window), { onPersistError, rethrow: true, keepDirty: true, ...(whole ? {} : { syncedAt: null }) }));
       };
       state.flight = scheduler.request({
@@ -1034,22 +1082,23 @@ export function createDataService({
       live();
       const { name, store, decl } = local(collection);
       const keyPath = decl?.keyPath || 'id';
-      if (Array.isArray(rows)) noteTouched(name, rows.filter((row) => row && typeof row === 'object').map((row) => row[keyPath]));
-      // A replacement removes rows it leaves out: a read already on its way never brings them back.
-      if (options?.replace) noteReplaced(name);
+      // In the collection's turn, through the store that records what it
+      // changes: a replacement removes rows it leaves out, and a read already
+      // on its way never brings them back.
       return inTurn(name, async () => {
         // A replacement ends what a declared read's cursor describes; a few
         // rows keep the source meta in step with the keys they add.
-        const small = !options?.replace && Array.isArray(rows) && rows.length <= PAGE_ROWS;
+        const tracksMeta = !!(sources.get(name) || decl?.source)?.read?.cursor;
+        const small = tracksMeta && !options?.replace && Array.isArray(rows) && rows.length <= PAGE_ROWS;
         const keys = small ? [...new Set(rows.filter((row) => row && typeof row === 'object').map((row) => String(row[keyPath])))] : [];
         const before = small ? await Promise.all(keys.map(async (key) => !!(await store.getRaw(key)))) : [];
-        const result = await ingestRows(collection, rows, options);
+        const result = await ingestRows(collection, rows, options, touching(name, store, keyPath));
         if (small) {
           const after = await Promise.all(keys.map(async (key) => !!(await store.getRaw(key))));
           await adjustMeta(name, {
             added: keys.filter((key, at) => !before[at] && after[at]), removed: keys.filter((key, at) => before[at] && !after[at]),
           });
-        } else await adjustMeta(name, null);
+        } else if (tracksMeta) await adjustMeta(name, null);
         return result;
       });
     },
@@ -1068,27 +1117,29 @@ export function createDataService({
       const keyPath = decl?.keyPath || 'id';
       if (!['put', 'patch', 'delete'].includes(command?.op)) throw serviceError('mutate: op must be put, patch or delete', 'DATA_INVALID');
       const key = String(command.op === 'put' ? command.record?.[keyPath] : command.key);
-      noteTouched(name, [key]);
       const push = pushOf(name, decl);
-      // One local write per row at a time, so each push knows the revision it wrote.
-      const written = await serial(`${label}:${key}`, async () => {
+      // In the collection's turn, through the store that records what it
+      // changes; one local write per row at a time, so each push knows the
+      // revision it wrote.
+      const writer = touching(name, store, keyPath);
+      const written = await inTurn(name, () => serial(`${label}:${key}`, async () => {
         let record = null;
         let held = null;
         if (command.op === 'put') {
           record = command.record;
-          await store.put(record);
+          await writer.put(record);
         } else if (command.op === 'patch') {
           record = bare({ ...((await store.getRaw(key)) || {}), ...command.patch });
-          await store.put(record);
+          await writer.put(record);
         } else if (typeof push === 'function' && typeof store.markRow === 'function' && (held = await store.getRaw(key))) {
           // A delete to send stays a hidden, unsent tombstone until it is sent,
           // so a reload sends it again. It keeps only its key, so it holds no
           // indexed value.
-          await store.markRow(key, { _deleted: true }, { dirty: true, body: { [keyPath]: held[keyPath] } });
-        } else await store.delete(key);
+          await writer.markRow(key, { _deleted: true }, { dirty: true, body: { [keyPath]: held[keyPath] } });
+        } else await writer.delete(key);
         const revision = typeof push !== 'function' ? undefined : (await store.getRaw(key))?._rev;
         return { record, revision };
-      });
+      }));
       if (typeof push !== 'function') return { key, pushed: false };
       // Fenced while the local write ran: the row stays unsent on disk for
       // the principal it was written under.
@@ -1176,12 +1227,12 @@ export function createDataService({
      * local writes to the row, so a change made just before is dropped too.
      */
     async discard(collection, key) {
-      const { name, label, store } = local(collection);
-      noteTouched(name, [key]);
-      await serial(`${label}:${String(key)}`, async () => {
+      const { name, label, store, decl } = local(collection);
+      const writer = touching(name, store, decl?.keyPath || 'id');
+      await inTurn(name, () => serial(`${label}:${String(key)}`, async () => {
         dropPending(label, key);
-        await store.delete(String(key));
-      });
+        await writer.delete(String(key));
+      }));
       emitStatus();
     },
     /**
@@ -1215,8 +1266,9 @@ export function createDataService({
             .map((row) => ({ key: String(row[keyPath]), dirty: !!row._dirty }));
         } else if (range) entries = await rangeKeys(store, keyPath, range);
         else entries = (await rawRows(store)).map((row) => ({ key: String(row[keyPath]), dirty: !!row._dirty }));
-        const removed = await removeRows({ label, store, keys: entries.filter(({ dirty }) => force || !dirty).map(({ key }) => key), force });
-        noteTouched(name, removed);
+        const removed = await removeRows({
+          label, store: touching(name, store, keyPath), keys: entries.filter(({ dirty }) => force || !dirty).map(({ key }) => key), force,
+        });
         await adjustMeta(name, whole ? null : { added: [], removed });
         await store.revalidateSubscribers?.();
         return { removed };
@@ -1238,7 +1290,7 @@ export function createDataService({
       return inTurn(name, async () => {
         const entries = await rangeKeys(store, keyPath, range);
         const older = entries.slice(0, Math.max(0, entries.length - spec.keep)).filter(({ dirty }) => !dirty).map(({ key }) => key);
-        const removed = await removeRows({ label, store, keys: older, force: false });
+        const removed = await removeRows({ label, store: touching(name, store, keyPath), keys: older, force: false });
         await adjustMeta(name, { added: [], removed });
         if (removed.length) await store.revalidateSubscribers?.();
         return { removed };

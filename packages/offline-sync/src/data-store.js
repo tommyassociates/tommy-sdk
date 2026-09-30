@@ -134,6 +134,13 @@ const RETAINED_BUDGET_MULTIPLE = 2;
  */
 const memoryFallback = new Map();
 
+/** Storage a backend could not reach: its store is unknown, not empty. */
+export function storageUnavailable(storeKey, cause) {
+  return Object.assign(new Error(`'${storeKey}': device storage could not be read`), {
+    name: 'StorageUnavailable', code: 'DATA_UNAVAILABLE', ...(cause ? { cause } : {}),
+  });
+}
+
 /** Approximate the bytes one entry costs in the serialised blob. Quota is
  *  charged in UTF-16 code units, which is what `.length` counts. */
 const entryBytes = (key, record) => JSON.stringify(String(key)).length
@@ -151,21 +158,29 @@ const entryBytes = (key, record) => JSON.stringify(String(key)).length
  * DataStore above decides what a failed persist means to a caller — but they no
  * longer pretend to have succeeded either, which is the defect this closes.
  *
- * Reads still degrade to empty rather than throwing when storage is absent or
- * the blob is corrupt: there is nothing useful to tell a caller who asked what
- * is in an unreadable store, and the answer "nothing" is true.
+ * READS CANNOT BE TAKEN FOR EMPTY EITHER. Storage that cannot be reached
+ * (gone, or throwing on read) rejects with DATA_UNAVAILABLE, so a caller never
+ * mistakes an unknown store for an empty one (a removal that removed nothing
+ * would report success). A blob that is there but corrupt reads as empty,
+ * and the next write replaces it.
  */
 export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAULT_MAX_BYTES, evict = true } = {}) {
   const storeKey = `mp-store:${dbName}:${storeName}`;
+  // Storage that cannot be reached is never taken for an empty store: the
+  // read rejects (DATA_UNAVAILABLE), and so does every write that needs it. A
+  // blob that is there but cannot be parsed holds nothing that can be read,
+  // and the next write replaces it.
   function load() {
     if (memoryFallback.has(storeKey)) return new Map(memoryFallback.get(storeKey));
     const store = webStorage();
-    if (!store) return new Map();
+    if (!store) throw storageUnavailable(storeKey);
+    let raw;
+    try { raw = store.getItem(storeKey); } catch (error) { throw storageUnavailable(storeKey, error); }
+    if (!raw) return new Map();
     try {
-      const raw = store.getItem(storeKey);
-      return raw ? new Map(Object.entries(JSON.parse(raw))) : new Map();
+      return new Map(Object.entries(JSON.parse(raw)));
     } catch (_) {
-      return new Map(); // corrupt/unavailable — behave as empty, never throw
+      return new Map();
     }
   }
 
@@ -343,22 +358,39 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
     }
   }
 
+  // A write whose store cannot be read writes nothing and keeps nothing: it
+  // does not know the rows beside it, so holding a partial map would later
+  // read as the whole store.
+  const unreadable = (error) => {
+    if (error?.code !== 'DATA_UNAVAILABLE') throw error;
+    return { ok: false, reason: 'unavailable', budget: maxBytes, evicted: [], discarded: [], retained: false };
+  };
+  const loadForWrite = () => {
+    try { return { map: load() }; } catch (error) { return { refused: unreadable(error) }; }
+  };
   return {
     async get(key) { return load().get(String(key)); },
     async getAll() { return [...load().values()]; },
     async put(key, record) {
-      const map = load();
+      const { map, refused } = loadForWrite();
+      if (refused) return refused;
       map.set(String(key), record);
       return save(map, String(key));
     },
-    async delete(key) { const map = load(); map.delete(String(key)); return save(map); },
+    async delete(key) {
+      const { map, refused } = loadForWrite();
+      if (refused) return refused;
+      map.delete(String(key));
+      return save(map);
+    },
     /**
      * Deletes the row unless `keep(stored)` says otherwise, reading and writing
      * the storage in one synchronous step. Resolves `{ kept: true }` when the
      * stored row was kept, otherwise the delete's result with `existed`.
      */
     async deleteIf(key, keep) {
-      const map = load();
+      const { map, refused } = loadForWrite();
+      if (refused) return refused;
       const stored = map.get(String(key));
       if (stored !== undefined && keep(stored)) return { kept: true };
       if (stored === undefined) return { ok: true, existed: false };
@@ -1159,8 +1191,9 @@ export function createDataStore({
         if (expectedRevision !== undefined && record._rev !== expectedRevision) return null;
         // Drop `_persistFailed` alongside `_dirty`: a row that reached the server
         // is no longer "saved on this device only", whatever happened to the local
-        // copy on the way.
-        const { _persistFailed: _pf, _pushRefused: _refused, ...rest } = record;
+        // copy on the way. A refusal for access set meanwhile stays: only a
+        // person's retry clears it.
+        const { _persistFailed: _pf, ...rest } = record;
         // ⚠ THIS WRITE CAN DISPLACE ROWS TOO. Marking a row synced makes it
         // evictable, which is exactly when the byte guard can act — and this path
         // discarded the result unconditionally, so those keys were never counted,
@@ -1219,6 +1252,9 @@ export function createDataStore({
           // eslint-disable-next-line no-await-in-loop
           key = await api.put(record, { silent: true, deferCap: true, ...(keepDirty ? { server: true } : {}) });
         } catch (e) {
+          // Storage that cannot be reached fails the whole merge: nothing of it
+          // is known, and skipping rows would report an ingest that stored none.
+          if (e?.code === 'DATA_UNAVAILABLE') throw e;
           // ⚠ TWO DIFFERENT FAILURES ARRIVE HERE AND THEY ARE NOT THE SAME ROW.
           //
           // A `PersistError` means the row IS in the store — the backend kept it
