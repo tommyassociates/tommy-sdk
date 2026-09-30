@@ -583,14 +583,14 @@ export function createDataService({
    * anything else after the read began keep that change. A refusal (403, 404)
    * purges the collection's rows, unsent ones kept.
    */
-  async function readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent) {
+  async function readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent, { full = false } = {}) {
     const { cursor: keepsCursor = false, removedField = null, fullEveryMs = FULL_EVERY_MS, forbidden = 'purge' } = spec.read;
     const startedAt = touchSequence;
     const all = await (store.getAllRaw ? store.getAllRaw() : store.getAll());
     const meta = all.find((row) => row && String(row[keyPath]) === SOURCE_META_KEY) || null;
     const storedKeys = new Set(all.filter((row) => row && String(row[keyPath]) !== SOURCE_META_KEY).map((row) => String(row[keyPath])));
     const whole = !!meta && Number.isSafeInteger(meta.count) && meta.count === storedKeys.size;
-    const since = keepsCursor && whole && typeof meta.cursor === 'string' && meta.cursor
+    const since = keepsCursor && !full && whole && typeof meta.cursor === 'string' && meta.cursor
       && Number.isFinite(meta.fullAt) && now() - meta.fullAt < fullEveryMs ? meta.cursor : null;
     let answer;
     try {
@@ -724,9 +724,10 @@ export function createDataService({
      * rejects so a surface with nothing to show can say why. `maxAge` skips
      * the fetch while the last successful sync is younger than it. A query
      * target without an index prunes the rows its `where` selects; its status,
-     * `maxAge` and coalescing belong to that `where` function.
+     * `maxAge` and coalescing belong to that `where` function. `full` makes a
+     * declared read read the whole collection whatever its cursor.
      */
-    refresh(target, { mode = 'silent', priority = 'normal', maxAge = 0, reason = null } = {}) {
+    refresh(target, { mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false } = {}) {
       live();
       const wanted = targetOf(target);
       const { name, label, store, decl } = local(wanted.collection);
@@ -770,7 +771,7 @@ export function createDataService({
           return;
         }
         if (spec.read && !wanted.query && !wanted.window && typeof spec.scope !== 'function') {
-          await readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent);
+          await readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent, { full });
           return;
         }
         // A query target prunes only the rows of that query; a list or window

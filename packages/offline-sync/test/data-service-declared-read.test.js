@@ -61,7 +61,9 @@ describe('a declared read', () => {
     // A row gone from the device (evicted): the next read is whole.
     await store.delete('a');
     await data.refresh('members', { mode: 'visible' });
-    expect(api.asked).toEqual([null, null, null]);
+    // Asked for the whole collection: whole, whatever the cursor.
+    await data.refresh('members', { mode: 'visible', full: true });
+    expect(api.asked).toEqual([null, null, null, null]);
   });
 
   it('removes rows a whole read leaves out, and stamps the collection synced only when a read completed', async () => {

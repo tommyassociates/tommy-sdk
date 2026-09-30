@@ -648,6 +648,8 @@ export interface DataRefreshOptions {
   /** Skip the fetch while the last successful sync is younger than this (ms). */
   readonly maxAge?: number;
   readonly reason?: string;
+  /** A declared read reads the whole collection, whatever its cursor. */
+  readonly full?: boolean;
 }
 export type DataMutation<Rec = unknown> =
   | { op: 'put'; record: Rec }
