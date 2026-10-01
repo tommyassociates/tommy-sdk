@@ -261,10 +261,14 @@ export const METHOD_SHARE_MS = 30 * 1000;
 const METHOD_FRESH_KEPT = 5000;
 const METHOD_GROUPS_KEPT = 500;
 const METHOD_NAME = /^[a-z][A-Za-z0-9]{0,63}$/;
+// The longest a string param may be.
+const MAX_METHOD_STRING = 200;
 /**
  * Refuses refresh methods it could not honour: each a named `{ params,
- * fetch, batch?, cadenceMs? }`, every param `{ type, max?, optional? }` of a
- * known type, `batch` naming an `ids` param.
+ * fetch, batch?, field?, cadenceMs?, available? }`, every param `{ type,
+ * max?, optional? }` of a known type (`max`: the most ids, or the longest
+ * string), `batch` naming an `ids` param and `field` the row field its ids
+ * name.
  */
 function checkMethods(methods) {
   const refuse = (why) => { throw serviceError(`source.methods: ${why}`, 'DATA_INVALID'); };
@@ -272,7 +276,7 @@ function checkMethods(methods) {
   Object.entries(methods).forEach(([name, method]) => {
     if (!METHOD_NAME.test(name)) refuse(`'${name}' is not a method name`);
     if (!method || typeof method !== 'object' || typeof method.fetch !== 'function') refuse(`'${name}' needs a fetch`);
-    const known = ['params', 'fetch', 'batch', 'cadenceMs'];
+    const known = ['params', 'fetch', 'batch', 'field', 'cadenceMs', 'available'];
     if (Object.keys(method).some((field) => !known.includes(field))) refuse(`'${name}' takes ${known.join(', ')} only`);
     const { params } = method;
     if (!params || typeof params !== 'object' || Array.isArray(params) || !Object.keys(params).length) refuse(`'${name}' needs its params`);
@@ -280,13 +284,16 @@ function checkMethods(methods) {
       if (!METHOD_NAME.test(param.replace(/_/g, 'x'))) refuse(`'${name}.${param}' is not a param name`);
       if (!spec || !METHOD_PARAM_TYPES.includes(spec.type)) refuse(`'${name}.${param}' needs a type (${METHOD_PARAM_TYPES.join(', ')})`);
       if (Object.keys(spec).some((field) => !['type', 'max', 'optional'].includes(field))) refuse(`'${name}.${param}' takes type, max, optional only`);
-      if (spec.max !== undefined && (spec.type !== 'ids' || !Number.isSafeInteger(spec.max) || spec.max < 1 || spec.max > MAX_METHOD_IDS)) {
-        refuse(`'${name}.${param}.max' is for ids, 1 to ${MAX_METHOD_IDS}`);
+      const ceiling = spec.type === 'ids' ? MAX_METHOD_IDS : MAX_METHOD_STRING;
+      if (spec.max !== undefined && (!['ids', 'string'].includes(spec.type) || !Number.isSafeInteger(spec.max) || spec.max < 1 || spec.max > ceiling)) {
+        refuse(`'${name}.${param}.max' is for ids (1 to ${MAX_METHOD_IDS}) or a string (1 to ${MAX_METHOD_STRING})`);
       }
       if (spec.optional !== undefined && typeof spec.optional !== 'boolean') refuse(`'${name}.${param}.optional' must be a boolean`);
     });
     if (method.batch !== undefined && (params[method.batch]?.type !== 'ids' || params[method.batch]?.optional)) refuse(`'${name}.batch' must name a required ids param`);
     if (method.cadenceMs !== undefined && !(Number.isFinite(method.cadenceMs) && method.cadenceMs >= 0)) refuse(`'${name}.cadenceMs' must be a duration`);
+    if (method.field !== undefined && (!method.batch || typeof method.field !== 'string' || !method.field)) refuse(`'${name}.field' names the row field a batched method's ids name`);
+    if (method.available !== undefined && typeof method.available !== 'function') refuse(`'${name}.available' must be a function`);
   });
 }
 const METHOD_ID = /^[A-Za-z0-9_.:~-]{1,64}$/;
@@ -325,7 +332,8 @@ function methodParams(collection, name, method, given) {
       if (id === null) refuse(`'${param}' is not an id`);
       out[param] = id;
     } else if (spec.type === 'string') {
-      if (typeof value !== 'string' || !value.trim() || value.length > 200) refuse(`'${param}' must be a string of 1 to 200 characters`);
+      const max = spec.max || MAX_METHOD_STRING;
+      if (typeof value !== 'string' || !value.trim() || value.trim().length > max) refuse(`'${param}' must be a string of 1 to ${max} characters`);
       out[param] = value.trim();
     } else if (spec.type === 'date') {
       if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(value) || !Number.isFinite(Date.parse(value))) refuse(`'${param}' must be an ISO date`);
@@ -1386,11 +1394,13 @@ export function createDataService({
    * the device does not hold it, so an older read never brings it back. Each
    * answered row becomes its record with the stored row as `prev`, and the
    * record's key decides. It stops between writes once its job is no longer
-   * `current()`, resolving null. Resolves the keys it answered, and whether
-   * the endpoint has more (`more`: a page of a search).
+   * `current()`, resolving null. `unanswered(records, keyPath)`, when given,
+   * names more keys gone: the stored rows of the ids asked that the answer
+   * left out. Resolves the keys it answered, and whether the endpoint has
+   * more (`more`: a page of a search).
    */
   async function commitMethod({ name, label, store, decl }, spec, answer, {
-    touched, turn, startedAt, current,
+    touched, turn, startedAt, current, unanswered = null,
   }) {
     const keyPath = decl?.keyPath || 'id';
     const rows = Array.isArray(answer) ? answer : answer?.rows;
@@ -1429,7 +1439,10 @@ export function createDataService({
     }
     if (!current()) return null;
     const answered = new Set(keys);
-    const goneKeys = [...new Set(gone.map(String))].filter((key) => !answered.has(key) && !touched.has(key));
+    // A batched method with a `field`: the stored rows whose field names an
+    // id the answer left out are gone for this principal too.
+    const unansweredKeys = unanswered ? await unanswered(mapped, keyPath) : [];
+    const goneKeys = [...new Set([...gone.map(String), ...unansweredKeys])].filter((key) => !answered.has(key) && !touched.has(key));
     // Gone as of the read's start, held or not.
     recordEffect(name, { removedKeys: goneKeys, at: startedAt });
     const goneRows = (await Promise.all(goneKeys.map((key) => store.getRaw(key)))).filter((row) => row && !row._dirty);
@@ -1460,6 +1473,11 @@ export function createDataService({
     if (!method) return Promise.reject(serviceError(`'${wanted.collection}' has no refresh method '${wanted.method}'`, 'DATA_INVALID'));
     let params;
     try { params = methodParams(name, wanted.method, method, wanted.params); } catch (error) { return Promise.reject(error); }
+    // A method the source cannot run now (its server does not offer it) is
+    // refused before anything is scheduled: no request, no job, nothing a
+    // circuit counts.
+    let available = true;
+    try { available = typeof method.available !== 'function' || method.available(params) !== false; } catch (_) { available = false; }
     const form = formOf(context);
     const batchParam = method.batch || null;
     const shared = batchParam ? Object.fromEntries(Object.entries(params).filter(([param]) => param !== batchParam)) : params;
@@ -1469,6 +1487,12 @@ export function createDataService({
     const outcome = () => (batchParam ? describeState(group.state)
       : { ...describeState(group.state), keys: group.state.keys ?? null, more: group.state.more ?? null });
     const settle = (promise) => (mode === 'visible' ? promise.then(outcome) : promise.then(outcome, outcome));
+    if (!available) {
+      const refusal = Object.assign(serviceError(`'${wanted.collection}' cannot run '${wanted.method}' now`, 'DATA_UNSUPPORTED'), { retryable: false });
+      group.state.state = 'error';
+      group.state.error = { code: refusal.code, status: null, message: refusal.message };
+      return settle(Promise.reject(refusal));
+    }
     // Never read more often than the method's cadence, whatever `maxAge` asks.
     const age = Math.max(Number(maxAge) || 0, method.cadenceMs || 0);
     const at = now();
@@ -1491,6 +1515,17 @@ export function createDataService({
       group.state.state = isOnline() ? 'error' : 'offline';
       group.state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
     };
+    // The stored rows whose `field` names an id asked for that the answer left
+    // out: for this principal, those rows are gone (not visible, or removed).
+    const unansweredBy = (ids) => (method.field && ids ? async (records, keyPath) => {
+      const answeredValues = new Set(records.map((record) => String(record[method.field])));
+      const missing = ids.filter((id) => !answeredValues.has(id));
+      if (!missing.length) return [];
+      if (method.field === keyPath) return missing;
+      const wantedValues = new Set(missing);
+      return (await rawRows(store)).filter((row) => row[method.field] !== undefined && row[method.field] !== null
+        && wantedValues.has(String(row[method.field]))).map((row) => String(row[keyPath]));
+    } : null);
     // One fetch: through the read guard, merged in the collection's turn. A
     // purge or trim while it was out leaves what it asked for not fetched.
     const run = async (asked, ids, isCurrent) => {
@@ -1504,7 +1539,7 @@ export function createDataService({
           stored = await commitMethod({
             name, label, store, decl,
           }, spec, answer, {
-            touched, turn, startedAt, current,
+            touched, turn, startedAt, current, unanswered: unansweredBy(ids),
           });
         }, { isCurrent: current });
         if (!stored || !current()) return;
