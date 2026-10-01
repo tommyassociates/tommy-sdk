@@ -1812,10 +1812,14 @@ export function createDataService({
         if (group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return group.state.flight.attempts.answer(group.state.flight.promise);
         methodBatches += 1;
         // Only the newest flight for these params stores and answers: one a
-        // later flight replaced (past the share window) is dropped.
-        const flight = { at, promise: null, attempts: readAttempts() };
+        // later flight replaced (past the share window) is dropped. One whose
+        // callers were answered at its deadline still stores what its retry
+        // reads, unless a newer flight began (`flightSeq`, numbered across
+        // the service, so a group cleared and made again never matches it).
+        const flight = { at, seq: methodBatches, promise: null, attempts: readAttempts() };
+        group.state.flightSeq = flight.seq;
         group.state.flight = flight;
-        flight.promise = job(String(methodBatches), (isCurrent) => run(params, null, () => isCurrent() && group.state.flight === flight), flight.attempts)
+        flight.promise = job(String(methodBatches), (isCurrent) => run(params, null, () => isCurrent() && group.state.flightSeq === flight.seq), flight.attempts)
           .finally(() => { if (group.state.flight === flight) group.state.flight = null; });
         return flight.attempts.answer(flight.promise);
       }

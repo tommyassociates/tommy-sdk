@@ -804,4 +804,43 @@ describe('refresh methods', () => {
     await ask(['199']);
     expect(api.byUserIds).toHaveBeenCalledTimes(4);
   });
+
+  it('stores what a search\'s retry reads after its callers were answered at the deadline, and never an older one over a newer', async () => {
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
+    const jobs = [];
+    // As the host's scheduler does at a visible read's deadline: the callers
+    // are answered REFRESH_TIMEOUT and the same job runs again behind.
+    const scheduler = {
+      request: (job) => new Promise((resolve, reject) => { jobs.push({ job, resolve, reject }); }),
+    };
+    const data = createDataService({
+      resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: () => 1_000_000, principal: { id: 'p1' }, scheduler,
+    });
+    const search = vi.fn(async ({ q }) => [member(q === 'ada' ? 1 : 2, { name: q })]);
+    data.source('members', {
+      fetch: vi.fn(async () => []), read: {},
+      methods: { search: { params: { q: { type: 'string', max: 40 } }, fetch: search } },
+    });
+    const ask = (q) => data.refresh({ collection: 'members', method: 'search', params: { q } }, { mode: 'visible' });
+    const first = ask('ada');
+    await vi.waitFor(() => expect(jobs).toHaveLength(1));
+    jobs[0].reject(Object.assign(new Error('Refresh took too long'), { code: 'REFRESH_TIMEOUT', retryable: true }));
+    await expect(first).rejects.toMatchObject({ code: 'REFRESH_TIMEOUT' });
+    // The retry runs behind and its answer lands.
+    await jobs[0].job.run(() => true);
+    expect(await data.read('members', '1')).toMatchObject({ name: 'ada' });
+    // The same search asked again before the older one's retry answered:
+    // only the newer stores.
+    const older = ask('bob');
+    await vi.waitFor(() => expect(jobs).toHaveLength(2));
+    jobs[1].reject(Object.assign(new Error('Refresh took too long'), { code: 'REFRESH_TIMEOUT', retryable: true }));
+    await expect(older).rejects.toMatchObject({ code: 'REFRESH_TIMEOUT' });
+    const newer = ask('bob');
+    await vi.waitFor(() => expect(jobs).toHaveLength(3));
+    await jobs[1].job.run(() => true);
+    expect(await data.read('members', '2')).toBeNull();
+    jobs[2].resolve(await jobs[2].job.run(() => true));
+    await newer;
+    expect(await data.read('members', '2')).toMatchObject({ name: 'bob' });
+  });
 });
