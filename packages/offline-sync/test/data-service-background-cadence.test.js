@@ -143,4 +143,18 @@ describe('a background account\'s cadence', () => {
     expect(members).not.toHaveBeenCalled();
     expect(profile).toHaveBeenCalledTimes(1);
   });
+
+  it('leaves a method read paused on its way stale, not refreshing or fresh', async () => {
+    let factor = 2;
+    const scheduler = { request: (job) => Promise.resolve().then(() => job.run(() => job.valid())) };
+    const account = service({ foreground: () => false, cadence: () => factor, scheduler });
+    let answer;
+    account.byUserIds.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }));
+    const read = account.data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } });
+    await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
+    factor = Infinity;
+    answer([{ id: '1', user_id: 101 }]);
+    await expect(read).resolves.toMatchObject({ state: 'stale' });
+    expect(await account.data.read('members')).toEqual([]);
+  });
 });

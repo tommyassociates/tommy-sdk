@@ -1738,7 +1738,12 @@ export function createDataService({
               touched, turn, startedAt, current, unanswered: unansweredBy(ids),
             });
           }, { isCurrent: current });
-          if (!stored || !current()) return;
+          // One that stored nothing, or stopped on its way (its reads paused,
+          // the service retired), leaves the method stale, never fresh.
+          if (!stored || !current()) {
+            if (group.state.state === 'refreshing') group.state.state = 'stale';
+            return;
+          }
           if (!batchParam) {
             group.state.keys = stored.keys;
             group.state.more = stored.more;
