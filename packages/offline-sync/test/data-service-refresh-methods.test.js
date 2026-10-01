@@ -582,6 +582,71 @@ describe('refresh methods', () => {
     expect(api.asked.map((call) => call.user_ids)).toEqual([['102']]);
   });
 
+  it('keeps a keyed read already on its way from storing a person a lookup found gone', async () => {
+    const { data } = service();
+    const api = server([]);
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    data.source('members', {
+      fetch: async (wanted) => { if (wanted.key !== undefined) { await held; return member(2); } return { rows: [] }; },
+      methods: methods(api, { field: 'user_id' }),
+    });
+    const keyed = data.refresh({ collection: 'members', key: '2' }, { mode: 'visible' });
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    // The lookup (begun after) finds user 102 gone.
+    await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['102'] } }, { mode: 'visible' });
+    release();
+    await keyed;
+    expect(await ids(data)).toEqual([]);
+  });
+
+  it('takes a whole read as covering only lookups asked as the form of the account it was read as', async () => {
+    let shown = { id: 'p1', form: 'team' };
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
+    const data = createDataService({
+      resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: () => 1_000_000, principal: () => shown,
+    });
+    const api = server([member(1)]);
+    data.source('members', { fetch: api.whole, read: {}, methods: methods(api) });
+    await data.refresh('members', { mode: 'visible' });
+    shown = { id: 'p1', form: 'member' };
+    await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
+    expect(api.asked.map((call) => call.user_ids)).toEqual([['101']]);
+    // As the form it was read as, the whole read answers.
+    shown = { id: 'p1', form: 'team' };
+    await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
+    expect(api.asked).toHaveLength(1);
+  });
+
+  it('keeps protection from a lookup\'s gone people whose markers were evicted: a read from before reads again', async () => {
+    const { data } = service();
+    const api = server([]);
+    let calls = 0;
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    data.source('members', {
+      fetch: async (wanted) => {
+        if (wanted.key === undefined) return { rows: [] };
+        calls += 1;
+        if (calls === 1) { await held; return member(2); }
+        return null;
+      },
+      methods: methods(api, { field: 'user_id', params: { user_ids: { type: 'ids', max: 200 } } }),
+    });
+    const keyed = data.refresh({ collection: 'members', key: '2' }, { mode: 'visible' });
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['102'] } }, { mode: 'visible' });
+    // Enough other people found gone to evict that marker.
+    for (let batch = 0; batch < 26; batch += 1) {
+      const ids = Array.from({ length: 200 }, (_, n) => String(10_000 + (batch * 200) + n));
+      await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ids } }, { mode: 'visible' }); // eslint-disable-line no-await-in-loop
+    }
+    release();
+    await keyed;
+    expect(await ids(data)).toEqual([]);
+    expect(calls).toBe(2);
+  });
+
   it('takes a complete ingest as a whole read that answers every id within the cadence', async () => {
     const { data } = service();
     const api = server([member(1)]);

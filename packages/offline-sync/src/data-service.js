@@ -496,7 +496,12 @@ export function createDataService({
       seen.delete(String(value));
       seen.set(String(value), at);
     });
-    while (seen.size > TOUCHES_KEPT) seen.delete(seen.keys().next().value);
+    // An evicted marker's protection is lost: a read begun before it reads again.
+    while (seen.size > TOUCHES_KEPT) {
+      const [oldest, stamp] = seen.entries().next().value;
+      seen.delete(oldest);
+      lostTouches.set(name, Math.max(lostTouches.get(name) || 0, stamp));
+    }
   }
   // Whether a record names a value found gone after `since`.
   const barredAfter = (name, since) => {
@@ -560,6 +565,9 @@ export function createDataService({
   function touching(name, store, keyPath, at = null) {
     const keyOf = (row) => (row && typeof row === 'object' ? row[keyPath] : undefined);
     const changed = (keys) => recordEffect(name, { changedKeys: keys, at });
+    // A fetched write (one with its read's start) stores no row naming a
+    // value a lookup found gone after that start, whichever path writes it.
+    const barred = at === null ? () => false : barredAfter(name, at);
     // Each write records exactly what it changed, once the store answered:
     // a write the store refused (an invalid row) changed nothing; one it
     // kept in memory only (`retained`) did.
@@ -573,7 +581,8 @@ export function createDataService({
       return result;
     };
     const writers = {
-      put: (record, ...rest) => recorded(() => store.put(record, ...rest), () => [keyOf(record)], () => [keyOf(record)]),
+      put: (record, ...rest) => (barred(record) ? Promise.resolve(undefined)
+        : recorded(() => store.put(record, ...rest), () => [keyOf(record)], () => [keyOf(record)])),
       delete: (key, ...rest) => recorded(() => store.delete(key, ...rest), () => [key], () => [key]),
       deleteMany: (keys, ...rest) => recorded(() => store.deleteMany(keys, ...rest),
         (removed) => (Array.isArray(removed) ? removed : (keys || [])), () => keys || []),
@@ -585,7 +594,8 @@ export function createDataService({
       // records the rows it wrote and removed, and nothing else. A
       // reconcile that failed part way records every row it was given, as it
       // may have stored some.
-      reconcile: async (records = [], { whole: replacesAll = false, ...options } = {}) => {
+      reconcile: async (given = [], { whole: replacesAll = false, ...options } = {}) => {
+        const records = given.filter((record) => !barred(record));
         const whole = replacesAll === true || (options.prune !== false && typeof options.scope !== 'function');
         let result;
         try { result = await store.reconcile(records, options); } catch (error) {
@@ -1409,6 +1419,9 @@ export function createDataService({
   let coverageSeq = 0;
   const coverageVoid = new Map();
   const wholeCovers = new Map();
+  // Coverage is the form of the account a whole read was made as: another
+  // form of it may see other rows.
+  const coverKey = (form, name) => JSON.stringify([form, name]);
   // A purge or trim of the collection: what its methods fetched, and what a
   // whole read before it covered, is fetched again when asked.
   const forgetMethods = (name) => {
@@ -1562,7 +1575,7 @@ export function createDataService({
       group.state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
     };
     if (batchParam) {
-      const covered = (wholeCovers.get(name) || 0) > voidOf(name);
+      const covered = (wholeCovers.get(coverKey(form, name)) || 0) > voidOf(name);
       if (covered && age > 0 && whole.syncedAt !== null && askedAt - whole.syncedAt < age && whole.state !== 'error') {
         // Answered by that read: the method's status says so.
         group.state.state = 'fresh';
@@ -1831,7 +1844,7 @@ export function createDataService({
       // A read that answered no list leaves the collection as it was, not fresh.
       if (outcome === NO_SNAPSHOT) { if (state.state === 'refreshing') state.state = 'stale'; return; }
       state.state = 'fresh'; state.syncedAt = now(); state.error = null;
-      if (wholeRead) wholeCovers.set(name, Math.max(wholeCovers.get(name) || 0, flightSeq));
+      if (wholeRead) wholeCovers.set(coverKey(form, name), Math.max(wholeCovers.get(coverKey(form, name)) || 0, flightSeq));
     }, (error) => {
       state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
       throw error;
@@ -2040,7 +2053,7 @@ export function createDataService({
         // kept every row of covers every key a batched method could ask for.
         if (everyRow && (options?.complete === true || (options?.replace && typeof options?.scope !== 'function'))) {
           coverageSeq += 1;
-          wholeCovers.set(name, coverageSeq);
+          wholeCovers.set(coverKey(formOf(jobContextNow()), name), coverageSeq);
         }
         if (small) {
           const after = await Promise.all(keys.map(async (key) => !!(await store.getRaw(key))));
