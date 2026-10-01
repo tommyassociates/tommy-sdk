@@ -51,3 +51,22 @@ describe('queueStats — bytes per partition + caps', () => {
     expect(stats.expiredOnLoad).toBe(0);
   });
 });
+
+describe('the offline queue caps, in the units Web Storage charges', () => {
+  it('counts a queued payload in UTF-16 code units: non-ASCII at the cap is queued, one unit past it is refused', async () => {
+    const issuer = createFakeIssuer();
+    const broker = createBroker({
+      capabilityService: issuer, online: false, now: () => 1_700_000_000_000,
+      serverInvoke: async () => ({ ok: true }),
+      offlineQueue: createDurableQueue({ storage: fakeStorage(), now: () => 1_700_000_000_000 }),
+    });
+    broker.registerMp(mp('time-clock', 'record_attendance'), { handlers: { activities: {} } });
+    const tc = await issuer.issue('time-clock', '1.0.0', 'team-A', [], 'i-tc');
+    const shell = JSON.stringify({ note: '' }).length;
+    // 'é' is one UTF-16 code unit (two UTF-8 bytes): exactly the cap in units.
+    await broker.invoke({ sourceMpId: 'time-clock', instanceId: 'i-tc', capabilityToken: tc, activity: 'time-clock.record_attendance', args: { note: 'é'.repeat(QUEUE_MAX_BYTES - shell) }, idempotencyKey: 'at-cap' });
+    expect(broker.queueStats().bytesBySource['time-clock']).toBe(QUEUE_MAX_BYTES);
+    await expect(broker.invoke({ sourceMpId: 'time-clock', instanceId: 'i-tc', capabilityToken: tc, activity: 'time-clock.record_attendance', args: {}, idempotencyKey: 'past-cap' }))
+      .rejects.toMatchObject({ code: 'Offline_QueueFull' });
+  });
+});
