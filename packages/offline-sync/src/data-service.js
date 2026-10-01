@@ -486,6 +486,11 @@ export function createDataService({
   principal = null,
   lane = null,
   foreground = () => true,
+  // While `foreground()` is false, how many times as long its reads wait
+  // between reads (the device budget's cadence multiplier): a refresh asked
+  // with a `maxAge`, or a method with a cadence, reads again only once that
+  // times this has passed. Infinity pauses its reads (sends go on).
+  backgroundCadence = () => 1,
   // Declared reads' cursors and the key digest of the set each left, one
   // record per collection, for this principal.
   sourceMeta = createMemorySourceMeta(),
@@ -500,6 +505,14 @@ export function createDataService({
   const laned = (label) => (lane === null ? label : `${lane}|${label}`);
   const lanedKey = (kind, rest) => (lane === null ? `${kind}:${rest}` : `${kind}:${lane}:${rest}`);
   const inForeground = () => { try { return foreground() !== false; } catch (_) { return true; } };
+  // The multiplier on how long reads wait between reads now: 1 while
+  // displayed, the device budget's while not (Infinity: no reads).
+  const cadenceFactor = () => {
+    if (inForeground()) return 1;
+    let factor = 1;
+    try { factor = Number(backgroundCadence()); } catch (_) { factor = 1; }
+    return Number.isNaN(factor) || factor < 1 ? 1 : factor;
+  };
   const sources = new Map();
   const states = new Map();
   const listeners = new Set();
@@ -1622,8 +1635,12 @@ export function createDataService({
       group.state.error = { code: refusal.code, status: null, message: refusal.message };
       return settle(Promise.reject(refusal));
     }
-    // Never read more often than the method's cadence, whatever `maxAge` asks.
-    const age = Math.max(Number(maxAge) || 0, method.cadenceMs || 0);
+    // Not displayed, with its reads paused: it reads nothing until it is.
+    const factor = cadenceFactor();
+    if (factor === Infinity) return settle(Promise.resolve());
+    // Never read more often than the method's cadence, whatever `maxAge` asks
+    // (longer while not displayed).
+    const age = Math.max(Number(maxAge) || 0, method.cadenceMs || 0) * factor;
     const askedAt = now();
     // A whole read fresh within that answers every key a batched method asks
     // for, and one in flight as this principal does once it lands; neither
@@ -1820,7 +1837,11 @@ export function createDataService({
     const state = stateFor(key);
     const settle = (promise) => (mode === 'visible' ? promise : promise.then(() => service.status(target), () => service.status(target)));
     if (!spec) return settle(Promise.reject(serviceError(`'${wanted.collection}' has no source`, 'DATA_NO_SOURCE')));
-    if (!fromNow && maxAge > 0 && state.syncedAt !== null && now() - state.syncedAt < maxAge && state.state !== 'error') return settle(Promise.resolve());
+    // Not displayed, with its reads paused: it reads nothing until it is.
+    const factor = cadenceFactor();
+    if (factor === Infinity) return settle(Promise.resolve());
+    const age = maxAge > 0 ? maxAge * factor : 0;
+    if (!fromNow && age > 0 && state.syncedAt !== null && now() - state.syncedAt < age && state.state !== 'error') return settle(Promise.resolve());
     if (!isOnline()) {
       state.state = 'offline';
       emitStatus();
