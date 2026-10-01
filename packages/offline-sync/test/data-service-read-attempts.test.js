@@ -154,3 +154,23 @@ describe('a read the scheduler tries again', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('a read asked to begin after the ask', () => {
+  it('is queued behind a read already on its way instead of joining it, whatever maxAge says', async () => {
+    const { data } = service(retryingScheduler());
+    let release;
+    const fetch = vi.fn()
+      .mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve([{ id: '1', name: 'Before' }]); }))
+      .mockResolvedValue([{ id: '1', name: 'After' }]);
+    data.source('members', { fetch });
+    const before = data.refresh('members', { mode: 'visible' });
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const after = data.refresh('members', { mode: 'visible', maxAge: 60000, fromNow: true });
+    // Without it, an ask joins the read on its way.
+    const joined = data.refresh('members', { mode: 'visible' });
+    release();
+    await Promise.all([before, joined, after]);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect((await data.read('members')).map((row) => row.name)).toEqual(['After']);
+  });
+});

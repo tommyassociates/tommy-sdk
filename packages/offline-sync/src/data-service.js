@@ -1737,7 +1737,9 @@ export function createDataService({
   }
 
   /** A refresh of `target` as the principal in `context` (taken when it was asked). */
-  function refreshAs(target, { mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false } = {}, context) {
+  function refreshAs(target, {
+    mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false, fromNow = false,
+  } = {}, context) {
     live();
     const wanted = targetOf(target);
     if (wanted.method !== undefined) {
@@ -1752,7 +1754,7 @@ export function createDataService({
     const state = stateFor(key);
     const settle = (promise) => (mode === 'visible' ? promise : promise.then(() => service.status(target), () => service.status(target)));
     if (!spec) return settle(Promise.reject(serviceError(`'${wanted.collection}' has no source`, 'DATA_NO_SOURCE')));
-    if (maxAge > 0 && state.syncedAt !== null && now() - state.syncedAt < maxAge && state.state !== 'error') return settle(Promise.resolve());
+    if (!fromNow && maxAge > 0 && state.syncedAt !== null && now() - state.syncedAt < maxAge && state.state !== 'error') return settle(Promise.resolve());
     if (!isOnline()) {
       state.state = 'offline';
       emitStatus();
@@ -1763,10 +1765,12 @@ export function createDataService({
     // changes by a whole read (`full`): it reads whole after it. A read of
     // changes may join a whole read.
     const form = formOf(context);
-    if (state.flight && state.flightForm === form && (!full || state.flightFull)) return settle(state.attempts.answer(state.flight));
+    if (state.flight && state.flightForm === form && (!full || state.flightFull) && !fromNow) return settle(state.attempts.answer(state.flight));
     if (state.flight) {
-      // Read after it; while its latest attempt has failed and it waits to
-      // try again, answered with that failure instead.
+      // Read after it (a read asked `fromNow` included: the read after it
+      // begins after this ask); while its latest attempt has failed and it
+      // waits to try again, answered with that failure instead, as its next
+      // attempt begins after this ask.
       const { attempts } = state;
       const after = () => refreshAs(target, {
         mode: 'visible', priority, maxAge: 0, reason, full,
@@ -2012,6 +2016,9 @@ export function createDataService({
      * target without an index prunes the rows its `where` selects; its status,
      * `maxAge` and coalescing belong to that `where` function. `full` makes a
      * declared read read the whole collection whatever its cursor.
+     * `fromNow` asks for a read that begins after this ask (after a write
+     * the server answered): one in flight is not joined, a read is queued
+     * behind it.
      *
      * `{ collection, method, params }` runs one of the source's refresh
      * methods: unknown methods and params, and params of the wrong shape,
