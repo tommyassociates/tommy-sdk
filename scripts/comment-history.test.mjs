@@ -236,32 +236,44 @@ function commentLines(src, ext) {
   return [...byLine.keys()].sort((a, b) => a - b).map((line) => byLine.get(line));
 }
 
+/** How many comment lines of `text` carry a history marker. */
+function historyCount(text, ext) {
+  return commentLines(text, ext)
+    .filter((line) => HISTORY.test(line) || REFERENCE.test(line) || PLAN.test(line)).length;
+}
+
 function counts() {
   const out = {};
   sources().forEach((file) => {
     const text = fs.readFileSync(path.join(ROOT, file), 'utf8');
-    const n = isGeneratedText(text) ? 0 : commentLines(text, path.extname(file))
-      .filter((line) => HISTORY.test(line) || REFERENCE.test(line) || PLAN.test(line)).length;
+    const n = isGeneratedText(text) ? 0 : historyCount(text, path.extname(file));
     if (n > 0) out[file] = n;
   });
   return out;
 }
 
-const SAMPLE_JS = [
-  "const accept = 'image/*'; // legacy upload",
-  'const url = "http://example.com";',
-  ['const t = `a $', '{"/*"} b`; const re = /\\/\\*[/*]/g; const half = total / 2;'].join(''),
-  "const later = 'legacy'; /* rc2 */",
+const STRINGS_JS = [
+  "const accept = 'image/*';",
+  'const url = "http://example.com/legacy";',
+  ['const t = `rc2 $', '{"/*"} legacy`;'].join(''),
+  'const re = /\\/\\*legacy[/*]/g; const half = total / 2;',
+  "const later = 'legacy';",
 ].join('\n');
-const SAMPLE_VUE = [
-  '<template>', '  <input accept="image/*">', "  <p>Don't // split</p>", '  <!-- legacy -->', '</template>',
-  '<script>', "const a = '//';", '</script>',
-  '<style lang="scss">', '.a { background: url(//cdn.example/x.png); }', '</style>', '',
+const STRINGS_VUE = [
+  '<template>', '  <input accept="image/*">', "  <p>Don't // legacy</p>", '</template>',
+  '<script>', "const a = '// legacy';", '</script>',
+  '<style lang="scss">', '.a { background: url(//cdn.example/legacy.png); content: "/* rc2"; }', '</style>', '',
 ].join('\n');
 
-test('reads comments, not strings, template literals or regexes', () => {
-  assert.deepEqual(commentLines(SAMPLE_JS, '.js').map((line) => line.trim()), ['// legacy upload', '/* rc2 */']);
-  assert.deepEqual(commentLines(SAMPLE_VUE, '.vue').map((line) => line.trim()), ['<!-- legacy -->']);
+test('counts nothing inside strings, template literals or regexes', () => {
+  assert.equal(historyCount(STRINGS_JS, '.js'), 0);
+  assert.equal(historyCount(STRINGS_VUE, '.vue'), 0);
+});
+
+test('counts a trailing history comment', () => {
+  assert.equal(historyCount('const x = 1; // legacy path removed 2026-10-02\n', '.js'), 1);
+  assert.equal(historyCount("const accept = 'image/*'; /* rc2 */\n", '.js'), 1);
+  assert.equal(historyCount('<template>\n  <p>x</p> <!-- legacy -->\n</template>\n', '.vue'), 1);
 });
 
 test('adds no comment lines carrying history markers', () => {
