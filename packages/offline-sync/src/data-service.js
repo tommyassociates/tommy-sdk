@@ -87,6 +87,46 @@ export function createImmediateScheduler() {
 const serviceError = (message, code) => Object.assign(new Error(message), { name: 'DataServiceError', code });
 
 /**
+ * A scheduled read's attempts as its callers see them. The scheduler may
+ * try a failed read again after a backoff; its callers are not held through
+ * that. Each caller is answered by the read's outcome or by the first
+ * attempt to fail after it asked, whichever comes first: at once while the
+ * latest attempt has failed and the next waits for its backoff. The retries
+ * go on in the background and settle the read itself. `run(work)` wraps the
+ * job's work; `answer(flight)` is one caller's answer; `failing()` whether
+ * the latest attempt failed and the read goes on; `settled()` marks the
+ * read settled.
+ */
+function readAttempts(onFailure = () => {}) {
+  let failure = null;
+  let done = false;
+  const waiting = new Set();
+  return {
+    run: (work) => async (...args) => {
+      failure = null;
+      try {
+        return await work(...args);
+      } catch (error) {
+        failure = { error };
+        try { onFailure(error); } catch (_) { /* the read's own outcome stands */ }
+        [...waiting].forEach((reject) => reject(error));
+        waiting.clear();
+        throw error;
+      }
+    },
+    answer(flight) {
+      if (failure && !done) return Promise.reject(failure.error);
+      return new Promise((resolve, reject) => {
+        waiting.add(reject);
+        flight.then((value) => { waiting.delete(reject); resolve(value); }, (error) => { waiting.delete(reject); reject(error); });
+      });
+    },
+    failing: () => !!failure && !done,
+    settled() { done = true; waiting.clear(); },
+  };
+}
+
+/**
  * Source meta kept in memory: `get(collection) → meta | null`,
  * `set(collection, meta | null)`. A host injects a durable one per
  * principal; without it a declared read's first read after a restart is
@@ -939,6 +979,8 @@ export function createDataService({
             await scheduler.request({
               key: lanedKey('push', `${entry.id}:${change.seq}`), target: `push:${laned(entry.label)}`, budgetKey, kind: 'write',
               priority: inForeground() ? PRIORITIES.high : PRIORITIES.background, visible: false,
+              // Never sent, or sent again, once fenced or retired.
+              valid: () => !disposed && !entry.discarded,
               run: async () => {
                 const push = pushOf(entry.collection, entry.decl);
                 if (typeof push !== 'function') throw serviceError(`'${entry.label}' has no push`, 'DATA_NO_SOURCE');
@@ -1622,8 +1664,10 @@ export function createDataService({
         }
       };
       // A job the scheduler refuses without running it (a full queue, an open
-      // circuit) is reported in the method's status too.
-      const job = (key, work) => Promise.resolve(scheduler.request({
+      // circuit) is reported in the method's status too. Its callers are
+      // answered by its first failed attempt (`attempts`); the flight itself
+      // rides the scheduler's retries.
+      const job = (key, work, attempts) => Promise.resolve(scheduler.request({
         key: lanedKey('data', `${label}:${wanted.method}:${key}`),
         target: laned(label),
         budgetKey: spec.budgetKey || budgetKey,
@@ -1631,24 +1675,27 @@ export function createDataService({
         ...(inForeground()
           ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
           : { priority: PRIORITIES.background, visible: false }),
-        run: work,
-      })).catch((error) => { failed(error); throw error; });
+        // Never run, or run again, once this service retired.
+        valid: () => !disposed,
+        run: attempts.run(work),
+      })).catch((error) => { failed(error); throw error; }).finally(() => attempts.settled());
       if (!batchParam) {
         if (fresh(group.state.syncedAt) && group.state.state !== 'error') return Promise.resolve();
-        if (group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return group.state.flight.promise;
+        if (group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return group.state.flight.attempts.answer(group.state.flight.promise);
         methodBatches += 1;
         // Only the newest flight for these params stores and answers: one a
         // later flight replaced (past the share window) is dropped.
-        const flight = { at, promise: null };
+        const flight = { at, promise: null, attempts: readAttempts() };
         group.state.flight = flight;
-        flight.promise = job(String(methodBatches), (isCurrent) => run(params, null, () => isCurrent() && group.state.flight === flight))
+        flight.promise = job(String(methodBatches), (isCurrent) => run(params, null, () => isCurrent() && group.state.flight === flight), flight.attempts)
           .finally(() => { if (group.state.flight === flight) group.state.flight = null; });
-        return flight.promise;
+        return flight.attempts.answer(flight.promise);
       }
       // Each id fresh within the cadence is answered; one being fetched joins
       // that fetch (while it is younger than the share window); the rest join
       // the batch about to go, up to the param's bound, or start one.
       const max = method.params[batchParam].max || MAX_METHOD_IDS;
+      // The batches this ask waits on.
       const waits = new Set();
       // New batches are handed to the scheduler only once every id of this ask
       // is in them, so a scheduler that runs a job at once never reads part.
@@ -1656,12 +1703,12 @@ export function createDataService({
       params[batchParam].forEach((id) => {
         if (fresh(group.fetched.get(id))) return;
         const flying = group.flying.get(id);
-        if (flying && at - flying.at < METHOD_SHARE_MS) { waits.add(flying.promise); return; }
+        if (flying && at - flying.at < METHOD_SHARE_MS) { waits.add(flying); return; }
         // A batch full, or waiting past the share window without starting, takes no more.
         if (!group.open || group.open.ids.size >= max || at - group.open.at >= METHOD_SHARE_MS) {
           methodBatches += 1;
           const batch = {
-            ids: new Set(), at, key: String(methodBatches), promise: null, settle: null,
+            ids: new Set(), at, key: String(methodBatches), promise: null, settle: null, attempts: readAttempts(),
           };
           batch.promise = new Promise((resolve, reject) => { batch.settle = { resolve, reject }; })
             .finally(() => {
@@ -1673,17 +1720,19 @@ export function createDataService({
         }
         group.open.ids.add(id);
         group.flying.set(id, group.open);
-        waits.add(group.open.promise);
+        waits.add(group.open);
       });
+      // Each batch answers this ask by its outcome or its first failed attempt.
+      const answers = [...waits].map((batch) => batch.attempts.answer(batch.promise));
       started.forEach((batch) => {
         job(batch.key, (isCurrent) => {
           // A batch takes no more ids once it runs.
           if (group.open === batch) group.open = null;
           const ids = [...batch.ids].sort(idOrder);
           return run({ ...shared, [batchParam]: ids }, ids, isCurrent);
-        }).then(batch.settle.resolve, batch.settle.reject);
+        }, batch.attempts).then(batch.settle.resolve, batch.settle.reject);
       });
-      return Promise.all([...waits]).then(() => undefined);
+      return Promise.all(answers).then(() => undefined);
     }
   }
 
@@ -1714,11 +1763,15 @@ export function createDataService({
     // changes by a whole read (`full`): it reads whole after it. A read of
     // changes may join a whole read.
     const form = formOf(context);
-    if (state.flight && state.flightForm === form && (!full || state.flightFull)) return settle(state.flight);
+    if (state.flight && state.flightForm === form && (!full || state.flightFull)) return settle(state.attempts.answer(state.flight));
     if (state.flight) {
-      return settle(state.flight.catch(() => {}).then(() => refreshAs(target, {
+      // Read after it; while its latest attempt has failed and it waits to
+      // try again, answered with that failure instead.
+      const { attempts } = state;
+      const after = () => refreshAs(target, {
         mode: 'visible', priority, maxAge: 0, reason, full,
-      }, context)));
+      }, context);
+      return settle(attempts.answer(state.flight).then(after, (error) => (attempts.failing() ? Promise.reject(error) : after())));
     }
     state.state = 'refreshing';
     emitStatus();
@@ -1774,6 +1827,14 @@ export function createDataService({
     };
     state.flightForm = form;
     state.flightFull = full === true;
+    // A failed attempt answers the read's callers and shows in its status;
+    // the scheduler's retries settle the read.
+    const attempts = readAttempts((error) => {
+      if (states.get(key) !== state) return;
+      state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
+      emitStatus();
+    });
+    state.attempts = attempts;
     // A read of the whole collection covers every key as of its start.
     const wholeRead = !wanted.query && !wanted.window && (wanted.key === undefined || wanted.key === null) && typeof spec.scope !== 'function';
     coverageSeq += 1;
@@ -1784,7 +1845,9 @@ export function createDataService({
       ...(inForeground()
         ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
         : { priority: PRIORITIES.background, visible: false }),
-      run,
+      // Never run, or run again, once this service retired.
+      valid: () => !disposed,
+      run: attempts.run(run),
     }).then((outcome) => {
       // A read that answered no list leaves the collection as it was, not fresh.
       if (outcome === NO_SNAPSHOT) { if (state.state === 'refreshing') state.state = 'stale'; return; }
@@ -1793,8 +1856,12 @@ export function createDataService({
     }, (error) => {
       state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
       throw error;
-    }).finally(() => { state.flight = null; state.flightForm = null; state.flightFull = false; emitStatus(); });
-    return settle(state.flight);
+    }).finally(() => {
+      attempts.settled();
+      if (state.attempts === attempts) state.attempts = null;
+      state.flight = null; state.flightForm = null; state.flightFull = false; emitStatus();
+    });
+    return settle(attempts.answer(state.flight));
   }
 
   const service = {
@@ -2177,6 +2244,8 @@ export function createDataService({
         entry.changes.splice(0).forEach((change) => change.reject(serviceError('Change fenced', 'DATA_FENCED')));
       });
       outbox.clear();
+      // Their jobs end now, queued retries included.
+      try { scheduler.revalidate?.(); } catch (_) { /* a scheduler without it checks before each run */ }
       emitStatus();
     },
     /**
@@ -2299,6 +2368,9 @@ export function createDataService({
       methodGroups.clear();
       coverageVoid.clear();
       wholeCovers.clear();
+      // Its reads and changes end now in the scheduler, queued retries
+      // included: none runs, or runs again, for a retired principal.
+      try { scheduler.revalidate?.(); } catch (_) { /* a scheduler without it checks before each run */ }
     },
   };
   // Every call but the synchronous ones counts as work until it settles.
