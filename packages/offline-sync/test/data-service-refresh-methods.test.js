@@ -392,4 +392,52 @@ describe('refresh methods', () => {
     await data.refresh({ collection: 'members', method: 'byIds', params: { ids: ['1', '4'] } }, { mode: 'visible' });
     expect(await ids(data)).toEqual(['1', '3']);
   });
+
+  it('hands a batch to the scheduler only once every id of the ask is in it', async () => {
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
+    // A scheduler that runs a job the moment it is handed one.
+    const scheduler = { request: (job) => Promise.resolve(job.run(() => true)) };
+    const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), scheduler, principal: { id: 'p1' } });
+    const api = server([member(1), member(2)]);
+    data.source('members', { fetch: api.whole, read: {}, methods: methods(api) });
+    await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101', '102'] } }, { mode: 'visible' });
+    expect(api.asked.map((call) => call.user_ids)).toEqual([['101', '102']]);
+    expect(await ids(data)).toEqual(['1', '2']);
+  });
+
+  it('lets only the newest flight of a search store and answer, never one a later flight replaced', async () => {
+    let at = 1_000_000;
+    const { data } = service({ at: () => at });
+    let releaseOld;
+    const old = new Promise((resolve) => { releaseOld = resolve; });
+    let calls = 0;
+    const search = vi.fn(async () => {
+      calls += 1;
+      if (calls === 1) { await old; return { rows: [member(1)], more: true }; }
+      return { rows: [member(2)], more: false };
+    });
+    data.source('members', { fetch: async () => ({ rows: [] }), read: {}, methods: { search: { params: { q: { type: 'string' } }, fetch: search, cadenceMs: 5 * MINUTE } } });
+    const stalled = data.refresh({ collection: 'members', method: 'search', params: { q: 'm' } });
+    await Promise.resolve();
+    at += 31000;
+    expect(await data.refresh({ collection: 'members', method: 'search', params: { q: 'm' } })).toMatchObject({ keys: ['2'], more: false });
+    releaseOld();
+    await stalled;
+    expect(await data.refresh({ collection: 'members', method: 'search', params: { q: 'm' } })).toMatchObject({ keys: ['2'], more: false });
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(await ids(data)).toEqual(['2']);
+  });
+
+  it('answers a method that joined a whole read with that read\'s outcome', async () => {
+    const { data } = service();
+    let fail;
+    const held = new Promise((resolve, reject) => { fail = reject; });
+    const api = server([member(1)]);
+    data.source('members', { fetch: () => held, read: {}, methods: methods(api) });
+    const reading = data.refresh('members').catch(() => {});
+    const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } });
+    fail(Object.assign(new Error('Service Unavailable'), { status: 503 }));
+    await reading;
+    expect(await asking).toMatchObject({ state: 'error', error: { status: 503 } });
+  });
 });
