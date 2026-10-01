@@ -1517,7 +1517,8 @@ export function createDataService({
     const form = formOf(context);
     const batchParam = method.batch || null;
     const shared = batchParam ? Object.fromEntries(Object.entries(params).filter(([param]) => param !== batchParam)) : params;
-    const group = methodGroup(JSON.stringify([form, name, wanted.method, shared]), name);
+    const groupKey = JSON.stringify([form, name, wanted.method, shared]);
+    let group = methodGroup(groupKey, name);
     // A method that is not batched (a search) also answers the keys of its
     // last answer and whether the endpoint has more.
     const outcome = () => (batchParam ? describeState(group.state)
@@ -1531,7 +1532,7 @@ export function createDataService({
     }
     // Never read more often than the method's cadence, whatever `maxAge` asks.
     const age = Math.max(Number(maxAge) || 0, method.cadenceMs || 0);
-    const at = now();
+    const askedAt = now();
     // A whole read fresh within that answers every key a batched method asks
     // for, and one in flight as this principal does once it lands; neither
     // answers a search (its filter, order and page are its own). One from
@@ -1543,7 +1544,7 @@ export function createDataService({
     };
     if (batchParam) {
       const covered = (wholeCovers.get(name) || 0) > voidOf(name);
-      if (covered && age > 0 && whole.syncedAt !== null && at - whole.syncedAt < age && whole.state !== 'error') return settle(Promise.resolve());
+      if (covered && age > 0 && whole.syncedAt !== null && askedAt - whole.syncedAt < age && whole.state !== 'error') return settle(Promise.resolve());
       // A whole read in flight as this principal answers the method when it
       // stores the collection. One that did not (refused, as for an account
       // that reads on demand; failed; stored nothing) leaves the method to
@@ -1551,17 +1552,27 @@ export function createDataService({
       if (whole.flight && whole.flightForm === form && (whole.flightSeq || 0) > voidOf(name)) {
         const stored = whole.flight.then(() => stateFor(targetKey({ collection: name })).state === 'fresh', () => false);
         return settle(stored.then((answered) => {
-          if (!answered) return lookup();
-          group.state.state = 'fresh';
-          group.state.error = null;
-          return undefined;
+          if (answered) {
+            group.state.state = 'fresh';
+            group.state.error = null;
+            return undefined;
+          }
+          // Its own lookup is a new ask: of a live service, as the principal
+          // it was asked as, in the group its ids belong to now (idle groups
+          // may have been cleared while it waited).
+          live();
+          if (formOf(jobContextNow()) !== form) throw serviceError('The account changed while the lookup waited', 'DATA_RETIRED');
+          group = methodGroup(groupKey, name);
+          return lookup();
         }));
       }
     }
     return settle(lookup());
 
-    // The method's own fetch: of its params, or of the ids it asks for, batched.
+    // The method's own fetch: of its params, or of the ids it asks for,
+    // batched, timed from when it runs.
     function lookup() {
+      const at = now();
       if (!isOnline()) {
         group.state.state = 'offline';
         return Promise.reject(serviceError('Offline', 'DATA_OFFLINE'));
