@@ -4,7 +4,9 @@
  *   read(collection, key?)            rows as stored (the paint ceiling applies)
  *   query(collection, spec)           rows by a declared index, in index order
  *   subscribe(target, callback)       the current value now, then on every change
- *   refresh(target, options)          a scheduled, coalesced background sync (experimental)
+ *   refresh(target, options)          a scheduled, coalesced background sync (experimental);
+ *                                     `{ collection, method, params }` runs one of the
+ *                                     source's named refresh methods
  *   ingest(collection, rows, options) server rows a domain received, stored synced
  *   mutate(collection, command)       an optimistic write, pushed when possible (experimental)
  *   purge(collection, options)        clear cached rows (never dirty ones unless forced)
@@ -25,6 +27,15 @@
  * Writes to one collection take turns: a declared read's commit (all its
  * chunks and its prune), ingests, purges, trims and a refresh's store step
  * never interleave, and a read decides what it keeps when its turn comes.
+ *
+ * A source may declare named refresh methods (`methods`), each a read of
+ * part of the collection with typed params (`byUserIds({ user_ids })`):
+ * the params are checked and put in one canonical form (unknown or invalid
+ * ones are refused), the batched ids of callers asking at once go in one
+ * fetch, an id being fetched is never fetched twice, a whole read in flight
+ * or fresh enough answers every id, and each answer is merged: it never
+ * removes a row it left out, never marks the collection synced, and removes
+ * only the keys it names gone.
  *
  * `source`, `refresh` and `mutate` with a source's `push` are experimental:
  * no host collection or MP uses them yet. Their outbox keeps every unsent
@@ -237,6 +248,108 @@ function checkRead(read) {
     || (read.forbidden !== undefined && !['purge', 'keep'].includes(read.forbidden));
   if (invalid) throw serviceError(`source.read: ${known.join(', ')} only (cursor a boolean, removedField a field name, fullEveryMs a positive number, forbidden 'purge' or 'keep')`, 'DATA_INVALID');
 }
+// The most ids one refresh method's ids param may name, and the most rows
+// one method answer may hold: a method reads a slice, never the collection.
+export const MAX_METHOD_IDS = 200;
+export const MAX_METHOD_ROWS = 5000;
+// The most keys a method answer may name gone.
+export const MAX_METHOD_GONE = 5000;
+export const METHOD_PARAM_TYPES = Object.freeze(['ids', 'id', 'string', 'date', 'boolean', 'page']);
+// A method fetch still unanswered after this is not joined: a later ask
+// fetches again rather than wait on a stalled one.
+export const METHOD_SHARE_MS = 30 * 1000;
+// Per method group, how many ids' fetch times are kept (the oldest go), and
+// how many groups are kept (the oldest idle ones go).
+const METHOD_FRESH_KEPT = 5000;
+const METHOD_GROUPS_KEPT = 500;
+const METHOD_NAME = /^[a-z][A-Za-z0-9]{0,63}$/;
+// The longest a string param may be.
+const MAX_METHOD_STRING = 200;
+/**
+ * Refuses refresh methods it could not honour: each a named `{ params,
+ * fetch, batch?, field?, cadenceMs?, available? }`, every param `{ type,
+ * max?, optional? }` of a known type (`max`: the most ids, or the longest
+ * string), `batch` naming an `ids` param and `field` the row field its ids
+ * name.
+ */
+function checkMethods(methods) {
+  const refuse = (why) => { throw serviceError(`source.methods: ${why}`, 'DATA_INVALID'); };
+  if (!methods || typeof methods !== 'object' || Array.isArray(methods)) refuse('an object of named methods');
+  Object.entries(methods).forEach(([name, method]) => {
+    if (!METHOD_NAME.test(name)) refuse(`'${name}' is not a method name`);
+    if (!method || typeof method !== 'object' || typeof method.fetch !== 'function') refuse(`'${name}' needs a fetch`);
+    const known = ['params', 'fetch', 'batch', 'field', 'cadenceMs', 'available'];
+    if (Object.keys(method).some((field) => !known.includes(field))) refuse(`'${name}' takes ${known.join(', ')} only`);
+    const { params } = method;
+    if (!params || typeof params !== 'object' || Array.isArray(params) || !Object.keys(params).length) refuse(`'${name}' needs its params`);
+    Object.entries(params).forEach(([param, spec]) => {
+      if (!METHOD_NAME.test(param.replace(/_/g, 'x'))) refuse(`'${name}.${param}' is not a param name`);
+      if (!spec || !METHOD_PARAM_TYPES.includes(spec.type)) refuse(`'${name}.${param}' needs a type (${METHOD_PARAM_TYPES.join(', ')})`);
+      if (Object.keys(spec).some((field) => !['type', 'max', 'optional'].includes(field))) refuse(`'${name}.${param}' takes type, max, optional only`);
+      const ceiling = spec.type === 'ids' ? MAX_METHOD_IDS : MAX_METHOD_STRING;
+      if (spec.max !== undefined && (!['ids', 'string'].includes(spec.type) || !Number.isSafeInteger(spec.max) || spec.max < 1 || spec.max > ceiling)) {
+        refuse(`'${name}.${param}.max' is for ids (1 to ${MAX_METHOD_IDS}) or a string (1 to ${MAX_METHOD_STRING})`);
+      }
+      if (spec.optional !== undefined && typeof spec.optional !== 'boolean') refuse(`'${name}.${param}.optional' must be a boolean`);
+    });
+    if (method.batch !== undefined && (params[method.batch]?.type !== 'ids' || params[method.batch]?.optional)) refuse(`'${name}.batch' must name a required ids param`);
+    if (method.cadenceMs !== undefined && !(Number.isFinite(method.cadenceMs) && method.cadenceMs >= 0)) refuse(`'${name}.cadenceMs' must be a duration`);
+    if (method.field !== undefined && (!method.batch || typeof method.field !== 'string' || !method.field)) refuse(`'${name}.field' names the row field a batched method's ids name`);
+    if (method.available !== undefined && typeof method.available !== 'function') refuse(`'${name}.available' must be a function`);
+  });
+}
+const METHOD_ID = /^[A-Za-z0-9_.:~-]{1,64}$/;
+const methodId = (value) => {
+  if (Number.isSafeInteger(value) && value >= 0) return String(value);
+  if (typeof value === 'string' && METHOD_ID.test(value)) return value;
+  return null;
+};
+// Ids in one order: numbers by value, then the rest as strings.
+const idOrder = (a, b) => (a.length - b.length) || (a < b ? -1 : Number(a > b));
+/** A method's params, checked against its declaration, in one canonical form (keys sorted, ids unique and sorted). */
+function methodParams(collection, name, method, given) {
+  const refuse = (why) => { throw serviceError(`refresh '${collection}' ${name}: ${why}`, 'DATA_INVALID'); };
+  const values = given === undefined || given === null ? {} : given;
+  if (typeof values !== 'object' || Array.isArray(values)) refuse('params must be an object');
+  const declared = method.params;
+  Object.keys(values).forEach((param) => { if (!Object.hasOwn(declared, param)) refuse(`unknown param '${param}'`); });
+  const out = {};
+  Object.keys(declared).sort().forEach((param) => {
+    const spec = declared[param];
+    const value = values[param];
+    if (value === undefined) {
+      if (!spec.optional) refuse(`'${param}' is required`);
+      return;
+    }
+    if (spec.type === 'ids') {
+      const max = spec.max || MAX_METHOD_IDS;
+      if (!Array.isArray(value) || !value.length) refuse(`'${param}' must be a non-empty list of ids`);
+      const ids = value.map(methodId);
+      if (ids.some((id) => id === null)) refuse(`'${param}' holds a value that is not an id`);
+      const unique = [...new Set(ids)].sort(idOrder);
+      if (unique.length > max) refuse(`'${param}' names more than ${max} ids`);
+      out[param] = unique;
+    } else if (spec.type === 'id') {
+      const id = methodId(value);
+      if (id === null) refuse(`'${param}' is not an id`);
+      out[param] = id;
+    } else if (spec.type === 'string') {
+      const max = spec.max || MAX_METHOD_STRING;
+      if (typeof value !== 'string' || !value.trim() || value.trim().length > max) refuse(`'${param}' must be a string of 1 to ${max} characters`);
+      out[param] = value.trim();
+    } else if (spec.type === 'date') {
+      if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}/.test(value) || !Number.isFinite(Date.parse(value))) refuse(`'${param}' must be an ISO date`);
+      out[param] = value;
+    } else if (spec.type === 'boolean') {
+      if (typeof value !== 'boolean') refuse(`'${param}' must be true or false`);
+      out[param] = value;
+    } else {
+      if (!Number.isSafeInteger(value) || value < 1 || value > 1000) refuse(`'${param}' must be a page from 1 to 1000`);
+      out[param] = value;
+    }
+  });
+  return Object.freeze(out);
+}
 /** Refuses, at once, a query spec a read could not honour. */
 // The most values one `anyOf` query may ask for.
 export const MAX_ANY_OF = 500;
@@ -358,6 +471,31 @@ export function createDataService({
     }
   }
   const touchedAfter = (name, since) => new Set([...(touches.get(name) || new Map())].filter(([, at]) => at > since).map(([key]) => key));
+  // Per collection and field, the values a method answer asked for and did
+  // not find (gone, or no longer visible), as of its read's start: a read
+  // that began before never stores a row naming one of them. The newest
+  // TOUCHES_KEPT values per field are kept.
+  const goneValues = new Map();
+  function noteGoneValues(name, field, values, at) {
+    if (!values.length) return;
+    if (!goneValues.has(name)) goneValues.set(name, new Map());
+    const fields = goneValues.get(name);
+    if (!fields.has(field)) fields.set(field, new Map());
+    const seen = fields.get(field);
+    values.forEach((value) => {
+      if ((seen.get(String(value)) || 0) > at) return;
+      seen.delete(String(value));
+      seen.set(String(value), at);
+    });
+    while (seen.size > TOUCHES_KEPT) seen.delete(seen.keys().next().value);
+  }
+  // Whether a record names a value found gone after `since`.
+  const barredAfter = (name, since) => {
+    const fields = goneValues.get(name);
+    if (!fields || !fields.size) return () => false;
+    return (record) => [...fields].some(([field, seen]) => record?.[field] !== undefined && record?.[field] !== null
+      && (seen.get(String(record[field])) || 0) > since);
+  };
   // Whether a marker a read that began at `since` needed was dropped.
   const protectionLost = (name, since) => (lostTouches.get(name) || 0) > since;
   // When a replacing ingest from outside a declared read last ran, by collection.
@@ -1144,7 +1282,8 @@ export function createDataService({
         removed = await removeRows({ label, store: raw, keys: [...removedKeys].filter((key) => !touched.has(key) && present.has(key)), force: false });
       }
       if (halted()) return stopHere();
-      const unchanged = (touched) => (row) => !touched.has(keyOf(row));
+      const barred = barredAfter(name, startedAt);
+      const unchanged = (touched) => (row) => !touched.has(keyOf(row)) && !barred(row);
       if (changesOnly) {
         for (const batch of ingestChunks(records)) {
           if (halted()) return stopHere();
@@ -1178,7 +1317,7 @@ export function createDataService({
         let oldest = null;
         records.forEach((record) => {
           const key = keyOf(record);
-          if (touched.has(key)) return;
+          if (touched.has(key) || barred(record)) return;
           const row = stored.get(key);
           if (!row || row._dirty || row._persistFailed || contentOf(record) !== contentOf(row)) { toWrite.push(record); return; }
           const at = Date.parse(row._updatedAt || '');
@@ -1230,10 +1369,344 @@ export function createDataService({
     return 'stored';
   }
 
+  // Refresh methods, by group: one per principal, collection, method and
+  // params other than the batched ids. A group holds the ids being fetched
+  // (each with its fetch and when it began), the batch still taking ids,
+  // when each id was last fetched, and the group's last outcome.
+  const methodGroups = new Map();
+  let methodBatches = 0;
+  function methodGroup(key, collection) {
+    if (!methodGroups.has(key)) {
+      // Idle groups beyond the bound go, oldest first.
+      if (methodGroups.size >= METHOD_GROUPS_KEPT) {
+        [...methodGroups.entries()].filter(([, group]) => !group.flying.size && !group.open && !group.state.flight)
+          .slice(0, methodGroups.size - METHOD_GROUPS_KEPT + 1).forEach(([old]) => methodGroups.delete(old));
+      }
+      methodGroups.set(key, {
+        collection, flying: new Map(), open: null, fetched: new Map(), state: { state: 'stale', syncedAt: null, error: null, flight: null },
+      });
+    }
+    return methodGroups.get(key);
+  }
+  const methodsWorking = () => [...methodGroups.values()].some((group) => group.flying.size || group.open || group.state.flight);
+  // Per collection, when (in `coverageSeq`) what methods know of it was last
+  // made void by a purge or trim, and as of when its last completed whole
+  // read covers every key.
+  let coverageSeq = 0;
+  const coverageVoid = new Map();
+  const wholeCovers = new Map();
+  // A purge or trim of the collection: what its methods fetched, and what a
+  // whole read before it covered, is fetched again when asked.
+  const forgetMethods = (name) => {
+    coverageSeq += 1;
+    coverageVoid.set(name, coverageSeq);
+    methodGroups.forEach((group) => {
+      if (group.collection !== name) return;
+      group.fetched.clear();
+      group.state.syncedAt = null;
+    });
+  };
+  const voidOf = (name) => coverageVoid.get(name) || 0;
+  function noteFetched(group, id, at) {
+    group.fetched.delete(id);
+    group.fetched.set(id, at);
+    while (group.fetched.size > METHOD_FRESH_KEPT) group.fetched.delete(group.fetched.keys().next().value);
+  }
+  /**
+   * Stores one method answer (`rows`, or `{ rows, gone, more }`) in the
+   * collection's turn, as a change of those rows as of the read's start
+   * (`startedAt`), so a read begun before it never undoes them: a merge that
+   * removes only the keys it names gone (`gone`: the endpoint said so, a 404
+   * or a null), never one changed on this device since the read began or one
+   * with an unsent change. A key named gone is recorded as removed even when
+   * the device does not hold it, so an older read never brings it back. Each
+   * answered row becomes its record with the stored row as `prev`, and the
+   * record's key decides. It stops between writes once its job is no longer
+   * `current()`, resolving null. `unanswered(records, keyPath)`, when given,
+   * names more gone: `{ keys, field, values }`, the stored rows of the ids
+   * asked that the answer left out, and those ids (`values` of `field`),
+   * which no older read stores again. Resolves the keys it answered, and
+   * whether the endpoint has more (`more`: a page of a search).
+   */
+  async function commitMethod({ name, label, store, decl }, spec, answer, {
+    touched, turn, startedAt, current, unanswered = null,
+  }) {
+    const keyPath = decl?.keyPath || 'id';
+    const rows = Array.isArray(answer) ? answer : answer?.rows;
+    const gone = Array.isArray(answer) ? [] : answer?.gone ?? [];
+    // An answer refused here would be refused again: never retried.
+    const invalid = (why) => Object.assign(serviceError(`'${name}': a method answer ${why}`, 'DATA_INVALID'), { retryable: false });
+    if (!Array.isArray(rows) || !Array.isArray(gone)) throw invalid('is rows, or { rows, gone }');
+    if (rows.length > MAX_METHOD_ROWS) {
+      throw Object.assign(serviceError(`'${name}': a method answered ${rows.length} rows; at most ${MAX_METHOD_ROWS}`, 'DATA_TOO_LARGE'), { retryable: false });
+    }
+    if (gone.length > MAX_METHOD_GONE) {
+      throw Object.assign(serviceError(`'${name}': a method named ${gone.length} keys gone; at most ${MAX_METHOD_GONE}`, 'DATA_TOO_LARGE'), { retryable: false });
+    }
+    if (rows.some((dto) => !dto || typeof dto !== 'object')) throw invalid('holds an entry that is not a row');
+    if (gone.some((key) => methodId(key) === null)) throw invalid('names a gone key that is not a key');
+    // The stored rows the answer's own keys name, as `prev` for the mapper.
+    const dtoKey = typeof spec.keyOf === 'function' ? spec.keyOf : (dto) => dto[keyPath];
+    const dtoKeys = rows.map((dto) => { const key = dtoKey(dto); return key === undefined || key === null ? null : String(key); });
+    const previous = previousByKey(await Promise.all([...new Set(dtoKeys.filter((key) => key !== null))].map((key) => store.getRaw(key))), keyPath);
+    const toRecord = spec.toRecord || ((dto) => dto);
+    const mapped = rows.map((dto, at) => toRecord(dto, dtoKeys[at] === null ? undefined : previous.get(dtoKeys[at])));
+    if (mapped.some((record) => !record || typeof record !== 'object' || record[keyPath] === undefined || record[keyPath] === null)) {
+      throw invalid('holds an entry that is not a row with a key');
+    }
+    const keys = [...new Set(mapped.map((record) => String(record[keyPath])))];
+    const before = await Promise.all(keys.map((key) => store.getRaw(key)));
+    const refusals = [];
+    const barred = barredAfter(name, startedAt);
+    const records = mapped.filter((record) => {
+      if (touched.has(String(record[keyPath])) || barred(record)) return false;
+      const why = typeof store.validateRecord === 'function' ? store.validateRecord(record) : null;
+      if (why) refusals.push(why);
+      return !why;
+    });
+    if (refusals.length) reportRejected(store, refusals, onPersistError);
+    for (const chunk of ingestChunks(records)) {
+      if (!current()) return null;
+      // eslint-disable-next-line no-await-in-loop
+      await turn.store.reconcile(chunk, { prune: false, keepDirty: true, syncedAt: null });
+    }
+    if (!current()) return null;
+    const answered = new Set(keys);
+    // A batched method with a `field`: the stored rows whose field names an
+    // id the answer left out are gone for this principal too, and so is the
+    // value itself, held or not.
+    const left = unanswered ? await unanswered(mapped, keyPath) : { keys: [], field: null, values: [] };
+    if (!current()) return null;
+    if (left.field && left.field !== keyPath) noteGoneValues(name, left.field, left.values, startedAt);
+    const goneKeys = [...new Set([...gone.map(String), ...left.keys])].filter((key) => !answered.has(key) && !touched.has(key));
+    // Gone as of the read's start, held or not.
+    recordEffect(name, { removedKeys: goneKeys, at: startedAt });
+    const goneRows = (await Promise.all(goneKeys.map((key) => store.getRaw(key)))).filter((row) => row && !row._dirty);
+    const removed = [];
+    for (let start = 0; start < goneRows.length; start += PAGE_ROWS) {
+      if (!current()) return null;
+      // eslint-disable-next-line no-await-in-loop
+      removed.push(...await removeRows({
+        label, store: turn.store, keys: goneRows.slice(start, start + PAGE_ROWS).map((row) => String(row[keyPath])), force: false,
+      }));
+    }
+    const after = await Promise.all(keys.map((key) => store.getRaw(key)));
+    await adjustMeta(name, { added: keys.filter((key, at) => !before[at] && after[at]), removed });
+    return { keys, more: !Array.isArray(answer) && answer?.more === true };
+  }
+  /**
+   * A refresh method's run (`{ collection, method, params }`) as the
+   * principal in `context`: see `refresh`.
+   */
+  function refreshMethodAs(wanted, {
+    mode = 'silent', priority = 'normal', maxAge = 0, reason = null,
+  } = {}, context) {
+    live();
+    const {
+      name, label, store, decl,
+    } = local(wanted.collection);
+    if (wanted.key !== undefined || wanted.query !== undefined || wanted.window !== undefined) {
+      return Promise.reject(serviceError('refresh: a method takes params, never a key, query or window', 'DATA_INVALID'));
+    }
+    const spec = sources.get(name) || decl?.source;
+    if (!spec) return Promise.reject(serviceError(`'${wanted.collection}' has no source`, 'DATA_NO_SOURCE'));
+    const method = spec.methods && typeof wanted.method === 'string' && Object.hasOwn(spec.methods, wanted.method) ? spec.methods[wanted.method] : null;
+    if (!method) return Promise.reject(serviceError(`'${wanted.collection}' has no refresh method '${wanted.method}'`, 'DATA_INVALID'));
+    let params;
+    try { params = methodParams(name, wanted.method, method, wanted.params); } catch (error) { return Promise.reject(error); }
+    // A method the source cannot run now (its server does not offer it) is
+    // refused before anything is scheduled: no request, no job, nothing a
+    // circuit counts.
+    let available = true;
+    try { available = typeof method.available !== 'function' || method.available(params) !== false; } catch (_) { available = false; }
+    const form = formOf(context);
+    const batchParam = method.batch || null;
+    const shared = batchParam ? Object.fromEntries(Object.entries(params).filter(([param]) => param !== batchParam)) : params;
+    const groupKey = JSON.stringify([form, name, wanted.method, shared]);
+    let group = methodGroup(groupKey, name);
+    // A method that is not batched (a search) also answers the keys of its
+    // last answer and whether the endpoint has more.
+    const outcome = () => (batchParam ? describeState(group.state)
+      : { ...describeState(group.state), keys: group.state.keys ?? null, more: group.state.more ?? null });
+    const settle = (promise) => (mode === 'visible' ? promise.then(outcome) : promise.then(outcome, outcome));
+    if (!available) {
+      const refusal = Object.assign(serviceError(`'${wanted.collection}' cannot run '${wanted.method}' now`, 'DATA_UNSUPPORTED'), { retryable: false });
+      group.state.state = 'error';
+      group.state.error = { code: refusal.code, status: null, message: refusal.message };
+      return settle(Promise.reject(refusal));
+    }
+    // Never read more often than the method's cadence, whatever `maxAge` asks.
+    const age = Math.max(Number(maxAge) || 0, method.cadenceMs || 0);
+    const askedAt = now();
+    // A whole read fresh within that answers every key a batched method asks
+    // for, and one in flight as this principal does once it lands; neither
+    // answers a search (its filter, order and page are its own). One from
+    // before a purge or trim covers nothing.
+    const whole = stateFor(targetKey({ collection: name }));
+    const failed = (error) => {
+      group.state.state = isOnline() ? 'error' : 'offline';
+      group.state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
+    };
+    if (batchParam) {
+      const covered = (wholeCovers.get(name) || 0) > voidOf(name);
+      if (covered && age > 0 && whole.syncedAt !== null && askedAt - whole.syncedAt < age && whole.state !== 'error') {
+        // Answered by that read: the method's status says so.
+        group.state.state = 'fresh';
+        group.state.error = null;
+        group.state.syncedAt = whole.syncedAt;
+        return settle(Promise.resolve());
+      }
+      // A whole read in flight as this principal answers the method when it
+      // stores the collection. One that did not (refused, as for an account
+      // that reads on demand; failed; stored nothing) leaves the method to
+      // send its own lookup: a keyed ask never inherits a whole read's outcome.
+      if (whole.flight && whole.flightWhole && whole.flightForm === form && (whole.flightSeq || 0) > voidOf(name)) {
+        const stored = whole.flight.then(() => stateFor(targetKey({ collection: name })).state === 'fresh', () => false);
+        return settle(stored.then((answered) => {
+          if (answered) {
+            group.state.state = 'fresh';
+            group.state.error = null;
+            return undefined;
+          }
+          // Its own lookup is a new ask: of a live service, as the principal
+          // it was asked as, in the group its ids belong to now (idle groups
+          // may have been cleared while it waited).
+          live();
+          if (formOf(jobContextNow()) !== form) throw serviceError('The account changed while the lookup waited', 'DATA_RETIRED');
+          group = methodGroup(groupKey, name);
+          return lookup();
+        }));
+      }
+    }
+    return settle(lookup());
+
+    // The method's own fetch: of its params, or of the ids it asks for,
+    // batched, timed from when it runs.
+    function lookup() {
+      const at = now();
+      if (!isOnline()) {
+        group.state.state = 'offline';
+        return Promise.reject(serviceError('Offline', 'DATA_OFFLINE'));
+      }
+      const fresh = (since) => age > 0 && since !== null && since !== undefined && at - since < age;
+      // The stored rows whose `field` names an id asked for that the answer left
+      // out: for this principal, those rows are gone (not visible, or removed).
+      const unansweredBy = (ids) => (method.field && ids ? async (records, keyPath) => {
+        const answeredValues = new Set(records.map((record) => String(record[method.field])));
+        const missing = ids.filter((id) => !answeredValues.has(id));
+        if (!missing.length) return { keys: [], field: method.field, values: [] };
+        if (method.field === keyPath) return { keys: missing, field: method.field, values: missing };
+        const wantedValues = new Set(missing);
+        const keys = (await rawRows(store)).filter((row) => row[method.field] !== undefined && row[method.field] !== null
+          && wantedValues.has(String(row[method.field]))).map((row) => String(row[keyPath]));
+        return { keys, field: method.field, values: missing };
+      } : null);
+      // One fetch: through the read guard, merged in the collection's turn. A
+      // purge or trim while it was out leaves what it asked for not fetched.
+      const run = async (asked, ids, isCurrent) => {
+        const current = () => !disposed && isCurrent();
+        const began = now();
+        const voidAtStart = voidOf(name);
+        group.state.state = 'refreshing';
+        try {
+          let stored = null;
+          await guardedRead(name, () => method.fetch(asked, context), async (answer, touched, startedAt, turn) => {
+            stored = await commitMethod({
+              name, label, store, decl,
+            }, spec, answer, {
+              touched, turn, startedAt, current, unanswered: unansweredBy(ids),
+            });
+          }, { isCurrent: current });
+          if (!stored || !current()) return;
+          if (!batchParam) {
+            group.state.keys = stored.keys;
+            group.state.more = stored.more;
+          }
+          group.state.state = 'fresh';
+          group.state.error = null;
+          if (voidOf(name) !== voidAtStart) return;
+          if (ids) ids.forEach((id) => noteFetched(group, id, began));
+          group.state.syncedAt = now();
+        } catch (error) {
+          failed(error);
+          throw error;
+        }
+      };
+      // A job the scheduler refuses without running it (a full queue, an open
+      // circuit) is reported in the method's status too.
+      const job = (key, work) => Promise.resolve(scheduler.request({
+        key: lanedKey('data', `${label}:${wanted.method}:${key}`),
+        target: laned(label),
+        budgetKey: spec.budgetKey || budgetKey,
+        reason,
+        ...(inForeground()
+          ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
+          : { priority: PRIORITIES.background, visible: false }),
+        run: work,
+      })).catch((error) => { failed(error); throw error; });
+      if (!batchParam) {
+        if (fresh(group.state.syncedAt) && group.state.state !== 'error') return Promise.resolve();
+        if (group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return group.state.flight.promise;
+        methodBatches += 1;
+        // Only the newest flight for these params stores and answers: one a
+        // later flight replaced (past the share window) is dropped.
+        const flight = { at, promise: null };
+        group.state.flight = flight;
+        flight.promise = job(String(methodBatches), (isCurrent) => run(params, null, () => isCurrent() && group.state.flight === flight))
+          .finally(() => { if (group.state.flight === flight) group.state.flight = null; });
+        return flight.promise;
+      }
+      // Each id fresh within the cadence is answered; one being fetched joins
+      // that fetch (while it is younger than the share window); the rest join
+      // the batch about to go, up to the param's bound, or start one.
+      const max = method.params[batchParam].max || MAX_METHOD_IDS;
+      const waits = new Set();
+      // New batches are handed to the scheduler only once every id of this ask
+      // is in them, so a scheduler that runs a job at once never reads part.
+      const started = [];
+      params[batchParam].forEach((id) => {
+        if (fresh(group.fetched.get(id))) return;
+        const flying = group.flying.get(id);
+        if (flying && at - flying.at < METHOD_SHARE_MS) { waits.add(flying.promise); return; }
+        // A batch full, or waiting past the share window without starting, takes no more.
+        if (!group.open || group.open.ids.size >= max || at - group.open.at >= METHOD_SHARE_MS) {
+          methodBatches += 1;
+          const batch = {
+            ids: new Set(), at, key: String(methodBatches), promise: null, settle: null,
+          };
+          batch.promise = new Promise((resolve, reject) => { batch.settle = { resolve, reject }; })
+            .finally(() => {
+              if (group.open === batch) group.open = null;
+              batch.ids.forEach((one) => { if (group.flying.get(one) === batch) group.flying.delete(one); });
+            });
+          group.open = batch;
+          started.push(batch);
+        }
+        group.open.ids.add(id);
+        group.flying.set(id, group.open);
+        waits.add(group.open.promise);
+      });
+      started.forEach((batch) => {
+        job(batch.key, (isCurrent) => {
+          // A batch takes no more ids once it runs.
+          if (group.open === batch) group.open = null;
+          const ids = [...batch.ids].sort(idOrder);
+          return run({ ...shared, [batchParam]: ids }, ids, isCurrent);
+        }).then(batch.settle.resolve, batch.settle.reject);
+      });
+      return Promise.all([...waits]).then(() => undefined);
+    }
+  }
+
   /** A refresh of `target` as the principal in `context` (taken when it was asked). */
   function refreshAs(target, { mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false } = {}, context) {
     live();
     const wanted = targetOf(target);
+    if (wanted.method !== undefined) {
+      return refreshMethodAs(wanted, {
+        mode, priority, maxAge, reason,
+      }, context);
+    }
     const { name, label, store, decl } = local(wanted.collection);
     if (wanted.query) checkQuery(wanted.query);
     const spec = sources.get(name) || decl?.source;
@@ -1312,6 +1785,13 @@ export function createDataService({
     };
     state.flightForm = form;
     state.flightFull = full === true;
+    // A read of the whole collection covers every key as of its start.
+    const wholeRead = !wanted.query && !wanted.window && (wanted.key === undefined || wanted.key === null) && typeof spec.scope !== 'function';
+    coverageSeq += 1;
+    const flightSeq = coverageSeq;
+    state.flightSeq = flightSeq;
+    // Only a read of every row answers a batched method that joins it.
+    state.flightWhole = wholeRead;
     state.flight = scheduler.request({
       key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
       ...(inForeground()
@@ -1322,10 +1802,11 @@ export function createDataService({
       // A read that answered no list leaves the collection as it was, not fresh.
       if (outcome === NO_SNAPSHOT) { if (state.state === 'refreshing') state.state = 'stale'; return; }
       state.state = 'fresh'; state.syncedAt = now(); state.error = null;
+      if (wholeRead) wholeCovers.set(name, Math.max(wholeCovers.get(name) || 0, flightSeq));
     }, (error) => {
       state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
       throw error;
-    }).finally(() => { state.flight = null; state.flightForm = null; state.flightFull = false; emitStatus(); });
+    }).finally(() => { state.flight = null; state.flightForm = null; state.flightFull = false; state.flightWhole = false; emitStatus(); });
     return settle(state.flight);
   }
 
@@ -1446,6 +1927,7 @@ export function createDataService({
       const { name } = local(collection);
       if (typeof spec?.fetch !== 'function') throw serviceError('source.fetch is required', 'DATA_INVALID');
       if (spec.read !== undefined) checkRead(spec.read);
+      if (spec.methods !== undefined) checkMethods(spec.methods);
       if (spec.budgetKey !== undefined && (typeof spec.budgetKey !== 'string' || !spec.budgetKey)) {
         throw serviceError('source.budgetKey must be a name', 'DATA_INVALID');
       }
@@ -1476,6 +1958,14 @@ export function createDataService({
      * target without an index prunes the rows its `where` selects; its status,
      * `maxAge` and coalescing belong to that `where` function. `full` makes a
      * declared read read the whole collection whatever its cursor.
+     *
+     * `{ collection, method, params }` runs one of the source's refresh
+     * methods: unknown methods and params, and params of the wrong shape,
+     * are refused (`DATA_INVALID`, also in silent mode). It never reads more
+     * often than the method's `cadenceMs` (per id for a batched method),
+     * whatever `maxAge` asks; a whole read fresh within that, or one in
+     * flight as this principal, answers it. Silent mode resolves the
+     * method's own status.
      */
     refresh(target, options = {}) {
       // The principal it reads as, taken when it is asked.
@@ -1517,6 +2007,12 @@ export function createDataService({
         const keys = small ? [...new Set(rows.filter((row) => row && typeof row === 'object').map((row) => String(row[keyPath])))] : [];
         const before = small ? await Promise.all(keys.map(async (key) => !!(await store.getRaw(key)))) : [];
         const result = await ingestRows(collection, rows, options, turn.store);
+        // A complete set (or a replacement of the whole collection) covers
+        // every key a batched method could ask for.
+        if (options?.complete === true || (options?.replace && typeof options?.scope !== 'function')) {
+          coverageSeq += 1;
+          wholeCovers.set(name, coverageSeq);
+        }
         if (small) {
           const after = await Promise.all(keys.map(async (key) => !!(await store.getRaw(key))));
           await adjustMeta(name, {
@@ -1749,6 +2245,7 @@ export function createDataService({
           label, store: turn.store, keys: entries.filter(({ dirty }) => force || !dirty).map(({ key }) => key), force,
         });
         await adjustMeta(name, whole ? null : { added: [], removed });
+        forgetMethods(name);
         return { removed };
       });
     },
@@ -1770,6 +2267,7 @@ export function createDataService({
         const older = entries.slice(0, Math.max(0, entries.length - spec.keep)).filter(({ dirty }) => !dirty).map(({ key }) => key);
         const removed = await removeRows({ label, store: turn.store, keys: older, force: false });
         await adjustMeta(name, { added: [], removed });
+        forgetMethods(name);
         return { removed };
       });
     },
@@ -1792,7 +2290,7 @@ export function createDataService({
      */
     idle() {
       return outbox.size === 0 && writes.size === 0 && turns.size === 0 && working === 0
-        && ![...states.values()].some((state) => state.flight);
+        && ![...states.values()].some((state) => state.flight) && !methodsWorking();
     },
     dispose() {
       disposed = true;
@@ -1811,6 +2309,9 @@ export function createDataService({
       });
       outbox.clear();
       states.clear();
+      methodGroups.clear();
+      coverageVoid.clear();
+      wholeCovers.clear();
     },
   };
   // Every call but the synchronous ones counts as work until it settles.
