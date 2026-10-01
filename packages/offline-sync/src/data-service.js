@@ -1517,7 +1517,8 @@ export function createDataService({
     const form = formOf(context);
     const batchParam = method.batch || null;
     const shared = batchParam ? Object.fromEntries(Object.entries(params).filter(([param]) => param !== batchParam)) : params;
-    const group = methodGroup(JSON.stringify([form, name, wanted.method, shared]), name);
+    const groupKey = JSON.stringify([form, name, wanted.method, shared]);
+    let group = methodGroup(groupKey, name);
     // A method that is not batched (a search) also answers the keys of its
     // last answer and whether the endpoint has more.
     const outcome = () => (batchParam ? describeState(group.state)
@@ -1531,7 +1532,7 @@ export function createDataService({
     }
     // Never read more often than the method's cadence, whatever `maxAge` asks.
     const age = Math.max(Number(maxAge) || 0, method.cadenceMs || 0);
-    const at = now();
+    const askedAt = now();
     // A whole read fresh within that answers every key a batched method asks
     // for, and one in flight as this principal does once it lands; neither
     // answers a search (its filter, order and page are its own). One from
@@ -1543,128 +1544,147 @@ export function createDataService({
     };
     if (batchParam) {
       const covered = (wholeCovers.get(name) || 0) > voidOf(name);
-      if (covered && age > 0 && whole.syncedAt !== null && at - whole.syncedAt < age && whole.state !== 'error') return settle(Promise.resolve());
-      // The method's status is the joined read's outcome.
+      if (covered && age > 0 && whole.syncedAt !== null && askedAt - whole.syncedAt < age && whole.state !== 'error') return settle(Promise.resolve());
+      // A whole read in flight as this principal answers the method when it
+      // stores the collection. One that did not (refused, as for an account
+      // that reads on demand; failed; stored nothing) leaves the method to
+      // send its own lookup: a keyed ask never inherits a whole read's outcome.
       if (whole.flight && whole.flightForm === form && (whole.flightSeq || 0) > voidOf(name)) {
-        return settle(whole.flight.then(() => {
-          // What the read did: fresh only when it stored the collection.
-          const done = stateFor(targetKey({ collection: name }));
-          group.state.state = done.state === 'fresh' ? 'fresh' : done.state;
-          group.state.error = done.error;
-        }, (error) => { failed(error); throw error; }));
+        const stored = whole.flight.then(() => stateFor(targetKey({ collection: name })).state === 'fresh', () => false);
+        return settle(stored.then((answered) => {
+          if (answered) {
+            group.state.state = 'fresh';
+            group.state.error = null;
+            return undefined;
+          }
+          // Its own lookup is a new ask: of a live service, as the principal
+          // it was asked as, in the group its ids belong to now (idle groups
+          // may have been cleared while it waited).
+          live();
+          if (formOf(jobContextNow()) !== form) throw serviceError('The account changed while the lookup waited', 'DATA_RETIRED');
+          group = methodGroup(groupKey, name);
+          return lookup();
+        }));
       }
     }
-    if (!isOnline()) {
-      group.state.state = 'offline';
-      return settle(Promise.reject(serviceError('Offline', 'DATA_OFFLINE')));
-    }
-    const fresh = (since) => age > 0 && since !== null && since !== undefined && at - since < age;
-    // The stored rows whose `field` names an id asked for that the answer left
-    // out: for this principal, those rows are gone (not visible, or removed).
-    const unansweredBy = (ids) => (method.field && ids ? async (records, keyPath) => {
-      const answeredValues = new Set(records.map((record) => String(record[method.field])));
-      const missing = ids.filter((id) => !answeredValues.has(id));
-      if (!missing.length) return { keys: [], field: method.field, values: [] };
-      if (method.field === keyPath) return { keys: missing, field: method.field, values: missing };
-      const wantedValues = new Set(missing);
-      const keys = (await rawRows(store)).filter((row) => row[method.field] !== undefined && row[method.field] !== null
-        && wantedValues.has(String(row[method.field]))).map((row) => String(row[keyPath]));
-      return { keys, field: method.field, values: missing };
-    } : null);
-    // One fetch: through the read guard, merged in the collection's turn. A
-    // purge or trim while it was out leaves what it asked for not fetched.
-    const run = async (asked, ids, isCurrent) => {
-      const current = () => !disposed && isCurrent();
-      const began = now();
-      const voidAtStart = voidOf(name);
-      group.state.state = 'refreshing';
-      try {
-        let stored = null;
-        await guardedRead(name, () => method.fetch(asked, context), async (answer, touched, startedAt, turn) => {
-          stored = await commitMethod({
-            name, label, store, decl,
-          }, spec, answer, {
-            touched, turn, startedAt, current, unanswered: unansweredBy(ids),
-          });
-        }, { isCurrent: current });
-        if (!stored || !current()) return;
-        if (!batchParam) {
-          group.state.keys = stored.keys;
-          group.state.more = stored.more;
+    return settle(lookup());
+
+    // The method's own fetch: of its params, or of the ids it asks for,
+    // batched, timed from when it runs.
+    function lookup() {
+      const at = now();
+      if (!isOnline()) {
+        group.state.state = 'offline';
+        return Promise.reject(serviceError('Offline', 'DATA_OFFLINE'));
+      }
+      const fresh = (since) => age > 0 && since !== null && since !== undefined && at - since < age;
+      // The stored rows whose `field` names an id asked for that the answer left
+      // out: for this principal, those rows are gone (not visible, or removed).
+      const unansweredBy = (ids) => (method.field && ids ? async (records, keyPath) => {
+        const answeredValues = new Set(records.map((record) => String(record[method.field])));
+        const missing = ids.filter((id) => !answeredValues.has(id));
+        if (!missing.length) return { keys: [], field: method.field, values: [] };
+        if (method.field === keyPath) return { keys: missing, field: method.field, values: missing };
+        const wantedValues = new Set(missing);
+        const keys = (await rawRows(store)).filter((row) => row[method.field] !== undefined && row[method.field] !== null
+          && wantedValues.has(String(row[method.field]))).map((row) => String(row[keyPath]));
+        return { keys, field: method.field, values: missing };
+      } : null);
+      // One fetch: through the read guard, merged in the collection's turn. A
+      // purge or trim while it was out leaves what it asked for not fetched.
+      const run = async (asked, ids, isCurrent) => {
+        const current = () => !disposed && isCurrent();
+        const began = now();
+        const voidAtStart = voidOf(name);
+        group.state.state = 'refreshing';
+        try {
+          let stored = null;
+          await guardedRead(name, () => method.fetch(asked, context), async (answer, touched, startedAt, turn) => {
+            stored = await commitMethod({
+              name, label, store, decl,
+            }, spec, answer, {
+              touched, turn, startedAt, current, unanswered: unansweredBy(ids),
+            });
+          }, { isCurrent: current });
+          if (!stored || !current()) return;
+          if (!batchParam) {
+            group.state.keys = stored.keys;
+            group.state.more = stored.more;
+          }
+          group.state.state = 'fresh';
+          group.state.error = null;
+          if (voidOf(name) !== voidAtStart) return;
+          if (ids) ids.forEach((id) => noteFetched(group, id, began));
+          group.state.syncedAt = now();
+        } catch (error) {
+          failed(error);
+          throw error;
         }
-        group.state.state = 'fresh';
-        group.state.error = null;
-        if (voidOf(name) !== voidAtStart) return;
-        if (ids) ids.forEach((id) => noteFetched(group, id, began));
-        group.state.syncedAt = now();
-      } catch (error) {
-        failed(error);
-        throw error;
-      }
-    };
-    // A job the scheduler refuses without running it (a full queue, an open
-    // circuit) is reported in the method's status too.
-    const job = (key, work) => Promise.resolve(scheduler.request({
-      key: lanedKey('data', `${label}:${wanted.method}:${key}`),
-      target: laned(label),
-      budgetKey: spec.budgetKey || budgetKey,
-      reason,
-      ...(inForeground()
-        ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
-        : { priority: PRIORITIES.background, visible: false }),
-      run: work,
-    })).catch((error) => { failed(error); throw error; });
-    if (!batchParam) {
-      if (fresh(group.state.syncedAt) && group.state.state !== 'error') return settle(Promise.resolve());
-      if (group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return settle(group.state.flight.promise);
-      methodBatches += 1;
-      // Only the newest flight for these params stores and answers: one a
-      // later flight replaced (past the share window) is dropped.
-      const flight = { at, promise: null };
-      group.state.flight = flight;
-      flight.promise = job(String(methodBatches), (isCurrent) => run(params, null, () => isCurrent() && group.state.flight === flight))
-        .finally(() => { if (group.state.flight === flight) group.state.flight = null; });
-      return settle(flight.promise);
-    }
-    // Each id fresh within the cadence is answered; one being fetched joins
-    // that fetch (while it is younger than the share window); the rest join
-    // the batch about to go, up to the param's bound, or start one.
-    const max = method.params[batchParam].max || MAX_METHOD_IDS;
-    const waits = new Set();
-    // New batches are handed to the scheduler only once every id of this ask
-    // is in them, so a scheduler that runs a job at once never reads part.
-    const started = [];
-    params[batchParam].forEach((id) => {
-      if (fresh(group.fetched.get(id))) return;
-      const flying = group.flying.get(id);
-      if (flying && at - flying.at < METHOD_SHARE_MS) { waits.add(flying.promise); return; }
-      // A batch full, or waiting past the share window without starting, takes no more.
-      if (!group.open || group.open.ids.size >= max || at - group.open.at >= METHOD_SHARE_MS) {
+      };
+      // A job the scheduler refuses without running it (a full queue, an open
+      // circuit) is reported in the method's status too.
+      const job = (key, work) => Promise.resolve(scheduler.request({
+        key: lanedKey('data', `${label}:${wanted.method}:${key}`),
+        target: laned(label),
+        budgetKey: spec.budgetKey || budgetKey,
+        reason,
+        ...(inForeground()
+          ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
+          : { priority: PRIORITIES.background, visible: false }),
+        run: work,
+      })).catch((error) => { failed(error); throw error; });
+      if (!batchParam) {
+        if (fresh(group.state.syncedAt) && group.state.state !== 'error') return Promise.resolve();
+        if (group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return group.state.flight.promise;
         methodBatches += 1;
-        const batch = {
-          ids: new Set(), at, key: String(methodBatches), promise: null, settle: null,
-        };
-        batch.promise = new Promise((resolve, reject) => { batch.settle = { resolve, reject }; })
-          .finally(() => {
-            if (group.open === batch) group.open = null;
-            batch.ids.forEach((one) => { if (group.flying.get(one) === batch) group.flying.delete(one); });
-          });
-        group.open = batch;
-        started.push(batch);
+        // Only the newest flight for these params stores and answers: one a
+        // later flight replaced (past the share window) is dropped.
+        const flight = { at, promise: null };
+        group.state.flight = flight;
+        flight.promise = job(String(methodBatches), (isCurrent) => run(params, null, () => isCurrent() && group.state.flight === flight))
+          .finally(() => { if (group.state.flight === flight) group.state.flight = null; });
+        return flight.promise;
       }
-      group.open.ids.add(id);
-      group.flying.set(id, group.open);
-      waits.add(group.open.promise);
-    });
-    started.forEach((batch) => {
-      job(batch.key, (isCurrent) => {
-        // A batch takes no more ids once it runs.
-        if (group.open === batch) group.open = null;
-        const ids = [...batch.ids].sort(idOrder);
-        return run({ ...shared, [batchParam]: ids }, ids, isCurrent);
-      }).then(batch.settle.resolve, batch.settle.reject);
-    });
-    return settle(Promise.all([...waits]).then(() => undefined));
+      // Each id fresh within the cadence is answered; one being fetched joins
+      // that fetch (while it is younger than the share window); the rest join
+      // the batch about to go, up to the param's bound, or start one.
+      const max = method.params[batchParam].max || MAX_METHOD_IDS;
+      const waits = new Set();
+      // New batches are handed to the scheduler only once every id of this ask
+      // is in them, so a scheduler that runs a job at once never reads part.
+      const started = [];
+      params[batchParam].forEach((id) => {
+        if (fresh(group.fetched.get(id))) return;
+        const flying = group.flying.get(id);
+        if (flying && at - flying.at < METHOD_SHARE_MS) { waits.add(flying.promise); return; }
+        // A batch full, or waiting past the share window without starting, takes no more.
+        if (!group.open || group.open.ids.size >= max || at - group.open.at >= METHOD_SHARE_MS) {
+          methodBatches += 1;
+          const batch = {
+            ids: new Set(), at, key: String(methodBatches), promise: null, settle: null,
+          };
+          batch.promise = new Promise((resolve, reject) => { batch.settle = { resolve, reject }; })
+            .finally(() => {
+              if (group.open === batch) group.open = null;
+              batch.ids.forEach((one) => { if (group.flying.get(one) === batch) group.flying.delete(one); });
+            });
+          group.open = batch;
+          started.push(batch);
+        }
+        group.open.ids.add(id);
+        group.flying.set(id, group.open);
+        waits.add(group.open.promise);
+      });
+      started.forEach((batch) => {
+        job(batch.key, (isCurrent) => {
+          // A batch takes no more ids once it runs.
+          if (group.open === batch) group.open = null;
+          const ids = [...batch.ids].sort(idOrder);
+          return run({ ...shared, [batchParam]: ids }, ids, isCurrent);
+        }).then(batch.settle.resolve, batch.settle.reject);
+      });
+      return Promise.all([...waits]).then(() => undefined);
+    }
   }
 
   /** A refresh of `target` as the principal in `context` (taken when it was asked). */
