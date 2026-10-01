@@ -1,5 +1,6 @@
 /** Durable branch of DataStore. The injected backend owns physical CAS/epochs. */
 import { jsonBytes, utf8Bytes, boundedBatches, WRITE_BATCH_BYTES } from './bytes.js';
+import { MAX_ROW_BYTES } from './host-store/protocol.js';
 // The most rows one whole-collection read returns, page by page.
 export const WHOLE_READ_ROWS = 20000;
 // A whole read that has to page stops at this many bytes too (a domain's
@@ -313,20 +314,21 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     ageLimitMs: () => ageLimit(),
     /**
      * Whether `records` could be stored as the store's rows, in its limits
-     * (each row's size and all of them together within its byte budget):
-     * null when they fit, else the reason they do not. Nothing is read or written.
+     * (each row within the host's row limit and the store's byte budget, and
+     * all of them together within that budget): null when they fit, else the
+     * reason they do not. Nothing is read or written.
      */
     fitsWhole(records = []) {
       const maxBytes = backend.limits?.maxBytes;
-      if (!Number.isFinite(maxBytes)) return null;
+      const budget = Number.isFinite(maxBytes);
       // As stored: with the fields the store adds to every row.
       const stamp = { _rev: Number.MAX_SAFE_INTEGER, _dirty: false, _updatedAt: new Date(now()).toISOString() };
       let total = 0;
       for (const record of records) {
         const size = jsonBytes({ ...record, ...stamp });
-        if (size > maxBytes) return 'payload-capacity';
+        if (size > MAX_ROW_BYTES || (budget && size > maxBytes)) return 'payload-capacity';
         total += size;
-        if (total > maxBytes) return 'quota';
+        if (budget && total > maxBytes) return 'quota';
       }
       return null;
     },
