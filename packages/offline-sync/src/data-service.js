@@ -592,6 +592,7 @@ export function createDataService({
   // A change held, not refused: it waits for its account to be displayed
   // again and is sent then. It lists as waiting, never as failed.
   const heldBack = (error) => error?.code === 'ACCOUNT_NOT_DISPLAYED';
+  const heldNow = (entry) => entry.held === true && entry.state === 'failed';
 
   /** Runs `task` after every earlier task for the same id. */
   function serial(id, task) {
@@ -1622,9 +1623,9 @@ export function createDataService({
         attempts: entry.attempts,
         lastError: entry.lastError,
         // A held change (its account not displayed) is waiting, not failed:
-        // the next retry sends it.
-        state: entry.held && entry.state === 'failed' ? 'queued' : entry.state,
-        ...(entry.held ? { waiting: 'account' } : {}),
+        // it goes once its account is displayed again, or on the next retry.
+        state: heldNow(entry) ? 'queued' : entry.state,
+        ...(heldNow(entry) ? { waiting: 'account' } : {}),
         restored: entry.restored,
       }));
     },
@@ -1660,6 +1661,17 @@ export function createDataService({
         entry.state = 'queued'; emitStatus();
       }
       return drain(entry);
+    },
+    /**
+     * Sends again every change held until its account was displayed (the
+     * host calls it once that account is displayed again); a change that
+     * failed otherwise waits for its own retry.
+     */
+    retryHeld() {
+      return Promise.allSettled([...outbox.values()].filter((entry) => heldNow(entry) && !entry.draining).map((entry) => {
+        entry.state = 'queued';
+        return drain(entry);
+      }));
     },
     /** Sends again every change that failed (never one refused for access), e.g. on reconnect. */
     retryFailed() {

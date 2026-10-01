@@ -756,4 +756,33 @@ describe('a change held until its account is displayed', () => {
     expect(sent).toEqual(['a']);
     expect(data.pending('items')).toEqual([]);
   });
+
+  it('goes when its account is displayed again, while a change that failed otherwise waits for its own retry', async () => {
+    const { data } = service();
+    let displayed = false;
+    let release;
+    const sent = [];
+    data.source('items', {
+      fetch: async () => [],
+      push: async (command, record) => {
+        if (record.id === 'broken') throw Object.assign(new Error('Server error'), { code: 'SERVER', retryable: true });
+        if (!displayed) throw Object.assign(new Error('This Mini Program belongs to an account that is not displayed now'), { code: 'ACCOUNT_NOT_DISPLAYED', retryable: true });
+        await new Promise((resolve) => { release = resolve; });
+        sent.push(record.id);
+      },
+    });
+    await data.mutate('items', { op: 'put', record: { id: 'a', chat_id: 1, seq: 1 } }, { wait: true }).catch(() => {});
+    await data.mutate('items', { op: 'put', record: { id: 'broken', chat_id: 1, seq: 2 } }, { wait: true }).catch(() => {});
+    displayed = true;
+    const going = data.retryHeld();
+    await vi.waitFor(() => expect(typeof release).toBe('function'));
+    // On its way, it is sending, no longer waiting for its account.
+    const sending = data.pending('items').find((entry) => entry.key === 'a');
+    expect(sending.state).toBe('sending');
+    expect(sending.waiting).toBeUndefined();
+    release();
+    await going;
+    expect(sent).toEqual(['a']);
+    expect(data.pending('items').map((entry) => [entry.key, entry.state, entry.attempts])).toEqual([['broken', 'failed', 1]]);
+  });
 });

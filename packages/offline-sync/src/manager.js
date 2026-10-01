@@ -346,6 +346,9 @@ export function createDataManager({
     pending: (...args) => service.pending(...args),
     // Sends this MP's failed changes again (the host calls it on reconnect).
     retryFailed: () => service.retryFailed(),
+    // Sends the changes held until this MP's account was displayed (the host
+    // calls it once that account is displayed again).
+    retryHeld: () => service.retryHeld(),
     /**
      * DataApi.store — only manifest-declared stores exist. Its writes go in
      * the store's turn with the data service's own, so a read already on its
