@@ -1,7 +1,6 @@
 {
   "packages/actions-runtime/src/broker.js": 21,
   "packages/manifest/scripts/check-schema-drift.mjs": 1,
-  "packages/manifest/src/generated/manifest.ts": 27,
   "packages/manifest/src/index.d.ts": 3,
   "packages/manifest/src/legacy-packages.js": 5,
   "packages/manifest/src/schema.js": 1,

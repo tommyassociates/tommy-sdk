@@ -44,61 +44,225 @@ const isSkipped = (name) => GENERATED.has(name) || name.includes('.generated.') 
 function sources() {
   const out = [];
   const walk = (dir) => {
-    for (const entry of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
+    fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).forEach((entry) => {
       const rel = path.posix.join(dir, entry.name);
       if (entry.isDirectory()) {
         if (!SKIP_DIRS.has(entry.name)) walk(rel);
       } else if (EXTENSIONS.has(path.extname(entry.name)) && !isSkipped(entry.name)) {
         out.push(rel);
       }
-    }
+    });
   };
-  for (const dir of ['packages', 'src', 'scripts']) walk(dir);
+  ['packages', 'src', 'scripts'].forEach(walk);
   return out.sort();
 }
 
-/** The lines of `text` that are comments: `//` lines and `/* *\/` / `<!-- -->` blocks. */
-function commentLines(text) {
-  const lines = [];
-  let close = null;
-  for (const line of text.split('\n')) {
-    let inside = close !== null;
-    let rest = line;
-    if (close === null && /^\s*\/\//.test(line)) {
-      lines.push(line);
-      continue;
-    }
-    while (rest.length) {
-      if (close === null) {
-        const open = [['/*', '*/'], ['<!--', '-->']]
-          .map(([o, c]) => [rest.indexOf(o), o, c])
-          .filter(([at]) => at >= 0)
-          .sort((a, b) => a[0] - b[0])[0];
-        if (!open) break;
-        inside = true;
-        close = open[2];
-        rest = rest.slice(open[0] + open[1].length);
-      } else {
-        const at = rest.indexOf(close);
-        if (at < 0) break;
-        rest = rest.slice(at + close.length);
-        close = null;
-      }
-    }
-    if (inside) lines.push(line);
+// A file whose header says it is generated is rewritten by its generator, not by hand.
+const isGeneratedText = (text) => {
+  const head = text.split('\n', 3).join('\n');
+  return /\bGENERATED\b/.test(head) || /do not (hand-?)?edit/i.test(head);
+};
+
+// After one of these characters or keywords, `/` starts a regex literal rather than a division.
+const REGEX_AFTER = new Set([...'(,=:[!&|?{};+-*%~^<>']);
+const REGEX_KEYWORDS = new Set(['return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'new', 'delete',
+  'void', 'throw', 'instanceof', 'yield', 'await']);
+const WORD = /[\w$]/;
+
+function regexAllowed(src, prev) {
+  if (prev < 0 || REGEX_AFTER.has(src[prev])) return true;
+  if (!WORD.test(src[prev])) return false;
+  let from = prev;
+  while (from > 0 && WORD.test(src[from - 1])) from -= 1;
+  return REGEX_KEYWORDS.has(src.slice(from, prev + 1));
+}
+
+/** Index just past the string literal opening at src[start]; an unescaped newline ends it. */
+function skipQuoted(src, start, end) {
+  const quote = src[start];
+  let i = start + 1;
+  while (i < end) {
+    if (src[i] === '\\') i += 2;
+    else if (src[i] === quote) return i + 1;
+    else if (src[i] === '\n') return i;
+    else i += 1;
   }
-  return lines;
+  return end;
+}
+
+/** Index just past the regex literal (and its flags) opening at src[start]. */
+function skipRegex(src, start, end) {
+  let i = start + 1;
+  let inClass = false;
+  while (i < end && src[i] !== '\n') {
+    if (src[i] === '\\') i += 1;
+    else if (src[i] === '[') inClass = true;
+    else if (src[i] === ']') inClass = false;
+    else if (src[i] === '/' && !inClass) break;
+    i += 1;
+  }
+  i += 1;
+  while (i < end && /[a-z]/.test(src[i])) i += 1;
+  return i;
+}
+
+/** Calls `add(from, to)` for each `<!-- -->` comment in src[start, end). */
+function markupComments(src, start, end, add) {
+  let i = src.indexOf('<!--', start);
+  while (i >= 0 && i < end) {
+    const close = src.indexOf('-->', i + 4);
+    const stop = close < 0 || close + 3 > end ? end : close + 3;
+    add(i, stop);
+    i = src.indexOf('<!--', stop);
+  }
+}
+
+/**
+ * Calls `add(from, to)` for each `//` and `/* *\/` comment in src[start, end),
+ * stepping over string, template and regex literals (or, in a stylesheet,
+ * strings and unquoted `url()` values).
+ */
+function codeComments(src, start, end, add, style) {
+  const lineEnd = (from) => {
+    const at = src.indexOf('\n', from);
+    return at < 0 || at > end ? end : at;
+  };
+  const templates = [];
+  let inTemplate = false;
+  let depth = 0;
+  let prev = -1;
+  let i = start;
+  while (i < end) {
+    const c = src[i];
+    const next = src[i + 1];
+    if (inTemplate) {
+      if (c === '\\') i += 2;
+      else if (c === '`') {
+        inTemplate = false;
+        prev = i;
+        i += 1;
+      } else if (c === '$' && next === '{') {
+        templates.push(depth);
+        depth += 1;
+        inTemplate = false;
+        prev = i + 1;
+        i += 2;
+      } else i += 1;
+    } else if (c === '/' && next === '/') {
+      add(i, lineEnd(i));
+      i = lineEnd(i);
+    } else if (c === '/' && next === '*') {
+      const close = src.indexOf('*/', i + 2);
+      const stop = close < 0 || close + 2 > end ? end : close + 2;
+      add(i, stop);
+      i = stop;
+    } else if (c === '\'' || c === '"') {
+      i = skipQuoted(src, i, end);
+      prev = i - 1;
+    } else if (style && (c === 'u' || c === 'U') && /^url\(\s*[^'"\s)]/i.test(src.slice(i, i + 64))) {
+      const close = src.indexOf(')', i);
+      i = close < 0 || close >= end ? end : close + 1;
+      prev = i - 1;
+    } else if (!style && c === '`') {
+      inTemplate = true;
+      i += 1;
+    } else if (!style && c === '/' && regexAllowed(src, prev)) {
+      i = skipRegex(src, i, end);
+      prev = i - 1;
+    } else {
+      if (c === '{') depth += 1;
+      if (c === '}') {
+        depth -= 1;
+        if (templates.length && templates[templates.length - 1] === depth) {
+          templates.pop();
+          inTemplate = true;
+        }
+      }
+      if (!/\s/.test(c)) prev = i;
+      i += 1;
+    }
+  }
+}
+
+/** Calls `add(from, to)` for each comment in a Vue single-file component. */
+function vueComments(src, add) {
+  const open = /^<(template|script|style)\b[^>]*>/gm;
+  let cursor = 0;
+  for (let m = open.exec(src); m; m = open.exec(src)) {
+    const tag = m[1];
+    const body = m.index + m[0].length;
+    markupComments(src, cursor, m.index, add);
+    const close = new RegExp(`^</${tag}>`, 'gm');
+    close.lastIndex = body;
+    const found = close.exec(src);
+    const bodyEnd = found ? found.index : src.length;
+    if (tag === 'template') markupComments(src, body, bodyEnd, add);
+    else codeComments(src, body, bodyEnd, add, tag === 'style');
+    cursor = found ? found.index + found[0].length : src.length;
+    open.lastIndex = cursor;
+  }
+  markupComments(src, cursor, src.length, add);
+}
+
+/**
+ * The comment text of each line of `src` that has any: `//`, `/* *\/` and
+ * `<!-- -->` comments, never the inside of a string, template or regex literal.
+ */
+function commentLines(src, ext) {
+  const lineStarts = [0];
+  for (let at = src.indexOf('\n'); at >= 0; at = src.indexOf('\n', at + 1)) lineStarts.push(at + 1);
+  const lineOf = (at) => {
+    let lo = 0;
+    let hi = lineStarts.length - 1;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (lineStarts[mid] <= at) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  };
+  const byLine = new Map();
+  const add = (from, to) => {
+    const first = lineOf(from);
+    src.slice(from, to).split('\n').forEach((part, k) => {
+      byLine.set(first + k, `${byLine.get(first + k) || ''} ${part}`);
+    });
+  };
+  if (ext === '.vue') vueComments(src, add);
+  else {
+    const start = src.startsWith('#!') ? src.indexOf('\n') + 1 : 0;
+    codeComments(src, start, src.length, add, ext === '.scss' || ext === '.css');
+  }
+  return [...byLine.keys()].sort((a, b) => a - b).map((line) => byLine.get(line));
 }
 
 function counts() {
   const out = {};
-  for (const file of sources()) {
-    const n = commentLines(fs.readFileSync(path.join(ROOT, file), 'utf8'))
+  sources().forEach((file) => {
+    const text = fs.readFileSync(path.join(ROOT, file), 'utf8');
+    const n = isGeneratedText(text) ? 0 : commentLines(text, path.extname(file))
       .filter((line) => HISTORY.test(line) || REFERENCE.test(line) || PLAN.test(line)).length;
     if (n > 0) out[file] = n;
-  }
+  });
   return out;
 }
+
+const SAMPLE_JS = [
+  "const accept = 'image/*'; // legacy upload",
+  'const url = "http://example.com";',
+  ['const t = `a $', '{"/*"} b`; const re = /\\/\\*[/*]/g; const half = total / 2;'].join(''),
+  "const later = 'legacy'; /* rc2 */",
+].join('\n');
+const SAMPLE_VUE = [
+  '<template>', '  <input accept="image/*">', "  <p>Don't // split</p>", '  <!-- legacy -->', '</template>',
+  '<script>', "const a = '//';", '</script>',
+  '<style lang="scss">', '.a { background: url(//cdn.example/x.png); }', '</style>', '',
+].join('\n');
+
+test('reads comments, not strings, template literals or regexes', () => {
+  assert.deepEqual(commentLines(SAMPLE_JS, '.js').map((line) => line.trim()), ['// legacy upload', '/* rc2 */']);
+  assert.deepEqual(commentLines(SAMPLE_VUE, '.vue').map((line) => line.trim()), ['<!-- legacy -->']);
+});
 
 test('adds no comment lines carrying history markers', () => {
   const now = counts();
@@ -106,9 +270,9 @@ test('adds no comment lines carrying history markers', () => {
 
   if (process.env.COMMENT_HISTORY_BASELINE === 'tighten') {
     const tightened = {};
-    for (const [file, allowed] of Object.entries(baseline).sort()) {
+    Object.entries(baseline).sort().forEach(([file, allowed]) => {
       if (now[file]) tightened[file] = Math.min(allowed, now[file]);
-    }
+    });
     fs.writeFileSync(BASELINE, `${JSON.stringify(tightened, null, 2)}\n`);
     baseline = tightened;
   }
