@@ -354,4 +354,42 @@ describe('refresh methods', () => {
     const status = await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } });
     expect(status).toMatchObject({ state: 'error', error: { code: 'REFRESH_CIRCUIT_OPEN' } });
   });
+
+  it('refuses a method its source cannot run now before scheduling anything, and says so in its status', async () => {
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
+    const scheduler = { request: vi.fn((job) => Promise.resolve().then(() => job.run(() => true))) };
+    const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), scheduler, principal: { id: 'p1' } });
+    const api = server([member(1)]);
+    data.source('members', { fetch: api.whole, read: {}, methods: methods(api, { available: () => false }) });
+    await expect(data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' }))
+      .rejects.toMatchObject({ code: 'DATA_UNSUPPORTED', retryable: false });
+    expect(await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } })).toMatchObject({ state: 'error', error: { code: 'DATA_UNSUPPORTED' } });
+    expect(scheduler.request).not.toHaveBeenCalled();
+    expect(api.byUserIds).not.toHaveBeenCalled();
+  });
+
+  it('refuses a string param longer than its declared bound', async () => {
+    const { data } = service();
+    const search = vi.fn(async () => []);
+    data.source('members', { fetch: async () => ({ rows: [] }), read: {}, methods: { search: { params: { q: { type: 'string', max: 5 } }, fetch: search } } });
+    await expect(data.refresh({ collection: 'members', method: 'search', params: { q: 'abcdef' } })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await data.refresh({ collection: 'members', method: 'search', params: { q: ' abc ' } }, { mode: 'visible' });
+    expect(search).toHaveBeenCalledWith({ q: 'abc' }, expect.anything());
+  });
+
+  it('removes the stored rows of the ids asked that the answer left out (gone, or no longer visible), never one with an unsent change', async () => {
+    const { data, store } = service();
+    const api = server([member(1)]);
+    data.source('members', { fetch: api.whole, read: {}, methods: methods(api, { field: 'user_id' }) });
+    await data.ingest('members', [member(1), member(2), member(3), member(4)]);
+    // Member 3 has an unsent local change.
+    await store.put({ ...member(3), name: 'Unsent' });
+    await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101', '102', '103'] } }, { mode: 'visible' });
+    expect(await ids(data)).toEqual(['1', '3', '4']);
+    // By key: an id the answer left out is gone.
+    const byIds = vi.fn(async ({ ids: asked }) => asked.filter((id) => id === '1').map((id) => member(Number(id))));
+    data.source('members', { fetch: api.whole, read: {}, methods: { byIds: { params: { ids: { type: 'ids' } }, batch: 'ids', field: 'id', fetch: byIds } } });
+    await data.refresh({ collection: 'members', method: 'byIds', params: { ids: ['1', '4'] } }, { mode: 'visible' });
+    expect(await ids(data)).toEqual(['1', '3']);
+  });
 });
