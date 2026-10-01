@@ -755,4 +755,31 @@ describe('refresh methods', () => {
     expect((await asking).state).toBe('fresh');
     expect(api.byUserIds).toHaveBeenCalledTimes(2);
   });
+
+  it('answers an ask whose ids are all fresh within the cadence as fresh, whatever another id\'s read or a moment unoffered left', async () => {
+    const { data } = service();
+    let offered = true;
+    const api = server([member(1), member(2)]);
+    const byUserIds = vi.fn(async (params, context) => {
+      if (params.user_ids.includes('102')) throw Object.assign(new Error('Service Unavailable'), { status: 503 });
+      return api.byUserIds(params, context);
+    });
+    data.source('members', {
+      fetch: api.whole, read: {}, methods: methods({ byUserIds }, { available: () => offered }),
+    });
+    const ask = (userIds, options) => data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: userIds } }, options);
+    await expect(ask(['101'])).resolves.toMatchObject({ state: 'fresh', error: null });
+    // Another id's read fails: the method's status says so.
+    await expect(ask(['102'])).resolves.toMatchObject({ state: 'error', error: { status: 503 } });
+    // The first id is still fresh: answered fresh, with nothing read.
+    const calls = byUserIds.mock.calls.length;
+    await expect(ask(['101'])).resolves.toMatchObject({ state: 'fresh', error: null });
+    await expect(ask(['101'], { mode: 'visible' })).resolves.toMatchObject({ state: 'fresh', error: null });
+    // A moment the method was not offered, then offered again.
+    offered = false;
+    await expect(ask(['101'])).resolves.toMatchObject({ state: 'error', error: { code: 'DATA_UNSUPPORTED' } });
+    offered = true;
+    await expect(ask(['101'])).resolves.toMatchObject({ state: 'fresh', error: null });
+    expect(byUserIds.mock.calls.length).toBe(calls);
+  });
 });
