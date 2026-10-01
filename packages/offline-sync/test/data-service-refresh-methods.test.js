@@ -428,7 +428,7 @@ describe('refresh methods', () => {
     expect(await ids(data)).toEqual(['2']);
   });
 
-  it('answers a method that joined a whole read with that read\'s outcome', async () => {
+  it('sends its own lookup when the whole read it joined failed, and answers that lookup\'s outcome', async () => {
     const { data } = service();
     let fail;
     const held = new Promise((resolve, reject) => { fail = reject; });
@@ -438,7 +438,25 @@ describe('refresh methods', () => {
     const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } });
     fail(Object.assign(new Error('Service Unavailable'), { status: 503 }));
     await reading;
-    expect(await asking).toMatchObject({ state: 'error', error: { status: 503 } });
+    expect(await asking).toMatchObject({ state: 'fresh' });
+    expect(api.byUserIds).toHaveBeenCalledTimes(1);
+    expect(await ids(data)).toEqual(['1']);
+  });
+
+  it('never inherits the refusal of a whole read it joined: an account that reads on demand still gets its lookup', async () => {
+    const { data } = service();
+    let refuse;
+    const held = new Promise((resolve, reject) => { refuse = reject; });
+    const api = server([member(1), member(2)]);
+    data.source('members', { fetch: () => held, read: {}, methods: methods(api) });
+    // A bootstrap's whole read, refused for this account once its access is known.
+    const reading = data.refresh('members', { mode: 'visible' }).catch((error) => error);
+    const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } });
+    refuse(Object.assign(new Error('read on demand for this account'), { code: 'DATA_ON_DEMAND', retryable: false }));
+    expect(await reading).toMatchObject({ code: 'DATA_ON_DEMAND' });
+    expect((await asking).state).toBe('fresh');
+    expect(api.asked.map((call) => call.user_ids)).toEqual([['101']]);
+    expect(await ids(data)).toEqual(['1']);
   });
 
   it('keeps a person a lookup found gone from coming back through an older read, held or not', async () => {
@@ -485,7 +503,7 @@ describe('refresh methods', () => {
     expect(api.byUserIds).not.toHaveBeenCalled();
   });
 
-  it('answers a method that joined a whole read that stored nothing as not fresh, whatever it answered before', async () => {
+  it('sends its own lookup when the whole read it joined stored nothing', async () => {
     let at = 1_000_000;
     const { data } = service({ at: () => at });
     let release;
@@ -500,6 +518,7 @@ describe('refresh methods', () => {
     const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } });
     release();
     await reading;
-    expect((await asking).state).not.toBe('fresh');
+    expect((await asking).state).toBe('fresh');
+    expect(api.byUserIds).toHaveBeenCalledTimes(2);
   });
 });
