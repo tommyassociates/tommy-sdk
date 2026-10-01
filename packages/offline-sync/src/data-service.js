@@ -1011,7 +1011,12 @@ export function createDataService({
         read = observed ? { rows, generation } : null;
         const keys = rows.map((row) => String(row[keyPath]));
         const whole = !!meta && typeof meta.digest === 'string' && meta.count === keys.length && meta.digest === keysDigest(keys);
-        if (whole && typeof meta.cursor === 'string' && meta.cursor && Number.isFinite(meta.fullAt) && now() - meta.fullAt < fullEveryMs) since = meta.cursor;
+        // A cursor vouches for the rows it left only while they stay readable:
+        // a whole read confirms (writes again) rows last written over
+        // confirmAfterMs ago, so one runs at least that often, before the
+        // store's age limit hides them.
+        const wholeWithin = Math.min(fullEveryMs, confirmAfterMs(store));
+        if (whole && typeof meta.cursor === 'string' && meta.cursor && Number.isFinite(meta.fullAt) && now() - meta.fullAt < wholeWithin) since = meta.cursor;
       }
       try {
         return { answer: await spec.fetch(wanted, { ...context, since }), since, read };

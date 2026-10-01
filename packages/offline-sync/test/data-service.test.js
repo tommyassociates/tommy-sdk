@@ -1640,3 +1640,36 @@ describe.each(DATABASES)('a pref removal another tab overtakes (%s)', (_name, cr
     await close();
   });
 });
+
+describe.each(DATABASES)('a cursor whose rows age out before its next whole read (%s)', (_name, create) => {
+  it('reads whole again before the rows it vouches for stop being readable, so they stay readable', async () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    let clock = Date.parse('2026-10-01T00:00:00Z');
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb', now: () => clock });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 5000, maxAgeMs: DAY, maxBytes: null } };
+    const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(port, null, options), now: () => clock });
+    const data = createDataService({
+      resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null), now: () => clock,
+    });
+    const asked = [];
+    data.source('chats.messages', {
+      // A whole read only once a week; the rows age out after a day.
+      read: { cursor: true, fullEveryMs: 7 * DAY },
+      fetch: async (_target, context) => {
+        asked.push(context.since);
+        if (context.since) return { rows: [], cursor: 'c1', since: true };
+        return { rows: [{ id: 'a', chat_id: 7, seq: 1 }, { id: 'b', chat_id: 7, seq: 2 }], cursor: 'c1' };
+      },
+    });
+    await data.refresh('chats.messages', { mode: 'visible' });
+    clock += 0.6 * DAY;
+    await data.refresh('chats.messages', { mode: 'visible' });
+    clock += 0.6 * DAY;
+    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['a', 'b']);
+    // The second read was whole: a read of changes would have left the rows to age out.
+    expect(asked[1]).toBeNull();
+    await database.close();
+  });
+});
