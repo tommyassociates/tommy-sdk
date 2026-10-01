@@ -589,6 +589,9 @@ export function createDataService({
   // it, e.g. after its role or scopes changed): the row stays unsent and is
   // listed as access changed, never sent again on its own.
   const refusedAccess = (error) => Number(error?.status) === 403 || error?.code === 'PermissionDenied' || error?.code === 'DATA_ACCESS_CHANGED';
+  // A change held, not refused: it waits for its account to be displayed
+  // again and is sent then. It lists as waiting, never as failed.
+  const heldBack = (error) => error?.code === 'ACCOUNT_NOT_DISPLAYED';
 
   /** Runs `task` after every earlier task for the same id. */
   function serial(id, task) {
@@ -842,7 +845,9 @@ export function createDataService({
             }
             if (!sent) {
               const refused = refusedAccess(error);
-              entry.state = refused ? 'access_changed' : 'failed'; entry.lastError = describeError(error); emitStatus();
+              entry.state = refused ? 'access_changed' : 'failed'; entry.lastError = describeError(error);
+              entry.held = !refused && heldBack(error);
+              emitStatus();
               // The refusal stays with the row, so a restart does not send it again on its own.
               if (refused) {
                 try {
@@ -1616,7 +1621,10 @@ export function createDataService({
         changes: entry.changes.length,
         attempts: entry.attempts,
         lastError: entry.lastError,
-        state: entry.state,
+        // A held change (its account not displayed) is waiting, not failed:
+        // the next retry sends it.
+        state: entry.held && entry.state === 'failed' ? 'queued' : entry.state,
+        ...(entry.held ? { waiting: 'account' } : {}),
         restored: entry.restored,
       }));
     },

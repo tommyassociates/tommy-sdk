@@ -733,3 +733,27 @@ describe('a restored change refused for access while it waited', () => {
   });
 });
 
+
+describe('a change held until its account is displayed', () => {
+  it('lists as waiting, never failed or access changed, and goes once retried', async () => {
+    const { data } = service();
+    let displayed = false;
+    const sent = [];
+    data.source('items', {
+      fetch: async () => [],
+      push: async (command, record) => {
+        if (!displayed) throw Object.assign(new Error('This Mini Program belongs to an account that is not displayed now'), { code: 'ACCOUNT_NOT_DISPLAYED', retryable: true });
+        sent.push(record.id);
+      },
+    });
+    await data.mutate('items', { op: 'put', record: { id: 'a', chat_id: 1, seq: 1 } }, { wait: true }).catch(() => {});
+    const [entry] = data.pending('items');
+    expect(entry).toMatchObject({ key: 'a', state: 'queued' });
+    expect(entry.state).not.toBe('access_changed');
+    // Its account displayed again: the host sends it again.
+    displayed = true;
+    await data.retryFailed();
+    expect(sent).toEqual(['a']);
+    expect(data.pending('items')).toEqual([]);
+  });
+});
