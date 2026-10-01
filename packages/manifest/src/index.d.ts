@@ -70,7 +70,7 @@ export function loadCatalogue(path?: string): Catalogue;
 export function searchCatalogue(catalogue: Catalogue, query?: CatalogueQuery): CatalogueEntry[];
 export function suggestScope(catalogue: Catalogue, unknown: string): string | null;
 
-// --- Identity adoption (council C3) ----------------------------------------
+// --- Identity adoption -----------------------------------------------------
 
 export interface ManifestIdentitySummary {
   id?: string;

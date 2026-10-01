@@ -3,7 +3,7 @@
  * loader injects into each MP's SDK) and mounts them into host-owned surface
  * elements with skeleton + per-panel containment (panel-runtime.md §2).
  *
- * MP panels NEVER enter the legacy `panelDefs` / `panels.top|left|right`
+ * MP panels NEVER enter the shell's `panelDefs` / `panels.top|left|right`
  * arrays (the core filter strips unknown names and edit-mode
  * persists those arrays into the `dashboard_layout` team setting) — the host
  * renders a PARALLEL, flag-gated grid section of its own.
