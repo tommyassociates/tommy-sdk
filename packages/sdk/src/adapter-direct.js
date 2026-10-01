@@ -80,7 +80,15 @@ export function createDirectAdapter({ broker, init, rpcTimeoutMs = DEFAULT_RPC_T
     try {
       return await withTimeout(Promise.resolve(entry.call(broker, env)), rpcId);
     } catch (err) {
-      if (isTommyError(err)) throw err;
+      if (err instanceof TommyError) throw err;
+      // A TommyError of another copy of this SDK (the host's broker is built
+      // with its own): the same error as this SDK's class, so an MP's
+      // `instanceof TommyError` holds for every rejection.
+      if (isTommyError(err)) {
+        throw new TommyError({
+          code: err.code, message: err.message, rule: err.rule, retryable: err.retryable, runId: err.runId, cause: err.cause,
+        });
+      }
       throw new TommyError({ code: 'ActivityFailed', message: String(err && err.message), retryable: false, cause: err });
     }
   }
