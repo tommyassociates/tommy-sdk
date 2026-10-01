@@ -1231,9 +1231,11 @@ export function createDataService({
       return settle(Promise.reject(serviceError('Offline', 'DATA_OFFLINE')));
     }
     // A read in flight as another form of the account is not joined: this
-    // one reads after it, as the principal it was asked as.
+    // one reads after it, as the principal it was asked as. Nor is a read of
+    // changes by a whole read (`full`): it reads whole after it. A read of
+    // changes may join a whole read.
     const form = formOf(context);
-    if (state.flight && state.flightForm === form) return settle(state.flight);
+    if (state.flight && state.flightForm === form && (!full || state.flightFull)) return settle(state.flight);
     if (state.flight) {
       return settle(state.flight.catch(() => {}).then(() => refreshAs(target, {
         mode: 'visible', priority, maxAge: 0, reason, full,
@@ -1292,6 +1294,7 @@ export function createDataService({
           })), { isCurrent });
     };
     state.flightForm = form;
+    state.flightFull = full === true;
     state.flight = scheduler.request({
       key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
       ...(inForeground()
@@ -1305,7 +1308,7 @@ export function createDataService({
     }, (error) => {
       state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
       throw error;
-    }).finally(() => { state.flight = null; state.flightForm = null; emitStatus(); });
+    }).finally(() => { state.flight = null; state.flightForm = null; state.flightFull = false; emitStatus(); });
     return settle(state.flight);
   }
 

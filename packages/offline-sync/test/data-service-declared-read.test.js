@@ -641,3 +641,28 @@ describe('the read guard records exactly what was stored', () => {
     expect((await data.read('members', 'k')).v).toBe(2);
   });
 });
+
+describe('a whole read asked while a read of changes is on its way', () => {
+  it('reads whole after it, never joining it; a read of changes joins a whole read', async () => {
+    const { data } = service();
+    const asked = [];
+    let release = null;
+    data.source('members', {
+      read: { cursor: true },
+      fetch: async (_target, context) => {
+        asked.push(context.since);
+        if (release === null && context.since) await new Promise((resolve) => { release = resolve; });
+        return { rows: [{ id: 'a', updated: 'c1' }], cursor: 'c1', ...(context.since ? { since: true } : {}) };
+      },
+    });
+    await data.refresh('members', { mode: 'visible' });
+    expect(asked).toEqual([null]);
+    // A read of changes is on its way.
+    const changes = data.refresh('members', { mode: 'visible' });
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+    const whole = data.refresh('members', { mode: 'visible', full: true });
+    release();
+    await Promise.all([changes, whole]);
+    expect(asked).toEqual([null, 'c1', null]);
+  });
+});
