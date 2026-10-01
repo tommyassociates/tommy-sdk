@@ -1501,20 +1501,26 @@ export function createDataService({
     // answers a search (its filter, order and page are its own). One from
     // before a purge or trim covers nothing.
     const whole = stateFor(targetKey({ collection: name }));
+    const failed = (error) => {
+      group.state.state = isOnline() ? 'error' : 'offline';
+      group.state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
+    };
     if (batchParam) {
       const covered = (wholeCovers.get(name) || 0) > voidOf(name);
       if (covered && age > 0 && whole.syncedAt !== null && at - whole.syncedAt < age && whole.state !== 'error') return settle(Promise.resolve());
-      if (whole.flight && whole.flightForm === form && (whole.flightSeq || 0) > voidOf(name)) return settle(whole.flight);
+      // The method's status is the joined read's outcome.
+      if (whole.flight && whole.flightForm === form && (whole.flightSeq || 0) > voidOf(name)) {
+        return settle(whole.flight.then(() => {
+          group.state.state = 'fresh';
+          group.state.error = null;
+        }, (error) => { failed(error); throw error; }));
+      }
     }
     if (!isOnline()) {
       group.state.state = 'offline';
       return settle(Promise.reject(serviceError('Offline', 'DATA_OFFLINE')));
     }
     const fresh = (since) => age > 0 && since !== null && since !== undefined && at - since < age;
-    const failed = (error) => {
-      group.state.state = isOnline() ? 'error' : 'offline';
-      group.state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
-    };
     // The stored rows whose `field` names an id asked for that the answer left
     // out: for this principal, those rows are gone (not visible, or removed).
     const unansweredBy = (ids) => (method.field && ids ? async (records, keyPath) => {
@@ -1573,10 +1579,12 @@ export function createDataService({
       if (fresh(group.state.syncedAt) && group.state.state !== 'error') return settle(Promise.resolve());
       if (group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return settle(group.state.flight.promise);
       methodBatches += 1;
+      // Only the newest flight for these params stores and answers: one a
+      // later flight replaced (past the share window) is dropped.
       const flight = { at, promise: null };
-      flight.promise = job(String(methodBatches), (isCurrent) => run(params, null, isCurrent))
-        .finally(() => { if (group.state.flight === flight) group.state.flight = null; });
       group.state.flight = flight;
+      flight.promise = job(String(methodBatches), (isCurrent) => run(params, null, () => isCurrent() && group.state.flight === flight))
+        .finally(() => { if (group.state.flight === flight) group.state.flight = null; });
       return settle(flight.promise);
     }
     // Each id fresh within the cadence is answered; one being fetched joins
@@ -1584,6 +1592,9 @@ export function createDataService({
     // the batch about to go, up to the param's bound, or start one.
     const max = method.params[batchParam].max || MAX_METHOD_IDS;
     const waits = new Set();
+    // New batches are handed to the scheduler only once every id of this ask
+    // is in them, so a scheduler that runs a job at once never reads part.
+    const started = [];
     params[batchParam].forEach((id) => {
       if (fresh(group.fetched.get(id))) return;
       const flying = group.flying.get(id);
@@ -1591,21 +1602,28 @@ export function createDataService({
       // A batch full, or waiting past the share window without starting, takes no more.
       if (!group.open || group.open.ids.size >= max || at - group.open.at >= METHOD_SHARE_MS) {
         methodBatches += 1;
-        const batch = { ids: new Set(), at, promise: null };
-        batch.promise = job(String(methodBatches), (isCurrent) => {
-          // A batch takes no more ids once it runs.
-          if (group.open === batch) group.open = null;
-          const ids = [...batch.ids].sort(idOrder);
-          return run({ ...shared, [batchParam]: ids }, ids, isCurrent);
-        }).finally(() => {
-          if (group.open === batch) group.open = null;
-          batch.ids.forEach((one) => { if (group.flying.get(one) === batch) group.flying.delete(one); });
-        });
+        const batch = {
+          ids: new Set(), at, key: String(methodBatches), promise: null, settle: null,
+        };
+        batch.promise = new Promise((resolve, reject) => { batch.settle = { resolve, reject }; })
+          .finally(() => {
+            if (group.open === batch) group.open = null;
+            batch.ids.forEach((one) => { if (group.flying.get(one) === batch) group.flying.delete(one); });
+          });
         group.open = batch;
+        started.push(batch);
       }
       group.open.ids.add(id);
       group.flying.set(id, group.open);
       waits.add(group.open.promise);
+    });
+    started.forEach((batch) => {
+      job(batch.key, (isCurrent) => {
+        // A batch takes no more ids once it runs.
+        if (group.open === batch) group.open = null;
+        const ids = [...batch.ids].sort(idOrder);
+        return run({ ...shared, [batchParam]: ids }, ids, isCurrent);
+      }).then(batch.settle.resolve, batch.settle.reject);
     });
     return settle(Promise.all([...waits]).then(() => undefined));
   }
