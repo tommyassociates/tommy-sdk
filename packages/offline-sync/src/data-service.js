@@ -175,6 +175,9 @@ const NO_SNAPSHOT = Symbol('no snapshot');
 // A read a whole replacement or purge of its collection overtook: it stored
 // nothing, and did not run as far as the caller is concerned.
 const DROPPED = Symbol('dropped');
+// A batched method ask whose ids were all fresh within the cadence: answered
+// fresh, with nothing read.
+const ANSWERED_FRESH = Symbol('answered fresh');
 /**
  * The rows a list or declared read answered, or null when it answered no
  * list (`null`, `undefined`, an object without `rows`): the one check every
@@ -1612,9 +1615,14 @@ export function createDataService({
     const groupKey = JSON.stringify([form, name, wanted.method, shared]);
     let group = methodGroup(groupKey, name);
     // A method that is not batched (a search) also answers the keys of its
-    // last answer and whether the endpoint has more.
-    const outcome = () => (batchParam ? describeState(group.state)
-      : { ...describeState(group.state), keys: group.state.keys ?? null, more: group.state.more ?? null });
+    // last answer and whether the endpoint has more. An ask whose ids are all
+    // fresh within the cadence is answered fresh, whatever another id's read
+    // (or a moment the method was not offered) left on the method's status.
+    const outcome = (value) => {
+      if (value === ANSWERED_FRESH) return { ...describeState(group.state), state: 'fresh', error: null };
+      return batchParam ? describeState(group.state)
+        : { ...describeState(group.state), keys: group.state.keys ?? null, more: group.state.more ?? null };
+    };
     const settle = (promise) => (mode === 'visible' ? promise.then(outcome) : promise.then(outcome, outcome));
     if (!available) {
       const refusal = Object.assign(serviceError(`'${wanted.collection}' cannot run '${wanted.method}' now`, 'DATA_UNSUPPORTED'), { retryable: false });
@@ -1788,6 +1796,8 @@ export function createDataService({
         group.flying.set(id, group.open);
         waits.add(group.open);
       });
+      // Every id fresh within the cadence: nothing to read, and this ask is answered fresh.
+      if (!waits.size) return Promise.resolve(ANSWERED_FRESH);
       // Each batch answers this ask by its outcome or its first failed attempt.
       const answers = [...waits].map((batch) => batch.attempts.answer(batch.promise));
       started.forEach((batch) => {
