@@ -411,21 +411,43 @@ export function createDataService({
   function touching(name, store, keyPath, at = null) {
     const keyOf = (row) => (row && typeof row === 'object' ? row[keyPath] : undefined);
     const changed = (keys) => recordEffect(name, { changedKeys: keys, at });
+    // Each write records exactly what it changed, once the store answered:
+    // a write the store refused (an invalid row) changed nothing; one it
+    // kept in memory only (`retained`) did.
+    const recorded = async (work, keysOf, failedKeys) => {
+      let result;
+      try { result = await work(); } catch (error) {
+        if (error?.retained === true) changed(failedKeys());
+        throw error;
+      }
+      changed(keysOf(result));
+      return result;
+    };
     const writers = {
-      put: (record, ...rest) => { changed([keyOf(record)]); return store.put(record, ...rest); },
-      delete: (key, ...rest) => { changed([key]); return store.delete(key, ...rest); },
-      deleteMany: (keys, ...rest) => { changed(keys || []); return store.deleteMany(keys, ...rest); },
-      markRow: (key, ...rest) => { changed([key]); return store.markRow(key, ...rest); },
-      patchSynced: (keys, ...rest) => { changed(keys || []); return store.patchSynced(keys, ...rest); },
+      put: (record, ...rest) => recorded(() => store.put(record, ...rest), () => [keyOf(record)], () => [keyOf(record)]),
+      delete: (key, ...rest) => recorded(() => store.delete(key, ...rest), () => [key], () => [key]),
+      deleteMany: (keys, ...rest) => recorded(() => store.deleteMany(keys, ...rest),
+        (removed) => (Array.isArray(removed) ? removed : (keys || [])), () => keys || []),
+      markRow: (key, ...rest) => recorded(() => store.markRow(key, ...rest), (found) => (found === false ? [] : [key]), () => [key]),
+      patchSynced: (keys, ...rest) => recorded(() => store.patchSynced(keys, ...rest),
+        (outcome) => (outcome && typeof outcome === 'object' ? [...(outcome.patched || []), ...(outcome.unsaved || [])] : (keys || [])), () => keys || []),
       // A prune with no scope (or one marked `whole`: a replacement of the
       // whole collection) replaces it; a scoped one (a window, a query)
-      // records the rows it wrote and removed, and nothing else.
+      // records the rows it wrote and removed, and nothing else. A
+      // reconcile that failed part way records every row it was given, as it
+      // may have stored some.
       reconcile: async (records = [], { whole: replacesAll = false, ...options } = {}) => {
         const whole = replacesAll === true || (options.prune !== false && typeof options.scope !== 'function');
-        changed(records.map(keyOf));
+        let result;
+        try { result = await store.reconcile(records, options); } catch (error) {
+          changed(records.map(keyOf));
+          throw error;
+        }
+        // Rows left as they were (an unsent local write kept) were not written.
+        const left = new Set((Array.isArray(result?.skipped) ? result.skipped : []).map(String));
+        changed(records.map(keyOf).filter((key) => !left.has(String(key))));
         if (whole) recordEffect(name, { whole: true, at });
-        const result = await store.reconcile(records, options);
-        if (!whole && Array.isArray(result?.prunedKeys)) recordEffect(name, { removedKeys: result.prunedKeys, at });
+        else if (Array.isArray(result?.prunedKeys)) recordEffect(name, { removedKeys: result.prunedKeys, at });
         return result;
       },
     };
@@ -1096,58 +1118,72 @@ export function createDataService({
       });
     };
     let removed = [];
+    // Rows sent to the store: a chunk that fails part way may have stored some.
+    const attempted = new Set();
+    const commitChunk = async (chunk, options) => {
+      chunk.forEach((record) => attempted.add(keyOf(record)));
+      noteResult(chunk, await raw.reconcile(chunk, options));
+    };
     const stopHere = () => { recordCommit(false); return stop(); };
-    if (changesOnly) {
-      const touched = touchedAfter(name, startedAt);
-      removed = await removeRows({ label, store: raw, keys: [...removedKeys].filter((key) => !touched.has(key) && present.has(key)), force: false });
-    }
-    if (halted()) return stopHere();
-    const unchanged = (touched) => (row) => !touched.has(keyOf(row));
-    if (changesOnly) {
-      for (const batch of ingestChunks(records)) {
-        if (halted()) return stopHere();
+    try {
+      if (changesOnly) {
         const touched = touchedAfter(name, startedAt);
-        const chunk = batch.filter(unchanged(touched));
-        // Chunks commit in order.
-        // eslint-disable-next-line no-await-in-loop
-        if (chunk.length) noteResult(chunk, await raw.reconcile(chunk, { prune: false, keepDirty: true }));
+        removed = await removeRows({ label, store: raw, keys: [...removedKeys].filter((key) => !touched.has(key) && present.has(key)), force: false });
       }
-    } else {
-      // The rows it left out go first, so the rows it answered fit beside
-      // the ones it adds, and none it answered is evicted for them.
-      const answered = new Set(records.map(keyOf));
-      const touchedBefore = touchedAfter(name, startedAt);
-      removed = await removeRows({
-        label, store: raw, keys: rows.filter((row) => !row._dirty && !answered.has(keyOf(row)) && !touchedBefore.has(keyOf(row))).map(keyOf), force: false,
-      });
       if (halted()) return stopHere();
-      // A whole read writes the rows it changed (and the unchanged ones last
-      // written a day or more ago, or half the store's age limit), keeps the
-      // rest as they are, and removes the rows it left out. One row is always
-      // written, which stamps the collection synced.
-      const touched = touchedAfter(name, startedAt);
-      const stored = new Map(rows.map((row) => [keyOf(row), row]));
-      const confirmBefore = now() - confirmAfterMs(store);
-      const toWrite = [];
-      let oldest = null;
-      records.forEach((record) => {
-        const key = keyOf(record);
-        if (touched.has(key)) return;
-        const row = stored.get(key);
-        if (!row || row._dirty || row._persistFailed || contentOf(record) !== contentOf(row)) { toWrite.push(record); return; }
-        const at = Date.parse(row._updatedAt || '');
-        if (!Number.isFinite(at) || at < confirmBefore) { toWrite.push(record); return; }
-        written.add(key);
-        if (!oldest || at < oldest.at) oldest = { record, at };
-      });
-      if (!toWrite.length && oldest) toWrite.push(oldest.record);
-      for (const batch of ingestChunks(toWrite)) {
+      const unchanged = (touched) => (row) => !touched.has(keyOf(row));
+      if (changesOnly) {
+        for (const batch of ingestChunks(records)) {
+          if (halted()) return stopHere();
+          const touched = touchedAfter(name, startedAt);
+          const chunk = batch.filter(unchanged(touched));
+          // Chunks commit in order.
+          // eslint-disable-next-line no-await-in-loop
+          if (chunk.length) await commitChunk(chunk, { prune: false, keepDirty: true });
+        }
+      } else {
+        // The rows it left out go first, so the rows it answered fit beside
+        // the ones it adds, and none it answered is evicted for them.
+        const answered = new Set(records.map(keyOf));
+        const touchedBefore = touchedAfter(name, startedAt);
+        removed = await removeRows({
+          label, store: raw, keys: rows.filter((row) => !row._dirty && !answered.has(keyOf(row)) && !touchedBefore.has(keyOf(row))).map(keyOf), force: false,
+        });
         if (halted()) return stopHere();
-        const touchedSince = touchedAfter(name, startedAt);
-        const chunk = batch.filter(unchanged(touchedSince));
-        // eslint-disable-next-line no-await-in-loop
-        if (chunk.length) noteResult(chunk, await raw.reconcile(chunk, { prune: false, keepDirty: true, protect: [...answered] }));
+        // A whole read writes the rows it changed (and the unchanged ones last
+        // written a day or more ago, or half the store's age limit), keeps the
+        // rest as they are, and removes the rows it left out. One row is always
+        // written, which stamps the collection synced.
+        const touched = touchedAfter(name, startedAt);
+        const stored = new Map(rows.map((row) => [keyOf(row), row]));
+        const confirmBefore = now() - confirmAfterMs(store);
+        const toWrite = [];
+        let oldest = null;
+        records.forEach((record) => {
+          const key = keyOf(record);
+          if (touched.has(key)) return;
+          const row = stored.get(key);
+          if (!row || row._dirty || row._persistFailed || contentOf(record) !== contentOf(row)) { toWrite.push(record); return; }
+          const at = Date.parse(row._updatedAt || '');
+          if (!Number.isFinite(at) || at < confirmBefore) { toWrite.push(record); return; }
+          written.add(key);
+          if (!oldest || at < oldest.at) oldest = { record, at };
+        });
+        if (!toWrite.length && oldest) toWrite.push(oldest.record);
+        for (const batch of ingestChunks(toWrite)) {
+          if (halted()) return stopHere();
+          const touchedSince = touchedAfter(name, startedAt);
+          const chunk = batch.filter(unchanged(touchedSince));
+          // eslint-disable-next-line no-await-in-loop
+          if (chunk.length) await commitChunk(chunk, { prune: false, keepDirty: true, protect: [...answered] });
+        }
       }
+    } catch (error) {
+      // A commit that failed part way records what it may have stored and
+      // removed, as of the read's start, so a read begun before it never
+      // undoes those rows.
+      recordEffect(name, { changedKeys: [...written, ...attempted], removedKeys: removed, at: startedAt });
+      throw error;
     }
     if (halted()) return stopHere();
     recordCommit(!changesOnly);

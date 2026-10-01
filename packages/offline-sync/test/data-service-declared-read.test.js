@@ -597,3 +597,47 @@ describe('a declared read on a store that cannot keep a row', () => {
   });
 });
 
+
+describe('the read guard records exactly what was stored', () => {
+  it('keeps the rows a declared read stored before a later chunk failed from an older read on its way', async () => {
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend(), maxRows: 5000 });
+    const reconcile = store.reconcile.bind(store);
+    let calls = 0;
+    store.reconcile = async (...args) => {
+      calls += 1;
+      if (calls === 2) throw Object.assign(new Error('Write not persisted'), { name: 'PersistError', retained: false });
+      return reconcile(...args);
+    };
+    const { data } = service({ store });
+    let answerOlder;
+    data.source('members', {
+      read: {},
+      fetch: (target) => (target?.key
+        ? new Promise((resolve) => { answerOlder = resolve; })
+        : Promise.resolve(Array.from({ length: 501 }, (_, at) => ({ id: `r${at}`, v: 2 })))),
+    });
+    // An older keyed read is on its way when the whole read stores its first chunk and fails on the second.
+    const older = data.refresh({ collection: 'members', key: 'r0' }, { mode: 'visible' });
+    await vi.waitFor(() => expect(answerOlder).toBeTypeOf('function'));
+    await expect(data.refresh('members', { mode: 'visible' })).rejects.toBeTruthy();
+    expect((await data.read('members', 'r0')).v).toBe(2);
+    answerOlder({ id: 'r0', v: 1 });
+    await older;
+    expect((await data.read('members', 'r0')).v).toBe(2);
+  });
+
+  it('records no change for a write the store refused, so the next server answer is stored', async () => {
+    const schema = { type: 'object', required: ['id', 'v'], properties: { id: { type: 'string' }, v: { type: 'number' } } };
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend(), recordSchema: schema });
+    const { data } = service({ store });
+    await data.ingest('members', [{ id: 'k', v: 1 }]);
+    let answer;
+    data.source('members', { read: {}, fetch: () => new Promise((resolve) => { answer = resolve; }) });
+    const reading = data.refresh('members', { mode: 'visible' });
+    await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
+    await expect(data.writer('members').put({ id: 'k', v: 'not a number' })).rejects.toBeTruthy();
+    answer([{ id: 'k', v: 2 }]);
+    await reading;
+    expect((await data.read('members', 'k')).v).toBe(2);
+  });
+});

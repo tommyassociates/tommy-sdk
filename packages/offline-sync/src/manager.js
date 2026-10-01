@@ -109,6 +109,8 @@ export function manifestIndexes(indexes) {
  * cannot declare it, and this declaration is the one used.
  */
 export const PREFS_STORE = 'prefs';
+// A removal another tab's write overtook is tried this many times in all.
+const PREF_REMOVE_TRIES = 2;
 export const PREFS_DECL = Object.freeze({
   keyPath: 'key',
   syncStrategy: 'last_write_wins',
@@ -305,8 +307,19 @@ export function createDataManager({
       const name = String(key);
       const change = changePref(name, false);
       if (!durableStores.has(PREFS_STORE)) { change.refused(); throw notSaved(name); }
-      await inPrefOrder(name, () => service.purge(PREFS_STORE, { keys: [name], force: true }))
-        .catch((error) => { change.refused(); throw notSaved(name, error); });
+      // Removed only when the store removed it, or it is gone already: a row
+      // another tab wrote since it was read is removed again, against that
+      // write, and a removal still overtaken is refused, never reported done.
+      await inPrefOrder(name, async () => {
+        for (let attempt = 0; attempt < PREF_REMOVE_TRIES; attempt += 1) {
+          // eslint-disable-next-line no-await-in-loop
+          const { removed } = await service.purge(PREFS_STORE, { keys: [name], force: true });
+          if (removed.includes(name)) return;
+          // eslint-disable-next-line no-await-in-loop
+          if (!(await service.read(PREFS_STORE, name, { raw: true }))) return;
+        }
+        throw Object.assign(new Error(`tommy.prefs: '${name}' was written again while it was removed`), { name: 'PersistError', reason: 'conflict', retained: false });
+      }).catch((error) => { change.refused(); throw notSaved(name, error); });
       change.saved();
     },
   });

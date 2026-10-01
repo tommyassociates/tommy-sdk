@@ -1587,3 +1587,56 @@ describe.each(DATABASES)('two stores open on one host store (%s)', (_name, creat
     await close();
   });
 });
+
+describe.each(DATABASES)('a pref removal another tab overtakes (%s)', (_name, create) => {
+  // A prefs store on the host store whose next removals find the row written
+  // again by another tab after it was read (`overtakes` times).
+  function overtaken(overtakes) {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: { ...identity(), mpId: 'scheduling' }, storeName: 'prefs', policy: 'authored', schemaVersion: 1, cacheFingerprint: null,
+      limits: { maxRows: 1000, maxAgeMs: null, maxBytes: null } };
+    const backend = transactionalBackend(port, null, options);
+    const snapshot = backend.snapshot;
+    let left = 0;
+    backend.snapshot = async (keys, ...rest) => {
+      const read = await snapshot(keys, ...rest);
+      if (left > 0 && keys.includes('a')) {
+        left -= 1;
+        return { ...read, rows: read.rows.map((row) => (row.key === 'a' ? { ...row, value: { ...row.value, _rev: (row.value._rev || 0) + 1 } } : row)) };
+      }
+      return read;
+    };
+    return {
+      data: createDataManager({
+        capabilityToken: { tenantId: 'team-46', mpId: 'scheduling' }, mpId: 'scheduling', localData: {},
+        backendFactory: () => backend,
+      }),
+      overtake() { left = overtakes; },
+      close: () => database.close(),
+    };
+  }
+
+  it('removes it against the other tab\'s write, and only then reports it removed', async () => {
+    const { data, overtake, close } = overtaken(1);
+    await data.prefs.ready();
+    await data.prefs.set('a', 1);
+    overtake();
+    await data.prefs.remove('a');
+    expect(data.prefs.get('a', 'fallback')).toBe('fallback');
+    // Gone from the device too: a reload finds nothing.
+    expect(await data.read('prefs', 'a')).toBeNull();
+    await close();
+  });
+
+  it('never reports a removal the other tab keeps overtaking: it is refused, and the pref stays', async () => {
+    const { data, overtake, close } = overtaken(5);
+    await data.prefs.ready();
+    await data.prefs.set('a', 1);
+    overtake();
+    await expect(data.prefs.remove('a')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+    expect(data.prefs.get('a', 'fallback')).not.toBe('fallback');
+    expect(await data.read('prefs', 'a')).not.toBeNull();
+    await close();
+  });
+});
