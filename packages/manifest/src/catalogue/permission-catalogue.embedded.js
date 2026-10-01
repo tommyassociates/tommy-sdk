@@ -1,6 +1,6 @@
 // GENERATED from permission-catalogue.json by scripts/embed-assets.mjs — do not hand-edit.
 // Embedded as a JS module so the package loads in BOTH node (the CLI)
-// and the browser/vite pipeline (the in-process loader) without fs
+// and the browser/vite pipeline (the M1 in-process loader) without fs
 // or JSON import attributes.
 export default {
   "_comment": "VENDORED FROM plans/refactor-plan/05-deliverables/02-manifest-tooling/permission-catalogue.sample.json — this copy is the runtime source of truth shipped inside @tommy/manifest (a pinned @tommy/manifest version = a pinned catalogue version). The catalogue is FIXED and versioned (Phase 3 Q2) — MPs may only request scopes that appear here; @tommy/manifest validate layer 3 rejects any non-member with the named rule 'permission-not-in-catalogue'. This is the M1 STARTER set (covers every scope the reference manifest uses); the EXHAUSTIVE production catalogue is a deliberate, reviewed Tommy authoring task before M4 (README:68, security-model.md §2) — NOT an M1 gate. Growing it: add entries here, bump catalogueVersion, review. Scope form: verb:resource (verb in read|write|invoke). sensitivity (low|medium|high) drives review attention; deviceCapabilityRequired is checked against the device by the production manifest strip.",
