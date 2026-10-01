@@ -489,7 +489,8 @@ export function createDataService({
   // While `foreground()` is false, how many times as long its reads wait
   // between reads (the device budget's cadence multiplier): a refresh asked
   // with a `maxAge`, or a method with a cadence, reads again only once that
-  // times this has passed. Infinity pauses its reads (sends go on).
+  // times this has passed. Infinity pauses its reads, queued ones and retries
+  // included, checked before each run (sends go on).
   backgroundCadence = () => 1,
   // Declared reads' cursors and the key digest of the set each left, one
   // record per collection, for this principal.
@@ -1758,8 +1759,8 @@ export function createDataService({
         ...(inForeground()
           ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
           : { priority: PRIORITIES.background, visible: false }),
-        // Never run, or run again, once this service retired.
-        valid: () => !disposed,
+        // Never run, or run again, once this service retired or its reads paused.
+        valid: () => !disposed && cadenceFactor() !== Infinity,
         run: attempts.run(work),
       })).catch((error) => { failed(error); throw error; }).finally(() => attempts.settled());
       if (!batchParam) {
@@ -1939,8 +1940,8 @@ export function createDataService({
       ...(inForeground()
         ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
         : { priority: PRIORITIES.background, visible: false }),
-      // Never run, or run again, once this service retired.
-      valid: () => !disposed,
+      // Never run, or run again, once this service retired or its reads paused.
+      valid: () => !disposed && cadenceFactor() !== Infinity,
       run: attempts.run(run),
     }).then((outcome) => {
       // A read a purge or replacement overtook stored nothing: not run, not fresh.
