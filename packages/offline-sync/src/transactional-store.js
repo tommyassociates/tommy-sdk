@@ -311,6 +311,25 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     validateRecord,
     /** How long a row stays visible without being written again (null: always). */
     ageLimitMs: () => ageLimit(),
+    /**
+     * Whether `records` could be stored as the store's rows, in its limits
+     * (each row's size and all of them together within its byte budget):
+     * null when they fit, else the reason they do not. Nothing is read or written.
+     */
+    fitsWhole(records = []) {
+      const maxBytes = backend.limits?.maxBytes;
+      if (!Number.isFinite(maxBytes)) return null;
+      // As stored: with the fields the store adds to every row.
+      const stamp = { _rev: Number.MAX_SAFE_INTEGER, _dirty: false, _updatedAt: new Date(now()).toISOString() };
+      let total = 0;
+      for (const record of records) {
+        const size = jsonBytes({ ...record, ...stamp });
+        if (size > maxBytes) return 'payload-capacity';
+        total += size;
+        if (total > maxBytes) return 'quota';
+      }
+      return null;
+    },
     async get(key) { live(); const row = await backend.get(keyString(key)); live(); return paintable(row) ? copy(row) : undefined; },
     async getRaw(key) { live(); const row = await backend.get(keyString(key), { aged: true }); live(); return copy(row); },
     async getAll() { live(); const rows = await wholeRows(); live(); return freshRows.has(rows) ? rows.filter(paintable) : rows.filter(paintable).map(copy); },

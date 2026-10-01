@@ -1673,3 +1673,23 @@ describe.each(DATABASES)('a cursor whose rows age out before its next whole read
     await database.close();
   });
 });
+
+describe.each(DATABASES)('a whole answer the store cannot keep (%s)', (_name, create) => {
+  it('is refused before anything is removed: the last rows stay', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 5000, maxAgeMs: 86400000, maxBytes: 400 } };
+    const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(port, null, options) });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    let answer = [{ id: 'old', chat_id: 7, seq: 1 }];
+    data.source('chats.messages', { read: {}, fetch: async () => answer });
+    await data.refresh('chats.messages', { mode: 'visible' });
+    expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['old']);
+    // The next whole answer holds a row larger than the store may keep.
+    answer = [{ id: 'big', chat_id: 7, seq: 2, body: 'x'.repeat(500) }];
+    await expect(data.refresh('chats.messages', { mode: 'visible' })).rejects.toBeTruthy();
+    expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['old']);
+    await database.close();
+  });
+});

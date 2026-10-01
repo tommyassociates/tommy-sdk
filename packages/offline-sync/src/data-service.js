@@ -1147,6 +1147,10 @@ export function createDataService({
           if (chunk.length) await commitChunk(chunk, { prune: false, keepDirty: true });
         }
       } else {
+        // An answer the store cannot keep whole is refused before anything
+        // goes: the rows it holds stay as the last usable set.
+        const unfit = typeof raw.fitsWhole === 'function' ? raw.fitsWhole(records) : null;
+        if (unfit) throw Object.assign(serviceError(`'${name}' answered rows this device cannot keep (${unfit})`, 'DATA_TOO_LARGE'), { reason: unfit });
         // The rows it left out go first, so the rows it answered fit beside
         // the ones it adds, and none it answered is evicted for them.
         const answered = new Set(records.map(keyOf));
