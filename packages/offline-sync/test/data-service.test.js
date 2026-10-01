@@ -849,6 +849,28 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     feedA.close(); feedB.close(); await database.close();
   });
 
+  it('reads many rows by a compound index\'s leading field or every field, as the memory store answers', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+    const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(port, null, options) });
+    const hosted = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    const memory = memoryService();
+    const rows = [{ id: 'a', chat_id: 7, seq: 1 }, { id: 'b', chat_id: 8, seq: 1 }, { id: 'c', chat_id: 7, seq: 2 }, { id: 'd', chat_id: 9, seq: 1 }];
+    await hosted.ingest('chats.messages', rows);
+    await memory.ingest('chats.messages', rows);
+    for (const query of [{ anyOf: [9, 7, 7, 42] }, { anyOf: [[7, 2], [9, 1]] }, { anyOf: [7, 8, 9], limit: 2 }]) {
+      // eslint-disable-next-line no-await-in-loop
+      const [fromHost, fromMemory] = await Promise.all([hosted, memory].map((data) => data.query('chats.messages', { index: 'byChat', ...query })));
+      expect(fromHost.rows.map((row) => row.id)).toEqual(fromMemory.rows.map((row) => row.id));
+      expect(fromHost.complete).toBe(fromMemory.complete);
+    }
+    expect((await hosted.query('chats.messages', { index: 'byChat', anyOf: [9, 7] })).rows.map((row) => row.id)).toEqual(['d', 'a', 'c']);
+    hosted.dispose();
+    await database.close();
+  });
+
   it('patches any number of rows, a store transaction at a time, and accounts for every key', async () => {
     const database = create();
     const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });

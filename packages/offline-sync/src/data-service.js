@@ -261,7 +261,9 @@ async function runQuery(store, keyPath, spec = {}) {
   const { index, limit = 50, cursor = null, where, raw = false, ...range } = spec;
   if (index && Array.isArray(range.anyOf)) {
     // Many rows by one declared index: the rows of each value asked for, in
-    // the order asked, each row once, up to `limit` in all.
+    // the order asked, each row once, up to `limit` in all. A value names the
+    // index's leading fields (one value, or a list of them), so a value for
+    // the first field of a compound index reads every row under it.
     const keyOf = (row) => String(row[keyPath]);
     const seen = new Set();
     const rows = [];
@@ -270,7 +272,7 @@ async function runQuery(store, keyPath, spec = {}) {
     for (const value of values) {
       if (rows.length >= limit) { complete = false; break; }
       // eslint-disable-next-line no-await-in-loop
-      const page = await queryPages(store, index, { equals: Array.isArray(value) ? value : [value] }, { limit: limit - rows.length, cursor: null, raw: raw === true });
+      const page = await queryPages(store, index, { prefix: Array.isArray(value) ? value : [value] }, { limit: limit - rows.length, cursor: null, raw: raw === true });
       page.rows.forEach((row) => { if (!seen.has(keyOf(row))) { seen.add(keyOf(row)); rows.push(row); } });
       if (!page.complete) complete = false;
     }
