@@ -153,6 +153,37 @@ describe('a read the scheduler tries again', () => {
     for (let turn = 0; turn < 20; turn += 1) await Promise.resolve(); // eslint-disable-line no-await-in-loop
     expect(fetch).toHaveBeenCalledTimes(1);
   });
+
+  it('shows no failure of an attempt that ends after its read settled, over the read that came next', async () => {
+    // A scheduler that can end its jobs while an attempt is still running.
+    const ended = [];
+    const scheduler = {
+      request(job) {
+        return new Promise((resolve, reject) => {
+          ended.push(reject);
+          Promise.resolve().then(() => job.run(() => true)).then(resolve, reject);
+        });
+      },
+      endAll() { ended.splice(0).forEach((reject) => reject(Object.assign(new Error('Refresh no longer current'), { code: 'REFRESH_DROPPED' }))); },
+      revalidate: vi.fn(),
+    };
+    const { data } = service(scheduler);
+    let failFirst;
+    const fetch = vi.fn()
+      .mockImplementationOnce(() => new Promise((_, reject) => { failFirst = reject; }))
+      .mockResolvedValue([{ id: '1', name: 'Ada' }]);
+    data.source('members', { fetch });
+    const first = data.refresh('members', { mode: 'visible' }).catch((error) => error);
+    for (let turn = 0; turn < 20; turn += 1) await Promise.resolve(); // eslint-disable-line no-await-in-loop
+    scheduler.endAll();
+    expect(await first).toMatchObject({ code: 'REFRESH_DROPPED' });
+    await data.refresh('members', { mode: 'visible' });
+    expect(data.status('members')).toMatchObject({ state: 'fresh', error: null });
+    // The first read's attempt fails only now.
+    failFirst(offline());
+    for (let turn = 0; turn < 20; turn += 1) await Promise.resolve(); // eslint-disable-line no-await-in-loop
+    expect(data.status('members')).toMatchObject({ state: 'fresh', error: null });
+  });
 });
 
 describe('a read asked to begin after the ask', () => {

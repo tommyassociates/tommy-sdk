@@ -95,7 +95,7 @@ const serviceError = (message, code) => Object.assign(new Error(message), { name
  * go on in the background and settle the read itself. `run(work)` wraps the
  * job's work; `answer(flight)` is one caller's answer; `failing()` whether
  * the latest attempt failed and the read goes on; `settled()` marks the
- * read settled.
+ * read settled, after which a failing attempt answers and reports nothing.
  */
 function readAttempts(onFailure = () => {}) {
   let failure = null;
@@ -107,6 +107,9 @@ function readAttempts(onFailure = () => {}) {
       try {
         return await work(...args);
       } catch (error) {
+        // An attempt that fails after its read settled answers no one and
+        // shows nothing: what came after the read stands.
+        if (done) throw error;
         failure = { error };
         try { onFailure(error); } catch (_) { /* the read's own outcome stands */ }
         [...waiting].forEach((reject) => reject(error));
@@ -1897,7 +1900,8 @@ export function createDataService({
     // A failed attempt answers the read's callers and shows in its status;
     // the scheduler's retries settle the read.
     const attempts = readAttempts((error) => {
-      if (states.get(key) !== state) return;
+      // Only the read now in flight shows its failure.
+      if (states.get(key) !== state || state.attempts !== attempts) return;
       state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
       emitStatus();
     });
