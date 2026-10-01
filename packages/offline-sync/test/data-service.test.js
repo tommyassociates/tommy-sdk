@@ -192,6 +192,32 @@ describe('data service on memory stores', () => {
     expect(capped.complete).toBe(false);
   });
 
+  it('reads overlapping anyOf values in whole pages, however few rows are left to fill', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES });
+    const service = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    const rows = Array.from({ length: 4999 }, (_, at) => ({ id: `m${String(at).padStart(5, '0')}`, chat_id: 'c', seq: 1 }));
+    await service.ingest('chats.messages', [...rows, { id: 'z', chat_id: 'c', seq: 2 }]);
+    const query = vi.spyOn(store, 'query');
+    const answer = await service.query('chats.messages', { index: 'byChat', anyOf: [['c', 1], 'c'], limit: 5000 });
+    expect(answer.rows).toHaveLength(5000);
+    expect(answer.complete).toBe(true);
+    // The second value's rows the first already gave are skipped a store page
+    // (100 rows) at a time, not one query per row: about 50 pages a value.
+    expect(query.mock.calls.length).toBeLessThanOrEqual(102);
+  });
+
+  it('reads no row back after an ordinary ingest', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES });
+    const service = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    const getRaw = vi.spyOn(store, 'getRaw');
+    const rows = Array.from({ length: 5000 }, (_, at) => ({ id: `m${at}`, chat_id: 'c', seq: at }));
+    await service.ingest('chats.messages', rows);
+    expect(getRaw).not.toHaveBeenCalled();
+    // A complete set checks it was kept in one read of the collection.
+    await service.ingest('chats.messages', rows, { complete: true });
+    expect(getRaw).not.toHaveBeenCalled();
+  });
+
   it('takes no refresh answer with an entry that is not a keyed row, and removes nothing', async () => {
     const data = memoryService();
     let answer = [null];

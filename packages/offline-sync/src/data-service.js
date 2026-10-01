@@ -425,17 +425,26 @@ async function runQuery(store, keyPath, spec = {}) {
     const rows = [];
     let complete = true;
     const values = [...new Map(range.anyOf.map((value) => [JSON.stringify(value), value])).values()];
-    // Each value is read to its end, page by page, so rows an earlier value
-    // already gave (overlapping prefixes) never count against the limit.
+    // Each value is read to its end in pages of the usual size, so rows an
+    // earlier value already gave (overlapping prefixes) never count against
+    // the limit and cost a page at a time, not a read each.
+    const pageRows = Math.max(limit, PAGE_ROWS);
     for (const value of values) {
       if (!complete) break;
       let next = null;
       do {
         if (rows.length >= limit) { complete = false; break; }
         // eslint-disable-next-line no-await-in-loop
-        const page = await queryPages(store, index, { prefix: Array.isArray(value) ? value : [value] }, { limit: limit - rows.length, cursor: next, raw: raw === true });
-        page.rows.forEach((row) => { if (!seen.has(keyOf(row))) { seen.add(keyOf(row)); rows.push(row); } });
-        next = page.complete ? null : page.nextCursor;
+        const page = await queryPages(store, index, { prefix: Array.isArray(value) ? value : [value] }, { limit: pageRows, cursor: next, raw: raw === true });
+        // A distinct row past the limit means the answer is not all of them.
+        const over = page.rows.some((row) => {
+          if (seen.has(keyOf(row))) return false;
+          if (rows.length >= limit) return true;
+          seen.add(keyOf(row)); rows.push(row);
+          return false;
+        });
+        if (over) complete = false;
+        next = complete && !page.complete ? page.nextCursor : null;
       } while (next !== null);
     }
     return { rows: rows.map(raw === true ? copyRow : clean), nextCursor: null, complete };
@@ -1114,10 +1123,16 @@ export function createDataService({
       if (replace) await store.reconcile([], { scope: (row) => inScope(row) && !kept.has(String(row[keyPath])), whole: !scoped });
     }
     const written = stored.size;
-    // Every row given was kept: each a distinct key the store accepted and stored.
+    // Only a complete set, or a replacement of the whole collection, can
+    // cover what a batched method asks for: for it, every row given was kept
+    // (each a distinct key the store accepted and now holds), checked in one
+    // read of the collection.
     const distinct = new Set(rows.filter((row) => row && typeof row === 'object').map((row) => String(row[keyPath])));
-    const everyRow = kept.size === distinct.size && !unsaved.size
-      && (await Promise.all([...kept].map(async (key) => !!(await store.getRaw?.(key))))).every(Boolean);
+    let everyRow = false;
+    if ((complete === true || (replace && !scoped)) && kept.size === distinct.size && !unsaved.size) {
+      const present = new Set((await rawRows(store)).map((row) => String(row[keyPath])));
+      everyRow = [...kept].every((key) => present.has(key));
+    }
     // A replacing or complete ingest is a whole read: the collection is fresh.
     if (replace || complete === true) {
       const state = stateFor(targetKey({ collection: name }));
