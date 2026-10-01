@@ -10,7 +10,7 @@ export { validateManifest } from './validate.js';
 export { parseManifest } from './parse.js';
 export { loadSchema } from './schema.js';
 export { loadCatalogue, searchCatalogue, suggestScope } from './catalogue.js';
-// Identity adoption (council C3) — the ONE derivation of manifest-declared
+// Identity adoption — the ONE derivation of manifest-declared
 // `legacyPackages` into a package -> mpId index (injectivity asserted here).
 export {
   legacyPackagesOf,

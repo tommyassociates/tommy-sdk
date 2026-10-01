@@ -1,6 +1,6 @@
 // Build step — generate the `Manifest` TypeScript type from the vendored schema
 // (json-schema-to-typescript). This is the build-time contract type exported by
-// @tommy/manifest for @tommy/sdk and the loader (spec Phase 3 change (a) / ac5).
+// @tommy/manifest for @tommy/sdk and the loader.
 // It is DISTINCT from `tommy manifest typegen`, which emits per-MP contract types.
 
 import { compile } from 'json-schema-to-typescript';

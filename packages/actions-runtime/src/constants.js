@@ -4,7 +4,7 @@
  * Rate seeds from security-model.md §7 (120 action calls/min/MP, 500
  * RPC/min/instance); loop caps from actions-runtime.md §7.2/§7.3. The
  * per-kind split + burst were unspecified — recorded design decision,
- * M6-tunable from telemetry (see the spec's Deviations).
+ * tunable from telemetry (see the spec's Deviations).
  */
 export const DEFAULT_THROTTLE_PROFILE = Object.freeze({
   emitsPerMin: 120,
@@ -57,7 +57,7 @@ export const RETRY_MAX_DELAY_MS = 400;
 
 /**
  * Delay BEFORE `attempt` (1-based). The first attempt is never delayed.
- * `none` keeps the old behaviour for an activity that wants it, and is the
+ * `none` keeps immediate retries for an activity that wants them, and is the
  * honest way to ask for immediate retries now that the default spaces them.
  */
 export function retryDelayMs(backoff, attempt) {
@@ -71,7 +71,7 @@ export function retryDelayMs(backoff, attempt) {
 }
 
 /**
- * Read-scope DERIVATION map (council C1 / Option B).
+ * Read-scope DERIVATION map.
  *
  * The fixed permission catalogue (@tommy/manifest
  * src/catalogue/permission-catalogue.json) speaks in DOMAINS — `read:shifts`,
@@ -105,8 +105,8 @@ export function domainScopeForMp(mpId, overrides = {}) {
 }
 
 /**
- * Primitives that domain derivation must NEVER grant (council C1 / Option B,
- * part 2). A caller needs the EXPLICIT `read:{owner}.{primitive}` scope for
+ * Primitives that domain derivation must NEVER grant. A caller needs the
+ * EXPLICIT `read:{owner}.{primitive}` scope for
  * these even with the enforcement flags on — holding `read:attendance` does
  * not hand you the kiosk PIN. Keyed `{ownerMpId}.{primitiveName}`; exported so
  * review tooling and tests read the same list the broker enforces.

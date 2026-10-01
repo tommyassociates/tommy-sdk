@@ -1,20 +1,18 @@
 /**
- * durable-queue.js — D.43 ruling: the broker's offline queue survives a reload.
+ * durable-queue.js — the broker's offline queue survives a reload.
  *
- * THE DEFECT. `const queue = []` (broker.js) is a plain array in closure scope.
- * An MP calls `invoke`, the broker is offline, the write is accepted, the MP's
- * promise RESOLVES as queued — and the row then evaporates on reload with no
- * error, no dead-letter and no trace. That is DATA LOSS, not duplication, which
- * makes it strictly worse than the idempotency defect next door. 123 of the
- * estate's 199 activities declare `offlineReplayable: true`.
+ * WHY. An MP calls `invoke` while the broker is offline, the write is accepted
+ * and the MP's promise RESOLVES as queued; a queue held only in memory would
+ * lose that row on reload with no error, no dead-letter and no trace — DATA
+ * LOSS, strictly worse than duplication. 123 of the estate's 199 activities
+ * declare `offlineReplayable: true`.
  *
- * ⚠ THIS STORE HOLDS TENANT DATA AT REST, AND THAT IS THE RULED TRADE.
+ * ⚠ THIS STORE HOLDS TENANT DATA AT REST, AND THAT IS THE CHOSEN TRADE.
  * The ledger next door could be narrowed to opaque keys; a queue row cannot.
  * A row IS the pending write — its full envelope, args included — so there is
- * no "keys only" version of persisting it. Gav ruled 2026-08-17 that losing an
- * accepted write is worse than storing it on the device that authored it, with
- * a cap and a TTL as the price. Recorded here because the next person to widen
- * this file needs to know the payload exposure was decided, not overlooked:
+ * no "keys only" version of persisting it. Losing an accepted write is worse
+ * than storing it on the device that authored it, with a cap and a TTL as the
+ * price. The payload exposure is deliberate, not overlooked:
  *
  *   - it persists ONLY to the device that already accepted the write (Web
  *     Storage is origin+device scoped — nothing leaves the machine);

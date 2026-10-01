@@ -13,8 +13,6 @@
         :title="`${addon.title} (${addon.package})`"
       >
       </f7-list-item>
-      <!-- <f7-list-item header="Environment" :title="addon.environment">
-      </f7-list-item> -->
       <f7-list-item header="Version" :title="addon.version">
       </f7-list-item>
       <f7-list-item header="Developer" :title="`${addon.developer}`">
@@ -34,10 +32,6 @@
       </f7-list-item>
       <f7-list-item v-if="addon.private" header="Private" title="Yes">
       </f7-list-item>
-    <!-- </f7-list>
-    <div id="addon-details-sandbox" v-if="remoteFetched">
-      <f7-block-title>Sandbox Testing</f7-block-title>
-      <f7-list> -->
         <f7-list-item header="Status" :title="addonStatus">
         </f7-list-item>
         <f7-list-item
@@ -47,7 +41,6 @@
         >
         </f7-list-item>
       </f7-list>
-    <!-- </div> -->
 
     <div id="addon-upload">
       <f7-block-title>Upload</f7-block-title>
@@ -58,7 +51,6 @@
               <!-- item-label -->
               <!-- <div class="item-header"> -->
                 Environment
-              <!-- </div> -->
             </div>
             <div class="item-input-wrap">
               <select
@@ -151,15 +143,8 @@ export default {
     pkg: {
       required: true
     },
-    // environment: {
-    //   required: true
-    // }
   },
   data() {
-    // const this = this;
-    // const pkg = this.f7route.params.package;
-    // const addon = this.$root.addons.filter((a) => a.package === pkg)[0];
-
     return {
       // pkg,
       // addon,
@@ -171,7 +156,6 @@ export default {
   },
 
   mounted() {
-    // const {addon} = this;
     this.$api
       .getAddonVersion(this.pkg, 'production', {
         showErrorMessages: false,

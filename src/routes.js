@@ -4,8 +4,6 @@ import AddonDetails from './pages/addon-details.vue';
 import Addons from './pages/addons.vue';
 
 import Views from './pages/views.vue';
-// import config from '../config.json';
-// import coreRoutes from 'tommy-core/src/routes';
 
 const routes = [
   {
@@ -30,7 +28,6 @@ const routes = [
     path: '/addon-details/:pkg/',
     component: AddonDetails,
   },
-  // ...coreRoutes,
 ];
 
 export default routes;

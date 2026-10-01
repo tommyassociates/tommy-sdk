@@ -6,12 +6,8 @@
  * exists, memory in node and tests. `recordBackend` on `createBroker` still
  * overrides it.
  *
- * ⚠ IT DID NOT ALWAYS. This header used to claim "an IndexedDB backend in the
- * shell (the loader supplies it)" — and the shell half was never passed, so
- * for the platform's whole life every run record died with the tab while this
- * file told readers the opposite. That is why the default now detects storage
- * instead of waiting to be handed one: a seam that needs the host to remember
- * something is a seam that rots, and it rotted here first (D.43).
+ * The default detects storage rather than waiting to be handed one: a seam that
+ * needs the host to remember something is a seam that rots.
  *
  * What is persisted is REDACTED — no `args`, `result` or `payload`. See
  * createWebStorageBackend: a record is diagnostics, not a pending write, and
@@ -38,7 +34,7 @@ export function createMemoryBackend() {
     async count() { return rows.size; },
     async delete(runId) { rows.delete(runId); },
     /** Atomic field release — see createRecordStore's window: a read-then-write
-     *  would clobber a concurrent update() (adversarial review 2026-08-31). */
+     *  would clobber a concurrent update(). */
     async releaseFields(runId, fields) {
       const current = rows.get(runId);
       if (!current) return;
@@ -63,7 +59,7 @@ const REDACTED_FIELDS = ['args', 'result', 'payload', 'lateResult'];
  * `args` STAYS: `broker.replay(runId)` re-dispatches from `record.args`, so
  * releasing them made every run older than the window unreplayable, and worse,
  * an activity with a permissive/absent inputSchema would have re-dispatched a
- * real write with `args === undefined` (adversarial review 2026-08-31).
+ * real write with `args === undefined`.
  * Persistence still drops all three — that tier is disk, this one is not.
  */
 const WINDOW_RELEASED_FIELDS = ['result', 'payload', 'lateResult'];

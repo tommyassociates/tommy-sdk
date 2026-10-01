@@ -2,8 +2,6 @@ import 'tommy-core/src/libs/moment-bootstrap.js';
 import tommy, {app} from 'tommy-core/src/tommy.js';
 import routes from './routes.js';
 import appComponent from './components/app.vue';
-// import components from './components.js';
-// import { registerStoreModule, storeModuleIsRegistered } from 'tommy-core/src/utils/modules';
 
 const language = localStorage.language || 'en-US';
 
@@ -36,7 +34,6 @@ const loadAddonLocales = (addon) => {
           }
         })
         .catch(err => {
-          // console.log('addon: locale load failed', err, addon.title, language, addon);
         });
     })
 
@@ -92,13 +89,6 @@ tommy.app.init({
       const localAddons = await this.loadLocalAddons();
       console.table(localAddons);
 
-      // Change the account to the previous logged in account on refresh.
-      // const previousAccount = {
-      //   id: localStorage.getItem('account_id'),
-      //   type: localStorage.getItem('account_type'),
-      //   ignoreAddons: true
-      // }
-
 
       const payload = {
         resetState: false,
@@ -111,13 +101,8 @@ tommy.app.init({
         }
       };
       this.$store.dispatch('login', payload).then((token) => {
-        // if (previousAccount.type !== 'user') {
-        //   this.$store.dispatch('changeAccount', previousAccount);
-        // }
         this.$store.state.addons.addonInstalls.length = 0;
         localAddons.forEach(addon => {
-          // addon.environment = addon.environment || 'production';
-
           // FIXME: Skip production addons for now - just work on development
           // addons until we can fix internal environment specific routing
           console.log('sdk: addon loaded', addon.url);
@@ -130,7 +115,6 @@ tommy.app.init({
                 const isModule = !!addonModule.default.routes;
                 const routes = isModule ? addonModule.default.routes : addonModule.default;
 
-                // routes.forEach(x => x.path = `/development${x.path}`);
                 const addonIndexView = routes.length ? routes[0] : {};
                 addon.entry_path = addonIndexView.path;
 
@@ -176,12 +160,6 @@ tommy.app.init({
       return url;
     },
     toast(message) {
-      // const finishToast = this.$f7.toast.create({
-      //   text: text,
-      //   position: 'center',
-      //   closeTimeout: 2000
-      // });
-      // finishToast.open();
       app.notify(message);
     },
   },

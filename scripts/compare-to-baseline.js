@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * compare-to-baseline.js — the M0 coupling freeze (block-on-increase).
+ * compare-to-baseline.js — the coupling freeze (block-on-increase).
  *
  * Parses ESLint JSON reports (array of file results) and dependency-cruiser
  * JSON reports ({ summary: { violations: [...] } }), counts violations per

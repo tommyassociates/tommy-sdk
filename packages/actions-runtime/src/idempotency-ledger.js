@@ -1,5 +1,5 @@
 /**
- * idempotency-ledger.js — D.39 ruling (c): a DURABLE half for the broker's
+ * idempotency-ledger.js — a DURABLE half for the broker's
  * idempotency ledger, so `client_key` means what it advertises across a reload.
  *
  * THE DEFECT. `processedKeys` (broker.js) is a Map in closure scope, and its own
@@ -13,7 +13,7 @@
  *
  * TWO DELIBERATE NARROWINGS, both of which change what this is allowed to hold.
  *
- * 1. KEYS ONLY — NEVER RESULTS (ruled by Gav 2026-08-17). The in-memory ledger
+ * 1. KEYS ONLY — NEVER RESULTS. The in-memory ledger
  *    stores each activity's full result so a replay can RETURN it, and making
  *    that durable would write result payloads to localStorage.
  *    `issue_kiosk_pin`'s resultSchema is `{ issued, pin }` — the live credential
@@ -172,14 +172,14 @@ const EPOCHS_MAX = 500;
 
 /**
  * DURABLE INVALIDATION EPOCHS — the half of `invalidatesIdempotency` that a
- * reload used to undo (review BSC-1).
+ * DURABLE INVALIDATION EPOCHS — the half of `invalidatesIdempotency` that must
+ * survive a reload.
  *
  * The epoch exists so a post-invalidation invoke FROM THIS DEVICE presents a
  * derived key the server has never seen, making its `Mp::Invocation` lookup
- * miss. Held in a closure Map, that worked until the shell reloaded — at which
- * point the counter reset to 0, the next invoke re-presented the ORIGINAL key,
- * and the server replayed the stale result. The exact defect the epoch was added
- * to stop, one refresh away.
+ * miss. Held only in a closure Map, the counter would reset to 0 on reload, the
+ * next invoke would re-present the ORIGINAL key, and the server would replay
+ * the stale result.
  *
  * ⚠ PER-DEVICE, WHILE THE SERVER LEDGER IS PER-TEAM, and this is a documented
  * limit rather than an oversight (review BSC-R2-7). `find_succeeded` matches on

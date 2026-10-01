@@ -31,7 +31,7 @@ export class PredicateError extends Error {
 }
 
 /**
- * The closed set. `includes_any` is the L-1 addition of scope 11d (JD11), and it
+ * The closed set. `includes_any` (JD11) is a later addition, and it
  * landed in BOTH evaluators and the schema in one release, because an operator in
  * one evaluator only is the R4 drift this file's header forbids: an older binary
  * that meets it throws `unknown predicate operator`, so it fails CLOSED rather
