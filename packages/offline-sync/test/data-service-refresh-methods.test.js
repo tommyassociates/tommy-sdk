@@ -252,4 +252,106 @@ describe('refresh methods', () => {
     await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
     expect(api.byUserIds).toHaveBeenCalledTimes(2);
   });
+
+  it('stops writing a method answer once its service is retired', async () => {
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
+    const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), principal: { id: 'p1' } });
+    const reconcile = store.reconcile.bind(store);
+    let chunks = 0;
+    store.reconcile = async (...args) => {
+      chunks += 1;
+      const result = await reconcile(...args);
+      if (chunks === 1) data.dispose();
+      return result;
+    };
+    const search = vi.fn(async () => Array.from({ length: 1001 }, (_, at) => ({ id: String(at) })));
+    data.source('members', { fetch: async () => ({ rows: [] }), read: {}, methods: { search: { params: { q: { type: 'string' } }, fetch: search } } });
+    await data.refresh({ collection: 'members', method: 'search', params: { q: 'a' } }).catch(() => {});
+    expect(chunks).toBe(1);
+    expect((await store.getAllRaw()).length).toBe(500);
+  });
+
+  it('keeps a key an answer named gone from coming back through an older read, held or not', async () => {
+    const { data } = service();
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    const search = vi.fn(async () => { await held; return [member(1)]; });
+    const byIds = vi.fn(async () => ({ rows: [], gone: ['1'] }));
+    data.source('members', {
+      fetch: async () => ({ rows: [] }),
+      read: {},
+      methods: { search: { params: { q: { type: 'string' } }, fetch: search }, byIds: { params: { ids: { type: 'ids' } }, batch: 'ids', fetch: byIds } },
+    });
+    const searching = data.refresh({ collection: 'members', method: 'search', params: { q: 'm' } }, { mode: 'visible' });
+    await Promise.resolve();
+    await data.refresh({ collection: 'members', method: 'byIds', params: { ids: ['1'] } }, { mode: 'visible' });
+    release();
+    await searching;
+    expect(await ids(data)).toEqual([]);
+  });
+
+  it('takes an answer\'s keys from the records the source maps it to', async () => {
+    const { data } = service();
+    const byIds = vi.fn(async () => [{ member_id: '1', name: 'Mapped' }]);
+    data.source('members', {
+      fetch: async () => ({ rows: [] }),
+      read: {},
+      toRecord: (dto) => ({ id: dto.member_id, name: dto.name }),
+      methods: { byIds: { params: { ids: { type: 'ids' } }, batch: 'ids', fetch: byIds } },
+    });
+    await data.refresh({ collection: 'members', method: 'byIds', params: { ids: ['1'] } }, { mode: 'visible' });
+    expect(await data.read('members', '1')).toMatchObject({ id: '1', name: 'Mapped' });
+  });
+
+  it('runs a search whatever the whole collection\'s read did, and answers its own keys', async () => {
+    const { data } = service();
+    const api = server([member(1), member(2)]);
+    const search = vi.fn(async ({ q }) => ({ rows: [member(2)], more: q === 'more' }));
+    data.source('members', { fetch: api.whole, read: {}, methods: { search: { params: { q: { type: 'string' } }, fetch: search, cadenceMs: 5 * MINUTE } } });
+    await data.refresh('members', { mode: 'visible' });
+    const answer = await data.refresh({ collection: 'members', method: 'search', params: { q: 'more' } });
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(answer).toMatchObject({ state: 'fresh', keys: ['2'], more: true });
+  });
+
+  it('reads by method again after a purge, though a whole read was fresh', async () => {
+    const { data } = service();
+    const api = server([member(1)]);
+    data.source('members', { fetch: api.whole, read: {}, methods: methods(api) });
+    await data.refresh('members', { mode: 'visible' });
+    await data.purge('members');
+    await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
+    expect(api.byUserIds).toHaveBeenCalledTimes(1);
+    expect(await ids(data)).toEqual(['1']);
+  });
+
+  it('does not take an id for fetched when a purge ran while its read was out', async () => {
+    const { data } = service();
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    const api = server([member(1)]);
+    let first = true;
+    const byUserIds = vi.fn(async (params, context) => { if (first) { first = false; await held; } return api.byUserIds(params, context); });
+    data.source('members', { fetch: api.whole, read: {}, methods: methods({ byUserIds }) });
+    const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
+    await Promise.resolve();
+    await data.purge('members', { keys: ['1'] });
+    release();
+    await asking;
+    expect(await ids(data)).toEqual([]);
+    await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
+    expect(byUserIds).toHaveBeenCalledTimes(2);
+    expect(await ids(data)).toEqual(['1']);
+  });
+
+  it('answers a scheduler\'s refusal in the method\'s status', async () => {
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
+    const refusal = Object.assign(new Error('circuit open'), { code: 'REFRESH_CIRCUIT_OPEN' });
+    const scheduler = { request: () => Promise.reject(refusal) };
+    const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), scheduler, principal: { id: 'p1' } });
+    const api = server([member(1)]);
+    data.source('members', { fetch: api.whole, read: {}, methods: methods(api) });
+    const status = await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } });
+    expect(status).toMatchObject({ state: 'error', error: { code: 'REFRESH_CIRCUIT_OPEN' } });
+  });
 });

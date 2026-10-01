@@ -1353,12 +1353,24 @@ export function createDataService({
     return methodGroups.get(key);
   }
   const methodsWorking = () => [...methodGroups.values()].some((group) => group.flying.size || group.open || group.state.flight);
-  // A purge or trim of the collection: what its methods fetched is fetched again when asked.
-  const forgetMethods = (name) => methodGroups.forEach((group) => {
-    if (group.collection !== name) return;
-    group.fetched.clear();
-    group.state.syncedAt = null;
-  });
+  // Per collection, when (in `coverageSeq`) what methods know of it was last
+  // made void by a purge or trim, and as of when its last completed whole
+  // read covers every key.
+  let coverageSeq = 0;
+  const coverageVoid = new Map();
+  const wholeCovers = new Map();
+  // A purge or trim of the collection: what its methods fetched, and what a
+  // whole read before it covered, is fetched again when asked.
+  const forgetMethods = (name) => {
+    coverageSeq += 1;
+    coverageVoid.set(name, coverageSeq);
+    methodGroups.forEach((group) => {
+      if (group.collection !== name) return;
+      group.fetched.clear();
+      group.state.syncedAt = null;
+    });
+  };
+  const voidOf = (name) => coverageVoid.get(name) || 0;
   function noteFetched(group, id, at) {
     group.fetched.delete(id);
     group.fetched.set(id, at);
@@ -1366,14 +1378,20 @@ export function createDataService({
   }
   /**
    * Stores one method answer (`rows`, or `{ rows, gone, more }`) in the
-   * collection's turn, as a change of those rows, so a whole read begun
-   * before it keeps them: a merge that removes only the keys it names gone
-   * (`gone`: the endpoint said so, a 404 or a null), never one changed on
-   * this device since the read began or one with an unsent change.
-   * Resolves the keys it answered, and whether the endpoint has more
-   * (`more`: a page of a search).
+   * collection's turn, as a change of those rows as of the read's start
+   * (`startedAt`), so a read begun before it never undoes them: a merge that
+   * removes only the keys it names gone (`gone`: the endpoint said so, a 404
+   * or a null), never one changed on this device since the read began or one
+   * with an unsent change. A key named gone is recorded as removed even when
+   * the device does not hold it, so an older read never brings it back. Each
+   * answered row becomes its record with the stored row as `prev`, and the
+   * record's key decides. It stops between writes once its job is no longer
+   * `current()`, resolving null. Resolves the keys it answered, and whether
+   * the endpoint has more (`more`: a page of a search).
    */
-  async function commitMethod({ name, label, store, decl }, spec, answer, touched, turn) {
+  async function commitMethod({ name, label, store, decl }, spec, answer, {
+    touched, turn, startedAt, current,
+  }) {
     const keyPath = decl?.keyPath || 'id';
     const rows = Array.isArray(answer) ? answer : answer?.rows;
     const gone = Array.isArray(answer) ? [] : answer?.gone ?? [];
@@ -1383,16 +1401,21 @@ export function createDataService({
     if (rows.length > MAX_METHOD_ROWS) {
       throw Object.assign(serviceError(`'${name}': a method answered ${rows.length} rows; at most ${MAX_METHOD_ROWS}`, 'DATA_TOO_LARGE'), { retryable: false });
     }
-    const dtoKey = typeof spec.keyOf === 'function' ? spec.keyOf : (dto) => dto?.[keyPath];
-    if (rows.some((dto) => !dto || typeof dto !== 'object' || dtoKey(dto) === undefined || dtoKey(dto) === null)) throw invalid('holds an entry that is not a row with a key');
+    if (rows.some((dto) => !dto || typeof dto !== 'object')) throw invalid('holds an entry that is not a row');
     if (gone.some((key) => methodId(key) === null)) throw invalid('names a gone key that is not a key');
-    const keys = [...new Set(rows.map((dto) => String(dtoKey(dto))))];
-    const before = await Promise.all(keys.map((key) => store.getRaw(key)));
-    const previous = previousByKey(before, keyPath);
+    // The stored rows the answer's own keys name, as `prev` for the mapper.
+    const dtoKey = typeof spec.keyOf === 'function' ? spec.keyOf : (dto) => dto[keyPath];
+    const dtoKeys = rows.map((dto) => { const key = dtoKey(dto); return key === undefined || key === null ? null : String(key); });
+    const previous = previousByKey(await Promise.all([...new Set(dtoKeys.filter((key) => key !== null))].map((key) => store.getRaw(key))), keyPath);
     const toRecord = spec.toRecord || ((dto) => dto);
+    const mapped = rows.map((dto, at) => toRecord(dto, dtoKeys[at] === null ? undefined : previous.get(dtoKeys[at])));
+    if (mapped.some((record) => !record || typeof record !== 'object' || record[keyPath] === undefined || record[keyPath] === null)) {
+      throw invalid('holds an entry that is not a row with a key');
+    }
+    const keys = [...new Set(mapped.map((record) => String(record[keyPath])))];
+    const before = await Promise.all(keys.map((key) => store.getRaw(key)));
     const refusals = [];
-    const records = rows.map((dto) => toRecord(dto, previous.get(String(dtoKey(dto))))).filter((record) => {
-      if (!record || typeof record !== 'object' || record[keyPath] === undefined || record[keyPath] === null) return false;
+    const records = mapped.filter((record) => {
       if (touched.has(String(record[keyPath]))) return false;
       const why = typeof store.validateRecord === 'function' ? store.validateRecord(record) : null;
       if (why) refusals.push(why);
@@ -1400,11 +1423,15 @@ export function createDataService({
     });
     if (refusals.length) reportRejected(store, refusals, onPersistError);
     for (const chunk of ingestChunks(records)) {
+      if (!current()) return null;
       // eslint-disable-next-line no-await-in-loop
       await turn.store.reconcile(chunk, { prune: false, keepDirty: true, syncedAt: null });
     }
+    if (!current()) return null;
     const answered = new Set(keys);
     const goneKeys = [...new Set(gone.map(String))].filter((key) => !answered.has(key) && !touched.has(key));
+    // Gone as of the read's start, held or not.
+    recordEffect(name, { removedKeys: goneKeys, at: startedAt });
     const goneRows = (await Promise.all(goneKeys.map((key) => store.getRaw(key)))).filter((row) => row && !row._dirty);
     const removed = await removeRows({
       label, store: turn.store, keys: goneRows.map((row) => String(row[keyPath])), force: false,
@@ -1445,44 +1472,59 @@ export function createDataService({
     // Never read more often than the method's cadence, whatever `maxAge` asks.
     const age = Math.max(Number(maxAge) || 0, method.cadenceMs || 0);
     const at = now();
-    // A whole read fresh within that answers every key, and one in flight as
-    // this principal does once it lands.
+    // A whole read fresh within that answers every key a batched method asks
+    // for, and one in flight as this principal does once it lands; neither
+    // answers a search (its filter, order and page are its own). One from
+    // before a purge or trim covers nothing.
     const whole = stateFor(targetKey({ collection: name }));
-    if (age > 0 && whole.syncedAt !== null && at - whole.syncedAt < age && whole.state !== 'error') return settle(Promise.resolve());
-    if (whole.flight && whole.flightForm === form) return settle(whole.flight);
+    if (batchParam) {
+      const covered = (wholeCovers.get(name) || 0) > voidOf(name);
+      if (covered && age > 0 && whole.syncedAt !== null && at - whole.syncedAt < age && whole.state !== 'error') return settle(Promise.resolve());
+      if (whole.flight && whole.flightForm === form && (whole.flightSeq || 0) > voidOf(name)) return settle(whole.flight);
+    }
     if (!isOnline()) {
       group.state.state = 'offline';
       return settle(Promise.reject(serviceError('Offline', 'DATA_OFFLINE')));
     }
     const fresh = (since) => age > 0 && since !== null && since !== undefined && at - since < age;
-    // One fetch: through the read guard, merged in the collection's turn.
+    const failed = (error) => {
+      group.state.state = isOnline() ? 'error' : 'offline';
+      group.state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
+    };
+    // One fetch: through the read guard, merged in the collection's turn. A
+    // purge or trim while it was out leaves what it asked for not fetched.
     const run = async (asked, ids, isCurrent) => {
       const current = () => !disposed && isCurrent();
       const began = now();
+      const voidAtStart = voidOf(name);
       group.state.state = 'refreshing';
       try {
         let stored = null;
-        await guardedRead(name, () => method.fetch(asked, context), async (answer, touched, _startedAt, turn) => {
+        await guardedRead(name, () => method.fetch(asked, context), async (answer, touched, startedAt, turn) => {
           stored = await commitMethod({
             name, label, store, decl,
-          }, spec, answer, touched, turn);
+          }, spec, answer, {
+            touched, turn, startedAt, current,
+          });
         }, { isCurrent: current });
         if (!stored || !current()) return;
-        if (ids) ids.forEach((id) => noteFetched(group, id, began));
-        else {
+        if (!batchParam) {
           group.state.keys = stored.keys;
           group.state.more = stored.more;
         }
         group.state.state = 'fresh';
-        group.state.syncedAt = now();
         group.state.error = null;
+        if (voidOf(name) !== voidAtStart) return;
+        if (ids) ids.forEach((id) => noteFetched(group, id, began));
+        group.state.syncedAt = now();
       } catch (error) {
-        group.state.state = isOnline() ? 'error' : 'offline';
-        group.state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
+        failed(error);
         throw error;
       }
     };
-    const job = (key, work) => scheduler.request({
+    // A job the scheduler refuses without running it (a full queue, an open
+    // circuit) is reported in the method's status too.
+    const job = (key, work) => Promise.resolve(scheduler.request({
       key: lanedKey('data', `${label}:${wanted.method}:${key}`),
       target: laned(label),
       budgetKey: spec.budgetKey || budgetKey,
@@ -1491,7 +1533,7 @@ export function createDataService({
         ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
         : { priority: PRIORITIES.background, visible: false }),
       run: work,
-    });
+    })).catch((error) => { failed(error); throw error; });
     if (!batchParam) {
       if (fresh(group.state.syncedAt) && group.state.state !== 'error') return settle(Promise.resolve());
       if (group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return settle(group.state.flight.promise);
@@ -1620,6 +1662,11 @@ export function createDataService({
     };
     state.flightForm = form;
     state.flightFull = full === true;
+    // A read of the whole collection covers every key as of its start.
+    const wholeRead = !wanted.query && !wanted.window && (wanted.key === undefined || wanted.key === null) && typeof spec.scope !== 'function';
+    coverageSeq += 1;
+    const flightSeq = coverageSeq;
+    state.flightSeq = flightSeq;
     state.flight = scheduler.request({
       key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
       ...(inForeground()
@@ -1630,6 +1677,7 @@ export function createDataService({
       // A read that answered no list leaves the collection as it was, not fresh.
       if (outcome === NO_SNAPSHOT) { if (state.state === 'refreshing') state.state = 'stale'; return; }
       state.state = 'fresh'; state.syncedAt = now(); state.error = null;
+      if (wholeRead) wholeCovers.set(name, Math.max(wholeCovers.get(name) || 0, flightSeq));
     }, (error) => {
       state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
       throw error;
@@ -2131,6 +2179,8 @@ export function createDataService({
       outbox.clear();
       states.clear();
       methodGroups.clear();
+      coverageVoid.clear();
+      wholeCovers.clear();
     },
   };
   // Every call but the synchronous ones counts as work until it settles.
