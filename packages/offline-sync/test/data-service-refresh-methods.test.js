@@ -440,4 +440,66 @@ describe('refresh methods', () => {
     await reading;
     expect(await asking).toMatchObject({ state: 'error', error: { status: 503 } });
   });
+
+  it('keeps a person a lookup found gone from coming back through an older read, held or not', async () => {
+    const { data } = service();
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    const search = vi.fn(async () => { await held; return [member(3)]; });
+    const byUserIds = vi.fn(async () => []);
+    data.source('members', {
+      fetch: async () => ({ rows: [] }),
+      read: {},
+      methods: {
+        search: { params: { q: { type: 'string' } }, fetch: search },
+        byUserIds: { params: { user_ids: { type: 'ids' } }, batch: 'user_ids', field: 'user_id', fetch: byUserIds },
+      },
+    });
+    const searching = data.refresh({ collection: 'members', method: 'search', params: { q: 'm' } }, { mode: 'visible' });
+    await Promise.resolve();
+    await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['103'] } }, { mode: 'visible' });
+    release();
+    await searching;
+    expect(await ids(data)).toEqual([]);
+  });
+
+  it('removes nothing once its service is retired while it looks for the rows an answer left out', async () => {
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
+    const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), principal: { id: 'p1' } });
+    const byUserIds = vi.fn(async () => []);
+    data.source('members', { fetch: async () => ({ rows: [] }), read: {}, methods: methods({ byUserIds }, { field: 'user_id' }) });
+    await data.ingest('members', [member(2)]);
+    const scan = store.getAllRaw.bind(store);
+    store.getAllRaw = async () => { const rows = await scan(); data.dispose(); return rows; };
+    await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['102'] } }).catch(() => {});
+    store.getAllRaw = scan;
+    expect((await store.getAllRaw()).map((row) => row.id)).toEqual(['2']);
+  });
+
+  it('takes a complete ingest as a whole read that answers every id within the cadence', async () => {
+    const { data } = service();
+    const api = server([member(1)]);
+    data.source('members', { fetch: api.whole, read: {}, methods: methods(api) });
+    await data.ingest('members', [member(1)], { complete: true });
+    await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
+    expect(api.byUserIds).not.toHaveBeenCalled();
+  });
+
+  it('answers a method that joined a whole read that stored nothing as not fresh, whatever it answered before', async () => {
+    let at = 1_000_000;
+    const { data } = service({ at: () => at });
+    let release;
+    let held = Promise.resolve();
+    const api = server([member(1)]);
+    data.source('members', { fetch: async () => { await held; return null; }, read: {}, methods: methods(api, { cadenceMs: 1000 }) });
+    // A fetch of its own first: the method's status is fresh.
+    expect((await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } })).state).toBe('fresh');
+    at += 2000;
+    held = new Promise((resolve) => { release = resolve; });
+    const reading = data.refresh('members');
+    const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } });
+    release();
+    await reading;
+    expect((await asking).state).not.toBe('fresh');
+  });
 });

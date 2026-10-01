@@ -469,6 +469,31 @@ export function createDataService({
     }
   }
   const touchedAfter = (name, since) => new Set([...(touches.get(name) || new Map())].filter(([, at]) => at > since).map(([key]) => key));
+  // Per collection and field, the values a method answer asked for and did
+  // not find (gone, or no longer visible), as of its read's start: a read
+  // that began before never stores a row naming one of them. The newest
+  // TOUCHES_KEPT values per field are kept.
+  const goneValues = new Map();
+  function noteGoneValues(name, field, values, at) {
+    if (!values.length) return;
+    if (!goneValues.has(name)) goneValues.set(name, new Map());
+    const fields = goneValues.get(name);
+    if (!fields.has(field)) fields.set(field, new Map());
+    const seen = fields.get(field);
+    values.forEach((value) => {
+      if ((seen.get(String(value)) || 0) > at) return;
+      seen.delete(String(value));
+      seen.set(String(value), at);
+    });
+    while (seen.size > TOUCHES_KEPT) seen.delete(seen.keys().next().value);
+  }
+  // Whether a record names a value found gone after `since`.
+  const barredAfter = (name, since) => {
+    const fields = goneValues.get(name);
+    if (!fields || !fields.size) return () => false;
+    return (record) => [...fields].some(([field, seen]) => record?.[field] !== undefined && record?.[field] !== null
+      && (seen.get(String(record[field])) || 0) > since);
+  };
   // Whether a marker a read that began at `since` needed was dropped.
   const protectionLost = (name, since) => (lostTouches.get(name) || 0) > since;
   // When a replacing ingest from outside a declared read last ran, by collection.
@@ -1255,7 +1280,8 @@ export function createDataService({
         removed = await removeRows({ label, store: raw, keys: [...removedKeys].filter((key) => !touched.has(key) && present.has(key)), force: false });
       }
       if (halted()) return stopHere();
-      const unchanged = (touched) => (row) => !touched.has(keyOf(row));
+      const barred = barredAfter(name, startedAt);
+      const unchanged = (touched) => (row) => !touched.has(keyOf(row)) && !barred(row);
       if (changesOnly) {
         for (const batch of ingestChunks(records)) {
           if (halted()) return stopHere();
@@ -1289,7 +1315,7 @@ export function createDataService({
         let oldest = null;
         records.forEach((record) => {
           const key = keyOf(record);
-          if (touched.has(key)) return;
+          if (touched.has(key) || barred(record)) return;
           const row = stored.get(key);
           if (!row || row._dirty || row._persistFailed || contentOf(record) !== contentOf(row)) { toWrite.push(record); return; }
           const at = Date.parse(row._updatedAt || '');
@@ -1395,9 +1421,10 @@ export function createDataService({
    * answered row becomes its record with the stored row as `prev`, and the
    * record's key decides. It stops between writes once its job is no longer
    * `current()`, resolving null. `unanswered(records, keyPath)`, when given,
-   * names more keys gone: the stored rows of the ids asked that the answer
-   * left out. Resolves the keys it answered, and whether the endpoint has
-   * more (`more`: a page of a search).
+   * names more gone: `{ keys, field, values }`, the stored rows of the ids
+   * asked that the answer left out, and those ids (`values` of `field`),
+   * which no older read stores again. Resolves the keys it answered, and
+   * whether the endpoint has more (`more`: a page of a search).
    */
   async function commitMethod({ name, label, store, decl }, spec, answer, {
     touched, turn, startedAt, current, unanswered = null,
@@ -1425,8 +1452,9 @@ export function createDataService({
     const keys = [...new Set(mapped.map((record) => String(record[keyPath])))];
     const before = await Promise.all(keys.map((key) => store.getRaw(key)));
     const refusals = [];
+    const barred = barredAfter(name, startedAt);
     const records = mapped.filter((record) => {
-      if (touched.has(String(record[keyPath]))) return false;
+      if (touched.has(String(record[keyPath])) || barred(record)) return false;
       const why = typeof store.validateRecord === 'function' ? store.validateRecord(record) : null;
       if (why) refusals.push(why);
       return !why;
@@ -1440,15 +1468,23 @@ export function createDataService({
     if (!current()) return null;
     const answered = new Set(keys);
     // A batched method with a `field`: the stored rows whose field names an
-    // id the answer left out are gone for this principal too.
-    const unansweredKeys = unanswered ? await unanswered(mapped, keyPath) : [];
-    const goneKeys = [...new Set([...gone.map(String), ...unansweredKeys])].filter((key) => !answered.has(key) && !touched.has(key));
+    // id the answer left out are gone for this principal too, and so is the
+    // value itself, held or not.
+    const left = unanswered ? await unanswered(mapped, keyPath) : { keys: [], field: null, values: [] };
+    if (!current()) return null;
+    if (left.field && left.field !== keyPath) noteGoneValues(name, left.field, left.values, startedAt);
+    const goneKeys = [...new Set([...gone.map(String), ...left.keys])].filter((key) => !answered.has(key) && !touched.has(key));
     // Gone as of the read's start, held or not.
     recordEffect(name, { removedKeys: goneKeys, at: startedAt });
     const goneRows = (await Promise.all(goneKeys.map((key) => store.getRaw(key)))).filter((row) => row && !row._dirty);
-    const removed = await removeRows({
-      label, store: turn.store, keys: goneRows.map((row) => String(row[keyPath])), force: false,
-    });
+    const removed = [];
+    for (let start = 0; start < goneRows.length; start += PAGE_ROWS) {
+      if (!current()) return null;
+      // eslint-disable-next-line no-await-in-loop
+      removed.push(...await removeRows({
+        label, store: turn.store, keys: goneRows.slice(start, start + PAGE_ROWS).map((row) => String(row[keyPath])), force: false,
+      }));
+    }
     const after = await Promise.all(keys.map((key) => store.getRaw(key)));
     await adjustMeta(name, { added: keys.filter((key, at) => !before[at] && after[at]), removed });
     return { keys, more: !Array.isArray(answer) && answer?.more === true };
@@ -1511,8 +1547,10 @@ export function createDataService({
       // The method's status is the joined read's outcome.
       if (whole.flight && whole.flightForm === form && (whole.flightSeq || 0) > voidOf(name)) {
         return settle(whole.flight.then(() => {
-          group.state.state = 'fresh';
-          group.state.error = null;
+          // What the read did: fresh only when it stored the collection.
+          const done = stateFor(targetKey({ collection: name }));
+          group.state.state = done.state === 'fresh' ? 'fresh' : done.state;
+          group.state.error = done.error;
         }, (error) => { failed(error); throw error; }));
       }
     }
@@ -1526,11 +1564,12 @@ export function createDataService({
     const unansweredBy = (ids) => (method.field && ids ? async (records, keyPath) => {
       const answeredValues = new Set(records.map((record) => String(record[method.field])));
       const missing = ids.filter((id) => !answeredValues.has(id));
-      if (!missing.length) return [];
-      if (method.field === keyPath) return missing;
+      if (!missing.length) return { keys: [], field: method.field, values: [] };
+      if (method.field === keyPath) return { keys: missing, field: method.field, values: missing };
       const wantedValues = new Set(missing);
-      return (await rawRows(store)).filter((row) => row[method.field] !== undefined && row[method.field] !== null
+      const keys = (await rawRows(store)).filter((row) => row[method.field] !== undefined && row[method.field] !== null
         && wantedValues.has(String(row[method.field]))).map((row) => String(row[keyPath]));
+      return { keys, field: method.field, values: missing };
     } : null);
     // One fetch: through the read guard, merged in the collection's turn. A
     // purge or trim while it was out leaves what it asked for not fetched.
@@ -1935,6 +1974,12 @@ export function createDataService({
         const keys = small ? [...new Set(rows.filter((row) => row && typeof row === 'object').map((row) => String(row[keyPath])))] : [];
         const before = small ? await Promise.all(keys.map(async (key) => !!(await store.getRaw(key)))) : [];
         const result = await ingestRows(collection, rows, options, turn.store);
+        // A complete set (or a replacement of the whole collection) covers
+        // every key a batched method could ask for.
+        if (options?.complete === true || (options?.replace && typeof options?.scope !== 'function')) {
+          coverageSeq += 1;
+          wholeCovers.set(name, coverageSeq);
+        }
         if (small) {
           const after = await Promise.all(keys.map(async (key) => !!(await store.getRaw(key))));
           await adjustMeta(name, {
