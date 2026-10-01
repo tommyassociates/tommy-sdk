@@ -197,7 +197,7 @@ describe('a declared read\'s commit', () => {
     await data.ingest('members', [{ id: 'a' }, { id: 'b' }]);
     await data.ingest('members', [{ id: 'a' }], { replace: true });
     release();
-    await declared;
+    await expect(declared).rejects.toMatchObject({ code: 'REFRESH_DROPPED' });
     expect((await data.read('members')).map((row) => row.id)).toEqual(['a']);
   });
 });

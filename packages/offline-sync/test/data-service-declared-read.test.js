@@ -346,7 +346,7 @@ describe('a declared read', () => {
     expect(await ids(data)).toEqual(['a', 'b']);
   });
 
-  it('drops a read\'s answer once a replacement of the collection landed after it began', async () => {
+  it('drops a read\'s answer once a replacement of the collection landed after it began, and says it did not run', async () => {
     const { data } = service();
     let answer;
     data.source('members', { fetch: () => new Promise((resolve) => { answer = resolve; }), read: { cursor: false } });
@@ -356,7 +356,7 @@ describe('a declared read', () => {
     // A whole answer from elsewhere replaces the set, leaving b out.
     await data.ingest('members', [{ id: 'a' }], { replace: true });
     answer({ rows: [{ id: 'a' }, { id: 'b' }] });
-    await reading;
+    await expect(reading).rejects.toMatchObject({ code: 'REFRESH_DROPPED' });
     expect(await ids(data)).toEqual(['a']);
   });
 

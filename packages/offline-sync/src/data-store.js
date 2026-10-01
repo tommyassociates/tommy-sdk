@@ -896,7 +896,17 @@ export function createDataStore({
      */
     async query(index, range = {}, { limit = 50, cursor = null, raw = false } = {}) {
       const fields = indexFields[index];
-      if (!fields) throw Object.assign(new Error(`store '${name}': index '${index}' is not declared`), { name: 'StorageReadError', reason: 'unserializable' });
+      const refuse = (why) => { throw Object.assign(new Error(`store '${name}': ${why}`), { name: 'StorageReadError', reason: 'unserializable' }); };
+      if (!fields) refuse(`index '${index}' is not declared`);
+      // The ranges the host store takes, and no others: `equals` names every
+      // field of the index; a `prefix` names leading fields, bounded on the
+      // next one when there is one.
+      const head = range.equals || range.prefix || [];
+      const bounded = range.lower !== undefined || range.upper !== undefined;
+      if ((range.equals && (range.prefix || bounded)) || head.length > fields.length
+        || (range.equals && head.length !== fields.length) || (bounded && head.length >= fields.length)) {
+        refuse(`index '${index}' takes equals of all ${fields.length} fields, or a prefix of fewer`);
+      }
       const rows = queryRows((await snapshot()).filter((row) => raw || paintable(row)), fields, range, keyOf);
       const start = cursor === null ? 0 : rows.findIndex((row) => String(keyOf(row)) === String(cursor)) + 1;
       const page = rows.slice(start, start + limit);

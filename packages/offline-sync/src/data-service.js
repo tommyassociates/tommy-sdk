@@ -129,6 +129,9 @@ const rawRows = (store) => (store.getAllRaw ? store.getAllRaw() : store.getAll()
 // A read that answered no list: nothing of the collection is removed or
 // stamped for it.
 const NO_SNAPSHOT = Symbol('no snapshot');
+// A read a whole replacement or purge of its collection overtook: it stored
+// nothing, and did not run as far as the caller is concerned.
+const DROPPED = Symbol('dropped');
 /**
  * The rows a list or declared read answered, or null when it answered no
  * list (`null`, `undefined`, an object without `rows`): the one check every
@@ -382,12 +385,18 @@ async function runQuery(store, keyPath, spec = {}) {
     const rows = [];
     let complete = true;
     const values = [...new Map(range.anyOf.map((value) => [JSON.stringify(value), value])).values()];
+    // Each value is read to its end, page by page, so rows an earlier value
+    // already gave (overlapping prefixes) never count against the limit.
     for (const value of values) {
-      if (rows.length >= limit) { complete = false; break; }
-      // eslint-disable-next-line no-await-in-loop
-      const page = await queryPages(store, index, { prefix: Array.isArray(value) ? value : [value] }, { limit: limit - rows.length, cursor: null, raw: raw === true });
-      page.rows.forEach((row) => { if (!seen.has(keyOf(row))) { seen.add(keyOf(row)); rows.push(row); } });
-      if (!page.complete) complete = false;
+      if (!complete) break;
+      let next = null;
+      do {
+        if (rows.length >= limit) { complete = false; break; }
+        // eslint-disable-next-line no-await-in-loop
+        const page = await queryPages(store, index, { prefix: Array.isArray(value) ? value : [value] }, { limit: limit - rows.length, cursor: next, raw: raw === true });
+        page.rows.forEach((row) => { if (!seen.has(keyOf(row))) { seen.add(keyOf(row)); rows.push(row); } });
+        next = page.complete ? null : page.nextCursor;
+      } while (next !== null);
     }
     return { rows: rows.map(raw === true ? copyRow : clean), nextCursor: null, complete };
   }
@@ -1053,13 +1062,17 @@ export function createDataService({
       if (replace) await store.reconcile([], { scope: (row) => inScope(row) && !kept.has(String(row[keyPath])), whole: !scoped });
     }
     const written = stored.size;
+    // Every row given was kept: each a distinct key the store accepted and stored.
+    const distinct = new Set(rows.filter((row) => row && typeof row === 'object').map((row) => String(row[keyPath])));
+    const everyRow = kept.size === distinct.size && !unsaved.size
+      && (await Promise.all([...kept].map(async (key) => !!(await store.getRaw?.(key))))).every(Boolean);
     // A replacing or complete ingest is a whole read: the collection is fresh.
     if (replace || complete === true) {
       const state = stateFor(targetKey({ collection: name }));
       state.state = 'fresh'; state.syncedAt = now(); state.error = null;
       emitStatus();
     }
-    return { written, ...(unsaved.size ? { unsaved: [...unsaved] } : {}) };
+    return { written, ...(unsaved.size ? { unsaved: [...unsaved] } : {}), everyRow };
   }
 
   /**
@@ -1110,11 +1123,12 @@ export function createDataService({
       const outcome = await inTurn(name, async (turn) => {
         // Still wanted, checked again in the turn, just before it commits.
         if (!isCurrent()) return { dropped: true };
-        if (replacedAfter(name, startedAt)) return { dropped: true };
+        if (replacedAfter(name, startedAt)) return { dropped: true, replaced: true };
         if (protectionLost(name, startedAt)) return null;
         const value = await commit(answer, touchedAfter(name, startedAt), startedAt, turn);
         return value === READ_AGAIN ? null : { value };
       }, { at: startedAt });
+      if (outcome?.replaced) return DROPPED;
       if (outcome) return outcome.dropped ? undefined : outcome.value;
     }
     throw serviceError(`'${name}' changed on this device faster than it could be read`, 'DATA_BUSY');
@@ -1179,7 +1193,7 @@ export function createDataService({
       });
       return stored === 'read_again' ? READ_AGAIN : undefined;
     }, { isCurrent });
-    return outcome === NO_SNAPSHOT ? NO_SNAPSHOT : undefined;
+    return outcome === NO_SNAPSHOT || outcome === DROPPED ? outcome : undefined;
   }
 
   /**
@@ -1569,11 +1583,21 @@ export function createDataService({
             return undefined;
           }
           // Its own lookup is a new ask: of a live service, as the principal
-          // it was asked as, in the group its ids belong to now (idle groups
-          // may have been cleared while it waited).
-          live();
-          if (formOf(jobContextNow()) !== form) throw serviceError('The account changed while the lookup waited', 'DATA_RETIRED');
+          // it was asked as, of a lookup its server still offers, in the group
+          // its ids belong to now (idle groups may have been cleared while it
+          // waited). A refusal is the method's status before it settles.
+          const refuse = (message, code) => {
+            const error = Object.assign(serviceError(message, code), { retryable: false });
+            group.state.state = 'error';
+            group.state.error = { code, status: null, message };
+            throw error;
+          };
+          if (disposed) refuse('Data service retired', 'DATA_RETIRED');
+          if (formOf(jobContextNow()) !== form) refuse('The account changed while the lookup waited', 'DATA_RETIRED');
           group = methodGroup(groupKey, name);
+          let offered = true;
+          try { offered = typeof method.available !== 'function' || method.available(params) !== false; } catch (_) { offered = false; }
+          if (!offered) refuse(`'${wanted.collection}' cannot run '${wanted.method}' now`, 'DATA_UNSUPPORTED');
           return lookup();
         }));
       }
@@ -1799,6 +1823,11 @@ export function createDataService({
         : { priority: PRIORITIES.background, visible: false }),
       run,
     }).then((outcome) => {
+      // A read a purge or replacement overtook stored nothing: not run, not fresh.
+      if (outcome === DROPPED) {
+        if (state.state === 'refreshing') state.state = 'stale';
+        throw Object.assign(serviceError(`'${wanted.collection}' was replaced while it was read`, 'REFRESH_DROPPED'), { retryable: false });
+      }
       // A read that answered no list leaves the collection as it was, not fresh.
       if (outcome === NO_SNAPSHOT) { if (state.state === 'refreshing') state.state = 'stale'; return; }
       state.state = 'fresh'; state.syncedAt = now(); state.error = null;
@@ -1999,17 +2028,17 @@ export function createDataService({
         const tracksMeta = !!(sources.get(name) || decl?.source)?.read?.cursor;
         if (options?.ifEmpty === true) {
           if ((await store.getAllRaw()).length) return { written: 0 };
-          const adopted = await ingestRows(collection, rows, { complete: false }, turn.raw);
+          const { everyRow: _everyRow, ...adopted } = await ingestRows(collection, rows, { complete: false }, turn.raw);
           if (tracksMeta) await adjustMeta(name, null);
           return adopted;
         }
         const small = tracksMeta && !options?.replace && Array.isArray(rows) && rows.length <= PAGE_ROWS;
         const keys = small ? [...new Set(rows.filter((row) => row && typeof row === 'object').map((row) => String(row[keyPath])))] : [];
         const before = small ? await Promise.all(keys.map(async (key) => !!(await store.getRaw(key)))) : [];
-        const result = await ingestRows(collection, rows, options, turn.store);
-        // A complete set (or a replacement of the whole collection) covers
-        // every key a batched method could ask for.
-        if (options?.complete === true || (options?.replace && typeof options?.scope !== 'function')) {
+        const { everyRow, ...result } = await ingestRows(collection, rows, options, turn.store);
+        // A complete set (or a replacement of the whole collection) the store
+        // kept every row of covers every key a batched method could ask for.
+        if (everyRow && (options?.complete === true || (options?.replace && typeof options?.scope !== 'function'))) {
           coverageSeq += 1;
           wholeCovers.set(name, coverageSeq);
         }

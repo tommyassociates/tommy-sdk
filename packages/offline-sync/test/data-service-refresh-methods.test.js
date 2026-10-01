@@ -538,6 +538,50 @@ describe('refresh methods', () => {
     expect(await ids(data)).toEqual(['9']);
   });
 
+  it('answers a silent lookup retired while it waited on a joined read as retired, not with its old status', async () => {
+    const { data } = service();
+    const api = server([member(1)]);
+    // A first lookup of its own: the method's status is fresh.
+    data.source('members', { fetch: () => held, read: {}, methods: methods(api) });
+    let fail;
+    let held = Promise.resolve({ rows: [] });
+    expect((await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } })).state).toBe('fresh');
+    held = new Promise((resolve, reject) => { fail = reject; });
+    const reading = data.refresh('members').catch(() => {});
+    const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['102'] } });
+    data.dispose();
+    fail(Object.assign(new Error('Service Unavailable'), { status: 503 }));
+    await reading;
+    expect(await asking).toMatchObject({ state: 'error', error: { code: 'DATA_RETIRED' } });
+  });
+
+  it('asks again whether its server offers the lookup before sending it after a joined read', async () => {
+    const { data } = service();
+    const api = server([member(1)]);
+    let offered = true;
+    let fail;
+    const held = new Promise((resolve, reject) => { fail = reject; });
+    data.source('members', { fetch: () => held, read: {}, methods: methods(api, { available: () => offered }) });
+    const reading = data.refresh('members').catch(() => {});
+    const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } });
+    offered = false;
+    fail(Object.assign(new Error('Service Unavailable'), { status: 503 }));
+    await reading;
+    expect(await asking).toMatchObject({ state: 'error', error: { code: 'DATA_UNSUPPORTED' } });
+    expect(api.byUserIds).not.toHaveBeenCalled();
+  });
+
+  it('takes a complete ingest the store kept only part of as no whole read', async () => {
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend(), recordSchema: { type: 'object', required: ['id', 'name'] } });
+    const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: () => 1_000_000 });
+    const api = server([member(1), member(2)]);
+    data.source('members', { fetch: api.whole, read: {}, methods: methods(api) });
+    // The second row is refused by the store: the ingest is not every row.
+    await data.ingest('members', [member(1), { id: '2', user_id: 102 }], { complete: true });
+    await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['102'] } }, { mode: 'visible' });
+    expect(api.asked.map((call) => call.user_ids)).toEqual([['102']]);
+  });
+
   it('takes a complete ingest as a whole read that answers every id within the cadence', async () => {
     const { data } = service();
     const api = server([member(1)]);

@@ -167,6 +167,31 @@ describe('data service on memory stores', () => {
     await expect(data.query('chats.messages', { anyOf: [7] })).rejects.toMatchObject({ code: 'DATA_INVALID' });
   });
 
+  it('refuses the index ranges the host store refuses, on a memory store too', async () => {
+    const service = memoryService();
+    await service.ingest('chats.messages', [{ id: 'a', chat_id: 'c', seq: 1 }]);
+    const refused = (range) => expect(service.query('chats.messages', { index: 'byChat', ...range })).rejects.toMatchObject({ reason: 'unserializable' });
+    // `equals` names every field of the index; a part is a `prefix`.
+    await refused({ equals: ['c'] });
+    await refused({ equals: ['c', 1, 'x'] });
+    await refused({ prefix: ['c', 1, 'x'] });
+    await refused({ prefix: ['c', 1], lower: 0 });
+    await refused({ equals: ['c', 1], prefix: ['c'] });
+    expect((await service.query('chats.messages', { index: 'byChat', equals: ['c', 1] })).rows.map((row) => row.id)).toEqual(['a']);
+    expect((await service.query('chats.messages', { index: 'byChat', prefix: ['c'] })).rows.map((row) => row.id)).toEqual(['a']);
+  });
+
+  it('answers overlapping anyOf values with every distinct row that fits, and says when it read them all', async () => {
+    const service = memoryService();
+    await service.ingest('chats.messages', [{ id: 'a', chat_id: 'c', seq: 1 }, { id: 'b', chat_id: 'c', seq: 2 }, { id: 'e', chat_id: 'd', seq: 1 }]);
+    const answer = await service.query('chats.messages', { index: 'byChat', anyOf: [['c', 1], 'c'], limit: 2 });
+    expect(answer.rows.map((row) => row.id)).toEqual(['a', 'b']);
+    expect(answer.complete).toBe(true);
+    const capped = await service.query('chats.messages', { index: 'byChat', anyOf: [['c', 1], 'c', 'd'], limit: 2 });
+    expect(capped.rows.map((row) => row.id)).toEqual(['a', 'b']);
+    expect(capped.complete).toBe(false);
+  });
+
   it('takes no refresh answer with an entry that is not a keyed row, and removes nothing', async () => {
     const data = memoryService();
     let answer = [null];
@@ -199,6 +224,22 @@ describe('data service on memory stores', () => {
     expect(seen).toHaveLength(2);
     off();
     await expect(data.read('contacts.people')).rejects.toMatchObject({ code: 'DATA_UNDECLARED' });
+  });
+
+  it('reports a refresh a whole purge overtook as not run, and does not stamp the emptied collection fresh', async () => {
+    const service = memoryService();
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    service.source('chats.messages', { fetch: async () => { await held; return [{ id: 'a', chat_id: 'c', seq: 1 }]; } });
+    await service.ingest('chats.messages', [{ id: 'z', chat_id: 'c', seq: 9 }]);
+    const reading = service.refresh('chats.messages', { mode: 'visible' }).then(() => 'ran', (error) => error);
+    await settle();
+    await service.purge('chats.messages', { force: true });
+    release();
+    expect(await reading).toMatchObject({ code: 'REFRESH_DROPPED' });
+    expect(await service.read('chats.messages')).toEqual([]);
+    expect(service.status('chats.messages')).toMatchObject({ syncedAt: null });
+    expect(service.status('chats.messages').state).not.toBe('fresh');
   });
 
   it('refreshes through the scheduler: coalesced, skipped while fresh, silent errors in status', async () => {
