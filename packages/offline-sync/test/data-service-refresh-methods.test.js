@@ -494,6 +494,50 @@ describe('refresh methods', () => {
     expect((await store.getAllRaw()).map((row) => row.id)).toEqual(['2']);
   });
 
+  it('sends its own lookup rather than join a read of only part of the collection (a scoped source)', async () => {
+    const { data } = service();
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    const api = server([member(1), member(2)]);
+    data.source('members', {
+      fetch: async () => { await held; return { rows: [member(2)] }; }, scope: () => (row) => row.id === '2', read: {}, methods: methods(api),
+    });
+    const reading = data.refresh('members');
+    const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
+    release();
+    await Promise.all([reading, asking]);
+    expect(data.status('members').state).toBe('fresh');
+    expect(api.asked.map((call) => call.user_ids)).toEqual([['101']]);
+  });
+
+  it('answers a method a recent whole read covers as fresh, whatever it answered before', async () => {
+    let at = 1_000_000;
+    const { data } = service({ at: () => at });
+    const api = server([member(1)]);
+    let fail = true;
+    const byUserIds = vi.fn(async (params, context) => { if (fail) throw Object.assign(new Error('Service Unavailable'), { status: 503 }); return api.byUserIds(params, context); });
+    data.source('members', { fetch: api.whole, read: {}, methods: methods({ byUserIds }) });
+    const ask = () => data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } });
+    expect((await ask()).state).toBe('error');
+    fail = false;
+    at += 1000;
+    await data.refresh('members', { mode: 'visible' });
+    expect(await ask()).toMatchObject({ state: 'fresh', error: null });
+    expect(byUserIds).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses an answer that names more keys gone than the bound, and stores nothing of it', async () => {
+    const { data } = service();
+    const api = server([member(1)]);
+    const gone = Array.from({ length: 5001 }, (_, n) => String(n + 1000));
+    const byUserIds = vi.fn(async () => ({ rows: [member(1)], gone }));
+    data.source('members', { fetch: api.whole, read: {}, methods: methods({ byUserIds }) });
+    await data.ingest('members', [member(9)]);
+    await expect(data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' }))
+      .rejects.toMatchObject({ code: 'DATA_TOO_LARGE' });
+    expect(await ids(data)).toEqual(['9']);
+  });
+
   it('takes a complete ingest as a whole read that answers every id within the cadence', async () => {
     const { data } = service();
     const api = server([member(1)]);

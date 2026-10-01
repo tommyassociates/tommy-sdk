@@ -252,6 +252,8 @@ function checkRead(read) {
 // one method answer may hold: a method reads a slice, never the collection.
 export const MAX_METHOD_IDS = 200;
 export const MAX_METHOD_ROWS = 5000;
+// The most keys a method answer may name gone.
+export const MAX_METHOD_GONE = 5000;
 export const METHOD_PARAM_TYPES = Object.freeze(['ids', 'id', 'string', 'date', 'boolean', 'page']);
 // A method fetch still unanswered after this is not joined: a later ask
 // fetches again rather than wait on a stalled one.
@@ -1438,6 +1440,9 @@ export function createDataService({
     if (rows.length > MAX_METHOD_ROWS) {
       throw Object.assign(serviceError(`'${name}': a method answered ${rows.length} rows; at most ${MAX_METHOD_ROWS}`, 'DATA_TOO_LARGE'), { retryable: false });
     }
+    if (gone.length > MAX_METHOD_GONE) {
+      throw Object.assign(serviceError(`'${name}': a method named ${gone.length} keys gone; at most ${MAX_METHOD_GONE}`, 'DATA_TOO_LARGE'), { retryable: false });
+    }
     if (rows.some((dto) => !dto || typeof dto !== 'object')) throw invalid('holds an entry that is not a row');
     if (gone.some((key) => methodId(key) === null)) throw invalid('names a gone key that is not a key');
     // The stored rows the answer's own keys name, as `prev` for the mapper.
@@ -1544,12 +1549,18 @@ export function createDataService({
     };
     if (batchParam) {
       const covered = (wholeCovers.get(name) || 0) > voidOf(name);
-      if (covered && age > 0 && whole.syncedAt !== null && askedAt - whole.syncedAt < age && whole.state !== 'error') return settle(Promise.resolve());
+      if (covered && age > 0 && whole.syncedAt !== null && askedAt - whole.syncedAt < age && whole.state !== 'error') {
+        // Answered by that read: the method's status says so.
+        group.state.state = 'fresh';
+        group.state.error = null;
+        group.state.syncedAt = whole.syncedAt;
+        return settle(Promise.resolve());
+      }
       // A whole read in flight as this principal answers the method when it
       // stores the collection. One that did not (refused, as for an account
       // that reads on demand; failed; stored nothing) leaves the method to
       // send its own lookup: a keyed ask never inherits a whole read's outcome.
-      if (whole.flight && whole.flightForm === form && (whole.flightSeq || 0) > voidOf(name)) {
+      if (whole.flight && whole.flightWhole && whole.flightForm === form && (whole.flightSeq || 0) > voidOf(name)) {
         const stored = whole.flight.then(() => stateFor(targetKey({ collection: name })).state === 'fresh', () => false);
         return settle(stored.then((answered) => {
           if (answered) {
@@ -1779,6 +1790,8 @@ export function createDataService({
     coverageSeq += 1;
     const flightSeq = coverageSeq;
     state.flightSeq = flightSeq;
+    // Only a read of every row answers a batched method that joins it.
+    state.flightWhole = wholeRead;
     state.flight = scheduler.request({
       key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
       ...(inForeground()
@@ -1793,7 +1806,7 @@ export function createDataService({
     }, (error) => {
       state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
       throw error;
-    }).finally(() => { state.flight = null; state.flightForm = null; state.flightFull = false; emitStatus(); });
+    }).finally(() => { state.flight = null; state.flightForm = null; state.flightFull = false; state.flightWhole = false; emitStatus(); });
     return settle(state.flight);
   }
 
