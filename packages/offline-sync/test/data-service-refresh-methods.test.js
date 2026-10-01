@@ -782,4 +782,26 @@ describe('refresh methods', () => {
     await expect(ask(['101'])).resolves.toMatchObject({ state: 'fresh', error: null });
     expect(byUserIds.mock.calls.length).toBe(calls);
   });
+
+  it('fetches an id again within the cadence once the store\'s bound evicted its row, and keeps an id answered absent fresh', async () => {
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend(), maxRows: 2 });
+    const data = createDataService({
+      resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: () => 1_000_000, principal: { id: 'p1' },
+    });
+    const api = server([member(1), member(2), member(3)]);
+    data.source('members', { fetch: api.whole, read: {}, methods: methods(api, { field: 'user_id' }) });
+    const ask = (userIds) => data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: userIds } }, { mode: 'visible' });
+    await ask(['101']);
+    await ask(['102', '103']);
+    // The bound keeps two rows: the oldest (101's) went.
+    expect(await ids(data)).toEqual(['2', '3']);
+    await ask(['101']);
+    expect(api.byUserIds).toHaveBeenCalledTimes(3);
+    expect(api.byUserIds.mock.calls[2][0].user_ids).toEqual(['101']);
+    expect(await data.read('members', '1')).toMatchObject({ id: '1', user_id: 101 });
+    // An id the server answered absent is not asked again within the cadence.
+    await ask(['199']);
+    await ask(['199']);
+    expect(api.byUserIds).toHaveBeenCalledTimes(4);
+  });
 });

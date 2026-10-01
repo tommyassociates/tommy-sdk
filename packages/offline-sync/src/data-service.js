@@ -1517,9 +1517,12 @@ export function createDataService({
     });
   };
   const voidOf = (name) => coverageVoid.get(name) || 0;
-  function noteFetched(group, id, at) {
+  // When an id was last fetched, and whether its answer held a row for it
+  // (true), answered it absent (false), or cannot say (null: a method with no
+  // `field` naming its rows).
+  function noteFetched(group, id, at, present = null) {
     group.fetched.delete(id);
-    group.fetched.set(id, at);
+    group.fetched.set(id, { at, present });
     while (group.fetched.size > METHOD_FRESH_KEPT) group.fetched.delete(group.fetched.keys().next().value);
   }
   /**
@@ -1602,7 +1605,7 @@ export function createDataService({
     }
     const after = await Promise.all(keys.map((key) => store.getRaw(key)));
     await adjustMeta(name, { added: keys.filter((key, at) => !before[at] && after[at]), removed });
-    return { keys, more: !Array.isArray(answer) && answer?.more === true };
+    return { keys, more: !Array.isArray(answer) && answer?.more === true, absent: unanswered ? left.values : null };
   }
   /**
    * A refresh method's run (`{ collection, method, params }`) as the
@@ -1709,15 +1712,34 @@ export function createDataService({
     }
     return settle(lookup());
 
+    // The ids among `ids` fetched with a row that the collection no longer
+    // holds (the store's bounds evicted it): fetched again, never taken for fresh.
+    async function evictedIds(ids) {
+      if (!method.field || !ids.length) return new Set();
+      const keyPath = decl?.keyPath || 'id';
+      if (method.field === keyPath) {
+        const rows = await Promise.all(ids.map((id) => Promise.resolve().then(() => store.getRaw(String(id))).catch(() => null)));
+        return new Set(ids.filter((id, at) => !rows[at]));
+      }
+      const held = new Set((await Promise.resolve().then(() => rawRows(store)).catch(() => []) || []).map((row) => row?.[method.field])
+        .filter((value) => value !== undefined && value !== null).map(String));
+      return new Set(ids.filter((id) => !held.has(String(id))));
+    }
+
     // The method's own fetch: of its params, or of the ids it asks for,
     // batched, timed from when it runs.
-    function lookup() {
+    async function lookup() {
       const at = now();
       if (!isOnline()) {
         group.state.state = 'offline';
-        return Promise.reject(serviceError('Offline', 'DATA_OFFLINE'));
+        throw serviceError('Offline', 'DATA_OFFLINE');
       }
       const fresh = (since) => age > 0 && since !== null && since !== undefined && at - since < age;
+      // An id answered with a row is fresh only while the collection still
+      // holds that row; one answered absent stays fresh for its cadence.
+      const freshEntry = (entry) => !!entry && fresh(entry.at);
+      const evicted = batchParam ? await evictedIds(params[batchParam]
+        .filter((id) => { const entry = group.fetched.get(id); return freshEntry(entry) && entry.present === true; })) : new Set();
       // The stored rows whose `field` names an id asked for that the answer left
       // out: for this principal, those rows are gone (not visible, or removed).
       const unansweredBy = (ids) => (method.field && ids ? async (records, keyPath) => {
@@ -1759,7 +1781,10 @@ export function createDataService({
           group.state.state = 'fresh';
           group.state.error = null;
           if (voidOf(name) !== voidAtStart) return;
-          if (ids) ids.forEach((id) => noteFetched(group, id, began));
+          if (ids) {
+            const absent = Array.isArray(stored.absent) ? new Set(stored.absent.map(String)) : null;
+            ids.forEach((id) => noteFetched(group, id, began, absent ? !absent.has(String(id)) : null));
+          }
           group.state.syncedAt = now();
         } catch (error) {
           failed(error);
@@ -1804,7 +1829,7 @@ export function createDataService({
       // is in them, so a scheduler that runs a job at once never reads part.
       const started = [];
       params[batchParam].forEach((id) => {
-        if (fresh(group.fetched.get(id))) return;
+        if (freshEntry(group.fetched.get(id)) && !evicted.has(id)) return;
         const flying = group.flying.get(id);
         if (flying && at - flying.at < METHOD_SHARE_MS) { waits.add(flying); return; }
         // A batch full, or waiting past the share window without starting, takes no more.
