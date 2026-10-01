@@ -503,6 +503,87 @@ describe('refresh methods', () => {
     expect(api.byUserIds).not.toHaveBeenCalled();
   });
 
+  it('sends nothing when its service is retired while it waits on a whole read it joined', async () => {
+    const { data } = service();
+    let fail;
+    const held = new Promise((resolve, reject) => { fail = reject; });
+    const api = server([member(1)]);
+    data.source('members', { fetch: () => held, read: {}, methods: methods(api) });
+    const reading = data.refresh('members').catch(() => {});
+    const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' }).catch((error) => error);
+    data.dispose();
+    fail(Object.assign(new Error('Service Unavailable'), { status: 503 }));
+    await reading;
+    expect(await asking).toMatchObject({ code: 'DATA_RETIRED' });
+    expect(api.byUserIds).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing as another principal when the account changed while it waited', async () => {
+    let shown = { id: 'p1' };
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
+    const data = createDataService({
+      resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: () => 1_000_000, isOnline: () => true, principal: () => shown,
+    });
+    let fail;
+    const held = new Promise((resolve, reject) => { fail = reject; });
+    const api = server([member(1)]);
+    data.source('members', { fetch: () => held, read: {}, methods: methods(api) });
+    const reading = data.refresh('members').catch(() => {});
+    const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' }).catch((error) => error);
+    shown = { id: 'p2' };
+    fail(Object.assign(new Error('Service Unavailable'), { status: 503 }));
+    await reading;
+    await asking;
+    expect(api.byUserIds).not.toHaveBeenCalled();
+  });
+
+  it('starts its own lookup when the wait ends, so an ask of the same ids just after joins it', async () => {
+    let at = 1_000_000;
+    const { data } = service({ at: () => at });
+    let fail;
+    const held = new Promise((resolve, reject) => { fail = reject; });
+    let release;
+    const slow = new Promise((resolve) => { release = resolve; });
+    const api = server([member(1)]);
+    const byUserIds = vi.fn(async (params, context) => { await slow; return api.byUserIds(params, context); });
+    data.source('members', { fetch: () => held, read: {}, methods: methods({ byUserIds }) });
+    const reading = data.refresh('members').catch(() => {});
+    const first = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
+    // The whole read takes longer than the share window, then fails.
+    at += 2 * MINUTE;
+    fail(Object.assign(new Error('Service Unavailable'), { status: 503 }));
+    await reading;
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    const second = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
+    release();
+    await Promise.all([first, second]);
+    expect(byUserIds).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers in the group its ids belong to, though idle groups were cleared while it waited', async () => {
+    const { data } = service();
+    let fail;
+    const held = new Promise((resolve, reject) => { fail = reject; });
+    const api = server([member(1)]);
+    const search = vi.fn(async () => []);
+    data.source('members', {
+      fetch: () => held,
+      read: {},
+      methods: { ...methods(api), search: { params: { q: { type: 'string', max: 20 } }, fetch: search } },
+    });
+    const reading = data.refresh('members').catch(() => {});
+    const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
+    // Enough other asks to clear the idle groups while it waits.
+    for (let n = 0; n < 501; n += 1) await data.refresh({ collection: 'members', method: 'search', params: { q: `q${n}` } }); // eslint-disable-line no-await-in-loop
+    fail(Object.assign(new Error('Service Unavailable'), { status: 503 }));
+    await reading;
+    await asking;
+    expect(api.byUserIds).toHaveBeenCalledTimes(1);
+    // Within the cadence the id is answered without another fetch.
+    await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
+    expect(api.byUserIds).toHaveBeenCalledTimes(1);
+  });
+
   it('sends its own lookup when the whole read it joined stored nothing', async () => {
     let at = 1_000_000;
     const { data } = service({ at: () => at });
