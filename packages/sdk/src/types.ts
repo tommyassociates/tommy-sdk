@@ -539,14 +539,20 @@ export interface DataStore<Rec = unknown> {
  * subscription holds its latest rows until the account is displayed again.
  */
 export interface HostCollection<Rec = unknown> {
-  /** Every row, one by key, or several by keys (null where none). */
+  /**
+   * Every row, one by key, or several by keys (null where none). Keys the
+   * device does not hold are asked of the host (the source's `byIds`
+   * method, when it has one), waited for a bounded time.
+   */
   read(key?: string | readonly string[] | null): Promise<readonly Rec[] | Rec | readonly (Rec | null)[] | null>;
-  /** Several rows by key, in the order asked (null where none). */
+  /** Several rows by key, in the order asked (null where none); misses as `read`. */
   getMany(keys: readonly string[]): Promise<readonly (Rec | null)[]>;
   /**
    * Rows by one of the view's lookups (`by_user`, `by_tag` for members;
    * `by_context` for tags) with `equals` or `anyOf`, in the order asked, each
-   * row once; or every row in key order, paged by `cursor`.
+   * row once; or every row in key order, paged by `cursor`. Values the device
+   * holds no row of are asked of the host through the method that reads by
+   * that lookup (`byUserIds` for `by_user`), waited for a bounded time.
    */
   query(spec?: { index?: string; equals?: readonly string[]; anyOf?: readonly string[]; limit?: number; cursor?: string | null }):
     Promise<{ rows: readonly Rec[]; nextCursor: string | null; complete: boolean }>;
@@ -554,8 +560,26 @@ export interface HostCollection<Rec = unknown> {
   subscribe(callback: (rows: readonly Rec[]) => void, options?: { onError?: (error: unknown) => void }): () => void;
   /** The collection's status; `complete` only when every collection the profile reads has completed a read. */
   status(): DataStatus & { complete: boolean };
-  /** Asks the host to read the collections again; never more often than each source's declared freshness. */
-  refresh(options?: { maxAge?: number }): Promise<DataStatus>;
+  /**
+   * Asks the host to read again; the host alone fetches, dedupes and keeps
+   * the cadence. With no `method`, every collection the profile reads, at
+   * the host's cadence for MP asks (`maxAge` may only ask for less often;
+   * `fresh` for an action that must not act on stale rows). With `method`
+   * and `params`, one of the source's refresh methods (`byIds({ ids })`,
+   * `byUserIds({ user_ids })`, `search({ q, page? })`); an unknown method or
+   * param, or a param of the wrong shape, is refused (`DATA_INVALID`). A
+   * method's answer is merged, never the whole list. `waitMs` (at most
+   * 60000) answers `{ state: 'refreshing', waited: true }` once it passed,
+   * while the read goes on. A search answers the keys of its page and
+   * whether there are more.
+   */
+  refresh(options?: {
+    method?: string;
+    params?: Readonly<Record<string, unknown>>;
+    maxAge?: number;
+    fresh?: boolean;
+    waitMs?: number;
+  }): Promise<DataStatus & { waited?: true; keys?: readonly string[] | null; more?: boolean | null }>;
 }
 
 export interface DataApi {
