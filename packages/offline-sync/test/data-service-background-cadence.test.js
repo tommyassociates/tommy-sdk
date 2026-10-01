@@ -2,8 +2,10 @@
 /**
  * An account that is not displayed reads at its device budget's cadence:
  * its refreshes wait `backgroundCadence()` times as long between reads, and
- * read nothing while the cadence is paused (Infinity). The displayed account
- * reads as asked. Sends are never held.
+ * read nothing while the cadence is paused (Infinity); a read paused on its
+ * way stores nothing and is not fresh. The displayed account reads as
+ * asked, and so does a collection the service keeps in the foreground for
+ * every account. Sends are never held.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { createDataService, createDataStore, createMemoryStoreBackend } from '../src/index.js';
@@ -98,5 +100,47 @@ describe('a background account\'s cadence', () => {
     shown = true;
     await account.data.refresh('members');
     expect(account.whole).toHaveBeenCalledTimes(1);
+  });
+
+  it('stores nothing from a read paused on its way, and reads it again once displayed', async () => {
+    let factor = 2;
+    let shown = false;
+    // Each run asks the job whether it is still wanted, as the host's scheduler does.
+    const scheduler = {
+      request: (job) => Promise.resolve().then(() => job.run(() => job.valid())),
+    };
+    const account = service({ foreground: () => shown, cadence: () => factor, scheduler });
+    let answer;
+    account.whole.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }));
+    const read = account.data.refresh('members');
+    await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
+    factor = Infinity;
+    answer([{ id: '1', user_id: 101 }]);
+    await expect(read).resolves.toMatchObject({ state: 'stale', syncedAt: null });
+    expect(await account.data.read('members')).toEqual([]);
+    // Displayed: a read asked with a maxAge is not answered by the paused one.
+    shown = true;
+    await account.data.refresh('members', { maxAge: MINUTE });
+    expect(account.whole).toHaveBeenCalledTimes(2);
+    expect(await account.data.read('members')).toHaveLength(1);
+  });
+
+  it('reads a collection kept in the foreground while the rest of its account is paused', async () => {
+    const stores = {
+      members: createDataStore({ name: 'members', backend: createMemoryStoreBackend() }),
+      profile: createDataStore({ name: 'profile', backend: createMemoryStoreBackend() }),
+    };
+    const data = createDataService({
+      resolve: (name) => (stores[name] ? { store: stores[name], decl: { keyPath: 'id' } } : null),
+      principal: { id: 'p1' }, foreground: (collection) => collection === 'profile', backgroundCadence: () => Infinity,
+    });
+    const members = vi.fn(async () => [{ id: '1' }]);
+    const profile = vi.fn(async () => [{ id: 'me' }]);
+    data.source('members', { fetch: members });
+    data.source('profile', { fetch: profile });
+    await data.refresh('members');
+    await data.refresh('profile');
+    expect(members).not.toHaveBeenCalled();
+    expect(profile).toHaveBeenCalledTimes(1);
   });
 });

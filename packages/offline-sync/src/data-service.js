@@ -175,6 +175,10 @@ const NO_SNAPSHOT = Symbol('no snapshot');
 // A read a whole replacement or purge of its collection overtook: it stored
 // nothing, and did not run as far as the caller is concerned.
 const DROPPED = Symbol('dropped');
+// A read that stopped on its way, no longer wanted (its account's reads
+// paused, the service retired): whatever it reached, the collection is not
+// fresh from it.
+const STOPPED = Symbol('stopped');
 /**
  * The rows a list or declared read answered, or null when it answered no
  * list (`null`, `undefined`, an object without `rows`): the one check every
@@ -481,16 +485,18 @@ export function createDataService({
   // every source's fetch and push: a value, or a function naming it now (a
   // namespace one account reaches in several forms). Each read or change
   // takes it when it is asked and keeps it until it is sent. `lane` keeps
-  // its scheduler jobs apart from other accounts'; while `foreground()` is
-  // false, its work waits behind the displayed account's.
+  // its scheduler jobs apart from other accounts'; while
+  // `foreground(collection)` is false, the collection's work waits behind
+  // the displayed account's.
   principal = null,
   lane = null,
   foreground = () => true,
-  // While `foreground()` is false, how many times as long its reads wait
-  // between reads (the device budget's cadence multiplier): a refresh asked
-  // with a `maxAge`, or a method with a cadence, reads again only once that
-  // times this has passed. Infinity pauses its reads, queued ones and retries
-  // included, checked before each run (sends go on).
+  // While `foreground(collection)` is false, how many times as long the
+  // collection's reads wait between reads (the device budget's cadence
+  // multiplier): a refresh asked with a `maxAge`, or a method with a cadence,
+  // reads again only once that times this has passed. Infinity pauses its
+  // reads, queued ones and retries included, checked before each run; a read
+  // paused while it runs stores nothing and is not fresh (sends go on).
   backgroundCadence = () => 1,
   // Declared reads' cursors and the key digest of the set each left, one
   // record per collection, for this principal.
@@ -505,13 +511,13 @@ export function createDataService({
   const formOf = (context) => { try { return JSON.stringify(context.principal ?? null); } catch (_) { return null; } };
   const laned = (label) => (lane === null ? label : `${lane}|${label}`);
   const lanedKey = (kind, rest) => (lane === null ? `${kind}:${rest}` : `${kind}:${lane}:${rest}`);
-  const inForeground = () => { try { return foreground() !== false; } catch (_) { return true; } };
-  // The multiplier on how long reads wait between reads now: 1 while
-  // displayed, the device budget's while not (Infinity: no reads).
-  const cadenceFactor = () => {
-    if (inForeground()) return 1;
+  const inForeground = (collection) => { try { return foreground(collection) !== false; } catch (_) { return true; } };
+  // The multiplier on how long a collection's reads wait between reads now:
+  // 1 while displayed, the device budget's while not (Infinity: no reads).
+  const cadenceFactor = (collection) => {
+    if (inForeground(collection)) return 1;
     let factor = 1;
-    try { factor = Number(backgroundCadence()); } catch (_) { factor = 1; }
+    try { factor = Number(backgroundCadence(collection)); } catch (_) { factor = 1; }
     return Number.isNaN(factor) || factor < 1 ? 1 : factor;
   };
   const sources = new Map();
@@ -1025,7 +1031,7 @@ export function createDataService({
             // A write: the scheduler never gives up its ownership before it settles.
             await scheduler.request({
               key: lanedKey('push', `${entry.id}:${change.seq}`), target: `push:${laned(entry.label)}`, budgetKey, kind: 'write',
-              priority: inForeground() ? PRIORITIES.high : PRIORITIES.background, visible: false,
+              priority: inForeground(entry.collection) ? PRIORITIES.high : PRIORITIES.background, visible: false,
               // Never sent, or sent again, once fenced or retired.
               valid: () => !disposed && !entry.discarded,
               run: async () => {
@@ -1637,7 +1643,7 @@ export function createDataService({
       return settle(Promise.reject(refusal));
     }
     // Not displayed, with its reads paused: it reads nothing until it is.
-    const factor = cadenceFactor();
+    const factor = cadenceFactor(name);
     if (factor === Infinity) return settle(Promise.resolve());
     // Never read more often than the method's cadence, whatever `maxAge` asks
     // (longer while not displayed).
@@ -1756,11 +1762,11 @@ export function createDataService({
         target: laned(label),
         budgetKey: spec.budgetKey || budgetKey,
         reason,
-        ...(inForeground()
+        ...(inForeground(name)
           ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
           : { priority: PRIORITIES.background, visible: false }),
         // Never run, or run again, once this service retired or its reads paused.
-        valid: () => !disposed && cadenceFactor() !== Infinity,
+        valid: () => !disposed && cadenceFactor(name) !== Infinity,
         run: attempts.run(work),
       })).catch((error) => { failed(error); throw error; }).finally(() => attempts.settled());
       if (!batchParam) {
@@ -1839,7 +1845,7 @@ export function createDataService({
     const settle = (promise) => (mode === 'visible' ? promise : promise.then(() => service.status(target), () => service.status(target)));
     if (!spec) return settle(Promise.reject(serviceError(`'${wanted.collection}' has no source`, 'DATA_NO_SOURCE')));
     // Not displayed, with its reads paused: it reads nothing until it is.
-    const factor = cadenceFactor();
+    const factor = cadenceFactor(name);
     if (factor === Infinity) return settle(Promise.resolve());
     const age = maxAge > 0 ? maxAge * factor : 0;
     if (!fromNow && age > 0 && state.syncedAt !== null && now() - state.syncedAt < age && state.state !== 'error') return settle(Promise.resolve());
@@ -1937,17 +1943,32 @@ export function createDataService({
     state.flightWhole = wholeRead;
     state.flight = scheduler.request({
       key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
-      ...(inForeground()
+      ...(inForeground(name)
         ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
         : { priority: PRIORITIES.background, visible: false }),
       // Never run, or run again, once this service retired or its reads paused.
-      valid: () => !disposed && cadenceFactor() !== Infinity,
-      run: attempts.run(run),
+      valid: () => !disposed && cadenceFactor(name) !== Infinity,
+      // An attempt that found itself no longer wanted on its way stopped
+      // there (`STOPPED`).
+      run: attempts.run(async (isCurrent) => {
+        let stopped = false;
+        const value = await run(() => {
+          const wantedNow = isCurrent();
+          if (!wantedNow) stopped = true;
+          return wantedNow;
+        });
+        return stopped ? STOPPED : value;
+      }),
     }).then((outcome) => {
       // A read a purge or replacement overtook stored nothing: not run, not fresh.
       if (outcome === DROPPED) {
         if (state.state === 'refreshing') state.state = 'stale';
         throw Object.assign(serviceError(`'${wanted.collection}' was replaced while it was read`, 'REFRESH_DROPPED'), { retryable: false });
+      }
+      // Nor did one that stopped on its way (its reads paused, the service retired).
+      if (outcome === STOPPED) {
+        if (state.state === 'refreshing') state.state = 'stale';
+        throw Object.assign(serviceError(`'${wanted.collection}' stopped being read on its way`, 'REFRESH_DROPPED'), { retryable: false });
       }
       // A read that answered no list leaves the collection as it was, not fresh.
       if (outcome === NO_SNAPSHOT) { if (state.state === 'refreshing') state.state = 'stale'; return; }
