@@ -67,6 +67,8 @@ const isGeneratedText = (text) => {
 const REGEX_AFTER = new Set([...'(,=:[!&|?{};+-*%~^<>']);
 const REGEX_KEYWORDS = new Set(['return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'new', 'delete',
   'void', 'throw', 'instanceof', 'yield', 'await']);
+// After the `)` that closes the head of one of these statements, `/` starts a regex literal too.
+const CONTROL_KEYWORDS = new Set(['if', 'while', 'for', 'with']);
 const WORD = /[\w$]/;
 
 function regexAllowed(src, prev) {
@@ -75,6 +77,20 @@ function regexAllowed(src, prev) {
   let from = prev;
   while (from > 0 && WORD.test(src[from - 1])) from -= 1;
   return REGEX_KEYWORDS.has(src.slice(from, prev + 1));
+}
+
+/**
+ * Whether the `(` after src[prev] opens the head of a control statement;
+ * `x.for(` is a method call.
+ */
+function opensControlHead(src, prev) {
+  if (prev < 0 || !WORD.test(src[prev])) return false;
+  let from = prev;
+  while (from > 0 && WORD.test(src[from - 1])) from -= 1;
+  if (!CONTROL_KEYWORDS.has(src.slice(from, prev + 1))) return false;
+  let before = from - 1;
+  while (before >= 0 && /\s/.test(src[before])) before -= 1;
+  return before < 0 || src[before] !== '.';
 }
 
 /** Index just past the string literal opening at src[start]; an unescaped newline ends it. */
@@ -106,17 +122,6 @@ function skipRegex(src, start, end) {
   return i;
 }
 
-/** Calls `add(from, to)` for each `<!-- -->` comment in src[start, end). */
-function markupComments(src, start, end, add) {
-  let i = src.indexOf('<!--', start);
-  while (i >= 0 && i < end) {
-    const close = src.indexOf('-->', i + 4);
-    const stop = close < 0 || close + 3 > end ? end : close + 3;
-    add(i, stop);
-    i = src.indexOf('<!--', stop);
-  }
-}
-
 /**
  * Calls `add(from, to)` for each `//` and `/* *\/` comment in src[start, end),
  * stepping over string, template and regex literals (or, in a stylesheet,
@@ -128,9 +133,12 @@ function codeComments(src, start, end, add, style) {
     return at < 0 || at > end ? end : at;
   };
   const templates = [];
+  const parens = [];
   let inTemplate = false;
   let depth = 0;
   let prev = -1;
+  let controlClose = -1;
+  const regexNext = () => prev === controlClose || regexAllowed(src, prev);
   let i = start;
   while (i < end) {
     const c = src[i];
@@ -170,12 +178,14 @@ function codeComments(src, start, end, add, style) {
       // A postfix `++` / `--` leaves its operand as the previous token, so a
       // `/` after it divides; a prefix one is an operator, so a `/` after it
       // opens a regex.
-      if (regexAllowed(src, prev)) prev = i + 1;
+      if (regexNext()) prev = i + 1;
       i += 2;
-    } else if (!style && c === '/' && regexAllowed(src, prev)) {
+    } else if (!style && c === '/' && regexNext()) {
       i = skipRegex(src, i, end);
       prev = i - 1;
     } else {
+      if (c === '(') parens.push(opensControlHead(src, prev));
+      if (c === ')' && parens.pop()) controlClose = i;
       if (c === '{') depth += 1;
       if (c === '}') {
         depth -= 1;
@@ -190,11 +200,12 @@ function codeComments(src, start, end, add, style) {
   }
 }
 
-// The rest of a tag after its name, through the closing `>`; a `>` inside a
-// quoted attribute does not end it.
-const TAG_REST = String.raw`(?=[\s/>])(?:[^>"']|"[^"]*"|'[^']*')*>`;
+// The rest of a tag after its name, through the closing `>`. A quoted
+// attribute value follows its `=` and may hold `<`, `>` or `<!--`.
+const TAG_REST = String.raw`(?=[\s/>])(?:[^<>"'=]|=\s*(?:"[^"]*"|'[^']*')?)*>`;
 const BLOCK_OPEN = new RegExp(`<!--|<(template|script|style)${TAG_REST}`, 'g');
-const TEMPLATE_TAG = new RegExp(`<!--|<(/?)template${TAG_REST}`, 'g');
+// A comment opening, or a whole tag with its attributes.
+const MARKUP = new RegExp(`<!--|<(/?)([A-Za-z][\\w:.-]*)${TAG_REST}`, 'g');
 const RAW_CLOSE = { script: /<\/script\s*>/g, style: /<\/style\s*>/g };
 
 /** Index just past the `<!-- -->` comment opening at src[start]. */
@@ -204,18 +215,35 @@ function markupCommentEnd(src, start) {
 }
 
 /**
+ * Calls `add(from, to)` for each `<!-- -->` comment in the markup src[start, end).
+ * Tags are stepped over whole, so a `<!--` inside a quoted attribute value is
+ * not read as a comment.
+ */
+function markupComments(src, start, end, add) {
+  MARKUP.lastIndex = start;
+  for (let m = MARKUP.exec(src); m && m.index < end; m = MARKUP.exec(src)) {
+    if (m[0] === '<!--') {
+      const stop = Math.min(markupCommentEnd(src, m.index), end);
+      add(m.index, stop);
+      MARKUP.lastIndex = stop;
+    }
+  }
+}
+
+/**
  * The match of the `</template>` that closes the template whose body starts at
- * `body`, or null. Nested templates are counted and comments are stepped over.
+ * `body`, or null. Nested templates are counted; comments and other tags are
+ * stepped over.
  */
 function templateClose(src, body) {
   let depth = 1;
-  TEMPLATE_TAG.lastIndex = body;
-  for (let m = TEMPLATE_TAG.exec(src); m; m = TEMPLATE_TAG.exec(src)) {
-    if (m[0] === '<!--') TEMPLATE_TAG.lastIndex = markupCommentEnd(src, m.index);
-    else if (m[1]) {
+  MARKUP.lastIndex = body;
+  for (let m = MARKUP.exec(src); m; m = MARKUP.exec(src)) {
+    if (m[0] === '<!--') MARKUP.lastIndex = markupCommentEnd(src, m.index);
+    else if (m[2] === 'template' && m[1]) {
       depth -= 1;
       if (depth === 0) return m;
-    } else if (!m[0].endsWith('/>')) depth += 1;
+    } else if (m[2] === 'template' && !m[0].endsWith('/>')) depth += 1;
   }
   return null;
 }
@@ -343,6 +371,20 @@ test('reads a slash after a postfix ++ or -- as a division', () => {
   assert.equal(historyCount('const rate = count++ / total; /* legacy */\n', '.js'), 1);
   assert.equal(historyCount('const rate = count-- / total; // rc2\n', '.js'), 1);
   assert.equal(historyCount('const at = ++/[/*]legacy/.lastIndex;\n', '.js'), 0);
+});
+
+test('reads a slash after the head of an if, while, for or with statement as a regex', () => {
+  assert.equal(historyCount('if (ok) /[/*]legacy/.test(value);\n', '.js'), 0);
+  assert.equal(historyCount('while (more()) /[/*]rc2/.exec(text);\n', '.js'), 0);
+  assert.equal(historyCount('const share = tally.for(team) / total; /* legacy */\n', '.js'), 1);
+});
+
+test('counts no markup comment inside a quoted attribute value', () => {
+  assert.equal(historyCount('<template>\n  <p title="<!-- legacy -->">x</p>\n</template>\n', '.vue'), 0);
+  assert.equal(
+    historyCount('<template>\n  <p title="<!-- a -->">Don\'t</p> <!-- legacy -->\n</template>\n', '.vue'),
+    1
+  );
 });
 
 test('adds no comment lines carrying history markers', () => {
