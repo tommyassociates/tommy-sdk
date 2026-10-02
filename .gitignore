@@ -68,3 +68,6 @@ depcruise-report.json
 
 # M0: the CircleCI config must not be swallowed by the config* pattern above
 !.circleci/config.yml
+
+# Retiring-path monitor records (core/src/retiring), regenerated every run
+test-results/

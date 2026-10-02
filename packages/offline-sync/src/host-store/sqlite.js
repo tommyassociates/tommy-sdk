@@ -14,8 +14,17 @@ function prefixWhere(prefix) {
 export function createSqliteDatabase({ driver }) {
   let tail = Promise.resolve();
   let initialized;
+  // A failed open is not remembered: the next transaction opens again.
   async function initialize() {
-    if (!initialized) initialized = (async () => {
+    if (!initialized) {
+      const opening = setUp();
+      initialized = opening;
+      opening.catch(() => { if (initialized === opening) initialized = undefined; });
+    }
+    return initialized;
+  }
+  function setUp() {
+    return (async () => {
       await driver.open?.();
       const mode = await driver.query('PRAGMA journal_mode = WAL', []);
       if (String(mode[0]?.journal_mode).toLowerCase() !== 'wal') throw storageError('unavailable');
@@ -37,7 +46,6 @@ export function createSqliteDatabase({ driver }) {
         await driver.run('COMMIT', []);
       } catch (error) { await driver.run('ROLLBACK', []).catch(() => {}); throw error; }
     })();
-    return initialized;
   }
   return {
     transaction(mode, work) {
@@ -90,6 +98,10 @@ export function createSqliteDatabase({ driver }) {
       tail = result.catch(() => {});
       return result;
     },
-    async close() { await tail; await driver.close?.(); },
+    close() {
+      const closing = tail.then(async () => { initialized = undefined; await driver.close?.(); });
+      tail = closing.catch(() => {});
+      return closing;
+    },
   };
 }
