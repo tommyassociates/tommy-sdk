@@ -2,14 +2,31 @@
 export const HOST_STORE_VERSION = 1;
 // What this engine accepts beyond version 1's open/read/commit/retire. A port
 // without a feature (an older desktop engine) is never sent its inputs.
-export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at']);
+export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at', 'schema-fingerprint', 'aged-reads', 'open-epoch', 'subject-retire']);
 export const HOST_STORE_DATABASE = 'tommy-host-store-v2';
 export const MAX_ROWS = 100;
 export const MAX_READ_BYTES = 8 * 1024 * 1024;
 export const MAX_ROW_BYTES = 4 * 1024 * 1024;
 export const COMPLETE_ROWS = 1000;
+// The one UTF-8 measure every store byte budget uses (offline-sync's
+// bytes.js re-exports it): kept here, since the desktop shell vendors only
+// this directory's index, port, protocol and sqlite modules.
 const encoder = new TextEncoder();
-export const bytes = (value) => encoder.encode(typeof value === 'string' ? value : JSON.stringify(value)).byteLength;
+// Reused for the text that fits (at most three bytes a UTF-16 code unit).
+const SCRATCH_LIMIT = 1024 * 1024;
+let scratch = new Uint8Array(64 * 1024);
+/** The UTF-8 size of `text`, in bytes. */
+export function utf8Bytes(text) {
+  const string = String(text);
+  const most = string.length * 3;
+  if (most > scratch.length) {
+    if (most > SCRATCH_LIMIT) return encoder.encode(string).byteLength;
+    scratch = new Uint8Array(most);
+  }
+  return encoder.encodeInto(string, scratch).written;
+}
+// A value's UTF-8 size as stored: a string as it is, anything else as its JSON.
+export const bytes = (value) => utf8Bytes(typeof value === 'string' ? value : (JSON.stringify(value) ?? ''));
 export const integer = (value) => Number.isSafeInteger(value) && value >= 0;
 export const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 export function closed(value, required, optional = []) {
@@ -18,10 +35,19 @@ export function closed(value, required, optional = []) {
 }
 export function fail(reason) { return { ok: false, reason, retained: false }; }
 export function readFailure(reason) { return { ok: false, reason }; }
+// A retirement's selector: the viewer at an origin, all of it; or one
+// session's chat fragments (`cacheSession`); or one subject's namespace
+// (`subjectKey`, an MP opened for a client whose access was revoked).
 export function retirementMatcher(selector) {
-  if (!closed(selector, ['authorityOrigin', 'viewerId'], ['cacheSession'])
-    || typeof selector.viewerId !== 'string' || !/^[1-9][0-9]*$/.test(selector.viewerId)) throw storageError('unserializable');
+  if (!closed(selector, ['authorityOrigin', 'viewerId'], ['cacheSession', 'subjectKey'])
+    || typeof selector.viewerId !== 'string' || !/^[1-9][0-9]*$/.test(selector.viewerId)
+    || (Object.hasOwn(selector, 'cacheSession') && Object.hasOwn(selector, 'subjectKey'))) throw storageError('unserializable');
   try { if (new URL(selector.authorityOrigin).origin !== selector.authorityOrigin || !/^https?:/.test(selector.authorityOrigin)) throw new Error(); } catch (_) { throw storageError('unserializable'); }
+  if (Object.hasOwn(selector, 'subjectKey')) {
+    const wanted = selector.subjectKey;
+    if (typeof wanted !== 'string' || !wanted || wanted.length > 512) throw storageError('unserializable');
+    return (subjectKey) => subjectKey === wanted;
+  }
   if (!Object.hasOwn(selector, 'cacheSession')) return () => true;
   const session = selector.cacheSession;
   if (!closed(session, ['id', 'generation']) || typeof session.id !== 'string' || !/^[1-9][0-9]*$/.test(session.id)
@@ -103,7 +129,8 @@ export function indexedValues(fields, row) {
 export const LRU_WIDTH = 16;
 export const lruEntry = (updatedAt, key) => `${String(updatedAt).padStart(LRU_WIDTH, '0')}\u0000${key}`;
 export function validateQuery(input) {
-  if (!closed(input, ['handle', 'expectedEpoch', 'index', 'limit'], ['equals', 'prefix', 'lower', 'upper', 'afterKey'])
+  if (!closed(input, ['handle', 'expectedEpoch', 'index', 'limit'], ['equals', 'prefix', 'lower', 'upper', 'afterKey', 'includeAged'])
+    || (input.includeAged !== undefined && typeof input.includeAged !== 'boolean')
     || !integer(input.expectedEpoch) || !INDEX_NAME.test(input.index)
     || !Number.isInteger(input.limit) || input.limit < 1 || input.limit > MAX_ROWS
     || (input.afterKey !== undefined && input.afterKey !== null && (typeof input.afterKey !== 'string' || input.afterKey.length > 2048))
@@ -126,7 +153,10 @@ export function ownerKey(identity) {
   return JSON.stringify([identity.authorityOrigin, identity.viewerId, identity.accountType, identity.accountId, identity.subjectKey]);
 }
 export function validateOpen(input) {
-  if (!closed(input, ['identity', 'storeName', 'policy', 'schemaVersion', 'cacheFingerprint', 'limits'], ['indexes'])
+  if (!closed(input, ['identity', 'storeName', 'policy', 'schemaVersion', 'cacheFingerprint', 'limits'], ['indexes', 'schemaFingerprint', 'expectedEpoch'])
+    || (input.expectedEpoch !== undefined && !integer(input.expectedEpoch))
+    || (input.schemaFingerprint !== undefined && input.schemaFingerprint !== null
+      && (typeof input.schemaFingerprint !== 'string' || !input.schemaFingerprint || input.schemaFingerprint.length > 128))
     || !storeNameValid(input.storeName)
     || !['authored', 'cache', 'ordinary_chat_fragments'].includes(input.policy)
     || !integer(input.schemaVersion) || input.schemaVersion < 1
@@ -141,12 +171,14 @@ export function validateOpen(input) {
   const evict = input.limits.evict || 'none';
   if (evict === 'lru' && input.policy !== 'cache') throw storageError('unserializable');
   if ((input.limits.domainMaxBytes ?? null) !== null && (evict !== 'lru' || !input.storeName.includes('.'))) throw storageError('unserializable');
+  const indexes = validateIndexes(input.indexes);
   return { namespace: JSON.stringify([identityKey(input.identity), input.storeName]), owner: ownerKey(input.identity),
-    indexes: validateIndexes(input.indexes), evict, domainMaxBytes: input.limits.domainMaxBytes ?? null };
+    indexes, evict, domainMaxBytes: input.limits.domainMaxBytes ?? null };
 }
 export function validateRead(input) {
-  if (!closed(input, ['handle', 'expectedEpoch'], ['keys', 'afterKey', 'limit', 'metadataOnly'])
-    || !integer(input.expectedEpoch) || (input.metadataOnly !== undefined && typeof input.metadataOnly !== 'boolean')) return false;
+  if (!closed(input, ['handle', 'expectedEpoch'], ['keys', 'afterKey', 'limit', 'metadataOnly', 'includeAged'])
+    || !integer(input.expectedEpoch) || (input.metadataOnly !== undefined && typeof input.metadataOnly !== 'boolean')
+    || (input.includeAged !== undefined && typeof input.includeAged !== 'boolean')) return false;
   if (Object.hasOwn(input, 'keys')) return !Object.hasOwn(input, 'afterKey') && !Object.hasOwn(input, 'limit')
     && Array.isArray(input.keys) && input.keys.length <= MAX_ROWS && input.keys.every(keyValid) && new Set(input.keys).size === input.keys.length;
   return (input.afterKey === null || keyValid(input.afterKey)) && Number.isInteger(input.limit) && input.limit > 0 && input.limit <= MAX_ROWS;

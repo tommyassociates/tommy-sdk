@@ -525,9 +525,68 @@ export interface DataStore<Rec = unknown> {
   subscribeQuery<V>(selector: Selector<Rec, V>, handler: (value: V) => void): Unsubscribe;
 }
 
+/**
+ * A read-only view of a host collection (host API level 5), through a named
+ * profile: the MP world's own account's rows, projected (and joined with the
+ * account's other collections) by the host. Readable only when the host
+ * exposes the collection and profile and the MP declares and holds every
+ * scope the profile names (`DATA_FORBIDDEN` otherwise, checked at every call,
+ * when an answer settles and before every delivery); `DATA_UNDECLARED` for a
+ * collection or profile the host does not expose. Without a profile named,
+ * the MP gets the smallest its scopes allow. Rows are frozen: repeated reads
+ * with no change answer the same rows. While the world's account is not
+ * displayed, reads refuse with `ACCOUNT_NOT_DISPLAYED` (retryable) and a
+ * subscription holds its latest rows until the account is displayed again.
+ */
+export interface HostCollection<Rec = unknown> {
+  /**
+   * Every row, one by key, or several by keys (null where none). Keys the
+   * device does not hold are asked of the host (the source's `byIds`
+   * method, when it has one), waited for a bounded time.
+   */
+  read(key?: string | readonly string[] | null): Promise<readonly Rec[] | Rec | readonly (Rec | null)[] | null>;
+  /** Several rows by key, in the order asked (null where none); misses as `read`. */
+  getMany(keys: readonly string[]): Promise<readonly (Rec | null)[]>;
+  /**
+   * Rows by one of the view's lookups (`by_user`, `by_tag` for members;
+   * `by_context` for tags) with `equals` or `anyOf`, in the order asked, each
+   * row once; or every row in key order, paged by `cursor`. Values the device
+   * holds no row of are asked of the host through the method that reads by
+   * that lookup (`byUserIds` for `by_user`), waited for a bounded time.
+   */
+  query(spec?: { index?: string; equals?: readonly string[]; anyOf?: readonly string[]; limit?: number; cursor?: string | null }):
+    Promise<{ rows: readonly Rec[]; nextCursor: string | null; complete: boolean }>;
+  /** The rows now, then whenever any collection they read changes, while the account is displayed. */
+  subscribe(callback: (rows: readonly Rec[]) => void, options?: { onError?: (error: unknown) => void }): () => void;
+  /** The collection's status; `complete` only when every collection the profile reads has completed a read. */
+  status(): DataStatus & { complete: boolean };
+  /**
+   * Asks the host to read again; the host alone fetches, dedupes and keeps
+   * the cadence. With no `method`, every collection the profile reads, at
+   * the host's cadence for MP asks (`maxAge` may only ask for less often;
+   * `fresh` for an action that must not act on stale rows). With `method`
+   * and `params`, one of the source's refresh methods (`byIds({ ids })`,
+   * `byUserIds({ user_ids })`, `search({ q, page? })`); an unknown method or
+   * param, or a param of the wrong shape, is refused (`DATA_INVALID`). A
+   * method's answer is merged, never the whole list. `waitMs` (at most
+   * 60000) answers `{ state: 'refreshing', waited: true }` once it passed,
+   * while the read goes on. A search answers the keys of its page and
+   * whether there are more.
+   */
+  refresh(options?: {
+    method?: string;
+    params?: Readonly<Record<string, unknown>>;
+    maxAge?: number;
+    fresh?: boolean;
+    waitMs?: number;
+  }): Promise<DataStatus & { waited?: true; keys?: readonly string[] | null; more?: boolean | null }>;
+}
+
 export interface DataApi {
   /** Open one of the object stores declared in manifest.localData. */
   store<Rec = unknown>(name: string): DataStore<Rec>;
+  /** Host API level 5: a host collection the host exposes to MPs, through a profile (e.g. `workforce.members`, `ref` or `team`). */
+  host?<Rec = unknown>(collection: string, options?: { profile?: string }): HostCollection<Rec>;
   /** Sync status for a store, for stale-while-revalidate UX + the brownout contract. */
   syncState(storeName: string): {
     lastSyncedAt: Iso8601 | null;
@@ -543,19 +602,52 @@ export interface DataApi {
    * names are the declared store names (or `mp.<mpId>.<store>`); any other
    * namespace is refused.
    */
-  read?<Rec = unknown>(collection: string, key?: string | readonly string[]): Promise<Rec | Rec[] | null>;
+  /**
+   * Rows as copies without storage metadata (`_rev`, `_dirty`, …). `raw: true`
+   * reads as writers see the collection: rows too old to paint and unsent
+   * tombstones included, with their metadata.
+   */
+  read?<Rec = unknown>(collection: string, key?: string | readonly string[] | null, options?: { raw?: boolean }): Promise<Rec | Rec[] | null>;
   query?<Rec = unknown>(collection: string, spec?: DataQuerySpec<Rec>): Promise<{ rows: Rec[]; nextCursor: string | null; complete: boolean }>;
   subscribe?<Value = unknown>(target: DataTarget, callback: (value: Value) => void, options?: { onError?: (error: unknown) => void }): () => void;
+  /**
+   * @experimental No MP uses a source yet. Rows with unsent changes keep them
+   * through a refresh; see `mutate` for how changes are sent.
+   */
   source?<Dto = unknown, Rec = unknown>(collection: string, spec: DataSource<Dto, Rec>): () => void;
+  /**
+   * @experimental Runs a collection's `source`. A row with an unsent local
+   * change keeps it; a query target prunes only the rows of its query.
+   */
   refresh?(target: DataTarget, options?: DataRefreshOptions): Promise<DataStatus>;
+  /**
+   * @experimental An optimistic write pushed through a source's `push`. An
+   * unsent change stays on the row (a delete as a hidden tombstone) and is
+   * sent again after a reload; a change refused for access (403) waits,
+   * marked on the row, until `retry`, and later changes to that row wait with
+   * it (with `wait`, they reject `DATA_ACCESS_CHANGED`); a retry sends the row
+   * once, as it is then. Failed ones go again on reconnect.
+   */
   mutate?<Rec = unknown>(collection: string, command: DataMutation<Rec>, options?: { wait?: boolean }): Promise<{ key: string; pushed: boolean }>;
-  /** Server rows the MP received, stored synced; `replace` makes them the complete set for `scope`. */
-  ingest?<Rec = unknown>(collection: string, rows: readonly Rec[], options?: { replace?: boolean; scope?: (row: Rec) => boolean }): Promise<{ written: number }>;
-  /** All cached rows, or only `keys`, or every row of an index range; dirty rows only with `force`. */
+  /**
+   * Server rows the MP received, stored synced; `replace` makes them the
+   * complete set for `scope`. Only a replacing ingest, or one marked
+   * `complete` (rows a complete read delivered), stamps the collection synced.
+   * `written` counts the rows stored; `unsaved` names rows the store could
+   * keep only in memory (the device's storage refused them).
+   */
+  ingest?<Rec = unknown>(collection: string, rows: readonly Rec[], options?: { replace?: boolean; complete?: boolean; scope?: (row: Rec) => boolean }): Promise<{ written: number; unsaved?: string[] }>;
+  /**
+   * All cached rows, or only `keys`, or every row of an index range; dirty
+   * rows only with `force`. Any other option, or one of another shape, is
+   * refused with `DATA_INVALID`.
+   */
   purge?(collection: string, options?: { force?: boolean; keys?: readonly string[]; query?: DataIndexRange }): Promise<{ removed: string[] }>;
   /** Keeps the newest `keep` rows of an index range; dirty rows are never removed. */
   trim?(collection: string, options: DataIndexRange & { keep: number }): Promise<{ removed: string[] }>;
   status?(target: DataTarget): DataStatus;
+  /** Sends every change that failed again (never one refused for access). */
+  retryFailed?(): Promise<unknown>;
 }
 
 export type DataTarget = string | { collection: string; key?: string; window?: Record<string, unknown>; query?: DataQuerySpec };
@@ -575,18 +667,43 @@ export interface DataQuerySpec<Rec = unknown> {
   readonly upper?: unknown;
   /** Rows to return, 1 to 5000 (default 50); anything else is refused with `DATA_INVALID`. */
   readonly limit?: number;
+  /** An index read's cursor, or without an index the last key a page returned. */
   readonly cursor?: string | null;
+  /** Filters a read without an index; refused with an index (`DATA_INVALID`). */
   readonly where?: (row: Rec) => boolean;
+  /** Answer as writers see the collection: rows too old to paint included. */
+  readonly raw?: boolean;
 }
 export interface DataSource<Dto = unknown, Rec = unknown> {
-  fetch(target: { collection: string; key?: string; window?: Record<string, unknown> }): Promise<Dto[] | Dto | null>;
+  /**
+   * With `read` declared, a whole-collection fetch is given `context.since`
+   * (the stored cursor, or null for a whole read) and may answer
+   * `{ rows, cursor, since }` (`since`: it read only what changed).
+   */
+  fetch(target: { collection: string; key?: string; window?: Record<string, unknown> }, context?: { since?: string | null; principal?: unknown; background?: boolean }): Promise<Dto[] | Dto | { rows: Dto[]; cursor?: string | null; since?: boolean } | null>;
+  /**
+   * @experimental A declared read: the service keeps its cursor (`cursor`) in
+   * the collection's source meta, never among its rows, and asks only for
+   * what changed while the stored rows are still the whole set the last read
+   * left; it reads whole at least every `fullEveryMs`, removes rows whose
+   * `removedField` is set, and purges the collection when the server refuses
+   * the read (`forbidden: 'purge'`, the default). A row the store cannot keep
+   * leaves the cursor where it was. Any other field is refused (`DATA_INVALID`).
+   */
+  read?: { cursor?: boolean; removedField?: string; fullEveryMs?: number; forbidden?: 'purge' | 'keep' };
+  /** The scheduler budget and circuit this source's refreshes run in (the service's own when absent). */
+  budgetKey?: string;
+  /** A record from an answered row; `prev` is the stored row it replaces (found by `keyOf`), without sync metadata. */
   toRecord?(dto: Dto, prev?: Rec): Rec;
+  /** The stored key of an answered row (for `prev`); a declared read defaults to the row's key field. */
   keyOf?(dto: Dto): string;
   scope?(target: { collection: string; window?: Record<string, unknown> }): (row: Rec) => boolean;
   /**
-   * Sends one local change; changes to a row arrive in order. A change left
-   * unsent by an earlier page or reload arrives as a `put` of the stored row,
-   * and a change may arrive again after a failure, so a push must be idempotent.
+   * @experimental Sends one local change; changes to a row arrive in order. A
+   * change left unsent by an earlier page or reload arrives as a `put` of the
+   * stored row, and a change may arrive again after a failure, so a push must
+   * be idempotent. A change restored after a reload is sent as the row is
+   * when it goes out, or not at all once it was sent elsewhere.
    */
   push?(command: DataMutation<Rec>, record: Rec | null): Promise<unknown>;
 }
@@ -597,6 +714,8 @@ export interface DataRefreshOptions {
   /** Skip the fetch while the last successful sync is younger than this (ms). */
   readonly maxAge?: number;
   readonly reason?: string;
+  /** A declared read reads the whole collection, whatever its cursor. */
+  readonly full?: boolean;
 }
 export type DataMutation<Rec = unknown> =
   | { op: 'put'; record: Rec }
@@ -1362,8 +1481,58 @@ export interface NavigationApi {
 // Root SDK object — `tommy`
 // ============================================================================
 
+/**
+ * This MP's own small UI choices (a layout, a filter, a toggle), kept per
+ * account on the device by the host, never sent anywhere. Hosts from API
+ * level 5 (`init.hostApi >= 5`); older hosts have no such namespace.
+ */
+export interface PrefsApi {
+  /**
+   * Resolves once the stored preferences are loaded. The store opens on the
+   * MP's first use; read choices again when this resolves.
+   */
+  ready(): Promise<void>;
+  /** The stored value (a copy), or `fallback` when none is stored or none has loaded yet. */
+  get<T = unknown>(key: string, fallback?: T): T;
+  /**
+   * Stores a JSON value; the next `get` returns it at once. Rejects with
+   * `DATA_NOT_SAVED` when the device could not keep it (its storage full or
+   * gone, or no room for it): it would be lost on reload. A saved choice is
+   * never dropped to make room for another.
+   */
+  set(key: string, value: unknown): Promise<void>;
+  /**
+   * Removes a stored value; the next `get` answers the fallback at once.
+   * Rejects with `DATA_NOT_SAVED` when the device could not record the
+   * removal: the value would return on reload.
+   */
+  remove(key: string): Promise<void>;
+}
+
+/** What an MP bundle's optional `migrate` export is told about a store rebuild. */
+export interface StoreMigrationContext {
+  /** The store's `schemaVersion` its rows were written under. */
+  fromSchema: number;
+  /** The `schemaVersion` the published manifest declares now. */
+  toSchema: number;
+  /** The declared store name. */
+  store: string;
+}
+
+/**
+ * An MP bundle's optional `migrate` export: a pure function carrying one
+ * authored or unsent row into the store's new declared schema. Return the
+ * row in its new shape (keyed by the store's `keyPath`), or `null` to set it
+ * aside unsent (Settings → App Data → Pending sync). A row that does not fit
+ * the new `recordSchema`, or whose key another kept row already has, is set
+ * aside too.
+ */
+export type StoreMigrate = (row: Record<string, unknown>, context: StoreMigrationContext) => Record<string, unknown> | null;
+
 export interface TommySdk {
   readonly init: MpInit;
+  /** Per-account UI preferences kept by the host (API level 5). */
+  readonly prefs: PrefsApi;
   readonly actions: ActionsApi;
   readonly panels: PanelsApi;
   readonly data: DataApi;

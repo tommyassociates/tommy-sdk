@@ -1389,6 +1389,22 @@
     "localData": {
       "description": "Object stores this MP persists in its per-MP IndexedDB database.",
       "type": "object",
+      "propertyNames": {
+        "description": "Store names are at most 57 characters (the host names a store's set-aside rows <name>__unfit within the 64-character limit). 'prefs' is the host's per-account UI preferences store (tommy.prefs), and names ending in '__unfit' hold rows a schema change set aside; neither can be declared.",
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 57,
+        "not": {
+          "anyOf": [
+            {
+              "const": "prefs"
+            },
+            {
+              "pattern": "__unfit$"
+            }
+          ]
+        }
+      },
       "additionalProperties": {
         "type": "object",
         "additionalProperties": false,
@@ -1404,8 +1420,15 @@
           "recordSchema": {
             "$ref": "#/$defs/jsonSchema"
           },
+          "schemaVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1,
+            "description": "Optional version of this store's schema. The host rebuilds the store on the device when it changes, or when keyPath, indexes or recordSchema change: cached server rows sync again, and authored and unsent rows go through the bundle's optional migrate(row, { fromSchema, toSchema, store }) and are kept when they fit, else set aside unsent (Settings → App Data → Pending sync). A lower version (a rolled-back MP) starts caches empty and sets authored rows aside. A bundle that declares any localData schemaVersion, or changes keyPath, indexes or recordSchema on any store, is published with min_host_api 5 or higher: a host below level 5 refuses the field and closes a changed authored store. Desktop builds rebuild stores only once their storage bridge advertises 'schema-fingerprint'; until then, publish no authored-store shape change."
+          },
           "indexes": {
             "type": "array",
+            "description": "Secondary indexes the host keeps for this store. They are never unique: uniqueness is the server's to enforce.",
             "items": {
               "type": "object",
               "additionalProperties": false,
@@ -1421,8 +1444,8 @@
                   "type": "string"
                 },
                 "unique": {
-                  "type": "boolean",
-                  "default": false
+                  "const": false,
+                  "description": "Device indexes are never unique; the server enforces uniqueness. false is accepted and changes nothing; true is refused."
                 }
               }
             }
@@ -1437,7 +1460,7 @@
           "maxRows": {
             "type": "integer",
             "minimum": 1,
-            "description": "Optional resident-row ceiling for this store. Omit to take the DataStore default (50000), which is a RUNAWAY BACKSTOP and not a working-set size. REQUIRED when persist is true: a persisted store on the default keeps every window ever viewed on the user's disk, which is how the legacy vuex plugin reached 50-200MB and why it excluded the windowed collections outright. Derive it as rows-per-window x windows-retained, with headroom. Eviction never touches an unsynced row."
+            "description": "Optional resident-row ceiling for this store. Omit to take the default (50000 rows for a store kept in memory, 20000 for one the host keeps on the device; the host caps a declaration at 50000), which is a RUNAWAY BACKSTOP and not a working-set size. REQUIRED when persist is true: a persisted store on the default keeps every window ever viewed on the user's disk, which is how the legacy vuex plugin reached 50-200MB and why it excluded the windowed collections outright. Derive it as rows-per-window x windows-retained, with headroom. Eviction never touches an unsynced row."
           },
           "persist": {
             "type": "boolean",

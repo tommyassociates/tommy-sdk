@@ -190,7 +190,7 @@ describe('tommy.data stores', () => {
     const scope = (row) => row.hours < 8;
     const result = await store.reconcile([{ id: 'a1', shiftId: 's-1', hours: 5 }], { scope });
 
-    expect(result).toEqual({ upserted: 1, pruned: 1 }); // a2 pruned
+    expect(result).toEqual({ upserted: 1, pruned: 1, prunedKeys: ['a2'] }); // a2 pruned, by key
     const a1 = await store.get('a1');
     expect(a1.hours).toBe(5); // upserted
     expect(a1._dirty).toBe(false); // marked synced (server-authoritative)
