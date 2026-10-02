@@ -166,6 +166,12 @@ function codeComments(src, start, end, add, style) {
     } else if (!style && c === '`') {
       inTemplate = true;
       i += 1;
+    } else if (!style && (c === '+' || c === '-') && next === c) {
+      // A postfix `++` / `--` leaves its operand as the previous token, so a
+      // `/` after it divides; a prefix one is an operator, so a `/` after it
+      // opens a regex.
+      if (regexAllowed(src, prev)) prev = i + 1;
+      i += 2;
     } else if (!style && c === '/' && regexAllowed(src, prev)) {
       i = skipRegex(src, i, end);
       prev = i - 1;
@@ -184,24 +190,66 @@ function codeComments(src, start, end, add, style) {
   }
 }
 
-/** Calls `add(from, to)` for each comment in a Vue single-file component. */
+// The rest of a tag after its name, through the closing `>`; a `>` inside a
+// quoted attribute does not end it.
+const TAG_REST = String.raw`(?=[\s/>])(?:[^>"']|"[^"]*"|'[^']*')*>`;
+const BLOCK_OPEN = new RegExp(`<!--|<(template|script|style)${TAG_REST}`, 'g');
+const TEMPLATE_TAG = new RegExp(`<!--|<(/?)template${TAG_REST}`, 'g');
+const RAW_CLOSE = { script: /<\/script\s*>/g, style: /<\/style\s*>/g };
+
+/** Index just past the `<!-- -->` comment opening at src[start]. */
+function markupCommentEnd(src, start) {
+  const close = src.indexOf('-->', start + 4);
+  return close < 0 ? src.length : close + 3;
+}
+
+/**
+ * The match of the `</template>` that closes the template whose body starts at
+ * `body`, or null. Nested templates are counted and comments are stepped over.
+ */
+function templateClose(src, body) {
+  let depth = 1;
+  TEMPLATE_TAG.lastIndex = body;
+  for (let m = TEMPLATE_TAG.exec(src); m; m = TEMPLATE_TAG.exec(src)) {
+    if (m[0] === '<!--') TEMPLATE_TAG.lastIndex = markupCommentEnd(src, m.index);
+    else if (m[1]) {
+      depth -= 1;
+      if (depth === 0) return m;
+    } else if (!m[0].endsWith('/>')) depth += 1;
+  }
+  return null;
+}
+
+/**
+ * Calls `add(from, to)` for each comment in a Vue single-file component. A
+ * block opens and closes wherever its tags sit on a line: a script or style
+ * body runs to its first closing tag, a template body to its matching one.
+ */
 function vueComments(src, add) {
-  const open = /^<(template|script|style)\b[^>]*>/gm;
   let cursor = 0;
-  for (let m = open.exec(src); m; m = open.exec(src)) {
+  BLOCK_OPEN.lastIndex = 0;
+  for (let m = BLOCK_OPEN.exec(src); m; m = BLOCK_OPEN.exec(src)) {
     const tag = m[1];
     const body = m.index + m[0].length;
-    markupComments(src, cursor, m.index, add);
-    const close = new RegExp(`^</${tag}>`, 'gm');
-    close.lastIndex = body;
-    const found = close.exec(src);
-    const bodyEnd = found ? found.index : src.length;
-    if (tag === 'template') markupComments(src, body, bodyEnd, add);
-    else codeComments(src, body, bodyEnd, add, tag === 'style');
-    cursor = found ? found.index + found[0].length : src.length;
-    open.lastIndex = cursor;
+    if (!tag) {
+      cursor = markupCommentEnd(src, m.index);
+      add(m.index, cursor);
+    } else if (m[0].endsWith('/>')) {
+      cursor = body;
+    } else {
+      let found;
+      if (tag === 'template') found = templateClose(src, body);
+      else {
+        RAW_CLOSE[tag].lastIndex = body;
+        found = RAW_CLOSE[tag].exec(src);
+      }
+      const bodyEnd = found ? found.index : src.length;
+      if (tag === 'template') markupComments(src, body, bodyEnd, add);
+      else codeComments(src, body, bodyEnd, add, tag === 'style');
+      cursor = found ? found.index + found[0].length : src.length;
+    }
+    BLOCK_OPEN.lastIndex = cursor;
   }
-  markupComments(src, cursor, src.length, add);
 }
 
 /**
@@ -264,6 +312,16 @@ const STRINGS_VUE = [
   '<script>', "const a = '// legacy';", '</script>',
   '<style lang="scss">', '.a { background: url(//cdn.example/legacy.png); content: "/* rc2"; }', '</style>', '',
 ].join('\n');
+const SHARED_LINE_VUE = [
+  '<template><div /></template>',
+  '<script>', "const a = '<!-- legacy -->'; // rc2", '</script>',
+  '<style lang="scss" src="./a.scss"></style>',
+  '<style>', '.a { color: red; } /* legacy */', '</style>', '',
+].join('\n');
+const NESTED_TEMPLATE_VUE = [
+  '<template>', '  <template v-if="a > b"><p>x</p></template> <!-- legacy -->', '</template>',
+  '<script>', 'const b = 2; /* rc2 */', '</script>', '',
+].join('\n');
 
 test('counts nothing inside strings, template literals or regexes', () => {
   assert.equal(historyCount(STRINGS_JS, '.js'), 0);
@@ -274,6 +332,17 @@ test('counts a trailing history comment', () => {
   assert.equal(historyCount('const x = 1; // legacy path removed 2026-10-02\n', '.js'), 1);
   assert.equal(historyCount("const accept = 'image/*'; /* rc2 */\n", '.js'), 1);
   assert.equal(historyCount('<template>\n  <p>x</p> <!-- legacy -->\n</template>\n', '.vue'), 1);
+});
+
+test('reads every block of a component whose tags share a line', () => {
+  assert.equal(historyCount(SHARED_LINE_VUE, '.vue'), 2);
+  assert.equal(historyCount(NESTED_TEMPLATE_VUE, '.vue'), 2);
+});
+
+test('reads a slash after a postfix ++ or -- as a division', () => {
+  assert.equal(historyCount('const rate = count++ / total; /* legacy */\n', '.js'), 1);
+  assert.equal(historyCount('const rate = count-- / total; // rc2\n', '.js'), 1);
+  assert.equal(historyCount('const at = ++/[/*]legacy/.lastIndex;\n', '.js'), 0);
 });
 
 test('adds no comment lines carrying history markers', () => {
