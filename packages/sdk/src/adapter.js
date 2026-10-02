@@ -2,8 +2,8 @@
  * adapter.js — the transport seam between the SDK surface and the host broker.
  *
  * One SDK, two adapters (execution-modes.md D2): the direct adapter
- * (in-process, M1 — adapter-direct.js) and the postMessage adapter
- * (sandboxed, M4 — not built yet). EVERYTHING above this interface is
+ * (in-process — adapter-direct.js) and the postMessage adapter
+ * (sandboxed — not built yet). EVERYTHING above this interface is
  * mode-independent; an MP cannot detect its mode through the SDK surface
  * (the contract-test suite asserts mode opacity).
  *

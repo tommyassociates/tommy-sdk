@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * check-shared-dep-versions.js — shared-dependency drift gate (M0, blocking
+ * check-shared-dep-versions.js — shared-dependency drift gate (blocking
  * from day 0). Closes audit 1.7's "pin shared dependency versions".
  *
  * The host provides ONE copy of vue / vuex / framework7 / framework7-vue at

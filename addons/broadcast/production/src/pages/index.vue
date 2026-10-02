@@ -29,7 +29,6 @@
   </f7-page>
 </template>
 <script>
-  // import API from '../api';
 
   export default {
     data() {

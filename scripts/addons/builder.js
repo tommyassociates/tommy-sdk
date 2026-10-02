@@ -3,8 +3,6 @@ const fs = require('fs')
 const { build } = require('vite')
 const helpers = require('../helpers')
 
-// const env = process.env.NODE_ENV || 'production'
-
 module.exports = async function(pkg, environment, version) {
   const localAddonFilePath = helpers.getLocalAddonFilePath(pkg, environment, version, '')
   console.log('addon building', pkg, environment, version) // , 'in', env

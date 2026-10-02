@@ -26,5 +26,7 @@ corepack yarn test:packages
 ```
 
 `test:packages` includes the store-name literal check. Run app loader and
-private-MP isolation checks when a contract changes. Keep current invariants
-beside code; move review rounds and decision history to docs.
+private-MP isolation checks when a contract changes.
+
+Comments state what the code does now and why, when that isn't obvious; rollout history, plan or ticket ids, dated rulings, review rounds and names go in commits, PRs and ledgers.
+`scripts/comment-history.test.mjs` fails on new comment lines carrying those markers; lower its baseline after a cleanup with `COMMENT_HISTORY_BASELINE=tighten`.

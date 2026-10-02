@@ -1,7 +1,6 @@
 <template>
   <f7-page addon="example">
     <f7-navbar>
-      <!-- <tommy-nav-menu></tommy-nav-menu> -->
       <f7-nav-title>Example</f7-nav-title>
       <f7-nav-right></f7-nav-right>
     </f7-navbar>
@@ -39,13 +38,9 @@
         title="Selected Date Range"
         :after="dateRange ? dateRange.join(' - ') : ''"
       ></f7-list-item> -->
-    <!-- </f7-list> -->
   </f7-page>
 </template>
 <script>
-  // import TagSelect from 'tommy-core/src/components/tag-select.vue';
-  // import PermissionSelect from 'tommy-core/src/components/permission-select.vue';
-  // import DateRangeSelect from 'tommy-core/src/components/date-range-select.vue';
 
   export default {
     props: {
@@ -72,9 +67,6 @@
       onSave() {
         console.log('example addon: save requested')
       }
-      // savePermission(permission) {
-      //   console.log('example addon: save permissions', permission)
-      // }
     },
   };
 </script>

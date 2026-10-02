@@ -3,8 +3,8 @@
  * loader injects into each MP's SDK) and mounts them into host-owned surface
  * elements with skeleton + per-panel containment (panel-runtime.md §2).
  *
- * MP panels NEVER enter the legacy `panelDefs` / `panels.top|left|right`
- * arrays (harden round-1: the core filter strips unknown names and edit-mode
+ * MP panels NEVER enter the shell's `panelDefs` / `panels.top|left|right`
+ * arrays (the core filter strips unknown names and edit-mode
  * persists those arrays into the `dashboard_layout` team setting) — the host
  * renders a PARALLEL, flag-gated grid section of its own.
  */
@@ -12,7 +12,7 @@ import { createApp, h } from 'vue';
 import { PanelTile } from './panel-tile.js';
 import { layoutFor, normalizePanels } from './layout.js';
 
-/** Advisory surface budget (harden round-1 default — tunable, never hit at M1). */
+/** Advisory surface budget (a tunable default). */
 export const SURFACE_PANEL_BUDGET = 24;
 export const SURFACE_MP_BUDGET = 12;
 
@@ -61,7 +61,7 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
             throw new Error(`tommy.panels.register: panel '${def.id}' must provide exactly one of 'component' or 'render'`);
           }
           // The `component` path mounts in LIGHT DOM sharing the host runtime
-          // (drops shadow isolation), so it is FIRST-PARTY ONLY until the M4
+          // (drops shadow isolation), so it is FIRST-PARTY ONLY until the
           // untrusted-review pipeline exists. Untrusted MPs stay on the
           // shadow-isolated `render` path.
           if (hasComponent && !firstParty) {
@@ -133,14 +133,14 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
      * `mpId` scopes the mount to a single MP (filtered BEFORE the panel
      * budget, so a scoped surface is never truncated by another MP).
      *
-     * `layout` (scope 01c) switches the mount to COMPOSED mode: the array is
+     * `layout` switches the mount to COMPOSED mode: the array is
      * `resolveComposedLayout`'s output and IS the tile list — order, geometry
      * and visibility were decided upstream; the host neither re-filters nor
      * re-sorts. Absent `layout`, declaration mode below runs exactly as
      * before — that dormancy is load-bearing (every pre-01c surface mounts
      * through it).
      *
-     * `pack: 'flow'` (owner-reported 2026-09-14) changes only HOW the composed
+     * `pack: 'flow'` changes only HOW the composed
      * cells are placed in CSS: tiles keep their stored ORDER (sorted by y then
      * x, the reading order the composition was flow-placed in) but are handed
      * to the grid with `grid-column: span w` and no explicit start line, so the
@@ -285,7 +285,7 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
       }
     },
 
-    /** Full teardown (team switch at M1 = teardown-and-cold-boot). */
+    /** Full teardown (a team switch is teardown-and-cold-boot). */
     teardownMp(mpId) {
       registrations.delete(mpId);
       declarations.delete(mpId);

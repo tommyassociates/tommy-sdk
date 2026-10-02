@@ -7,7 +7,7 @@
  * re-runs load, 3 consecutive failures escalate to a "Reload add-on" state.
  * (§8's 30 KB/200 ms/5 MB are review/harness checks, NOT runtime-enforced.)
  *
- * Containment: load/render failures are caught here (the M0 boundary pattern
+ * Containment: load/render failures are caught here (the boundary pattern
  * — a broken panel is a fallback tile, siblings keep running) and reported
  * through the budget-hook event stream.
  */
