@@ -76,16 +76,21 @@ describe('reference MP (team-checkin)', () => {
   let world;
   beforeEach(async () => { world = await bootWorld(); });
 
-  it('its manifest validates clean and matches the plans seed byte-for-byte', () => {
+  it('its manifest validates clean and matches the seed byte-for-byte', () => {
     const verdict = validateManifest(referenceMp.manifest);
     expect(verdict.errors || []).toEqual([]);
     expect(verdict.ok).toBe(true);
-    // Walk up from cwd to the workspace root (vitest's transformed
-    // import.meta.url is not a file: URL here).
+    // The seed as this repository keeps it: the manifest package's fixture
+    // (the run's cwd is this package; vitest's transformed import.meta.url is
+    // not a file: URL here).
+    const seed = readFileSync(path.resolve(process.cwd(), '../manifest/test/fixtures/reference-manifest.yml'), 'utf8');
+    expect(referenceMp.manifest).toBe(seed);
+    // A workspace that holds the plans above this repository has the seed's
+    // original there too: the same bytes.
     let root = process.cwd();
     while (!existsSync(path.join(root, 'plans')) && root !== path.dirname(root)) root = path.dirname(root);
-    const seed = readFileSync(path.join(root, 'plans/refactor-plan/05-deliverables/05-reference-mp/reference-manifest.yml'), 'utf8');
-    expect(referenceMp.manifest).toBe(seed);
+    const original = path.join(root, 'plans/refactor-plan/05-deliverables/05-reference-mp/reference-manifest.yml');
+    if (existsSync(original)) expect(referenceMp.manifest).toBe(readFileSync(original, 'utf8'));
   });
 
   it('the required Action loop runs end-to-end: emit checkin_posted → record_checkin persists', async () => {
