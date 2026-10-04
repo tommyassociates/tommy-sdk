@@ -8,7 +8,7 @@
  * `tommy.data` wrapper (@tommy/offline-sync src/names.js) is the ONLY name
  * resolver — this blocking check rejects literal `tommy-mp:` / `tommy-core:`
  * construction anywhere else (comments included, same posture as the other
- * M0 detectors).
+ * isolation detectors).
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, extname, relative } from 'node:path';

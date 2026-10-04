@@ -1,5 +1,5 @@
 /**
- * MP-isolation lint (M0 — mp-platform-m0-coupling-detectors).
+ * MP-isolation lint.
  *
  * Standalone config run with `eslint --no-eslintrc -c .eslintrc.isolation.js`
  * (see the lint:isolation script). It is deliberately separate from the main

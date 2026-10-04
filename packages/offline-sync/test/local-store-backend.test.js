@@ -8,9 +8,11 @@
  * installed on globalThis — the backend reads `globalThis.localStorage`.
  */
 import {
-  describe, it, expect, beforeEach, afterEach,
+  describe, it, expect, beforeEach, afterEach, vi,
 } from 'vitest';
-import { createLocalStorageBackend, hasWebStorage, createDataManager } from '../src/index.js';
+import {
+  createLocalStorageBackend, hasWebStorage, createDataManager, createMemoryStoreBackend,
+} from '../src/index.js';
 import { databaseName } from '../src/names.js';
 
 /**
@@ -71,22 +73,31 @@ describe('createLocalStorageBackend', () => {
     expect(await team9.get('view')).toBeUndefined();
   });
 
-  it('RETAINS the row and reports failure when Web Storage has gone away', async () => {
+  it('reports a write it could not make, and never reads an unreachable store as empty, when Web Storage has gone away', async () => {
     // This backend is only ever chosen because Web Storage existed when the
     // store was built, so reaching here means it went away mid-session (a
-    // WKWebView data store cleared, a permission revoked). It used to answer
-    // `{ ok: true }` and drop the write — a silent loss with a success result,
-    // the very shape the quota path was written to end (review finding F4).
-    // The row is now held for the session and the caller is told; only the
-    // BACKEND stays throw-free, and DataStore turns the report into a
-    // PersistError for the surface above it.
+    // WKWebView data store cleared, a permission revoked). A write reports
+    // it did not reach storage and keeps nothing (it does not know the rows
+    // beside it); a read rejects, so no caller takes the unknown store for
+    // an empty one.
     delete globalThis.localStorage;
     expect(hasWebStorage()).toBe(false);
     const b = createLocalStorageBackend(dbFor('team-3'), 'settings');
     const res = await b.put('view', { key: 'view', value: { x: 1 } });
-    expect(res.ok).toBe(false);
-    expect(res.reason).toBe('unavailable');
-    expect(await b.getAll()).toEqual([{ key: 'view', value: { x: 1 } }]);
+    expect(res).toMatchObject({ ok: false, reason: 'unavailable', retained: false });
+    await expect(b.getAll()).rejects.toMatchObject({ code: 'DATA_UNAVAILABLE' });
+    await expect(b.get('view')).rejects.toMatchObject({ code: 'DATA_UNAVAILABLE' });
+  });
+
+  it('rejects a read of storage that throws, and reads a corrupt blob as empty', async () => {
+    globalThis.localStorage = { getItem: () => { throw new Error('SecurityError'); }, setItem() {}, removeItem() {} };
+    const b = createLocalStorageBackend(dbFor('team-3'), 'blocked');
+    await expect(b.getAll()).rejects.toMatchObject({ code: 'DATA_UNAVAILABLE' });
+    await expect(b.delete('view')).resolves.toMatchObject({ ok: false, reason: 'unavailable' });
+    const map = new Map([['mp-store:x:corrupt', '{not json']]);
+    globalThis.localStorage = { getItem: (key) => map.get(key) ?? null, setItem: (key, value) => map.set(key, value), removeItem: (key) => map.delete(key) };
+    const corrupt = createLocalStorageBackend('x', 'corrupt');
+    await expect(corrupt.getAll()).resolves.toEqual([]);
   });
 });
 
@@ -116,3 +127,79 @@ describe('createDataManager default backend selection', () => {
     expect(await afterReload.store('schedule_cache').get('s1')).toBeUndefined(); // memory — gone
   });
 });
+
+/**
+ * Two tabs over the same Web Storage store: each has its own page (its own
+ * module instance, so its own write turns); the origin's Web Locks and the
+ * storage itself are shared.
+ */
+describe('Web Storage stores across tabs', () => {
+  const settle = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+  async function tab() {
+    vi.resetModules();
+    return import('../src/data-store.js');
+  }
+
+  it('a delete fenced to a revision never removes an edit another tab wrote since', async () => {
+    const tabA = await tab();
+    const tabB = await tab();
+    const storeIn = (page, backend) => page.createDataStore({ name: 'drafts', keyPath: 'id', syncStrategy: 'last_write_wins', backend });
+    const seed = storeIn(tabA, tabA.createLocalStorageBackend(dbFor('team-3'), 'drafts'));
+    await seed.put({ id: 'd1', body: 'first' });
+    const listed = await seed.get('d1');
+    const b = storeIn(tabB, tabB.createLocalStorageBackend(dbFor('team-3'), 'drafts'));
+    // Tab B edits the row while tab A is in its fenced delete: right after A
+    // reads the row, or before A's one-step compare-and-delete.
+    let edit = null;
+    const editMeanwhile = async () => {
+      if (!edit) { edit = b.put({ id: 'd1', body: 'edited in tab B' }); await settle(30); }
+    };
+    const inner = tabA.createLocalStorageBackend(dbFor('team-3'), 'drafts');
+    const a = storeIn(tabA, {
+      ...inner,
+      async get(key) { const row = await inner.get(key); await editMeanwhile(); return row; },
+      async deleteIf(key, keep) { await editMeanwhile(); return inner.deleteIf(key, keep); },
+    });
+    const removed = a.delete('d1', { expectedRevision: listed._rev }).then(() => 'deleted', (error) => error.reason);
+    await removed;
+    await edit;
+    const row = await b.get('d1');
+    expect(row).toMatchObject({ body: 'edited in tab B', _dirty: true });
+  });
+});
+
+describe('a pref removed while storage cannot be read', () => {
+  it('is not saved: the removal rejects rather than report a removal it could not make', async () => {
+    const saved = globalThis.localStorage;
+    const kept = new Map();
+    let readable = true;
+    globalThis.localStorage = {
+      getItem: (k) => { if (!readable) throw new Error('SecurityError'); return kept.has(k) ? kept.get(k) : null; },
+      setItem: (k, v) => { kept.set(k, String(v)); },
+      removeItem: (k) => { kept.delete(k); },
+    };
+    try {
+      const data = createDataManager({ capabilityToken: { tenantId: 'team-48', mpId: 'scheduling' }, mpId: 'scheduling', localData: {} });
+      await data.prefs.set('layout', 'grid');
+      readable = false;
+      await expect(data.prefs.remove('layout')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+      readable = true;
+      const reloaded = createDataManager({ capabilityToken: { tenantId: 'team-48', mpId: 'scheduling' }, mpId: 'scheduling', localData: {} });
+      await reloaded.prefs.ready();
+      expect(reloaded.prefs.get('layout')).toBe('grid');
+    } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+});
+
+describe('prefs on a store whose reads fail', () => {
+  it('answer a removal and a save the store could not read for as not saved, alike', async () => {
+    const unreadable = () => { throw Object.assign(new Error('Storage read failed (unavailable)'), { name: 'StorageReadError', reason: 'unavailable' }); };
+    const inner = createMemoryStoreBackend();
+    const failing = { ...inner, getAll: async () => unreadable(), get: async () => unreadable(), put: async () => unreadable() };
+    const data = createDataManager({ capabilityToken: { tenantId: 'team-53', mpId: 'scheduling' }, mpId: 'scheduling', localData: {},
+      backendFactory: (_db, storeName) => (storeName === 'prefs' ? failing : createMemoryStoreBackend()) });
+    await expect(data.prefs.remove('layout')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+    await expect(data.prefs.set('layout', 'grid')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+  });
+});
+

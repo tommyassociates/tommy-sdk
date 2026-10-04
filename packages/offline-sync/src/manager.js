@@ -13,7 +13,8 @@
  * them from M1's fabric work onward).
  */
 import { databaseName } from './names.js';
-import { assertCompleteSet, StorageReadError } from './transactional-store.js';
+import { reconcileFetched, windowKeyOf } from './reconcile.js';
+import { createDataService } from './data-service.js';
 
 // ⚠ THE MANAGER NO LONGER KEEPS ITS OWN COPY OF THE PAINT CEILING, and removing
 // it is the fix rather than a simplification of one.
@@ -51,17 +52,31 @@ import {
  */
 function defaultBackend(dbName, storeName, syncStrategy) {
   if (syncStrategy === 'last_write_wins' && hasWebStorage()) {
-    return createLocalStorageBackend(dbName, storeName);
+    // Its rows are the only copy: a write that does not fit is refused, never
+    // made room for by dropping another.
+    return createLocalStorageBackend(dbName, storeName, { evict: false });
   }
   // ⚠ A `persist: true` SERVER-AUTHORITATIVE STORE STILL LANDS IN MEMORY HERE,
   // and that is deliberate. Durable caching needs a store far larger than Web
-  // Storage can hold, so the backend for it is IndexedDB-backed and lives in the
-  // HOST (`app/src/services/mp-loader/mp-store-durable-backend.js`) — the SDK
-  // package must not grow a storage dependency, and only the host knows the
+  // Storage can hold, so the host supplies it: its backend factory opens the
+  // store on the host-store port (`app/src/services/mp-loader/mp-store-backend.js`).
+  // The SDK package must not grow a storage dependency, and only the host knows the
   // account the database has to be namespaced by. With no host factory injected
   // (node, tests, a standalone SDK consumer) memory is the correct answer: the
   // declaration is honoured by whoever can honour it.
   return createMemoryStoreBackend();
+}
+
+/**
+ * A store's manifest `indexes` (`[{ name, keyPath }]`) as DataStore indexes
+ * (`{ name: field }`); the object form passes through.
+ */
+export function manifestIndexes(indexes) {
+  if (Array.isArray(indexes)) {
+    return Object.fromEntries(indexes.filter((entry) => typeof entry?.name === 'string' && entry.name && entry.keyPath)
+      .map((entry) => [entry.name, entry.keyPath]));
+  }
+  return indexes && typeof indexes === 'object' ? { ...indexes } : {};
 }
 
 /**
@@ -87,15 +102,47 @@ function defaultBackend(dbName, storeName, syncStrategy) {
  *   "saved on this device only"), so the host decides. Without a handler the
  *   write still rejects; it just goes unreported.
  */
+/**
+ * Every MP's own preferences store (`mp.<mpId>.prefs`): small UI choices a
+ * person makes (a layout, a filter, a toggle), kept per account on the
+ * device, never sent anywhere. `prefs` is a host-owned name: a manifest
+ * cannot declare it, and this declaration is the one used.
+ */
+export const PREFS_STORE = 'prefs';
+// A removal another tab's write overtook is tried this many times in all.
+const PREF_REMOVE_TRIES = 2;
+export const PREFS_DECL = Object.freeze({
+  keyPath: 'key',
+  syncStrategy: 'last_write_wins',
+  recordSchema: Object.freeze({
+    type: 'object',
+    required: ['key'],
+    additionalProperties: false,
+    properties: { key: { type: 'string', minLength: 1, maxLength: 200 }, value: {} },
+  }),
+});
+const clone = (value) => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));
+
+// `lane`: what keeps this world's scheduler jobs (its reads and pushes) apart
+// from another world's of the same MP on a shared scheduler; the host names
+// the world (its viewer and account). Without one, the MP's database for its
+// tenant does.
 export function createDataManager({
-  capabilityToken, mpId, localData = {}, backendFactory, now, onPersistError,
+  capabilityToken, mpId, localData: declaredData = {}, backendFactory, now, onPersistError,
+  scheduler, feed = null, isOnline, lane = null,
 }) {
+  const localData = { ...declaredData, [PREFS_STORE]: PREFS_DECL };
   const dbName = databaseName(capabilityToken, mpId);
   const stores = new Map();
+  // Each store's handle for the MP: its writes go in the store's turn.
+  const writers = new Map();
   let disposed = false;
   const live = () => { if (disposed) throw Object.assign(new Error('Data manager retired'), { name: 'StorageReadError', reason: 'retired' }); };
   const syncMeta = new Map(); // storeName -> { lastSyncedAt, pending, online }
 
+  // Stores whose rows outlive a reload: the host's, or Web Storage for a
+  // client-owned store. Prefs promise the device keeps them.
+  const durableStores = new Set();
   for (const [storeName, decl] of Object.entries(localData)) {
     // The 4th argument is the store DECLARATION, added for `persist` (spec
     // mp-durable-instant-surfaces). Positional 1-3 are unchanged, so an existing
@@ -104,10 +151,12 @@ export function createDataManager({
     const backend = backendFactory
       ? backendFactory(dbName, storeName, decl.syncStrategy, decl)
       : defaultBackend(dbName, storeName, decl.syncStrategy);
+    if (backendFactory || (decl.syncStrategy === 'last_write_wins' && hasWebStorage())) durableStores.add(storeName);
     stores.set(storeName, createDataStore({
       name: storeName,
       keyPath: decl.keyPath || 'id',
       recordSchema: decl.recordSchema,
+      indexes: manifestIndexes(decl.indexes),
       backend,
       now,
       ...(decl.maxRows ? { maxRows: decl.maxRows } : {}),
@@ -126,121 +175,191 @@ export function createDataManager({
   // `toRecord` (with a `prev` lookup when `keyOf` is supplied, for rich-field
   // preservation across a thin DTO), and reconcile them into the store under
   // `scope`. A failed fetch is swallowed so the SWR paint holds (cache intact).
-  // Each public caller performs its own final read with its display scope.
-  function windowKeyOf(window) {
-    if (window == null || typeof window !== 'object') return undefined;
-    const keys = Object.keys(window).sort();
-    if (!keys.length) return undefined;
-    try {
-      return JSON.stringify(keys.map((k) => [k, window[k]]));
-    } catch (_) {
-      return undefined; // unserialisable window — no key, no window retention
-    }
-  }
-
-  /** Drop the sync-metadata stamps so a row is safe to SPREAD into a record. */
-  const stripMeta = (row) => Object.fromEntries(
-    Object.entries(row).filter(([k]) => !k.startsWith('_')),
+  // In a store that sends its changes, a row with an unsent change keeps it:
+  // the server's copy never replaces an edit still waiting to go.
+  // Returns the reconciled, scope-filtered cache read.
+  // Only a read whose reconcile covers the whole store (`complete`) marks the
+  // collection synced; a scoped read leaves its stamp as it was.
+  // A store's name as the data service knows it: the manager's namespace
+  // before it, so a declared name with a dot of its own stays this MP's.
+  const qualified = (storeName) => `mp.${mpId}.${storeName}`;
+  // Through the data service's one read guard, in the store's turn: a read
+  // begun before a newer change (an ingest, a removal, a local write) never
+  // undoes it.
+  const fetchAndReconcile = (store, keyPath, spec, scope, window, windowKey, storeName, complete) => service.reconcileWindow( // eslint-disable-line no-use-before-define
+    qualified(storeName), {
+      fetch: spec.fetch, toRecord: spec.toRecord, keyOf: spec.keyOf, scope, window, windowKey, complete, keepDirty: service.sends(qualified(storeName)), // eslint-disable-line no-use-before-define
+    },
   );
 
-  /** Tell the host a fetched DTO could not be cached, and why. */
-  function reportRejected(store, reasons) {
-    if (typeof onPersistError !== 'function') return;
-    try {
-      onPersistError({
-        event: 'record_rejected',
-        store: store?.name,
-        reason: 'recordSchema',
-        rejected: reasons.length,
-        detail: reasons[0],
-      });
-    } catch (_) { /* the reporter's problem, not the sync's */ }
-  }
+  // The same small surface the host uses, confined to this MP's own stores
+  // (`mp.<mpId>.<store>`): anything else is refused before it reaches a store.
+  const service = createDataService({
+    namespace: `mp.${mpId}`,
+    resolve: (name) => (stores.has(name) ? { store: stores.get(name), decl: localData[name] } : null),
+    labelOf: (name) => `mp.${mpId}.${name}`,
+    budgetKey: `mp.${mpId}`,
+    lane: typeof lane === 'string' && lane ? lane : dbName,
+    ...(scheduler ? { scheduler } : {}),
+    ...(now ? { now } : {}),
+    ...(typeof isOnline === 'function' ? { isOnline } : {}),
+    feed,
+    onPersistError,
+  });
 
-  async function fetchAndReconcile(store, keyPath, { fetch, toRecord, keyOf }, scope, window, windowKey) {
-    let dtos = null;
-    try {
-      dtos = typeof fetch === 'function' ? await fetch(window) : null;
-    } catch (_) {
-      dtos = null; // offline / fetch failed — keep the cache, paint holds
-    }
-    if (Array.isArray(dtos)) {
-      assertCompleteSet(dtos);
-      let prevByKey = null;
-      if (keyOf) {
-        // ⚠ getAllRaw, NOT getAll, AND STRIPPED. Two defects met on this line.
-        //
-        // (1) `getAll()` applies the paint ceiling, so since that landed a row
-        //     older than 7 days was INVISIBLE to the merge map — `toRecord(dto,
-        //     undefined)` then ran as though the row were new and silently
-        //     dropped exactly the rich fields this map exists to preserve. The
-        //     MP-side rule already says a writer building a `prevById` map must
-        //     read `getAllRaw()`; this is the SDK's own copy of that shape.
-        // (2) The rows carry `_rev/_dirty/_updatedAt`, and `prev` is documented
-        //     to be SPREAD into the new record. Every MP cache declares
-        //     `additionalProperties: false`, so the documented pattern poisoned
-        //     its own record: the write threw, the `try` below swallowed it, and
-        //     the STALE row came back as though the sync had succeeded.
-        const existing = [];
-        const keys = [...new Set(dtos.map((dto) => String(keyOf(dto))))];
-        let bytes = 2;
-        for (const key of keys) {
-          const row = await store.getRaw(key);
-          if (!row) continue;
-          bytes += new TextEncoder().encode(JSON.stringify(row)).byteLength + 1;
-          if (bytes > 8 * 1024 * 1024) throw new StorageReadError('scan-required');
-          existing.push(row);
+  // tommy.prefs: the store opens on first use, so an MP that never reads a
+  // preference never opens it. `get` answers the change on its way when there
+  // is one, else what the device holds once a load or a save has said (the
+  // fallback before that; an MP reads again after `ready()`). `set` and
+  // `remove` write through; a change the device refused never counts as saved.
+  // A failed load is not remembered: the next `ready()` loads again.
+  // Preferences are the device's own, so they are stored as settled rows,
+  // never as changes waiting to be sent; a `set` the store refused rejects.
+  //
+  // Per key: `held`, what the device holds (`{ present, value }`, null until
+  // a load or a save says); `saves`, how many changes the device saved; and
+  // `changes`, the changes on their way, in the order they were asked.
+  const prefKeys = new Map();
+  let prefsLoaded = null;
+  let prefsTried = false;
+  const prefKey = (name) => {
+    if (!prefKeys.has(name)) prefKeys.set(name, { held: null, saves: 0, changes: [] });
+    return prefKeys.get(name);
+  };
+  function changePref(name, present, value) {
+    const state = prefKey(name);
+    const change = { present, value };
+    state.changes.push(change);
+    const settle = () => { state.changes.splice(state.changes.indexOf(change), 1); };
+    return {
+      saved() { settle(); state.held = { present, value }; state.saves += 1; },
+      refused() { settle(); },
+    };
+  }
+  // One key's writes and removals reach the store in the order they were
+  // made, so what is stored follows what `get` answers.
+  const prefWrites = new Map();
+  function inPrefOrder(name, task) {
+    const next = (prefWrites.get(name) || Promise.resolve()).then(task);
+    const tail = next.then(() => {}, () => {});
+    prefWrites.set(name, tail);
+    tail.then(() => { if (prefWrites.get(name) === tail) prefWrites.delete(name); });
+    return next;
+  }
+  // The one mapping every prefs write and removal answers through: a change
+  // the device's storage refused (full or gone) or could not read for, on
+  // any backend (a PersistError, DATA_UNAVAILABLE, or a host store's
+  // StorageReadError other than a retired store), is DATA_NOT_SAVED; any
+  // other error is passed on as it is.
+  const storageRefusal = (error) => error?.name === 'PersistError' || error?.code === 'DATA_UNAVAILABLE'
+    || (error?.name === 'StorageReadError' && error.reason !== 'retired');
+  function notSaved(name, error) {
+    if (error && !storageRefusal(error)) return error;
+    return Object.assign(new Error(`tommy.prefs: '${name}' was not saved on this device`), { code: 'DATA_NOT_SAVED', ...(error ? { cause: error } : {}) });
+  }
+  // Once disposed, prefs answer nothing held (never the previous account's
+  // choices), load nothing, and refuse writes.
+  const prefs = Object.freeze({
+    ready() {
+      prefsTried = true;
+      if (disposed) return Promise.resolve();
+      if (prefsLoaded) return prefsLoaded;
+      const savesAtStart = new Map([...prefKeys].map(([name, state]) => [name, state.saves]));
+      const loading = service.read(PREFS_STORE).then((rows) => {
+        if (disposed) return;
+        const found = new Map();
+        (rows || []).forEach((row) => { if (row && typeof row.key === 'string') found.set(row.key, row.value); });
+        // What the device held when read, for every key no save has changed since.
+        new Set([...found.keys(), ...prefKeys.keys()]).forEach((name) => {
+          const state = prefKey(name);
+          if (state.saves !== (savesAtStart.get(name) || 0)) return;
+          state.held = found.has(name) ? { present: true, value: found.get(name) } : { present: false };
+        });
+      }).catch(() => { if (prefsLoaded === loading) prefsLoaded = null; });
+      prefsLoaded = loading;
+      return loading;
+    },
+    get(key, fallback = null) {
+      if (disposed) return fallback;
+      if (!prefsTried) prefs.ready();
+      const state = prefKeys.get(String(key));
+      const shown = state && (state.changes[state.changes.length - 1] || state.held);
+      return shown && shown.present ? clone(shown.value) : fallback;
+    },
+    async set(key, value) {
+      live();
+      const name = String(key);
+      const copied = clone(value);
+      const stored = copied === undefined ? null : copied;
+      const change = changePref(name, true, stored);
+      // A device with no storage to keep prefs keeps none.
+      if (!durableStores.has(PREFS_STORE)) { change.refused(); throw notSaved(name); }
+      const result = await inPrefOrder(name, () => service.ingest(PREFS_STORE, [{ key: name, value: stored }]))
+        .catch((error) => { change.refused(); throw notSaved(name, error); });
+      // Saved only once the device holds it: a store that kept it in memory
+      // only (its storage full or gone) would lose it on reload.
+      if (result?.unsaved?.includes(name)) { change.refused(); throw notSaved(name); }
+      if (!result?.written) { change.refused(); throw Object.assign(new Error(`tommy.prefs: '${name}' was not saved`), { code: 'DATA_INVALID' }); }
+      change.saved();
+    },
+    async remove(key) {
+      live();
+      const name = String(key);
+      const change = changePref(name, false);
+      if (!durableStores.has(PREFS_STORE)) { change.refused(); throw notSaved(name); }
+      // Removed only when the store removed it, or it is gone already: a row
+      // another tab wrote since it was read is removed again, against that
+      // write, and a removal still overtaken is refused, never reported done.
+      await inPrefOrder(name, async () => {
+        for (let attempt = 0; attempt < PREF_REMOVE_TRIES; attempt += 1) {
+          // eslint-disable-next-line no-await-in-loop
+          const { removed } = await service.purge(PREFS_STORE, { keys: [name], force: true });
+          if (removed.includes(name)) return;
+          // eslint-disable-next-line no-await-in-loop
+          if (!(await service.read(PREFS_STORE, name, { raw: true }))) return;
         }
-        prevByKey = new Map(existing.map((row) => [String(row[keyPath]), stripMeta(row)]));
-      }
-      const records = dtos.map(
-        (dto) => toRecord(dto, prevByKey ? prevByKey.get(String(keyOf(dto))) : undefined),
-      );
-
-      // ⚠ THE MISSING HALF WAS THE REPORT, NOT THE SURVIVAL. The spec inherited
-      // a claim from sdk commit e7b4cbe that one malformed DTO left the store
-      // half-written with the prune never run. That was TRUE of the code that
-      // commit was written against and is NOT true of this branch: `reconcile`
-      // already catches a `recordSchema` rejection per record, skips that row
-      // and carries on, so the valid rows land and the prune still runs
-      // (data-store.js, the `catch` inside the reconcile loop). Verified by
-      // removing this partition — the valid rows and the prune both survived.
-      //
-      // What it does NOT do is tell anyone. A row silently vanishing from a
-      // cache because the server changed a field's type is exactly the kind of
-      // drift that goes unnoticed for months. Partitioning here keeps the write
-      // path free of throw/catch churn AND gives the rejects somewhere to go.
-      const valid = [];
-      const rejected = [];
-      for (const record of records) {
-        const why = typeof store.validateRecord === 'function' ? store.validateRecord(record) : null;
-        if (why) rejected.push(why); else valid.push(record);
-      }
-      // Dropping a malformed row is a judgement call; dropping it SILENTLY is
-      // not. The rejects go out the same channel as every other data loss.
-      if (rejected.length) reportRejected(store, rejected);
-      try {
-        await store.reconcile(valid, { scope, ...(windowKey != null ? { windowKey } : {}) });
-      } catch (error) {
-        // A failed durable write or incomplete read cannot certify the cache
-        // as the complete fresh result. Consumers must retain their error path.
-        if (error?.name === 'StorageReadError' || (error?.name === 'PersistError' && error.retained === false)) throw error;
-      }
-    }
-  }
+        throw Object.assign(new Error(`tommy.prefs: '${name}' was written again while it was removed`), { name: 'PersistError', reason: 'conflict', retained: false });
+      }).catch((error) => { change.refused(); throw notSaved(name, error); });
+      change.saved();
+    },
+  });
 
   return {
     databaseName: dbName,
+    prefs,
     async dispose(options) {
       disposed = true;
+      prefKeys.clear();
+      service.dispose();
       await Promise.all([...stores.values()].map((store) => store.dispose?.(options)));
     },
-    /** DataApi.store — only manifest-declared stores exist. */
+    read: (...args) => { live(); return service.read(...args); },
+    query: (...args) => { live(); return service.query(...args); },
+    subscribe: (...args) => { live(); return service.subscribe(...args); },
+    source: (...args) => { live(); return service.source(...args); },
+    refresh: (...args) => { live(); return service.refresh(...args); },
+    mutate: (...args) => { live(); return service.mutate(...args); },
+    ingest: (...args) => { live(); return service.ingest(...args); },
+    purge: (...args) => { live(); return service.purge(...args); },
+    trim: (...args) => { live(); return service.trim(...args); },
+    status: (...args) => service.status(...args),
+    pending: (...args) => service.pending(...args),
+    // Sends this MP's failed changes again (the host calls it on reconnect).
+    retryFailed: () => service.retryFailed(),
+    // Sends the changes held until this MP's account was displayed (the host
+    // calls it once that account is displayed again).
+    retryHeld: () => service.retryHeld(),
+    /**
+     * DataApi.store — only manifest-declared stores exist. Its writes go in
+     * the store's turn with the data service's own, so a read already on its
+     * way never undoes them.
+     */
     store(name) {
       live();
       const store = stores.get(name);
       if (!store) throw new Error(`tommy.data.store('${name}'): store not declared in manifest.localData`);
-      return store;
+      if (!writers.has(name)) writers.set(name, service.writer(qualified(name)));
+      return writers.get(name);
     },
     /**
      * DataApi.windowCache — the reusable "instant data" (SWR) combinator every
@@ -277,9 +396,10 @@ export function createDataManager({
         // scope below stays the caller's own, or an aged row would silently
         // escape pruning while still sitting in the store.
         read: (window) => store.readWhere(scopeFor(window)),
+        // The reconcile answers with its own read of the window's scope.
         sync: (window) => fetchAndReconcile(
-          store, keyPath, { fetch, toRecord, keyOf }, scopeFor(window), window, windowKeyOf(window),
-        ).then(() => store.readWhere(scopeFor(window))),
+          store, keyPath, { fetch, toRecord, keyOf }, scopeFor(window), window, windowKeyOf(window), storeName, !scopeOf,
+        ),
       };
     },
     /**
@@ -335,11 +455,18 @@ export function createDataManager({
           const prev = await store.get(key);
           const rec = toRecord(dto, prev);
           if (!rec) return undefined;
-          // A cache write must never fail the read it was serving: the record is
-          // returned either way, so a full/blocked store degrades to
-          // fetch-every-time rather than to a blank surface.
-          try { await store.put(rec); } catch (_) { /* cache write is best-effort */ }
-          return rec;
+          // Stored as the server's row. In a store that sends its changes, a
+          // row with an edit still waiting to go keeps it, and the read
+          // answers with it: nothing when that edit is a delete. A cache write must never fail the read it was
+          // serving: the record is returned either way, so a full/blocked
+          // store degrades to fetch-every-time rather than to a blank surface.
+          let kept = false;
+          try {
+            // One record says nothing about the rest: the collection's synced stamp stays.
+            const result = await service.writer(qualified(storeName)).reconcile([rec], { prune: false, syncedAt: null, ...(service.sends(qualified(storeName)) ? { keepDirty: true } : {}) }); // eslint-disable-line no-use-before-define
+            kept = (Array.isArray(result?.skipped) ? result.skipped : []).map(String).includes(key);
+          } catch (_) { /* cache write is best-effort */ }
+          return kept ? store.get(key) : rec;
         },
       };
     },
@@ -374,8 +501,9 @@ export function createDataManager({
        * would otherwise reopen and paint a confident, wrong fortnight-old
        * surface — which on a compliance or roster screen is worse than an empty
        * one, because nothing on it says it is old. Rows past the ceiling are not
-       * PAINTED; they are still stored, and the store's own TTL evicts them at
-       * open. A `_dirty` row is exempt: it is a local write that has not reached
+       * PAINTED; they are still stored until a sync replaces or prunes them,
+       * a purge removes them or the store evicts them, and writers still see
+       * them. A `_dirty` row is exempt: it is a local write that has not reached
        * the server, and its age is not a reason to hide it from its author.
        *
        * ⚠ THE CEILING IS APPLIED BY `DataStore.readWhere`, NOT HERE. The manager
@@ -400,6 +528,8 @@ export function createDataManager({
        * unchanged — the scope governs both, as before.
        */
       const prunePredicate = typeof pruneScope === 'function' ? pruneScope : scopePredicate;
+      // A revalidate with neither scope reads the whole store.
+      const wholeRead = typeof scope !== 'function' && typeof pruneScope !== 'function';
       return {
         store,
         read: () => store.readWhere(predicate),
@@ -411,7 +541,13 @@ export function createDataManager({
               .then((rows) => { if (live) handler(rows); })
               .catch(() => { /* subscriber read error — skip this emit */ });
           };
-          const off = store.subscribe(() => emit());
+          // A change delivers the store's rows: each subscriber paints from
+          // them rather than reading the whole store again.
+          const off = store.subscribe((rows) => {
+            if (!live) return;
+            if (!Array.isArray(rows) || typeof store.selectFrom !== 'function') { emit(); return; }
+            try { handler(store.selectFrom(rows, predicate)); } catch (_) { /* subscriber errors are theirs */ }
+          });
           emit(); // instant first paint from the warm cache
           return () => { live = false; off(); };
         },
@@ -423,9 +559,11 @@ export function createDataManager({
         // use. The stores were bounded by `maxRows` alone, which is the backstop,
         // not the design. A whole-store cache still passes no window and so still
         // opts out, exactly as windowCache does.
+        // The reconcile answers with its read of the prune scope; a read whose
+        // paint scope differs reads that too.
         revalidate: (window) => fetchAndReconcile(
-          store, keyPath, { fetch, toRecord, keyOf }, prunePredicate, window, windowKeyOf(window),
-        ).then(() => store.readWhere(predicate)),
+          store, keyPath, { fetch, toRecord, keyOf }, prunePredicate, window, windowKeyOf(window), storeName, wholeRead,
+        ).then((rows) => (prunePredicate === predicate ? rows : store.readWhere(predicate))),
       };
     },
     /** DataApi.syncState — SWR UX inputs (offline-sync.md §6). */
@@ -459,6 +597,7 @@ export function createReplayCoordinator({ broker, addOnlineListener }) {
 
   return {
     start() {
+      if (unsubscribe) return;
       if (addOnlineListener) {
         unsubscribe = addOnlineListener(() => { drain(); });
       } else if (typeof window !== 'undefined') {

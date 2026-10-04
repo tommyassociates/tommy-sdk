@@ -1,7 +1,7 @@
 /**
  * capability.js — the CapabilityService seam (host-interfaces.ts:46-52).
  *
- * The broker depends on `{ issue, validate, scheduleRefresh }`. At M1:
+ * The broker depends on `{ issue, validate, scheduleRefresh }`:
  *  - `issue` binds to the LIVE backend token-issue endpoint through the F0
  *    typed client's `issueToken` — INJECTED by the loader (never an endpoint
  *    literal in this package); tests use `createFakeIssuer`.

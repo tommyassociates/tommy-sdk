@@ -339,6 +339,8 @@ describe('quota-guard red · finding 3: backendFactory loses syncStrategy', () =
     expect(seen).toEqual([
       { storeName: 'settings', syncStrategy: 'last_write_wins' },
       { storeName: 'attendance_cache', syncStrategy: 'server_authoritative' },
+      // Every MP's own prefs store, host-provided.
+      { storeName: 'prefs', syncStrategy: 'last_write_wins' },
     ]);
   });
 

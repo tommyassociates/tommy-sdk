@@ -20,7 +20,7 @@ const nextRpcId = (instanceId) => `rpc-${instanceId}-${(rpcSeq += 1)}`;
 /**
  * @param {object} opts
  * @param {object} opts.broker host broker entry points:
- *   { emit(env), query(env), invoke(env), subscribe(mpId, trigger, handler),
+ *   { emit(env), query(env), invoke(env), subscribe(mpId, trigger, handler, { tenantId }),
  *     teardown(instanceId) } — all enforcement lives THERE, never here.
  * @param {object} opts.init the MpInit payload the loader hands over
  * @param {number} [opts.rpcTimeoutMs]
@@ -62,6 +62,9 @@ export function createDirectAdapter({ broker, init, rpcTimeoutMs = DEFAULT_RPC_T
       instanceId: init.instanceId,
       ...(envelope.activity === 'team.update_member'
         ? { restoreDeadlineAt: Date.now() + rpcTimeoutMs } : {}),
+      // When this call times out here, so the broker can give up first and
+      // answer with its own, more specific error.
+      rpcDeadlineAt: Date.now() + rpcTimeoutMs,
     };
     const ENTRY_BY_KIND = {
       emit: 'emit',
@@ -77,7 +80,15 @@ export function createDirectAdapter({ broker, init, rpcTimeoutMs = DEFAULT_RPC_T
     try {
       return await withTimeout(Promise.resolve(entry.call(broker, env)), rpcId);
     } catch (err) {
-      if (isTommyError(err)) throw err;
+      if (err instanceof TommyError) throw err;
+      // A TommyError of another copy of this SDK (the host's broker is built
+      // with its own): the same error as this SDK's class, so an MP's
+      // `instanceof TommyError` holds for every rejection.
+      if (isTommyError(err)) {
+        throw new TommyError({
+          code: err.code, message: err.message, rule: err.rule, retryable: err.retryable, runId: err.runId, cause: err.cause,
+        });
+      }
       throw new TommyError({ code: 'ActivityFailed', message: String(err && err.message), retryable: false, cause: err });
     }
   }
@@ -85,7 +96,8 @@ export function createDirectAdapter({ broker, init, rpcTimeoutMs = DEFAULT_RPC_T
   return {
     rpc,
     subscribe(trigger, handler) {
-      const unsubscribe = broker.subscribe(init.mpId, trigger, handler);
+      // The instance's tenant, so the broker checks that tenant's grant.
+      const unsubscribe = broker.subscribe(init.mpId, trigger, handler, { tenantId: init.tenant?.tenantId });
       subscriptions.add(unsubscribe);
       return () => { subscriptions.delete(unsubscribe); unsubscribe(); };
     },

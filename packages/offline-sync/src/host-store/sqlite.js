@@ -14,8 +14,17 @@ function prefixWhere(prefix) {
 export function createSqliteDatabase({ driver }) {
   let tail = Promise.resolve();
   let initialized;
+  // A failed open is not remembered: the next transaction opens again.
   async function initialize() {
-    if (!initialized) initialized = (async () => {
+    if (!initialized) {
+      const opening = setUp();
+      initialized = opening;
+      opening.catch(() => { if (initialized === opening) initialized = undefined; });
+    }
+    return initialized;
+  }
+  function setUp() {
+    return (async () => {
       await driver.open?.();
       const mode = await driver.query('PRAGMA journal_mode = WAL', []);
       if (String(mode[0]?.journal_mode).toLowerCase() !== 'wal') throw storageError('unavailable');
@@ -37,7 +46,6 @@ export function createSqliteDatabase({ driver }) {
         await driver.run('COMMIT', []);
       } catch (error) { await driver.run('ROLLBACK', []).catch(() => {}); throw error; }
     })();
-    return initialized;
   }
   return {
     transaction(mode, work) {
@@ -46,6 +54,19 @@ export function createSqliteDatabase({ driver }) {
         await driver.run(mode === 'readwrite' ? 'BEGIN IMMEDIATE' : 'BEGIN', []);
         const tx = {
           async get(table, key) { return decoded(await driver.query(`SELECT payload FROM ${tableName(table)} WHERE key = ?`, [encoded(key)]))[0]; },
+          // One query per 100 keys, not one per key: on Capacitor every query is a
+          // native bridge round trip (~15 ms), and a keyed read of 250 rows was
+          // ~500 of them — 1.5 s per full-store read on an Android phone.
+          // Results follow `keys` order; a missing key is `undefined`.
+          async getMany(table, keys) {
+            const found = new Map();
+            for (let start = 0; start < keys.length; start += 100) {
+              const chunk = keys.slice(start, start + 100).map(encoded);
+              const rows = await driver.query(`SELECT key, payload FROM ${tableName(table)} WHERE key IN (${chunk.map(() => '?').join(', ')})`, chunk);
+              for (const row of rows) found.set(row.key, JSON.parse(row.payload));
+            }
+            return keys.map((key) => found.get(encoded(key)));
+          },
           async put(table, row) {
             const parts = Array.isArray(row.key) ? row.key : [row.key];
             await driver.run(`INSERT INTO ${tableName(table)} (key, owner, namespace, generation, kind, row_order, principal, policy, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET owner=excluded.owner, namespace=excluded.namespace, generation=excluded.generation, kind=excluded.kind, row_order=excluded.row_order, principal=excluded.principal, policy=excluded.policy, payload=excluded.payload`, [encoded(row.key), parts[0], parts[1] ?? null, parts[2] ?? null, parts[3] ?? null, ordering(parts.at(-1)), row.principal ?? null, row.policy ?? null, JSON.stringify(row)]);
@@ -77,6 +98,10 @@ export function createSqliteDatabase({ driver }) {
       tail = result.catch(() => {});
       return result;
     },
-    async close() { await tail; await driver.close?.(); },
+    close() {
+      const closing = tail.then(async () => { initialized = undefined; await driver.close?.(); });
+      tail = closing.catch(() => {});
+      return closing;
+    },
   };
 }

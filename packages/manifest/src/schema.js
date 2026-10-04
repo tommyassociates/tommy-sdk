@@ -1,7 +1,7 @@
 // Shared schema loader + Ajv 2020 instance.
 // The vendored schema (src/schema/manifest-schema.json) is the runtime truth
 // (see src/schema/PROVENANCE.md). Ajv runs strict EXCEPT strictRequired:false —
-// the D22 seed schema's triggers if/then trips Ajv's extra-standard
+// the seed schema's triggers if/then trips Ajv's extra-standard
 // strictRequired lint but is valid Draft 2020-12; the schema is left untouched.
 
 import Ajv2020 from 'ajv/dist/2020.js';

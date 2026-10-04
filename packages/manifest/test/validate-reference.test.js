@@ -5,6 +5,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateManifest, loadSchema } from '../src/index.js';
 
@@ -12,9 +13,14 @@ const REF = fileURLToPath(new URL('./fixtures/reference-manifest.yml', import.me
 const PLANS_REF = fileURLToPath(
   new URL('../../../../plans/refactor-plan/05-deliverables/05-reference-mp/reference-manifest.yml', import.meta.url),
 );
-const PLANS_SCHEMA = fileURLToPath(
-  new URL('../../../../plans/refactor-plan/02-architecture/manifest-schema.json', import.meta.url),
-);
+// The plans-tree schema is the FROZEN D22 design seed (src/schema/PROVENANCE.md,
+// 2026-09-08): the runtime JSON here is the source of truth and has extended it
+// since (ai / agentVisible / placement.seed …), so a byte comparison against the
+// seed is not a drift check any more. Mirrors scripts/check-schema-drift.mjs: a
+// design source is compared only when named explicitly.
+const PLANS_SCHEMA = process.env.MP_MANIFEST_DESIGN_SOURCE
+  ? resolve(process.env.MP_MANIFEST_DESIGN_SOURCE)
+  : null;
 const VENDORED_SCHEMA = fileURLToPath(new URL('../src/schema/manifest-schema.json', import.meta.url));
 
 describe('schema + reference manifest', () => {
@@ -39,8 +45,9 @@ describe('schema + reference manifest', () => {
     expect(readFileSync(REF, 'utf8')).toBe(readFileSync(PLANS_REF, 'utf8'));
   });
 
-  it('the vendored schema has not drifted from the plans copy (when present)', () => {
-    if (!existsSync(PLANS_SCHEMA)) return;
+  it('the vendored schema matches an explicitly named design source (MP_MANIFEST_DESIGN_SOURCE)', () => {
+    if (!PLANS_SCHEMA) return; // no explicit source named — nothing to diff against
+    expect(existsSync(PLANS_SCHEMA), `explicit design source missing: ${PLANS_SCHEMA}`).toBe(true);
     expect(readFileSync(VENDORED_SCHEMA, 'utf8')).toBe(readFileSync(PLANS_SCHEMA, 'utf8'));
   });
 });

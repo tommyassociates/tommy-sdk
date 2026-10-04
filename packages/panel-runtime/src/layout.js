@@ -1,7 +1,7 @@
 /**
  * layout.js — which declared panels are visible on a surface for a viewer.
- * Role filtering comes from the manifest `panels[].rbac.roles` (harden
- * round-1) — never from the legacy `visiblePanels` machinery.
+ * Role filtering comes from the manifest `panels[].rbac.roles`
+ * — never from the old `visiblePanels` machinery.
  */
 /** The manifest `panels` block is an array of {id,...}; maps also accepted. */
 export function normalizePanels(manifestPanels) {
@@ -23,7 +23,7 @@ export function layoutFor(manifestPanels = {}, surface, viewerRoles = []) {
     .map(([panelId]) => panelId);
 }
 
-/* Audience contexts the `dashboards` Setting may target (scope 01c). AND
+/* Audience contexts the `dashboards` Setting may target. AND
  * across contexts, OR within a list — an unknown key in stored data is
  * IGNORED, not failed on: an old client must not hide a tab a newer admin
  * UI targeted by a context this build doesn't know. */
@@ -51,7 +51,7 @@ function matchesAudience(audience, viewer = {}) {
 const clampInt = (n, min, max) => Math.min(max, Math.max(min, Math.trunc(n)));
 
 /**
- * resolveComposedLayout — scope 01c: join one composed dashboard tab's
+ * resolveComposedLayout — join one composed dashboard tab's
  * `panels[]` (PanelInstance[] from the `dashboards` team Setting) against the
  * installed MPs' manifest declarations and emit, in stored order, the tile
  * list the host mounts VERBATIM (`mountSurface` opts.layout).

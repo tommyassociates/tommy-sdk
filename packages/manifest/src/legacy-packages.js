@@ -1,5 +1,5 @@
 /**
- * legacy-packages.js — the IDENTITY-ADOPTION derivation (council C3).
+ * legacy-packages.js — the IDENTITY-ADOPTION derivation.
  *
  * An MP that replaces a legacy addon ADOPTS the legacy install identity: the
  * tenant's existing `addon_installs` row (package `time_clock`) must activate

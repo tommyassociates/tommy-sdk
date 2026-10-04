@@ -17,7 +17,7 @@ export type Category = ("scheduling" | "time_attendance" | "hr_people" | "financ
  */
 export type Predicate = ({
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 } | {
@@ -26,12 +26,12 @@ operands?: unknown[]
  */
 allOf: [{
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 }, ...({
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 })[]]
@@ -41,12 +41,12 @@ operands?: unknown[]
  */
 anyOf: [{
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 }, ...({
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 })[]]
@@ -713,6 +713,14 @@ description?: string
 placement?: {
 defaultSurface?: Surface
 order?: number
+/**
+ * Which dashboard region this panel seeds into. 'top' renders the tile ABOVE the shell/core panels (the legacy band position); omitted or 'bottom' keeps the default MP grid below them.
+ */
+region?: ("top" | "bottom")
+/**
+ * Whether the host seeds this panel onto an UNCONFIGURED dashboard. Omitted or true: the panel is part of the default composition. false: the panel is NOT seeded — it stays in the Add Panel catalogue and renders only where an admin has placed it. A stored composition is never affected.
+ */
+seed?: boolean
 }
 /**
  * How the panel behaves with no connectivity.
@@ -802,7 +810,7 @@ autoLaunch?: {
  */
 when?: ({
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 } | {
@@ -811,12 +819,12 @@ operands?: unknown[]
  */
 allOf: [{
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 }, ...({
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 })[]]
@@ -826,16 +834,20 @@ operands?: unknown[]
  */
 anyOf: [{
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 }, ...({
 source: InputMapSource
-op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range")
+op: ("exists" | "not_exists" | "equals" | "not_equals" | "one_of" | "range" | "includes_any")
 operand?: unknown
 operands?: unknown[]
 })[]]
 })
+/**
+ * Route tours use the canonical MP route. Surface tours are offered by the mounted view through tommy.tours.offer; the host owns completion, launch and concurrent-tour guards.
+ */
+mode?: ("route" | "surface")
 }
 /**
  * @minItems 1
@@ -992,14 +1004,24 @@ localData?: {
 [k: string]: {
 keyPath: string
 recordSchema: JsonSchema1
+/**
+ * Optional version of this store's schema. The host rebuilds the store on the device when it changes, or when keyPath, indexes or recordSchema change: cached server rows sync again, and authored and unsent rows go through the bundle's optional migrate(row, { fromSchema, toSchema, store }) and are kept when they fit, else set aside unsent (Settings → App Data → Pending sync). A lower version (a rolled-back MP) starts caches empty and sets authored rows aside. A bundle that declares any localData schemaVersion, or changes keyPath, indexes or recordSchema on any store, is published with min_host_api 5 or higher: a host below level 5 refuses the field and closes a changed authored store. Desktop builds rebuild stores only once their storage bridge advertises 'schema-fingerprint'; until then, publish no authored-store shape change.
+ */
+schemaVersion?: number
+/**
+ * Secondary indexes the host keeps for this store. They are never unique: uniqueness is the server's to enforce.
+ */
 indexes?: {
 name: string
 keyPath: string
-unique?: boolean
+/**
+ * Device indexes are never unique; the server enforces uniqueness. false is accepted and changes nothing; true is refused.
+ */
+unique?: false
 }[]
 syncStrategy: ("server_authoritative" | "last_write_wins" | "custom")
 /**
- * Optional resident-row ceiling for this store. Omit to take the DataStore default (50000), which is a RUNAWAY BACKSTOP and not a working-set size. REQUIRED when persist is true: a persisted store on the default keeps every window ever viewed on the user's disk, which is how the legacy vuex plugin reached 50-200MB and why it excluded the windowed collections outright. Derive it as rows-per-window x windows-retained, with headroom. Eviction never touches an unsynced row.
+ * Optional resident-row ceiling for this store. Omit to take the default (50000 rows for a store kept in memory, 20000 for one the host keeps on the device; the host caps a declaration at 50000), which is a RUNAWAY BACKSTOP and not a working-set size. REQUIRED when persist is true: a persisted store on the default keeps every window ever viewed on the user's disk, which is how the legacy vuex plugin reached 50-200MB and why it excluded the windowed collections outright. Derive it as rows-per-window x windows-retained, with headroom. Eviction never touches an unsynced row.
  */
 maxRows?: number
 /**

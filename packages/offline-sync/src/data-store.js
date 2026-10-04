@@ -1,4 +1,5 @@
 import { createTransactionalDataStore } from './transactional-store.js';
+import { utf16Units } from './bytes.js';
 /**
  * data-store.js — the DataStore behind `tommy.data.store(name)`
  * (sdk-types.ts DataStore/DataApi; offline-sync.md §1/§4).
@@ -18,13 +19,60 @@ import addFormats from 'ajv-formats';
 const ajv = new Ajv({ allErrors: true, strict: false });
 addFormats(ajv);
 
+/**
+ * Why a row does not fit a declared record schema, or null when it fits (or
+ * there is no schema): the same check a store's `put` makes.
+ */
+export function recordSchemaCheck(recordSchema) {
+  const validate = recordSchema ? ajv.compile(recordSchema) : null;
+  return (row) => (validate && !validate(row)
+    ? (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ') : null);
+}
+
+/** Rows by key, keyed as strings like every other backend (a numeric id and its text find the same row). */
+// Per backend: the pending write turn of each row key (see `rowTurn`). A
+// backend over shared storage names it (`turnKey`), so every handle over that
+// storage in this page takes the same turns, and every tab takes that
+// storage's Web Lock for each turn (see `acrossTabs`).
+const backendTurns = new WeakMap();
+const sharedTurns = new Map();
+function turnsFor(backend) {
+  if (typeof backend.turnKey === 'string') {
+    if (!sharedTurns.has(backend.turnKey)) sharedTurns.set(backend.turnKey, new Map());
+    return sharedTurns.get(backend.turnKey);
+  }
+  if (!backendTurns.has(backend)) backendTurns.set(backend, new Map());
+  return backendTurns.get(backend);
+}
+
+/** The origin's Web Locks, shared by every tab, or null where the runtime has none. */
+function webLocks() {
+  try {
+    const locks = globalThis.navigator?.locks;
+    return locks && typeof locks.request === 'function' ? locks : null;
+  } catch (_) {
+    return null;
+  }
+}
+/**
+ * Runs `task` holding the Web Lock for shared storage `name`, so a read-check-
+ * write in one tab never interleaves with a write to that storage from
+ * another. The storage is one blob per store, so the lock is per store.
+ * Without Web Locks the task runs as it is; the fenced delete then compares
+ * and deletes in one synchronous step on the storage (`deleteIf`).
+ */
+function acrossTabs(name, task) {
+  const locks = webLocks();
+  return locks ? locks.request(`offline-sync:${name}`, () => task()) : task();
+}
+
 export function createMemoryStoreBackend() {
   const rows = new Map();
   return {
-    async get(key) { return rows.get(key); },
+    async get(key) { return rows.get(String(key)); },
     async getAll() { return [...rows.values()]; },
-    async put(key, record) { rows.set(key, record); },
-    async delete(key) { rows.delete(key); },
+    async put(key, record) { rows.set(String(key), record); },
+    async delete(key) { rows.delete(String(key)); },
     keys() { return [...rows.keys()]; },
   };
 }
@@ -87,10 +135,17 @@ const RETAINED_BUDGET_MULTIPLE = 2;
  */
 const memoryFallback = new Map();
 
-/** Approximate the bytes one entry costs in the serialised blob. Quota is
- *  charged in UTF-16 code units, which is what `.length` counts. */
-const entryBytes = (key, record) => JSON.stringify(String(key)).length
-  + JSON.stringify(record).length + 1;
+/** Storage a backend could not reach: its store is unknown, not empty. */
+export function storageUnavailable(storeKey, cause) {
+  return Object.assign(new Error(`'${storeKey}': device storage could not be read`), {
+    name: 'StorageUnavailable', code: 'DATA_UNAVAILABLE', ...(cause ? { cause } : {}),
+  });
+}
+
+/** What one entry costs in the serialised blob: Web Storage charges its
+ *  quota in UTF-16 code units, so this store's budget counts those. */
+const entryBytes = (key, record) => utf16Units(JSON.stringify(String(key)))
+  + utf16Units(JSON.stringify(record)) + 1;
 
 /**
  * A localStorage-backed store backend — the same async contract as
@@ -104,21 +159,29 @@ const entryBytes = (key, record) => JSON.stringify(String(key)).length
  * DataStore above decides what a failed persist means to a caller — but they no
  * longer pretend to have succeeded either, which is the defect this closes.
  *
- * Reads still degrade to empty rather than throwing when storage is absent or
- * the blob is corrupt: there is nothing useful to tell a caller who asked what
- * is in an unreadable store, and the answer "nothing" is true.
+ * READS CANNOT BE TAKEN FOR EMPTY EITHER. Storage that cannot be reached
+ * (gone, or throwing on read) rejects with DATA_UNAVAILABLE, so a caller never
+ * mistakes an unknown store for an empty one (a removal that removed nothing
+ * would report success). A blob that is there but corrupt reads as empty,
+ * and the next write replaces it.
  */
-export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAULT_MAX_BYTES } = {}) {
+export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAULT_MAX_BYTES, evict = true } = {}) {
   const storeKey = `mp-store:${dbName}:${storeName}`;
+  // Storage that cannot be reached is never taken for an empty store: the
+  // read rejects (DATA_UNAVAILABLE), and so does every write that needs it. A
+  // blob that is there but cannot be parsed holds nothing that can be read,
+  // and the next write replaces it.
   function load() {
     if (memoryFallback.has(storeKey)) return new Map(memoryFallback.get(storeKey));
     const store = webStorage();
-    if (!store) return new Map();
+    if (!store) throw storageUnavailable(storeKey);
+    let raw;
+    try { raw = store.getItem(storeKey); } catch (error) { throw storageUnavailable(storeKey, error); }
+    if (!raw) return new Map();
     try {
-      const raw = store.getItem(storeKey);
-      return raw ? new Map(Object.entries(JSON.parse(raw))) : new Map();
+      return new Map(Object.entries(JSON.parse(raw)));
     } catch (_) {
-      return new Map(); // corrupt/unavailable — behave as empty, never throw
+      return new Map();
     }
   }
 
@@ -130,6 +193,10 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
    * Which means an all-dirty store cannot be shrunk at all — and that is the
    * point. A drafts store over budget FAILS THE WRITE rather than deleting
    * somebody's unsent work to make room for the next one.
+   *
+   * With `evict: false` (a store the device authors, such as preferences) no
+   * row is evictable: each is the only copy, so a write that does not fit is
+   * refused instead.
    */
   function evictToFit(map, protect) {
     let total = 0;
@@ -137,7 +204,7 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
     for (const [key, record] of map) {
       const bytes = entryBytes(key, record);
       total += bytes;
-      if (record && record._dirty) continue;
+      if (!evict || (record && record._dirty)) continue;
       if (protect !== undefined && String(key) === String(protect)) continue;
       rows.push({ key, bytes, at: record && record._updatedAt ? String(record._updatedAt) : '' });
     }
@@ -216,11 +283,18 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
     return discarded;
   }
 
-  /** Retain `map` for the session, bounded, and report what the bound cost. */
+  /**
+   * Retain `map` for the session, bounded, and report what the bound cost.
+   *
+   * With `evict: false` nothing is held: the write is refused (`refused`) and
+   * the store stays as it was saved, so a refused row never counts against a
+   * later write and no saved row is ever trimmed to bound what is held.
+   */
   function retain(map, protect) {
+    if (!evict) return { discarded: [], refused: true };
     const discarded = boundRetained(map, protect);
     memoryFallback.set(storeKey, new Map(map));
-    return discarded;
+    return { discarded, refused: false };
   }
 
   /**
@@ -241,7 +315,10 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
     return true;
   }
 
-  /** Persist `map`. Returns the same result shape as put/delete. */
+  /**
+   * Persist `map`. Returns the same result shape as put/delete; a write
+   * refused and not held anywhere (see `retain`) says `retained: false`.
+   */
   function save(map, protect) {
     const store = webStorage();
     if (!store) {
@@ -252,18 +329,18 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
       // store's quota path was written to end (review finding F4). Retain the
       // rows for the session and tell the caller, the same way the quota branch
       // does.
-      const discarded = retain(map, protect);
+      const { discarded, refused } = retain(map, protect);
       return {
-        ok: false, reason: 'unavailable', budget: maxBytes, evicted: [], discarded,
+        ok: false, reason: 'unavailable', budget: maxBytes, evicted: [], discarded, ...(refused ? { retained: false } : {}),
       };
     }
     const { total, evicted } = evictToFit(map, protect);
     if (total > maxBytes) {
       // Over budget with nothing left to give — every remaining row is either
       // dirty or the row being written. Refuse rather than drop a draft.
-      const discarded = retain(map, protect);
+      const { discarded, refused } = retain(map, protect);
       return {
-        ok: false, reason: 'budget', bytes: total, budget: maxBytes, evicted, discarded,
+        ok: false, reason: 'budget', bytes: total, budget: maxBytes, evicted, discarded, ...(refused ? { retained: false } : {}),
       };
     }
     try {
@@ -275,24 +352,55 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
       // The ORIGIN quota, not our own budget — some other key filled the 5MB, or
       // storage is disabled. Keep the rows for the session so the write is not
       // simply lost, and tell the caller it did not reach disk.
-      const discarded = retain(map, protect);
+      const { discarded, refused } = retain(map, protect);
       return {
-        ok: false, reason: 'quota', bytes: total, budget: maxBytes, evicted, discarded, error: e?.name || 'Error',
+        ok: false, reason: 'quota', bytes: total, budget: maxBytes, evicted, discarded, error: e?.name || 'Error', ...(refused ? { retained: false } : {}),
       };
     }
   }
 
+  // A write whose store cannot be read writes nothing and keeps nothing: it
+  // does not know the rows beside it, so holding a partial map would later
+  // read as the whole store.
+  const unreadable = (error) => {
+    if (error?.code !== 'DATA_UNAVAILABLE') throw error;
+    return { ok: false, reason: 'unavailable', budget: maxBytes, evicted: [], discarded: [], retained: false };
+  };
+  const loadForWrite = () => {
+    try { return { map: load() }; } catch (error) { return { refused: unreadable(error) }; }
+  };
   return {
     async get(key) { return load().get(String(key)); },
     async getAll() { return [...load().values()]; },
     async put(key, record) {
-      const map = load();
+      const { map, refused } = loadForWrite();
+      if (refused) return refused;
       map.set(String(key), record);
       return save(map, String(key));
     },
-    async delete(key) { const map = load(); map.delete(String(key)); return save(map); },
+    async delete(key) {
+      const { map, refused } = loadForWrite();
+      if (refused) return refused;
+      map.delete(String(key));
+      return save(map);
+    },
+    /**
+     * Deletes the row unless `keep(stored)` says otherwise, reading and writing
+     * the storage in one synchronous step. Resolves `{ kept: true }` when the
+     * stored row was kept, otherwise the delete's result with `existed`.
+     */
+    async deleteIf(key, keep) {
+      const { map, refused } = loadForWrite();
+      if (refused) return refused;
+      const stored = map.get(String(key));
+      if (stored !== undefined && keep(stored)) return { kept: true };
+      if (stored === undefined) return { ok: true, existed: false };
+      map.delete(String(key));
+      return { ...save(map), existed: true };
+    },
     keys() { return [...load().keys()]; },
     patchRetained,
+    turnKey: storeKey,
   };
 }
 
@@ -352,14 +460,42 @@ export class PersistError extends Error {
   }
 }
 
+/**
+ * Index order for stores without a physical index (memory and Web Storage):
+ * the same value order the host store's encoding gives, so a query returns
+ * the same rows in the same order on every backend.
+ */
+function compareIndexValues(a, b) {
+  const rank = (value) => (value === null || value === undefined ? 0 : typeof value === 'boolean' ? 1 : typeof value === 'number' ? 2 : 3);
+  if (rank(a) !== rank(b)) return rank(a) - rank(b);
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+export function queryRows(rows, fields, { equals, prefix, lower, upper } = {}, keyOf = (row) => row.id) {
+  const head = equals || prefix || [];
+  const at = head.length;
+  return rows.filter((row) => head.every((value, index) => compareIndexValues(row[fields[index]], value) === 0)
+    && (lower === undefined || compareIndexValues(row[fields[at]], lower) >= 0)
+    && (upper === undefined || compareIndexValues(row[fields[at]], upper) <= 0))
+    .sort((a, b) => {
+      for (const field of fields) { const result = compareIndexValues(a[field], b[field]); if (result) return result; }
+      const ka = String(keyOf(a)); const kb = String(keyOf(b));
+      return ka < kb ? -1 : ka > kb ? 1 : 0;
+    });
+}
+
 export function createDataStore({
   name, keyPath = 'id', recordSchema, backend = createMemoryStoreBackend(),
   now = () => Date.now(), maxRows = DEFAULT_MAX_ROWS, maxWindows = DEFAULT_MAX_WINDOWS, onPersistError,
-  syncStrategy = 'server_authoritative',
+  syncStrategy = 'server_authoritative', indexes = {},
 }) {
   const validate = recordSchema ? ajv.compile(recordSchema) : null;
+  // A client-owned (`last_write_wins`) store holds the only copy of its rows:
+  // neither the row cap nor window retention removes them.
+  const evictsRows = syncStrategy !== 'last_write_wins';
   const wholeStoreSubscribers = new Set();
   const selectorSubscribers = new Set(); // {selector, handler, touched:Set, last}
+  const changeListeners = new Set();
 
   /**
    * Resident row count, so `put` can bound the store WITHOUT walking it.
@@ -387,6 +523,32 @@ export function createDataStore({
   // can make a row evictable again — a delete, a markSynced clearing `_dirty` —
   // clears the latch.
   let capSaturated = false;
+  // The highest revision this store has written or removed. A row's next
+  // revision is above it, so a key written again after it was removed never
+  // takes a revision it held (a push still on its way cannot settle the new
+  // row).
+  let revisionTop = 0;
+  const noteRevision = (row) => { if (Number.isSafeInteger(row?._rev) && row._rev > revisionTop) revisionTop = row._rev; };
+  const nextRowRevision = (previous) => { revisionTop = Math.max(revisionTop, previous?._rev || 0) + 1; return revisionTop; };
+  // A write reads the row and writes it back as one step per key: `put`,
+  // `delete` and `markSynced` on the same key take turns, so a check against
+  // the stored row (dirty, revision) still holds when the write lands. The
+  // turns belong to the backend, so every store handle over it in this page
+  // takes turns with the others; over shared storage (Web Storage) each turn
+  // also holds that storage's Web Lock, so other tabs' writes wait for it.
+  // Durable collections use the transactional host store, which checks inside
+  // its commit.
+  const rowTurns = turnsFor(backend);
+  const sharedStorage = typeof backend.turnKey === 'string' ? backend.turnKey : null;
+  function rowTurn(key, task) {
+    const id = String(key);
+    const run = sharedStorage ? () => acrossTabs(sharedStorage, task) : task;
+    const next = (rowTurns.get(id) || Promise.resolve()).then(run);
+    const tail = next.then(() => {}, () => {});
+    rowTurns.set(id, tail);
+    tail.then(() => { if (rowTurns.get(id) === tail) rowTurns.delete(id); });
+    return next;
+  }
 
   /**
    * Tell the host a write did not reach disk. One channel, not two: the host
@@ -538,6 +700,8 @@ export function createDataStore({
    *     spent on the only candidates available, which are the freshest ones:
    *     a store holding many dirty rows strip-mined the CURRENT window and the
    *     grid silently painted half of it (adversarial review 2026-08-31).
+   *   · every row of a client-owned (`last_write_wins`) store — each is the
+   *     only copy, so such a store has no row cap at all.
    *
    * Rows lacking `_updatedAt` sort as UNKNOWN age, not as epoch-zero, so they
    * are evicted only after genuinely-older stamped rows.
@@ -564,16 +728,20 @@ export function createDataStore({
    * before it throws — and the row simply stays resident, which is the same
    * outcome the cap already tolerates for a `_dirty` row.
    */
-  async function evict(key) {
+  // With `expectedRevision`, a row written since it was read is kept.
+  // Resolves whether the row left memory.
+  async function evict(key, expectedRevision) {
     try {
-      await api.delete(key, { silent: true });
+      await api.delete(key, { silent: true, ...(expectedRevision !== undefined ? { expectedRevision } : {}) });
+      return true;
     } catch (e) {
       if (e?.name !== 'PersistError') throw e;
+      return e.reason !== 'conflict';
     }
   }
 
   async function enforceRowCap({ protect, changed } = {}) {
-    if (!Number.isFinite(maxRows) || maxRows <= 0) return [];
+    if (!evictsRows || !Number.isFinite(maxRows) || maxRows <= 0) return [];
     const rows = await backend.getAll();
     if (rows.length <= maxRows) return [];
     const evictable = rows.filter((row) => !row._dirty
@@ -590,7 +758,7 @@ export function createDataStore({
     for (const row of doomed) {
       const key = keyOf(row);
       // eslint-disable-next-line no-await-in-loop
-      await evict(key);
+      if (!(await evict(key, row._rev))) continue;
       if (changed) changed.add(key);
       evicted.push(key);
     }
@@ -633,17 +801,20 @@ export function createDataStore({
    * Whether a row may be PAINTED. Caches age out at the platform ceiling;
    * client-owned (`last_write_wins`) rows never do — they are the only copy.
    */
-  const ceilingApplies = syncStrategy !== 'last_write_wins';
+  const ceilingApplies = evictsRows;
+  // A local delete waiting to be sent (`_deleted`) never paints.
   const paintable = (row) => {
+    if (row?._deleted) return false;
     if (!ceilingApplies || !row || row._dirty) return true;
     const at = Date.parse(row._updatedAt || '');
     return !Number.isFinite(at) || at >= now() - PAINT_CEILING_MS;
   };
 
-  if (backend.transactional) return createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows });
+  if (backend.transactional) return createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows: evictsRows ? maxWindows : Infinity, indexes, queryRows });
+
 
   async function enforceWindowRetention({ current, changed, keep = maxWindows } = {}) {
-    if (!Number.isFinite(keep) || keep <= 0) return [];
+    if (!evictsRows || !Number.isFinite(keep) || keep <= 0) return [];
     const rows = await backend.getAll();
     const lastTouched = new Map();
     for (const row of rows) {
@@ -672,16 +843,16 @@ export function createDataStore({
       if (!row || row._window == null || !drop.has(row._window) || row._dirty) continue;
       const key = keyOf(row);
       // eslint-disable-next-line no-await-in-loop
-      await evict(key);
-      if (changed) changed.add(key);
+      if (await evict(key, row._rev) && changed) changed.add(key);
     }
     return doomed;
   }
 
+  // Keys compare as text, as the backends store them.
   function trackedQuery(records, touched) {
-    const byKey = new Map(records.map((r) => [keyOf(r), r]));
+    const byKey = new Map(records.map((r) => [String(keyOf(r)), r]));
     return {
-      get(key) { touched.add(key); return byKey.get(key); },
+      get(key) { touched.add(String(key)); return byKey.get(String(key)); },
       getAll() { touched.add('*'); return records; },
     };
   }
@@ -692,10 +863,14 @@ export function createDataStore({
    * every subscriber exactly once instead of N times (see reconcile below).
    */
   async function notify(changed) {
-    const changedKeys = (changed && typeof changed !== 'string' && typeof changed[Symbol.iterator] === 'function')
-      ? new Set(changed)
-      : new Set([changed]);
-    const records = await snapshot();
+    const changedKeys = new Set([...((changed && typeof changed !== 'string' && typeof changed[Symbol.iterator] === 'function')
+      ? changed : [changed])].map(String));
+    for (const listener of changeListeners) {
+      try { listener(); } catch (_) { /* listener errors are theirs */ }
+    }
+    // Subscribers see what a read would: rows that paint (never an unsent
+    // delete's tombstone, never a row past the paint ceiling).
+    const records = (await snapshot()).filter(paintable);
     for (const handler of wholeStoreSubscribers) {
       try { handler(records); } catch (_) { /* subscriber errors are theirs */ }
     }
@@ -712,11 +887,40 @@ export function createDataStore({
   }
 
   let disposed = false;
+  const indexFields = Object.fromEntries(Object.entries(indexes || {}).map(([index, fields]) => [index, Array.isArray(fields) ? fields : [fields]]));
   const api = {
+    /**
+     * Rows by a declared index, in index order, the same as the host store's
+     * physical indexes: `equals`, or a `prefix` of the leading fields with an
+     * inclusive `lower`/`upper` bound on the next one. `cursor` continues.
+     */
+    async query(index, range = {}, { limit = 50, cursor = null, raw = false } = {}) {
+      const fields = indexFields[index];
+      const refuse = (why) => { throw Object.assign(new Error(`store '${name}': ${why}`), { name: 'StorageReadError', reason: 'unserializable' }); };
+      if (!fields) refuse(`index '${index}' is not declared`);
+      // The ranges the host store takes, and no others: `equals` names every
+      // field of the index; a `prefix` names leading fields, bounded on the
+      // next one when there is one.
+      const head = range.equals || range.prefix || [];
+      const bounded = range.lower !== undefined || range.upper !== undefined;
+      if ((range.equals && (range.prefix || bounded)) || head.length > fields.length
+        || (range.equals && head.length !== fields.length) || (bounded && head.length >= fields.length)) {
+        refuse(`index '${index}' takes equals of all ${fields.length} fields, or a prefix of fewer`);
+      }
+      const rows = queryRows((await snapshot()).filter((row) => raw || paintable(row)), fields, range, keyOf);
+      const start = cursor === null ? 0 : rows.findIndex((row) => String(keyOf(row)) === String(cursor)) + 1;
+      const page = rows.slice(start, start + limit);
+      const more = start + limit < rows.length;
+      return { rows: page, nextCursor: more ? String(keyOf(page.at(-1))) : null, complete: !more };
+    },
+    /** Subscribers read the store again after a change made elsewhere. */
+    /** Subscribers read the store again; `removed` names rows that went, so a subscriber watching one hears it. */
+    async revalidateSubscribers(removed = []) { await notify([...(backend.keys?.() || []), ...removed.map(String)]); },
     dispose(options) {
       disposed = true;
       wholeStoreSubscribers.clear();
       selectorSubscribers.clear();
+      changeListeners.clear();
       return backend.close?.(options);
     },
     /** The declared store name — so a report can say WHICH store rejected. */
@@ -745,9 +949,11 @@ export function createDataStore({
       return (await snapshot()).filter(paintable);
     },
     /**
-     * The WRITERS' view: every row, ceiling and all. A writer building a merge
-     * map (`prevById`) or reconciling must see rows it may not paint, or it will
-     * delete or duplicate what it cannot see.
+     * The WRITERS' view: every row, past the paint ceiling and the host
+     * store's age limit too. A writer building a merge map (`prevById`),
+     * reconciling or deciding what to purge must see rows it may not paint, or
+     * it will delete or duplicate what it cannot see, or leave behind what it
+     * reports removed.
      */
     async getAllRaw() {
       return snapshot();
@@ -779,6 +985,10 @@ export function createDataStore({
     async readWhere(predicate = () => true) {
       return (await snapshot()).filter(paintable).filter(predicate).map(stripMeta);
     },
+    /** What `readWhere(predicate)` would answer, from rows a subscriber was just given. */
+    selectFrom(rows, predicate = () => true) {
+      return (rows || []).filter(paintable).filter(predicate).map(stripMeta);
+    },
     /**
      * Why a record would be REFUSED by `put`, or null if it would be accepted.
      *
@@ -795,41 +1005,56 @@ export function createDataStore({
       if (keyOf(record) === undefined) return `record missing keyPath '${keyPath}'`;
       return null;
     },
-    async put(record, { dedupeKey, silent = false, deferCap = false } = {}) {
+    // `server: true` (reconcile with `keepDirty`) stores the row synced in the
+    // same write, and leaves a row with an unsent local write untouched:
+    // resolves undefined then.
+    async put(record, { dedupeKey, silent = false, deferCap = false, server = false } = {}) {
       if (validate && !validate(record)) {
         const detail = (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ');
-        throw new Error(`store '${name}': record failed recordSchema: ${detail}`);
+        throw Object.assign(new Error(`store '${name}': record failed recordSchema: ${detail}`), { code: 'DATA_INVALID' });
       }
       const key = keyOf(record);
-      if (key === undefined) throw new Error(`store '${name}': record missing keyPath '${keyPath}'`);
-      const previous = await backend.get(key);
-      if (residentCount === null) {
-        // `keys()` is the cheap route (both shipped backends answer it without
-        // deserialising rows), but it is not part of the documented
-        // backendFactory contract, so fall back rather than throw on a custom one.
-        residentCount = typeof backend.keys === 'function'
-          ? backend.keys().length
-          : (await backend.getAll()).length;
-      }
-      const stamped = {
-        ...record,
-        // ⚠ CARRY `_window` FORWARD. It is store metadata of the same class as
-        // `_rev` — the caller's record never contains it — so spreading the
-        // record over the row DROPPED it, and any writer that reconciles
-        // without a `windowKey` (a filtered read, an optimistic form write)
-        // silently un-tagged rows a windowed read had tagged. Retention only
-        // sees `_window` rows (enforceWindowRetention), so a store with mixed
-        // writers leaked out of its own retention bound one row at a time. A
-        // reconcile that DOES carry a windowKey re-stamps the row afterwards,
-        // so this preserves without ever pinning a row to a stale window.
-        ...(previous?._window != null ? { _window: previous._window } : {}),
-        _rev: (previous?._rev || 0) + 1,
-        _updatedAt: new Date(now()).toISOString(),
-        _dirty: true,
-        ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}),
-      };
-      const persisted = await backend.put(key, stamped);
-      if (previous === undefined) residentCount += 1;
+      if (key === undefined) throw Object.assign(new Error(`store '${name}': record missing keyPath '${keyPath}'`), { code: 'DATA_INVALID' });
+      const turn = await rowTurn(key, async () => {
+        const previous = await backend.get(key);
+        if (server && previous?._dirty) return null;
+        if (residentCount === null) {
+          // `keys()` is the cheap route (both shipped backends answer it without
+          // deserialising rows), but it is not part of the documented
+          // backendFactory contract, so fall back rather than throw on a custom one.
+          residentCount = typeof backend.keys === 'function'
+            ? backend.keys().length
+            : (await backend.getAll()).length;
+        }
+        const stamped = {
+          ...record,
+          // ⚠ CARRY `_window` FORWARD. It is store metadata of the same class as
+          // `_rev` — the caller's record never contains it — so spreading the
+          // record over the row DROPPED it, and any writer that reconciles
+          // without a `windowKey` (a filtered read, an optimistic form write)
+          // silently un-tagged rows a windowed read had tagged. Retention only
+          // sees `_window` rows (enforceWindowRetention), so a store with mixed
+          // writers leaked out of its own retention bound one row at a time. A
+          // reconcile that DOES carry a windowKey re-stamps the row afterwards,
+          // so this preserves without ever pinning a row to a stale window.
+          ...(previous?._window != null ? { _window: previous._window } : {}),
+          // What a push acknowledged of this row stays known through later writes.
+          ...(Number.isSafeInteger(previous?._ackRev) ? { _ackRev: previous._ackRev } : {}),
+          // A local write keeps a refusal for access: the row stays refused until a retry.
+          ...(!server && previous?._pushRefused != null ? { _pushRefused: previous._pushRefused } : {}),
+          _rev: nextRowRevision(previous),
+          _updatedAt: new Date(now()).toISOString(),
+          _dirty: !server,
+          ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}),
+        };
+        if (server) capSaturated = false;   // a clean row is an evictable row
+        const written = await backend.put(key, stamped);
+        // A write refused and not held (`retained: false`) left the row as it was.
+        if (previous === undefined && !(written?.ok === false && written.retained === false)) residentCount += 1;
+        return { stamped, persisted: written };
+      });
+      if (turn === null) return undefined;
+      const { stamped, persisted } = turn;
       if (persisted && persisted.ok === false) {
         // The row IS in the store — the backend retained it in memory — but it
         // is not on disk. Flag it so a surface can say so, notify so the flag
@@ -842,13 +1067,13 @@ export function createDataStore({
         // backend without it keeps the old behaviour rather than losing the flag.
         // The re-put fallback runs the whole save path again, so its result can
         // carry gone rows of its own — dropped on the floor until BSC-5.
+        // A write the backend did not hold (`retained: false`) left the row
+        // as it was: there is nothing to flag.
         let reput = null;
-        if (typeof backend.patchRetained === 'function') {
-          if (!backend.patchRetained(key, { _persistFailed: true })) {
+        if (persisted.retained !== false) {
+          if (typeof backend.patchRetained !== 'function' || !backend.patchRetained(key, { _persistFailed: true })) {
             reput = await backend.put(key, { ...stamped, _persistFailed: true });
           }
-        } else {
-          reput = await backend.put(key, { ...stamped, _persistFailed: true });
         }
         // ⚠ ITS KEYS JOIN THE BATCH TOO. Counting and reporting them while
         // leaving them out of the notify meant a selector subscriber watching a
@@ -883,7 +1108,7 @@ export function createDataStore({
       // and the host heard nothing about storage pressure that HAD cost data.
       const byteEvicted = accountForGoneRows(persisted, key);
       let evicted = [];
-      if (!deferCap && residentCount > maxRows && !capSaturated) {
+      if (!deferCap && evictsRows && residentCount > maxRows && !capSaturated) {
         // `protect` the row just written — it is the newest thing in the store,
         // and eviction spending its budget on it would undo the write.
         evicted = await enforceRowCap({ protect: new Set([String(key)]) });
@@ -897,10 +1122,34 @@ export function createDataStore({
       if (!silent) await notify(displaced.length ? [key, ...displaced] : key);
       return key;
     },
-    async delete(key, { silent = false } = {}) {
-      capSaturated = false;   // one fewer row: the cap may be able to act again
-      if (residentCount !== null && (await backend.get(key)) !== undefined) residentCount -= 1;
-      const persisted = await backend.delete(key);
+    /**
+     * With `expectedRevision`, only while the row is still that revision: a
+     * row written since is kept and the delete rejects with a `conflict`
+     * PersistError, as on the host store.
+     */
+    async delete(key, { silent = false, expectedRevision } = {}) {
+      const persisted = await rowTurn(key, async () => {
+        if (expectedRevision !== undefined && typeof backend.deleteIf === 'function') {
+          // Compared and deleted in one step on the storage itself.
+          const result = await backend.deleteIf(key, (stored) => { noteRevision(stored); return stored._rev !== expectedRevision; });
+          if (result?.kept) throw new PersistError(name, { reason: 'conflict', retained: false });
+          if (result?.existed && !(result.ok === false && result.retained === false)) {
+            capSaturated = false;
+            if (residentCount !== null) residentCount -= 1;
+          }
+          return result;
+        }
+        const current = await backend.get(key);
+        noteRevision(current);
+        if (current !== undefined && expectedRevision !== undefined && current._rev !== expectedRevision) {
+          throw new PersistError(name, { reason: 'conflict', retained: false });
+        }
+        capSaturated = false;   // one fewer row: the cap may be able to act again
+        const result = await backend.delete(key);
+        // A delete refused and not held (`retained: false`) left the row.
+        if (residentCount !== null && current !== undefined && !(result?.ok === false && result.retained === false)) residentCount -= 1;
+        return result;
+      });
       // `backend.delete` runs the same `save()` as a put, so it can byte-evict
       // on success and trip the retention bound on failure. This path read
       // neither field, so a delete that displaced other rows inflated the
@@ -912,23 +1161,108 @@ export function createDataStore({
         throw new PersistError(name, persisted);
       }
     },
-    /** Sync engine hook: clear _dirty after a successful push. */
-    async markSynced(key) {
-      const record = await backend.get(key);
-      if (!record) return;
-      // Drop `_persistFailed` alongside `_dirty`: a row that reached the server
-      // is no longer "saved on this device only", whatever happened to the local
-      // copy on the way.
-      const { _persistFailed: _pf, ...rest } = record;
-      // ⚠ THIS WRITE CAN DISPLACE ROWS TOO. Marking a row synced makes it
-      // evictable, which is exactly when the byte guard can act — and this path
-      // discarded the result unconditionally, so those keys were never counted,
-      // never notified and never reported (review BSC-5).
-      const persisted = await backend.put(key, { ...rest, _dirty: false });
+    /**
+     * Sync engine hook: writes its markers onto a stored row without
+     * validating or re-stamping the record — `_deleted` (a local delete
+     * waiting to be sent, hidden from every read that paints) and
+     * `_pushRefused` (the server refused the row's push). A `null` value
+     * removes a marker; `dirty: true` makes the row an unsent change; `body`
+     * replaces the row's fields (a tombstone keeps only its key, so it holds
+     * no indexed value). Resolves whether the row was there.
+     */
+    async markRow(key, patch, { dirty = false, body = null } = {}) {
+      const persisted = await rowTurn(key, async () => {
+        const record = await backend.get(key);
+        if (!record) return null;
+        const meta = Object.fromEntries(Object.entries(record).filter(([field]) => field.startsWith('_')));
+        const next = body ? { ...body, ...meta } : { ...record };
+        Object.entries(patch).forEach(([field, value]) => { if (value === null) delete next[field]; else next[field] = value; });
+        if (dirty) Object.assign(next, { _dirty: true, _rev: nextRowRevision(record), _updatedAt: new Date(now()).toISOString() });
+        return backend.put(key, next);
+      });
+      if (persisted === null) return false;
+      const gone = accountForGoneRows(persisted, key);
+      await notify(gone.length ? [key, ...gone] : key);
+      if (persisted && persisted.ok === false) {
+        reportPersistFailure(persisted, key);
+        throw new PersistError(name, persisted);
+      }
+      return true;
+    },
+    /**
+     * Sync engine hook: clear _dirty after a successful push. With
+     * `expectedRevision`, only while the row is still that revision: a later
+     * local write stays dirty until its own push. `pushed` records the
+     * revision as one a push acknowledged (`_ackRev`); a server row marked
+     * synced is not one.
+     */
+    async markSynced(key, { expectedRevision, pushed = false } = {}) {
+      const persisted = await rowTurn(key, async () => {
+        const record = await backend.get(key);
+        if (!record) return null;
+        if (expectedRevision !== undefined && record._rev !== expectedRevision) return null;
+        // Drop `_persistFailed` alongside `_dirty`: a row that reached the server
+        // is no longer "saved on this device only", whatever happened to the local
+        // copy on the way. A refusal for access set meanwhile stays: only a
+        // person's retry clears it.
+        const { _persistFailed: _pf, ...rest } = record;
+        // ⚠ THIS WRITE CAN DISPLACE ROWS TOO. Marking a row synced makes it
+        // evictable, which is exactly when the byte guard can act — and this path
+        // discarded the result unconditionally, so those keys were never counted,
+        // never notified and never reported (review BSC-5).
+        return backend.put(key, { ...rest, _dirty: false, ...(pushed ? { _ackRev: record._rev } : {}) });
+      });
+      if (persisted === null) return;
       const gone = accountForGoneRows(persisted, key);
       if (gone.length) await notify(gone);
       capSaturated = false;   // a clean row is an evictable row
 
+    },
+    /**
+     * Sets `patch`'s fields on the stored rows of `keys` as a server change:
+     * each row is read and written in one turn (other handles in this page,
+     * and other tabs over shared storage, wait for it), so a write or delete
+     * that lands first is what the patch applies to. A row that is gone or
+     * holds an unsent local write is left as it is; a row the record schema
+     * refuses once patched is not written. Resolves `{ patched, unsaved,
+     * skipped: [{ key, reason: 'gone' | 'unsent' }], refused: [{ key, reason }] }`;
+     * `unsaved` rows are patched in memory but not on the device.
+     */
+    async patchSynced(keys, patch) {
+      const patched = [];
+      const unsaved = [];
+      const skipped = [];
+      const refused = [];
+      const changed = [];
+      for (const key of [...new Set((keys || []).map(String))]) {
+        // eslint-disable-next-line no-await-in-loop
+        const outcome = await rowTurn(key, async () => {
+          const previous = await backend.get(key);
+          if (!previous || previous._deleted) return { skip: 'gone' };
+          if (previous._dirty) return { skip: 'unsent' };
+          const record = { ...stripMeta(previous), ...patch };
+          if (validate && !validate(record)) {
+            return { refuse: (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ') || 'invalid' };
+          }
+          const { _persistFailed: _pf, ...meta } = Object.fromEntries(Object.entries(previous).filter(([field]) => field.startsWith('_')));
+          const persisted = await backend.put(key, {
+            ...record, ...meta, _rev: nextRowRevision(previous), _updatedAt: new Date(now()).toISOString(), _dirty: false,
+          });
+          return { persisted };
+        });
+        if (outcome.skip) skipped.push({ key, reason: outcome.skip });
+        else if (outcome.refuse) refused.push({ key, reason: outcome.refuse });
+        else {
+          changed.push(key, ...accountForGoneRows(outcome.persisted, key));
+          if (outcome.persisted && outcome.persisted.ok === false) {
+            if (outcome.persisted.retained === false) refused.push({ key, reason: outcome.persisted.reason || 'not-saved' });
+            else unsaved.push(key);
+            reportPersistFailure(outcome.persisted, key);
+          } else patched.push(key);
+        }
+      }
+      if (changed.length) await notify(changed);
+      return { patched, unsaved, skipped, refused };
     },
     /**
      * SWR reconcile — merge a fresh AUTHORITATIVE set of records into the store,
@@ -950,10 +1284,20 @@ export function createDataStore({
      * indexeddb.js`). With a `windowKey`, `enforceWindowRetention` keeps the K
      * most recently touched windows and drops the rest. Untagged rows are never
      * touched by it: a non-windowed store behaves exactly as before.
+     *
+     * `prune: false` only upserts: no row the set leaves out is removed.
+     * `keepDirty: true` leaves a row with an unsent local write as it is
+     * (its key listed in `skipped`) instead of overwriting it with the
+     * server's copy.
      */
-    async reconcile(records = [], { scope, windowKey } = {}) {
-      const existing = await backend.getAll();
+    // `protect`: keys the row cap never evicts for this reconcile (rows a
+    // whole read answered that it did not write again).
+    async reconcile(records = [], { scope, windowKey, prune = true, keepDirty = false, protect = [] } = {}) {
+      const existing = prune ? await backend.getAll() : [];
       const incoming = new Set();
+      const skipped = [];
+      // Rows kept in memory only: their device storage refused them.
+      const unsaved = [];
       // ONE notify for the whole merge, at the end. Per-record notifies made a
       // reconcile of N rows wake every subscriber N times, each with a
       // partially-merged snapshot — so an instant-data surface repainted N
@@ -966,12 +1310,18 @@ export function createDataStore({
         let key;
         try {
           // eslint-disable-next-line no-await-in-loop
-          key = await api.put(record, { silent: true, deferCap: true });
+          key = await api.put(record, { silent: true, deferCap: true, ...(keepDirty ? { server: true } : {}) });
         } catch (e) {
+          // Only a record the store refused as a record (DATA_INVALID) or kept
+          // in memory (PersistError) is handled here; any other failure is the
+          // storage's, and fails the whole merge rather than be counted stored.
+          if (e?.name !== 'PersistError' && e?.code !== 'DATA_INVALID') throw e;
           // ⚠ TWO DIFFERENT FAILURES ARRIVE HERE AND THEY ARE NOT THE SAME ROW.
           //
           // A `PersistError` means the row IS in the store — the backend kept it
-          // in memory and flagged `_persistFailed` — it just did not reach disk.
+          // in memory and flagged `_persistFailed` — it just did not reach disk
+          // (unless it says `retained: false`: nothing was kept, and the row is
+          // as it was saved).
           // Skipping it here left it out of `incoming`, so the prune below then
           // DELETED it as absent, microseconds after the retain contract promised
           // to keep it. On a durable cache under storage pressure, which is the
@@ -989,6 +1339,7 @@ export function createDataStore({
             if (failedKey !== undefined) {
               incoming.add(String(failedKey));
               changed.add(failedKey);
+              unsaved.push(String(failedKey));
               // ...and clear `_dirty`, which `put` stamped on the way in. This
               // row came from the SERVER; leaving it dirty misuses the flag that
               // means "unpushed user work" and makes the row untouchable — dirty
@@ -999,7 +1350,7 @@ export function createDataStore({
               // repair above). `_persistFailed` is deliberately KEPT: not on disk
               // is still true.
               // eslint-disable-next-line no-await-in-loop
-              const retained = await backend.get(failedKey);
+              const retained = e.retained === false ? null : await backend.get(failedKey);
               if (retained) {
                 // eslint-disable-next-line no-await-in-loop
                 const cleared = await backend.put(failedKey, { ...retained, _dirty: false });
@@ -1013,8 +1364,15 @@ export function createDataStore({
           }
           continue;
         }
+        if (key === undefined) {
+          // An unsent local write (`keepDirty`): the row stays as the user left it.
+          incoming.add(String(keyOf(record)));
+          skipped.push(String(keyOf(record)));
+          continue;
+        }
+        // A `server` put already stored the row synced.
         // eslint-disable-next-line no-await-in-loop
-        await api.markSynced(key);
+        if (!keepDirty) await api.markSynced(key);
         // Tag the row with the window it was fetched under, so retention can
         // drop whole windows later. Written straight to the backend rather than
         // through `put` so it costs no schema validation and no extra notify —
@@ -1022,25 +1380,27 @@ export function createDataStore({
         // never reach a recordSchema.
         if (windowKey != null) {
           // eslint-disable-next-line no-await-in-loop
-          const stored = await backend.get(key);
-          if (stored) {
-            // eslint-disable-next-line no-await-in-loop
-            const stamped = await backend.put(key, { ...stored, _window: String(windowKey) });
-            for (const k of accountForGoneRows(stamped, key)) changed.add(k);
-          }
+          const stamped = await rowTurn(key, async () => {
+            const stored = await backend.get(key);
+            return stored ? backend.put(key, { ...stored, _window: String(windowKey) }) : null;
+          });
+          if (stamped) for (const k of accountForGoneRows(stamped, key)) changed.add(k);
         }
         incoming.add(String(key));
         changed.add(key);
       }
       let pruned = 0;
+      const prunedKeys = [];
       for (const row of existing) {
         const key = keyOf(row);
         if (incoming.has(String(key)) || row._dirty) continue; // kept: fresh or optimistic
         if (scope && !scope(row)) continue; // out of the reconcile scope
+        // A row written since the set was read stays.
         // eslint-disable-next-line no-await-in-loop
-        await evict(key);
+        if (!(await evict(key, row._rev))) continue;
         changed.add(key);
         pruned += 1;
+        prunedKeys.push(String(key));
       }
       // Out-of-scope rows survive the prune above BY DESIGN (that is what
       // scoped reconcile means), so the cap is the only thing standing
@@ -1054,12 +1414,16 @@ export function createDataStore({
       const dropped = windowKey != null
         ? await enforceWindowRetention({ current: String(windowKey), changed })
         : [];
-      const evicted = await enforceRowCap({ protect: incoming, changed });
+      const evicted = await enforceRowCap({ protect: new Set([...incoming, ...protect.map(String)]), changed });
       capSaturated = false;   // the merge changed both the row set and its dirtiness
       if (changed.size) await notify(changed);
       return {
-        upserted: incoming.size,
+        upserted: incoming.size - new Set(skipped).size,
         pruned,
+        // The keys it removed, when it removed any.
+        ...(prunedKeys.length ? { prunedKeys } : {}),
+        ...(skipped.length ? { skipped: [...new Set(skipped)] } : {}),
+        ...(unsaved.length ? { unsaved: [...new Set(unsaved)] } : {}),
         ...(dropped.length ? { windowsDropped: dropped.length } : {}),
         ...(evicted.length ? { evicted: evicted.length } : {}),
       };
@@ -1068,12 +1432,17 @@ export function createDataStore({
       wholeStoreSubscribers.add(handler);
       return () => wholeStoreSubscribers.delete(handler);
     },
+    /** Called after every change, before subscribers read the store. */
+    onChange(listener) {
+      changeListeners.add(listener);
+      return () => changeListeners.delete(listener);
+    },
     subscribeQuery(selector, handler) {
       const sub = { selector, handler, touched: new Set(['*']), last: undefined };
       // Prime: compute initial value + touched set without firing the handler.
       snapshot().then((records) => {
         const touched = new Set();
-        sub.last = selector(trackedQuery(records, touched));
+        sub.last = selector(trackedQuery(records.filter(paintable), touched));
         sub.touched = touched;
       });
       selectorSubscribers.add(sub);

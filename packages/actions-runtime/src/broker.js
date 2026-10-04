@@ -19,7 +19,7 @@
  *  - server_write forwards to the injected `serverInvoke` seam (the F0 typed
  *    client's invoke — contract envelope; NEVER an endpoint literal here)
  */
-import { TommyError, isTommyError } from '@tommy/sdk';
+import { TommyError, isTommyError, DEFAULT_RPC_TIMEOUT_MS } from '@tommy/sdk';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import {
@@ -52,6 +52,10 @@ const PROCESSED_KEYS_MAX = 1000;
 /** Keys whose RESULT was released but whose already-applied fact must survive
  *  — far cheaper per entry, so it holds an order of magnitude more. */
 const APPLIED_KEYS_OVERFLOW_MAX = 10000;
+/** Idempotent runs that may be in flight at once. Past it a new keyed invoke
+ *  is refused (`RateLimited`) rather than admitted, so every running key stays
+ *  joinable and a stuck MP cannot pile up work without limit. */
+const INFLIGHT_RUNS_MAX = 500;
 
 // Server-write activities whose host adapter needs replay provenance (see
 // executeInvoke). Additive: an activity in neither set gets exactly the envelope
@@ -121,6 +125,9 @@ function stableHash(value) {
   return (hash >>> 0).toString(36);
 }
 
+// A text's size in UTF-16 code units, as Web Storage quotas charge it.
+const utf16Units = (text) => String(text).length;
+
 export function createBroker({
   capabilityService,
   recordBackend,
@@ -146,6 +153,17 @@ export function createBroker({
   enforceConditionScopes = false,
   /** F3/F4: emit must own the trigger namespace; subscribe must be granted. */
   strictEmitOwnership = false,
+  /**
+   * `(mpId, tenantId) => string[]`: the scopes that MP's install holds in that
+   * tenant (its capability token's `effectiveScopes`, the authority invoke and
+   * query judge). The paths that carry no token read it: `subscribe()` when it
+   * registers and again at every delivery, an Action's trigger binding, and the
+   * identity an Action's dispatches run under. `tenantId` is the emit's tenant,
+   * or the subscription's own when it registers (undefined if the caller gave
+   * none). An MP it returns no array for holds no scopes. Omitted, those paths
+   * read the registered manifest's declared `permissions.scopes`.
+   */
+  grantedScopes,
   /** C1/Option B: `{ mpId: 'domain' }` overrides for read-scope derivation. */
   domainScopeOverrides = {},
   /** C1/Option B: primitives derivation must not grant (defaults to the exported set). */
@@ -175,6 +193,16 @@ export function createBroker({
    * radio, not a query.
    */
   registrationTimeoutMs = 8000,
+  /**
+   * How long an invoke that joins a run already in flight with its idempotency
+   * key waits for that run before rejecting with a non-retryable `Timeout`.
+   * An envelope carrying `rpcDeadlineAt` (the SDK adapter's own deadline) waits
+   * less: the join gives up shortly before that deadline (`joinWaitMs`), so the
+   * caller receives this error rather than the adapter's generic timeout.
+   * The bound also ends a handler invoking its own activity with its own key,
+   * which would otherwise wait on itself.
+   */
+  inflightJoinTimeoutMs = DEFAULT_RPC_TIMEOUT_MS,
   /**
    * How the retry loop waits between attempts. Injectable so a test can assert
    * the SCHEDULE rather than sit through it — the delays are small by design,
@@ -233,6 +261,10 @@ export function createBroker({
   const suppressionTally = new Map(); // `${tenantId}:${trigger}:${day}` -> count
   const debouncePending = new Map();  // `${trigger}:${emitterMpId}` -> {timer, resolvers}
   const invokeChains = new Map();     // sourceMpId -> tail promise (FIFO per source MP)
+  const inflightInvokes = new Map();  // processedKey -> { deadlineAt, waiters } of the run applying it
+  // A join rejects this long before the caller's `rpcDeadlineAt` at most, and
+  // never more than a fifth of the time the caller has left.
+  const JOIN_DEADLINE_MARGIN_MS = 250;
   const executingChains = new Map();  // sourceMpId -> depth of handler execution ON that chain (F6)
   const txnSteps = new Map();         // txnId -> [{activity, args, idempotencyKey}]
   const chainBudget = new Map();      // rootRunId -> total run count
@@ -242,6 +274,14 @@ export function createBroker({
   // gets a storage-less instance rather than a second code path.
   const queueStore = offlineQueue || createDurableQueue({ now, storage: null });
   let isOnline = online;
+  let pendingWork = 0;
+  let retired = false;
+  async function trackWork(run) {
+    if (retired) throw err('ActivityFailed', 'MP runtime retired', { retryable: false });
+    pendingWork += 1;
+    try { return await run(); } finally { pendingWork -= 1; }
+  }
+
 
   const qualify = (mpId, name) => `${mpId}.${name}`;
   const splitQualified = (qualified) => {
@@ -417,6 +457,13 @@ export function createBroker({
 
   const holdsReadGrant = (held, grant) => grant.accepts.some((s) => held.includes(s)) || held.includes('*');
 
+  /** The scopes a tokenless path judges `mpId` by in `tenantId` — see `grantedScopes`. */
+  function tokenlessScopes(mpId, tenantId) {
+    if (typeof grantedScopes !== 'function') return mps.get(mpId)?.manifest.permissions?.scopes || [];
+    const held = grantedScopes(mpId, tenantId);
+    return Array.isArray(held) ? held : [];
+  }
+
   /**
    * F2 — condition reads were unmediated: no authz, no scope, no equivalent of
    * `authorizeInvoke`, so any MP could read any other MP's conditions
@@ -439,28 +486,28 @@ export function createBroker({
    * F4 — `subscribe()` was completely unauthorized: any MP could subscribe to
    * any trigger and receive its payload (passive cross-MP exfiltration).
    * Subscription is a REGISTRATION, not an RPC — there is no envelope and no
-   * capability token on this path — so the grant is read from the subscriber's
-   * REGISTERED MANIFEST `permissions.scopes` — which, under council C1's
-   * derived-scope resolution, is exactly the vocabulary that list already
-   * speaks: the owner's catalogue DOMAIN scope grants its triggers, with the
-   * explicit per-primitive form still accepted and SENSITIVE_CONDITIONS still
-   * excluded from derivation. Trigger ownership is the other way through,
-   * mirroring the same-MP exemption used by invoke/query.
+   * capability token on this path — so the grant is the subscriber's
+   * `tokenlessScopes`: its install's grants, or its declared manifest scopes
+   * when the host supplies none. Under council C1's derived-scope resolution
+   * the owner's catalogue DOMAIN scope grants its triggers, with the explicit
+   * per-primitive form still accepted and SENSITIVE_CONDITIONS still excluded
+   * from derivation. Trigger ownership is the other way through, mirroring the
+   * same-MP exemption used by invoke/query.
    *
    * Shares `strictEmitOwnership` with F3: emit-side and subscribe-side trigger
    * authority land (and flip) together.
+   *
+   * This is the registration check. Every delivery re-tests the grant for the
+   * emit's tenant (`subscriberHears`), so a grant that narrows later stops the
+   * payloads without the subscriber unsubscribing.
    */
-  function authorizeSubscribe(subscriberMpId, triggerQualified) {
-    if (!strictEmitOwnership) return;
+  function authorizeSubscribe(subscriberMpId, triggerQualified, tenantId) {
+    if (triggerGranted(subscriberMpId, triggerQualified, tenantId)) return;
     const [ownerMpId, triggerName] = splitQualified(triggerQualified);
-    if (ownerMpId === subscriberMpId) return; // an MP always hears its own triggers
-    const declared = mps.get(subscriberMpId)?.manifest.permissions?.scopes || [];
     const grant = readGrant(ownerMpId, triggerName);
-    if (!holdsReadGrant(declared, grant)) {
-      throw err('PermissionDenied', `mp '${subscriberMpId}' may not subscribe to '${triggerQualified}': ${grant.denialMessage}`, {
-        rule: 'permissions', retryable: false,
-      });
-    }
+    throw err('PermissionDenied', `mp '${subscriberMpId}' may not subscribe to '${triggerQualified}': ${grant.denialMessage}`, {
+      rule: 'permissions', retryable: false,
+    });
   }
 
   // --- Active Trigger Index (D21) -------------------------------------------
@@ -490,10 +537,15 @@ export function createBroker({
   }
 
   /**
+   * Whether `mpId` may hear `triggerQualified` in `tenantId`: always for its own
+   * triggers, otherwise only with a read grant in its `tokenlessScopes`. One
+   * test for `subscribe()` (at registration and at each delivery) and for the
+   * DECLARATIVE binding.
+   *
    * D.36 — `subscribe()` is grant-tested (F4) and the DECLARATIVE binding was
    * not, so an MP could consume another MP's trigger simply by naming it in an
-   * Action. Same test, same vocabulary, same source: the consumer's registered
-   * manifest scopes, since neither path carries a capability token.
+   * Action. Same test, same vocabulary, same source, since neither path
+   * carries a capability token.
    *
    * A binding that fails the test is DROPPED from the wiring rather than
    * throwing. The imperative path can reject at `subscribe()` because a caller
@@ -503,12 +555,11 @@ export function createBroker({
    * `triggerIsActive` honest — an ungranted binding is not a consumer, so the
    * emit suppresses exactly as it would with no binding at all.
    */
-  function actionBindingAuthorized(consumerMpId, triggerQualified) {
+  function triggerGranted(mpId, triggerQualified, tenantId) {
     if (!strictEmitOwnership) return true;
     const [ownerMpId, triggerName] = splitQualified(triggerQualified);
-    if (ownerMpId === consumerMpId) return true;
-    const declared = mps.get(consumerMpId)?.manifest.permissions?.scopes || [];
-    return holdsReadGrant(declared, readGrant(ownerMpId, triggerName));
+    if (ownerMpId === mpId) return true;
+    return holdsReadGrant(tokenlessScopes(mpId, tenantId), readGrant(ownerMpId, triggerName));
   }
 
   function actionsForTrigger(tenantId, triggerQualified, payload) {
@@ -519,7 +570,7 @@ export function createBroker({
       for (const [actionId, action] of Object.entries(actions)) {
         const srcMp = action.trigger.mp || mpId;
         if (qualify(srcMp, action.trigger.name) !== triggerQualified) continue;
-        if (!actionBindingAuthorized(mpId, triggerQualified)) continue;
+        if (!triggerGranted(mpId, triggerQualified, tenantId)) continue;
         const scopedState = locationId == null ? null : actionState.get(actionKey(tenantId, mpId, actionId, locationId));
         const local = scopedState?.inherited === true ? null : scopedState;
         if (local && action.locationOverridable !== true) continue;
@@ -531,8 +582,18 @@ export function createBroker({
     return wired;
   }
 
+  /**
+   * Whether a stored subscription receives an emit in `tenantId`: one
+   * registered for a tenant hears only that tenant, and the subscriber must
+   * still hold the grant there.
+   */
+  function subscriberHears(sub, triggerQualified, tenantId) {
+    if (sub.tenantKey !== undefined && sub.tenantKey !== tenantStateKey(tenantId)) return false;
+    return triggerGranted(sub.mpId, triggerQualified, tenantId);
+  }
+
   function triggerIsActive(tenantId, triggerQualified, payload) {
-    return (subscribers.get(triggerQualified)?.size || 0) > 0
+    return [...(subscribers.get(triggerQualified) || [])].some((sub) => subscriberHears(sub, triggerQualified, tenantId))
       || actionsForTrigger(tenantId, triggerQualified, payload).length > 0;
   }
 
@@ -550,8 +611,8 @@ export function createBroker({
    * same way: the run record carried B's capability token.
    *
    * There is no capability token on this path (nobody made an RPC — the broker
-   * is running a declared wiring), so the scopes come from the executing MP's
-   * REGISTERED MANIFEST, exactly as `authorizeSubscribe` reads them for the
+   * is running a declared wiring), so the scopes are the executing MP's
+   * `tokenlessScopes`, exactly as `authorizeSubscribe` reads them for the
    * other tokenless path. The emitter's token id is kept as `causedByTokenId`
    * so the chain is still traceable to the emit that caused it.
    */
@@ -559,7 +620,7 @@ export function createBroker({
     return {
       mpId: executingMpId,
       tenantId: emitterIdentity?.tenantId,
-      scopes: mps.get(executingMpId)?.manifest.permissions?.scopes || [],
+      scopes: tokenlessScopes(executingMpId, emitterIdentity?.tenantId),
       tokenId: undefined,
       causedByTokenId: emitterIdentity?.tokenId,
     };
@@ -650,12 +711,15 @@ export function createBroker({
     });
   }
 
-  async function deliverEmit(record, payload, tenantId, identity) {
+  function deliverEmit(...args) { return trackWork(() => deliverEmitInnerTracked(...args)); }
+
+  async function deliverEmitInnerTracked(record, payload, tenantId, identity) {
     const triggerQualified = record.triggerName;
     const chain = { rootRunId: record.rootRunId, depth: record.depth, chainPath: record.chainPath };
     const deliveries = [];
 
     for (const sub of subscribers.get(triggerQualified) || []) {
+      if (!subscriberHears(sub, triggerQualified, tenantId)) continue;
       const delivery = records.open({
         kind: 'delivery',
         parentRunId: record.runId,
@@ -707,10 +771,12 @@ export function createBroker({
       );
     }
 
-    return deliveries;
+    return deliveries.map((delivery) => trackWork(() => delivery));
   }
 
-  async function dispatchEmit(envelope) {
+  function dispatchEmit(...args) { return trackWork(() => dispatchEmitInnerTracked(...args)); }
+
+  async function dispatchEmitInnerTracked(envelope) {
     const identity = envelope.identity || authenticate(envelope);
     const tenantId = identity.tenantId;
     const [emitterMp] = [envelope.sourceMpId];
@@ -803,7 +869,7 @@ export function createBroker({
     }
     const entry = pending || { superseded: [], resolvers: [] };
     entry.latest = { record, payload };
-    entry.timer = setTimeout(async () => {
+    entry.timer = setTimeout(() => trackWork(async () => {
       debouncePending.delete(key);
       for (const old of entry.superseded) {
         // eslint-disable-next-line no-await-in-loop
@@ -811,7 +877,7 @@ export function createBroker({
       }
       await deliverEmit(entry.latest.record, entry.latest.payload, tenantId, identity);
       await records.update(entry.latest.record.runId, { status: 'succeeded' });
-    }, debounceMs);
+    }), debounceMs);
     debouncePending.set(key, entry);
     return { emitId: record.runId, deliveredTo: 0, queuedFor: 0, coalescing: true };
   }
@@ -882,7 +948,9 @@ export function createBroker({
     }
   }
 
-  async function dispatchQuery(envelope) {
+  function dispatchQuery(...args) { return trackWork(() => dispatchQueryInnerTracked(...args)); }
+
+  async function dispatchQueryInnerTracked(envelope) {
     const identity = envelope.identity || authenticate(envelope);
     const tenantId = envelope.tenantId || identity.tenantId;
     takeToken(envelope.sourceMpId, 'query');
@@ -1127,12 +1195,14 @@ export function createBroker({
   /**
    * F6 — re-entrancy. The chain for `mpId` is "executing" for exactly as long
    * as one of its dispatches is inside an activity handler/executor. A nested
-   * invoke can only be issued from THERE (handler code calling
-   * `tommy.actions.invoke` again), so an invoke that arrives while its own
-   * chain is executing is a descendant of the dispatch holding the chain —
-   * queueing it behind that dispatch is a guaranteed deadlock. It runs INLINE
-   * on the running chain instead, which is also the correct ordering: the
-   * ancestor is, by construction, still ahead of it.
+   * invoke is issued from THERE (handler code calling `tommy.actions.invoke`
+   * again), and queueing it behind the dispatch holding the chain would
+   * deadlock, so every invoke that arrives while its MP's chain is executing
+   * runs INLINE. The broker cannot tell a nested invoke from an unrelated one
+   * the MP issues while a handler awaits, so an unrelated invoke in that window
+   * also runs inline and can overlap the running one. One that repeats the
+   * running write's idempotency key joins that run instead of applying it
+   * again (`joinInflightInvoke`).
    */
   function enterExecution(mpId) { executingChains.set(mpId, (executingChains.get(mpId) || 0) + 1); }
   function exitExecution(mpId) {
@@ -1140,7 +1210,9 @@ export function createBroker({
     if (depth > 0) executingChains.set(mpId, depth); else executingChains.delete(mpId);
   }
 
-  async function dispatchInvoke(envelope) {
+  function dispatchInvoke(...args) { return trackWork(() => dispatchInvokeInnerTracked(...args)); }
+
+  async function dispatchInvokeInnerTracked(envelope) {
     const sourceMpId = envelope.sourceMpId;
     // Re-entrant (nested) dispatch: run inline, never behind our own ancestor.
     if (executingChains.has(sourceMpId)) return dispatchInvokeInner(envelope);
@@ -1148,7 +1220,9 @@ export function createBroker({
     const tail = invokeChains.get(sourceMpId) || Promise.resolve();
     const run = tail.catch(() => {}).then(() => dispatchInvokeInner(envelope));
     invokeChains.set(sourceMpId, run);
-    return run;
+    try { return await run; } finally {
+      if (invokeChains.get(sourceMpId) === run) invokeChains.delete(sourceMpId);
+    }
   }
 
   async function dispatchInvokeInner(envelope) {
@@ -1240,6 +1314,75 @@ export function createBroker({
       throw err('Offline', `activity '${envelope.activity}' is not offlineReplayable and the device is offline`, { retryable: false });
     }
 
+    const admitted = {
+      envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, chain, idempotencyKey, processedKey,
+    };
+    if (!processedKey) return runAdmittedInvoke(admitted);
+    // Same key, same tenant, still running: join that run rather than apply the
+    // write a second time. A second invoke can get here while the first is
+    // mid-handler, because an MP's invokes run inline while one of its handlers
+    // is executing (see `dispatchInvokeInnerTracked`).
+    const running = inflightInvokes.get(processedKey);
+    if (running) return joinInflightInvoke(running, envelope);
+    if (inflightInvokes.size >= INFLIGHT_RUNS_MAX) {
+      throw err('RateLimited', `${INFLIGHT_RUNS_MAX} idempotent invokes are already in flight; '${envelope.activity}' was not started`, {
+        rule: 'idempotency.inflight_capacity', retryable: true,
+      });
+    }
+    const run = runAdmittedInvoke(admitted);
+    // Joins wait on the entry, not on `run`: one reaction on the run settles
+    // them all, and a join that times out removes itself.
+    const entry = { deadlineAt: envelope.rpcDeadlineAt, waiters: new Set() };
+    inflightInvokes.set(processedKey, entry);
+    const settle = (outcome) => {
+      if (inflightInvokes.get(processedKey) === entry) inflightInvokes.delete(processedKey);
+      for (const waiter of entry.waiters) waiter(outcome);
+      entry.waiters.clear();
+    };
+    run.then((final) => settle({ final }), (error) => settle({ error }));
+    return run;
+  }
+
+  /**
+   * How long a join may wait: until shortly before the earlier of the joining
+   * call's deadline and the deadline of the call that started the run. The
+   * second bounds a handler that invokes its own activity with its own key,
+   * whose nested call carries a later deadline than the call it is part of.
+   * The adapter stamps `rpcDeadlineAt` from the wall clock, so the time left
+   * is read from the wall clock too, not from `now`.
+   */
+  function joinWaitMs(envelope, running) {
+    const deadlines = [envelope.rpcDeadlineAt, running.deadlineAt].filter(Number.isFinite);
+    if (!deadlines.length) return inflightJoinTimeoutMs;
+    const remaining = Math.min(...deadlines) - Date.now();
+    const margin = Math.min(JOIN_DEADLINE_MARGIN_MS, remaining / 5);
+    return Math.max(0, Math.min(inflightJoinTimeoutMs, remaining - margin));
+  }
+
+  /** Wait for the run in flight with this key: its result (as a replay) or its error, within the join bound. */
+  function joinInflightInvoke(running, envelope) {
+    const waitMs = joinWaitMs(envelope, running);
+    return new Promise((resolve, reject) => {
+      let timer = null;
+      const waiter = ({ final, error }) => {
+        clearTimeout(timer);
+        if (error) reject(error);
+        else resolve({ ...final, idempotentReplay: true });
+      };
+      running.waiters.add(waiter);
+      timer = setTimeout(() => {
+        running.waiters.delete(waiter);
+        reject(err('Timeout', `activity '${envelope.activity}' is already running with this idempotency key and did not settle within ${Math.round(waitMs)}ms`, {
+          rule: 'idempotency.inflight', retryable: false,
+        }));
+      }, waitMs);
+    });
+  }
+
+  /** Record, execute (with retries) and settle one admitted invoke. */
+  async function runAdmittedInvoke({
+    envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, chain, idempotencyKey, processedKey,
+  }) {
     const record = await records.open({
       kind: 'invoke',
       activityName: envelope.activity,
@@ -1361,7 +1504,9 @@ export function createBroker({
     });
   }
 
-  async function rollbackTransaction(envelope) {
+  function rollbackTransaction(...args) { return trackWork(() => rollbackTransactionInnerTracked(...args)); }
+
+  async function rollbackTransactionInnerTracked(envelope) {
     const identity = envelope.identity || authenticate(envelope);
     const steps = txnSteps.get(envelope.txnId) || [];
     txnSteps.delete(envelope.txnId);
@@ -1390,7 +1535,9 @@ export function createBroker({
   // --- offline queue (broker-owned store; FIFO per source MP) ----------------
 
   function enqueueOffline(sourceMpId, envelope) {
-    const bytes = JSON.stringify(envelope.args || envelope.payload || {}).length;
+    // The queue is kept in Web Storage, whose quota the browser charges in
+    // UTF-16 code units: its caps count those, not UTF-8 bytes.
+    const bytes = utf16Units(JSON.stringify(envelope.args || envelope.payload || {}));
     const partition = queueStore.all().filter((row) => row.sourceMpId === sourceMpId);
     const partitionBytes = partition.reduce((sum, row) => sum + row.bytes, 0);
     if (partition.length >= QUEUE_MAX_ENTRIES || partitionBytes + bytes > QUEUE_MAX_BYTES) {
@@ -1399,7 +1546,9 @@ export function createBroker({
     return queueStore.push({ sourceMpId, envelope, bytes });
   }
 
-  async function drainOfflineQueue() {
+  function drainOfflineQueue(...args) { return trackWork(() => drainOfflineQueueInnerTracked(...args)); }
+
+  async function drainOfflineQueueInnerTracked() {
     const bySource = new Map();
     for (const row of queueStore.takeAll()) {
       const list = bySource.get(row.sourceMpId) || [];
@@ -1419,7 +1568,7 @@ export function createBroker({
           // replayed write can carry about how long it waited, and the runtime
           // sets it here so no MP can forge it.
           : dispatchInvoke({
-            ...envelope, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
+            ...envelope, rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
           }))
           .then((result) => ({ ok: true, result }))
           .catch((error) => ({ ok: false, error }));
@@ -1565,11 +1714,15 @@ export function createBroker({
      */
     evaluatePredicate: evaluateDeclaredPredicate,
 
-    subscribe(mpId, trigger, handler) {
+    /**
+     * `tenantId`: the subscribing instance's tenant. The subscription then
+     * hears only that tenant's emits; without it, every tenant's.
+     */
+    subscribe(mpId, trigger, handler, { tenantId } = {}) {
       const qualified = trigger.includes('.') ? trigger : qualify(mpId, trigger);
-      authorizeSubscribe(mpId, qualified);
+      authorizeSubscribe(mpId, qualified, tenantId);
       const set = subscribers.get(qualified) || new Set();
-      const entry = { mpId, handler };
+      const entry = { mpId, handler, ...(tenantId !== undefined ? { tenantKey: tenantStateKey(tenantId) } : {}) };
       set.add(entry);
       subscribers.set(qualified, set);
       return () => set.delete(entry);
@@ -1663,6 +1816,26 @@ export function createBroker({
       };
     },
 
-    async teardown() { /* flush semantics: nothing buffered at M1 beyond debounce */ },
+    /** Diagnostics: idempotent runs in flight, and the joins waiting on them. */
+    inflightStats() {
+      let waiting = 0;
+      for (const entry of inflightInvokes.values()) waiting += entry.waiters.size;
+      return { runs: inflightInvokes.size, waiting };
+    },
+
+    /** Host retention must not retire a running action or delayed delivery. */
+    hasPendingWork: () => pendingWork > 0 || debouncePending.size > 0,
+    async teardown(instanceId) {
+      if (instanceId != null) return;
+      retired = true;
+      for (const entry of debouncePending.values()) clearTimeout(entry.timer);
+      debouncePending.clear();
+      subscribers.clear();
+      mps.clear();
+      conditionCache.clear();
+      processedKeys.clear();
+      invokeChains.clear();
+      inflightInvokes.clear();
+    },
   };
 }

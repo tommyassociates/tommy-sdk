@@ -10,7 +10,6 @@ const privateDir = '../sdk-private/addons'
 
 function resolvePath() {
   let args = Array.prototype.slice.call(arguments)
-  // args = [__dirname, '..'].concat(args)
   args = [process.cwd()].concat(args)
   return path.join.apply(path.join, args)
 }

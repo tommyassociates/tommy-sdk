@@ -1,10 +1,6 @@
 const express = require('express')
 const ViteExpress = require('vite-express')
-// import ViteExpress from "vite-express";
 
-// const webpack = require('webpack')
-// const webpackDevMiddleware = require('webpack-dev-middleware')
-// const webpackHotMiddleware = require('webpack-hot-middleware')
 const addonBuilder = require('./scripts/addons/builder')
 const addonArchiver = require('./scripts/addons/archiver')
 const addonUploader = require('./scripts/addons/uploader')
@@ -14,25 +10,12 @@ const helpers = require('./scripts/helpers')
 // console.log(helpers.readLocalAddons())
 
 const env = process.env.NODE_ENV || 'development'
-// const webpackConfigFilename = env === 'development' ? 'dev' : 'prod'
-// const webpackConfig = require(`./build/webpack.${webpackConfigFilename}.js`)
 
 const app = express()
-// const compiler = webpack(webpackConfig)
 const fs = require('fs')
 
 // Middleware
 // --------------------------
-
-// app.use(webpackDevMiddleware(compiler, {
-//   // noInfo: true,
-//   publicPath: webpackConfig.output.publicPath,
-//   headers: { "Access-Control-Allow-Origin": "*" },
-//   stats: 'errors-warnings'
-//   // stats: { colors: true } // 'errors-only'
-// }))
-
-// if (env === 'development') app.use(webpackHotMiddleware(compiler))
 
 
 // Routes
@@ -78,12 +61,6 @@ app.post('/addon/buildAll', async (req, res) => {
     }
   }
 
-  // .forEach(async (addon) => {
-  //   const pkg = addon.package
-  //   const version = addon.version
-  //   await addonBuilder(pkg, environment, version)
-  //   await addonArchiver(pkg, environment, version)
-  // }
   res.sendStatus(200)
 })
 

@@ -1,12 +1,12 @@
 /**
  * @tommy/reference-mp — Team Check-in, the reference Mini Program
- * (05-deliverables/05-reference-mp; the M1 forcing function: built first,
+ * (05-deliverables/05-reference-mp; built first,
  * the runtime refined against it).
  *
  * Exercises EVERY manifest primitive: one trigger (checkin_posted), one
  * condition (has_checked_in_today), one activity (record_checkin), a
  * required declared Action wiring them (record_on_checkin), the 2.22
- * teaching Actions (registered; extended-grammar dispatch is a recorded M1
+ * teaching Actions (registered; extended-grammar dispatch is a recorded
  * deferral), panels on all three surfaces, one local store (checkins,
  * last_write_wins), and a bus subscription.
  *
@@ -15,9 +15,9 @@
  * through the injected `tommy` object (register(tommy)). The detectors run
  * over this source in CI to prove the isolation contract is real.
  *
- * Home: kept in the sdk Yarn-Berry workspace for M1 (round-1 decision; the
- * plan's own-repo `tommy-mp-reference` extraction is a recorded deviation,
- * deferred to the docs/public-SDK milestone).
+ * Home: kept in the sdk Yarn-Berry workspace (the plan's own-repo
+ * `tommy-mp-reference` extraction is deferred to the docs/public-SDK
+ * milestone).
  */
 import manifestYaml from './manifest.js';
 

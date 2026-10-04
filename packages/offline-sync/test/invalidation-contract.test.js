@@ -359,3 +359,48 @@ describe('the paint ceiling has one owner', () => {
     expect(await cache.read({})).toEqual([]);
   });
 });
+
+describe('a revalidate reads the store once', () => {
+  const manager = () => createDataManager({
+    capabilityToken: { tenantId: 'team-3', mpId: 'reads-mp' }, mpId: 'reads-mp',
+    localData: { rows: { keyPath: 'id' } },
+    backendFactory: () => createMemoryStoreBackend(),
+  });
+
+  it('answers liveQuery.revalidate and windowCache.sync from the reconcile\'s own read', async () => {
+    const mgr = manager();
+    const lq = mgr.liveQuery('rows', { scope: () => true, fetch: () => [{ id: '1' }, { id: '2' }] });
+    const reads = vi.spyOn(lq.store, 'readWhere');
+    expect((await lq.revalidate()).map((row) => row.id)).toEqual(['1', '2']);
+    expect(reads).toHaveBeenCalledTimes(1);
+    const wc = mgr.windowCache('rows', { fetch: () => [{ id: '3' }], scopeOf: () => (row) => row.id === '3' });
+    reads.mockClear();
+    expect((await wc.sync({ from: 'a' })).map((row) => row.id)).toEqual(['3']);
+    expect(reads).toHaveBeenCalledTimes(1);
+    // A read that may not prune still paints by its own scope.
+    const filtered = mgr.liveQuery('rows', { scope: (row) => row.id !== '2', pruneScope: () => false, fetch: () => [{ id: '4' }] });
+    expect((await filtered.revalidate()).map((row) => row.id).sort()).toEqual(['1', '3', '4']);
+  });
+});
+
+describe('liveQuery subscribers', () => {
+  it('repaint from the rows each change delivers, never reading the store again per subscriber', async () => {
+    const mgr = createDataManager({
+      capabilityToken: { tenantId: 'team-3', mpId: 'subs-mp' }, mpId: 'subs-mp',
+      localData: { rows: { keyPath: 'id' } },
+      backendFactory: () => createMemoryStoreBackend(),
+    });
+    const lq = mgr.liveQuery('rows', { scope: (row) => row.kind === 'shift', fetch: () => [] });
+    const seen = [[], []];
+    const offs = seen.map((list) => lq.subscribe((rows) => list.push(rows.map((row) => row.id))));
+    await vi.waitFor(() => expect(seen.every((list) => list.length === 1)).toBe(true));
+    const reads = vi.spyOn(lq.store, 'readWhere');
+    await lq.store.put({ id: 's1', kind: 'shift' });
+    await lq.store.put({ id: 'n1', kind: 'note' });
+    await vi.waitFor(() => expect(seen.map((list) => list.at(-1))).toEqual([['s1'], ['s1']]));
+    expect(reads).not.toHaveBeenCalled();
+    // What they paint is what a read would give: scoped, without store fields.
+    expect(await lq.read()).toEqual([{ id: 's1', kind: 'shift' }]);
+    offs.forEach((off) => off());
+  });
+});

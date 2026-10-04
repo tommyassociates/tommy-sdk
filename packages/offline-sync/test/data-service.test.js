@@ -1,0 +1,1784 @@
+// @vitest-environment node
+/**
+ * The data service surface over the DataStore layer, on memory and on the
+ * host store (both engines): read/query/subscribe/refresh/mutate/purge/status,
+ * cross-tab change notification, MP namespace confinement.
+ */
+import { describe, it, expect, vi } from 'vitest';
+import { createDataService, createDataStore, createMemoryStoreBackend, createLocalStorageBackend, createDataManager } from '../src/index.js';
+import { PREFS_DECL } from '../src/manager.js';
+import { createHostStorePort, createHostStoreChangeFeed, observeHostStorePort } from '../src/host-store/index.js';
+import { COMPLETE_ROWS } from '../src/host-store/protocol.js';
+import { DATABASES, identity, createChannelBus } from './helpers/host-databases.js';
+
+const settle = () => new Promise((resolve) => { setTimeout(resolve, 0); });
+const INDEXES = { byChat: ['chat_id', 'seq'] };
+
+function memoryService(options = {}) {
+  const stores = new Map([['chats.messages', createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES })]]);
+  return createDataService({ resolve: (name) => (stores.has(name) ? { store: stores.get(name), decl: { keyPath: 'id' } } : null), ...options });
+}
+
+/** A host-store-backed collection the way the app opens one. */
+function transactionalBackend(port, opened, options) {
+  let handle;
+  const ready = () => (handle ||= port.open(options));
+  // A writer's read (`aged`) includes rows past the age limit, as the app's backend asks.
+  const read = async ({ aged = false, ...input }) => {
+    const h = await ready();
+    const result = await port.read({ handle: h.handle, expectedEpoch: h.epoch, ...input, ...(aged ? { includeAged: true } : {}) });
+    if (result.ok === false) throw Object.assign(new Error(result.reason), { name: 'StorageReadError', reason: result.reason });
+    return result;
+  };
+  return {
+    transactional: true, policy: options.policy, limits: options.limits,
+    snapshot: (keys, { aged = false } = {}) => read({ keys, aged }),
+    page: ({ afterKey = null, limit = 100, aged = false } = {}) => read({ afterKey, limit, aged }),
+    async get(key, { aged = false } = {}) { return (await read({ keys: [String(key)], aged })).rows[0]?.value; },
+    async getAll({ aged = false } = {}) {
+      const rows = []; let afterKey = null;
+      do { const page = await read({ afterKey, limit: 100, aged }); rows.push(...page.rows.map((row) => row.value)); afterKey = page.nextKey; } while (afterKey !== null);
+      return rows;
+    },
+    async query({ aged = false, ...input }) {
+      const h = await ready();
+      const result = await port.query({ handle: h.handle, expectedEpoch: h.epoch, ...input, ...(aged ? { includeAged: true } : {}) });
+      if (result.ok === false) throw Object.assign(new Error(result.reason), { name: 'StorageReadError', reason: result.reason });
+      return result;
+    },
+    async commit(snapshot, changes, extra) {
+      const h = await ready();
+      return port.commit({ handle: h.handle, expectedEpoch: snapshot.epoch, expectedStoreRevision: snapshot.storeRevision, changes, ...(extra || {}) });
+    },
+    async close() {},
+    opened,
+  };
+}
+
+describe('data service on memory stores', () => {
+  it('sends each change and read as the principal it was asked under, and never joins a read asked as another form', async () => {
+    let form = { accountType: 'Team', accountId: '44' };
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend() });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null), principal: () => form });
+    const pushed = [];
+    const read = [];
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    data.source('chats.messages', {
+      fetch: async (target, context) => { read.push(context.principal.accountType); if (read.length === 1) await gate; return []; },
+      push: async (command, record, context) => { pushed.push([record.id, context.principal.accountType]); },
+    });
+    const change = data.mutate('chats.messages', { op: 'put', record: { id: 'a' } }, { wait: true });
+    const first = data.refresh('chats.messages', { mode: 'visible' });
+    await settle();
+    form = { accountType: 'TeamMember', accountId: '90' };
+    const second = data.refresh('chats.messages', { mode: 'visible' });
+    release();
+    await Promise.all([change, first, second]);
+    expect(pushed).toEqual([['a', 'Team']]);
+    expect(read).toEqual(['Team', 'TeamMember']);
+  });
+
+  it('removes every listener it installed when disposed, those on the shared change feed too', async () => {
+    const feed = createHostStoreChangeFeed({ BroadcastChannelImpl: null });
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend() });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null), feed });
+    const watched = vi.fn();
+    const subscribed = vi.fn();
+    data.watch('chats.messages', watched);
+    data.subscribe('chats.messages', subscribed);
+    await settle();
+    data.dispose();
+    watched.mockClear();
+    subscribed.mockClear();
+    feed.publish({ type: 'purge', principal: 'p', store: 's', keys: ['a'] });
+    await settle();
+    expect(watched).not.toHaveBeenCalled();
+    expect(subscribed).not.toHaveBeenCalled();
+    feed.close();
+  });
+
+  it('tells a watcher when a collection may have changed, without reading it, until it stops', async () => {
+    const data = memoryService();
+    const calls = vi.fn();
+    const off = data.watch('chats.messages', calls);
+    await data.ingest('chats.messages', [{ id: 'a', chat_id: 7, seq: 1 }]);
+    expect(calls).toHaveBeenCalled();
+    calls.mockClear();
+    off();
+    await data.ingest('chats.messages', [{ id: 'b', chat_id: 7, seq: 2 }]);
+    expect(calls).not.toHaveBeenCalled();
+  });
+
+  it('sends a change and a read as the principal named when each was asked, whatever it names by the time they go', async () => {
+    let form = { accountType: 'Team', accountId: '44' };
+    const base = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend() });
+    let releasePut;
+    const putGate = new Promise((resolve) => { releasePut = resolve; });
+    let slowPut = true;
+    const store = new Proxy(base, { get(target, property) {
+      if (property === 'put') return async (...args) => { if (slowPut) { slowPut = false; await putGate; } return target.put(...args); };
+      const value = target[property];
+      return typeof value === 'function' ? value.bind(target) : value;
+    } });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null), principal: () => form });
+    const pushed = [];
+    const read = [];
+    let releaseRead;
+    const readGate = new Promise((resolve) => { releaseRead = resolve; });
+    data.source('chats.messages', {
+      fetch: async (target, context) => { read.push(context.principal.accountType); if (read.length === 1) await readGate; return []; },
+      push: async (command, record, context) => { pushed.push(context.principal.accountType); },
+    });
+    // A change asked as the team; the form changes while its row is written.
+    const change = data.mutate('chats.messages', { op: 'put', record: { id: 'a' } }, { wait: true });
+    await settle();
+    form = { accountType: 'TeamMember', accountId: '90' };
+    releasePut();
+    await change;
+    expect(pushed).toEqual(['Team']);
+    // A read asked as the member while one as the team is in flight; the form changes again before it goes.
+    form = { accountType: 'Team', accountId: '44' };
+    const first = data.refresh('chats.messages', { mode: 'visible' });
+    await settle();
+    form = { accountType: 'TeamMember', accountId: '90' };
+    const second = data.refresh('chats.messages', { mode: 'visible' });
+    form = { accountType: 'User', accountId: '31' };
+    releaseRead();
+    await Promise.all([first, second]);
+    expect(read).toEqual(['Team', 'TeamMember']);
+  });
+
+  it('reads many rows by one index: each value asked, in order, each row once, and refuses what it cannot honour', async () => {
+    const data = memoryService();
+    await data.ingest('chats.messages', [
+      { id: 'a', chat_id: 7, seq: 1 }, { id: 'b', chat_id: 8, seq: 1 }, { id: 'c', chat_id: 7, seq: 2 }, { id: 'd', chat_id: 9, seq: 1 },
+    ]);
+    const page = await data.query('chats.messages', { index: 'byChat', anyOf: [9, 7, 7, 42] });
+    expect(page.rows.map((row) => row.id)).toEqual(['d', 'a', 'c']);
+    expect(page).toMatchObject({ nextCursor: null, complete: true });
+    expect((await data.query('chats.messages', { index: 'byChat', anyOf: [[7, 2]] })).rows.map((row) => row.id)).toEqual(['c']);
+    const capped = await data.query('chats.messages', { index: 'byChat', anyOf: [7, 8, 9], limit: 2 });
+    expect(capped.rows.map((row) => row.id)).toEqual(['a', 'c']);
+    expect(capped.complete).toBe(false);
+    await expect(data.query('chats.messages', { index: 'byChat', anyOf: 'x' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.query('chats.messages', { index: 'byChat', anyOf: [7], cursor: 'a' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.query('chats.messages', { index: 'byChat', anyOf: [7], lower: 1 })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.query('chats.messages', { anyOf: [7] })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+  });
+
+  it('refuses the index ranges the host store refuses, on a memory store too', async () => {
+    const service = memoryService();
+    await service.ingest('chats.messages', [{ id: 'a', chat_id: 'c', seq: 1 }]);
+    const refused = (range) => expect(service.query('chats.messages', { index: 'byChat', ...range })).rejects.toMatchObject({ reason: 'unserializable' });
+    // `equals` names every field of the index; a part is a `prefix`.
+    await refused({ equals: ['c'] });
+    await refused({ equals: ['c', 1, 'x'] });
+    await refused({ prefix: ['c', 1, 'x'] });
+    await refused({ prefix: ['c', 1], lower: 0 });
+    await refused({ equals: ['c', 1], prefix: ['c'] });
+    expect((await service.query('chats.messages', { index: 'byChat', equals: ['c', 1] })).rows.map((row) => row.id)).toEqual(['a']);
+    expect((await service.query('chats.messages', { index: 'byChat', prefix: ['c'] })).rows.map((row) => row.id)).toEqual(['a']);
+  });
+
+  it('answers overlapping anyOf values with every distinct row that fits, and says when it read them all', async () => {
+    const service = memoryService();
+    await service.ingest('chats.messages', [{ id: 'a', chat_id: 'c', seq: 1 }, { id: 'b', chat_id: 'c', seq: 2 }, { id: 'e', chat_id: 'd', seq: 1 }]);
+    const answer = await service.query('chats.messages', { index: 'byChat', anyOf: [['c', 1], 'c'], limit: 2 });
+    expect(answer.rows.map((row) => row.id)).toEqual(['a', 'b']);
+    expect(answer.complete).toBe(true);
+    const capped = await service.query('chats.messages', { index: 'byChat', anyOf: [['c', 1], 'c', 'd'], limit: 2 });
+    expect(capped.rows.map((row) => row.id)).toEqual(['a', 'b']);
+    expect(capped.complete).toBe(false);
+  });
+
+  it('reads overlapping anyOf values in whole pages, however few rows are left to fill', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES });
+    const service = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    const rows = Array.from({ length: 4999 }, (_, at) => ({ id: `m${String(at).padStart(5, '0')}`, chat_id: 'c', seq: 1 }));
+    await service.ingest('chats.messages', [...rows, { id: 'z', chat_id: 'c', seq: 2 }]);
+    const query = vi.spyOn(store, 'query');
+    const answer = await service.query('chats.messages', { index: 'byChat', anyOf: [['c', 1], 'c'], limit: 5000 });
+    expect(answer.rows).toHaveLength(5000);
+    expect(answer.complete).toBe(true);
+    // The second value's rows the first already gave are skipped a store page
+    // (100 rows) at a time, not one query per row: about 50 pages a value.
+    expect(query.mock.calls.length).toBeLessThanOrEqual(102);
+  });
+
+  it('reads no row back after an ordinary ingest', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES });
+    const service = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    const getRaw = vi.spyOn(store, 'getRaw');
+    const rows = Array.from({ length: 5000 }, (_, at) => ({ id: `m${at}`, chat_id: 'c', seq: at }));
+    await service.ingest('chats.messages', rows);
+    expect(getRaw).not.toHaveBeenCalled();
+    // A complete set checks it was kept in one read of the collection.
+    await service.ingest('chats.messages', rows, { complete: true });
+    expect(getRaw).not.toHaveBeenCalled();
+  });
+
+  it('takes no refresh answer with an entry that is not a keyed row, and removes nothing', async () => {
+    const data = memoryService();
+    let answer = [null];
+    data.source('chats.messages', { fetch: async () => answer });
+    await data.ingest('chats.messages', [{ id: 'a' }, { id: 'b' }], { replace: true });
+    await expect(data.refresh('chats.messages', { mode: 'visible' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    answer = [{ id: 'a' }, { chat_id: 7 }];
+    await expect(data.refresh('chats.messages', { mode: 'visible' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['a', 'b']);
+  });
+
+  it('reads, queries by index and subscribes with the current value first', async () => {
+    const data = memoryService();
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'a', chat_id: 7, seq: 10 } });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'b', chat_id: 7, seq: 2 } });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'c', chat_id: 12, seq: 1 } });
+    expect((await data.read('chats.messages', 'a')).seq).toBe(10);
+    const page = await data.query('chats.messages', { index: 'byChat', prefix: [7] });
+    expect(page.rows.map((row) => row.id)).toEqual(['b', 'a']);
+    const seen = [];
+    const off = data.subscribe({ collection: 'chats.messages', query: { index: 'byChat', prefix: [7] } }, (rows) => seen.push(rows.map((row) => row.id)));
+    await settle();
+    expect(seen).toEqual([['b', 'a']]);
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'd', chat_id: 7, seq: 5 } });
+    await settle();
+    expect(seen).toEqual([['b', 'a'], ['b', 'd', 'a']]);
+    // A change that leaves the value the same does not fire again.
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'e', chat_id: 12, seq: 9 } });
+    await settle();
+    expect(seen).toHaveLength(2);
+    off();
+    await expect(data.read('contacts.people')).rejects.toMatchObject({ code: 'DATA_UNDECLARED' });
+  });
+
+  it('reports a refresh a whole purge overtook as not run, and does not stamp the emptied collection fresh', async () => {
+    const service = memoryService();
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    service.source('chats.messages', { fetch: async () => { await held; return [{ id: 'a', chat_id: 'c', seq: 1 }]; } });
+    await service.ingest('chats.messages', [{ id: 'z', chat_id: 'c', seq: 9 }]);
+    const reading = service.refresh('chats.messages', { mode: 'visible' }).then(() => 'ran', (error) => error);
+    await settle();
+    await service.purge('chats.messages', { force: true });
+    release();
+    expect(await reading).toMatchObject({ code: 'REFRESH_DROPPED' });
+    expect(await service.read('chats.messages')).toEqual([]);
+    expect(service.status('chats.messages')).toMatchObject({ syncedAt: null });
+    expect(service.status('chats.messages').state).not.toBe('fresh');
+  });
+
+  it('refreshes through the scheduler: coalesced, skipped while fresh, silent errors in status', async () => {
+    const requests = [];
+    const scheduler = { request: vi.fn((job) => { requests.push(job); return Promise.resolve().then(() => job.run(() => true)); }) };
+    let clock = 0;
+    const data = memoryService({ scheduler, now: () => clock });
+    const fetch = vi.fn(async () => [{ id: 'a', chat_id: 7, seq: 1 }]);
+    data.source('chats.messages', { fetch, scope: () => (row) => row.chat_id === 7 });
+    expect(data.status('chats.messages').state).toBe('stale');
+    const [first, second] = [data.refresh('chats.messages'), data.refresh('chats.messages')];
+    await Promise.all([first, second]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(requests[0]).toMatchObject({ key: expect.stringContaining('chats.messages'), target: 'chats.messages', budgetKey: 'host', priority: 2, visible: false });
+    expect(data.status('chats.messages')).toMatchObject({ state: 'fresh', syncedAt: 0 });
+    await data.refresh('chats.messages', { maxAge: 60000 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    clock = 10 * 60000;
+    expect(data.status('chats.messages').state).toBe('stale');
+    fetch.mockRejectedValueOnce(Object.assign(new Error('Overloaded'), { status: 503 }));
+    await expect(data.refresh('chats.messages')).resolves.toMatchObject({ state: 'error', error: { status: 503 } });
+    fetch.mockRejectedValueOnce(Object.assign(new Error('Overloaded'), { status: 503 }));
+    await expect(data.refresh('chats.messages', { mode: 'visible', priority: 'visible' })).rejects.toMatchObject({ status: 503 });
+    expect(requests.at(-1)).toMatchObject({ visible: true, priority: 0 });
+    // Rows already shown stay through failed refreshes.
+    expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['a']);
+  });
+
+  it('keeps a push the server refused for access as access changed: unsent, listed, never sent again on its own', async () => {
+    const data = memoryService();
+    const push = vi.fn(async () => { throw Object.assign(new Error('Forbidden'), { status: 403 }); });
+    data.source('chats.messages', { fetch: async () => [], push });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 2 } });
+    await settle();
+    expect(data.pending()).toEqual([expect.objectContaining({ key: 'draft', state: 'access_changed', attempts: 1 })]);
+    expect((await data.read('chats.messages', 'draft', { raw: true }))._dirty).toBe(true);
+    // A refusal by code reads the same.
+    push.mockImplementationOnce(async () => { throw Object.assign(new Error('Denied'), { code: 'PermissionDenied' }); });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'other', chat_id: 7, seq: 3 } });
+    await settle();
+    expect(data.pending().map((entry) => [entry.key, entry.state]).sort()).toEqual([['draft', 'access_changed'], ['other', 'access_changed']]);
+    expect(push).toHaveBeenCalledTimes(2);
+    await data.discard('chats.messages', 'draft');
+    expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['other']);
+  });
+
+  it('keeps dirty rows through a refresh and a purge, and tracks pushes until confirmed', async () => {
+    const data = memoryService();
+    let fail = true;
+    const push = vi.fn(async () => { if (fail) throw Object.assign(new Error('Offline'), { status: 0 }); });
+    data.source('chats.messages', { fetch: async () => [{ id: 'server', chat_id: 7, seq: 1 }], push });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 2 } });
+    await settle();
+    expect(data.pending()).toEqual([expect.objectContaining({ key: 'draft', state: 'failed', attempts: 1, lastError: expect.objectContaining({ status: 0 }) })]);
+    await data.refresh('chats.messages');
+    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['draft', 'server']);
+    expect(await data.purge('chats.messages')).toEqual({ removed: ['server'] });
+    expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['draft']);
+    fail = false;
+    await data.retry('chats.messages', 'draft');
+    expect(data.pending()).toEqual([]);
+    expect((await data.read('chats.messages', 'draft', { raw: true }))._dirty).toBe(false);
+    await data.discard('chats.messages', 'draft');
+    expect(await data.read('chats.messages')).toEqual([]);
+  });
+
+  it('sends every change to a row in order and marks it synced only at its latest write', async () => {
+    const data = memoryService();
+    const sent = [];
+    const releases = [];
+    const push = vi.fn((command) => {
+      sent.push(command.op === 'patch' ? command.patch.seq : command.record.seq);
+      return new Promise((resolve) => { releases.push(resolve); });
+    });
+    data.source('chats.messages', { fetch: async () => [], push });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'a', chat_id: 7, seq: 1 } });
+    await settle();
+    const second = data.mutate('chats.messages', { op: 'patch', key: 'a', patch: { seq: 2 } }, { wait: true });
+    await settle();
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(data.pending()).toEqual([expect.objectContaining({ key: 'a', changes: 2, state: 'sending', op: 'patch' })]);
+    releases[0]();
+    await vi.waitFor(() => expect(push).toHaveBeenCalledTimes(2));
+    // The first push is confirmed, but the row has a later local write.
+    expect((await data.read('chats.messages', 'a', { raw: true }))._dirty).toBe(true);
+    releases[1]();
+    await expect(second).resolves.toEqual({ key: 'a', pushed: true });
+    expect(sent).toEqual([1, 2]);
+    expect((await data.read('chats.messages', 'a', { raw: true }))._dirty).toBe(false);
+    expect(data.pending()).toEqual([]);
+  });
+
+  it('sends a change left unsent by a disposed service', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES });
+    const make = (decl = { keyPath: 'id' }) => createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl } : null) });
+    const first = make();
+    first.source('chats.messages', { fetch: async () => [], push: async () => { throw Object.assign(new Error('Offline'), { status: 0 }); } });
+    await first.mutate('chats.messages', { op: 'put', record: { id: 'a', chat_id: 7, seq: 3 } });
+    await settle();
+    expect(first.pending()).toEqual([expect.objectContaining({ key: 'a', state: 'failed' })]);
+    first.dispose();
+    // A rebuilt service sends it when its push is registered.
+    const push = vi.fn(async () => {});
+    const second = make();
+    second.source('chats.messages', { fetch: async () => [], push });
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith({ op: 'put', record: { id: 'a', chat_id: 7, seq: 3 } }, { id: 'a', chat_id: 7, seq: 3 },
+      { principal: null, background: true }));
+    await vi.waitFor(async () => expect((await store.getRaw('a'))._dirty).toBe(false));
+    expect(second.pending()).toEqual([]);
+    second.dispose();
+    // A declared push with no registration is sent on retry.
+    await store.put({ id: 'b', chat_id: 7, seq: 4 });
+    const declared = vi.fn(async () => {});
+    const third = make({ keyPath: 'id', push: declared });
+    expect(third.pending()).toEqual([]);
+    await expect(third.retry('chats.messages', 'b')).resolves.toEqual({ key: 'b', pushed: true });
+    expect(declared).toHaveBeenCalledWith({ op: 'put', record: { id: 'b', chat_id: 7, seq: 4 } }, { id: 'b', chat_id: 7, seq: 4 },
+      { principal: null, background: true });
+    expect((await store.getRaw('b'))._dirty).toBe(false);
+  });
+
+  it('hands a keyed refresh the previous row without storage metadata', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), recordSchema: {
+      type: 'object', additionalProperties: false, properties: { id: { type: 'string' }, chat_id: { type: 'number' }, seq: { type: 'number' } },
+    } });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    const toRecord = vi.fn((dto, prev) => ({ ...prev, ...dto }));
+    data.source('chats.messages', { fetch: async (target) => (target.key ? { id: 'a', seq: 2 } : [{ id: 'a', chat_id: 7, seq: 1 }]), toRecord });
+    await data.refresh('chats.messages');
+    await data.refresh({ collection: 'chats.messages', key: 'a' });
+    expect(Object.keys(toRecord.mock.calls.at(-1)[1]).filter((field) => field.startsWith('_'))).toEqual([]);
+    expect(await data.read('chats.messages', 'a')).toMatchObject({ chat_id: 7, seq: 2 });
+  });
+
+  it('reads a row by its key whether the key is given as a number or as text', async () => {
+    const stores = new Map([['chats.rows', createDataStore({ name: 'chats.rows', backend: createMemoryStoreBackend() })]]);
+    const data = createDataService({ resolve: (name) => (stores.has(name) ? { store: stores.get(name), decl: { keyPath: 'id' } } : null) });
+    await data.ingest('chats.rows', [{ id: 101, title: 'Numeric id' }]);
+    expect((await data.read('chats.rows', '101')).title).toBe('Numeric id');
+    expect((await data.read('chats.rows', 101)).title).toBe('Numeric id');
+    expect(await data.purge('chats.rows', { keys: [101] })).toEqual({ removed: ['101'] });
+  });
+
+  it('subscribes to a later page of an indexed query', async () => {
+    const data = memoryService();
+    for (const [id, seq] of [['a', 1], ['b', 2], ['c', 3]]) await data.mutate('chats.messages', { op: 'put', record: { id, chat_id: 7, seq } });
+    const seen = [];
+    data.subscribe({ collection: 'chats.messages', query: { index: 'byChat', prefix: [7], limit: 1, cursor: 'a' } }, (rows) => seen.push(rows.map((row) => row.id)));
+    await vi.waitFor(() => expect(seen).toEqual([['b']]));
+  });
+
+  it('reports offline without fetching', async () => {
+    const data = memoryService({ isOnline: () => false });
+    const fetch = vi.fn();
+    data.source('chats.messages', { fetch });
+    await expect(data.refresh('chats.messages')).resolves.toMatchObject({ state: 'offline' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('MP data API confinement', () => {
+  const token = { tenantId: 'team-44', mpId: 'scheduling' };
+  const localData = { shifts: { keyPath: 'id', syncStrategy: 'server_authoritative' } };
+
+  it('offers the same surface over its own stores only', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    await data.mutate('shifts', { op: 'put', record: { id: '1', at: 'mon' } });
+    expect((await data.read('mp.scheduling.shifts', '1')).at).toBe('mon');
+    await expect(data.read('mp.time-clock.shifts')).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
+    await expect(data.read('chats.messages')).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
+    await expect(data.read('undeclared')).rejects.toMatchObject({ code: 'DATA_UNDECLARED' });
+    data.source('shifts', { fetch: async () => [{ id: '2', at: 'tue' }] });
+    await data.refresh('shifts');
+    expect((await data.read('shifts')).map((row) => row.id)).toEqual(['1', '2']);
+    expect(data.status('shifts').state).toBe('fresh');
+    await data.ingest('mp.scheduling.shifts', [{ id: '3', at: 'wed' }]);
+    expect((await data.read('shifts', '3', { raw: true }))._dirty).toBe(false);
+    await expect(data.ingest('chats.messages', [{ id: 'x' }])).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
+    await expect(data.trim('mp.time-clock.shifts', { index: 'by_day', keep: 1 })).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
+  });
+  it.each(['liveQuery', 'windowCache'])('keeps an edit waiting to be sent through a %s revalidation, and sends it', async (kind) => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const pushed = [];
+    data.source('shifts', { fetch: async () => [], push: async (command) => { if (!pushed.length) await gate; pushed.push(command.record?.at); } });
+    await data.mutate('shifts', { op: 'put', record: { id: '1', at: 'mon' } });
+    const second = data.mutate('shifts', { op: 'put', record: { id: '1', at: 'tue' } }, { wait: true });
+    await settle();
+    const fetch = async () => [{ id: '1', at: 'server' }];
+    if (kind === 'liveQuery') await data.liveQuery('shifts', { fetch }).revalidate();
+    else await data.windowCache('shifts', { fetch }).sync('week');
+    expect(await data.read('shifts', '1', { raw: true })).toMatchObject({ at: 'tue', _dirty: true });
+    release();
+    await expect(second).resolves.toEqual({ key: '1', pushed: true });
+    expect(pushed).toEqual(['mon', 'tue']);
+  });
+
+  it('keeps each world\'s changes apart on a shared scheduler: the same store and key in two accounts both send', async () => {
+    // A scheduler that joins a job to one already queued under the same key, as the host's does.
+    const queued = new Map();
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const scheduler = {
+      request(job) {
+        if (queued.has(job.key)) return queued.get(job.key);
+        const run = gate.then(() => job.run(() => true)).finally(() => queued.delete(job.key));
+        queued.set(job.key, run);
+        return run;
+      },
+    };
+    const worlds = ['team-44', 'team-45'].map((tenantId) => createDataManager({
+      capabilityToken: { tenantId, mpId: 'scheduling' }, mpId: 'scheduling', scheduler,
+      localData: { drafts: { keyPath: 'id', syncStrategy: 'last_write_wins' } },
+    }));
+    const sent = [];
+    worlds.forEach((data, at) => data.source('drafts', { fetch: async () => [], push: async (command) => { sent.push([at, command.record.v]); } }));
+    const changes = worlds.map((data, at) => data.mutate('drafts', { op: 'put', record: { id: 'settings', v: `world ${at}` } }, { wait: true }));
+    await settle();
+    release();
+    await expect(Promise.all(changes)).resolves.toEqual([{ key: 'settings', pushed: true }, { key: 'settings', pushed: true }]);
+    expect(sent.sort()).toEqual([[0, 'world 0'], [1, 'world 1']]);
+    for (const data of worlds) {
+      // eslint-disable-next-line no-await-in-loop, no-underscore-dangle
+      expect((await data.read('drafts', 'settings', { raw: true }))._dirty).toBe(false);
+    }
+  });
+
+  it.each(['windowCache', 'liveQuery'])('never lets a %s read begun before a newer change undo it', async (kind) => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    await data.ingest('shifts', [{ id: '1', at: 'mon' }, { id: '2', at: 'tue' }]);
+    let answer;
+    const fetch = () => new Promise((resolve) => { answer = resolve; });
+    const reading = kind === 'liveQuery' ? data.liveQuery('shifts', { fetch }).revalidate() : data.windowCache('shifts', { fetch }).sync('week');
+    await settle();
+    // Newer than the read: an ingest of row 1, and a removal of row 2.
+    await data.ingest('shifts', [{ id: '1', at: 'moved' }]);
+    await data.purge('shifts', { keys: ['2'] });
+    answer([{ id: '1', at: 'mon' }, { id: '2', at: 'tue' }]);
+    await reading;
+    expect(await data.read('shifts', '1')).toMatchObject({ at: 'moved' });
+    expect(await data.read('shifts', '2')).toBeNull();
+  });
+
+  it('keeps a row a record read stored while a list revalidation was on its way', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    await data.ingest('shifts', [{ id: '1', at: 'mon' }]);
+    let answer;
+    const revalidating = data.liveQuery('shifts', { fetch: () => new Promise((resolve) => { answer = resolve; }) }).revalidate();
+    await settle();
+    // A detail read fetches a row the list did not have yet.
+    await data.record('shifts', { fetch: async (id) => ({ id, at: 'tue' }) }).get('2');
+    answer([{ id: '1', at: 'mon' }]);
+    await revalidating;
+    expect(await data.read('shifts', '2')).toMatchObject({ at: 'tue' });
+  });
+
+  it('writes an MP\'s own store handle in the collection\'s turn: a revalidation begun before keeps what it wrote', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    await data.ingest('shifts', [{ id: '1', at: 'mon' }]);
+    let answer;
+    const revalidating = data.liveQuery('shifts', { fetch: () => new Promise((resolve) => { answer = resolve; }) }).revalidate();
+    await settle();
+    await data.store('shifts').reconcile([{ id: '3', at: 'wed' }], { prune: false });
+    answer([{ id: '1', at: 'mon' }]);
+    await revalidating;
+    expect(await data.read('shifts', '3')).toMatchObject({ at: 'wed' });
+  });
+
+  it('never evicts a saved pref to make room for another: a pref that does not fit is refused', async () => {
+    const saved = globalThis.localStorage;
+    const kept = new Map();
+    globalThis.localStorage = { getItem: (k) => (kept.has(k) ? kept.get(k) : null), setItem: (k, v) => { kept.set(k, String(v)); }, removeItem: (k) => { kept.delete(k); } };
+    try {
+      const data = createDataManager({ capabilityToken: { tenantId: 'team-45', mpId: 'scheduling' }, mpId: 'scheduling', localData: {} });
+      await data.prefs.set('a', 'x'.repeat(200000));
+      await data.prefs.set('b', 'x'.repeat(200000));
+      await expect(data.prefs.set('c', 'x'.repeat(200000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+      const [storeKey] = [...kept.keys()].filter((key) => key.endsWith(':prefs'));
+      expect(Object.keys(JSON.parse(kept.get(storeKey))).sort()).toEqual(['a', 'b']);
+    } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+
+  it('never drops a saved pref to bound what refused ones hold: the pref over the bound is refused instead', async () => {
+    const saved = globalThis.localStorage;
+    const kept = new Map();
+    globalThis.localStorage = { getItem: (k) => (kept.has(k) ? kept.get(k) : null), setItem: (k, v) => { kept.set(k, String(v)); }, removeItem: (k) => { kept.delete(k); } };
+    const token = { tenantId: 'team-47', mpId: 'scheduling' };
+    try {
+      const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {} });
+      await data.prefs.set('layout', 'grid');
+      // Each too big to save; the second past what the refused ones may hold.
+      await expect(data.prefs.set('big1', 'x'.repeat(600000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+      await expect(data.prefs.set('big2', 'x'.repeat(600000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+      await data.prefs.remove('big1');
+      await data.prefs.remove('big2');
+      const [storeKey] = [...kept.keys()].filter((key) => key.endsWith(':prefs'));
+      expect(Object.keys(JSON.parse(kept.get(storeKey)))).toEqual(['layout']);
+      const reloaded = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {} });
+      await reloaded.prefs.ready();
+      expect(reloaded.prefs.get('layout')).toBe('grid');
+    } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+
+  it('reads, syncs and revalidates a declared store whose name has a dot', async () => {
+    const data = createDataManager({ capabilityToken: { tenantId: 'team-49', mpId: 'reports' }, mpId: 'reports',
+      localData: { 'cache.rows': { keyPath: 'id', syncStrategy: 'server_authoritative' } } });
+    await expect(data.windowCache('cache.rows', { fetch: async () => [{ id: '1' }] }).sync('week')).resolves.toEqual([{ id: '1' }]);
+    await expect(data.liveQuery('cache.rows', { fetch: async () => [{ id: '2' }] }).revalidate()).resolves.toEqual([{ id: '2' }]);
+    await expect(data.record('cache.rows', { fetch: async (id) => ({ id: String(id) }) }).get('3', { refresh: true })).resolves.toMatchObject({ id: '3' });
+    // Read by its declared name, and by its full one; another namespace's name stays refused.
+    expect((await data.read('cache.rows')).map((row) => row.id).sort()).toEqual(['2', '3']);
+    expect((await data.read('mp.reports.cache.rows')).map((row) => row.id).sort()).toEqual(['2', '3']);
+    await expect(data.read('chats.rows')).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
+  });
+
+  it('puts a pref back to its saved value when overlapping writes to it are all refused', async () => {
+    const saved = globalThis.localStorage;
+    const kept = new Map();
+    let full = false;
+    globalThis.localStorage = {
+      getItem: (k) => (kept.has(k) ? kept.get(k) : null),
+      setItem: (k, v) => { if (full) throw Object.assign(new Error('full'), { name: 'QuotaExceededError' }); kept.set(k, String(v)); },
+      removeItem: (k) => { kept.delete(k); },
+    };
+    try {
+      const data = createDataManager({ capabilityToken: { tenantId: 'team-50', mpId: 'scheduling' }, mpId: 'scheduling', localData: {} });
+      await data.prefs.set('layout', 'grid');
+      full = true;
+      const first = data.prefs.set('layout', 'list').catch((error) => error);
+      const second = data.prefs.set('layout', 'table').catch((error) => error);
+      expect((await first).code).toBe('DATA_NOT_SAVED');
+      expect((await second).code).toBe('DATA_NOT_SAVED');
+      expect(data.prefs.get('layout')).toBe('grid');
+    } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+
+  it('never takes a load\'s older value as saved once a later set saved another', async () => {
+    const inner = createMemoryStoreBackend();
+    let release;
+    let holdReads = false;
+    let refuse = false;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const held = {
+      ...inner,
+      getAll: async (...args) => {
+        const rows = await inner.getAll(...args);
+        // The load's read only: it answers the rows it read, once released.
+        if (holdReads) { holdReads = false; await gate; }
+        return rows;
+      },
+      put: async (key, record) => (refuse ? { ok: false, reason: 'quota', retained: false } : inner.put(key, record)),
+    };
+    await inner.put('layout', { key: 'layout', value: 'grid', _rev: 1, _dirty: false });
+    const data = createDataManager({ capabilityToken: { tenantId: 'team-52', mpId: 'scheduling' }, mpId: 'scheduling', localData: {},
+      backendFactory: (_db, storeName) => (storeName === 'prefs' ? held : createMemoryStoreBackend()) });
+    holdReads = true;
+    const loading = data.prefs.ready();
+    // A set saves while the load, which read 'grid', is still on its way.
+    await data.prefs.set('layout', 'list');
+    release();
+    await loading;
+    refuse = true;
+    await expect(data.prefs.set('layout', 'table')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+    expect(data.prefs.get('layout')).toBe('list');
+  });
+
+  it('refuses a pref with DATA_NOT_SAVED where the device has no storage to keep it', async () => {
+    const saved = globalThis.localStorage;
+    delete globalThis.localStorage;
+    try {
+      const data = createDataManager({ capabilityToken: { tenantId: 'team-51', mpId: 'scheduling' }, mpId: 'scheduling', localData: {} });
+      await expect(data.prefs.set('layout', 'grid')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+      expect(data.prefs.get('layout', 'none')).toBe('none');
+      await expect(data.prefs.remove('layout')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+    } finally { if (saved !== undefined) globalThis.localStorage = saved; }
+  });
+
+  it('holds nothing of a refused pref: it reads as saved, and later prefs save normally', async () => {
+    const saved = globalThis.localStorage;
+    const kept = new Map();
+    globalThis.localStorage = { getItem: (k) => (kept.has(k) ? kept.get(k) : null), setItem: (k, v) => { kept.set(k, String(v)); }, removeItem: (k) => { kept.delete(k); } };
+    const token = { tenantId: 'team-48', mpId: 'scheduling' };
+    try {
+      const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {} });
+      await data.prefs.set('layout', 'grid');
+      await expect(data.prefs.set('big', 'x'.repeat(600000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+      await expect(data.prefs.set('layout', 'x'.repeat(600000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+      // Each reads as it was saved: nothing, and the earlier choice.
+      expect(data.prefs.get('big', 'none')).toBe('none');
+      expect(data.prefs.get('layout')).toBe('grid');
+      await data.prefs.set('theme', 'dark');
+      const reloaded = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {} });
+      await reloaded.prefs.ready();
+      expect([reloaded.prefs.get('layout'), reloaded.prefs.get('theme'), reloaded.prefs.get('big', 'none')]).toEqual(['grid', 'dark', 'none']);
+    } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+
+  it('never evicts a client-owned row in memory: only cached rows go past the row cap', async () => {
+    const own = createDataStore({ name: 'drafts', backend: createMemoryStoreBackend(), syncStrategy: 'last_write_wins', maxRows: 2 });
+    await own.reconcile([{ id: '1' }, { id: '2' }], { prune: false });
+    await own.reconcile([{ id: '3' }], { prune: false });
+    expect((await own.getAll()).map((row) => row.id).sort()).toEqual(['1', '2', '3']);
+    const cache = createDataStore({ name: 'rows', backend: createMemoryStoreBackend(), maxRows: 2 });
+    await cache.reconcile([{ id: '1' }, { id: '2' }], { prune: false });
+    await cache.reconcile([{ id: '3' }], { prune: false });
+    expect(await cache.getAll()).toHaveLength(2);
+    // Nor does window retention: an older window's rows stay.
+    const paged = createDataStore({ name: 'notes', backend: createMemoryStoreBackend(), syncStrategy: 'last_write_wins', maxWindows: 1 });
+    await paged.reconcile([{ id: 'a' }], { prune: false, windowKey: 'mon' });
+    await paged.reconcile([{ id: 'b' }], { prune: false, windowKey: 'tue' });
+    expect((await paged.getAll()).map((row) => row.id).sort()).toEqual(['a', 'b']);
+  });
+
+  it('refuses a pref removal the device could not keep with DATA_NOT_SAVED', async () => {
+    const saved = globalThis.localStorage;
+    const kept = new Map();
+    let full = false;
+    globalThis.localStorage = {
+      getItem: (k) => (kept.has(k) ? kept.get(k) : null),
+      setItem: (k, v) => { if (full) throw Object.assign(new Error('full'), { name: 'QuotaExceededError' }); kept.set(k, String(v)); },
+      removeItem: (k) => { kept.delete(k); },
+    };
+    try {
+      const data = createDataManager({ capabilityToken: { tenantId: 'team-46', mpId: 'scheduling' }, mpId: 'scheduling', localData: {} });
+      await data.prefs.set('a', 1);
+      full = true;
+      await expect(data.prefs.remove('a')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+      // Still there, as saved.
+      expect(data.prefs.get('a')).toBe(1);
+    } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+
+  it('refuses purge options it does not know or cannot read, removing nothing', async () => {
+    const data = memoryService();
+    await data.ingest('chats.messages', [{ id: 'a', chat_id: 7, seq: 1 }, { id: 'b', chat_id: 7, seq: 2 }]);
+    await expect(data.purge('chats.messages', { key: 'a' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.purge('chats.messages', { keys: 'a' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.purge('chats.messages', { query: 'byChat' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.purge('chats.messages', { force: 'yes' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['a', 'b']);
+    await expect(data.purge('chats.messages', { keys: ['a'] })).resolves.toEqual({ removed: ['a'] });
+  });
+
+  it('reads a whole collection raw, past the paint ceiling', async () => {
+    let clock = Date.parse('2026-09-01T00:00:00Z');
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), now: () => clock });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null), now: () => clock });
+    await data.ingest('chats.messages', [{ id: 'old' }]);
+    clock += 8 * 24 * 60 * 60 * 1000;
+    await data.ingest('chats.messages', [{ id: 'new' }]);
+    expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['new']);
+    expect((await data.read('chats.messages', null, { raw: true })).map((row) => row.id).sort()).toEqual(['new', 'old']);
+  });
+
+  it('rejects a pref the device could not save, rather than report it saved', async () => {
+    const saved = globalThis.localStorage;
+    globalThis.localStorage = { getItem: () => null, setItem: () => { throw Object.assign(new Error('full'), { name: 'QuotaExceededError' }); }, removeItem: () => {} };
+    try {
+      const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: (db, store) => createLocalStorageBackend(db, store) });
+      await expect(data.prefs.set('layout', 'board')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+    } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+
+  it('counts only rows a store saved as written, and names the ones it kept in memory only', async () => {
+    const saved = globalThis.localStorage;
+    globalThis.localStorage = { getItem: () => null, setItem: () => { throw Object.assign(new Error('full'), { name: 'QuotaExceededError' }); }, removeItem: () => {} };
+    try {
+      const store = createDataStore({ name: 'chats.messages', backend: createLocalStorageBackend('db-unsaved', 'chats.messages') });
+      const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+      expect(await data.ingest('chats.messages', [{ id: 'a', chat_id: 7, seq: 1 }])).toEqual({ written: 0, unsaved: ['a'] });
+      // Still shown: the store keeps it for the session.
+      expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['a']);
+    } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
+  });
+
+  it('gives every MP its own prefs, read at once once loaded and kept as settled rows', async () => {
+    const backends = new Map();
+    const factory = (_db, store) => { if (!backends.has(store)) backends.set(store, createMemoryStoreBackend()); return backends.get(store); };
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    await data.prefs.ready();
+    expect(data.prefs.get('layout', 'list')).toBe('list');
+    await data.prefs.set('layout', 'board');
+    await data.prefs.set('filters', { status: ['open'] });
+    const value = data.prefs.get('filters');
+    value.status.push('mutated');
+    expect(data.prefs.get('filters')).toEqual({ status: ['open'] });
+    // Stored per MP, not pending: a new manager over the same stores reads them back.
+    expect(data.pending()).toEqual([]);
+    const next = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    await next.prefs.ready();
+    expect(next.prefs.get('layout')).toBe('board');
+    await next.prefs.remove('layout');
+    const third = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    await third.prefs.ready();
+    expect(third.prefs.get('layout', 'list')).toBe('list');
+    // Other MPs cannot reach them.
+    await expect(next.read('mp.time-clock.prefs')).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
+  });
+
+  it('answers no preference once the manager is disposed, never the previous account\'s', async () => {
+    const backends = new Map();
+    const factory = (_db, store) => { if (!backends.has(store)) backends.set(store, createMemoryStoreBackend()); return backends.get(store); };
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    await data.prefs.ready();
+    await data.prefs.set('layout', 'board');
+    expect(data.prefs.get('layout', 'list')).toBe('board');
+    await data.dispose();
+    expect(data.prefs.get('layout', 'list')).toBe('list');
+    await expect(data.prefs.set('layout', 'grid')).rejects.toMatchObject({ reason: 'retired' });
+  });
+
+  it('refuses a store handle held across dispose as retired, its writes as its reads', async () => {
+    const backends = new Map();
+    const factory = (_db, store) => { if (!backends.has(store)) backends.set(store, createMemoryStoreBackend()); return backends.get(store); };
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: { drafts: { keyPath: 'id', syncStrategy: 'last_write_wins' } }, backendFactory: factory });
+    const held = data.store('drafts');
+    await held.put({ id: 'a' });
+    await data.dispose();
+    await expect(Promise.resolve().then(() => held.get('a'))).rejects.toMatchObject({ name: 'StorageReadError', reason: 'retired' });
+    for (const write of [() => held.put({ id: 'b' }), () => held.delete('a'), () => held.markSynced('a'), () => held.reconcile([], {})]) {
+      await expect(Promise.resolve().then(write)).rejects.toMatchObject({ name: 'StorageReadError', reason: 'retired' }); // eslint-disable-line no-await-in-loop
+    }
+  });
+
+  it('stores a preference set then removed before the first write landed as removed', async () => {
+    let gate = null;
+    const backends = new Map();
+    const factory = (_db, store) => {
+      if (!backends.has(store)) {
+        const inner = createMemoryStoreBackend();
+        backends.set(store, { ...inner, async put(...args) { if (gate) { const wait = gate; gate = null; await wait; } return inner.put(...args); } });
+      }
+      return backends.get(store);
+    };
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    await data.prefs.ready();
+    let open;
+    gate = new Promise((resolve) => { open = resolve; });
+    const setting = data.prefs.set('layout', 'board');
+    const removing = data.prefs.remove('layout');
+    await new Promise((resolve) => { setTimeout(resolve, 5); });
+    open();
+    await Promise.all([setting, removing]);
+    expect(data.prefs.get('layout', 'list')).toBe('list');
+    const next = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    await next.prefs.ready();
+    expect(next.prefs.get('layout', 'list')).toBe('list');
+  });
+
+  it('opens an MP\'s prefs only when it reads one, and always with the host\'s declaration', async () => {
+    const reads = [];
+    const backends = new Map();
+    const factory = (_db, store, _strategy, decl) => {
+      if (!backends.has(store)) {
+        const inner = createMemoryStoreBackend();
+        backends.set(store, { ...inner, decl, async getAll() { reads.push(store); return inner.getAll(); } });
+      }
+      return backends.get(store);
+    };
+    const bogus = { keyPath: 'id', syncStrategy: 'server_authoritative', recordSchema: { type: 'object' } };
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: { prefs: bogus }, backendFactory: factory });
+    expect(backends.get('prefs').decl).toEqual(PREFS_DECL);
+    await new Promise((resolve) => { setTimeout(resolve, 5); });
+    expect(reads).toEqual([]);
+    // The first read starts the load and answers the fallback; ready() then has it.
+    expect(data.prefs.get('layout', 'list')).toBe('list');
+    await data.prefs.ready();
+    expect(reads).toEqual(['prefs']);
+  });
+
+  it('loads prefs again after a failed load, never undoes a remove made while loading, and fails a set nothing stored', async () => {
+    let failRead = false;
+    let gate = null;
+    const backends = new Map();
+    const factory = (_db, store) => {
+      if (!backends.has(store)) {
+        const inner = createMemoryStoreBackend();
+        backends.set(store, { ...inner, async getAll() {
+          if (failRead) { failRead = false; throw Object.assign(new Error('busy'), { name: 'StorageReadError', reason: 'busy' }); }
+          if (gate) await gate;
+          return inner.getAll();
+        } });
+      }
+      return backends.get(store);
+    };
+    const first = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    await first.prefs.set('layout', 'board');
+    await first.prefs.set('columns', ['name']);
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    failRead = true;
+    // The first load fails; the next ready() loads.
+    await data.prefs.ready();
+    expect(data.prefs.get('layout', 'list')).toBe('list');
+    await data.prefs.ready();
+    expect(data.prefs.get('layout', 'list')).toBe('board');
+    // A remove made while a load runs stays removed.
+    const again = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    let open;
+    gate = new Promise((resolve) => { open = resolve; });
+    const loading = again.prefs.ready();
+    const removing = again.prefs.remove('columns');
+    open();
+    await Promise.all([loading, removing]);
+    gate = null;
+    expect(again.prefs.get('columns', 'none')).toBe('none');
+    // A value the store refuses is not reported as saved.
+    await expect(again.prefs.set('cycle', { toJSON() { throw new Error('unserializable'); } })).rejects.toThrow();
+  });
+
+  it('queries the indexes its manifest declares', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {
+      shifts: { keyPath: 'id', syncStrategy: 'server_authoritative', indexes: [{ name: 'by_day', keyPath: 'at' }] },
+    } });
+    await data.mutate('shifts', { op: 'put', record: { id: '1', at: 'tue' } });
+    await data.mutate('shifts', { op: 'put', record: { id: '2', at: 'mon' } });
+    expect((await data.query('shifts', { index: 'by_day' })).rows.map((row) => row.id)).toEqual(['2', '1']);
+    expect((await data.query('mp.scheduling.shifts', { index: 'by_day', equals: ['tue'] })).rows.map((row) => row.id)).toEqual(['1']);
+  });
+});
+
+describe.each(DATABASES)('data service on the host store (%s)', (_name, create) => {
+  it('queries physical indexes and hears writes from another tab', async () => {
+    const Channel = createChannelBus();
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+    const tab = (feed) => {
+      const observed = observeHostStorePort(port, feed);
+      const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(observed, null, options) });
+      return createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null), feed });
+    };
+    const feedA = createHostStoreChangeFeed({ BroadcastChannelImpl: Channel });
+    const feedB = createHostStoreChangeFeed({ BroadcastChannelImpl: Channel });
+    const a = tab(feedA);
+    const b = tab(feedB);
+    const seen = [];
+    b.subscribe({ collection: 'chats.messages', query: { index: 'byChat', prefix: [7] } }, (rows) => seen.push(rows.map((row) => row.id)));
+    await settle();
+    expect(seen).toEqual([[]]);
+    a.source('chats.messages', { fetch: async () => [{ id: 'x', chat_id: 7, seq: 3 }, { id: 'y', chat_id: 7, seq: 1 }] });
+    await a.refresh('chats.messages');
+    await vi.waitFor(() => expect(seen.at(-1)).toEqual(['y', 'x']));
+    expect((await a.query('chats.messages', { index: 'byChat', prefix: [7], lower: 2 })).rows.map((row) => row.id)).toEqual(['x']);
+    const listed = (await port.inspect({ op: 'stores', selector: { authorityOrigin: 'https://api.example.test', viewerId: '7' } })).stores[0];
+    expect(listed.syncedAt).toEqual(expect.any(Number));
+    feedA.close(); feedB.close(); await database.close();
+  });
+
+  it('reads many rows by a compound index\'s leading field or every field, as the memory store answers', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+    const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(port, null, options) });
+    const hosted = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    const memory = memoryService();
+    const rows = [{ id: 'a', chat_id: 7, seq: 1 }, { id: 'b', chat_id: 8, seq: 1 }, { id: 'c', chat_id: 7, seq: 2 }, { id: 'd', chat_id: 9, seq: 1 }];
+    await hosted.ingest('chats.messages', rows);
+    await memory.ingest('chats.messages', rows);
+    for (const query of [{ anyOf: [9, 7, 7, 42] }, { anyOf: [[7, 2], [9, 1]] }, { anyOf: [7, 8, 9], limit: 2 }]) {
+      // eslint-disable-next-line no-await-in-loop
+      const [fromHost, fromMemory] = await Promise.all([hosted, memory].map((data) => data.query('chats.messages', { index: 'byChat', ...query })));
+      expect(fromHost.rows.map((row) => row.id)).toEqual(fromMemory.rows.map((row) => row.id));
+      expect(fromHost.complete).toBe(fromMemory.complete);
+    }
+    expect((await hosted.query('chats.messages', { index: 'byChat', anyOf: [9, 7] })).rows.map((row) => row.id)).toEqual(['d', 'a', 'c']);
+    hosted.dispose();
+    await database.close();
+  });
+
+  it('patches any number of rows, a store transaction at a time, and accounts for every key', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+    const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(port, null, options) });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    await data.ingest('chats.messages', Array.from({ length: 240 }, (_, at) => ({ id: `m${at}`, chat_id: 7, seq: at })));
+    const keys = Array.from({ length: 250 }, (_, at) => `m${at}`);
+    const result = await data.patchRows('chats.messages', keys, { seen: true });
+    expect(result.patched).toHaveLength(240);
+    expect(result.skipped).toEqual(keys.slice(240).map((key) => ({ key, reason: 'gone' })));
+    expect(result.refused).toEqual([]);
+    expect((await data.read('chats.messages')).every((row) => row.seen === true)).toBe(true);
+    data.dispose();
+    await database.close();
+  });
+
+  it('patches rows as another tab left them: a row it removed stays gone, a change it made stays', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+    const other = createDataService({
+      resolve: (name) => (name === 'chats.messages' ? { store: createDataStore({ name, backend: transactionalBackend(port, null, options) }), decl: { keyPath: 'id' } } : null),
+    });
+    const backend = transactionalBackend(port, null, options);
+    let meddle = null;
+    const commit = backend.commit.bind(backend);
+    // The other tab writes after this tab read the rows and before it commits.
+    backend.commit = async (...args) => { if (meddle) { const run = meddle; meddle = null; await run(); } return commit(...args); };
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store: createDataStore({ name, backend }), decl: { keyPath: 'id' } } : null) });
+    await data.ingest('chats.messages', [{ id: 'a', chat_id: 7, seq: 1, name: 'Ana' }, { id: 'b', chat_id: 7, seq: 2, name: 'Ben' }]);
+    meddle = async () => {
+      await other.purge('chats.messages', { keys: ['a'] });
+      await other.ingest('chats.messages', [{ id: 'b', chat_id: 7, seq: 2, name: 'Benny' }]);
+    };
+    await expect(data.patchRows('chats.messages', ['a', 'b'], { seen: true })).resolves.toEqual({
+      patched: ['b'], unsaved: [], skipped: [{ key: 'a', reason: 'gone' }], refused: [],
+    });
+    expect(await data.read('chats.messages', 'a')).toBeNull();
+    expect(await data.read('chats.messages', 'b')).toEqual({ id: 'b', chat_id: 7, seq: 2, name: 'Benny', seen: true });
+    other.dispose(); data.dispose();
+    await database.close();
+  });
+
+  it('stamps a collection synced only when a complete set arrives, never on a partial one', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+    const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(port, null, options) });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    const syncedAt = async () => (await port.inspect({ op: 'stores', selector: { authorityOrigin: 'https://api.example.test', viewerId: '7' } })).stores[0]?.syncedAt ?? null;
+    await data.ingest('chats.messages', [{ id: 'a', chat_id: 7, seq: 1 }]);
+    expect(await syncedAt()).toBeNull();
+    await data.ingest('chats.messages', [{ id: 'b', chat_id: 7, seq: 2 }], { replace: true });
+    expect(await syncedAt()).toEqual(expect.any(Number));
+    await database.close();
+  });
+
+  it('drops a change another tab queued for a row this tab force-purges', async () => {
+    const Channel = createChannelBus();
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+    const tab = (feed) => {
+      const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(observeHostStorePort(port, feed), null, options), indexes: INDEXES });
+      return createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null), feed });
+    };
+    const feedA = createHostStoreChangeFeed({ BroadcastChannelImpl: Channel });
+    const feedB = createHostStoreChangeFeed({ BroadcastChannelImpl: Channel });
+    const a = tab(feedA);
+    const b = tab(feedB);
+    const push = vi.fn(async () => { throw Object.assign(new Error('Offline'), { status: 0 }); });
+    a.source('chats.messages', { fetch: async () => [], push });
+    await a.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 1 } });
+    await a.mutate('chats.messages', { op: 'put', record: { id: 'other', chat_id: 8, seq: 1 } });
+    await vi.waitFor(() => expect(a.pending().map((entry) => [entry.key, entry.state]).sort()).toEqual([['draft', 'failed'], ['other', 'failed']]));
+    expect(await b.purge('chats.messages', { force: true, query: { index: 'byChat', prefix: [7] } })).toEqual({ removed: ['draft'] });
+    await vi.waitFor(() => expect(a.pending().map((entry) => entry.key)).toEqual(['other']));
+    await expect(a.retry('chats.messages', 'draft')).resolves.toEqual({ key: 'draft', pushed: false });
+    expect(push.mock.calls.map(([command]) => command.record.id).sort()).toEqual(['draft', 'other']);
+    feedA.close(); feedB.close(); await database.close();
+  });
+
+  it('stamps a collection synced only for a read of all of it, never for one record, a query or a scoped read', async () => {
+    const selector = { authorityOrigin: 'https://api.example.test', viewerId: '7' };
+    const open = () => {
+      const database = create();
+      const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+      const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+        limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+      const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(port, null, options), indexes: INDEXES });
+      const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+      const syncedAt = async () => (await port.inspect({ op: 'stores', selector })).stores[0]?.syncedAt ?? null;
+      return { data, syncedAt, close: () => database.close() };
+    };
+    const fetch = async (target) => (target.key ? { id: String(target.key), chat_id: 7, seq: 1 } : [{ id: 'a', chat_id: 7, seq: 1 }]);
+    const whole = open();
+    whole.data.source('chats.messages', { fetch });
+    await whole.data.refresh({ collection: 'chats.messages', key: 'a' }, { mode: 'visible' });
+    expect(await whole.syncedAt()).toBeNull();
+    await whole.data.refresh({ collection: 'chats.messages', query: { index: 'byChat', prefix: [7] } }, { mode: 'visible' });
+    expect(await whole.syncedAt()).toBeNull();
+    await whole.data.refresh('chats.messages', { mode: 'visible' });
+    expect(await whole.syncedAt()).toEqual(expect.any(Number));
+    await whole.close();
+    // A source whose reads each cover a part of the collection (its scope).
+    const scoped = open();
+    scoped.data.source('chats.messages', { fetch, scope: (target) => (row) => row.chat_id === target.window?.chat });
+    await scoped.data.refresh({ collection: 'chats.messages', window: { chat: 7 } }, { mode: 'visible' });
+    await scoped.data.refresh('chats.messages', { mode: 'visible' });
+    expect(await scoped.syncedAt()).toBeNull();
+    await scoped.close();
+  });
+
+  it('keeps an MP\'s collection unstamped by a record read-through or a window, and stamps it for a read of all of it', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const who = identity({ mpId: 'scheduling', tenantId: 'team-44' });
+    const factory = (_db, storeName, syncStrategy) => transactionalBackend(port, null, {
+      identity: who, storeName, policy: syncStrategy === 'last_write_wins' ? 'authored' : 'cache', schemaVersion: 1,
+      cacheFingerprint: syncStrategy === 'last_write_wins' ? null : 'fp',
+      limits: { maxRows: 1000, maxAgeMs: syncStrategy === 'last_write_wins' ? null : 86400000, maxBytes: null },
+    });
+    const data = createDataManager({ capabilityToken: { tenantId: 'team-44', mpId: 'scheduling' }, mpId: 'scheduling',
+      localData: { shifts: { keyPath: 'id', syncStrategy: 'server_authoritative' } }, backendFactory: factory });
+    const syncedAt = async () => (await port.inspect({ op: 'stores', selector: { authorityOrigin: 'https://api.example.test', viewerId: '7' } }))
+      .stores.find((row) => row.label === 'mp.scheduling.shifts')?.syncedAt ?? null;
+    await data.record('shifts', { fetch: async (id) => ({ id: String(id), at: 'mon' }) }).get('1', { refresh: true });
+    expect(await syncedAt()).toBeNull();
+    await data.windowCache('shifts', { fetch: async () => [{ id: '2', at: 'tue' }], scopeOf: () => (row) => row.at === 'tue' }).sync('week');
+    expect(await syncedAt()).toBeNull();
+    await data.liveQuery('shifts', { fetch: async () => [{ id: '1', at: 'mon' }, { id: '2', at: 'tue' }] }).revalidate();
+    expect(await syncedAt()).toEqual(expect.any(Number));
+    await database.close();
+  });
+
+  it('refuses a pref the host store could not save with DATA_NOT_SAVED, and a value it cannot store as before', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const who = identity({ mpId: 'scheduling', tenantId: 'team-44' });
+    const factory = (_db, storeName) => transactionalBackend(port, null, {
+      identity: who, storeName, policy: 'authored', schemaVersion: 1, cacheFingerprint: null,
+      limits: { maxRows: 1, maxAgeMs: null, maxBytes: null },
+    });
+    const data = createDataManager({ capabilityToken: { tenantId: 'team-44', mpId: 'scheduling' }, mpId: 'scheduling', localData: {}, backendFactory: factory });
+    await data.prefs.set('first', 'ok');
+    // The store holds one row: a second pref cannot be saved.
+    await expect(data.prefs.set('second', 'ok')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+    const refused = await data.prefs.set('cycle', { toJSON() { throw new Error('unserializable'); } }).catch((error) => error);
+    expect(refused).toBeInstanceOf(Error);
+    expect(refused.code).not.toBe('DATA_NOT_SAVED');
+    await database.close();
+  });
+
+  it('keeps a client-owned store\'s older windows when a read of a newer one prunes', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const backend = transactionalBackend(port, null, {
+      identity: identity({ mpId: 'scheduling', tenantId: 'team-44' }), storeName: 'notes', policy: 'authored', schemaVersion: 1, cacheFingerprint: null,
+      limits: { maxRows: 1000, maxAgeMs: null, maxBytes: null },
+    });
+    const store = createDataStore({ name: 'notes', backend, syncStrategy: 'last_write_wins', maxWindows: 1 });
+    await store.reconcile([{ id: 'a', day: 'mon' }], { windowKey: 'mon', scope: (row) => row.day === 'mon' });
+    await store.reconcile([{ id: 'b', day: 'tue' }], { windowKey: 'tue', scope: (row) => row.day === 'tue' });
+    expect((await store.getAll()).map((row) => row.id).sort()).toEqual(['a', 'b']);
+    await database.close();
+  });
+
+  it('keeps a row\'s window when a record read refreshes it without one, so window retention still reaches it', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'shifts', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null } };
+    const store = createDataStore({ name: 'shifts', backend: transactionalBackend(port, null, options) });
+    await store.reconcile([{ id: 's1', title: 'Early' }], { windowKey: 'week-40' });
+    // A detail read of the same shift: no window of its own.
+    await store.reconcile([{ id: 's1', title: 'Early (edited)' }], { prune: false, syncedAt: null });
+    expect(await store.getRaw('s1')).toMatchObject({ title: 'Early (edited)', _window: 'week-40' });
+    await database.close();
+  });
+
+  it('keeps a row\'s refusal for access through a later local write and through a sync, until a retry clears it', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'drafts', policy: 'authored', schemaVersion: 1, cacheFingerprint: null,
+      limits: { maxRows: 1000, maxAgeMs: null, maxBytes: null } };
+    const store = createDataStore({ name: 'drafts', backend: transactionalBackend(port, null, options) });
+    await store.put({ id: 'd1', v: 'first' });
+    await store.markRow('d1', { _pushRefused: 'access' });
+    await store.put({ id: 'd1', v: 'second' });
+    expect(await store.getRaw('d1')).toMatchObject({ v: 'second', _dirty: true, _pushRefused: 'access' });
+    await store.markSynced('d1');
+    expect(await store.getRaw('d1')).toMatchObject({ _pushRefused: 'access' });
+    await store.markRow('d1', { _pushRefused: null });
+    expect(await store.getRaw('d1')).not.toHaveProperty('_pushRefused');
+    await database.close();
+  });
+
+  it('reads a declared index in memory where the store opened without it', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity({ mpId: 'scheduling', tenantId: 'team-44' }), storeName: 'shifts', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null } };
+    const store = createDataStore({ name: 'shifts', backend: { ...transactionalBackend(port, null, options), indexes: [] }, indexes: { byDay: 'at' } });
+    await store.put({ id: '1', at: 'tue' });
+    await store.put({ id: '2', at: 'mon' });
+    await store.put({ id: '3', at: 'wed' });
+    const first = await store.query('byDay', {}, { limit: 2 });
+    expect(first.rows.map((row) => row.id)).toEqual(['2', '1']);
+    expect((await store.query('byDay', {}, { limit: 2, cursor: first.nextCursor })).rows.map((row) => row.id)).toEqual(['3']);
+    await expect(store.query('undeclared')).rejects.toMatchObject({ reason: 'unserializable' });
+    await database.close();
+  });
+});
+
+/** A host-store-backed data service over `chats.messages`, counting commits. */
+function hostService(create, { maxRows = 5000 } = {}) {
+  const database = create();
+  const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+  const commits = { count: 0 };
+  const counted = { ...port, commit: (input) => { commits.count += 1; return port.commit(input); } };
+  const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+    limits: { maxRows, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
+  const backend = transactionalBackend(counted, null, options);
+  // The shell adapter refuses a complete read past COMPLETE_ROWS, as here.
+  const completeReads = { count: 0 };
+  const bounded = { ...backend, async getAll() {
+    completeReads.count += 1;
+    const rows = await backend.getAll();
+    if (rows.length > COMPLETE_ROWS) throw Object.assign(new Error('scan-required'), { name: 'StorageReadError', reason: 'scan-required' });
+    return rows;
+  } };
+  const store = createDataStore({ name: 'chats.messages', backend: bounded, indexes: INDEXES });
+  const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+  return { data, store, port, commits, completeReads, close: () => database.close() };
+}
+const messages = (chat, from, to) => Array.from({ length: to - from + 1 }, (_, index) => ({ id: `${chat}:${from + index}`, chat_id: chat, seq: from + index }));
+
+describe.each([
+  ['memory', () => ({ data: memoryService(), close: () => {} })],
+  ...DATABASES.map(([name, create]) => [`host store (${name})`, () => hostService(create)]),
+])('server rows written into a collection (%s)', (_name, make) => {
+  it('ingests server rows as synced, never pruning unless the set replaces a scope', async () => {
+    const { data, close } = make();
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 99 } });
+    await data.ingest('chats.messages', messages(7, 1, 3));
+    await data.ingest('chats.messages', messages(8, 1, 2));
+    expect((await data.read('chats.messages', null, { raw: true })).map((row) => [row.id, row._dirty]).sort()).toEqual([
+      ['7:1', false], ['7:2', false], ['7:3', false], ['8:1', false], ['8:2', false], ['draft', true],
+    ]);
+    expect(data.pending()).toEqual([]);
+    // A complete set for chat 7 prunes the chat-7 rows it leaves out; dirty rows stay.
+    await data.ingest('chats.messages', messages(7, 2, 3), { replace: true, scope: (row) => row.chat_id === 7 });
+    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['7:2', '7:3', '8:1', '8:2', 'draft']);
+    expect(data.status('chats.messages').state).toBe('fresh');
+    await close();
+  });
+
+  it('keeps an unsent local write when the server copy of its row arrives', async () => {
+    const { data, close } = make();
+    await data.mutate('chats.messages', { op: 'put', record: { id: '7:2', chat_id: 7, seq: 2, body: 'unsent' } });
+    expect(await data.ingest('chats.messages', messages(7, 1, 3))).toEqual({ written: 2 });
+    expect(await data.read('chats.messages', '7:2', { raw: true })).toMatchObject({ body: 'unsent', _dirty: true });
+    // A replacement, and one past a single chunk, keep it too.
+    expect(await data.ingest('chats.messages', messages(7, 1, 3), { replace: true, scope: (row) => row.chat_id === 7 })).toEqual({ written: 2 });
+    expect(await data.ingest('chats.messages', messages(7, 1, 600), { replace: true })).toEqual({ written: 599 });
+    expect(await data.read('chats.messages', '7:2', { raw: true })).toMatchObject({ body: 'unsent', _dirty: true });
+    expect(await data.read('chats.messages', '7:3', { raw: true })).toMatchObject({ _dirty: false });
+    await close();
+  });
+
+  it('counts an unsent row left in two chunks once', async () => {
+    const { data, close } = make();
+    await data.mutate('chats.messages', { op: 'put', record: { id: '7:1', chat_id: 7, seq: 1, body: 'unsent' } });
+    const rows = [...messages(7, 1, 500), { id: '7:1', chat_id: 7, seq: 1 }];
+    expect(await data.ingest('chats.messages', rows)).toEqual({ written: 499 });
+    expect(await data.read('chats.messages', '7:1', { raw: true })).toMatchObject({ body: 'unsent', _dirty: true });
+    await close();
+  });
+
+  it('purges one subject by index, and specific keys, keeping unsent rows unless forced', async () => {
+    const { data, close } = make();
+    await data.ingest('chats.messages', [...messages(7, 1, 3), ...messages(8, 1, 2)]);
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 99 } });
+    expect(await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] } })).toEqual({ removed: ['7:1', '7:2', '7:3'] });
+    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['8:1', '8:2', 'draft']);
+    expect(await data.purge('chats.messages', { keys: ['8:2', 'draft', 'missing'] })).toEqual({ removed: ['8:2'] });
+    expect(await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] }, force: true })).toEqual({ removed: ['draft'] });
+    expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['8:1']);
+    await close();
+  });
+
+  it('trims a subject to its newest rows in index order, never an unsent one', async () => {
+    const { data, close } = make();
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 0 } });
+    await data.ingest('chats.messages', [...messages(7, 1, 6), ...messages(8, 1, 2)]);
+    const seen = [];
+    data.subscribe({ collection: 'chats.messages', query: { index: 'byChat', prefix: [7], limit: 100 } }, (rows) => seen.push(rows.map((row) => row.seq)));
+    await vi.waitFor(() => expect(seen.at(-1)).toEqual([0, 1, 2, 3, 4, 5, 6]));
+    expect(await data.trim('chats.messages', { index: 'byChat', prefix: [7], keep: 3 })).toEqual({ removed: ['7:1', '7:2', '7:3'] });
+    await vi.waitFor(() => expect(seen.at(-1)).toEqual([0, 4, 5, 6]));
+    expect(await data.trim('chats.messages', { index: 'byChat', prefix: [8], keep: 3 })).toEqual({ removed: [] });
+    await expect(data.trim('chats.messages', { prefix: [7], keep: 3 })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await close();
+  });
+});
+
+describe.each([
+  ['memory', () => ({ store: createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES }), close: () => {} })],
+  ...DATABASES.map(([name, create]) => [`host store (${name})`, () => hostService(create)]),
+])('a delete at a known revision (%s)', (_name, make) => {
+  it('removes the row only while it is still that revision', async () => {
+    const { store, close } = make();
+    await store.put({ id: 'a', chat_id: 7, seq: 1 });
+    const listed = await store.getRaw('a');
+    await store.put({ id: 'a', chat_id: 7, seq: 1, body: 'written since' });
+    await expect(store.delete('a', { expectedRevision: listed._rev })).rejects.toMatchObject({ name: 'PersistError', reason: 'conflict' });
+    expect(await store.get('a')).toMatchObject({ body: 'written since' });
+    await store.delete('a', { expectedRevision: (await store.getRaw('a'))._rev });
+    expect(await store.get('a')).toBeUndefined();
+    await close();
+  });
+});
+
+// A fake Web Storage for a store kept there (node has none).
+function webStorageStore() {
+  const saved = globalThis.localStorage;
+  const map = new Map();
+  globalThis.localStorage = { getItem: (k) => (map.has(k) ? map.get(k) : null), setItem: (k, v) => { map.set(k, String(v)); }, removeItem: (k) => { map.delete(k); } };
+  const store = createDataStore({ name: 'chats.messages', backend: createLocalStorageBackend('db-revisions', 'chats.messages'), indexes: INDEXES });
+  return { store, close: () => { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; } };
+}
+const memoryData = () => {
+  const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES });
+  const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+  return { data, store, close: () => {} };
+};
+
+describe.each([
+  ['memory', () => memoryData()],
+  ['web storage', () => webStorageStore()],
+  ...DATABASES.map(([name, create]) => [`host store (${name})`, () => hostService(create)]),
+])('a key removed and written again (%s)', (_name, make) => {
+  it('never takes a revision the key held before', async () => {
+    const { store, close } = make();
+    await store.put({ id: 'a', chat_id: 7, seq: 1 });
+    await store.put({ id: 'a', chat_id: 7, seq: 1, body: 'second' });
+    const before = (await store.getRaw('a'))._rev;
+    await store.put({ id: 'b', chat_id: 7, seq: 2 });
+    await store.delete('a');
+    await store.put({ id: 'a', chat_id: 7, seq: 1, body: 'new' });
+    const after = (await store.getRaw('a'))._rev;
+    expect(after).toBeGreaterThan(before);
+    // A delete at the old revision leaves the new row alone.
+    await expect(store.delete('a', { expectedRevision: before })).rejects.toMatchObject({ reason: 'conflict' });
+    expect(await store.get('a')).toMatchObject({ body: 'new' });
+    await close();
+  });
+});
+
+describe.each([
+  ['memory', () => memoryData()],
+  ...DATABASES.map(([name, create]) => [`host store (${name})`, () => hostService(create)]),
+])('a row force-purged and written again while its push is on the way (%s)', (_name, make) => {
+  it('never takes the old push\'s answer for the new row, which stays unsent until its own push lands', async () => {
+    const { data, store, close } = make();
+    const answers = [];
+    const push = vi.fn(() => new Promise((resolve, reject) => { answers.push({ resolve, reject }); }));
+    data.source('chats.messages', { fetch: async () => [], push });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'a', chat_id: 7, seq: 1, body: 'A' } });
+    await vi.waitFor(() => expect(push).toHaveBeenCalledTimes(1));
+    await data.purge('chats.messages', { force: true });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'a', chat_id: 7, seq: 1, body: 'B' } });
+    await vi.waitFor(() => expect(push).toHaveBeenCalledTimes(2));
+    answers[0].resolve();
+    await settle(); await settle();
+    expect(await store.getRaw('a')).toMatchObject({ body: 'B', _dirty: true });
+    // B's own push fails: B stays unsent, listed, and on the device.
+    answers[1].reject(Object.assign(new Error('Offline'), { status: 0 }));
+    await vi.waitFor(() => expect(data.pending()).toEqual([expect.objectContaining({ key: 'a', state: 'failed' })]));
+    expect(await store.getRaw('a')).toMatchObject({ body: 'B', _dirty: true });
+    await close();
+  });
+});
+
+describe.each(DATABASES)('a store cleared from Settings while a push is on the way (%s)', (_name, create) => {
+  it('never takes the old push\'s answer for a row written after the clear', async () => {
+    const { data, store, port, close } = hostService(create);
+    const answers = [];
+    const push = vi.fn(() => new Promise((resolve) => { answers.push(resolve); }));
+    data.source('chats.messages', { fetch: async () => [], push });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'a', chat_id: 7, seq: 1, body: 'A' } });
+    await vi.waitFor(() => expect(push).toHaveBeenCalledTimes(1));
+    const selector = { authorityOrigin: 'https://api.example.test', viewerId: '7' };
+    const listed = (await port.inspect({ op: 'stores', selector })).stores[0];
+    await expect(port.purge({ selector, store: listed.id, force: true })).resolves.toMatchObject({ ok: true });
+    await store.put({ id: 'a', chat_id: 7, seq: 1, body: 'B' });
+    answers[0]();
+    await settle(); await settle();
+    expect(await store.getRaw('a')).toMatchObject({ body: 'B', _dirty: true });
+    await close();
+  });
+});
+
+/** A memory store whose next read of `method` answers late: the value it read, after `release()`. */
+function lateStore(method) {
+  const inner = createMemoryStoreBackend();
+  let gate = null;
+  const backend = { ...inner, async [method](...args) {
+    const value = await inner[method](...args);
+    if (gate) { const wait = gate.promise; gate = null; await wait; }
+    return value;
+  } };
+  const store = createDataStore({ name: 'chats.messages', backend, indexes: INDEXES });
+  return {
+    store,
+    backend,
+    hold() { let release; gate = { promise: new Promise((resolve) => { release = resolve; }) }; return () => release(); },
+  };
+}
+
+describe('a memory store writes each row in turn', () => {
+  it('never lets a server row overwrite a local write that landed while it read', async () => {
+    const { store, hold } = lateStore('get');
+    const release = hold();
+    const server = store.reconcile([{ id: 'a', chat_id: 7, seq: 1, body: 'server' }], { prune: false, keepDirty: true });
+    const local = store.put({ id: 'a', chat_id: 7, seq: 1, body: 'unsent' });
+    await settle();
+    release();
+    await Promise.all([server, local]);
+    expect(await store.getRaw('a')).toMatchObject({ body: 'unsent', _dirty: true });
+  });
+
+  it('never deletes a revision written while the delete read the row', async () => {
+    const { store, hold } = lateStore('get');
+    await store.put({ id: 'a', chat_id: 7, seq: 1 });
+    const listed = (await store.getRaw('a'))._rev;
+    const release = hold();
+    const removal = store.delete('a', { expectedRevision: listed });
+    const local = store.put({ id: 'a', chat_id: 7, seq: 1, body: 'written since' });
+    await settle();
+    release();
+    await Promise.allSettled([removal, local]);
+    expect(await store.get('a')).toMatchObject({ body: 'written since' });
+  });
+
+  it('takes turns with another store handle over the same backend', async () => {
+    const { store, backend, hold } = lateStore('get');
+    const other = createDataStore({ name: 'chats.messages', backend, indexes: INDEXES });
+    await store.put({ id: 'a', chat_id: 7, seq: 1 });
+    const listed = (await store.getRaw('a'))._rev;
+    const release = hold();
+    const removal = store.delete('a', { expectedRevision: listed });
+    const local = other.put({ id: 'a', chat_id: 7, seq: 1, body: 'from the other handle' });
+    await settle();
+    release();
+    await Promise.allSettled([removal, local]);
+    expect(await other.get('a')).toMatchObject({ body: 'from the other handle' });
+  });
+
+  it('never prunes a row written while a reconcile read the set', async () => {
+    const { store, hold } = lateStore('getAll');
+    await store.reconcile([{ id: 'a', chat_id: 7, seq: 1 }]);
+    const release = hold();
+    const server = store.reconcile([]);
+    await settle();
+    await store.put({ id: 'a', chat_id: 7, seq: 1, body: 'unsent' });
+    release();
+    expect(await server).toMatchObject({ pruned: 0 });
+    expect(await store.getRaw('a')).toMatchObject({ body: 'unsent', _dirty: true });
+  });
+});
+
+describe('whole-range purge and trim, and the rows an ingest stored', () => {
+  it('purges and trims an index range of any size, never stopping part-way', async () => {
+    const data = memoryService();
+    await data.ingest('chats.messages', messages(7, 1, 6000));
+    await data.ingest('chats.messages', messages(8, 1, 10));
+    expect((await data.trim('chats.messages', { index: 'byChat', prefix: [7], keep: 100 })).removed).toHaveLength(5900);
+    const kept = await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 1000 });
+    expect(kept.rows.map((row) => row.seq)).toEqual(messages(7, 5901, 6000).map((row) => row.seq));
+    await data.ingest('chats.messages', messages(7, 1, 5900));
+    expect((await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] } })).removed).toHaveLength(6000);
+    expect((await data.query('chats.messages', { index: 'byChat', limit: 1000 })).rows.map((row) => row.chat_id)).toEqual(Array(10).fill(8));
+  });
+
+  it('refuses a query limit that is not a whole number up to the platform maximum', async () => {
+    const data = memoryService();
+    await data.ingest('chats.messages', messages(7, 1, 3));
+    for (const limit of [Infinity, 5001, 0, 2.5]) {
+      // eslint-disable-next-line no-await-in-loop
+      await expect(data.query('chats.messages', { index: 'byChat', prefix: [7], limit })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+      expect(() => data.subscribe({ collection: 'chats.messages', query: { index: 'byChat', limit } }, () => {})).toThrow(expect.objectContaining({ code: 'DATA_INVALID' }));
+    }
+    await expect(data.query('chats.messages', { limit: Infinity })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    expect((await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 5000 })).rows).toHaveLength(3);
+  });
+
+  it('refuses paging or filter fields on a range it would otherwise over-purge', async () => {
+    const data = memoryService();
+    await data.ingest('chats.messages', messages(7, 1, 5));
+    await expect(data.purge('chats.messages', { query: { index: 'byChat', prefix: [7], limit: 2 } })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.purge('chats.messages', { query: { index: 'byChat', cursor: '7:1' } })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.purge('chats.messages', { query: { index: 'byChat', prefix: [7], keep: 2 } })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    await expect(data.trim('chats.messages', { index: 'byChat', prefix: [7], keep: 1, where: () => true })).rejects.toMatchObject({ code: 'DATA_INVALID' });
+    expect((await data.read('chats.messages'))).toHaveLength(5);
+  });
+
+  it('keeps a local edit made while a purge or trim is listing: it is written after the removal, in its own turn', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES });
+    let data;
+    let edit = null;
+    // A local edit lands after the range was listed, before its rows are removed.
+    const listing = new Proxy(store, { get(target, property) {
+      if (property !== 'query') return typeof target[property] === 'function' ? target[property].bind(target) : target[property];
+      return async (...args) => {
+        const page = await target.query(...args);
+        if (edit) { data.mutate('chats.messages', { op: 'put', record: edit }); edit = null; }
+        return page;
+      };
+    } });
+    data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store: listing, decl: { keyPath: 'id' } } : null) });
+    await data.ingest('chats.messages', messages(7, 1, 4));
+    edit = { id: '7:1', chat_id: 7, seq: 1, body: 'unsent' };
+    await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] } });
+    await vi.waitFor(async () => expect(await data.read('chats.messages', '7:1', { raw: true })).toMatchObject({ body: 'unsent', _dirty: true }));
+    await data.ingest('chats.messages', messages(7, 2, 4));
+    edit = { id: '7:2', chat_id: 7, seq: 2, body: 'unsent too' };
+    await data.trim('chats.messages', { index: 'byChat', prefix: [7], keep: 1 });
+    await vi.waitFor(async () => expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['7:1', '7:2', '7:4']));
+    expect(await data.read('chats.messages', '7:2', { raw: true })).toMatchObject({ body: 'unsent too', _dirty: true });
+  });
+
+  it('drops the unsent changes of a row it force-purges', async () => {
+    const data = memoryService();
+    const push = vi.fn(async () => { throw Object.assign(new Error('Offline'), { status: 0 }); });
+    data.source('chats.messages', { fetch: async () => [], push });
+    await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: 1 } });
+    await vi.waitFor(() => expect(data.pending()).toEqual([expect.objectContaining({ key: 'draft', state: 'failed' })]));
+    expect(await data.purge('chats.messages', { force: true, query: { index: 'byChat', prefix: [7] } })).toEqual({ removed: ['draft'] });
+    expect(data.pending()).toEqual([]);
+    await expect(data.retry('chats.messages', 'draft')).resolves.toEqual({ key: 'draft', pushed: false });
+    expect(push).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts each accepted key once, and a refused row never keeps an old version through a replacement', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES, recordSchema: {
+      type: 'object', required: ['id', 'chat_id'], properties: { id: { type: 'string' }, chat_id: { type: 'number' }, seq: { type: 'number' } },
+    } });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    const many = messages(7, 1, 500);
+    // The last key of the first chunk comes again in the second.
+    expect(await data.ingest('chats.messages', [...many, { ...many[499], seq: 9999 }])).toEqual({ written: 500 });
+    await data.ingest('chats.messages', [{ id: 'old', chat_id: 7, seq: 0 }]);
+    const replacement = [...messages(8, 1, 500), { id: 'old', chat_id: 'not a number' }];
+    expect(await data.ingest('chats.messages', replacement, { replace: true })).toEqual({ written: 500 });
+    expect(await data.read('chats.messages', 'old')).toBeNull();
+  });
+
+  it('reports the rows an ingest stored, not the rows it was given', async () => {
+    const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES, recordSchema: {
+      type: 'object', required: ['id', 'chat_id'], properties: { id: { type: 'string' }, chat_id: { type: 'number' }, seq: { type: 'number' } },
+    } });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    const given = [{ id: 'a', chat_id: 7, seq: 1 }, { id: 'a', chat_id: 7, seq: 2 }, { id: 'b', chat_id: 'seven' }, { id: 'c', chat_id: 7, seq: 3 }];
+    expect(await data.ingest('chats.messages', given)).toEqual({ written: 2 });
+    expect(await data.ingest('chats.messages', given, { replace: true })).toEqual({ written: 2 });
+  });
+});
+
+describe.each(DATABASES)('large collections on the host store (%s)', (_name, create) => {
+  it('writes a page of server rows in bounded transactions, not one per row', async () => {
+    const { data, commits, close } = hostService(create);
+    await data.ingest('chats.messages', messages(7, 1, 250));
+    expect(commits.count).toBeLessThanOrEqual(3);
+    expect((await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 1 })).rows[0].seq).toBe(1);
+    await close();
+  });
+
+  it('purges and trims in bounded commits, keeping a row written dirty after it was listed', async () => {
+    const { data, store, commits, close } = hostService(create);
+    await data.ingest('chats.messages', [...messages(7, 1, 250), ...messages(8, 1, 250)]);
+    commits.count = 0;
+    expect((await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] } })).removed).toHaveLength(250);
+    expect(commits.count).toBeLessThanOrEqual(3);
+    commits.count = 0;
+    expect((await data.trim('chats.messages', { index: 'byChat', prefix: [8], keep: 20 })).removed).toHaveLength(230);
+    expect(commits.count).toBeLessThanOrEqual(3);
+    // A local write lands after the range was listed, before its rows go.
+    let edited;
+    const listing = new Proxy(store, { get(target, property) {
+      if (property !== 'query') return typeof target[property] === 'function' ? target[property].bind(target) : target[property];
+      return async (...args) => {
+        const page = await target.query(...args);
+        if (!edited) edited = target.put({ id: '8:240', chat_id: 8, seq: 240, body: 'unsent' });
+        await edited;
+        return page;
+      };
+    } });
+    const racing = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store: listing, decl: { keyPath: 'id' } } : null) });
+    expect((await racing.purge('chats.messages', { query: { index: 'byChat', prefix: [8] } })).removed).toHaveLength(19);
+    expect(await data.read('chats.messages', '8:240', { raw: true })).toMatchObject({ body: 'unsent', _dirty: true });
+    await close();
+  });
+
+  it('reads a whole collection past one complete read, page by page', async () => {
+    const { data, store, close } = hostService(create);
+    await data.ingest('chats.messages', messages(7, 1, 1500));
+    expect(await store.getAll()).toHaveLength(1500);
+    expect(await data.read('chats.messages')).toHaveLength(1500);
+    const seen = [];
+    store.subscribe((rows) => seen.push(rows.length));
+    await data.ingest('chats.messages', messages(8, 1, 1));
+    await vi.waitFor(() => expect(seen.at(-1)).toBe(1501));
+    await close();
+  });
+
+  it('stops trying one complete read on a collection that needed pages, until it fits one again', async () => {
+    const { data, store, completeReads, close } = hostService(create);
+    await data.ingest('chats.messages', messages(7, 1, 1500));
+    await store.getAll();
+    const after = completeReads.count;
+    await store.getAll();
+    await data.read('chats.messages');
+    expect(completeReads.count).toBe(after);
+    await data.purge('chats.messages', { query: { index: 'byChat', prefix: [7] }, force: true });
+    await data.ingest('chats.messages', messages(9, 1, 3));
+    expect(await store.getAll()).toHaveLength(3);
+    expect(await store.getAll()).toHaveLength(3);
+    expect(completeReads.count).toBe(after + 1);
+    await close();
+  });
+
+  it('reads and subscribes to more rows than one index page holds', async () => {
+    const { data, close } = hostService(create);
+    await data.ingest('chats.messages', messages(7, 1, 250));
+    const all = await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 1000 });
+    expect(all).toMatchObject({ complete: true, nextCursor: null });
+    expect(all.rows.map((row) => row.seq)).toEqual(messages(7, 1, 250).map((row) => row.seq));
+    const first = await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 120 });
+    expect(first.rows).toHaveLength(120);
+    expect(first.complete).toBe(false);
+    const rest = await data.query('chats.messages', { index: 'byChat', prefix: [7], limit: 1000, cursor: first.nextCursor });
+    expect(rest.rows[0].seq).toBe(121);
+    const seen = [];
+    data.subscribe({ collection: 'chats.messages', query: { index: 'byChat', prefix: [7], limit: 200 } }, (rows) => seen.push(rows.length));
+    await vi.waitFor(() => expect(seen).toEqual([200]));
+    await close();
+  });
+
+  it('keeps a subscription live once the collection outgrows a complete read', async () => {
+    const { data, close } = hostService(create);
+    for (let chat = 1; chat <= 3; chat += 1) await data.ingest('chats.messages', messages(chat, 1, 400)); // eslint-disable-line no-await-in-loop
+    const seen = [];
+    data.subscribe({ collection: 'chats.messages', query: { index: 'byChat', prefix: [9], limit: 10 } }, (rows) => seen.push(rows.map((row) => row.seq)));
+    await vi.waitFor(() => expect(seen).toEqual([[]]));
+    await data.ingest('chats.messages', messages(9, 1, 2));
+    await vi.waitFor(() => expect(seen.at(-1)).toEqual([1, 2]));
+    await close();
+  });
+
+  // Three rows that each fit one commit, and together are past its 8 MiB.
+  const MIB = 1024 * 1024;
+  const wide = (id) => ({ id, chat_id: 5, seq: Number(id.slice(1)), body: id.repeat(3 * MIB / id.length) });
+
+  it('patches rows whose patched sizes together pass one commit, in commits that each fit', async () => {
+    const { data, close } = hostService(create);
+    await data.ingest('chats.messages', [{ id: 'p1', chat_id: 5, seq: 1 }, { id: 'p2', chat_id: 5, seq: 2 }, { id: 'p3', chat_id: 5, seq: 3 }]);
+    const outcome = await data.patchRows('chats.messages', ['p1', 'p2', 'p3'], { body: 'x'.repeat(3 * MIB) });
+    expect(outcome).toMatchObject({ patched: ['p1', 'p2', 'p3'], refused: [], skipped: [] });
+    for (const key of ['p1', 'p2', 'p3']) expect((await data.read('chats.messages', key)).body).toHaveLength(3 * MIB); // eslint-disable-line no-await-in-loop
+    await close();
+  });
+
+  it('patches rows whose stored sizes together pass one read, in commits that each fit', async () => {
+    const { data, close } = hostService(create);
+    for (const id of ['s1', 's2', 's3']) await data.ingest('chats.messages', [wide(id)]); // eslint-disable-line no-await-in-loop
+    const outcome = await data.patchRows('chats.messages', ['s1', 's2', 's3'], { note: 'seen' });
+    expect(outcome.patched).toEqual(['s1', 's2', 's3']);
+    expect((await data.read('chats.messages', 's3')).note).toBe('seen');
+    await close();
+  });
+
+  it('ingests rows that together pass one commit, whether or not they replace', async () => {
+    const { data, close } = hostService(create);
+    await expect(data.ingest('chats.messages', [wide('i1'), wide('i2'), wide('i3')])).resolves.toMatchObject({ written: 3 });
+    await expect(data.ingest('chats.messages', [wide('r1'), wide('r2'), wide('r3')], { replace: true })).resolves.toMatchObject({ written: 3 });
+    expect(await data.read('chats.messages', 'i1')).toBeNull();
+    expect((await data.read('chats.messages', 'r3')).body).toHaveLength(3 * MIB);
+    await close();
+  });
+
+  it('stores a declared read whose rows together pass one commit', async () => {
+    const { data, close } = hostService(create);
+    data.source('chats.messages', { read: {}, fetch: async () => [wide('d1'), wide('d2'), wide('d3')] });
+    await data.refresh('chats.messages', { mode: 'visible' });
+    for (const key of ['d1', 'd2', 'd3']) expect((await data.read('chats.messages', key)).body).toHaveLength(3 * MIB); // eslint-disable-line no-await-in-loop
+    await close();
+  });
+});
+
+describe.each(DATABASES)('two stores open on one host store (%s)', (_name, create) => {
+  function twoStores() {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 5000, maxAgeMs: 86400000, maxBytes: null } };
+    const backendA = transactionalBackend(port, null, options);
+    const a = createDataStore({ name: 'chats.messages', backend: backendA });
+    const b = createDataStore({ name: 'chats.messages', backend: transactionalBackend(port, null, options) });
+    return { a, b, backendA, close: () => database.close() };
+  }
+
+  it('tells its subscribers of its own write when another store writes while it reads the rows back', async () => {
+    const { a, b, backendA, close } = twoStores();
+    const heard = [];
+    a.subscribeQuery((query) => query.getAll().map((row) => row.id).sort(), (ids) => heard.push(ids));
+    await settle();
+    // The other store commits while this one reads its rows back after a write.
+    const read = backendA.getAll.bind(backendA);
+    let interleave = true;
+    backendA.getAll = async (...args) => {
+      if (interleave) {
+        interleave = false;
+        await b.put({ id: 'b' });
+        throw Object.assign(new Error('Storage read failed (conflict)'), { name: 'StorageReadError', reason: 'conflict' });
+      }
+      return read(...args);
+    };
+    await a.put({ id: 'a' });
+    await vi.waitFor(() => expect(heard.at(-1)).toEqual(['a', 'b']));
+    await close();
+  });
+});
+
+describe.each(DATABASES)('a pref removal another tab overtakes (%s)', (_name, create) => {
+  // A prefs store on the host store whose next removals find the row written
+  // again by another tab after it was read (`overtakes` times).
+  function overtaken(overtakes) {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: { ...identity(), mpId: 'scheduling' }, storeName: 'prefs', policy: 'authored', schemaVersion: 1, cacheFingerprint: null,
+      limits: { maxRows: 1000, maxAgeMs: null, maxBytes: null } };
+    const backend = transactionalBackend(port, null, options);
+    const snapshot = backend.snapshot;
+    let left = 0;
+    backend.snapshot = async (keys, ...rest) => {
+      const read = await snapshot(keys, ...rest);
+      if (left > 0 && keys.includes('a')) {
+        left -= 1;
+        return { ...read, rows: read.rows.map((row) => (row.key === 'a' ? { ...row, value: { ...row.value, _rev: (row.value._rev || 0) + 1 } } : row)) };
+      }
+      return read;
+    };
+    return {
+      data: createDataManager({
+        capabilityToken: { tenantId: 'team-46', mpId: 'scheduling' }, mpId: 'scheduling', localData: {},
+        backendFactory: () => backend,
+      }),
+      overtake() { left = overtakes; },
+      close: () => database.close(),
+    };
+  }
+
+  it('removes it against the other tab\'s write, and only then reports it removed', async () => {
+    const { data, overtake, close } = overtaken(1);
+    await data.prefs.ready();
+    await data.prefs.set('a', 1);
+    overtake();
+    await data.prefs.remove('a');
+    expect(data.prefs.get('a', 'fallback')).toBe('fallback');
+    // Gone from the device too: a reload finds nothing.
+    expect(await data.read('prefs', 'a')).toBeNull();
+    await close();
+  });
+
+  it('never reports a removal the other tab keeps overtaking: it is refused, and the pref stays', async () => {
+    const { data, overtake, close } = overtaken(5);
+    await data.prefs.ready();
+    await data.prefs.set('a', 1);
+    overtake();
+    await expect(data.prefs.remove('a')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+    expect(data.prefs.get('a', 'fallback')).not.toBe('fallback');
+    expect(await data.read('prefs', 'a')).not.toBeNull();
+    await close();
+  });
+});
+
+describe.each(DATABASES)('a cursor whose rows age out before its next whole read (%s)', (_name, create) => {
+  it('reads whole again before the rows it vouches for stop being readable, so they stay readable', async () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    let clock = Date.parse('2026-10-01T00:00:00Z');
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb', now: () => clock });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 5000, maxAgeMs: DAY, maxBytes: null } };
+    const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(port, null, options), now: () => clock });
+    const data = createDataService({
+      resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null), now: () => clock,
+    });
+    const asked = [];
+    data.source('chats.messages', {
+      // A whole read only once a week; the rows age out after a day.
+      read: { cursor: true, fullEveryMs: 7 * DAY },
+      fetch: async (_target, context) => {
+        asked.push(context.since);
+        if (context.since) return { rows: [], cursor: 'c1', since: true };
+        return { rows: [{ id: 'a', chat_id: 7, seq: 1 }, { id: 'b', chat_id: 7, seq: 2 }], cursor: 'c1' };
+      },
+    });
+    await data.refresh('chats.messages', { mode: 'visible' });
+    clock += 0.6 * DAY;
+    await data.refresh('chats.messages', { mode: 'visible' });
+    clock += 0.6 * DAY;
+    expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['a', 'b']);
+    // The second read was whole: a read of changes would have left the rows to age out.
+    expect(asked[1]).toBeNull();
+    await database.close();
+  });
+});
+
+describe.each(DATABASES)('a whole answer the store cannot keep (%s)', (_name, create) => {
+  it('is refused before anything is removed: the last rows stay', async () => {
+    const database = create();
+    const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
+    const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
+      limits: { maxRows: 5000, maxAgeMs: 86400000, maxBytes: 400 } };
+    const store = createDataStore({ name: 'chats.messages', backend: transactionalBackend(port, null, options) });
+    const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
+    let answer = [{ id: 'old', chat_id: 7, seq: 1 }];
+    data.source('chats.messages', { read: {}, fetch: async () => answer });
+    await data.refresh('chats.messages', { mode: 'visible' });
+    expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['old']);
+    // The next whole answer holds a row larger than the store may keep.
+    answer = [{ id: 'big', chat_id: 7, seq: 2, body: 'x'.repeat(500) }];
+    await expect(data.refresh('chats.messages', { mode: 'visible' })).rejects.toBeTruthy();
+    expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['old']);
+    await database.close();
+  });
+});
