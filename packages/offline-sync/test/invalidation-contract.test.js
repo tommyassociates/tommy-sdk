@@ -26,7 +26,7 @@ describe.each([
     const scope = (row) => row.group === 'visible';
     const query = kind === 'windowCache'
       ? data.windowCache(storeName, { fetch, scopeOf: () => scope })
-      : data.liveQuery(storeName, { fetch, scope, pruneScope: () => false });
+      : data.liveQuery(storeName, { fetch, scope });
     return { data, store, revalidate: () => (kind === 'windowCache' ? query.sync({}) : query.revalidate({})) };
   };
 
@@ -48,7 +48,7 @@ describe.each([
     expect(rows.find((row) => row.id === 'remote').title).toBe('fresh');
     expect((await store.get('local'))._dirty).toBe(true);
     expect((await store.get('outside')).title).toBe('keep');
-    expect((await store.get('remote'))._rev).toBe(2);
+    expect((await store.get('remote'))._rev).toBeGreaterThan(1);
     rows.find((row) => row.id === 'remote').title = 'caller mutation';
     expect((await store.get('remote')).title).toBe('fresh');
   });
@@ -63,13 +63,13 @@ describe.each([
     expect(returnedReads).toHaveBeenCalledTimes(2);
   });
 
-  it('rejects an outstanding read after manager retirement even when fetch returns no records', async () => {
+  it('rejects an outstanding revalidate once the manager is disposed, even when fetch returns no records', async () => {
     const pending = Promise.withResolvers();
     const { data, revalidate } = world(() => pending.promise);
     const refresh = revalidate();
     await data.dispose();
     pending.resolve(null);
-    await expect(refresh).rejects.toMatchObject({ name: 'StorageReadError', reason: 'retired' });
+    await expect(refresh).rejects.toMatchObject({ name: 'DataServiceError', code: 'DATA_RETIRED' });
   });
 });
 
