@@ -331,10 +331,11 @@ function checkMethods(methods) {
   Object.entries(methods).forEach(([name, method]) => {
     if (!METHOD_NAME.test(name)) refuse(`'${name}' is not a method name`);
     if (!method || typeof method !== 'object' || typeof method.fetch !== 'function') refuse(`'${name}' needs a fetch`);
-    const known = ['params', 'fetch', 'batch', 'field', 'cadenceMs', 'available'];
+    const known = ['params', 'fetch', 'batch', 'field', 'cadenceMs', 'available', 'prunesWhere'];
     if (Object.keys(method).some((field) => !known.includes(field))) refuse(`'${name}' takes ${known.join(', ')} only`);
     const { params } = method;
-    if (!params || typeof params !== 'object' || Array.isArray(params) || !Object.keys(params).length) refuse(`'${name}' needs its params`);
+    // A method with nothing to ask names that: `params: {}`.
+    if (!params || typeof params !== 'object' || Array.isArray(params)) refuse(`'${name}' needs its params`);
     Object.entries(params).forEach(([param, spec]) => {
       if (!METHOD_NAME.test(param.replace(/_/g, 'x'))) refuse(`'${name}.${param}' is not a param name`);
       if (!spec || !METHOD_PARAM_TYPES.includes(spec.type)) refuse(`'${name}.${param}' needs a type (${METHOD_PARAM_TYPES.join(', ')})`);
@@ -348,6 +349,10 @@ function checkMethods(methods) {
     if (method.batch !== undefined && (params[method.batch]?.type !== 'ids' || params[method.batch]?.optional)) refuse(`'${name}.batch' must name a required ids param`);
     if (method.cadenceMs !== undefined && !(Number.isFinite(method.cadenceMs) && method.cadenceMs >= 0)) refuse(`'${name}.cadenceMs' must be a duration`);
     if (method.field !== undefined && (!method.batch || typeof method.field !== 'string' || !method.field)) refuse(`'${name}.field' names the row field a batched method's ids name`);
+    // A method whose complete answer is the whole of what it covers: the
+    // stored rows `prunesWhere(row, params)` names that it left out are gone.
+    // Never a batched method (its `field` says what its answer covers).
+    if (method.prunesWhere !== undefined && (typeof method.prunesWhere !== 'function' || method.batch)) refuse(`'${name}.prunesWhere' is a row predicate of a method that is not batched`);
     if (method.available !== undefined && typeof method.available !== 'function') refuse(`'${name}.available' must be a function`);
   });
 }
@@ -1612,7 +1617,7 @@ export function createDataService({
    * principal in `context`: see `refresh`.
    */
   function refreshMethodAs(wanted, {
-    mode = 'silent', priority = 'normal', maxAge = 0, reason = null,
+    mode = 'silent', priority = 'normal', maxAge = 0, reason = null, fromNow = false,
   } = {}, context) {
     live();
     const {
@@ -1644,7 +1649,9 @@ export function createDataService({
     const outcome = (value) => {
       if (value === ANSWERED_FRESH) return { ...describeState(group.state), state: 'fresh', error: null };
       return batchParam ? describeState(group.state)
-        : { ...describeState(group.state), keys: group.state.keys ?? null, more: group.state.more ?? null };
+        : {
+          ...describeState(group.state), keys: group.state.keys ?? null, more: group.state.more ?? null, truncated: group.state.truncated === true,
+        };
     };
     const settle = (promise) => (mode === 'visible' ? promise.then(outcome) : promise.then(outcome, outcome));
     if (!available) {
@@ -1669,7 +1676,9 @@ export function createDataService({
       group.state.state = isOnline() ? 'error' : 'offline';
       group.state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
     };
-    if (batchParam) {
+    // `fromNow`: a read begun after this ask (one after a write), never one
+    // in flight before it nor one fresh within the cadence.
+    if (batchParam && !fromNow) {
       const covered = (wholeCovers.get(coverKey(form, name)) || 0) > voidOf(name);
       if (covered && age > 0 && whole.syncedAt !== null && askedAt - whole.syncedAt < age && whole.state !== 'error') {
         // Answered by that read: the method's status says so.
@@ -1734,7 +1743,7 @@ export function createDataService({
         group.state.state = 'offline';
         throw serviceError('Offline', 'DATA_OFFLINE');
       }
-      const fresh = (since) => age > 0 && since !== null && since !== undefined && at - since < age;
+      const fresh = (since) => !fromNow && age > 0 && since !== null && since !== undefined && at - since < age;
       // An id answered with a row is fresh only while the collection still
       // holds that row; one answered absent stays fresh for its cadence.
       const freshEntry = (entry) => !!entry && fresh(entry.at);
@@ -1752,6 +1761,17 @@ export function createDataService({
           && wantedValues.has(String(row[method.field]))).map((row) => String(row[keyPath]));
         return { keys, field: method.field, values: missing };
       } : null);
+      // A pruning method's complete answer: the stored rows its `prunesWhere`
+      // names for these params that the answer left out are gone (commitMethod
+      // keeps any changed on this device since, or with an unsent change).
+      const unansweredOf = (asked) => (typeof method.prunesWhere === 'function' ? async (records, keyPath) => {
+        const answeredKeys = new Set(records.map((record) => String(record[keyPath])));
+        const keys = (await rawRows(store)).filter((row) => {
+          if (answeredKeys.has(String(row[keyPath]))) return false;
+          try { return method.prunesWhere(row, asked) === true; } catch (_) { return false; }
+        }).map((row) => String(row[keyPath]));
+        return { keys, field: null, values: [] };
+      } : null);
       // One fetch: through the read guard, merged in the collection's turn. A
       // purge or trim while it was out leaves what it asked for not fetched.
       const run = async (asked, ids, isCurrent) => {
@@ -1761,13 +1781,23 @@ export function createDataService({
         group.state.state = 'refreshing';
         try {
           let stored = null;
+          let truncated = false;
           await guardedRead(name, () => method.fetch(asked, context), async (answer, touched, startedAt, turn) => {
+            // An answer that says it is not the whole of what was asked (a
+            // read stopped at its cap) stores nothing: neither its rows (they
+            // would crowd out other windows under the store's bounds) nor what
+            // it left out.
+            if (answer && !Array.isArray(answer) && answer.complete === false) {
+              truncated = true;
+              return;
+            }
             stored = await commitMethod({
               name, label, store, decl,
             }, spec, answer, {
-              touched, turn, startedAt, current, unanswered: unansweredBy(ids),
+              touched, turn, startedAt, current, unanswered: unansweredBy(ids) || unansweredOf(asked),
             });
           }, { isCurrent: current });
+          if (!batchParam) group.state.truncated = truncated;
           // One that stored nothing, or stopped on its way (its reads paused,
           // the service retired), leaves the method stale, never fresh.
           if (!stored || !current()) {
@@ -1809,7 +1839,7 @@ export function createDataService({
       })).catch((error) => { failed(error); throw error; }).finally(() => attempts.settled());
       if (!batchParam) {
         if (fresh(group.state.syncedAt) && group.state.state !== 'error') return Promise.resolve();
-        if (group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return group.state.flight.attempts.answer(group.state.flight.promise);
+        if (!fromNow && group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return group.state.flight.attempts.answer(group.state.flight.promise);
         methodBatches += 1;
         // Only the newest flight for these params stores and answers: one a
         // later flight replaced (past the share window) is dropped. One whose
@@ -1835,7 +1865,7 @@ export function createDataService({
       params[batchParam].forEach((id) => {
         if (freshEntry(group.fetched.get(id)) && !evicted.has(id)) return;
         const flying = group.flying.get(id);
-        if (flying && at - flying.at < METHOD_SHARE_MS) { waits.add(flying); return; }
+        if (!fromNow && flying && at - flying.at < METHOD_SHARE_MS) { waits.add(flying); return; }
         // A batch full, or waiting past the share window without starting, takes no more.
         if (!group.open || group.open.ids.size >= max || at - group.open.at >= METHOD_SHARE_MS) {
           methodBatches += 1;
@@ -1878,7 +1908,7 @@ export function createDataService({
     const wanted = targetOf(target);
     if (wanted.method !== undefined) {
       return refreshMethodAs(wanted, {
-        mode, priority, maxAge, reason,
+        mode, priority, maxAge, reason, fromNow,
       }, context);
     }
     const { name, label, store, decl } = local(wanted.collection);

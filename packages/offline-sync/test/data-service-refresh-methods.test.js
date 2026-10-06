@@ -843,4 +843,155 @@ describe('refresh methods', () => {
     await newer;
     expect(await data.read('members', '2')).toMatchObject({ name: 'bob' });
   });
+
+  describe('range methods that prune (prunesWhere), a complete answer, and fromNow', () => {
+    // Shifts by start day: `byRange` answers the rows whose `day` is in [from, to].
+    const shift = (id, day, extra = {}) => ({ id: String(id), day, ...extra });
+    const inRange = (row, { from, to }) => row.day >= from && row.day <= to;
+    function shifts(rows, { complete = true } = {}) {
+      const byRange = vi.fn(async ({ from, to }) => ({
+        rows: rows.filter((row) => row.day >= from && row.day <= to).map((row) => ({ ...row })), ...(complete ? {} : { complete: false }),
+      }));
+      return byRange;
+    }
+    const range = (from, to) => ({ collection: 'members', method: 'byRange', params: { from, to } });
+    const declare = (data, byRange, extra = {}) => data.source('members', {
+      fetch: async () => ({ rows: [] }),
+      read: {},
+      methods: {
+        byRange: {
+          params: { from: { type: 'date' }, to: { type: 'date' } }, fetch: byRange, cadenceMs: 5 * MINUTE, prunesWhere: inRange, ...extra,
+        },
+      },
+    });
+
+    it('removes the stored rows in its range that a complete answer left out, and none outside it', async () => {
+      const { data } = service();
+      declare(data, shifts([shift(1, '2026-10-05')]));
+      await data.ingest('members', [shift(1, '2026-10-05'), shift(2, '2026-10-06'), shift(3, '2026-10-20')]);
+      await data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible' });
+      expect(await ids(data)).toEqual(['1', '3']);
+    });
+
+    it('stores nothing from an answer that says it is not complete: no rows and no removals', async () => {
+      const { data } = service();
+      const byRange = shifts([shift(1, '2026-10-05', { name: 'New' }), shift(4, '2026-10-07')], { complete: false });
+      declare(data, byRange);
+      await data.ingest('members', [shift(1, '2026-10-05'), shift(2, '2026-10-06')]);
+      const answer = await data.refresh(range('2026-10-05', '2026-10-11'));
+      expect(byRange).toHaveBeenCalledTimes(1);
+      expect(await ids(data)).toEqual(['1', '2']);
+      expect((await data.read('members', '1')).name).toBeUndefined();
+      expect(answer).toMatchObject({ truncated: true });
+      expect(answer.state).not.toBe('fresh');
+    });
+
+    it('never removes a row with an unsent change, nor one written on this device after the read began', async () => {
+      const { data, store } = service();
+      let release;
+      const gate = new Promise((resolve) => { release = resolve; });
+      const byRange = vi.fn(async () => { await gate; return { rows: [] }; });
+      declare(data, byRange);
+      await data.ingest('members', [shift(1, '2026-10-05'), shift(2, '2026-10-06'), shift(3, '2026-10-07')]);
+      await store.put({ ...shift(1, '2026-10-05'), name: 'Unsent' });
+      const pending = data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible' });
+      await vi.waitFor(() => expect(byRange).toHaveBeenCalled());
+      await data.ingest('members', [shift(2, '2026-10-06', { name: 'Written since' })]);
+      release();
+      await pending;
+      expect(await ids(data)).toEqual(['1', '2']);
+    });
+
+    it('keeps a row it removed from coming back through a read that began before it', async () => {
+      const { data } = service();
+      declare(data, shifts([]));
+      await data.ingest('members', [shift(1, '2026-10-05')]);
+      let releaseOld;
+      const oldGate = new Promise((resolve) => { releaseOld = resolve; });
+      data.source('members', {
+        fetch: async () => { await oldGate; return { rows: [shift(1, '2026-10-05')] }; },
+        read: {},
+        methods: {
+          byRange: {
+            params: { from: { type: 'date' }, to: { type: 'date' } }, fetch: shifts([]), cadenceMs: 5 * MINUTE, prunesWhere: inRange,
+          },
+        },
+      });
+      const older = data.refresh('members', { mode: 'visible' });
+      await data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible' });
+      expect(await ids(data)).toEqual([]);
+      releaseOld();
+      await older.catch(() => {});
+      expect(await ids(data)).toEqual([]);
+    });
+
+    it('treats a predicate that throws as not covering the row', async () => {
+      const { data } = service();
+      declare(data, shifts([]), { prunesWhere: (row) => { if (row.id === '2') throw new Error('bad row'); return true; } });
+      await data.ingest('members', [shift(1, '2026-10-05'), shift(2, '2026-10-06')]);
+      await data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible' });
+      expect(await ids(data)).toEqual(['2']);
+    });
+
+    it('refuses prunesWhere that is not a function, or on a batched method; accepts a method with no params', () => {
+      const { data } = service();
+      const fetch = async () => [];
+      expect(() => data.source('members', { fetch, methods: { byRange: { params: { from: { type: 'date' } }, fetch, prunesWhere: true } } }))
+        .toThrow(expect.objectContaining({ code: 'DATA_INVALID' }));
+      expect(() => data.source('members', { fetch, methods: { byIds: { params: { ids: { type: 'ids' } }, batch: 'ids', fetch, prunesWhere: () => true } } }))
+        .toThrow(expect.objectContaining({ code: 'DATA_INVALID' }));
+      expect(() => data.source('members', { fetch, methods: { byRange: { params: { from: { type: 'date' } }, fetch, unknownOption: 1 } } }))
+        .toThrow(expect.objectContaining({ code: 'DATA_INVALID' }));
+      expect(() => data.source('members', { fetch, methods: { parents: { fetch } } }))
+        .toThrow(expect.objectContaining({ code: 'DATA_INVALID' }));
+      expect(() => data.source('members', { fetch, methods: { parents: { params: {}, fetch } } })).not.toThrow();
+    });
+
+    it('runs a method with no params', async () => {
+      const { data } = service();
+      const parents = vi.fn(async () => ({ rows: [shift(7, '2026-01-01', { repeat: 'weekly' })] }));
+      data.source('members', {
+        fetch: async () => ({ rows: [] }), read: {}, methods: { parents: { params: {}, fetch: parents, prunesWhere: (row) => row.repeat === 'weekly' } },
+      });
+      await data.ingest('members', [shift(8, '2026-02-01', { repeat: 'weekly' }), shift(9, '2026-02-01')]);
+      await data.refresh({ collection: 'members', method: 'parents', params: {} }, { mode: 'visible' });
+      expect(parents).toHaveBeenCalledTimes(1);
+      expect(await ids(data)).toEqual(['7', '9']);
+    });
+
+    it('fromNow reads again within the cadence and never joins a read already in flight; without it, both answer', async () => {
+      const { data } = service();
+      let release;
+      let gate = new Promise((resolve) => { release = resolve; });
+      const byRange = vi.fn(async () => { await gate; return { rows: [] }; });
+      declare(data, byRange);
+      const first = data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible' });
+      await vi.waitFor(() => expect(byRange).toHaveBeenCalledTimes(1));
+      // Joins the flight in the share window.
+      const joined = data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible' });
+      // Starts its own read.
+      const own = data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible', fromNow: true });
+      await vi.waitFor(() => expect(byRange).toHaveBeenCalledTimes(2));
+      release();
+      await Promise.all([first.catch(() => {}), joined.catch(() => {}), own]);
+      gate = Promise.resolve();
+      // Fresh within the cadence: answered without a read.
+      await data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible' });
+      expect(byRange).toHaveBeenCalledTimes(2);
+      // fromNow reads again.
+      await data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible', fromNow: true });
+      expect(byRange).toHaveBeenCalledTimes(3);
+    });
+
+    it('fromNow on a batched method fetches ids fresh within the cadence again', async () => {
+      const { data } = service();
+      const api = server([member(1)]);
+      data.source('members', { fetch: api.whole, read: {}, methods: methods(api) });
+      await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
+      await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
+      expect(api.byUserIds).toHaveBeenCalledTimes(1);
+      await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible', fromNow: true });
+      expect(api.byUserIds).toHaveBeenCalledTimes(2);
+    });
+  });
 });
