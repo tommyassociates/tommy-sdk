@@ -786,6 +786,10 @@ export interface PickOptions extends PickerOptions {
  * (MP scope ∩ user visibility) — see host-services.md.
  */
 export interface UiApi {
+  /** Temporarily colour the web/native top edge for this MP instance. Calls take precedence. */
+  setTopEdge(options: { color: string; content?: 'auto' | 'light' | 'dark' }): Promise<void>;
+  /** Restore the previous owner or current app theme; also automatic on instance disposal. */
+  resetTopEdge(): Promise<void>;
   /** Captures into the originating registered host pane. Files and URLs never leave the host. */
   captureChatAttachment(opts: { el: HTMLElement; kind: 'files' | 'photo' | 'audio' }): Promise<{
     id: string; state: string; count: number; requiresReattachment: boolean;
