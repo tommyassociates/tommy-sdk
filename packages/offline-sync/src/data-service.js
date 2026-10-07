@@ -483,6 +483,9 @@ export function createDataService({
   resolve,
   scheduler = createImmediateScheduler(),
   feed = null,
+  // The durable owner pinned by the host; account forms and client subjects
+  // may share collection labels but never share completeness.
+  changeOwner = null,
   labelOf = (name) => name,
   now = () => Date.now(),
   isOnline = () => true,
@@ -530,6 +533,7 @@ export function createDataService({
   };
   const sources = new Map();
   const states = new Map();
+  const knownCollections = new Set();
   const listeners = new Set();
   let disposed = false;
   const live = () => { if (disposed) throw serviceError('Data service retired', 'DATA_RETIRED'); };
@@ -714,12 +718,6 @@ export function createDataService({
     if (typeof store.onChange !== 'function') return false;
     try { watchedStores.set(name, store.onChange(() => bump(name))); return true; } catch (_) { return false; }
   }
-  const offGenerationFeed = feed?.subscribe((event) => {
-    [...watchedStores.keys()].forEach((name) => {
-      const label = labelOf(name);
-      if (event?.label === label || event?.labels?.includes(label) || (event?.type === 'purge' && !event.label)) bump(name);
-    });
-  });
   /**
    * Keeps a collection's source meta in step with keys a write added or
    * removed (`toggled`: keys whose presence changed), or forgets it
@@ -757,6 +755,7 @@ export function createDataService({
     }
     const found = resolve(bare);
     if (!found?.store) throw serviceError(`Collection '${name}' is not declared`, 'DATA_UNDECLARED');
+    knownCollections.add(bare);
     return { name: bare, label: labelOf(bare), ...found, store: readOnly(bare, found.store) };
   }
   // A collection's store as every reader sees it: a write through it is
@@ -1164,8 +1163,9 @@ export function createDataService({
       const present = new Set((await rawRows(store)).map((row) => String(row[keyPath])));
       everyRow = [...kept].every((key) => present.has(key));
     }
-    // A replacing or complete ingest is a whole read: the collection is fresh.
-    if (replace || complete === true) {
+    // A scoped replacement retains its existing collection-status contract.
+    // Whole-set ingests are stamped only after retained coverage is checked.
+    if (replace && scoped && complete !== true) {
       const state = stateFor(targetKey({ collection: name }));
       state.state = 'fresh'; state.syncedAt = now(); state.error = null;
       emitStatus();
@@ -1553,6 +1553,7 @@ export function createDataService({
   // read covers every key.
   let coverageSeq = 0;
   const coverageVoid = new Map();
+  const coverageLoss = new Map();
   const wholeCovers = new Map();
   // Coverage is the form of the account a whole read was made as: another
   // form of it may see other rows.
@@ -1569,6 +1570,46 @@ export function createDataService({
     });
   };
   const voidOf = (name) => coverageVoid.get(name) || 0;
+  const lossOf = (name) => coverageLoss.get(name) || 0;
+  const ownsChange = (event) => {
+    if (changeOwner === null) return true;
+    if (typeof event?.owner === 'string') return event.owner === changeOwner;
+    // A principal purge has no account owner: it can remove any of this
+    // viewer's forms. Unknown event identities cannot grant coverage claims.
+    if (event?.type !== 'purge' || typeof event.principal !== 'string') return false;
+    try { return JSON.stringify(JSON.parse(changeOwner).slice(0, 2)) === event.principal; } catch (_) { return false; }
+  };
+  const matchesCollection = (event, name) => {
+    const label = labelOf(name);
+    return event?.label === label || event?.labels?.includes(label) || event?.store === label
+      || (event?.type === 'purge' && !event.label && !event.labels);
+  };
+  function loseCoverage(name) {
+    forgetMethods(name);
+    coverageLoss.set(name, voidOf(name));
+    states.forEach((state, key) => {
+      if (JSON.parse(key)[0] !== name) return;
+      state.syncedAt = null;
+      if (state.state === 'fresh') state.state = 'stale';
+    });
+    methodGroups.forEach((group) => {
+      if (group.collection === name && group.state.state === 'fresh') group.state.state = 'stale';
+    });
+  }
+  const offGenerationFeed = feed?.subscribe((event) => {
+    if (disposed || !ownsChange(event)) return;
+    let invalidated = false;
+    knownCollections.forEach((name) => {
+      if (!matchesCollection(event, name)) return;
+      if (watchedStores.has(name)) bump(name);
+      if (event.type === 'evict' || event.type === 'purge') {
+        loseCoverage(name);
+        invalidated = true;
+      }
+    });
+    if (invalidated) emitStatus();
+  });
+
   // When an id was last fetched, and whether its answer held a row for it
   // (true), answered it absent (false), or cannot say (null: a method with no
   // `field` naming its rows).
@@ -1739,7 +1780,9 @@ export function createDataService({
       // that reads on demand; failed; stored nothing) leaves the method to
       // send its own lookup: a keyed ask never inherits a whole read's outcome.
       if (whole.flight && whole.flightWhole && whole.flightForm === form && (whole.flightSeq || 0) > voidOf(name)) {
-        const stored = whole.flight.then(() => stateFor(targetKey({ collection: name })).state === 'fresh', () => false);
+        const stored = whole.flight.then(() => !disposed && formOf(jobContextNow()) === form
+          && (wholeCovers.get(coverKey(form, name)) || 0) > voidOf(name)
+          && stateFor(targetKey({ collection: name })).state === 'fresh', () => false);
         return settle(stored.then((answered) => {
           if (answered) {
             group.state.state = 'fresh';
@@ -2093,6 +2136,12 @@ export function createDataService({
       }
       // A read that answered no list leaves the collection as it was, not fresh.
       if (outcome === NO_SNAPSHOT) { if (state.state === 'refreshing') state.state = 'stale'; return; }
+      if (wholeRead && flightSeq <= lossOf(name)) {
+        const error = Object.assign(serviceError(`'${wanted.collection}' lost rows while it was read`, 'DATA_INCOMPLETE'), { retryable: false });
+        state.state = isOnline() ? 'error' : 'offline'; state.syncedAt = null;
+        state.error = { code: error.code, status: null, message: error.message };
+        throw error;
+      }
       state.state = 'fresh'; state.syncedAt = now(); state.error = null;
       if (wholeRead) wholeCovers.set(coverKey(form, name), Math.max(wholeCovers.get(coverKey(form, name)) || 0, flightSeq));
     }, (error) => {
@@ -2298,7 +2347,8 @@ export function createDataService({
      * copy does not replace it. With `replace`, the rows are the complete set
      * for `scope` (a row predicate; the whole collection without one): rows in
      * scope that the set leaves out are removed, dirty rows never. After a
-     * replacing or `complete` ingest the collection is fresh. Resolves
+     * whole replacing or `complete` ingest the collection is fresh only if
+     * every answered row was retained without a concurrent loss. Resolves
      * `{ written }`, the rows stored, and `unsaved`, the keys of rows a store
      * could keep only in memory (its device storage refused them). With
      * `ifEmpty`, the rows (an earlier copy, such as a restored snapshot) are
@@ -2311,6 +2361,7 @@ export function createDataService({
       live();
       const { name, store, decl } = local(collection);
       const keyPath = decl?.keyPath || 'id';
+      const ingestForm = formOf(jobContextNow());
       // In the collection's turn, through the store that records what it
       // changes: a replacement removes rows it leaves out, and a read already
       // on its way never brings them back.
@@ -2327,12 +2378,19 @@ export function createDataService({
         const small = tracksMeta && !options?.replace && Array.isArray(rows) && rows.length <= PAGE_ROWS;
         const keys = small ? [...new Set(rows.filter((row) => row && typeof row === 'object').map((row) => String(row[keyPath])))] : [];
         const before = small ? await Promise.all(keys.map(async (key) => !!(await store.getRaw(key)))) : [];
+        const lossBefore = voidOf(name);
         const { everyRow, ...result } = await ingestRows(collection, rows, options, turn.store);
         // A complete set (or a replacement of the whole collection) the store
         // kept every row of covers every key a batched method could ask for.
-        if (everyRow && (options?.complete === true || (options?.replace && typeof options?.scope !== 'function'))) {
-          coverageSeq += 1;
-          wholeCovers.set(coverKey(formOf(jobContextNow()), name), coverageSeq);
+        if (options?.complete === true || (options?.replace && typeof options?.scope !== 'function')) {
+          if (disposed) return result;
+          if (everyRow && lossBefore === voidOf(name) && ingestForm === formOf(jobContextNow())) {
+            coverageSeq += 1;
+            wholeCovers.set(coverKey(ingestForm, name), coverageSeq);
+            const state = stateFor(targetKey({ collection: name }));
+            state.state = 'fresh'; state.syncedAt = now(); state.error = null;
+          } else loseCoverage(name);
+          if (!disposed) emitStatus();
         }
         if (small) {
           const after = await Promise.all(keys.map(async (key) => !!(await store.getRaw(key))));
@@ -2634,7 +2692,9 @@ export function createDataService({
       states.clear();
       methodGroups.clear();
       coverageVoid.clear();
+      coverageLoss.clear();
       wholeCovers.clear();
+      knownCollections.clear();
       windowReads.clear();
       // Its reads and changes end now in the scheduler, queued retries
       // included: none runs, or runs again, for a retired principal.

@@ -129,7 +129,7 @@ const clone = (value) => (value === undefined ? undefined : JSON.parse(JSON.stri
 // tenant does.
 export function createDataManager({
   capabilityToken, mpId, localData: declaredData = {}, backendFactory, now, onPersistError,
-  scheduler, feed = null, isOnline, lane = null,
+  scheduler, feed = null, changeOwner = null, isOnline, lane = null,
 }) {
   const localData = { ...declaredData, [PREFS_STORE]: PREFS_DECL };
   const dbName = databaseName(capabilityToken, mpId);
@@ -204,6 +204,7 @@ export function createDataManager({
     ...(now ? { now } : {}),
     ...(typeof isOnline === 'function' ? { isOnline } : {}),
     feed,
+    changeOwner,
     onPersistError,
   });
 
