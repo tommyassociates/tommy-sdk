@@ -188,7 +188,7 @@ export function createDataManager({
   // undoes it.
   const fetchAndReconcile = (store, keyPath, spec, scope, window, windowKey, storeName, complete) => service.reconcileWindow( // eslint-disable-line no-use-before-define
     qualified(storeName), {
-      fetch: spec.fetch, toRecord: spec.toRecord, keyOf: spec.keyOf, scope, window, windowKey, complete, keepDirty: service.sends(qualified(storeName)), // eslint-disable-line no-use-before-define
+      fetch: spec.fetch, toRecord: spec.toRecord, keyOf: spec.keyOf, readKey: spec.readKey, onReadDropped: spec.onReadDropped, scope, window, windowKey, complete, keepDirty: service.sends(qualified(storeName)), // eslint-disable-line no-use-before-define
     },
   );
 
@@ -385,7 +385,7 @@ export function createDataManager({
      * window has nothing to retain BY window and the row cap is the right bound.
      */
     windowCache(storeName, {
-      fetch, toRecord = (dto) => dto, scopeOf, keyOf,
+      fetch, toRecord = (dto) => dto, scopeOf, keyOf, readKey,
     } = {}) {
       const store = stores.get(storeName);
       if (!store) throw new Error(`tommy.data.windowCache('${storeName}'): store not declared in manifest.localData`);
@@ -398,7 +398,7 @@ export function createDataManager({
         read: (window) => store.readWhere(scopeFor(window)),
         // The reconcile answers with its own read of the window's scope.
         sync: (window) => fetchAndReconcile(
-          store, keyPath, { fetch, toRecord, keyOf }, scopeFor(window), window, windowKeyOf(window), storeName, !scopeOf,
+          store, keyPath, { fetch, toRecord, keyOf, readKey }, scopeFor(window), window, windowKeyOf(window), storeName, !scopeOf,
         ),
       };
     },
@@ -448,25 +448,11 @@ export function createDataManager({
             if (hit) return hit;
           }
           if (typeof fetch !== 'function') return undefined;
-          const dto = await fetch(id);
-          if (!dto) return undefined;
-          // `prev` so a thin single-record DTO cannot erase rich fields an
-          // earlier window reconcile already put in the row.
-          const prev = await store.get(key);
-          const rec = toRecord(dto, prev);
-          if (!rec) return undefined;
-          // Stored as the server's row. In a store that sends its changes, a
-          // row with an edit still waiting to go keeps it, and the read
-          // answers with it: nothing when that edit is a delete. A cache write must never fail the read it was
-          // serving: the record is returned either way, so a full/blocked
-          // store degrades to fetch-every-time rather than to a blank surface.
-          let kept = false;
-          try {
-            // One record says nothing about the rest: the collection's synced stamp stays.
-            const result = await service.writer(qualified(storeName)).reconcile([rec], { prune: false, syncedAt: null, ...(service.sends(qualified(storeName)) ? { keepDirty: true } : {}) }); // eslint-disable-line no-use-before-define
-            kept = (Array.isArray(result?.skipped) ? result.skipped : []).map(String).includes(key);
-          } catch (_) { /* cache write is best-effort */ }
-          return kept ? store.get(key) : rec;
+          // Transport begins inside the shared guard, so a late answer cannot
+          // undo a newer confirmed write, removal or eviction.
+          return service.reconcileRecord(qualified(storeName), key, {
+            fetch: () => fetch(id), toRecord, keepDirty: service.sends(qualified(storeName)),
+          });
         },
       };
     },
@@ -487,9 +473,12 @@ export function createDataManager({
      * for a detail. subscribe uses the whole-store notify then re-filters by
      * scope: simple and correct (a change outside the scope re-runs the handler
      * to the same result — harmless). `fetch`/`toRecord`/`keyOf` are as windowCache.
+     * `readKey` (a string or function of the window) opts into coverage ordering;
+     * include every filter/actor/kind/page that changes the fetched set.
+     * `onReadDropped()` signals an obsolete response so its page metadata cannot authorize pruning.
      */
     liveQuery(storeName, {
-      scope, pruneScope, fetch, toRecord = (dto) => dto, keyOf,
+      scope, pruneScope, fetch, toRecord = (dto) => dto, keyOf, readKey, onReadDropped,
     } = {}) {
       const store = stores.get(storeName);
       if (!store) throw new Error(`tommy.data.liveQuery('${storeName}'): store not declared in manifest.localData`);
@@ -562,7 +551,7 @@ export function createDataManager({
         // The reconcile answers with its read of the prune scope; a read whose
         // paint scope differs reads that too.
         revalidate: (window) => fetchAndReconcile(
-          store, keyPath, { fetch, toRecord, keyOf }, prunePredicate, window, windowKeyOf(window), storeName, wholeRead,
+          store, keyPath, { fetch, toRecord, keyOf, readKey, onReadDropped }, prunePredicate, window, windowKeyOf(window), storeName, wholeRead,
         ).then((rows) => (prunePredicate === predicate ? rows : store.readWhere(predicate))),
       };
     },
