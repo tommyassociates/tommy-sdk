@@ -53,12 +53,13 @@
 import {
   reconcileFetched, windowKeyOf, previousByKey, reportRejected,
 } from './reconcile.js';
+import { copyStorageRow } from './transactional-store.js'; // eslint-disable-line import/extensions
 import { boundedBatches } from './bytes.js';
 
 export const DATA_STATES = Object.freeze(['fresh', 'stale', 'refreshing', 'offline', 'error']);
 // A store's methods that change its rows: called only on the handles a
 // collection's turn gives (see inTurn), never on the store `local()` answers.
-const WRITE_METHODS = new Set(['put', 'delete', 'deleteMany', 'markRow', 'markSynced', 'reconcile', 'patchSynced']);
+const WRITE_METHODS = new Set(['put', 'delete', 'deleteMany', 'markRow', 'markSynced', 'reconcile', 'patchSynced', 'replaceSynced']);
 /**
  * The service's public methods that answer at once; every other one is
  * tracked from its call to its end (`idle()` is false meanwhile).
@@ -671,8 +672,16 @@ export function createDataService({
       deleteMany: (keys, ...rest) => recorded(() => store.deleteMany(keys, ...rest),
         (removed) => (Array.isArray(removed) ? removed : (keys || [])), () => keys || []),
       markRow: (key, ...rest) => recorded(() => store.markRow(key, ...rest), (found) => (found === false ? [] : [key]), () => [key]),
-      patchSynced: (keys, ...rest) => recorded(() => store.patchSynced(keys, ...rest),
-        (outcome) => (outcome && typeof outcome === 'object' ? [...(outcome.patched || []), ...(outcome.unsaved || [])] : (keys || [])), () => keys || []),
+      patchSynced: (keys, ...rest) => recorded(
+        () => store.patchSynced(keys, ...rest),
+        (outcome) => (outcome && typeof outcome === 'object' ? [...(outcome.patched || []), ...(outcome.unsaved || [])] : (keys || [])),
+        () => keys || []
+      ),
+      replaceSynced: (key, ...rest) => recorded(
+        () => store.replaceSynced(key, ...rest),
+        (outcome) => (outcome?.replaced === true ? [key] : []),
+        () => [key]
+      ),
       // A prune with no scope (or one marked `whole`: a replacement of the
       // whole collection) replaces it; a scoped one (a window, a query)
       // records the rows it wrote and removed, and nothing else. A
@@ -799,12 +808,13 @@ export function createDataService({
   }
   const emitStatus = () => { [...listeners].forEach((listener) => { try { listener(); } catch (_) { /* listener isolation */ } }); };
 
-  async function valueOf(target) {
+  async function valueOf(target, { storageMetadata = false } = {}) {
     const { store, decl } = local(target.collection);
     const keyPath = decl?.keyPath || 'id';
     if (target.query) return (await runQuery(store, keyPath, target.query)).rows;
-    if (target.key !== undefined && target.key !== null) return clean(await store.get(String(target.key)));
-    return (await store.getAll()).map(clean);
+    const project = storageMetadata ? copyRow : clean;
+    if (target.key !== undefined && target.key !== null) return project(await store.get(String(target.key)));
+    return (await store.getAll()).map(project);
   }
 
   // One entry per row with unsent changes, oldest change first.
@@ -1115,10 +1125,15 @@ export function createDataService({
   }
 
   /** Stores server rows (see `ingest`), noting nothing as a change of its own. */
-  async function ingestRows(collection, rows, { replace = false, scope = null, complete = false } = {}, store) {
+  async function ingestRows(collection, incomingRows, { replace = false, scope = null, complete = false } = {}, store) {
     live();
     const { name, decl } = local(collection);
-    if (!Array.isArray(rows)) throw serviceError('ingest: rows must be an array', 'DATA_INVALID');
+    if (!Array.isArray(incomingRows)) throw serviceError('ingest: rows must be an array', 'DATA_INVALID');
+    const rows = incomingRows.map((row) => {
+      if (!row || typeof row !== 'object' || !Object.hasOwn(row, '_writeReceipt')) return row;
+      const { _writeReceipt: _receipt, ...domain } = row;
+      return domain;
+    });
     const keyPath = decl?.keyPath || 'id';
     const inScope = typeof scope === 'function' ? scope : () => true;
     // Only rows the store accepts count, once per key; a refused row never
@@ -1478,7 +1493,7 @@ export function createDataService({
           const key = keyOf(record);
           if (touched.has(key) || barred(record)) return;
           const row = stored.get(key);
-          if (!row || row._dirty || row._persistFailed || contentOf(record) !== contentOf(row)) { toWrite.push(record); return; }
+          if (!row || row._dirty || row._persistFailed || Object.hasOwn(row, '_writeReceipt') || contentOf(record) !== contentOf(row)) { toWrite.push(record); return; }
           const at = Date.parse(row._updatedAt || '');
           if (!Number.isFinite(at) || at < confirmBefore) { toWrite.push(record); return; }
           written.add(key);
@@ -2161,13 +2176,14 @@ export function createDataService({
     // see the collection (rows past the paint ceiling and the store's age
     // limit, and unsent tombstones), metadata kept, for a caller checking what
     // it painted or deciding what to remove.
-    async read(collection, key, { raw = false } = {}) {
+    async read(collection, key, { raw = false, storageMetadata = false } = {}) {
       live();
       const { store } = local(collection);
-      const one = async (item) => (raw ? copyRow(await store.getRaw(String(item))) : clean(await store.get(String(item))));
+      const project = storageMetadata ? copyRow : clean;
+      const one = async (item) => (raw ? copyRow(await store.getRaw(String(item))) : project(await store.get(String(item))));
       if (Array.isArray(key)) return Promise.all(key.map(one));
       if (key !== undefined && key !== null) return one(key);
-      return raw ? (await store.getAllRaw()).map(copyRow) : (await store.getAll()).map(clean);
+      return raw ? (await store.getAllRaw()).map(copyRow) : (await store.getAll()).map(project);
     },
     // `raw: true` answers as writers see the collection (rows past the paint
     // ceiling and the age limit included), for a caller deciding what to remove.
@@ -2253,7 +2269,7 @@ export function createDataService({
      * `{ collection, query: { index, … } }`. Fires with the current value, then
      * whenever it changes — in this tab or another.
      */
-    subscribe(target, callback, { onError } = {}) {
+    subscribe(target, callback, { onError, storageMetadata = false } = {}) {
       live();
       const wanted = targetOf(target);
       const { store, label } = local(wanted.collection);
@@ -2265,7 +2281,7 @@ export function createDataService({
         if (!active) return;
         seq += 1;
         const mine = seq;
-        valueOf(wanted).then((value) => {
+        valueOf(wanted, { storageMetadata }).then((value) => {
           if (!active || mine !== seq || (last !== undefined && same(value, last))) return;
           last = value;
           callback(value);
@@ -2433,6 +2449,26 @@ export function createDataService({
         }
         return outcome;
       });
+    },
+    /**
+     * Internal canonical-store hook: replace or remove a synced row only
+     * while its current raw value passes `when`. The predicate runs inside
+     * each revision-checked commit; a receipt is opaque storage metadata.
+     * No push, outbox, or whole-source freshness is created.
+     */
+    async replaceSyncedRow(collection, key, record, { when, receipt = null, guardKey = null } = {}) {
+      live();
+      const generation = fenceGeneration;
+      const { name, store } = local(collection);
+      if (typeof when !== 'function' || typeof store.replaceSynced !== 'function') {
+        throw serviceError('replaceSyncedRow needs a conditional canonical store', 'DATA_INVALID');
+      }
+      const submitted = record === null ? null : copyStorageRow(record);
+      return inTurn(name, ({ store: writer }) => writer.replaceSynced(key, submitted, {
+        receipt,
+        guardKey,
+        when: (previous, guard) => !disposed && generation === fenceGeneration && when(previous, guard) === true,
+      }));
     },
     /**
      * `{ op: 'put', record } | { op: 'patch', key, patch } | { op: 'delete', key }`.

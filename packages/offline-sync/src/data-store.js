@@ -1,4 +1,4 @@
-import { createTransactionalDataStore } from './transactional-store.js';
+import { createTransactionalDataStore, copyStorageRow } from './transactional-store.js';
 import { utf16Units } from './bytes.js';
 /**
  * data-store.js — the DataStore behind `tommy.data.store(name)`
@@ -540,15 +540,16 @@ export function createDataStore({
   // its commit.
   const rowTurns = turnsFor(backend);
   const sharedStorage = typeof backend.turnKey === 'string' ? backend.turnKey : null;
-  function rowTurn(key, task) {
-    const id = String(key);
+  function rowsTurn(keys, task) {
+    const ids = [...new Set(keys.map(String))];
     const run = sharedStorage ? () => acrossTabs(sharedStorage, task) : task;
-    const next = (rowTurns.get(id) || Promise.resolve()).then(run);
+    const next = Promise.all(ids.map((id) => rowTurns.get(id) || Promise.resolve())).then(run);
     const tail = next.then(() => {}, () => {});
-    rowTurns.set(id, tail);
-    tail.then(() => { if (rowTurns.get(id) === tail) rowTurns.delete(id); });
+    ids.forEach((id) => rowTurns.set(id, tail));
+    tail.then(() => ids.forEach((id) => { if (rowTurns.get(id) === tail) rowTurns.delete(id); }));
     return next;
   }
+  const rowTurn = (key, task) => rowsTurn([key], task);
 
   /**
    * Tell the host a write did not reach disk. One channel, not two: the host
@@ -1008,15 +1009,17 @@ export function createDataStore({
     // `server: true` (reconcile with `keepDirty`) stores the row synced in the
     // same write, and leaves a row with an unsent local write untouched:
     // resolves undefined then.
-    async put(record, { dedupeKey, silent = false, deferCap = false, server = false } = {}) {
+    async put(record, { dedupeKey, silent = false, deferCap = false, server = false, when = null, receipt = null, guardKey = null } = {}) {
       if (validate && !validate(record)) {
         const detail = (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ');
         throw Object.assign(new Error(`store '${name}': record failed recordSchema: ${detail}`), { code: 'DATA_INVALID' });
       }
       const key = keyOf(record);
       if (key === undefined) throw Object.assign(new Error(`store '${name}': record missing keyPath '${keyPath}'`), { code: 'DATA_INVALID' });
-      const turn = await rowTurn(key, async () => {
+      const turn = await rowsTurn(guardKey === null ? [key] : [key, guardKey], async () => {
         const previous = await backend.get(key);
+        const guard = guardKey === null ? undefined : await backend.get(guardKey);
+        if (when && when(previous, guard) !== true) return null;
         if (server && previous?._dirty) return null;
         if (residentCount === null) {
           // `keys()` is the cheap route (both shipped backends answer it without
@@ -1028,6 +1031,7 @@ export function createDataStore({
         }
         const stamped = {
           ...record,
+          ...(receipt !== null ? { _writeReceipt: receipt } : {}), // eslint-disable-line no-underscore-dangle
           // ⚠ CARRY `_window` FORWARD. It is store metadata of the same class as
           // `_rev` — the caller's record never contains it — so spreading the
           // record over the row DROPPED it, and any writer that reconciles
@@ -1047,7 +1051,8 @@ export function createDataStore({
           _dirty: !server,
           ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}),
         };
-        if (server) capSaturated = false;   // a clean row is an evictable row
+        if (when && when(previous, guard) !== true) return null;
+        if (server) capSaturated = false; // a clean row is an evictable row
         const written = await backend.put(key, stamped);
         // A write refused and not held (`retained: false`) left the row as it was.
         if (previous === undefined && !(written?.ok === false && written.retained === false)) residentCount += 1;
@@ -1127,11 +1132,18 @@ export function createDataStore({
      * row written since is kept and the delete rejects with a `conflict`
      * PersistError, as on the host store.
      */
-    async delete(key, { silent = false, expectedRevision } = {}) {
-      const persisted = await rowTurn(key, async () => {
-        if (expectedRevision !== undefined && typeof backend.deleteIf === 'function') {
+    async delete(key, { silent = false, expectedRevision, when = null, guardKey = null } = {}) {
+      const persisted = await rowsTurn(guardKey === null ? [key] : [key, guardKey], async () => {
+        const guard = guardKey === null ? undefined : await backend.get(guardKey);
+        if ((expectedRevision !== undefined || when) && typeof backend.deleteIf === 'function') {
           // Compared and deleted in one step on the storage itself.
-          const result = await backend.deleteIf(key, (stored) => { noteRevision(stored); return stored._rev !== expectedRevision; });
+          const result = await backend.deleteIf(key, (stored) => {
+            noteRevision(stored);
+            // eslint-disable-next-line no-underscore-dangle
+            return (when && (stored._dirty || when(stored, guard) !== true))
+              || (expectedRevision !== undefined && stored._rev !== expectedRevision);
+          });
+          if (when && (result?.kept || result?.existed === false)) return null;
           if (result?.kept) throw new PersistError(name, { reason: 'conflict', retained: false });
           if (result?.existed && !(result.ok === false && result.retained === false)) {
             capSaturated = false;
@@ -1140,6 +1152,8 @@ export function createDataStore({
           return result;
         }
         const current = await backend.get(key);
+        // eslint-disable-next-line no-underscore-dangle
+        if (when && (!current || current._dirty || when(current, guard) !== true)) return null;
         noteRevision(current);
         if (current !== undefined && expectedRevision !== undefined && current._rev !== expectedRevision) {
           throw new PersistError(name, { reason: 'conflict', retained: false });
@@ -1154,12 +1168,30 @@ export function createDataStore({
       // on success and trip the retention bound on failure. This path read
       // neither field, so a delete that displaced other rows inflated the
       // counter and left subscribers watching those rows asleep.
+      if (persisted === null) return false;
       const gone = accountForGoneRows(persisted, key);
       if (!silent) await notify(gone.length ? [key, ...gone] : key);
       if (persisted && persisted.ok === false) {
         reportPersistFailure(persisted, key);
         throw new PersistError(name, persisted);
       }
+      return when ? true : undefined;
+    },
+    /**
+     * Replaces or removes one synced row only while a synchronous ownership
+     * predicate accepts it inside the row's write turn. The optional opaque
+     * receipt is storage metadata, never a domain field or an outbox entry.
+     */
+    async replaceSynced(key, record, { when, receipt = null, guardKey = null } = {}) {
+      if ((guardKey !== null && (typeof guardKey !== 'string' || !guardKey || guardKey.length > 1024))
+        || typeof when !== 'function' || (receipt !== null && (typeof receipt !== 'string' || !receipt || receipt.length > 128))) {
+        throw Object.assign(new Error('replaceSynced needs an ownership predicate and a bounded receipt'), { code: 'DATA_INVALID' });
+      }
+      if (record === null) return { replaced: await this.delete(key, { when, guardKey }) === true };
+      if (!record || String(record[keyPath]) !== String(key) || Object.keys(record).some((field) => field.startsWith('_'))) {
+        throw Object.assign(new Error('replaceSynced needs a domain row with the requested key'), { code: 'DATA_INVALID' });
+      }
+      return { replaced: await this.put(copyStorageRow(record), { server: true, when, receipt, guardKey }) !== undefined };
     },
     /**
      * Sync engine hook: writes its markers onto a stored row without
@@ -1292,7 +1324,12 @@ export function createDataStore({
      */
     // `protect`: keys the row cap never evicts for this reconcile (rows a
     // whole read answered that it did not write again).
-    async reconcile(records = [], { scope, windowKey, prune = true, keepDirty = false, protect = [] } = {}) {
+    async reconcile(submittedRecords = [], { scope, windowKey, prune = true, keepDirty = false, protect = [] } = {}) {
+      const records = submittedRecords.map((record) => {
+        if (!record || typeof record !== 'object' || !Object.hasOwn(record, '_writeReceipt')) return record;
+        const { _writeReceipt: _receipt, ...domain } = record;
+        return domain;
+      });
       const existing = prune ? await backend.getAll() : [];
       const incoming = new Set();
       const skipped = [];

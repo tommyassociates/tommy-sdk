@@ -208,6 +208,52 @@ export function createDataManager({
     onPersistError,
   });
 
+  // Every advertised store handle shares one projected interface. Canonical
+  // reads still observe permitted read substitutions; substituted methods
+  // receive this interface, never the private writer as their receiver.
+  function publicWriter(name) {
+    if (writers.has(name)) return writers.get(name);
+    const writer = service.writer(qualified(name));
+    const target = {};
+    const readMethods = new Set([
+      'get', 'getRaw', 'getAll', 'getAllRaw', 'readWhere', 'selectFrom',
+      'query', 'validateRecord', 'subscribe', 'subscribeQuery', 'onChange',
+    ]);
+    const publicArgs = (property, args) => {
+      if (property !== 'put' && property !== 'delete') return args;
+      const { when: _when, receipt: _receipt, guardKey: _guardKey, ...options } = args[1] || {};
+      return [args[0], options, ...args.slice(2)];
+    };
+    Reflect.ownKeys(writer).filter((property) => property !== 'replaceSynced').forEach((property) => {
+      const value = writer[property];
+      if (typeof value === 'function') {
+        target[property] = (...args) => Reflect.apply(value, writer, publicArgs(property, args));
+      } else target[property] = value;
+    });
+    let handle;
+    const forward = (property, value) => {
+      // Write wrappers already enter the service turn. Forwarding one back
+      // to its raw store would recursively queue that same turn.
+      if (readMethods.has(property) && typeof value === 'function') {
+        writer[property] = (...args) => Reflect.apply(value, handle, publicArgs(property, args));
+      }
+    };
+    handle = new Proxy(target, {
+      set(projected, property, value) {
+        const changed = Reflect.set(projected, property, value, projected);
+        if (changed) forward(property, value);
+        return changed;
+      },
+      defineProperty(projected, property, descriptor) {
+        const changed = Reflect.defineProperty(projected, property, descriptor);
+        if (changed && Object.hasOwn(descriptor, 'value')) forward(property, descriptor.value);
+        return changed;
+      },
+    });
+    writers.set(name, handle);
+    return handle;
+  }
+
   // tommy.prefs: the store opens on first use, so an MP that never reads a
   // preference never opens it. `get` answers the change on its way when there
   // is one, else what the device holds once a load or a save has said (the
@@ -334,9 +380,9 @@ export function createDataManager({
       service.dispose();
       await Promise.all([...stores.values()].map((store) => store.dispose?.(options)));
     },
-    read: (...args) => { live(); return service.read(...args); },
+    read: (collection, key, { raw = false } = {}) => { live(); return service.read(collection, key, { raw }); },
     query: (...args) => { live(); return service.query(...args); },
-    subscribe: (...args) => { live(); return service.subscribe(...args); },
+    subscribe: (target, callback, { onError } = {}) => { live(); return service.subscribe(target, callback, { onError }); },
     source: (...args) => { live(); return service.source(...args); },
     refresh: (...args) => { live(); return service.refresh(...args); },
     mutate: (...args) => { live(); return service.mutate(...args); },
@@ -359,8 +405,7 @@ export function createDataManager({
       live();
       const store = stores.get(name);
       if (!store) throw new Error(`tommy.data.store('${name}'): store not declared in manifest.localData`);
-      if (!writers.has(name)) writers.set(name, service.writer(qualified(name)));
-      return writers.get(name);
+      return publicWriter(name);
     },
     /**
      * DataApi.windowCache — the reusable "instant data" (SWR) combinator every
@@ -521,7 +566,7 @@ export function createDataManager({
       // A revalidate with neither scope reads the whole store.
       const wholeRead = typeof scope !== 'function' && typeof pruneScope !== 'function';
       return {
-        store,
+        store: publicWriter(storeName),
         read: () => store.readWhere(predicate),
         subscribe(handler) {
           let live = true;

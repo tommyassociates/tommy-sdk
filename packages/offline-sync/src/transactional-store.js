@@ -12,7 +12,7 @@ export class StorageReadError extends Error {
   constructor(reason) { super(`Storage read failed (${reason})`); this.name = 'StorageReadError'; this.reason = reason; }
 }
 const strip = (row) => Object.fromEntries(Object.entries(row).filter(([key]) => !key.startsWith('_')));
-const copy = (row) => {
+export const copyStorageRow = (row) => {
   if (row === undefined) return undefined;
   const seen = new Set();
   function check(value) {
@@ -29,6 +29,7 @@ const copy = (row) => {
   check(row);
   return JSON.parse(JSON.stringify(row));
 };
+const copy = copyStorageRow;
 export function assertCompleteSet(rows, { maxRows = 1000, maxBytes = 8 * 1024 * 1024 } = {}) {
   if (!Array.isArray(rows) || rows.length > maxRows) throw new StorageReadError('scan-required');
   let bytes = 2;
@@ -391,6 +392,48 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         return removed;
       });
     },
+    /**
+     * An internal synced replacement or removal, conditional on the row at
+     * the atomic commit. Every conflict retry rechecks ownership. Receipts
+     * stay in storage metadata and never make an outbox entry.
+     */
+    /* eslint-disable no-underscore-dangle */
+    replaceSynced(key, record, { when, receipt = null, guardKey = null } = {}) {
+      if ((guardKey !== null && (typeof guardKey !== 'string' || !guardKey || guardKey.length > 1024))
+        || typeof when !== 'function' || (receipt !== null && (typeof receipt !== 'string' || !receipt || receipt.length > 128))) {
+        return Promise.reject(Object.assign(new Error('replaceSynced needs an ownership predicate and a bounded receipt'), { code: 'DATA_INVALID' }));
+      }
+      if (record !== null && (!record || keyString(record[keyPath]) !== keyString(key) || Object.keys(record).some((field) => field.startsWith('_')))) {
+        return Promise.reject(Object.assign(new Error('replaceSynced needs a domain row with the requested key'), { code: 'DATA_INVALID' }));
+      }
+      if (record !== null) requiredRecord(record);
+      const submitted = record === null ? null : copy(record);
+      return exclusive(async () => {
+        let replaced = false;
+        await mutation(guardKey === null ? [keyString(key)] : [keyString(key), guardKey], (rows, storeRevision) => {
+          const previous = rows.get(keyString(key));
+          replaced = !previous?._dirty && when(previous, guardKey === null ? undefined : rows.get(guardKey)) === true && (submitted !== null || !!previous);
+          if (!replaced) return [];
+          if (submitted === null) return [{ op: 'delete', key: keyString(key) }];
+          return [{
+            op: 'put',
+            key: keyString(key),
+            value: {
+              ...submitted,
+              ...(previous?._window != null ? { _window: previous._window } : {}),
+              ...acknowledged(previous),
+              ...(receipt !== null ? { _writeReceipt: receipt } : {}),
+              _rev: rowRevision(previous, storeRevision),
+              _dirty: false,
+              _updatedAt: new Date(now()).toISOString(),
+            },
+          }];
+        }, { retry: true, syncedAt: null });
+        if (replaced) await notify();
+        return { replaced };
+      });
+    },
+    /* eslint-enable no-underscore-dangle */
     // The sync engine's markers on a stored row, written without validating
     // or re-stamping the record (see the DataStore's `markRow`).
     markRow(key, patch, { dirty = false, body = null } = {}) {
@@ -468,7 +511,12 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
      * `keepDirty: true` leaves a row with an unsent local write as it is
      * (its key listed in `skipped`), decided inside the same commit.
      */
-    async reconcile(records = [], { scope, windowKey, syncedAt = now(), prune = true, keepDirty = false } = {}) {
+    async reconcile(submittedRecords = [], { scope, windowKey, syncedAt = now(), prune = true, keepDirty = false } = {}) {
+      const records = submittedRecords.map((record) => {
+        if (!record || typeof record !== 'object' || !Object.hasOwn(record, '_writeReceipt')) return record;
+        const { _writeReceipt: _receipt, ...domain } = record;
+        return domain;
+      });
       assertCompleteSet(records);
       assertCompleteSet(records.map((row) => ({ ...row, _rev: Number.MAX_SAFE_INTEGER, _dirty: false,
         _updatedAt: new Date(now()).toISOString(), ...(windowKey != null ? { _window: String(windowKey) } : {}) })), {
