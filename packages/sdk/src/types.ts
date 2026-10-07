@@ -941,6 +941,141 @@ export interface DeviceApi {
 // versioned, cannot be uninstalled. Exposed as plain reads.
 // ============================================================================
 
+export interface ForecastingGate {
+  readonly experimental: boolean;
+  readonly plusOrPro: boolean;
+  readonly salesForecastingEnabled: boolean;
+  readonly demandPlanningEnabled: boolean;
+}
+
+export interface ForecastingSettings {
+  readonly businessDayCutoff: string;
+  readonly businessDayCutoffOverrides: Readonly<Record<string, string>>;
+  readonly forecastWeeksWindow: number;
+  readonly minGeneratedShiftHours: number;
+}
+
+/** HTTP failures resolve as flat results; local permission gates reject. */
+export interface ForecastingErrorResult {
+  readonly error: 'upgrade_required' | 'billing_locked' | 'hidden' | 'forbidden'
+    | 'unauthenticated' | 'not_found' | 'conflict' | 'validation' | 'rate_limited'
+    | 'offline' | 'failed';
+  readonly status: number;
+  readonly code: string | null;
+  readonly message: string | null;
+  readonly details?: Readonly<Record<string, unknown>>;
+}
+
+export type ForecastingResult<T> = T | ForecastingErrorResult;
+
+export interface SalesMetricsWeekPage {
+  readonly location_id: number;
+  readonly iso_week: string;
+  readonly complete: boolean;
+  readonly content_hash: string;
+  readonly buckets: ReadonlyArray<readonly [timestamp: number, revenue: number | null, txCount: number | null]>;
+}
+
+export interface SalesMetricsManifest {
+  readonly location_id: number;
+  readonly weeks: Readonly<Record<string, string>>;
+}
+
+export interface DemandRuleTiming {
+  readonly time_window?: { readonly start: string; readonly end: string } | null;
+  readonly min_shift_hours?: number | null;
+}
+
+export interface SalesBandRuleParams extends DemandRuleTiming {
+  readonly metric: 'revenue' | 'tx_count';
+  readonly per_value: number;
+  readonly min: number;
+  readonly max: number;
+}
+
+export type CalendarRuleParams = DemandRuleTiming & { readonly headcount: number } & (
+  | { readonly trigger: 'day_of_week' | 'day_of_month'; readonly value: ReadonlyArray<number> }
+  | { readonly trigger: 'day_of_year' | 'public_holiday'; readonly value: ReadonlyArray<string> }
+);
+
+/** Returned rows retain the server's snake_case serializer fields. */
+export type DemandRule = {
+  readonly id: number;
+  readonly location_id: number | null;
+  readonly role_tag_id: number;
+  readonly role_name: string | null;
+  readonly active: boolean;
+  readonly position: number;
+} & (
+  | { readonly kind: 'sales_band'; readonly params: SalesBandRuleParams }
+  | { readonly kind: 'calendar'; readonly params: CalendarRuleParams }
+);
+
+export interface DemandModel {
+  readonly id: number;
+  readonly name: string;
+  readonly status: 'draft' | 'active' | 'archived';
+  readonly config_version: string;
+  readonly created_by_id: number | null;
+  readonly created_at: Iso8601;
+  readonly updated_at: Iso8601;
+  readonly rules: ReadonlyArray<DemandRule>;
+}
+
+export type DemandModelsRead =
+  | { readonly notModified: true; readonly etag: string | null }
+  | {
+    readonly notModified: false;
+    readonly etag: string | null;
+    readonly demand_models: ReadonlyArray<DemandModel>;
+    readonly bands_omitted: boolean;
+  };
+
+export interface SalesEstimate {
+  readonly id: number;
+  readonly location_id: number;
+  readonly business_date: string;
+  readonly hour: number | null;
+  readonly value: number;
+  readonly tx_count: number | null;
+  readonly note: string | null;
+  readonly created_by_id: number | null;
+  readonly updated_at: Iso8601;
+}
+
+export interface ForecastingRuleWrite {
+  kind?: 'sales_band' | 'calendar';
+  locationId?: string | number | null;
+  roleId?: string | number;
+  active?: boolean;
+  position?: number;
+  params?: SalesBandRuleParams | CalendarRuleParams;
+}
+
+/** CamelCase command arguments; successful results are unwrapped wire DTOs. */
+export interface ForecastingHostApi {
+  settings(): Promise<ForecastingSettings>;
+  weeks(args: { locationId: string | number; isoWeeks: string | ReadonlyArray<string>; kinds?: string | ReadonlyArray<'total' | 'count'> }): Promise<ForecastingResult<{ readonly pages: ReadonlyArray<SalesMetricsWeekPage> }>>;
+  manifest(args: { locationId: string | number; from: string; to: string }): Promise<ForecastingResult<SalesMetricsManifest>>;
+  demandModels(args?: { etag?: string }): Promise<ForecastingResult<DemandModelsRead>>;
+  createDemandModel(args: { name: string }): Promise<ForecastingResult<DemandModel>>;
+  updateDemandModel(args: { id: string | number; name?: string; status?: DemandModel['status'] }): Promise<ForecastingResult<DemandModel>>;
+  deleteDemandModel(args: { id: string | number }): Promise<ForecastingResult<{ readonly deleted: true }>>;
+  createRule(args: ForecastingRuleWrite & { modelId: string | number; kind: 'sales_band' | 'calendar'; roleId: string | number; params: SalesBandRuleParams | CalendarRuleParams }): Promise<ForecastingResult<DemandRule>>;
+  updateRule(args: ForecastingRuleWrite & { modelId: string | number; ruleId: string | number }): Promise<ForecastingResult<DemandRule>>;
+  deleteRule(args: { modelId: string | number; ruleId: string | number }): Promise<ForecastingResult<{ readonly deleted: true }>>;
+  estimates(args: { locationId: string | number; from: string; to: string; since?: Iso8601 }): Promise<ForecastingResult<{ readonly sales_estimates: ReadonlyArray<SalesEstimate> }>>;
+  upsertEstimate(args: { locationId: string | number; businessDate: string; hour?: number | null; value: number; txCount?: number | null; note?: string | null }): Promise<ForecastingResult<SalesEstimate>>;
+  deleteEstimate(args: { locationId: string | number; businessDate: string; hour?: number | null }): Promise<ForecastingResult<{ readonly deleted: true }>>;
+}
+
+export interface HostHoliday {
+  readonly id: string;
+  readonly date: Iso8601;
+  readonly name: string;
+  readonly regions: ReadonlyArray<string>;
+}
+
 export interface HostApi {
   /** Read-only managed template preview. Does not create a team journey. */
   journeysTemplatePreview?(params: {product_key: string}): Promise<Record<string, unknown>>;
@@ -959,9 +1094,10 @@ export interface HostApi {
   /** Does the current user hold a permission? Host applies the real RBAC. (X8) */
   permission(name: string): Promise<boolean>;
   /** Public holidays in a range (platform service — not an MP). */
-  holidays(range: { startAt: Iso8601; endAt: Iso8601 }): Promise<
-    ReadonlyArray<{ date: Iso8601; name: string }>
-  >;
+  holidays(range: { startAt: Iso8601; endAt: Iso8601; force?: boolean }): Promise<ReadonlyArray<HostHoliday>>;
+  /** Rendering hints only; forecasting calls retain the host/API permission gates. */
+  forecastingGate(): Promise<ForecastingGate>;
+  readonly forecasting: ForecastingHostApi;
   /** Pay-rate templates (platform service). Shape is the payroll contract. */
   payTemplates(query: { teamMemberId?: string }): Promise<ReadonlyArray<unknown>>;
   /** Videos platform service (interim until/unless a Training MP exists):
