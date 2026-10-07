@@ -757,6 +757,8 @@ export interface PickerResult extends Array<EntityRef> {
 }
 
 export interface PickerOptions {
+  /** Restrict member candidates to current authoritative internal-booking assignees. */
+  readonly purpose?: 'booking_assignee';
   /** Entity ids (EntityRef.id space) pre-selected when the picker opens. */
   readonly preselected?: readonly string[];
   /** team_member: pre-select by USER id instead — for fields that store one. */
