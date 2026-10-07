@@ -534,7 +534,9 @@ export interface DataStore<Rec = unknown> {
  * when an answer settles and before every delivery); `DATA_UNDECLARED` for a
  * collection or profile the host does not expose. Without a profile named,
  * the MP gets the smallest its scopes allow. Rows are frozen: repeated reads
- * with no change answer the same rows. While the world's account is not
+ * with no change answer the same rows while retained in the host's bounded
+ * memo. Evicted keyed rows are projected again; whole-list identity stays
+ * until a change. While the world's account is not
  * displayed, reads refuse with `ACCOUNT_NOT_DISPLAYED` (retryable) and a
  * subscription holds its latest rows until the account is displayed again.
  */
@@ -556,6 +558,12 @@ export interface HostCollection<Rec = unknown> {
    */
   query(spec?: { index?: string; equals?: readonly string[]; anyOf?: readonly string[]; limit?: number; cursor?: string | null }):
     Promise<{ rows: readonly Rec[]; nextCursor: string | null; complete: boolean }>;
+  /**
+   * Only the selected keys, copied at subscription time (at most 100), in
+   * order with null for a missing row. Revalidates through the source's
+   * covering method, preserving its cadence and compatibility fallback.
+   */
+  subscribe(callback: (rows: readonly (Rec | null)[]) => void, options: { keys: readonly string[]; onError?: (error: unknown) => void }): () => void;
   /** The rows now, then whenever their rows or read status changes, while the account is displayed. */
   subscribe(callback: (rows: readonly Rec[]) => void, options?: { onError?: (error: unknown) => void }): () => void;
   /** The collection's status; `complete` only when every collection the profile reads has completed a read. */
