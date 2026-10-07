@@ -556,7 +556,7 @@ export interface HostCollection<Rec = unknown> {
    */
   query(spec?: { index?: string; equals?: readonly string[]; anyOf?: readonly string[]; limit?: number; cursor?: string | null }):
     Promise<{ rows: readonly Rec[]; nextCursor: string | null; complete: boolean }>;
-  /** The rows now, then whenever any collection they read changes, while the account is displayed. */
+  /** The rows now, then whenever their rows or read status changes, while the account is displayed. */
   subscribe(callback: (rows: readonly Rec[]) => void, options?: { onError?: (error: unknown) => void }): () => void;
   /** The collection's status; `complete` only when every collection the profile reads has completed a read. */
   status(): DataStatus & { complete: boolean };
@@ -579,6 +579,8 @@ export interface HostCollection<Rec = unknown> {
     maxAge?: number;
     fresh?: boolean;
     waitMs?: number;
+    /** Deliberate retry: reset these sources' circuits and begin a read after this ask, bypassing freshness. */
+    retry?: boolean;
   }): Promise<DataStatus & { waited?: true; keys?: readonly string[] | null; more?: boolean | null }>;
 }
 
