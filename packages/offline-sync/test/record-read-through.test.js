@@ -101,6 +101,54 @@ describe('DataApi.record', () => {
     expect(row).toMatchObject({ hours: 2 });
   });
 
+  it('keeps a confirmed answer written after the single-record transport began', async () => {
+    const data = manager();
+    await data.ingest('entries', [{ id: '4', shiftId: 's4', hours: 1 }]);
+    let answer;
+    const reading = data.record('entries', { fetch: () => new Promise((resolve) => { answer = resolve; }) }).get('4', { refresh: true });
+    await data.store('entries').patchSynced(['4'], { hours: 9 });
+    answer({ id: '4', shiftId: 's4', hours: 2 });
+    expect(await reading).toMatchObject({ hours: 9 });
+    expect(await data.store('entries').get('4')).toMatchObject({ hours: 9 });
+  });
+
+  it('does not restore a record removed while its fetch was in flight', async () => {
+    const data = manager();
+    await data.ingest('entries', [{ id: '4', shiftId: 's4', hours: 1 }]);
+    let answer;
+    const reading = data.record('entries', { fetch: () => new Promise((resolve) => { answer = resolve; }) }).get('4', { refresh: true });
+    await data.store('entries').delete('4');
+    answer({ id: '4', shiftId: 's4', hours: 2 });
+    expect(await reading).toBeUndefined();
+    expect(await data.store('entries').get('4')).toBeUndefined();
+  });
+
+  it('keeps the later single-record read when answers arrive out of order', async () => {
+    const data = manager();
+    let answer;
+    const older = data.record('entries', { fetch: () => new Promise((resolve) => { answer = resolve; }) }).get('4', { refresh: true });
+    await data.record('entries', { fetch: async () => ({ id: '4', shiftId: 's4', hours: 9 }) }).get('4', { refresh: true });
+    answer({ id: '4', shiftId: 's4', hours: 2 });
+    expect(await older).toMatchObject({ hours: 9 });
+    expect(await data.store('entries').get('4')).toMatchObject({ hours: 9 });
+  });
+
+  it('returns a valid server answer when its cache schema refuses to retain it', async () => {
+    const data = manager();
+    const row = await data.record('entries', { fetch: async () => ({ id: '4', hours: 2 }) }).get('4');
+    expect(row).toEqual({ id: '4', hours: 2 });
+    expect(await data.store('entries').get('4')).toBeUndefined();
+  });
+
+  it('drops a pending single-record answer after its data manager is retired', async () => {
+    const data = manager();
+    let answer;
+    const reading = data.record('entries', { fetch: () => new Promise((resolve) => { answer = resolve; }) }).get('4', { refresh: true });
+    data.dispose();
+    answer({ id: '4', shiftId: 's4', hours: 2 });
+    expect(await reading).toBeUndefined();
+  });
+
   it('stores a fetched record as the server\'s row, and keeps an edit still waiting to be sent', async () => {
     const data = createDataManager({ capabilityToken: token, mpId: 'time-clock', localData: { entries: { ...localData.entries, syncStrategy: 'server_authoritative' } } });
     let release;

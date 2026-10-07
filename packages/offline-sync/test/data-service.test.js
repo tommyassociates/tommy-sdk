@@ -523,6 +523,77 @@ describe('MP data API confinement', () => {
     expect(await data.read('shifts', '2')).toMatchObject({ at: 'tue' });
   });
 
+  it.each([[[]], [[{ id: 'new', at: 'tue' }]]])('an older same-window answer cannot introduce unseen keys after a newer page %j', async (newer) => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    let answer;
+    const older = data.liveQuery('shifts', {
+      fetch: () => new Promise((resolve) => { answer = resolve; }), pruneScope: () => false, readKey: 'page-1',
+    }).revalidate('page-1');
+    await data.liveQuery('shifts', { fetch: async () => newer, pruneScope: () => false, readKey: 'page-1' }).revalidate('page-1');
+    answer([{ id: 'old', at: 'mon' }]);
+    await older;
+    expect(await data.read('shifts', 'old')).toBeNull();
+    if (newer.length) expect(await data.read('shifts', 'new')).toMatchObject({ at: 'tue' });
+  });
+
+  it('keeps independent pages even when another page answers later', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    let answer;
+    const first = data.liveQuery('shifts', {
+      fetch: () => new Promise((resolve) => { answer = resolve; }), pruneScope: () => false, readKey: (window) => `page:${window.page}`,
+    }).revalidate({ page: 1 });
+    await data.liveQuery('shifts', { fetch: async () => [{ id: '2', at: 'tue' }], pruneScope: () => false, readKey: (window) => `page:${window.page}` }).revalidate({ page: 2 });
+    answer([{ id: '1', at: 'mon' }]);
+    await first;
+    expect(await data.read('shifts', '1')).toMatchObject({ at: 'mon' });
+    expect(await data.read('shifts', '2')).toMatchObject({ at: 'tue' });
+  });
+
+  it('reports a dropped older empty page so callers cannot prune from its obsolete span', async () => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    let answer;
+    const dropped = vi.fn();
+    const older = data.liveQuery('shifts', {
+      fetch: () => new Promise((resolve) => { answer = resolve; }), pruneScope: () => false, readKey: 'page-1', onReadDropped: dropped,
+    }).revalidate('page-1');
+    await data.liveQuery('shifts', { fetch: async () => [{ id: '2', at: 'tue' }], pruneScope: () => false, readKey: 'page-1' }).revalidate('page-1');
+    answer([]);
+    expect(await older).toEqual([expect.objectContaining({ id: '2', at: 'tue' })]);
+    expect(dropped).toHaveBeenCalledOnce();
+  });
+
+  it.each(['failed', 'invalid'])('a newer %s window read cannot vouch for missing keys', async (kind) => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    let answer;
+    const older = data.liveQuery('shifts', {
+      fetch: () => new Promise((resolve) => { answer = resolve; }), pruneScope: () => false, readKey: 'page-1',
+    }).revalidate('page-1');
+    await data.liveQuery('shifts', {
+      fetch: async () => { if (kind === 'failed') throw new Error('offline'); return [null]; }, pruneScope: () => false, readKey: 'page-1',
+    }).revalidate('page-1');
+    answer([{ id: '1', at: 'mon' }]);
+    await older;
+    expect(await data.read('shifts', '1')).toMatchObject({ at: 'mon' });
+  });
+
+  it.each(['liveQuery', 'windowCache'])('keeps different %s scopes sharing the same date window independent', async (kind) => {
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    const window = { month: 'October' };
+    let answer;
+    const firstFetch = () => new Promise((resolve) => { answer = resolve; });
+    const secondFetch = async () => [];
+    const scopeA = (row) => row.group === 'A';
+    const scopeB = (row) => row.group === 'B';
+    const first = kind === 'liveQuery'
+      ? data.liveQuery('shifts', { fetch: firstFetch, scope: scopeA }).revalidate(window)
+      : data.windowCache('shifts', { fetch: firstFetch, scopeOf: () => scopeA }).sync(window);
+    if (kind === 'liveQuery') await data.liveQuery('shifts', { fetch: secondFetch, scope: scopeB }).revalidate(window);
+    else await data.windowCache('shifts', { fetch: secondFetch, scopeOf: () => scopeB }).sync(window);
+    answer([{ id: '1', at: 'mon', group: 'A' }]);
+    await first;
+    expect(await data.read('shifts', '1')).toMatchObject({ at: 'mon', group: 'A' });
+  });
+
   it('writes an MP\'s own store handle in the collection\'s turn: a revalidation begun before keeps what it wrote', async () => {
     const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
     await data.ingest('shifts', [{ id: '1', at: 'mon' }]);

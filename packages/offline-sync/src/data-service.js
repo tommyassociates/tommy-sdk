@@ -1205,6 +1205,10 @@ export function createDataService({
   }
   // A commit that lost its protection part way asks for the read again.
   const READ_AGAIN = Symbol('read again');
+  // Coverage order for overlapping reads of the same window. A newer empty
+  // page also vouches that an older answer must not introduce unseen keys.
+  // Frames retain only counters and disappear when the last reader settles.
+  const windowReads = new Map();
   async function guardedRead(name, read, commit, { isCurrent = () => true } = {}) {
     for (let attempt = 0; attempt < READ_TRIES; attempt += 1) {
       // Each read begins at its own point: what a read that began later
@@ -1237,22 +1241,65 @@ export function createDataService({
    * leaves the collection as it was. Resolves the stored rows in `scope`.
    */
   async function reconcileWindow(name, store, keyPath, {
-    fetch, toRecord = (dto) => dto, keyOf, scope = () => true, window, windowKey, complete = false, keepDirty = false, rethrow = false, context,
+    fetch, toRecord = (dto) => dto, keyOf, scope = () => true, window, windowKey, complete = false, keepDirty = false, rethrow = false, readKey, onReadDropped, context,
   }) {
     // No fetch (a store its own writer fills), or a failed one: the rows as they are.
     if (typeof fetch !== 'function') return store.readWhere(scope);
-    let failed = false;
-    const stored = await guardedRead(name, async () => {
-      try { return await fetch(window, context); } catch (error) {
-        if (rethrow) throw error;
-        failed = true;
-        return null;
+    // A date/window alone does not identify coverage: different kinds or
+    // actors can share it. Scoped callers explicitly identify their read.
+    const identity = typeof readKey === 'function' ? readKey(window) : readKey;
+    const coverageKey = typeof identity === 'string' && identity
+      ? `read:${identity}` : (complete && window == null ? 'whole' : null);
+    let frame = null;
+    if (coverageKey !== null) {
+      if (!windowReads.has(name)) windowReads.set(name, new Map());
+      const windows = windowReads.get(name);
+      if (!windows.has(coverageKey)) windows.set(coverageKey, { readers: 0, confirmed: 0 });
+      frame = windows.get(coverageKey);
+      frame.readers += 1;
+    }
+    try {
+      let failed = false;
+      const stored = await guardedRead(name, async () => {
+        failed = false;
+        try { return await fetch(window, context); } catch (error) {
+          if (rethrow) throw error;
+          failed = true;
+          return null;
+        }
+      }, async (dtos, touched, startedAt, turn) => {
+        if (failed) return null;
+        if (frame && frame.confirmed > startedAt) return DROPPED;
+        let validAnswer = Array.isArray(dtos) && dtos.every((row) => row && typeof row === 'object');
+        const mapRecord = (dto, previous) => {
+          const record = toRecord(dto, previous);
+          if (!record || typeof record !== 'object' || record[keyPath] == null
+            || (typeof store.validateRecord === 'function' && store.validateRecord(record))) validAnswer = false;
+          return record;
+        };
+        const rows = await reconcileFetched(turn.store, keyPath, { fetch: () => dtos, toRecord: mapRecord, keyOf }, scope, window, windowKey, {
+          onPersistError, rethrow, keepDirty, skip: touched, ...(complete ? {} : { syncedAt: null }),
+        });
+        if (frame && validAnswer) frame.confirmed = startedAt;
+        return rows;
+      });
+      if (stored === DROPPED && typeof onReadDropped === 'function') {
+        try { onReadDropped(); } catch (_) { /* An observer cannot fail the read. */ }
       }
-    }, (dtos, touched, _startedAt, turn) => (failed ? null : reconcileFetched(turn.store, keyPath, { fetch: () => dtos, toRecord, keyOf }, scope, window, windowKey, {
-      onPersistError, rethrow, keepDirty, skip: touched, ...(complete ? {} : { syncedAt: null }),
-    })));
-    // The reconcile answers with its own read of the scope.
-    return Array.isArray(stored) ? stored : store.readWhere(scope);
+      // The reconcile answers with its own read of the scope.
+      return Array.isArray(stored) ? stored : store.readWhere(scope);
+    } finally {
+      if (frame) {
+        frame.readers -= 1;
+        if (!frame.readers) {
+          const windows = windowReads.get(name);
+          if (windows?.get(coverageKey) === frame) {
+            windows.delete(coverageKey);
+            if (!windows.size) windowReads.delete(name);
+          }
+        }
+      }
+    }
   }
   async function readDeclared(target, spec, wanted, isCurrent, { full = false, context = jobContextNow() } = {}) {
     const { name, store, keyPath } = target;
@@ -2092,6 +2139,28 @@ export function createDataService({
       const { name, store, decl } = local(collection);
       return reconcileWindow(name, store, decl?.keyPath || 'id', { ...options, context: jobContextNow() });
     },
+    /** A caller's single-record fetch, protected by the same read guard as a window. */
+    async reconcileRecord(collection, key, { fetch, toRecord = (dto) => dto, keepDirty = false } = {}) {
+      live();
+      const { name, store, decl } = local(collection);
+      const keyPath = decl?.keyPath || 'id';
+      const rowKey = String(key);
+      const outcome = await guardedRead(name, fetch, async (dto, touched, _startedAt, turn) => {
+        if (!dto) return undefined;
+        // A write, removal or eviction after transport began wins over its answer.
+        if (touched.has(rowKey)) return (await store.get(rowKey)) || undefined;
+        const previous = await store.getRaw(rowKey);
+        const record = toRecord(dto, previous ? previousByKey([previous], keyPath).get(rowKey) : undefined);
+        if (!record) return undefined;
+        let kept = false;
+        try {
+          const result = await turn.store.reconcile([record], { prune: false, syncedAt: null, ...(keepDirty ? { keepDirty: true } : {}) });
+          kept = (Array.isArray(result?.skipped) ? result.skipped : []).map(String).includes(rowKey);
+        } catch (_) { /* A refused cache write cannot turn a server answer into a blank detail. */ }
+        return kept ? (await store.get(rowKey)) || undefined : record;
+      }, { isCurrent: () => !disposed });
+      return outcome === DROPPED ? (await store.get(rowKey)) || undefined : outcome;
+    },
     /**
      * A collection's store for a caller that writes it directly (an MP's own
      * store handle): reads go straight to the store, and every write goes in
@@ -2566,6 +2635,7 @@ export function createDataService({
       methodGroups.clear();
       coverageVoid.clear();
       wholeCovers.clear();
+      windowReads.clear();
       // Its reads and changes end now in the scheduler, queued retries
       // included: none runs, or runs again, for a retired principal.
       try { scheduler.revalidate?.(); } catch (_) { /* a scheduler without it checks before each run */ }
