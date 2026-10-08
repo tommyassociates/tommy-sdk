@@ -8,6 +8,8 @@ const selectedShifts = ['27', '28'] as const;
 host.fetchTimesheets({ shiftIds: selectedShifts });
 host.timesheetsSnapshot({ shiftIds: selectedShifts });
 host.followTimesheets({ shiftIds: selectedShifts }, () => {})();
+host.fetchTimesheets({ shiftIds: [] as const });
+host.timesheetsSnapshot({ shiftIds: [] as const });
 // @ts-expect-error Selected shift identifiers use the mapped string contract.
 host.fetchTimesheets({ shiftIds: [27] });
 // @ts-expect-error A selected shift set is an array of identifiers.
