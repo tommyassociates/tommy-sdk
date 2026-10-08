@@ -1091,6 +1091,8 @@ export interface HostHoliday {
 export interface HostTimesheetQuery {
   readonly timesheetId?: string;
   readonly shiftId?: string;
+  /** A nonempty selected set of at most 200 identifiers, exclusive of shiftId. */
+  readonly shiftIds?: ReadonlyArray<string>;
   readonly startAt?: Iso8601;
   readonly endAt?: Iso8601;
   readonly teamMemberId?: string;

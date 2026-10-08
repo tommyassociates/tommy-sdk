@@ -4,6 +4,14 @@ declare const host: HostApi;
 host.fetchTimesheets();
 host.fetchTimesheets({ dashboard: true });
 host.fetchTimesheets({ shiftId: '27' });
+const selectedShifts = ['27', '28'] as const;
+host.fetchTimesheets({ shiftIds: selectedShifts });
+host.timesheetsSnapshot({ shiftIds: selectedShifts });
+host.followTimesheets({ shiftIds: selectedShifts }, () => {})();
+// @ts-expect-error Selected shift identifiers use the mapped string contract.
+host.fetchTimesheets({ shiftIds: [27] });
+// @ts-expect-error A selected shift set is an array of identifiers.
+host.fetchTimesheets({ shiftIds: '27' });
 host.fetchTimesheets({ startAt: '2026-10-01T00:00:00Z', endAt: '2026-11-01T00:00:00Z', teamMemberId: '31' });
 host.fetchTimesheet('91').then((row) => {
   const nullable: HostTimesheet | null = row;
