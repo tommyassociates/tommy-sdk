@@ -55,6 +55,7 @@ import {
 } from './reconcile.js';
 import { copyStorageRow } from './transactional-store.js'; // eslint-disable-line import/extensions
 import { boundedBatches } from './bytes.js';
+import createTargetStateBudget from './target-state-budget.js'; // eslint-disable-line import/extensions
 
 export const DATA_STATES = Object.freeze(['fresh', 'stale', 'refreshing', 'offline', 'error']);
 // A store's methods that change its rows: called only on the handles a
@@ -785,6 +786,7 @@ export function createDataService({
     }
     return readOnlyStores.get(store);
   }
+  const targetStates = createTargetStateBudget({ states, budgetOf: (name) => local(name).decl?.targetStateBudget });
   const targetOf = (target) => (typeof target === 'string' ? { collection: target } : { ...target });
   // A query's `where` is known by the function itself: two predicates are two
   // targets, each refreshed and reported on its own.
@@ -796,10 +798,7 @@ export function createDataService({
   };
   const queryKey = (query) => (query && typeof query.where === 'function' ? { ...query, where: predicateId(query.where) } : query ?? null);
   const targetKey = (target) => JSON.stringify([target.collection, target.key ?? null, target.window ?? null, queryKey(target.query)]);
-  function stateFor(key) {
-    if (!states.has(key)) states.set(key, { state: 'stale', syncedAt: null, error: null, flight: null });
-    return states.get(key);
-  }
+  const stateFor = (key, options) => targetStates.get(key, options);
   function describeState(state) {
     let value = state.state;
     if (value !== 'refreshing' && !isOnline()) value = 'offline';
@@ -2020,154 +2019,162 @@ export function createDataService({
     if (wanted.query) checkQuery(wanted.query);
     const spec = sources.get(name) || decl?.source;
     const key = targetKey({ ...wanted, collection: name });
-    const state = stateFor(key);
-    const settle = (promise) => (mode === 'visible' ? promise : promise.then(() => service.status(target), () => service.status(target)));
-    if (!spec) return settle(Promise.reject(serviceError(`'${wanted.collection}' has no source`, 'DATA_NO_SOURCE')));
-    // Not displayed, with its reads paused: it reads nothing until it is.
-    const factor = cadenceFactor(name);
-    if (factor === Infinity) return settle(Promise.resolve());
-    const age = maxAge > 0 ? maxAge * factor : 0;
-    if (!fromNow && age > 0 && state.syncedAt !== null && now() - state.syncedAt < age && state.state !== 'error') return settle(Promise.resolve());
-    if (!isOnline()) {
-      state.state = 'offline';
-      emitStatus();
-      return settle(Promise.reject(serviceError('Offline', 'DATA_OFFLINE')));
-    }
-    // A read in flight as another form of the account is not joined: this
-    // one reads after it, as the principal it was asked as. Nor is a read of
-    // changes by a whole read (`full`): it reads whole after it. A read of
-    // changes may join a whole read.
-    const form = formOf(context);
-    if (state.flight && state.flightForm === form && (!full || state.flightFull) && !fromNow) return settle(state.attempts.answer(state.flight));
-    if (state.flight) {
-      // Read after it (a read asked `fromNow` included: the read after it
-      // begins after this ask); while its latest attempt has failed and it
-      // waits to try again, answered with that failure instead, as its next
-      // attempt begins after this ask.
-      const { attempts } = state;
-      const after = () => refreshAs(target, {
-        mode: 'visible', priority, maxAge: 0, reason, full,
-      }, context);
-      return settle(attempts.answer(state.flight).then(after, (error) => (attempts.failing() ? Promise.reject(error) : after())));
-    }
-    state.state = 'refreshing';
-    emitStatus();
-    const keyPath = decl?.keyPath || 'id';
-    // A server copy never replaces a row with an unsent local change.
-    const run = async (isCurrent) => {
-      if (wanted.key !== undefined && wanted.key !== null) {
-        const rowKey = String(wanted.key);
-        // Stored through the one read guard (a change to the row since the
-        // read began is kept), and recorded as a change of the row: a
-        // declared read already on its way keeps it.
-        await guardedRead(name, () => spec.fetch(wanted, context), async (dto, touched, _startedAt, { store: writer }) => {
-          if (touched.has(rowKey)) return;
-          if (!dto) {
-            // Decided in turn with local writes to the row, on the row as it is then.
-            await serial(`${label}:${rowKey}`, async () => {
-              const current = await store.getRaw?.(rowKey);
-              if (!current || current._dirty) return;
-              try {
-                await writer.delete(rowKey, Number.isSafeInteger(current._rev) ? { expectedRevision: current._rev } : {});
-              } catch (error) { if (error?.reason !== 'conflict') throw error; }
-            });
-            return;
-          }
-          const prev = await store.getRaw?.(rowKey);
-          const record = (spec.toRecord || ((value) => value))(dto, prev ? previousByKey([prev], keyPath).get(rowKey) : prev);
-          // One record leaves the collection's synced stamp as it was.
-          await writer.reconcile([record], { prune: false, keepDirty: true, syncedAt: null });
-        }, { isCurrent });
-        return;
-      }
-      if (spec.read && !wanted.query && !wanted.window && typeof spec.scope !== 'function') {
-        return readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent, { full, context });
-      }
-      // A query target prunes only the rows of that query; a list or window
-      // target the source's scope (the whole collection without one).
-      let scope = typeof spec.scope === 'function' ? spec.scope(wanted) : () => true;
-      if (wanted.query && typeof spec.scope !== 'function') {
-        const { limit: _limit, cursor: _cursor, raw: _raw, where, ...range } = wanted.query;
-        if (range.index) {
-          const held = new Set((await rangeKeys(store, keyPath, wholeRange(range, 'refresh'))).map((entry) => entry.key));
-          scope = (row) => held.has(String(row[keyPath]));
-        } else if (typeof where === 'function') scope = (row) => where(row);
-      }
-      // Only a read of the whole collection marks it synced.
-      const whole = !wanted.query && typeof spec.scope !== 'function';
-      // Fetched first; stored through the one read guard.
-      return guardedRead(name, async () => snapshotRows(await spec.fetch(wanted, context)), (dtos, touched, _startedAt, turn) => (dtos === null ? NO_SNAPSHOT
-        : reconcileFetched(turn.store, keyPath, { fetch: () => dtos, toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
-          scope, wanted.window, windowKeyOf(wanted.window), {
-            onPersistError, rethrow: true, keepDirty: true, skip: touched, ...(whole ? {} : { syncedAt: null }),
-          })), { isCurrent });
+    const { state, release } = targetStates.acquire(key);
+    const settle = (promise) => {
+      const answer = mode === 'visible' ? promise : promise.then(() => service.status(target), () => service.status(target));
+      return release ? answer.finally(release) : answer;
     };
-    state.flightForm = form;
-    state.flightFull = full === true;
-    // A failed attempt answers the read's callers and shows in its status;
-    // the scheduler's retries settle the read.
-    const attempts = readAttempts((error) => {
-      // Only the read now in flight shows its failure.
-      if (states.get(key) !== state || state.attempts !== attempts) return;
-      state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
+    try {
+      if (!spec) return settle(Promise.reject(serviceError(`'${wanted.collection}' has no source`, 'DATA_NO_SOURCE')));
+      // Not displayed, with its reads paused: it reads nothing until it is.
+      const factor = cadenceFactor(name);
+      if (factor === Infinity) return settle(Promise.resolve());
+      const age = maxAge > 0 ? maxAge * factor : 0;
+      if (!fromNow && age > 0 && state.syncedAt !== null && now() - state.syncedAt < age && state.state !== 'error') return settle(Promise.resolve());
+      if (!isOnline()) {
+        state.state = 'offline';
+        emitStatus();
+        return settle(Promise.reject(serviceError('Offline', 'DATA_OFFLINE')));
+      }
+      // A read in flight as another form of the account is not joined: this
+      // one reads after it, as the principal it was asked as. Nor is a read of
+      // changes by a whole read (`full`): it reads whole after it. A read of
+      // changes may join a whole read.
+      const form = formOf(context);
+      if (state.flight && state.flightForm === form && (!full || state.flightFull) && !fromNow) return settle(state.attempts.answer(state.flight));
+      if (state.flight) {
+        // Read after it (a read asked `fromNow` included: the read after it
+        // begins after this ask); while its latest attempt has failed and it
+        // waits to try again, answered with that failure instead, as its next
+        // attempt begins after this ask.
+        const { attempts } = state;
+        const after = () => refreshAs(target, {
+          mode: 'visible', priority, maxAge: 0, reason, full,
+        }, context);
+        return settle(attempts.answer(state.flight).then(after, (error) => (attempts.failing() ? Promise.reject(error) : after())));
+      }
+      state.state = 'refreshing';
       emitStatus();
-    });
-    state.attempts = attempts;
-    // A read of the whole collection covers every key as of its start.
-    const wholeRead = !wanted.query && !wanted.window && (wanted.key === undefined || wanted.key === null) && typeof spec.scope !== 'function';
-    coverageSeq += 1;
-    const flightSeq = coverageSeq;
-    state.flightSeq = flightSeq;
-    // Only a read of every row answers a batched method that joins it.
-    state.flightWhole = wholeRead;
-    state.flight = scheduler.request({
-      key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
-      ...(inForeground(name)
-        ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
-        : { priority: PRIORITIES.background, visible: false }),
-      // Never run, or run again, once this service retired or its reads paused.
-      valid: () => !disposed && cadenceFactor(name) !== Infinity,
-      // An attempt that found itself no longer wanted on its way stopped
-      // there (`STOPPED`).
-      run: attempts.run(async (isCurrent) => {
-        let stopped = false;
-        const value = await run(() => {
-          const wantedNow = isCurrent();
-          if (!wantedNow) stopped = true;
-          return wantedNow;
-        });
-        return stopped ? STOPPED : value;
-      }),
-    }).then((outcome) => {
-      // A read a purge or replacement overtook stored nothing: not run, not fresh.
-      if (outcome === DROPPED) {
-        if (state.state === 'refreshing') state.state = 'stale';
-        throw Object.assign(serviceError(`'${wanted.collection}' was replaced while it was read`, 'REFRESH_DROPPED'), { retryable: false });
-      }
-      // Nor did one that stopped on its way (its reads paused, the service retired).
-      if (outcome === STOPPED) {
-        if (state.state === 'refreshing') state.state = 'stale';
-        throw Object.assign(serviceError(`'${wanted.collection}' stopped being read on its way`, 'REFRESH_DROPPED'), { retryable: false });
-      }
-      // A read that answered no list leaves the collection as it was, not fresh.
-      if (outcome === NO_SNAPSHOT) { if (state.state === 'refreshing') state.state = 'stale'; return; }
-      if (wholeRead && flightSeq <= lossOf(name)) {
-        const error = Object.assign(serviceError(`'${wanted.collection}' lost rows while it was read`, 'DATA_INCOMPLETE'), { retryable: false });
-        state.state = isOnline() ? 'error' : 'offline'; state.syncedAt = null;
-        state.error = { code: error.code, status: null, message: error.message };
+      const keyPath = decl?.keyPath || 'id';
+      // A server copy never replaces a row with an unsent local change.
+      const run = async (isCurrent) => {
+        if (wanted.key !== undefined && wanted.key !== null) {
+          const rowKey = String(wanted.key);
+          // Stored through the one read guard (a change to the row since the
+          // read began is kept), and recorded as a change of the row: a
+          // declared read already on its way keeps it.
+          await guardedRead(name, () => spec.fetch(wanted, context), async (dto, touched, _startedAt, { store: writer }) => {
+            if (touched.has(rowKey)) return;
+            if (!dto) {
+              // Decided in turn with local writes to the row, on the row as it is then.
+              await serial(`${label}:${rowKey}`, async () => {
+                const current = await store.getRaw?.(rowKey);
+                if (!current || current._dirty) return;
+                try {
+                  await writer.delete(rowKey, Number.isSafeInteger(current._rev) ? { expectedRevision: current._rev } : {});
+                } catch (error) { if (error?.reason !== 'conflict') throw error; }
+              });
+              return;
+            }
+            const prev = await store.getRaw?.(rowKey);
+            const record = (spec.toRecord || ((value) => value))(dto, prev ? previousByKey([prev], keyPath).get(rowKey) : prev);
+            // One record leaves the collection's synced stamp as it was.
+            await writer.reconcile([record], { prune: false, keepDirty: true, syncedAt: null });
+          }, { isCurrent });
+          return;
+        }
+        if (spec.read && !wanted.query && !wanted.window && typeof spec.scope !== 'function') {
+          return readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent, { full, context });
+        }
+        // A query target prunes only the rows of that query; a list or window
+        // target the source's scope (the whole collection without one).
+        let scope = typeof spec.scope === 'function' ? spec.scope(wanted) : () => true;
+        if (wanted.query && typeof spec.scope !== 'function') {
+          const { limit: _limit, cursor: _cursor, raw: _raw, where, ...range } = wanted.query;
+          if (range.index) {
+            const held = new Set((await rangeKeys(store, keyPath, wholeRange(range, 'refresh'))).map((entry) => entry.key));
+            scope = (row) => held.has(String(row[keyPath]));
+          } else if (typeof where === 'function') scope = (row) => where(row);
+        }
+        // Only a read of the whole collection marks it synced.
+        const whole = !wanted.query && typeof spec.scope !== 'function';
+        // Fetched first; stored through the one read guard.
+        return guardedRead(name, async () => snapshotRows(await spec.fetch(wanted, context)), (dtos, touched, _startedAt, turn) => (dtos === null ? NO_SNAPSHOT
+          : reconcileFetched(turn.store, keyPath, { fetch: () => dtos, toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
+            scope, wanted.window, windowKeyOf(wanted.window), {
+              onPersistError, rethrow: true, keepDirty: true, skip: touched, ...(whole ? {} : { syncedAt: null }),
+            })), { isCurrent });
+      };
+      state.flightForm = form;
+      state.flightFull = full === true;
+      // A failed attempt answers the read's callers and shows in its status;
+      // the scheduler's retries settle the read.
+      const attempts = readAttempts((error) => {
+        // Only the read now in flight shows its failure.
+        if (states.get(key) !== state || state.attempts !== attempts) return;
+        state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
+        emitStatus();
+      });
+      state.attempts = attempts;
+      // A read of the whole collection covers every key as of its start.
+      const wholeRead = !wanted.query && !wanted.window && (wanted.key === undefined || wanted.key === null) && typeof spec.scope !== 'function';
+      coverageSeq += 1;
+      const flightSeq = coverageSeq;
+      state.flightSeq = flightSeq;
+      // Only a read of every row answers a batched method that joins it.
+      state.flightWhole = wholeRead;
+      state.flight = scheduler.request({
+        key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
+        ...(inForeground(name)
+          ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
+          : { priority: PRIORITIES.background, visible: false }),
+        // Never run, or run again, once this service retired or its reads paused.
+        valid: () => !disposed && cadenceFactor(name) !== Infinity,
+        // An attempt that found itself no longer wanted on its way stopped
+        // there (`STOPPED`).
+        run: attempts.run(async (isCurrent) => {
+          let stopped = false;
+          const value = await run(() => {
+            const wantedNow = isCurrent();
+            if (!wantedNow) stopped = true;
+            return wantedNow;
+          });
+          return stopped ? STOPPED : value;
+        }),
+      }).then((outcome) => {
+        // A read a purge or replacement overtook stored nothing: not run, not fresh.
+        if (outcome === DROPPED) {
+          if (state.state === 'refreshing') state.state = 'stale';
+          throw Object.assign(serviceError(`'${wanted.collection}' was replaced while it was read`, 'REFRESH_DROPPED'), { retryable: false });
+        }
+        // Nor did one that stopped on its way (its reads paused, the service retired).
+        if (outcome === STOPPED) {
+          if (state.state === 'refreshing') state.state = 'stale';
+          throw Object.assign(serviceError(`'${wanted.collection}' stopped being read on its way`, 'REFRESH_DROPPED'), { retryable: false });
+        }
+        // A read that answered no list leaves the collection as it was, not fresh.
+        if (outcome === NO_SNAPSHOT) { if (state.state === 'refreshing') state.state = 'stale'; return; }
+        if (wholeRead && flightSeq <= lossOf(name)) {
+          const error = Object.assign(serviceError(`'${wanted.collection}' lost rows while it was read`, 'DATA_INCOMPLETE'), { retryable: false });
+          state.state = isOnline() ? 'error' : 'offline'; state.syncedAt = null;
+          state.error = { code: error.code, status: null, message: error.message };
+          throw error;
+        }
+        state.state = 'fresh'; state.syncedAt = now(); state.error = null;
+        if (wholeRead) wholeCovers.set(coverKey(form, name), Math.max(wholeCovers.get(coverKey(form, name)) || 0, flightSeq));
+      }, (error) => {
+        state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
         throw error;
-      }
-      state.state = 'fresh'; state.syncedAt = now(); state.error = null;
-      if (wholeRead) wholeCovers.set(coverKey(form, name), Math.max(wholeCovers.get(coverKey(form, name)) || 0, flightSeq));
-    }, (error) => {
-      state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
+      }).finally(() => {
+        attempts.settled();
+        if (state.attempts === attempts) state.attempts = null;
+        state.flight = null; state.flightForm = null; state.flightFull = false; state.flightWhole = false; emitStatus();
+      });
+      return settle(attempts.answer(state.flight));
+    } catch (error) {
+      release?.();
       throw error;
-    }).finally(() => {
-      attempts.settled();
-      if (state.attempts === attempts) state.attempts = null;
-      state.flight = null; state.flightForm = null; state.flightFull = false; state.flightWhole = false; emitStatus();
-    });
-    return settle(attempts.answer(state.flight));
+    }
   }
 
   const service = {
@@ -2691,7 +2698,7 @@ export function createDataService({
     status(target) {
       const wanted = targetOf(target);
       const { name } = local(wanted.collection);
-      return describeState(stateFor(targetKey({ ...wanted, collection: name })));
+      return describeState(stateFor(targetKey({ ...wanted, collection: name }), { allocate: false }));
     },
     /** Status of every target this service has refreshed. */
     statuses() {
@@ -2726,6 +2733,7 @@ export function createDataService({
       });
       outbox.clear();
       states.clear();
+      targetStates.clear();
       methodGroups.clear();
       coverageVoid.clear();
       coverageLoss.clear();
