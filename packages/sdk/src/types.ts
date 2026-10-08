@@ -1116,7 +1116,7 @@ export interface HostApi {
   readSchedulingPayContexts(query: { userIds: readonly string[]; force?: boolean }): Promise<
     ReadonlyArray<Readonly<{ userId: string; employeeExists: boolean; payTemplateId: string | null }>>
   >;
-  /** Canonical invalidation notices contain no payroll rows. Dispose on popup retirement. */
+  /** Canonical invalidation notices contain no payroll rows. Unsubscribe when the popup closes. */
   followSchedulingPayData(options: { userIds?: readonly string[]; onChange(): void; onError?(error: unknown): void }): () => void;
   /** Videos platform service (interim until/unless a Training MP exists):
    *  clock-in videos a team member must watch. First consumer: Time Clock. */
