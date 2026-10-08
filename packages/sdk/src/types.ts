@@ -1088,6 +1088,40 @@ export interface HostHoliday {
   readonly regions: ReadonlyArray<string>;
 }
 
+export interface HostTimesheetQuery {
+  readonly timesheetId?: string;
+  readonly shiftId?: string;
+  readonly startAt?: Iso8601;
+  readonly endAt?: Iso8601;
+  readonly teamMemberId?: string;
+  readonly status?: string;
+  readonly kind?: string;
+  readonly locationId?: string;
+  readonly dashboard?: true;
+}
+
+/** Mapped fields retain omissions from the permission-scoped server answer. */
+export interface HostTimesheet {
+  readonly id: string;
+  readonly teamMemberId: string;
+  readonly status: string;
+  readonly shiftId?: string;
+  readonly startAt?: Iso8601;
+  readonly endAt?: Iso8601;
+  readonly kind?: string;
+  readonly totalHours?: number;
+  readonly payTemplateId?: string;
+  readonly locationId?: string;
+  readonly leaveRequestId?: string;
+  readonly notes?: string;
+  readonly exportRefs?: Readonly<Record<string, unknown>>;
+  readonly calculations?: Readonly<Record<string, unknown>>;
+  readonly items: ReadonlyArray<Readonly<Record<string, unknown>>>;
+  readonly breaks: ReadonlyArray<Readonly<Record<string, unknown>>>;
+  readonly allowances: ReadonlyArray<Readonly<Record<string, unknown>>>;
+  readonly expenses: ReadonlyArray<Readonly<Record<string, unknown>>>;
+}
+
 export interface HostApi {
   /** Read-only managed template preview. Does not create a team journey. */
   journeysTemplatePreview?(params: {product_key: string}): Promise<Record<string, unknown>>;
@@ -1118,6 +1152,17 @@ export interface HostApi {
   >;
   /** Canonical invalidation notices contain no payroll rows. Unsubscribe when the popup closes. */
   followSchedulingPayData(options: { userIds?: readonly string[]; onChange(): void; onError?(error: unknown): void }): () => void;
+  /** Complete bounded canonical query; unavailable or partial reads reject. */
+  fetchTimesheets(query?: HostTimesheetQuery): Promise<ReadonlyArray<HostTimesheet>>;
+  /** Null denotes an answered exact absence, rather than a missing retained key. */
+  fetchTimesheet(id: string): Promise<HostTimesheet | null>;
+  /** Reads only an answered query whose authority and retained keys still hold. */
+  timesheetsSnapshot(query?: HostTimesheetQuery): Promise<{
+    readonly timesheets: ReadonlyArray<HostTimesheet>;
+    readonly unresolved: boolean;
+  }>;
+  /** Invalidation notices carry no rows and never start a refresh. */
+  followTimesheets(query: HostTimesheetQuery, onInvalidate: () => void): () => void;
   /** Videos platform service (interim until/unless a Training MP exists):
    *  clock-in videos a team member must watch. First consumer: Time Clock. */
   requiredClockInVideos(teamMemberId: string): Promise<
