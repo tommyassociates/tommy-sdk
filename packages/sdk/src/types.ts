@@ -1111,7 +1111,13 @@ export interface HostApi {
   forecastingGate(): Promise<ForecastingGate>;
   readonly forecasting: ForecastingHostApi;
   /** Pay-rate templates (platform service). Shape is the payroll contract. */
-  payTemplates(query: { teamMemberId?: string }): Promise<ReadonlyArray<unknown>>;
+  payTemplates(query?: { teamMemberId?: string; force?: boolean }): Promise<ReadonlyArray<unknown>>;
+  /** Minimal employment context, aligned to the unique selected user IDs. Unknown reads reject. */
+  readSchedulingPayContexts(query: { userIds: readonly string[]; force?: boolean }): Promise<
+    ReadonlyArray<Readonly<{ userId: string; employeeExists: boolean; payTemplateId: string | null }>>
+  >;
+  /** Canonical invalidation notices contain no payroll rows. Dispose on popup retirement. */
+  followSchedulingPayData(options: { userIds?: readonly string[]; onChange(): void; onError?(error: unknown): void }): () => void;
   /** Videos platform service (interim until/unless a Training MP exists):
    *  clock-in videos a team member must watch. First consumer: Time Clock. */
   requiredClockInVideos(teamMemberId: string): Promise<
