@@ -1784,9 +1784,14 @@ export function createDataService({
     // answers a search (its filter, order and page are its own). One from
     // before a purge or trim covers nothing.
     const whole = stateFor(targetKey({ collection: name }));
-    const failed = (error) => {
+    const dropped = () => Object.assign(serviceError(`'${wanted.collection}' refresh method '${wanted.method}' is no longer current`, 'REFRESH_DROPPED'), { retryable: false });
+    const failed = (error, isCurrent = null) => {
+      // An inactive exact read has no authority to publish a failure or a
+      // terminal HTTP refusal over the current query's status and rows.
+      if (isCurrent && !isCurrent()) return dropped();
       group.state.state = isOnline() ? 'error' : 'offline';
       group.state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
+      return error;
     };
     // `fromNow`: a read begun after this ask (one after a write), never one
     // in flight before it nor one fresh within the cadence.
@@ -1888,8 +1893,12 @@ export function createDataService({
       } : null);
       // One fetch: through the read guard, merged in the collection's turn. A
       // purge or trim while it was out leaves what it asked for not fetched.
-      const run = async (asked, ids, isCurrent) => {
+      const run = async (asked, ids, isCurrent, afterDeadline = () => false) => {
         const current = () => !disposed && isCurrent();
+        if (!batchParam && !current()) {
+          if (afterDeadline()) return;
+          throw dropped();
+        }
         const began = now();
         const voidAtStart = voidOf(name);
         group.state.state = 'refreshing';
@@ -1911,6 +1920,10 @@ export function createDataService({
               touched, turn, startedAt, current, unanswered: unansweredBy(ids) || unansweredOf(asked),
             });
           }, { isCurrent: current });
+          if (!batchParam && !current()) {
+            if (afterDeadline()) return;
+            throw dropped();
+          }
           if (!batchParam) group.state.truncated = truncated;
           // One that stored nothing, or stopped on its way (its reads paused,
           // the service retired), leaves the method stale, never fresh.
@@ -1931,15 +1944,14 @@ export function createDataService({
           }
           group.state.syncedAt = now();
         } catch (error) {
-          failed(error);
-          throw error;
+          throw failed(error, batchParam ? null : current);
         }
       };
       // A job the scheduler refuses without running it (a full queue, an open
       // circuit) is reported in the method's status too. Its callers are
       // answered by its first failed attempt (`attempts`); the flight itself
       // rides the scheduler's retries.
-      const job = (key, work, attempts) => Promise.resolve(scheduler.request({
+      const job = (key, work, attempts, isCurrent = null) => Promise.resolve(scheduler.request({
         key: lanedKey('data', `${label}:${wanted.method}:${key}`),
         target: laned(label),
         budgetKey: spec.budgetKey || budgetKey,
@@ -1948,9 +1960,9 @@ export function createDataService({
           ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
           : { priority: PRIORITIES.background, visible: false }),
         // Never run, or run again, once this service retired or its reads paused.
-        valid: () => !disposed && cadenceFactor(name) !== Infinity,
+        valid: () => !disposed && cadenceFactor(name) !== Infinity && (!isCurrent || isCurrent()),
         run: attempts.run(work),
-      })).catch((error) => { failed(error); throw error; }).finally(() => attempts.settled());
+      })).catch((error) => { throw failed(error, isCurrent); }).finally(() => attempts.settled());
       if (!batchParam) {
         if (fresh(group.state.syncedAt) && group.state.state !== 'error') return Promise.resolve();
         if (!fromNow && group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return group.state.flight.attempts.answer(group.state.flight.promise);
@@ -1960,11 +1972,30 @@ export function createDataService({
         // callers were answered at its deadline still stores what its retry
         // reads, unless a newer flight began (`flightSeq`, numbered across
         // the service, so a group cleared and made again never matches it).
-        const flight = { at, seq: methodBatches, promise: null, attempts: readAttempts() };
+        const flight = {
+          at, seq: methodBatches, promise: null, attempts: readAttempts(), settled: false, deadlineRetry: false,
+        };
+        const voidAtAsk = voidOf(name);
         group.state.flightSeq = flight.seq;
         group.state.flight = flight;
-        flight.promise = job(String(methodBatches), (isCurrent) => run(params, null, () => isCurrent() && group.state.flightSeq === flight.seq), flight.attempts)
-          .finally(() => { if (group.state.flight === flight) group.state.flight = null; });
+        // The joinable flight ends at its caller's deadline. Only a retryable
+        // timeout permits that same logical read to continue behind it; the
+        // abandoned physical attempt still fails the scheduler's guard.
+        const afterDeadline = () => flight.settled && flight.deadlineRetry;
+        // Identity also fences a group removed while an attempt was still
+        // running, and a source, account form or purge that invalidated this ask.
+        const current = () => !disposed && cadenceFactor(name) !== Infinity
+          && methodGroups.get(groupKey) === group && (group.state.flight === flight || afterDeadline()) && group.state.flightSeq === flight.seq
+          && (sources.get(name) || decl?.source) === spec && formOf(jobContextNow()) === form && voidOf(name) === voidAtAsk;
+        flight.promise = job(String(flight.seq), (isCurrent) => run(params, null, () => isCurrent() && current(), afterDeadline), flight.attempts, current)
+          .catch((error) => {
+            flight.deadlineRetry = error?.code === 'REFRESH_TIMEOUT' && error?.retryable === true;
+            throw error;
+          })
+          .finally(() => {
+            flight.settled = true;
+            if (group.state.flight === flight) group.state.flight = null;
+          });
         return flight.attempts.answer(flight.promise);
       }
       // Each id fresh within the cadence is answered; one being fetched joins
