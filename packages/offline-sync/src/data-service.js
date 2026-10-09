@@ -1561,6 +1561,17 @@ export function createDataService({
     }
     return methodGroups.get(key);
   }
+  // A receipt identifies the completed query, including an authoritative empty
+  // answer. Starting another flight or losing coverage withdraws that receipt.
+  function describeMethod(state) {
+    const status = describeState(state);
+    return {
+      ...status, keys: Array.isArray(state.keys) ? state.keys.slice() : null,
+      more: state.more ?? null, truncated: state.truncated === true,
+      receipt: status.state === 'fresh' && state.syncedAt !== null && Number.isSafeInteger(state.flightSeq)
+        ? state.flightSeq : null,
+    };
+  }
   const methodsWorking = () => [...methodGroups.values()].some((group) => group.flying.size || group.open || group.state.flight);
   // Per collection, when (in `coverageSeq`) what methods know of it was last
   // made void by a purge or trim, and as of when its last completed whole
@@ -1582,6 +1593,7 @@ export function createDataService({
       group.fetched.clear();
       group.state.syncedAt = null;
     });
+    emitStatus();
   };
   const voidOf = (name) => coverageVoid.get(name) || 0;
   const lossOf = (name) => coverageLoss.get(name) || 0;
@@ -1751,9 +1763,7 @@ export function createDataService({
     const outcome = (value) => {
       if (value === ANSWERED_FRESH) return { ...describeState(group.state), state: 'fresh', error: null };
       return batchParam ? describeState(group.state)
-        : {
-          ...describeState(group.state), keys: group.state.keys ?? null, more: group.state.more ?? null, truncated: group.state.truncated === true,
-        };
+        : describeMethod(group.state);
     };
     const settle = (promise) => (mode === 'visible' ? promise.then(outcome) : promise.then(outcome, outcome));
     if (!available) {
@@ -2695,10 +2705,35 @@ export function createDataService({
         return { removed };
       });
     },
-    status(target) {
+    status(target, { receipt = false } = {}) {
       const wanted = targetOf(target);
-      const { name } = local(wanted.collection);
-      return describeState(stateFor(targetKey({ ...wanted, collection: name }), { allocate: false }));
+      const { name, store } = local(wanted.collection);
+      const observed = receipt && watchChanges(name, store);
+      if (wanted.method !== undefined) {
+        const spec = sources.get(name) || local(wanted.collection).decl?.source;
+        const method = spec?.methods && Object.hasOwn(spec.methods, wanted.method) ? spec.methods[wanted.method] : null;
+        if (!method || wanted.key !== undefined || wanted.query !== undefined || wanted.window !== undefined) {
+          throw serviceError('status: the method target is outside its declared contract', 'DATA_INVALID');
+        }
+        const params = methodParams(name, wanted.method, method, wanted.params);
+        // Batched methods retain their collection-status contract: a group can
+        // cover several different sets of ids and has no single query receipt.
+        if (!method.batch) {
+          const group = methodGroups.get(JSON.stringify([formOf(jobContextNow()), name, wanted.method, params]));
+          return { ...describeMethod(group?.state || { state: 'stale', syncedAt: null, error: null }),
+            ...(receipt ? { revision: observed ? generationOf(name) : null } : {}) };
+        }
+      }
+      const status = describeState(stateFor(targetKey({ ...wanted, collection: name }), { allocate: false }));
+      if (!receipt) return status;
+      const state = stateFor(targetKey({ ...wanted, collection: name }), { allocate: false });
+      const whole = wanted.key == null && !wanted.query && !wanted.window;
+      const covered = wholeCovers.get(coverKey(formOf(jobContextNow()), name)) || 0;
+      return {
+        ...status, revision: observed ? generationOf(name) : null,
+        receipt: whole && status.state === 'fresh' && covered > voidOf(name)
+          ? JSON.stringify([state.flightSeq || 0, covered, voidOf(name), lossOf(name)]) : null,
+      };
     },
     /** Status of every target this service has refreshed. */
     statuses() {
