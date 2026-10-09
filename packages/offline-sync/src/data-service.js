@@ -1791,6 +1791,7 @@ export function createDataService({
       if (isCurrent && !isCurrent()) return dropped();
       group.state.state = isOnline() ? 'error' : 'offline';
       group.state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
+      if (!batchParam) emitStatus();
       return error;
     };
     // `fromNow`: a read begun after this ask (one after a write), never one
@@ -1902,10 +1903,21 @@ export function createDataService({
         const began = now();
         const voidAtStart = voidOf(name);
         group.state.state = 'refreshing';
+        if (!batchParam) {
+          group.state.error = null;
+          emitStatus();
+        }
+        if (!batchParam && !current()) {
+          if (afterDeadline()) return;
+          throw dropped();
+        }
         try {
           let stored = null;
           let truncated = false;
-          await guardedRead(name, () => method.fetch(asked, context), async (answer, touched, startedAt, turn) => {
+          await guardedRead(name, () => {
+            if (!batchParam && !current()) return undefined;
+            return method.fetch(asked, context);
+          }, async (answer, touched, startedAt, turn) => {
             // An answer that says it is not the whole of what was asked (a
             // read stopped at its cap) stores nothing: neither its rows (they
             // would crowd out other windows under the store's bounds) nor what
@@ -1929,6 +1941,7 @@ export function createDataService({
           // the service retired), leaves the method stale, never fresh.
           if (!stored || !current()) {
             if (group.state.state === 'refreshing') group.state.state = 'stale';
+            if (!batchParam) emitStatus();
             return;
           }
           if (!batchParam) {
@@ -1943,6 +1956,7 @@ export function createDataService({
             ids.forEach((id) => noteFetched(group, id, began, absent ? !absent.has(String(id)) : null));
           }
           group.state.syncedAt = now();
+          if (!batchParam) emitStatus();
         } catch (error) {
           throw failed(error, batchParam ? null : current);
         }
@@ -1964,7 +1978,7 @@ export function createDataService({
         run: attempts.run(work),
       })).catch((error) => { throw failed(error, isCurrent); }).finally(() => attempts.settled());
       if (!batchParam) {
-        if (fresh(group.state.syncedAt) && group.state.state !== 'error') return Promise.resolve();
+        if (fresh(group.state.syncedAt) && group.state.state === 'fresh') return Promise.resolve();
         if (!fromNow && group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return group.state.flight.attempts.answer(group.state.flight.promise);
         methodBatches += 1;
         // Only the newest flight for these params stores and answers: one a
@@ -1987,15 +2001,38 @@ export function createDataService({
         const current = () => !disposed && cadenceFactor(name) !== Infinity
           && methodGroups.get(groupKey) === group && (group.state.flight === flight || afterDeadline()) && group.state.flightSeq === flight.seq
           && (sources.get(name) || decl?.source) === spec && formOf(jobContextNow()) === form && voidOf(name) === voidAtAsk;
-        flight.promise = job(String(flight.seq), (isCurrent) => run(params, null, () => isCurrent() && current(), afterDeadline), flight.attempts, current)
+        // Install the joinable promise before an inline scheduler can notify.
+        let resolveFlight;
+        let rejectFlight;
+        flight.promise = new Promise((_resolve, _reject) => { resolveFlight = _resolve; rejectFlight = _reject; });
+        // Queued work already owns this query: the preceding receipt and
+        // refusal cannot authorize retained rows before the current read runs.
+        group.state.state = 'refreshing';
+        group.state.error = null;
+        let scheduled;
+        try {
+          scheduled = job(String(flight.seq), (isCurrent) => run(params, null, () => isCurrent() && current(), afterDeadline), flight.attempts, current);
+        } catch (error) {
+          flight.attempts.settled();
+          scheduled = Promise.reject(failed(error, current));
+        }
+        scheduled
           .catch((error) => {
             flight.deadlineRetry = error?.code === 'REFRESH_TIMEOUT' && error?.retryable === true;
             throw error;
           })
           .finally(() => {
             flight.settled = true;
-            if (group.state.flight === flight) group.state.flight = null;
-          });
+            if (group.state.flight !== flight) return;
+            group.state.flight = null;
+            if (!disposed && methodGroups.get(groupKey) === group && group.state.flightSeq === flight.seq
+              && !flight.deadlineRetry && group.state.state === 'refreshing') {
+              group.state.state = 'stale';
+            }
+          })
+          .then(resolveFlight, rejectFlight)
+          .catch(rejectFlight);
+        if (current()) emitStatus();
         return flight.attempts.answer(flight.promise);
       }
       // Each id fresh within the cadence is answered; one being fetched joins
