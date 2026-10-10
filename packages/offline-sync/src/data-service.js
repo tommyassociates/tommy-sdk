@@ -322,10 +322,12 @@ const METHOD_NAME = /^[a-z][A-Za-z0-9]{0,63}$/;
 const MAX_METHOD_STRING = 200;
 /**
  * Refuses refresh methods it could not honour: each a named `{ params,
- * fetch, batch?, field?, cadenceMs?, available? }`, every param `{ type,
+ * fetch, batch?, field?, cadenceMs?, available?, strictReceipt? }`, every param `{ type,
  * max?, optional? }` of a known type (`max`: the most ids, or the longest
  * string), `batch` naming an `ids` param and `field` the row field its ids
- * name.
+ * name. A non-batched `strictReceipt` method requires complete canonical
+ * admission and a collection change observer. Its status carries the stored
+ * turn's `receiptRevision`, which later row changes do not recapture.
  */
 function checkMethods(methods) {
   const refuse = (why) => { throw serviceError(`source.methods: ${why}`, 'DATA_INVALID'); };
@@ -333,7 +335,7 @@ function checkMethods(methods) {
   Object.entries(methods).forEach(([name, method]) => {
     if (!METHOD_NAME.test(name)) refuse(`'${name}' is not a method name`);
     if (!method || typeof method !== 'object' || typeof method.fetch !== 'function') refuse(`'${name}' needs a fetch`);
-    const known = ['params', 'fetch', 'batch', 'field', 'cadenceMs', 'available', 'prunesWhere'];
+    const known = ['params', 'fetch', 'batch', 'field', 'cadenceMs', 'available', 'prunesWhere', 'strictReceipt'];
     if (Object.keys(method).some((field) => !known.includes(field))) refuse(`'${name}' takes ${known.join(', ')} only`);
     const { params } = method;
     // A method with nothing to ask names that: `params: {}`.
@@ -356,6 +358,9 @@ function checkMethods(methods) {
     // Never a batched method (its `field` says what its answer covers).
     if (method.prunesWhere !== undefined && (typeof method.prunesWhere !== 'function' || method.batch)) refuse(`'${name}.prunesWhere' is a row predicate of a method that is not batched`);
     if (method.available !== undefined && typeof method.available !== 'function') refuse(`'${name}.available' must be a function`);
+    if (method.strictReceipt !== undefined && (typeof method.strictReceipt !== 'boolean' || method.batch)) {
+      refuse(`'${name}.strictReceipt' is a boolean for a method that is not batched`);
+    }
   });
 }
 const METHOD_ID = /^[A-Za-z0-9_.:~-]{1,64}$/;
@@ -726,7 +731,12 @@ export function createDataService({
   function watchChanges(name, store) {
     if (watchedStores.has(name)) return true;
     if (typeof store.onChange !== 'function') return false;
-    try { watchedStores.set(name, store.onChange(() => bump(name))); return true; } catch (_) { return false; }
+    try {
+      const off = store.onChange(() => bump(name));
+      if (typeof off !== 'function') return false;
+      watchedStores.set(name, off);
+      return true;
+    } catch (_) { return false; }
   }
   /**
    * Keeps a collection's source meta in step with keys a write added or
@@ -1563,14 +1573,36 @@ export function createDataService({
   }
   // A receipt identifies the completed query, including an authoritative empty
   // answer. Starting another flight or losing coverage withdraws that receipt.
-  function describeMethod(state) {
+  function describeMethod(state, strictReceipt = false) {
     const status = describeState(state);
     return {
       ...status, keys: Array.isArray(state.keys) ? state.keys.slice() : null,
       more: state.more ?? null, truncated: state.truncated === true,
       receipt: status.state === 'fresh' && state.syncedAt !== null && Number.isSafeInteger(state.flightSeq)
         ? state.flightSeq : null,
+      ...(strictReceipt ? {
+        receiptRevision: status.state === 'fresh' && state.syncedAt !== null && Number.isSafeInteger(state.receiptRevision)
+          ? state.receiptRevision : null,
+        expiresAt: status.state === 'fresh' && Number.isFinite(state.syncedAt)
+          && Number.isFinite(staleAfterMs) && Number.isSafeInteger(state.receiptRevision)
+          ? state.syncedAt + staleAfterMs : null,
+      } : {}),
     };
+  }
+
+  function retireStrictMethods(name, before, after) {
+    let retired = false;
+    methodGroups.forEach((group, key) => {
+      if (group.collection !== name) return;
+      const method = JSON.parse(key)[2];
+      if (before?.methods?.[method]?.strictReceipt !== true
+        && after?.methods?.[method]?.strictReceipt !== true) return;
+      group.state.syncedAt = null;
+      group.state.receiptRevision = null;
+      if (group.state.state === 'fresh' || group.state.state === 'refreshing') group.state.state = 'stale';
+      retired = true;
+    });
+    if (retired) emitStatus();
   }
   const methodsWorking = () => [...methodGroups.values()].some((group) => group.flying.size || group.open || group.state.flight);
   // Per collection, when (in `coverageSeq`) what methods know of it was last
@@ -1661,7 +1693,7 @@ export function createDataService({
    * whether the endpoint has more (`more`: a page of a search).
    */
   async function commitMethod({ name, label, store, decl }, spec, answer, {
-    touched, turn, startedAt, current, unanswered = null,
+    touched, turn, startedAt, current, unanswered = null, strictReceipt = false,
   }) {
     const keyPath = decl?.keyPath || 'id';
     const rows = Array.isArray(answer) ? answer : answer?.rows;
@@ -1688,6 +1720,9 @@ export function createDataService({
     }
     const keys = [...new Set(mapped.map((record) => String(record[keyPath])))];
     const before = await Promise.all(keys.map((key) => store.getRaw(key)));
+    const incomplete = () => Object.assign(serviceError(`'${name}': a strict method answer was not completely admitted`, 'DATA_INCOMPLETE'), { retryable: false });
+    if (strictReceipt && (keys.length !== mapped.length || before.some((row) => row?._dirty)
+      || mapped.some((row) => row._dirty === true))) throw incomplete();
     const refusals = [];
     const barred = barredAfter(name, startedAt);
     const records = mapped.filter((record) => {
@@ -1697,10 +1732,12 @@ export function createDataService({
       return !why;
     });
     if (refusals.length) reportRejected(store, refusals, onPersistError);
+    if (strictReceipt && records.length !== mapped.length) throw incomplete();
     for (const chunk of ingestChunks(records)) {
       if (!current()) return null;
       // eslint-disable-next-line no-await-in-loop
-      await turn.store.reconcile(chunk, { prune: false, keepDirty: true, syncedAt: null });
+      const applied = await turn.store.reconcile(chunk, { prune: false, keepDirty: true, syncedAt: null });
+      if (strictReceipt && (applied?.upserted !== chunk.length || applied.skipped?.length || applied.unsaved?.length)) throw incomplete();
     }
     if (!current()) return null;
     const answered = new Set(keys);
@@ -1710,7 +1747,10 @@ export function createDataService({
     const left = unanswered ? await unanswered(mapped, keyPath) : { keys: [], field: null, values: [] };
     if (!current()) return null;
     if (left.field && left.field !== keyPath) noteGoneValues(name, left.field, left.values, startedAt);
-    const goneKeys = [...new Set([...gone.map(String), ...left.keys])].filter((key) => !answered.has(key) && !touched.has(key));
+    const unansweredKeys = [...new Set([...gone.map(String), ...left.keys])].filter((key) => !answered.has(key));
+    if (strictReceipt && unansweredKeys.some((key) => touched.has(key))) throw incomplete();
+    const goneKeys = unansweredKeys.filter((key) => !touched.has(key));
+    if (strictReceipt && (await Promise.all(goneKeys.map((key) => store.getRaw(key)))).some((row) => row?._dirty)) throw incomplete();
     // Gone as of the read's start, held or not.
     recordEffect(name, { removedKeys: goneKeys, at: startedAt });
     const goneRows = (await Promise.all(goneKeys.map((key) => store.getRaw(key)))).filter((row) => row && !row._dirty);
@@ -1723,6 +1763,7 @@ export function createDataService({
       }));
     }
     const after = await Promise.all(keys.map((key) => store.getRaw(key)));
+    if (strictReceipt && after.some((row) => !row || row._dirty || row._persistFailed)) throw incomplete();
     await adjustMeta(name, { added: keys.filter((key, at) => !before[at] && after[at]), removed });
     return { keys, more: !Array.isArray(answer) && answer?.more === true, absent: unanswered ? left.values : null };
   }
@@ -1763,7 +1804,7 @@ export function createDataService({
     const outcome = (value) => {
       if (value === ANSWERED_FRESH) return { ...describeState(group.state), state: 'fresh', error: null };
       return batchParam ? describeState(group.state)
-        : describeMethod(group.state);
+        : describeMethod(group.state, method.strictReceipt === true);
     };
     const settle = (promise) => (mode === 'visible' ? promise.then(outcome) : promise.then(outcome, outcome));
     if (!available) {
@@ -1794,6 +1835,10 @@ export function createDataService({
       if (!batchParam) emitStatus();
       return error;
     };
+    if (method.strictReceipt === true && !watchChanges(name, store)) {
+      const refusal = Object.assign(serviceError(`'${name}' cannot observe strict method coverage`, 'DATA_INCOMPLETE'), { retryable: false });
+      return settle(Promise.reject(failed(refusal)));
+    }
     // `fromNow`: a read begun after this ask (one after a write), never one
     // in flight before it nor one fresh within the cadence.
     if (batchParam && !fromNow) {
@@ -1929,8 +1974,9 @@ export function createDataService({
             stored = await commitMethod({
               name, label, store, decl,
             }, spec, answer, {
-              touched, turn, startedAt, current, unanswered: unansweredBy(ids) || unansweredOf(asked),
+              touched, turn, startedAt, current, unanswered: unansweredBy(ids) || unansweredOf(asked), strictReceipt: method.strictReceipt === true,
             });
+            if (stored && method.strictReceipt === true) stored.receiptRevision = generationOf(name);
           }, { isCurrent: current });
           if (!batchParam && !current()) {
             if (afterDeadline()) return;
@@ -1947,6 +1993,7 @@ export function createDataService({
           if (!batchParam) {
             group.state.keys = stored.keys;
             group.state.more = stored.more;
+            if (method.strictReceipt === true) group.state.receiptRevision = stored.receiptRevision;
           }
           group.state.state = 'fresh';
           group.state.error = null;
@@ -2399,14 +2446,20 @@ export function createDataService({
       if (spec.budgetKey !== undefined && (typeof spec.budgetKey !== 'string' || !spec.budgetKey)) {
         throw serviceError('source.budgetKey must be a name', 'DATA_INVALID');
       }
+      const before = sources.get(name) || resolve(name)?.decl?.source;
       sources.set(name, spec);
+      if (before !== spec) retireStrictMethods(name, before, spec);
       // With a push, every dirty row in the collection is an unsent change:
       // ones this service has no record of (it was rebuilt) are sent again.
       if (typeof spec.push === 'function') {
         const { label, store, decl } = local(collection);
         tracked(restoreDirty({ name, label, store, decl })).catch(() => {});
       }
-      return () => { if (sources.get(name) === spec) sources.delete(name); };
+      return () => {
+        if (sources.get(name) !== spec) return;
+        sources.delete(name);
+        retireStrictMethods(name, spec, resolve(name)?.decl?.source);
+      };
     },
     /** Whether `collection` sends its local changes (a push is registered or declared). */
     sends(collection) {
@@ -2788,7 +2841,7 @@ export function createDataService({
         // cover several different sets of ids and has no single query receipt.
         if (!method.batch) {
           const group = methodGroups.get(JSON.stringify([formOf(jobContextNow()), name, wanted.method, params]));
-          return { ...describeMethod(group?.state || { state: 'stale', syncedAt: null, error: null }),
+          return { ...describeMethod(group?.state || { state: 'stale', syncedAt: null, error: null }, method.strictReceipt === true),
             ...(receipt ? { revision: observed ? generationOf(name) : null } : {}) };
         }
       }
