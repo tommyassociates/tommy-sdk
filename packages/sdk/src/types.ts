@@ -1171,6 +1171,23 @@ export interface HostTaskQueryFailure {
   readonly status?: number;
 }
 export interface HostApi {
+  fetchDocumentsCatalogue(options?: {
+    readonly allTeam?: boolean; readonly targetUserId?: string; readonly force?: boolean;
+  }): Promise<{
+    readonly documents: ReadonlyArray<Record<string, unknown>>;
+    readonly documentTypes: ReadonlyArray<Record<string, unknown>>; readonly proof: unknown;
+  }>;
+  fetchDocumentTypesCatalogue(options?: {
+    readonly force?: boolean; readonly manager?: boolean;
+  }): Promise<{ readonly documentTypes: ReadonlyArray<Record<string, unknown>>; readonly proof: unknown }>;
+  followDocumentsCatalogue(options?: {
+    readonly allTeam?: boolean; readonly targetUserId?: string;
+    readonly onChange?: () => void; readonly onError?: (error: unknown) => void;
+  }): Promise<() => void>;
+  followDocumentTypesCatalogue(options?: {
+    readonly manager?: boolean; readonly onChange?: () => void;
+    readonly onError?: (error: unknown) => void;
+  }): Promise<() => void>;
   /** Complete bounded logical Tasks reads through the canonical host response owner. */
   tasksBoardQuery(options?: HostTaskQueryOptions & {
     readonly incremental?: boolean;
@@ -1219,6 +1236,16 @@ export interface HostApi {
   readSchedulingPayContexts(query: { userIds: readonly string[]; force?: boolean }): Promise<
     ReadonlyArray<Readonly<{ userId: string; employeeExists: boolean; payTemplateId: string | null }>>
   >;
+  /** One bounded canonical template/selection read with synchronous current display admission. */
+  openSchedulingPayData(options: {
+    userIds: readonly string[];
+    onSnapshot(snapshot: Readonly<{
+      templates: ReadonlyArray<unknown>;
+      contexts: ReadonlyArray<Readonly<{ userId: string; employeeExists: boolean; payTemplateId: string | null }>>;
+    }>): void;
+    onInvalidated?(): void;
+    onError?(error: unknown): void;
+  }): Readonly<{ load(options?: { force?: boolean }): Promise<void>; stop(): void }>;
   /** Canonical invalidation notices contain no payroll rows. Unsubscribe when the popup closes. */
   followSchedulingPayData(options: { userIds?: readonly string[]; onChange(): void; onError?(error: unknown): void }): () => void;
   /** Complete bounded canonical query; unavailable or partial reads reject. */
