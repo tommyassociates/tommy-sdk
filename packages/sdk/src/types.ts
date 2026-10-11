@@ -1414,6 +1414,15 @@ export interface DisplayEpisodeTicket {
   stop(): void;
 }
 
+/** Host admission combined with a consumer's local semantic lifetime. */
+export interface DisplayOwner extends DisplayEpisodeTicket {
+  assertCurrent(): void;
+}
+export declare function createDisplayOwner(
+  tommy: { readonly lifecycle?: Partial<LifecycleApi> } | null | undefined,
+  options?: { current?: () => boolean; onRetire?: () => void },
+): Readonly<DisplayOwner>;
+
 /**
  * Platform lifecycle BUS triggers above remain available through Actions subscriptions.
  * DEFERRED — reserved, not implemented: cross-MP mp_opened/mp_closed events;

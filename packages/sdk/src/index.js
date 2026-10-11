@@ -21,6 +21,7 @@ export { createDirectAdapter } from './adapter-direct.js';
 export { DEFAULT_RPC_TIMEOUT_MS } from './adapter.js';
 export { createChatSendFeedback, CHAT_SEND_NOTICE_MS } from './chat-send-feedback.js';
 export { visibleChatMessageIds, visibleChatConversationIds } from './chat-viewport.js';
+export { default as createDisplayOwner } from './display-owner.js';
 
 const STUB_NAMESPACES = [
   'ui', 'directory', 'device', 'host', 'navigation', 'theme', 'messaging',
