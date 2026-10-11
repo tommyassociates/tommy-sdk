@@ -16,3 +16,4 @@ export { queryRows, recordSchemaCheck } from './data-store.js';
 
 export { StorageReadError } from './transactional-store.js';
 export { utf8Bytes, jsonBytes, utf16Units } from './bytes.js';
+export { storeMutationOrigin, withStoreMutationOrigin } from './store-mutation-origin.js';

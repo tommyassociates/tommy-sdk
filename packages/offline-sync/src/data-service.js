@@ -55,6 +55,7 @@ import {
 } from './reconcile.js';
 import { copyStorageRow } from './transactional-store.js'; // eslint-disable-line import/extensions
 import { boundedBatches } from './bytes.js';
+import { storeMutationOrigin, withStoreMutationOrigin } from './store-mutation-origin.js';
 import createTargetStateBudget from './target-state-budget.js'; // eslint-disable-line import/extensions
 
 export const DATA_STATES = Object.freeze(['fresh', 'stale', 'refreshing', 'offline', 'error']);
@@ -899,12 +900,12 @@ export function createDataService({
    * forced removal drops the row's unsent changes with it. Resolves whether
    * the row was removed.
    */
-  function removeRow({ label, store, key, force }) {
+  function removeRow({ label, store, key, force, origin = null }) {
     return serial(`${label}:${key}`, async () => {
       const row = await store.getRaw(key);
       if (!row || (!force && row._dirty)) return false;
       try {
-        await store.delete(key, { silent: true, ...(Number.isSafeInteger(row._rev) ? { expectedRevision: row._rev } : {}) });
+        await store.delete(key, withStoreMutationOrigin({ silent: true, ...(Number.isSafeInteger(row._rev) ? { expectedRevision: row._rev } : {}) }, origin));
       } catch (error) {
         // Another tab wrote the row since: it stays.
         if (error?.reason === 'conflict') return false;
@@ -921,17 +922,17 @@ export function createDataService({
    * deletes, goes row by row in turn with local writes. Resolves the keys
    * removed.
    */
-  async function removeRows({ label, store, keys, force }) {
+  async function removeRows({ label, store, keys, force, origin = null }) {
     const removed = [];
     if (force || typeof store.deleteMany !== 'function') {
       for (const key of keys) {
         // eslint-disable-next-line no-await-in-loop
-        if (await removeRow({ label, store, key, force })) removed.push(key);
+        if (await removeRow({ label, store, key, force, origin })) removed.push(key);
       }
     } else {
       for (let start = 0; start < keys.length; start += PAGE_ROWS) {
         // eslint-disable-next-line no-await-in-loop
-        removed.push(...await store.deleteMany(keys.slice(start, start + PAGE_ROWS), { keep: (row) => !!row._dirty, silent: true }));
+        removed.push(...await store.deleteMany(keys.slice(start, start + PAGE_ROWS), withStoreMutationOrigin({ keep: (row) => !!row._dirty, silent: true }, origin)));
       }
     }
     // The removals go out together, once: every subscriber hears of them,
@@ -2787,6 +2788,7 @@ export function createDataService({
         || (options.query !== undefined && options.query !== null && (typeof options.query !== 'object' || Array.isArray(options.query)));
       if (invalid) throw serviceError('purge: options are force, keys (an array) and query (an index range)', 'DATA_INVALID');
       const { force = false, keys = null, query = null } = options;
+      const origin = storeMutationOrigin(options);
       const {
         name, label, store, decl,
       } = local(collection);
@@ -2808,7 +2810,7 @@ export function createDataService({
         } else if (range) entries = await rangeKeys(store, keyPath, range);
         else entries = (await rawRows(store)).map((row) => ({ key: String(row[keyPath]), dirty: !!row._dirty }));
         const removed = await removeRows({
-          label, store: turn.store, keys: entries.filter(({ dirty }) => force || !dirty).map(({ key }) => key), force,
+          label, store: turn.store, keys: entries.filter(({ dirty }) => force || !dirty).map(({ key }) => key), force, origin,
         });
         await adjustMeta(name, whole ? null : { added: [], removed });
         forgetMethods(name);
