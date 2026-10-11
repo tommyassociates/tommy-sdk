@@ -113,14 +113,15 @@ function readAttempts(onFailure = () => {}) {
         // shows nothing: what came after the read stands.
         if (done) throw error;
         failure = { error };
-        try { onFailure(error); } catch (_) { /* the read's own outcome stands */ }
-        [...waiting].forEach((reject) => reject(error));
+        const answered = [...waiting];
         waiting.clear();
+        try { onFailure(error); } catch (_) { /* the read's own outcome stands */ }
+        answered.forEach((reject) => reject(error));
         throw error;
       }
     },
-    answer(flight) {
-      if (failure && !done) return Promise.reject(failure.error);
+    answer(flight, { nextAttempt = false } = {}) {
+      if (failure && !done && !nextAttempt) return Promise.reject(failure.error);
       return new Promise((resolve, reject) => {
         waiting.add(reject);
         flight.then((value) => { waiting.delete(reject); resolve(value); }, (error) => { waiting.delete(reject); reject(error); });
@@ -2131,10 +2132,14 @@ export function createDataService({
 
   /** A refresh of `target` as the principal in `context` (taken when it was asked). */
   function refreshAs(target, {
-    mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false, fromNow = false,
+    mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false, fromNow = false, nextAttempt = false,
   } = {}, context) {
     live();
     const wanted = targetOf(target);
+    if (typeof nextAttempt !== 'boolean') return Promise.reject(serviceError('nextAttempt must be true or false', 'DATA_INVALID'));
+    if (nextAttempt && (wanted.method !== undefined || wanted.query !== undefined || wanted.window !== undefined)) {
+      return Promise.reject(serviceError('nextAttempt needs a collection or exact key read', 'DATA_UNSUPPORTED'));
+    }
     if (wanted.method !== undefined) {
       return refreshMethodAs(wanted, {
         mode, priority, maxAge, reason, fromNow,
@@ -2166,7 +2171,7 @@ export function createDataService({
       // changes by a whole read (`full`): it reads whole after it. A read of
       // changes may join a whole read.
       const form = formOf(context);
-      if (state.flight && state.flightForm === form && (!full || state.flightFull) && !fromNow) return settle(state.attempts.answer(state.flight));
+      if (state.flight && state.flightForm === form && (!full || state.flightFull) && !fromNow) return settle(state.attempts.answer(state.flight, { nextAttempt }));
       if (state.flight) {
         // Read after it (a read asked `fromNow` included: the read after it
         // begins after this ask); while its latest attempt has failed and it
@@ -2176,7 +2181,7 @@ export function createDataService({
         const after = () => refreshAs(target, {
           mode: 'visible', priority, maxAge: 0, reason, full,
         }, context);
-        return settle(attempts.answer(state.flight).then(after, (error) => (attempts.failing() ? Promise.reject(error) : after())));
+        return settle(attempts.answer(state.flight, { nextAttempt }).then(after, (error) => (nextAttempt || attempts.failing() ? Promise.reject(error) : after())));
       }
       state.state = 'refreshing';
       emitStatus();
@@ -2481,7 +2486,13 @@ export function createDataService({
      * declared read read the whole collection whatever its cursor.
      * `fromNow` asks for a read that begins after this ask (after a write
      * the server answered): one in flight is not joined, a read is queued
-     * behind it.
+     * behind it. For a collection or exact key, the internal host option
+     * `nextAttempt: true` waits for the next attempt of an already failed
+     * read, instead of answering its previous error. It joins the same
+     * scheduled read, preserving its principal, backoff and deadlines, and
+     * answers at the next failure or the read's success. Ordinary callers
+     * still fail at once. Methods, queries and windows refuse this option;
+     * it is not a hosted MP collection refresh option.
      *
      * `{ collection, method, params }` runs one of the source's refresh
      * methods: unknown methods and params, and params of the wrong shape,

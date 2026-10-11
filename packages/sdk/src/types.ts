@@ -727,6 +727,11 @@ export interface DataRefreshOptions {
   /** A declared read reads the whole collection, whatever its cursor. */
   readonly full?: boolean;
 }
+/** @internal Options for the host's canonical collection or exact-key reader, outside hosted MP refresh profiles. */
+export interface HostOwnedDataRefreshOptions extends DataRefreshOptions {
+  /** Join the next attempt of a failed read, with the same principal, backoff and deadlines; ordinary refresh remains fail-fast. */
+  readonly nextAttempt?: boolean;
+}
 export type DataMutation<Rec = unknown> =
   | { op: 'put'; record: Rec }
   | { op: 'patch'; key: string; patch: Partial<Rec> }
@@ -1170,7 +1175,26 @@ export interface HostTaskQueryFailure {
   readonly code?: string;
   readonly status?: number;
 }
+/** Metadata of one canonical exact Forms read; response values are not cached by MPs. */
+export interface HostFormEntryProof {
+  readonly epoch: number; readonly grants: number; readonly receipt: number;
+  readonly revision: number; readonly keys: readonly string[];
+  readonly rowRevision: number | null; readonly origin: string | null;
+}
+export interface HostFormEntry {
+  readonly id: string; readonly name: string;
+  readonly fields: Readonly<Record<string, unknown>>;
+  readonly user_id: string | number | null; readonly team_id: string | number;
+  readonly [field: string]: unknown;
+}
 export interface HostApi {
+  /** Existing scoped exact GET. A 404 is absence only for this identifier. API9. */
+  fetchFormSubmission(options: { readonly formId: string | number; readonly withReceipt: true }): Promise<{
+    readonly record: HostFormEntry | null; readonly proof: HostFormEntryProof;
+  }>;
+  fetchFormSubmission(options: { readonly formId: string | number; readonly withReceipt?: false }): Promise<HostFormEntry | null>;
+  /** Synchronous metadata admission; never starts transport or retains another response. API9. */
+  formSubmissionCurrent(options: { readonly formId: string | number; readonly proof: HostFormEntryProof }): boolean;
   fetchDocumentsCatalogue(options?: {
     readonly allTeam?: boolean; readonly targetUserId?: string; readonly force?: boolean;
   }): Promise<{
