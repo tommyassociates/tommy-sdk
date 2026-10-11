@@ -1124,7 +1124,74 @@ export interface HostTimesheet {
   readonly expenses: ReadonlyArray<Readonly<Record<string, unknown>>>;
 }
 
+/** Filters from the generated Tasks contract. Paging and clocks remain host-owned. */
+export interface HostTaskBoardFilters {
+  readonly from?: Iso8601;
+  readonly to?: Iso8601;
+  readonly view_id?: string | number;
+  readonly assignee_id?: string | number;
+  readonly location_id?: string | number;
+  readonly status?: 'to_do' | 'in_progress' | 'done' | 'overdue' |
+    ReadonlyArray<'to_do' | 'in_progress' | 'done' | 'overdue'>;
+}
+export interface HostTaskCard {
+  readonly id: string;
+  readonly name: string;
+  readonly origin: 'standalone' | 'shift';
+  readonly status: 'to_do' | 'in_progress' | 'done';
+  readonly version: number;
+  readonly completable_via: 'api' | 'shift_route';
+  readonly [field: string]: unknown;
+}
+export interface HostTaskSavedView {
+  readonly id: string;
+  readonly name: string;
+  readonly definition: Readonly<Record<string, unknown>>;
+  readonly version: number;
+  readonly [field: string]: unknown;
+}
+export interface HostTaskQueryOptions {
+  readonly windowKey?: string;
+  readonly params?: HostTaskBoardFilters;
+  /** Optional caller view lifetime; the host also applies its own display ticket. */
+  readonly isCurrent?: () => boolean;
+}
+export interface HostTaskBoardSnapshot {
+  readonly cards: ReadonlyArray<HostTaskCard>;
+  readonly complete: boolean;
+}
+export interface HostTaskViewsSnapshot {
+  readonly views: ReadonlyArray<HostTaskSavedView>;
+  readonly complete: boolean;
+}
+export interface HostTaskQueryFailure {
+  readonly stale?: boolean;
+  readonly error?: string;
+  readonly code?: string;
+  readonly status?: number;
+}
 export interface HostApi {
+  /** Complete bounded logical Tasks reads through the canonical host response owner. */
+  tasksBoardQuery(options?: HostTaskQueryOptions & {
+    readonly incremental?: boolean;
+    readonly onPage?: (cards: ReadonlyArray<HostTaskCard>) => void;
+  }): Promise<HostTaskBoardSnapshot & HostTaskQueryFailure & { readonly serverTime?: string }>;
+  /** No transport; complete means retained query membership and authority still hold. */
+  tasksBoardSnapshot(options?: HostTaskQueryOptions): Promise<HostTaskBoardSnapshot>;
+  tasksViews(options?: { readonly isCurrent?: () => boolean }): Promise<HostTaskViewsSnapshot & HostTaskQueryFailure>;
+  tasksViewsSnapshot(options?: { readonly isCurrent?: () => boolean }): Promise<HostTaskViewsSnapshot>;
+  /** Invalidation drops query proofs; it never deletes authored intent or starts a read. */
+  tasksInvalidateBoardQuery(options?: { readonly windowKey?: string }): boolean;
+  followTasksBoard(options: HostTaskQueryOptions & {
+    readonly onChange?: (snapshot: HostTaskBoardSnapshot) => void;
+    readonly onError?: (error: unknown) => void;
+  }): () => void;
+  followTasksViews(options: {
+    readonly isCurrent?: () => boolean;
+    readonly onChange?: (snapshot: HostTaskViewsSnapshot) => void;
+    readonly onError?: (error: unknown) => void;
+  }): () => void;
+
   /** Read-only managed template preview. Does not create a team journey. */
   journeysTemplatePreview?(params: {product_key: string}): Promise<Record<string, unknown>>;
   /** Version-checked soft archive; retains existing records and activity. */
@@ -1341,17 +1408,21 @@ export interface LifecycleNetworkOfflineTrigger {
   readonly at: Iso8601;
 }
 
+/** Opaque display admission. Original accepted commands keep their own authority and outcome. */
+export interface DisplayEpisodeTicket {
+  current(): boolean;
+  stop(): void;
+}
+
 /**
- * Lifecycle namespace marker. These are platform-emitted BUS triggers wired in
- * Actions (subscribe via `tommy.actions.subscribe`), not in-MP callbacks — so
- * `LifecycleApi` carries no methods; the payload types above are the contract.
- *
- * DEFERRED — reserved, NOT built (no concrete consumer; privacy-sensitive):
- * `tommy.lifecycle.mp_opened` / `mp_closed` (cross-MP open/close), scope-gated
- * `read:lifecycle_mp_events` (default-deny). Do not wire.
+ * Platform lifecycle BUS triggers above remain available through Actions subscriptions.
+ * DEFERRED — reserved, not implemented: cross-MP mp_opened/mp_closed events;
+ * privacy-sensitive read:lifecycle_mp_events remains default-deny. Do not wire.
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface LifecycleApi {}
+export interface LifecycleApi {
+  /** Capture once per displayed view lifetime. Stop on close, replacement or unmount. */
+  captureDisplayEpisode(): DisplayEpisodeTicket;
+}
 
 // ============================================================================
 // Cross-user notifications — `tommy.notifications` (see platform-primitives.md
