@@ -1187,7 +1187,35 @@ export interface HostFormEntry {
   readonly user_id: string | number | null; readonly team_id: string | number;
   readonly [field: string]: unknown;
 }
+/** Current raw resident rows of an actual canonical source read. */
+export interface HostFormSubmissionReadRow {
+  readonly id: string;
+  readonly name: string;
+  readonly team_id: string;
+  readonly user_id?: string | null;
+  readonly created_at: string;
+  readonly fields: Readonly<Record<string, unknown>>;
+  readonly [field: string]: unknown;
+}
+/** Scalar result of rebuilding a followed window under its current canonical grant. */
+export interface HostFormSubmissionWindowRestoration {
+  readonly window: string;
+  readonly requestedThrough: number;
+  readonly page: number;
+  readonly limit: number;
+  readonly more: boolean | null;
+  readonly moreKnown: boolean;
+  readonly count: number | null;
+  readonly pages: number | null;
+  readonly atomic: false;
+  readonly queryComplete: false;
+}
 export interface HostApi {
+  restoreFormSubmissionWindow(options: {
+    readonly window: string;
+    readonly throughPage?: number;
+    readonly onRead?: (rows: ReadonlyArray<HostFormSubmissionReadRow>) => undefined;
+  }): Promise<HostFormSubmissionWindowRestoration>;
   /** Existing scoped exact GET. A 404 is absence only for this identifier. API9. */
   fetchFormSubmission(options: { readonly formId: string | number; readonly withReceipt: true }): Promise<{
     readonly record: HostFormEntry | null; readonly proof: HostFormEntryProof;
