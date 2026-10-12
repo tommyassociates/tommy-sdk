@@ -626,8 +626,11 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
     async purge(input) {
       validatePurge(input);
       try {
+        let named = {};
         const removed = await database.transaction('readwrite', async (tx) => {
-          const { store } = await selectedStore(tx, input.selector, input.store);
+          const { owner: account, store } = await selectedStore(tx, input.selector, input.store);
+          // Whose store it is and which collection it holds, for the change feed.
+          named = { owner: ownerKey(account.identity), label: describe(account, store).label };
           if (store.policy === 'authored' && !input.force) return [];
           const [owner, namespace] = store.key;
           if (input.keys) {
@@ -656,7 +659,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
           await tx.put('stores', store);
           return doomed.map((metadata) => metadata.id);
         });
-        return { ok: true, removed };
+        return { ok: true, removed, ...named };
       } catch (error) { return fail(failureReason(error)); }
     },
   };
@@ -785,8 +788,20 @@ export function observeHostStorePort(port, feed) {
   };
   if (typeof port.purge === 'function') {
     wrapped.purge = async (input) => {
-      const result = await port.purge(input);
-      if (result?.ok) feed.publish({ type: 'purge', principal: principalOf(input.selector), store: input.store, keys: result.removed });
+      // The port names the store's account and collection for the feed alone:
+      // only that collection of that account hears its rows went, and the
+      // caller is answered as before.
+      const { owner, label, ...result } = (await port.purge(input)) || {};
+      if (result.ok) {
+        feed.publish({
+          type: 'purge',
+          principal: principalOf(input.selector),
+          ...(typeof owner === 'string' ? { owner } : {}),
+          ...(typeof label === 'string' ? { label } : {}),
+          store: input.store,
+          keys: result.removed
+        });
+      }
       return result;
     };
   }

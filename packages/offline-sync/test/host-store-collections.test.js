@@ -382,15 +382,15 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     expect(page.rows.map((row) => row.value)).toEqual([{ id: 1, n: 1 }]);
     expect((await port.inspect({ op: 'rows', selector: SELECTOR, store: cache.id, afterKey: page.nextKey })).rows.map((row) => row.key)).toEqual(['2']);
     expect((await port.inspect({ op: 'pending', selector: SELECTOR, store: cache.id })).rows.map((row) => row.key)).toEqual(['2']);
-    await expect(port.purge({ selector: SELECTOR, store: cache.id })).resolves.toEqual({ ok: true, removed: ['1'] });
+    await expect(port.purge({ selector: SELECTOR, store: cache.id })).resolves.toMatchObject({ ok: true, removed: ['1'] });
     expect(await rows.all()).toEqual([{ id: 2, n: 2, _dirty: true }]);
     const draftStore = listed.find((row) => row.policy === 'authored');
-    await expect(port.purge({ selector: SELECTOR, store: draftStore.id })).resolves.toEqual({ ok: true, removed: [] });
+    await expect(port.purge({ selector: SELECTOR, store: draftStore.id })).resolves.toMatchObject({ ok: true, removed: [] });
     expect((await stores()).find((row) => row.policy === 'authored').rowCount).toBe(1);
     await outbox.put([{ id: 'q2', body: 'second', _dirty: true }]);
-    await expect(port.purge({ selector: SELECTOR, store: draftStore.id, keys: ['q2'] })).resolves.toEqual({ ok: true, removed: [] });
-    await expect(port.purge({ selector: SELECTOR, store: draftStore.id, keys: ['q2'], force: true })).resolves.toEqual({ ok: true, removed: ['q2'] });
-    await expect(port.purge({ selector: SELECTOR, store: draftStore.id, force: true })).resolves.toEqual({ ok: true, removed: ['q1'] });
+    await expect(port.purge({ selector: SELECTOR, store: draftStore.id, keys: ['q2'] })).resolves.toMatchObject({ ok: true, removed: [] });
+    await expect(port.purge({ selector: SELECTOR, store: draftStore.id, keys: ['q2'], force: true })).resolves.toMatchObject({ ok: true, removed: ['q2'] });
+    await expect(port.purge({ selector: SELECTOR, store: draftStore.id, force: true })).resolves.toMatchObject({ ok: true, removed: ['q1'] });
     expect((await stores()).find((row) => row.policy === 'authored').rowCount).toBe(0);
   });
 
@@ -524,7 +524,7 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     const drafts = await open({ storeName: 'drafts', policy: 'authored' });
     await drafts.put([{ id: 'd1', _dirty: true }, { id: 'd2', _dirty: true }]);
     const listed = (await stores()).find((row) => row.label === 'drafts');
-    await expect(port.purge({ selector: SELECTOR, store: listed.id, force: true })).resolves.toEqual({ ok: true, removed: ['d1', 'd2'] });
+    await expect(port.purge({ selector: SELECTOR, store: listed.id, force: true })).resolves.toMatchObject({ ok: true, removed: ['d1', 'd2'] });
     expect(await drafts.all()).toEqual([]);
     // The handle's snapshot is stale: its write conflicts, then succeeds on the new revision.
     await expect(drafts.put([{ id: 'd3', _dirty: true }])).resolves.toMatchObject({ ok: false, reason: 'conflict' });
@@ -537,7 +537,7 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     const rebuilding = await port.open(openInput({ storeName: 'drafts', policy: 'authored', schemaVersion: 2 }));
     const step = (phase, extra = {}) => port.migration({ handle: rebuilding.handle, expectedEpoch: rebuilding.epoch, phase, ...extra });
     await expect(step('begin')).resolves.toMatchObject({ ok: true });
-    await expect(port.purge({ selector: SELECTOR, store: listed.id, force: true })).resolves.toEqual({ ok: true, removed: ['d3'] });
+    await expect(port.purge({ selector: SELECTOR, store: listed.id, force: true })).resolves.toMatchObject({ ok: true, removed: ['d3'] });
     await expect(step('write', { changes: [{ op: 'put', key: 'd3', value: { id: 'd3', _dirty: true } }] })).resolves.toMatchObject({ ok: false, reason: 'conflict' });
     expect((await stores()).find((row) => row.label === 'drafts')).toMatchObject({ rowCount: 0, dirtyCount: 0 });
   });
@@ -569,11 +569,15 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     await observed.commit({ handle: opened.handle, expectedEpoch: opened.epoch, expectedStoreRevision: first.storeRevision,
       changes: [{ op: 'put', key: '2', value: { id: 2, secret: 'body' } }] });
     const cache = (await observed.inspect({ op: 'stores', selector: SELECTOR })).stores[0];
-    await observed.purge({ selector: SELECTOR, store: cache.id });
+    await expect(observed.purge({ selector: SELECTOR, store: cache.id })).resolves.toEqual({ ok: true, removed: ['2'] });
     await new Promise((resolve) => { setTimeout(resolve, 0); });
     expect(local.map((event) => [event.type, event.label || null, event.keys])).toEqual([
-      ['commit', 'chats.rows', ['1']], ['commit', 'chats.rows', ['2']], ['evict', null, ['1']], ['purge', null, ['2']],
+      ['commit', 'chats.rows', ['1']], ['commit', 'chats.rows', ['2']], ['evict', null, ['1']], ['purge', 'chats.rows', ['2']],
     ]);
+    // A cleared store is named with its account, so no other account's reads hear it.
+    const [commit, , , purge] = local;
+    expect(purge.owner).toBe(commit.owner);
+    expect(purge.store).toBe(cache.id);
     expect(local.every((event) => event.remote === false)).toBe(true);
     expect(remote.map((event) => [event.type, event.remote])).toEqual([['commit', true], ['commit', true], ['evict', true], ['purge', true]]);
     expect(JSON.stringify([...local, ...remote])).not.toContain('secret');

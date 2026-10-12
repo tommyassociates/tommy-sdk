@@ -258,3 +258,71 @@ describe('canonical coverage after row loss', () => {
     expect(f.lookup).toThrow(expect.objectContaining({ code: 'DATA_RETIRED' }));
   });
 });
+
+describe('a purge that names one store', () => {
+  const otherAccount = JSON.stringify(['https://api.example.test', '31', 'Team', '45', null]);
+  const storeOf = (ownerKey, name) => JSON.stringify([ownerKey, JSON.stringify(['host', name])]);
+  /** A whole read of `products` held on its way, and the events sent meanwhile. */
+  const heldRead = () => {
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const f = fixture();
+    const fetch = vi.fn(async () => { await gate; return [{ id: '1', title: 'Product' }]; });
+    f.data.source('products', { fetch, read: {} });
+    const reading = f.data.refresh('products', { mode: 'visible' });
+    const send = (event) => [...f.listeners].forEach((fn) => fn(event));
+    return {
+      f, fetch, reading, send, release
+    };
+  };
+
+  it('leaves a read of this account alone when another account\'s store was cleared', async () => {
+    const read = heldRead();
+    await vi.waitFor(() => expect(read.fetch).toHaveBeenCalledTimes(1));
+
+    // One store of an account that left the viewer's list, as the port announces it.
+    read.send({
+      type: 'purge', principal, owner: otherAccount, label: 'products', store: storeOf(otherAccount, 'products'), keys: ['9']
+    });
+    read.release();
+
+    await read.reading;
+    expect(read.f.data.status('products')).toMatchObject({ state: 'fresh', syncedAt: 1000, error: null });
+  });
+
+  it('leaves a read alone when another collection of this account was cleared', async () => {
+    const read = heldRead();
+    await vi.waitFor(() => expect(read.fetch).toHaveBeenCalledTimes(1));
+
+    read.send({
+      type: 'purge', principal, owner, label: 'orders', store: storeOf(owner, 'orders'), keys: ['7']
+    });
+    read.release();
+
+    await read.reading;
+    expect(read.f.data.status('products')).toMatchObject({ state: 'fresh', syncedAt: 1000 });
+  });
+
+  it('still fails a read of the collection whose own store was cleared', async () => {
+    const read = heldRead();
+    await vi.waitFor(() => expect(read.fetch).toHaveBeenCalledTimes(1));
+
+    read.send({
+      type: 'purge', principal, owner, label: 'products', store: storeOf(owner, 'products'), keys: ['1']
+    });
+    read.release();
+
+    await expect(read.reading).rejects.toMatchObject({ code: 'DATA_INCOMPLETE' });
+    expect(read.f.data.status('products').syncedAt).toBeNull();
+  });
+
+  it('still fails every read when the viewer\'s stores were all cleared', async () => {
+    const read = heldRead();
+    await vi.waitFor(() => expect(read.fetch).toHaveBeenCalledTimes(1));
+
+    read.send({ type: 'purge', principal });
+    read.release();
+
+    await expect(read.reading).rejects.toMatchObject({ code: 'DATA_INCOMPLETE' });
+  });
+});
