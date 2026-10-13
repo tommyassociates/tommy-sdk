@@ -12,7 +12,7 @@
  * the broker reference is held in closure, never exposed.
  */
 import { TommyError, isTommyError } from './errors.js';
-import { DEFAULT_RPC_TIMEOUT_MS } from './adapter.js';
+import { DEFAULT_RPC_TIMEOUT_MS, DEFAULT_WRITE_TIMEOUT_MS, WRITE_RPC_KINDS } from './adapter.js';
 
 let rpcSeq = 0;
 const nextRpcId = (instanceId) => `rpc-${instanceId}-${(rpcSeq += 1)}`;
@@ -23,26 +23,34 @@ const nextRpcId = (instanceId) => `rpc-${instanceId}-${(rpcSeq += 1)}`;
  *   { emit(env), query(env), invoke(env), subscribe(mpId, trigger, handler, { tenantId }),
  *     teardown(instanceId) } — all enforcement lives THERE, never here.
  * @param {object} opts.init the MpInit payload the loader hands over
- * @param {number} [opts.rpcTimeoutMs]
+ * @param {number} [opts.rpcTimeoutMs] how long a call is waited for. Named on
+ *   its own it holds for every call, writes included.
+ * @param {number} [opts.writeTimeoutMs] how long a write (`WRITE_RPC_KINDS`)
+ *   is waited for; DEFAULT_WRITE_TIMEOUT_MS when neither is named.
  * @param {function} [opts.getCapabilityToken] host-supplied async provider that
  *   returns the CURRENT capability token, re-minting it when it nears expiry
  *   (capability tokens carry a short TTL — security-model §3). Omitted in tests
  *   and legacy callers, which fall back to the frozen `init.capabilityToken`.
  */
-export function createDirectAdapter({ broker, init, rpcTimeoutMs = DEFAULT_RPC_TIMEOUT_MS, getCapabilityToken }) {
+export function createDirectAdapter({
+  broker, init, rpcTimeoutMs: callTimeoutMs, writeTimeoutMs, getCapabilityToken,
+}) {
   if (!broker) throw new Error('createDirectAdapter: broker required');
   if (!init) throw new Error('createDirectAdapter: init required');
+  const rpcTimeoutMs = callTimeoutMs ?? DEFAULT_RPC_TIMEOUT_MS;
+  // A caller that names one deadline gets it for every call.
+  const writeMs = writeTimeoutMs ?? (callTimeoutMs === undefined ? DEFAULT_WRITE_TIMEOUT_MS : callTimeoutMs);
 
   const subscriptions = new Set();
 
-  function withTimeout(promise, rpcId) {
+  function withTimeout(promise, rpcId, waitMs) {
     let timer;
     const timeout = new Promise((_, reject) => {
       timer = setTimeout(() => reject(new TommyError({
         code: 'Timeout',
-        message: `RPC ${rpcId} timed out after ${rpcTimeoutMs}ms`,
+        message: `RPC ${rpcId} timed out after ${waitMs}ms`,
         retryable: true,
-      })), rpcTimeoutMs);
+      })), waitMs);
     });
     return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
   }
@@ -62,8 +70,10 @@ export function createDirectAdapter({ broker, init, rpcTimeoutMs = DEFAULT_RPC_T
       instanceId: init.instanceId,
       ...(envelope.activity === 'team.update_member'
         ? { restoreDeadlineAt: Date.now() + rpcTimeoutMs } : {}),
-      // When this call times out here, so the broker can give up first and
-      // answer with its own, more specific error.
+      // The deadline the broker reads: a join of a write already running
+      // gives up before it and answers with its own, more specific error. It
+      // is the call deadline for a write too, though a write is waited for
+      // longer here.
       rpcDeadlineAt: Date.now() + rpcTimeoutMs,
     };
     const ENTRY_BY_KIND = {
@@ -78,7 +88,8 @@ export function createDirectAdapter({ broker, init, rpcTimeoutMs = DEFAULT_RPC_T
       throw new TommyError({ code: 'InvalidPayload', message: `unknown rpc kind '${env.kind}'`, retryable: false });
     }
     try {
-      return await withTimeout(Promise.resolve(entry.call(broker, env)), rpcId);
+      return await withTimeout(Promise.resolve(entry.call(broker, env)), rpcId,
+        WRITE_RPC_KINDS.includes(env.kind) ? writeMs : rpcTimeoutMs);
     } catch (err) {
       if (err instanceof TommyError) throw err;
       // A TommyError of another copy of this SDK (the host's broker is built
