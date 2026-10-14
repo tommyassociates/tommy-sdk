@@ -1,9 +1,9 @@
 export default {
   app: {
-    name: '托me'
+    name: 'Tommy'
   },
   label: {
-    ok: '完成',
+    ok: '好的',
     cancel: '取消',
     save: '保存'
   },
@@ -11,7 +11,7 @@ export default {
     date: {
       default: 'D MMM, YYYY',
       long: 'MMMM D, YYYY',
-      short: 'D MMM'
+      short: 'MMM D'
     },
     time: {
       default: 'h:mma',
