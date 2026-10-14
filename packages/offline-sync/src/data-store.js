@@ -1,5 +1,6 @@
 import { createTransactionalDataStore, copyStorageRow } from './transactional-store.js';
 import { utf16Units } from './bytes.js';
+import { unchangedServerRow } from './unchanged-row.js';
 /**
  * data-store.js — the DataStore behind `tommy.data.store(name)`
  * (sdk-types.ts DataStore/DataApi; offline-sync.md §1/§4).
@@ -1344,6 +1345,14 @@ export function createDataStore({
       // a lie about the store's contents.
       const changed = new Set();
       for (const record of records) {
+        // A row the server answered as it is held is left as it is, unwritten
+        // and unannounced: see unchangedServerRow.
+        const heldKey = keyOf(record);
+        // eslint-disable-next-line no-await-in-loop
+        if (heldKey !== undefined && unchangedServerRow(record, await backend.get(heldKey), { paintable, now, windowKey })) {
+          incoming.add(String(heldKey));
+          continue;
+        }
         let key;
         try {
           // eslint-disable-next-line no-await-in-loop

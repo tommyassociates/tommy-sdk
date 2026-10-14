@@ -197,7 +197,8 @@ describe('strict non-batched method commit receipts', () => {
       put: (...args) => (refused ? Promise.resolve({ ok: false, retained: false, reason: 'quota' }) : memory.put(...args)),
     };
     const { data } = setup({ backend });
-    install(data, async () => [record()]);
+    // The second answer changes the row (one answered as held is not written again).
+    install(data, async () => [refused ? record({ name: 'Changed' }) : record()]);
     await data.refresh(target(), { mode: 'visible' });
     refused = true;
     await expect(data.refresh(target(), { mode: 'visible', fromNow: true }))

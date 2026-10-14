@@ -1,6 +1,7 @@
 /** Durable branch of DataStore. The injected backend owns physical CAS/epochs. */
 import { jsonBytes, utf8Bytes, boundedBatches, WRITE_BATCH_BYTES } from './bytes.js';
 import { MAX_ROW_BYTES } from './host-store/protocol.js';
+import { unchangedServerRow } from './unchanged-row.js';
 // The most rows one whole-collection read returns, page by page.
 export const WHOLE_READ_ROWS = 20000;
 // A whole read that has to page stops at this many bytes too (a domain's
@@ -534,23 +535,39 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
           return previous?._window != null ? { _window: previous._window } : {};
         };
         const stamp = (row, previous, storeRevision) => ({ ...row, ...acknowledged(previous), _rev: rowRevision(previous, storeRevision), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...windowOf(previous) });
+        // A row the server answered as it is held is not written (every commit
+        // is announced on the change feed), unless this read stamps the
+        // collection synced (`syncedAt`), which only a commit carries: then it
+        // is restamped, keeping its revision. See unchangedServerRow.
+        const unchanged = (row, previous) => unchangedServerRow(row, previous, { paintable, now, windowKey });
+        const restamp = (previous) => ({ ...previous, _updatedAt: new Date(now()).toISOString() });
+        const quiet = syncedAt === null || syncedAt === undefined;
+        let changed = false;
         for (const batch of upsertBatches(incoming)) {
           // eslint-disable-next-line no-await-in-loop
           await inParts(batch.map(([key]) => key), async (keys) => {
             const part = batch.filter(([key]) => keys.includes(key));
             let left = [];
+            let partChanged = false;
             await mutation(keys, (rows, storeRevision) => {
               left = keepDirty ? part.filter(([key]) => rows.get(key)?._dirty).map(([key]) => key) : [];
-              return part.filter(([key]) => !left.includes(key)).map(([key, row]) => ({ op: 'put', key, value: stamp(row, rows.get(key), storeRevision) }));
+              partChanged = false;
+              return part.filter(([key]) => !left.includes(key)).flatMap(([key, row]) => {
+                const previous = rows.get(key);
+                if (unchanged(row, previous)) return quiet ? [] : [{ op: 'put', key, value: restamp(previous) }];
+                partChanged = true;
+                return [{ op: 'put', key, value: stamp(row, previous, storeRevision) }];
+              });
             }, { syncedAt, retry: true });
             upserted += part.length - left.length;
+            if (partChanged) changed = true;
             left.forEach((key) => skipped.add(key));
           });
         }
         const counts = skipped.size ? { skipped: [...skipped] } : {};
         if (windowKey != null) { windows.delete(String(windowKey)); windows.set(String(windowKey), now()); }
         if (!prune) {
-          await notify();
+          if (changed) await notify();
           return { upserted, pruned: 0, ...counts };
         }
         const retainedWindows = new Set([...windows.keys()].slice(-maxWindows));
@@ -570,7 +587,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
           }
           afterKey = page.nextKey;
         } while (afterKey !== null);
-        await notify();
+        if (changed || pruned) await notify();
         return { upserted, pruned, ...(prunedKeys.length ? { prunedKeys } : {}), ...counts };
       });
     },
