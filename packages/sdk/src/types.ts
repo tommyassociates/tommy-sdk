@@ -1925,13 +1925,34 @@ export interface ResolvedWallTime {
   readonly ambiguous: boolean;
 }
 
+export interface CalendarDayBounds {
+  readonly date: string;
+  readonly timezone: string;
+  readonly start: Iso8601;
+  /** Exclusive: the first instant after this business date, including a following skipped date. */
+  readonly end: Iso8601;
+  readonly startOffset: string;
+  readonly endOffset: string;
+  readonly durationMinutes: number;
+  readonly adjustedStart: boolean;
+  readonly adjustedEnd: boolean;
+  readonly diagnostics: ReadonlyArray<Readonly<{
+    code: 'TIMEZONE_CALENDAR_BOUNDARY_SHIFTED';
+    boundary: 'start' | 'end';
+    requestedDate: string;
+    actualDate: string;
+    time: string;
+  }>>;
+}
+
 export type TimeDisplayErrorCode =
   | 'TIMEZONE_INVALID' | 'TIMEZONE_UNSUPPORTED' | 'TIMEZONE_CONTEXT_STALE'
   | 'TIME_DATE_INVALID' | 'TIME_INSTANT_INVALID' | 'TIME_RANGE_REVERSED'
   | 'TIME_DISPLAY_KIND_INVALID' | 'TIME_DISPLAY_LOCALE_UNSUPPORTED'
   | 'TIME_WALL_CLOCK_INVALID' | 'TIME_DISAMBIGUATION_INVALID'
   | 'TIMEZONE_WALL_TIME_NONEXISTENT' | 'TIMEZONE_WALL_TIME_AMBIGUOUS'
-  | 'TIMEZONE_RULES_CONFLICT' | 'TIMEZONE_OFFSET_UNAVAILABLE';
+  | 'TIMEZONE_RULES_CONFLICT' | 'TIMEZONE_OFFSET_UNAVAILABLE'
+  | 'TIMEZONE_CALENDAR_DATE_SKIPPED' | 'TIMEZONE_CALENDAR_DATE_DISCONTIGUOUS';
 
 export interface TimeDisplayError extends RangeError {
   readonly code: TimeDisplayErrorCode;
@@ -1940,6 +1961,7 @@ export interface TimeDisplayError extends RangeError {
   readonly date?: string;
   readonly time?: string;
   readonly choices?: ReadonlyArray<Readonly<{ instant: Iso8601; offset: string }>>;
+  readonly segments?: ReadonlyArray<Readonly<{ start: Iso8601; end: Iso8601 }>>;
 }
 
 /** Synchronous host-owned display; private preferences never enter an MP store. */
@@ -1953,6 +1975,8 @@ export interface TimeApi {
   calendarParts(value: Iso8601, options: { readonly timezone: string }): Readonly<{
     date: string; time: string; weekday: number;
   }>;
+  /** Read-only civil-day bounds; user-authored wall times still use strict resolveWallTime. */
+  dayBounds(date: string, options: { readonly timezone: string }): CalendarDayBounds;
   /** Gaps reject; an overlap without disambiguation rejects with chronological choices. */
   resolveWallTime(options: {
     readonly date: string;
