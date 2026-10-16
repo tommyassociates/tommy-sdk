@@ -302,8 +302,8 @@ function checkRead(read) {
     || (read.cursor !== undefined && typeof read.cursor !== 'boolean')
     || (read.removedField !== undefined && read.removedField !== null && typeof read.removedField !== 'string')
     || (read.fullEveryMs !== undefined && !(Number.isFinite(read.fullEveryMs) && read.fullEveryMs > 0))
-    || (read.forbidden !== undefined && !['purge', 'keep'].includes(read.forbidden));
-  if (invalid) throw serviceError(`source.read: ${known.join(', ')} only (cursor a boolean, removedField a field name, fullEveryMs a positive number, forbidden 'purge' or 'keep')`, 'DATA_INVALID');
+    || (read.forbidden !== undefined && !['purge', 'confirm', 'keep'].includes(read.forbidden));
+  if (invalid) throw serviceError(`source.read: ${known.join(', ')} only (cursor a boolean, removedField a field name, fullEveryMs a positive number, forbidden 'purge', 'confirm' or 'keep')`, 'DATA_INVALID');
 }
 // The most ids one refresh method's ids param may name, and the most rows
 // one method answer may hold: a method reads a slice, never the collection.
@@ -727,6 +727,10 @@ export function createDataService({
   const generations = new Map();
   const watchedStores = new Map();
   const generationOf = (name) => generations.get(name) || 0;
+  // Collections whose last declared read the server refused (403/404): a
+  // source that reads with `forbidden: 'confirm'` purges only when the read
+  // after that is refused too. An answered read forgets the refusal.
+  const refusedOnce = new Set();
   const bump = (name) => generations.set(name, generationOf(name) + 1);
   // Whether the collection's changes are heard (its store tells them): only
   // then may rows read earlier stand in for a read now.
@@ -1350,11 +1354,17 @@ export function createDataService({
         if (whole && typeof meta.cursor === 'string' && meta.cursor && Number.isFinite(meta.fullAt) && now() - meta.fullAt < wholeWithin) since = meta.cursor;
       }
       try {
-        return { answer: await spec.fetch(wanted, { ...context, since }), since, read };
+        const answer = await spec.fetch(wanted, { ...context, since });
+        refusedOnce.delete(name);
+        return { answer, since, read };
       } catch (error) {
-        if (forbidden === 'purge' && [403, 404].includes(Number(error?.status)) && isCurrent()) {
+        const refused = [403, 404].includes(Number(error?.status)) && isCurrent();
+        // 'confirm': a single refusal (a token or team switch caught mid-way)
+        // keeps the rows; a second one in a row is the account losing them.
+        if (refused && (forbidden === 'purge' || (forbidden === 'confirm' && refusedOnce.has(name)))) {
           await service.purge(name, {}).catch(() => {}); // eslint-disable-line no-use-before-define
         }
+        if (refused && forbidden === 'confirm') refusedOnce.add(name);
         throw error;
       }
     }, async ({ answer, since, read }, _touched, startedAt, turn) => {

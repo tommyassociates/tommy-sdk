@@ -108,6 +108,30 @@ describe('a declared read', () => {
     expect(data.status('members').state).toBe('error');
   });
 
+  it('with forbidden \'confirm\', keeps the rows through one refusal and purges on the next', async () => {
+    const { data } = service();
+    const api = server([{ id: 'a', updated: 'c0' }]);
+    let refuse = false;
+    data.source('members', {
+      fetch: async (target, context) => { if (refuse) throw Object.assign(new Error('Forbidden'), { status: 403 }); return api.fetch(target, context); },
+      read: { forbidden: 'confirm' },
+    });
+    await data.refresh('members', { mode: 'visible' });
+    refuse = true;
+    await data.refresh('members', { maxAge: 0, fromNow: true });
+    expect(await ids(data)).toEqual(['a']);
+    expect(data.status('members').state).toBe('error');
+    // An answered read in between forgets the refusal.
+    refuse = false;
+    await data.refresh('members', { maxAge: 0, fromNow: true });
+    refuse = true;
+    await data.refresh('members', { maxAge: 0, fromNow: true });
+    expect(await ids(data)).toEqual(['a']);
+    // Refused twice in a row: the account lost the collection.
+    await data.refresh('members', { maxAge: 0, fromNow: true });
+    expect(await ids(data)).toEqual([]);
+  });
+
   it.each([
     ['a keyed read of a row not held', { collection: 'members', key: 'x' }],
     ['a window read', null],
