@@ -1873,6 +1873,119 @@ export interface PrefsApi {
   remove(key: string): Promise<void>;
 }
 
+export interface TimePreferences {
+  readonly timezone_mode: 'auto' | 'manual';
+  readonly manual_timezone: string | null;
+  readonly date_format: 'locale' | 'day_first' | 'month_first' | 'iso' | 'written';
+  readonly time_format: 'locale' | '12h' | '24h';
+  readonly timezone_label: 'name_offset' | 'offset';
+  readonly comparison_tooltips: boolean;
+  readonly revision: number;
+}
+
+export interface ViewerTimezone {
+  readonly timezone: string;
+  readonly source: 'manual' | 'detected' | 'cached' | 'business_fallback' | 'system_fallback';
+  readonly detectedTimezone: string | null;
+  readonly fallbackReason: 'MANUAL_TIMEZONE_INVALID' | 'DEVICE_TIMEZONE_UNAVAILABLE' | null;
+}
+
+export interface TimeDisplayOptions {
+  readonly timezone: string;
+  readonly locale?: string;
+  readonly kind?: 'datetime' | 'date' | 'time';
+  readonly includeZone?: 'auto' | 'always';
+}
+
+export interface ZonedTimeText {
+  readonly text: string;
+  readonly timezone: string;
+  readonly offset: string;
+  readonly zoneLabel: string;
+}
+
+export interface TimeDisplay extends ZonedTimeText {
+  readonly datetime: Iso8601;
+  readonly showZone: boolean;
+  readonly mismatch: boolean;
+  readonly comparison: ZonedTimeText | null;
+  readonly viewer: ViewerTimezone;
+  readonly diagnostics: ReadonlyArray<string>;
+}
+
+export interface TimeRangeDisplay extends TimeDisplay {
+  readonly start: TimeDisplay;
+  readonly end: TimeDisplay;
+}
+
+export interface ResolvedWallTime {
+  readonly instant: Iso8601;
+  readonly timezone: string;
+  readonly offset: string;
+  readonly ambiguous: boolean;
+}
+
+export interface CalendarDayBounds {
+  readonly date: string;
+  readonly timezone: string;
+  readonly start: Iso8601;
+  /** Exclusive: the first instant after this business date, including a following skipped date. */
+  readonly end: Iso8601;
+  readonly startOffset: string;
+  readonly endOffset: string;
+  readonly durationMinutes: number;
+  readonly adjustedStart: boolean;
+  readonly adjustedEnd: boolean;
+  readonly diagnostics: ReadonlyArray<Readonly<{
+    code: 'TIMEZONE_CALENDAR_BOUNDARY_SHIFTED';
+    boundary: 'start' | 'end';
+    requestedDate: string;
+    actualDate: string;
+    time: string;
+  }>>;
+}
+
+export type TimeDisplayErrorCode =
+  | 'TIMEZONE_INVALID' | 'TIMEZONE_UNSUPPORTED' | 'TIMEZONE_CONTEXT_STALE'
+  | 'TIME_DATE_INVALID' | 'TIME_INSTANT_INVALID' | 'TIME_RANGE_REVERSED'
+  | 'TIME_DISPLAY_KIND_INVALID' | 'TIME_DISPLAY_LOCALE_UNSUPPORTED'
+  | 'TIME_WALL_CLOCK_INVALID' | 'TIME_DISAMBIGUATION_INVALID'
+  | 'TIMEZONE_WALL_TIME_NONEXISTENT' | 'TIMEZONE_WALL_TIME_AMBIGUOUS'
+  | 'TIMEZONE_RULES_CONFLICT' | 'TIMEZONE_OFFSET_UNAVAILABLE'
+  | 'TIMEZONE_CALENDAR_DATE_SKIPPED' | 'TIMEZONE_CALENDAR_DATE_DISCONTIGUOUS';
+
+export interface TimeDisplayError extends RangeError {
+  readonly code: TimeDisplayErrorCode;
+  readonly timezone?: string;
+  readonly instant?: Iso8601;
+  readonly date?: string;
+  readonly time?: string;
+  readonly choices?: ReadonlyArray<Readonly<{ instant: Iso8601; offset: string }>>;
+  readonly segments?: ReadonlyArray<Readonly<{ start: Iso8601; end: Iso8601 }>>;
+}
+
+/** Synchronous host-owned display; private preferences never enter an MP store. */
+export interface TimeApi {
+  formatInstant(value: Iso8601, options: TimeDisplayOptions): TimeDisplay;
+  formatRange(start: Iso8601, end: Iso8601, options: TimeDisplayOptions): TimeRangeDisplay;
+  formatDateOnly(value: string, options?: { readonly locale?: string }): string;
+  viewer(): ViewerTimezone;
+  context(): Readonly<{ teamTimezone: string | null; enabled: boolean }>;
+  zones(): ReadonlyArray<string>;
+  calendarParts(value: Iso8601, options: { readonly timezone: string }): Readonly<{
+    date: string; time: string; weekday: number;
+  }>;
+  /** Read-only civil-day bounds; user-authored wall times still use strict resolveWallTime. */
+  dayBounds(date: string, options: { readonly timezone: string }): CalendarDayBounds;
+  /** Gaps reject; an overlap without disambiguation rejects with chronological choices. */
+  resolveWallTime(options: {
+    readonly date: string;
+    readonly time: string;
+    readonly timezone: string;
+    readonly disambiguation?: 'earlier' | 'later';
+  }): ResolvedWallTime;
+}
+
 /** What an MP bundle's optional `migrate` export is told about a store rebuild. */
 export interface StoreMigrationContext {
   /** The store's `schemaVersion` its rows were written under. */
@@ -1897,6 +2010,7 @@ export interface TommySdk {
   readonly init: MpInit;
   /** Per-account UI preferences kept by the host (API level 5). */
   readonly prefs: PrefsApi;
+  readonly time: TimeApi;
   readonly actions: ActionsApi;
   readonly panels: PanelsApi;
   readonly data: DataApi;

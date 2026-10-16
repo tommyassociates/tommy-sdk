@@ -57,6 +57,7 @@ const STUB_NAMESPACES = [
   // ANOTHER MP shows on its next mount. Setting stays with navigation
   // (`?actor_id=`) and the shell.
   'identity',
+  'time',
 ];
 
 function stubNamespace(name) {
