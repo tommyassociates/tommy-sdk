@@ -2184,6 +2184,13 @@ export function createDataService({
       // changes by a whole read (`full`): it reads whole after it. A read of
       // changes may join a whole read.
       const form = formOf(context);
+      // A visible ask that joins a read queued as background work promotes it:
+      // asked again as visible, the scheduler runs that one queued job as visible.
+      if (state.flight && mode === 'visible' && inForeground(name) && state.flightJob && !state.flightJob.visible) {
+        const promoted = { ...state.flightJob, priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: true };
+        state.flightJob = promoted;
+        Promise.resolve(scheduler.request(promoted)).catch(() => {});
+      }
       if (state.flight && state.flightForm === form && (!full || state.flightFull) && !fromNow) return settle(state.attempts.answer(state.flight, { nextAttempt }));
       if (state.flight) {
         // Read after it (a read asked `fromNow` included: the read after it
@@ -2266,7 +2273,7 @@ export function createDataService({
       state.flightSeq = flightSeq;
       // Only a read of every row answers a batched method that joins it.
       state.flightWhole = wholeRead;
-      state.flight = scheduler.request({
+      const flightJob = {
         key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
         ...(inForeground(name)
           ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
@@ -2286,7 +2293,9 @@ export function createDataService({
           });
           return stopped ? STOPPED : value;
         }),
-      }).then((outcome) => {
+      };
+      state.flightJob = flightJob;
+      state.flight = scheduler.request(flightJob).then((outcome) => {
         // A read a purge or replacement overtook stored nothing: not run, not fresh.
         if (outcome === DROPPED) {
           if (state.state === 'refreshing') state.state = 'stale';
@@ -2313,7 +2322,7 @@ export function createDataService({
       }).finally(() => {
         attempts.settled();
         if (state.attempts === attempts) state.attempts = null;
-        state.flight = null; state.flightForm = null; state.flightFull = false; state.flightWhole = false; emitStatus();
+        state.flight = null; state.flightJob = null; state.flightForm = null; state.flightFull = false; state.flightWhole = false; emitStatus();
       });
       return settle(attempts.answer(state.flight));
     } catch (error) {

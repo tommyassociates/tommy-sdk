@@ -294,6 +294,29 @@ describe('data service on memory stores', () => {
     expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['a']);
   });
 
+  it('promotes a read queued as background work when a visible ask joins it', async () => {
+    const requests = [];
+    let release;
+    const scheduler = {
+      request: vi.fn((job) => {
+        requests.push(job);
+        if (requests.length > 1) return Promise.resolve();
+        return new Promise((resolve) => { release = () => resolve(job.run(() => true)); });
+      })
+    };
+    const data = memoryService({ scheduler });
+    data.source('chats.messages', { fetch: async () => [] });
+    const background = data.refresh('chats.messages', { mode: 'silent' });
+    await vi.waitFor(() => expect(requests).toHaveLength(1));
+    expect(requests[0]).toMatchObject({ visible: false });
+    const shown = data.refresh('chats.messages', { mode: 'visible', priority: 'visible' });
+    await vi.waitFor(() => expect(requests).toHaveLength(2));
+    expect(requests[1]).toMatchObject({ key: requests[0].key, visible: true, priority: 0 });
+    expect(requests[1].run).toBe(requests[0].run);
+    release();
+    await Promise.all([background, shown]);
+  });
+
   it('marks a gate source\'s refreshes for the scheduler, and only its', async () => {
     const requests = [];
     const scheduler = { request: vi.fn((job) => { requests.push(job); return Promise.resolve().then(() => job.run(() => true)); }) };
