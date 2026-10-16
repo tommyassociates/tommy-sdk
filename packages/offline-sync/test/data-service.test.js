@@ -294,6 +294,19 @@ describe('data service on memory stores', () => {
     expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['a']);
   });
 
+  it('marks a gate source\'s refreshes for the scheduler, and only its', async () => {
+    const requests = [];
+    const scheduler = { request: vi.fn((job) => { requests.push(job); return Promise.resolve().then(() => job.run(() => true)); }) };
+    const data = memoryService({ scheduler });
+    data.source('chats.messages', { fetch: async () => [], gate: true });
+    await data.refresh('chats.messages', { mode: 'visible' });
+    expect(requests.at(-1)).toMatchObject({ gate: true });
+    data.source('chats.messages', { fetch: async () => [] });
+    await data.refresh('chats.messages', { mode: 'visible', maxAge: 0, fromNow: true });
+    expect(requests.at(-1)).not.toHaveProperty('gate');
+    expect(() => data.source('chats.messages', { fetch: async () => [], gate: 'yes' })).toThrow('source.gate must be a boolean');
+  });
+
   it('keeps a push the server refused for access as access changed: unsent, listed, never sent again on its own', async () => {
     const data = memoryService();
     const push = vi.fn(async () => { throw Object.assign(new Error('Forbidden'), { status: 403 }); });

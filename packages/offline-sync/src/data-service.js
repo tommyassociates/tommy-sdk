@@ -2032,6 +2032,8 @@ export function createDataService({
         ...(inForeground(name)
           ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
           : { priority: PRIORITIES.background, visible: false }),
+        // A read other runs wait on from inside their own starts past the visible cap.
+        ...(spec.gate === true ? { gate: true } : {}),
         // Never run, or run again, once this service retired or its reads paused.
         valid: () => !disposed && cadenceFactor(name) !== Infinity && (!isCurrent || isCurrent()),
         run: attempts.run(work),
@@ -2269,6 +2271,8 @@ export function createDataService({
         ...(inForeground(name)
           ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
           : { priority: PRIORITIES.background, visible: false }),
+        // A read other runs wait on from inside their own starts past the visible cap.
+        ...(spec.gate === true ? { gate: true } : {}),
         // Never run, or run again, once this service retired or its reads paused.
         valid: () => !disposed && cadenceFactor(name) !== Infinity,
         // An attempt that found itself no longer wanted on its way stopped
@@ -2446,7 +2450,8 @@ export function createDataService({
     /**
      * Registers how a collection syncs: `fetch(target) → DTO[] | DTO | null`,
      * with `budgetKey` (optional) the scheduler budget and circuit its
-     * refreshes run in (the service's own without one),
+     * refreshes run in (the service's own without one), `gate` (optional)
+     * for a read other refreshes wait on from inside their own runs,
      * `toRecord(dto, prev)`, optional `keyOf(dto)` and `scope(target) →
      * row predicate` for list targets (rows in scope that the server no longer
      * returns are pruned; dirty rows never are). With `push(command, record)`,
@@ -2462,6 +2467,7 @@ export function createDataService({
       if (spec.budgetKey !== undefined && (typeof spec.budgetKey !== 'string' || !spec.budgetKey)) {
         throw serviceError('source.budgetKey must be a name', 'DATA_INVALID');
       }
+      if (spec.gate !== undefined && typeof spec.gate !== 'boolean') throw serviceError('source.gate must be a boolean', 'DATA_INVALID');
       const before = sources.get(name) || resolve(name)?.decl?.source;
       sources.set(name, spec);
       if (before !== spec) retireStrictMethods(name, before, spec);
