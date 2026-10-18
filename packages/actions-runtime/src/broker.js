@@ -184,6 +184,15 @@ export function createBroker({
    */
   offlineQueue = createDurableQueue({ now }),
   /**
+   * `() => ({ person, accountType, accountId, tenantId })`: who this broker
+   * queues and sends offline writes for. The queue is one store on the device;
+   * each row is stamped with the tenant, person and account that queued it and
+   * only a broker of the same ones sends it (see `ownsQueuedRow`). A row from
+   * before stamping is sent by a broker of its tenant. Without it every row
+   * is this broker's.
+   */
+  queueOwner = null,
+  /**
    * How long a dispatch waits for an EXPECTED-but-unregistered MP (see
    * `expectedMps` below) before giving up and raising the ordinary
    * Unknown{Condition,Activity}. Only ever applies to an MP the host announced
@@ -1534,16 +1543,47 @@ export function createBroker({
 
   // --- offline queue (broker-owned store; FIFO per source MP) ----------------
 
+  function currentQueueOwner() {
+    try { return typeof queueOwner === 'function' ? queueOwner() || null : null; } catch (_) { return null; }
+  }
+
+  const OWNER_FIELDS = ['person', 'accountType', 'accountId'];
+  const known = (value) => value !== undefined && value !== null && value !== '';
+
+  /**
+   * Whether this broker may send a queued row (see `queueOwner`): the row's
+   * tenant is this broker's, and every person or account field the row was
+   * stamped with is this broker's too. A broker that does not know one of
+   * them sends no row stamped with it.
+   */
+  function ownsQueuedRow(row, holder) {
+    if (typeof queueOwner !== 'function') return true;
+    if (!holder || !known(holder.tenantId)) return false;
+    const stamp = row.owner || {};
+    const tenant = known(stamp.tenantId) ? stamp.tenantId : row.envelope?.identity?.tenantId;
+    if (String(tenant) !== String(holder.tenantId)) return false;
+    return OWNER_FIELDS.every((key) => !known(stamp[key]) || (known(holder[key]) && String(stamp[key]) === String(holder[key])));
+  }
+
+  function ownQueuedRows() {
+    const holder = currentQueueOwner();
+    return queueStore.all().filter((row) => ownsQueuedRow(row, holder));
+  }
+
   function enqueueOffline(sourceMpId, envelope) {
     // The queue is kept in Web Storage, whose quota the browser charges in
     // UTF-16 code units: its caps count those, not UTF-8 bytes.
     const bytes = utf16Units(JSON.stringify(envelope.args || envelope.payload || {}));
-    const partition = queueStore.all().filter((row) => row.sourceMpId === sourceMpId);
+    const holder = currentQueueOwner();
+    const partition = ownQueuedRows().filter((row) => row.sourceMpId === sourceMpId);
     const partitionBytes = partition.reduce((sum, row) => sum + row.bytes, 0);
     if (partition.length >= QUEUE_MAX_ENTRIES || partitionBytes + bytes > QUEUE_MAX_BYTES) {
       throw err('Offline_QueueFull', `offline queue full for mp '${sourceMpId}' (${partition.length} entries)`, { retryable: false });
     }
-    return queueStore.push({ sourceMpId, envelope, bytes });
+    const owner = holder
+      ? Object.fromEntries(['tenantId', ...OWNER_FIELDS].filter((key) => known(holder[key])).map((key) => [key, holder[key]]))
+      : undefined;
+    return queueStore.push({ sourceMpId, envelope, bytes, owner });
   }
 
   // One drain at a time: a drain asked for while one runs joins it, so a row
@@ -1585,7 +1625,7 @@ export function createBroker({
 
   async function drainOfflineQueueInnerTracked() {
     const bySource = new Map();
-    for (const row of queueStore.all().slice()) {
+    for (const row of ownQueuedRows()) {
       const list = bySource.get(row.sourceMpId) || [];
       list.push(row);
       bySource.set(row.sourceMpId, list);
@@ -1833,7 +1873,7 @@ export function createBroker({
     isOnline: () => isOnline,
     drainOfflineQueue,
     queueStats() {
-      const rows = queueStore.all();
+      const rows = ownQueuedRows();
       const bySource = {};
       const bytesBySource = {};
       for (const row of rows) {

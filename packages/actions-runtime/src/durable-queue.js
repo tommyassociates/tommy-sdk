@@ -108,9 +108,9 @@ export function createDurableQueue({ ttlMs = DEFAULT_TTL_MS, now = () => Date.no
     },
 
     /** Append a row; assigns the FIFO sequence. */
-    push({ sourceMpId, envelope, bytes }) {
+    push({ sourceMpId, envelope, bytes, owner }) {
       seq += 1;
-      rows.push({ sourceMpId, envelope, bytes, seq, queuedAt: now() });
+      rows.push({ sourceMpId, envelope, bytes, seq, queuedAt: now(), ...(owner ? { owner } : {}) });
       persist();
       return seq;
     },

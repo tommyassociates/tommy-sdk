@@ -303,3 +303,73 @@ describe('a queued row leaves the queue only once the server has answered it', (
     expect(applied).toEqual(['w1']);
   });
 });
+
+describe('a queued row is sent only by the person and account that queued it', () => {
+  let storage;
+  let applied;
+
+  const owner = (person, accountId, tenantId = `team-${accountId}`) => ({ person, accountType: 'Team', accountId, tenantId });
+  const makeBroker = async (queueOwner, tenantId = queueOwner?.tenantId || 'team-A') => {
+    const issuer = createFakeIssuer();
+    const broker = createBroker({
+      capabilityService: issuer,
+      online: false,
+      queueOwner: queueOwner && (() => queueOwner),
+      serverInvoke: async (envelope) => { applied.push(`${tenantId}:${envelope.args.week}`); return { ok: true }; },
+      offlineQueue: createDurableQueue({ storage }),
+    });
+    broker.registerMp(MANIFEST, { handlers: { activities: {} } });
+    const token = await issuer.issue('timesheets', '1.0.0', tenantId, [], 'i-a');
+    const call = (week, key) => broker.invoke({
+      sourceMpId: 'timesheets', instanceId: 'i-a', capabilityToken: token,
+      activity: 'timesheets.submit_timesheet', args: { week }, idempotencyKey: key,
+    });
+    return { broker, call };
+  };
+  const stored = () => JSON.parse(storage.getItem('mp-offline-queue')).rows.map((row) => row.envelope.args.week);
+
+  beforeEach(() => { storage = fakeStorage(); applied = []; });
+
+  it('a row queued in team A is not sent by team B, and is still there when A opens', async () => {
+    const a = await makeBroker(owner('1', '3'));
+    await a.call('a-week', 'k-a');
+
+    const b = await makeBroker(owner('1', '8'));
+    expect(b.broker.queueStats().total).toBe(0);
+    b.broker.setOnline(true);
+    await b.broker.drainOfflineQueue();
+    expect(applied).toEqual([]);
+    expect(stored()).toEqual(['a-week']);
+
+    const again = await makeBroker(owner('1', '3'));
+    again.broker.setOnline(true);
+    await again.broker.drainOfflineQueue();
+    expect(applied).toEqual(['team-3:a-week']);
+  });
+
+  it('person A\'s row is not sent by person B on the same team', async () => {
+    const a = await makeBroker(owner('1', '3'));
+    await a.call('a-week', 'k-a');
+
+    const b = await makeBroker(owner('2', '3'));
+    b.broker.setOnline(true);
+    await b.broker.drainOfflineQueue();
+    expect(applied).toEqual([]);
+    expect(stored()).toEqual(['a-week']);
+  });
+
+  it('a row from before stamping is adopted only by a world of the same tenant', async () => {
+    const old = await makeBroker(null, 'team-3');
+    await old.call('old-week', 'k-old');
+
+    const other = await makeBroker(owner('1', '8'));
+    other.broker.setOnline(true);
+    await other.broker.drainOfflineQueue();
+    expect(applied).toEqual([]);
+
+    const same = await makeBroker(owner('1', '3'));
+    same.broker.setOnline(true);
+    await same.broker.drainOfflineQueue();
+    expect(applied).toEqual(['team-3:old-week']);
+  });
+});
