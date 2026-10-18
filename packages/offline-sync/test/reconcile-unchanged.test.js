@@ -72,6 +72,17 @@ describe.each(STORES)('reconcile of unchanged server rows (%s)', (_name, create)
     await database.close();
   });
 
+  it('writes an otherwise identical row that brings its own read stamp', async () => {
+    const { database, store } = open(create);
+    await store.reconcile(team, { prune: false, keepDirty: true, syncedAt: null });
+    const heard = vi.fn();
+    store.onChange(heard);
+    await store.reconcile([{ ...team[0], _readStamp: 'exact-1' }, team[1]], { prune: false, keepDirty: true, syncedAt: null });
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect((await store.getRaw('1'))._readStamp).toBe('exact-1');
+    await database.close();
+  });
+
   it('announces a row whose content changed and gives it a new revision', async () => {
     const { database, store } = open(create);
     await store.reconcile(team, { prune: false, keepDirty: true, syncedAt: null });

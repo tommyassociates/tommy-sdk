@@ -20,7 +20,8 @@ export const RECENT_MS = 24 * 60 * 60 * 1000;
 /**
  * The server answered `row` exactly as `previous` is held: clean, painting,
  * recently stamped, in the window this read names, with no flag a write
- * would clear. Writing it again changes nothing a reader sees, and every
+ * would clear, and the answer brings no metadata of its own (a read's
+ * provenance stamp is written). Writing it again changes nothing a reader sees, and every
  * write is announced, so a reconcile leaves it as it is. Announcing it moved
  * every reader of the collection: two strict reads over shared rows (a
  * team-wide and an own documents catalogue) voided each other's receipt and
@@ -30,6 +31,7 @@ export function unchangedServerRow(row, previous, { paintable, now, windowKey = 
   return !!previous && !previous._dirty && paintable(previous)
     && now() - Date.parse(previous._updatedAt || '') < RECENT_MS
     && Object.keys(previous).every((key) => !key.startsWith('_') || QUIET_META.has(key))
+    && Object.keys(row).every((key) => !key.startsWith('_') || QUIET_META.has(key))
     && (windowKey == null || previous._window === String(windowKey))
     && canonical(domain(row)) === canonical(domain(previous));
 }
