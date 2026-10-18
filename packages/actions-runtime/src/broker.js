@@ -1546,11 +1546,46 @@ export function createBroker({
     return queueStore.push({ sourceMpId, envelope, bytes });
   }
 
-  function drainOfflineQueue(...args) { return trackWork(() => drainOfflineQueueInnerTracked(...args)); }
+  // One drain at a time: a drain asked for while one runs joins it, so a row
+  // is never sent twice by two drains.
+  let drainInFlight = null;
+
+  function drainOfflineQueue(...args) {
+    if (drainInFlight) return drainInFlight;
+    drainInFlight = trackWork(() => drainOfflineQueueInnerTracked(...args))
+      .finally(() => { drainInFlight = null; });
+    return drainInFlight;
+  }
+
+  // Codes that mean "not yet", never "no": the row is sent again later.
+  const UNSETTLED_CODES = new Set([
+    'ActivityFailed', 'Timeout', 'Offline', 'RateLimited', 'UnknownActivity', 'UnknownTrigger',
+    'ACCOUNT_NOT_DISPLAYED', 'ACCOUNT_PERMISSIONS_UNKNOWN',
+  ]);
+
+  /**
+   * A queued row is settled when it was applied or refused for good:
+   * - the server answered a 4xx other than 401, 408 and 429 (found on the
+   *   error or its causes); any other HTTP status leaves the row queued;
+   * - with no HTTP answer, the activity's own error is a final refusal
+   *   (not retryable, and not one of UNSETTLED_CODES).
+   * Anything else (no answer, a timeout, 401, 429, 5xx, an account not on
+   * screen, a Mini Program not loaded yet) leaves the row to be sent again.
+   */
+  function refusedForGood(error) {
+    let cause = error;
+    for (let depth = 0; cause && depth < 8; depth += 1) {
+      const status = Number(cause.status ?? cause.response?.status);
+      if (status >= 400 && status < 600) return status < 500 && ![401, 408, 429].includes(status);
+      cause = cause.cause;
+    }
+    const own = error?.code === 'ActivityFailed' && error.cause ? error.cause : error;
+    return isTommyError(own) && own.retryable === false && !UNSETTLED_CODES.has(own.code);
+  }
 
   async function drainOfflineQueueInnerTracked() {
     const bySource = new Map();
-    for (const row of queueStore.takeAll()) {
+    for (const row of queueStore.all().slice()) {
       const list = bySource.get(row.sourceMpId) || [];
       list.push(row);
       bySource.set(row.sourceMpId, list);
@@ -1573,6 +1608,10 @@ export function createBroker({
           .then((result) => ({ ok: true, result }))
           .catch((error) => ({ ok: false, error }));
         results.push(outcome);
+        // A row not settled stays queued, and so do the rows its Mini Program
+        // queued after it (a clock-out never goes before its clock-in).
+        if (!outcome.ok && !refusedForGood(outcome.error)) break;
+        queueStore.remove(row.seq);
         if (typeof onOfflineOutcome === 'function') {
           try {
             Promise.resolve(onOfflineOutcome(envelope, outcome)).catch(() => {});

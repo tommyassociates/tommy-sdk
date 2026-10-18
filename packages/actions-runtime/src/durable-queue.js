@@ -16,8 +16,9 @@
  *
  *   - it persists ONLY to the device that already accepted the write (Web
  *     Storage is origin+device scoped — nothing leaves the machine);
- *   - rows are DELETED as they drain, so the resting set is exactly the
- *     not-yet-applied writes and not a history;
+ *   - a row is DELETED once the server has answered it (applied, or refused
+ *     with a 4xx), so the resting set is exactly the not-yet-applied writes
+ *     and not a history;
  *   - a row older than the TTL is dropped rather than replayed (below).
  *
  * TTL SEMANTICS ARE A REAL CHOICE, NOT A CLEANUP DETAIL. Replaying a write from
@@ -114,12 +115,16 @@ export function createDurableQueue({ ttlMs = DEFAULT_TTL_MS, now = () => Date.no
       return seq;
     },
 
-    /** Remove and return every row (the drain). */
-    takeAll() {
-      const taken = rows;
-      rows = [];
+    /**
+     * Remove one row, by its sequence, once its send has settled. Rows stay in
+     * storage while they are being sent, so a reload mid-send still has them.
+     */
+    remove(rowSeq) {
+      const at = rows.findIndex((row) => row.seq === rowSeq);
+      if (at === -1) return false;
+      rows.splice(at, 1);
       persist();
-      return taken;
+      return true;
     },
 
     /**

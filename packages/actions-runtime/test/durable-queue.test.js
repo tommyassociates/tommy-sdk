@@ -11,6 +11,7 @@
  * are the price the ruling was given at, not incidental hygiene.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
+import { TommyError } from '@tommy/sdk';
 import { createBroker, createFakeIssuer, createDurableQueue } from '../src/index.js';
 
 /** A localStorage stand-in that PERSISTS across broker instances, like the real one. */
@@ -175,5 +176,130 @@ describe('D.43 — the offline queue survives a reload', () => {
 
     const second = await makeBroker({ queue: null });
     expect(second.broker.queueStats().total).toBe(0);
+  });
+});
+
+describe('a queued row leaves the queue only once the server has answered it', () => {
+  let storage;
+  let applied;
+  let answer;
+
+  const makeBroker = async ({ onOfflineOutcome } = {}) => {
+    const issuer = createFakeIssuer();
+    const broker = createBroker({
+      capabilityService: issuer,
+      online: false,
+      onOfflineOutcome,
+      serverInvoke: async (envelope) => answer(envelope),
+      offlineQueue: createDurableQueue({ storage }),
+    });
+    broker.registerMp(MANIFEST, { handlers: { activities: {} } });
+    const token = await issuer.issue('timesheets', '1.0.0', 'team-A', [], 'i-a');
+    const call = (week, key) => broker.invoke({
+      sourceMpId: 'timesheets', instanceId: 'i-a', capabilityToken: token,
+      activity: 'timesheets.submit_timesheet', args: { week }, idempotencyKey: key,
+    });
+    return { broker, call };
+  };
+  const stored = () => JSON.parse(storage.getItem('mp-offline-queue')).rows.map((row) => row.envelope.args.week);
+  const sends = () => { answer = async (envelope) => { applied.push(envelope.args.week); return { ok: true }; }; };
+  const noNetwork = () => { answer = async () => { throw new TypeError('Failed to fetch'); }; };
+
+  beforeEach(() => { storage = fakeStorage(); applied = []; sends(); });
+
+  it('keeps a row whose send got no answer', async () => {
+    const { broker, call } = await makeBroker();
+    await call('w1', 'k-1');
+    noNetwork();
+    broker.setOnline(true);
+    await broker.drainOfflineQueue();
+
+    expect(stored()).toEqual(['w1']);
+    expect(broker.queueStats().total).toBe(1);
+    sends();
+    await broker.drainOfflineQueue();
+    expect(applied).toEqual(['w1']);
+    expect(stored()).toEqual([]);
+  });
+
+  it('keeps a row in storage while it is being sent, so a reload mid-send still has it', async () => {
+    const { broker, call } = await makeBroker();
+    await call('w1', 'k-1');
+    let release;
+    answer = (envelope) => new Promise((resolve) => { release = () => { applied.push(envelope.args.week); resolve({ ok: true }); }; });
+    broker.setOnline(true);
+    const draining = broker.drainOfflineQueue();
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    expect(createDurableQueue({ storage }).all()).toHaveLength(1);
+    release();
+    await draining;
+    expect(createDurableQueue({ storage }).all()).toHaveLength(0);
+  });
+
+  it('removes a row the server refused (4xx) and reports it', async () => {
+    const outcomes = [];
+    const { broker, call } = await makeBroker({ onOfflineOutcome: (envelope, outcome) => outcomes.push(outcome.ok) });
+    await call('w1', 'k-1');
+    answer = async () => { throw Object.assign(new Error('Unprocessable'), { status: 422 }); };
+    broker.setOnline(true);
+    await broker.drainOfflineQueue();
+
+    expect(stored()).toEqual([]);
+    expect(outcomes).toEqual([false]);
+  });
+
+  it('removes a row the host refused for good, and keeps one it can only send later', async () => {
+    const outcomes = [];
+    const { broker, call } = await makeBroker({ onOfflineOutcome: (envelope, outcome) => outcomes.push(outcome.error?.cause?.code) });
+    await call('w1', 'k-1');
+    broker.setOnline(true);
+    answer = async () => { throw new TommyError({ code: 'ACCOUNT_NOT_DISPLAYED', message: 'Not on screen', retryable: true }); };
+    await broker.drainOfflineQueue();
+    expect(stored()).toEqual(['w1']);
+
+    answer = async () => { throw new TommyError({ code: 'CHAT_ACCESS_REVOKED', message: 'No access', retryable: false }); };
+    await broker.drainOfflineQueue();
+    expect(stored()).toEqual([]);
+    expect(outcomes).toEqual(['CHAT_ACCESS_REVOKED']);
+  });
+
+  it('keeps a row the server asked to slow down (429) or failed on (5xx)', async () => {
+    const { broker, call } = await makeBroker();
+    await call('w1', 'k-1');
+    broker.setOnline(true);
+    for (const status of [429, 503]) {
+      answer = async () => { throw Object.assign(new Error('Busy'), { response: { status } }); };
+      // eslint-disable-next-line no-await-in-loop
+      await broker.drainOfflineQueue();
+      expect(stored()).toEqual(['w1']);
+    }
+  });
+
+  it('holds back a Mini Program\'s later rows behind one that is kept (clock-in before clock-out)', async () => {
+    const { broker, call } = await makeBroker();
+    await call('w1', 'k-1');
+    await call('w2', 'k-2');
+    let first = true;
+    answer = async (envelope) => {
+      if (first) { first = false; throw new TypeError('Failed to fetch'); }
+      applied.push(envelope.args.week);
+      return { ok: true };
+    };
+    broker.setOnline(true);
+    await broker.drainOfflineQueue();
+    expect(applied).toEqual([]);
+    expect(stored()).toEqual(['w1', 'w2']);
+
+    await broker.drainOfflineQueue();
+    expect(applied).toEqual(['w1', 'w2']);
+  });
+
+  it('sends each row once when two drains start together', async () => {
+    const { broker, call } = await makeBroker();
+    await call('w1', 'k-1');
+    broker.setOnline(true);
+    await Promise.all([broker.drainOfflineQueue(), broker.drainOfflineQueue()]);
+    expect(applied).toEqual(['w1']);
   });
 });
