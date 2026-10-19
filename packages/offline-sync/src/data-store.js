@@ -1,6 +1,6 @@
 import { createTransactionalDataStore, copyStorageRow } from './transactional-store.js';
 import { utf16Units } from './bytes.js';
-import { unchangedServerRow } from './unchanged-row.js';
+import { unchangedServerRow, heldProvenance } from './unchanged-row.js';
 /**
  * data-store.js — the DataStore behind `tommy.data.store(name)`
  * (sdk-types.ts DataStore/DataApi; offline-sync.md §1/§4).
@@ -1349,14 +1349,15 @@ export function createDataStore({
         // and unannounced: see unchangedServerRow.
         const heldKey = keyOf(record);
         // eslint-disable-next-line no-await-in-loop
-        if (heldKey !== undefined && unchangedServerRow(record, await backend.get(heldKey), { paintable, now, windowKey })) {
+        const held = heldKey === undefined ? undefined : await backend.get(heldKey);
+        if (heldKey !== undefined && unchangedServerRow(record, held, { paintable, now, windowKey })) {
           incoming.add(String(heldKey));
           continue;
         }
         let key;
         try {
           // eslint-disable-next-line no-await-in-loop
-          key = await api.put(record, { silent: true, deferCap: true, ...(keepDirty ? { server: true } : {}) });
+          key = await api.put({ ...heldProvenance(record, held), ...record }, { silent: true, deferCap: true, ...(keepDirty ? { server: true } : {}) });
         } catch (e) {
           // Only a record the store refused as a record (DATA_INVALID) or kept
           // in memory (PersistError) is handled here; any other failure is the

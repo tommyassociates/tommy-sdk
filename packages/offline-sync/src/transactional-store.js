@@ -1,7 +1,7 @@
 /** Durable branch of DataStore. The injected backend owns physical CAS/epochs. */
 import { jsonBytes, utf8Bytes, boundedBatches, WRITE_BATCH_BYTES } from './bytes.js';
 import { MAX_ROW_BYTES } from './host-store/protocol.js';
-import { unchangedServerRow } from './unchanged-row.js';
+import { unchangedServerRow, heldProvenance } from './unchanged-row.js';
 // The most rows one whole-collection read returns, page by page.
 export const WHOLE_READ_ROWS = 20000;
 // A whole read that has to page stops at this many bytes too (a domain's
@@ -534,7 +534,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
           if (windowKey != null) return { _window: String(windowKey) };
           return previous?._window != null ? { _window: previous._window } : {};
         };
-        const stamp = (row, previous, storeRevision) => ({ ...row, ...acknowledged(previous), _rev: rowRevision(previous, storeRevision), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...windowOf(previous) });
+        const stamp = (row, previous, storeRevision) => ({ ...heldProvenance(row, previous), ...row, ...acknowledged(previous), _rev: rowRevision(previous, storeRevision), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...windowOf(previous) });
         // A row the server answered as it is held is not written (every commit
         // is announced on the change feed), unless this read stamps the
         // collection synced (`syncedAt`), which only a commit carries: then it

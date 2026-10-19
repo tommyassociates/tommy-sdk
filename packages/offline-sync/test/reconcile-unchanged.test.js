@@ -83,6 +83,70 @@ describe.each(STORES)('reconcile of unchanged server rows (%s)', (_name, create)
     await database.close();
   });
 
+  it('keeps a held read stamp through an unstamped answer of the same row, unwritten', async () => {
+    const { database, store } = open(create);
+    await store.reconcile([{ ...team[0], _readStamp: 'exact-1' }, team[1]], { prune: false, keepDirty: true, syncedAt: null });
+    const before = await store.getRaw('1');
+    const heard = vi.fn();
+    store.onChange(heard);
+    await store.reconcile(team, { prune: false, keepDirty: true, syncedAt: null });
+    expect(heard).not.toHaveBeenCalled();
+    expect(await store.getRaw('1')).toEqual(before);
+    await database.close();
+  });
+
+  it('leaves a row answered again with the stamp it holds unwritten', async () => {
+    const { database, store } = open(create);
+    await store.reconcile([{ ...team[0], _readStamp: 'exact-1' }], { prune: false, keepDirty: true, syncedAt: null });
+    const before = await store.getRaw('1');
+    const heard = vi.fn();
+    store.onChange(heard);
+    await store.reconcile([{ ...team[0], _readStamp: 'exact-1' }], { prune: false, keepDirty: true, syncedAt: null });
+    expect(heard).not.toHaveBeenCalled();
+    expect(await store.getRaw('1')).toEqual(before);
+    await database.close();
+  });
+
+  it('writes a row answered with a new stamp', async () => {
+    const { database, store } = open(create);
+    await store.reconcile([{ ...team[0], _readStamp: 'exact-1' }], { prune: false, keepDirty: true, syncedAt: null });
+    const heard = vi.fn();
+    store.onChange(heard);
+    await store.reconcile([{ ...team[0], _readStamp: 'exact-2' }], { prune: false, keepDirty: true, syncedAt: null });
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect((await store.getRaw('1'))._readStamp).toBe('exact-2');
+    await database.close();
+  });
+
+  it('keeps a held stamp through a write of the same content, and drops it over changed content', async () => {
+    const { database, store } = open(create);
+    await store.reconcile([{ ...team[0], _readStamp: 'exact-1' }], { prune: false, keepDirty: true, syncedAt: null, windowKey: 'w1' });
+    // Another window's read: written (retagged), the content the stamp read unchanged.
+    await store.reconcile([team[0]], { prune: false, keepDirty: true, syncedAt: null, windowKey: 'w2' });
+    expect(await store.getRaw('1')).toMatchObject({ _readStamp: 'exact-1', _window: 'w2' });
+    // A newer version no stamped read saw.
+    await store.reconcile([{ ...team[0], status: 'rejected' }], { prune: false, keepDirty: true, syncedAt: null });
+    const after = await store.getRaw('1');
+    expect(after.status).toBe('rejected');
+    expect(after._readStamp).toBeUndefined();
+    await database.close();
+  });
+
+  it('leaves a stamped row with an unsent local write as it is', async () => {
+    const { database, store } = open(create);
+    await store.reconcile([{ ...team[0], _readStamp: 'exact-1' }], { prune: false, keepDirty: true, syncedAt: null });
+    await store.put({ ...team[0], status: 'draft' });
+    const before = await store.getRaw('1');
+    expect(before._dirty).toBe(true);
+    const heard = vi.fn();
+    store.onChange(heard);
+    const answered = await store.reconcile([{ ...team[0], _readStamp: 'exact-2' }], { prune: false, keepDirty: true, syncedAt: null });
+    expect(answered.skipped).toEqual(['1']);
+    expect(heard).not.toHaveBeenCalled();
+    expect(await store.getRaw('1')).toEqual(before);
+    await database.close();
+  });
+
   it('announces a row whose content changed and gives it a new revision', async () => {
     const { database, store } = open(create);
     await store.reconcile(team, { prune: false, keepDirty: true, syncedAt: null });
