@@ -1505,6 +1505,17 @@ export function createBroker({
       }
     }
 
+    // A replayable server write whose request never reached the server waits
+    // in the offline queue, as it would had the device reported itself
+    // offline. A drained replay is still in the queue, so it just fails here
+    // and stays there.
+    if (activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable
+      && !envelope.restoreDrain && neverReachedServer(lastError)) {
+      enqueueOffline(envelope.sourceMpId, { ...envelope, identity, idempotencyKey });
+      await records.update(record.runId, { status: 'queued_offline', attempts: attempt });
+      return { rpcId: record.runId, status: 'queued_offline' };
+    }
+
     // Budget exhausted or non-retryable: dead-letter (§3.4).
     await records.update(record.runId, {
       status: 'dead_letter',
@@ -1615,6 +1626,21 @@ export function createBroker({
    * Anything else (no answer, a timeout, 401, 429, 5xx, an account not on
    * screen, a Mini Program not loaded yet) leaves the row to be sent again.
    */
+  // No answer came back at all: no connection, or the request was cut off
+  // before a response (status 0, or the fetch itself threw). Any HTTP status
+  // means the server answered.
+  function neverReachedServer(error) {
+    let cause = error;
+    for (let depth = 0; cause && depth < 8; depth += 1) {
+      const status = cause.status ?? cause.response?.status;
+      if (status === 0) return true;
+      if (Number(status) >= 100) return false;
+      if (cause.name === 'TypeError' && /fetch|network|load failed/i.test(String(cause.message))) return true;
+      cause = cause.cause;
+    }
+    return false;
+  }
+
   function refusedForGood(error) {
     let cause = error;
     for (let depth = 0; cause && depth < 8; depth += 1) {
