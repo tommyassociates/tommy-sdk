@@ -701,12 +701,15 @@ export function createBroker({
 
     const targetMp = binding.mp || mpId;
     // An Action-dispatched client_key activity has no caller to supply the
-    // key — derive it DETERMINISTICALLY from (action, assembled args) so a
-    // replayed emission of the same logical event (offline drain, retry)
-    // carries the SAME key and the server's exactly-once ledger absorbs it.
+    // key — derive it DETERMINISTICALLY from (action, trigger payload,
+    // assembled args) so a replayed emission of the same logical event
+    // (offline drain, retry) carries the SAME key and the server's
+    // exactly-once ledger absorbs it. The trigger payload is part of the key
+    // because args alone can repeat across distinct events (a constant
+    // prompt), and those are separate writes, not replays.
     const targetDef = mps.get(targetMp)?.manifest.activities?.[binding.name];
     const derivedKey = targetDef?.idempotency === 'client_key'
-      ? `act-${mpId}-${actionId}-${stableHash(args)}`.slice(0, 128)
+      ? `act-${mpId}-${actionId}-${stableHash({ trigger: triggerPayload ?? null, args })}`.slice(0, 128)
       : undefined;
     return dispatchInvoke({
       sourceMpId: mpId,
