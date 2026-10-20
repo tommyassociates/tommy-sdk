@@ -13,9 +13,10 @@ import { join } from 'node:path';
 import { createSqliteDatabase, createHostStorePort } from '../src/host-store/index.js';
 import { identity } from './helpers/host-databases.js';
 
-function nodeDriver({ failOpens = 0 } = {}) {
+function nodeDriver({ failOpens = 0, openTransaction = false } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'host-store-open-'));
   const connection = new DatabaseSync(join(directory, 'store.sqlite'));
+  if (openTransaction) connection.exec('BEGIN IMMEDIATE');
   let refusals = failOpens;
   const calls = { open: 0, close: 0 };
   return {
@@ -51,6 +52,14 @@ describe('SQLite engine connection set-up', () => {
       const written = await port.commit({ handle: handle.handle, expectedEpoch: handle.epoch, expectedStoreRevision: handle.storeRevision,
         changes: [{ op: 'put', key: 'd1', value: { id: 'd1' } }] });
       expect(written).toMatchObject({ ok: true });
+    } finally { native.dispose(); }
+  });
+
+  it('opens a connection a reloaded page left inside a transaction', async () => {
+    const native = nodeDriver({ openTransaction: true });
+    try {
+      const database = createSqliteDatabase({ driver: native.driver });
+      await expect(database.transaction('readwrite', async () => 'written')).resolves.toBe('written');
     } finally { native.dispose(); }
   });
 

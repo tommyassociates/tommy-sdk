@@ -26,6 +26,11 @@ export function createSqliteDatabase({ driver }) {
   function setUp() {
     return (async () => {
       await driver.open?.();
+      // A native connection kept across a WebView reload can still hold the
+      // reloaded page's open transaction; the pragmas below are refused inside
+      // one ("Safety level may not be changed inside a transaction"). That
+      // page is gone, so its work is rolled back. With none open this errors.
+      await driver.run('ROLLBACK', []).catch(() => {});
       const mode = await driver.query('PRAGMA journal_mode = WAL', []);
       if (String(mode[0]?.journal_mode).toLowerCase() !== 'wal') throw storageError('unavailable');
       await driver.run('PRAGMA synchronous = FULL', []);
