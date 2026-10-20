@@ -90,6 +90,21 @@ export function createImmediateScheduler() {
 const serviceError = (message, code) => Object.assign(new Error(message), { name: 'DataServiceError', code });
 
 /**
+ * A visible read that passed its deadline answers its caller with the
+ * scheduler's REFRESH_TIMEOUT (the read goes on in the background). That error
+ * is made by the scheduler's timer, so its stack names no caller, and one left
+ * unhandled cannot be traced. The caller hears it with the collection named
+ * and the stack of where it asked, its code and fields unchanged.
+ */
+export function timedOutFor(error, collection, asked) {
+  if (error?.code !== 'REFRESH_TIMEOUT' || !asked) return error;
+  const named = Object.assign(new Error(`Refresh took too long: '${collection}'`), error, { collection, cause: error });
+  const frames = String(asked.stack || '').replace(/^Error\n/, '');
+  named.stack = `${named.name}: ${named.message}\n${frames}`;
+  return named;
+}
+
+/**
  * A scheduled read's attempts as its callers see them. The scheduler may
  * try a failed read again after a backoff; its callers are not held through
  * that. Each caller is answered by the read's outcome or by the first
@@ -2520,8 +2535,12 @@ export function createDataService({
      * method's own status.
      */
     refresh(target, options = {}) {
+      // Where a visible read was asked, for a timeout that reaches its caller.
+      const asked = options?.mode === 'visible' ? new Error() : null;
       // The principal it reads as, taken when it is asked.
-      return refreshAs(target, options, jobContextNow());
+      const answer = refreshAs(target, options, jobContextNow());
+      if (!asked) return answer;
+      return answer.catch((error) => { throw timedOutFor(error, targetOf(target).collection, asked); });
     },    /**
      * Stores rows a domain received from the server (a page, an event, a
      * detail read) as synced rows: views subscribed to them update, nothing is
