@@ -507,6 +507,9 @@ export function createDataService({
   resolve,
   scheduler = createImmediateScheduler(),
   feed = null,
+  // How long an unchanged collection's whole read is answered again (see
+  // `readWhole`); 0 reads it every time.
+  wholeReadReuseMs = 0,
   // The durable owner pinned by the host; account forms and client subjects
   // may share collection labels but never share completeness.
   changeOwner = null,
@@ -2337,6 +2340,31 @@ export function createDataService({
     }
   }
 
+  // With `wholeReadReuseMs`, a whole read is answered again for that long
+  // while nothing changed the collection's rows: its store tells this page's
+  // changes (see `watchChanges`) and the feed tells other tabs', so only a
+  // service given the feed keeps them. Permission checks, receipts and panels
+  // read the same collections many times a second; on a phone each read is
+  // several native SQLite calls in one queue, and at boot that queue held a
+  // screen's reads for a minute. Kept briefly, so the store's time-based
+  // limits (the paint ceiling, the age limit) still apply.
+  const wholeReads = new Map();
+  async function readWhole(name, store, raw) {
+    const id = `${raw ? 'raw' : 'paint'}:${name}`;
+    const direct = () => (raw ? store.getAllRaw() : store.getAll());
+    if (!(wholeReadReuseMs > 0) || !feed || !watchChanges(name, store)) return direct();
+    const generation = generationOf(name);
+    const kept = wholeReads.get(id);
+    if (kept && kept.generation === generation && now() - kept.at < wholeReadReuseMs) return kept.rows;
+    const entry = { generation, at: now(), rows: direct() };
+    wholeReads.set(id, entry);
+    try { entry.rows = await entry.rows; } catch (error) {
+      if (wholeReads.get(id) === entry) wholeReads.delete(id);
+      throw error;
+    }
+    return entry.rows;
+  }
+
   const service = {
     namespace,
     // Rows come as copies without storage metadata. `raw` reads as writers
@@ -2345,12 +2373,12 @@ export function createDataService({
     // it painted or deciding what to remove.
     async read(collection, key, { raw = false, storageMetadata = false } = {}) {
       live();
-      const { store } = local(collection);
+      const { name, store } = local(collection);
       const project = storageMetadata ? copyRow : clean;
       const one = async (item) => (raw ? copyRow(await store.getRaw(String(item))) : project(await store.get(String(item))));
       if (Array.isArray(key)) return Promise.all(key.map(one));
       if (key !== undefined && key !== null) return one(key);
-      return raw ? (await store.getAllRaw()).map(copyRow) : (await store.getAll()).map(project);
+      return (await readWhole(name, store, raw)).map(raw ? copyRow : project);
     },
     // `raw: true` answers as writers see the collection (rows past the paint
     // ceiling and the age limit included), for a caller deciding what to remove.
