@@ -1597,7 +1597,12 @@ export function createBroker({
     const owner = holder
       ? Object.fromEntries(['tenantId', ...OWNER_FIELDS].filter((key) => known(holder[key])).map((key) => [key, holder[key]]))
       : undefined;
-    return queueStore.push({ sourceMpId, envelope, bytes, owner });
+    try {
+      return queueStore.push({ sourceMpId, envelope, bytes, owner });
+    } catch (cause) {
+      if (cause?.name !== 'QueueNotKept') throw cause;
+      throw err('Offline_QueueFull', `offline queue for mp '${sourceMpId}' could not be kept on this device`, { retryable: false, cause });
+    }
   }
 
   // One drain at a time: a drain asked for while one runs joins it, so a row

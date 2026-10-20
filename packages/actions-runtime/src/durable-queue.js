@@ -31,9 +31,11 @@
  * claimed a shell-supplied IndexedDB backend that was never passed for the
  * platform's whole life (D.43 again). A seam that needs the host to remember
  * something is a seam that eventually rots, so there is no second half here.
- * Absent, corrupt, disabled or over-quota storage degrades to in-memory — i.e.
- * exactly today's behaviour — and NEVER throws: a durability improvement must
- * not become an outage on the write path.
+ * Absent, corrupt or disabled storage degrades to in-memory and never throws.
+ * Storage that is there but cannot take a new row (its quota is spent, e.g. by
+ * the photos of a form) refuses that row: `push` throws `QueueNotKept` with
+ * the row taken back out, so the write is never reported as queued while it
+ * would be gone at the next reload. Rows already held stay as they were.
  */
 
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -68,13 +70,16 @@ export function createDurableQueue({ ttlMs = DEFAULT_TTL_MS, now = () => Date.no
   let seq = 0;
   let expired = 0;
 
+  // Whether storage holds the rows now: true with no storage at all (memory
+  // is all there is), false when storage is there and refused the write.
   function persist() {
     const s = store();
-    if (!s) return;
+    if (!s) return true;
     try {
       s.setItem(STORAGE_KEY, JSON.stringify({ seq, rows }));
+      return true;
     } catch (_) {
-      /* quota / disabled — degrade to in-memory-until-reload */
+      return false;
     }
   }
 
@@ -107,11 +112,18 @@ export function createDurableQueue({ ttlMs = DEFAULT_TTL_MS, now = () => Date.no
       return rows;
     },
 
-    /** Append a row; assigns the FIFO sequence. */
+    /**
+     * Append a row; assigns the FIFO sequence. Throws `QueueNotKept`, with
+     * the row taken back out, when storage is there but cannot take it.
+     */
     push({ sourceMpId, envelope, bytes, owner }) {
       seq += 1;
       rows.push({ sourceMpId, envelope, bytes, seq, queuedAt: now(), ...(owner ? { owner } : {}) });
-      persist();
+      if (!persist()) {
+        rows.pop();
+        seq -= 1;
+        throw Object.assign(new Error('the offline queue could not be kept on this device'), { name: 'QueueNotKept' });
+      }
       return seq;
     },
 
