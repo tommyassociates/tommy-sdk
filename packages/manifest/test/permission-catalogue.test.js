@@ -124,6 +124,14 @@ describe('catalogue integrity', () => {
     }
   });
 
+  // People's pay facts (agreed hours, agreements, qualifications) change what shifts cost, and some
+  // are sensitive, so both scopes are reviewed as high.
+  it('carries the employee pay facts scopes, both high', () => {
+    for (const scope of ['read:employee_facts', 'write:employee_facts']) {
+      expect(catalogue.byScope.get(scope), scope).toMatchObject({ category: 'timesheets', sensitivity: 'high' });
+    }
+  });
+
   it('searchCatalogue filters by substring and category', () => {
     expect(searchCatalogue(catalogue, { search: 'team' }).length).toBeGreaterThan(0);
     const device = searchCatalogue(catalogue, { category: 'device' });
