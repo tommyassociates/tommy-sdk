@@ -16,6 +16,22 @@ export const DEFAULT_THROTTLE_PROFILE = Object.freeze({
   maxNodeRepeats: 3,
 });
 
+/**
+ * How long a QUERY waits for its MP's next rate token before it is refused.
+ *
+ * A read that finds the bucket empty takes the next token (so reads queued
+ * behind it take the ones after) and waits for it, up to this long. Past it the
+ * read is refused at once with `RateLimited`, carrying `retryAfterMs`: how long
+ * until a token is free for it. At the default 120 queries/min a token comes
+ * every 500 ms, so a read made one at a time never waits long enough to be
+ * refused, and a burst past the 30 is spread over about four tokens before the
+ * rest are refused.
+ *
+ * Queries only. An emit or invoke that finds the bucket empty is refused at
+ * once, as before, now with `retryAfterMs` too.
+ */
+export const QUERY_RATE_WAIT_MAX_MS = 2000;
+
 /** offline-sync.md §3 — per-MP offline queue caps. */
 export const QUEUE_MAX_ENTRIES = 500;
 export const QUEUE_MAX_BYTES = 5 * 1024 * 1024;
@@ -37,10 +53,11 @@ export const DEFAULT_RETRY = Object.freeze({ maxAttempts: 3, backoff: 'exponenti
  * only ones that reach the loop.
  *
  * ⚠ IT DOES NOT COVER `RateLimited`, and an earlier version of this comment
- * claimed it did. `takeToken` runs at the top of `dispatchInvokeInner`
- * (broker.js:1053), ~100 lines BEFORE the retry loop opens (broker.js:1157), so
- * a throttled invoke throws straight out of the dispatch and gets zero attempts
- * and zero backoff. Where a `RateLimited` does reach a loop — a nested child
+ * claimed it did. `takeToken` runs at the top of `dispatchInvokeInner`,
+ * BEFORE the retry loop opens, so a throttled invoke throws straight out of
+ * the dispatch and gets zero attempts and zero backoff (its error carries
+ * `retryAfterMs` for the caller instead; a QUERY waits for its token, see
+ * QUERY_RATE_WAIT_MAX_MS). Where a `RateLimited` does reach a loop — a nested child
  * bubbling up through its parent's handler — the arithmetic still does not
  * close: the bucket refills `perMin * elapsedMinutes`, so at 120 invokes/min one
  * token needs 500ms while the default schedule spends 300ms across both gaps.

@@ -98,6 +98,7 @@ export function createDirectAdapter({
       if (isTommyError(err)) {
         throw new TommyError({
           code: err.code, message: err.message, rule: err.rule, retryable: err.retryable, runId: err.runId, cause: err.cause,
+          retryAfterMs: err.retryAfterMs,
         });
       }
       throw new TommyError({ code: 'ActivityFailed', message: String(err && err.message), retryable: false, cause: err });

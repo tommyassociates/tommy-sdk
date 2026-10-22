@@ -76,6 +76,12 @@ export interface TommyError {
   /** Correlates with the ActionRun record for debugging. */
   readonly runId?: string;
   readonly cause?: unknown;
+  /**
+   * On a `RateLimited` refusal from the broker's rate limit: milliseconds until
+   * a token is free for the caller. Absent when unknown (older hosts, and a
+   * refusal for another reason, such as too many writes in flight).
+   */
+  readonly retryAfterMs?: number;
 }
 
 // ============================================================================

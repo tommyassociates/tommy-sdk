@@ -12,7 +12,7 @@ export { validateToken, createFakeIssuer } from './capability.js';
 // caller re-implements a comparison.
 export { evaluatePredicate, resolveSource, PredicateError, PREDICATE_OPERATORS } from './predicate.js';
 export {
-  DEFAULT_THROTTLE_PROFILE, QUEUE_MAX_ENTRIES, QUEUE_MAX_BYTES, SYNC_EMIT_TIMEOUT_MS,
+  DEFAULT_THROTTLE_PROFILE, QUERY_RATE_WAIT_MAX_MS, QUEUE_MAX_ENTRIES, QUEUE_MAX_BYTES, SYNC_EMIT_TIMEOUT_MS,
   // Read-scope derivation — exported so review tooling
   // and tests read the same lists the broker enforces.
   DOMAIN_SCOPE_BY_MP, SENSITIVE_CONDITIONS, domainScopeForMp,
