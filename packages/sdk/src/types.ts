@@ -564,6 +564,13 @@ export interface HostCollection<Rec = unknown> {
    * covering method, preserving its cadence and compatibility fallback.
    */
   subscribe(callback: (rows: readonly (Rec | null)[]) => void, options: { keys: readonly string[]; onError?: (error: unknown) => void }): () => void;
+  /**
+   * The rows one of the source's methods covers for `params` (its own match,
+   * e.g. `workforce.shifts` `byRange` with `{ from, to }`): the rows held at
+   * once, then whenever they change; revalidated through that method's read.
+   * Host API level 11.
+   */
+  subscribe(callback: (rows: readonly Rec[]) => void, options: { method: string; params: Record<string, unknown>; onError?: (error: unknown) => void }): () => void;
   /** The rows now, then whenever their rows or read status changes, while the account is displayed. */
   subscribe(callback: (rows: readonly Rec[]) => void, options?: { onError?: (error: unknown) => void }): () => void;
   /** The collection's status; `complete` only when every collection the profile reads has completed a read. */
