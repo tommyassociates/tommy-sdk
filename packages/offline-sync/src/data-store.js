@@ -430,10 +430,18 @@ const DEFAULT_MAX_ROWS = 50000;
 const DEFAULT_MAX_WINDOWS = 3;
 
 /**
- * How old a row may be and still be PAINTED — a platform promise, not a per-store
- * tuning knob. A device left closed for a fortnight must start cold rather than
- * confident: a stale roster or compliance surface with nothing on it saying it is
- * stale is worse than an empty one.
+ * How old a row may be and still be PAINTED — a platform promise for every
+ * cache, not a tuning knob. A device left closed for a fortnight must start cold
+ * rather than confident: a stale roster or compliance surface with nothing on it
+ * saying it is stale is worse than an empty one.
+ *
+ * The age is the same for every store. A cache opts out in one way only, by
+ * declaring `paintCeiling: false` at `createDataStore`: for rows that stay as
+ * valid at any age as when they were read (pages a later read checks by content
+ * hash, and the inputs computed with them). Such a store's rows paint at any
+ * age; its row cap, window retention and the backend's age limit apply as to
+ * any cache. A client-owned (`last_write_wins`) store is not a cache and the
+ * ceiling never applies to it.
  */
 export const PAINT_CEILING_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -488,8 +496,9 @@ export function queryRows(rows, fields, { equals, prefix, lower, upper } = {}, k
 export function createDataStore({
   name, keyPath = 'id', recordSchema, backend = createMemoryStoreBackend(),
   now = () => Date.now(), maxRows = DEFAULT_MAX_ROWS, maxWindows = DEFAULT_MAX_WINDOWS, onPersistError,
-  syncStrategy = 'server_authoritative', indexes = {},
+  syncStrategy = 'server_authoritative', indexes = {}, paintCeiling = true,
 }) {
+  if (typeof paintCeiling !== 'boolean') throw new TypeError(`store '${name}': paintCeiling must be true or false`);
   const validate = recordSchema ? ajv.compile(recordSchema) : null;
   // A client-owned (`last_write_wins`) store holds the only copy of its rows:
   // neither the row cap nor window retention removes them.
@@ -800,10 +809,11 @@ export function createDataStore({
   let windowVisitSeq = 0;
 
   /**
-   * Whether a row may be PAINTED. Caches age out at the platform ceiling;
-   * client-owned (`last_write_wins`) rows never do — they are the only copy.
+   * Whether a row may be PAINTED. Caches age out at the platform ceiling unless
+   * the store declared `paintCeiling: false`; client-owned (`last_write_wins`)
+   * rows never do — they are the only copy.
    */
-  const ceilingApplies = evictsRows;
+  const ceilingApplies = evictsRows && paintCeiling;
   // A local delete waiting to be sent (`_deleted`) never paints.
   const paintable = (row) => {
     if (row?._deleted) return false;
@@ -977,9 +987,9 @@ export function createDataStore({
      * ⚠ AND IT APPLIES TO CACHES ONLY. A `last_write_wins` store is not stale
      * server data going off — it is the user's OWN row, the truth, and the only
      * copy. Ageing a member's saved settings or a half-typed draft out of a read
-     * would be data loss dressed as a freshness guarantee. The first version of
-     * this fix did exactly that; the strategy is now threaded from the manifest
-     * so the rule can tell a cache from a client-owned record.
+     * would be data loss dressed as a freshness guarantee, so the store's
+     * `syncStrategy` tells a cache from a client-owned record. A cache declared
+     * `paintCeiling: false` (see PAINT_CEILING_MS) paints its rows at any age.
      *
      * A `_dirty` row is exempt regardless: it has not reached the server, and
      * its age is not a reason to hide it from its author.
