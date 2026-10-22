@@ -155,7 +155,7 @@ describe('D.43 — the offline queue survives a reload', () => {
     expect(second.broker.queueStats().total).toBe(0);
   });
 
-  it('NEVER throws when storage is absent, corrupt or over quota — it degrades to memory', () => {
+  it('never throws when storage is absent or corrupt; storage over quota refuses the new row', () => {
     expect(() => createDurableQueue({ storage: null })).not.toThrow();
 
     const corrupt = fakeStorage();
@@ -165,8 +165,9 @@ describe('D.43 — the offline queue survives a reload', () => {
 
     const full = { getItem: () => null, setItem: () => { throw new Error('QuotaExceeded'); } };
     const quota = createDurableQueue({ storage: full });
-    expect(() => quota.push({ sourceMpId: 'timesheets', envelope: { a: 1 }, bytes: 2 })).not.toThrow();
-    expect(quota.all()).toHaveLength(1);             // still queued IN MEMORY — today's behaviour
+    expect(() => quota.push({ sourceMpId: 'timesheets', envelope: { a: 1 }, bytes: 2 }))
+      .toThrow(expect.objectContaining({ name: 'QueueNotKept' }));
+    expect(quota.all()).toHaveLength(0);             // never reported as queued
   });
 
   it('persistence can be turned OFF, and then a reload loses the row (the OLD behaviour)', async () => {

@@ -10,10 +10,24 @@ function prefixWhere(prefix) {
   if (!Array.isArray(prefix) || prefix.length > fields.length) throw storageError('unserializable');
   return prefix.map((_, index) => `${fields[index]} = ?`).join(' AND ') || '1 = 1';
 }
-/** Fixed SQL only. Driver owns its native connection; no SQL reaches the MP API. */
-export function createSqliteDatabase({ driver }) {
+// Tables whose rows an exclusive database answers from memory once read.
+const HELD_TABLES = new Set(['owners', 'stores']);
+/**
+ * Fixed SQL only. Driver owns its native connection; no SQL reaches the MP API.
+ *
+ * `exclusive`: this page is the database's only user (a phone's WebView, where
+ * every statement is a native bridge call). Its transactions already run one
+ * after another here, so a read needs no BEGIN and COMMIT of its own; and the
+ * owner and store rows, which change only through this driver, are answered
+ * from memory once read. A read was six bridge calls, four of them these.
+ */
+export function createSqliteDatabase({ driver, exclusive = false }) {
   let tail = Promise.resolve();
   let initialized;
+  // Owner and store rows as last read or committed here, by table and key:
+  // their JSON, or null for a row known absent (exclusive only).
+  const held = new Map([...HELD_TABLES].map((table) => [table, new Map()]));
+  const forgetHeld = () => held.forEach((rows) => rows.clear());
   // A failed open is not remembered: the next transaction opens again.
   async function initialize() {
     if (!initialized) {
@@ -26,6 +40,11 @@ export function createSqliteDatabase({ driver }) {
   function setUp() {
     return (async () => {
       await driver.open?.();
+      // A native connection kept across a WebView reload can still hold the
+      // reloaded page's open transaction; the pragmas below are refused inside
+      // one ("Safety level may not be changed inside a transaction"). That
+      // page is gone, so its work is rolled back. With none open this errors.
+      await driver.run('ROLLBACK', []).catch(() => {});
       const mode = await driver.query('PRAGMA journal_mode = WAL', []);
       if (String(mode[0]?.journal_mode).toLowerCase() !== 'wal') throw storageError('unavailable');
       await driver.run('PRAGMA synchronous = FULL', []);
@@ -51,9 +70,31 @@ export function createSqliteDatabase({ driver }) {
     transaction(mode, work) {
       const result = tail.then(async () => {
         await initialize();
-        await driver.run(mode === 'readwrite' ? 'BEGIN IMMEDIATE' : 'BEGIN', []);
+        const bare = exclusive && mode !== 'readwrite';
+        if (!bare) await driver.run(mode === 'readwrite' ? 'BEGIN IMMEDIATE' : 'BEGIN', []);
+        // Held rows this transaction wrote: read from the database until it
+        // commits, then held as committed.
+        const written = new Map();
+        let clearedHeld = false;
+        const heldRows = (table) => (exclusive && HELD_TABLES.has(table) ? held.get(table) : null);
+        const wrote = (table, key, json) => {
+          if (!heldRows(table)) return;
+          if (!written.has(table)) written.set(table, new Map());
+          written.get(table).set(encoded(key), json);
+        };
         const tx = {
-          async get(table, key) { return decoded(await driver.query(`SELECT payload FROM ${tableName(table)} WHERE key = ?`, [encoded(key)]))[0]; },
+          async get(table, key) {
+            const rows = heldRows(table);
+            const id = encoded(key);
+            const own = written.get(table)?.has(id) || clearedHeld;
+            if (rows && !own && rows.has(id)) {
+              const json = rows.get(id);
+              return json === null ? undefined : JSON.parse(json);
+            }
+            const found = await driver.query(`SELECT payload FROM ${tableName(table)} WHERE key = ?`, [id]);
+            if (rows && !own) rows.set(id, found.length ? found[0].payload : null);
+            return decoded(found)[0];
+          },
           // One query per 100 keys, not one per key: on Capacitor every query is a
           // native bridge round trip (~15 ms), and a keyed read of 250 rows was
           // ~500 of them — 1.5 s per full-store read on an Android phone.
@@ -69,9 +110,14 @@ export function createSqliteDatabase({ driver }) {
           },
           async put(table, row) {
             const parts = Array.isArray(row.key) ? row.key : [row.key];
-            await driver.run(`INSERT INTO ${tableName(table)} (key, owner, namespace, generation, kind, row_order, principal, policy, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET owner=excluded.owner, namespace=excluded.namespace, generation=excluded.generation, kind=excluded.kind, row_order=excluded.row_order, principal=excluded.principal, policy=excluded.policy, payload=excluded.payload`, [encoded(row.key), parts[0], parts[1] ?? null, parts[2] ?? null, parts[3] ?? null, ordering(parts.at(-1)), row.principal ?? null, row.policy ?? null, JSON.stringify(row)]);
+            const json = JSON.stringify(row);
+            await driver.run(`INSERT INTO ${tableName(table)} (key, owner, namespace, generation, kind, row_order, principal, policy, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET owner=excluded.owner, namespace=excluded.namespace, generation=excluded.generation, kind=excluded.kind, row_order=excluded.row_order, principal=excluded.principal, policy=excluded.policy, payload=excluded.payload`, [encoded(row.key), parts[0], parts[1] ?? null, parts[2] ?? null, parts[3] ?? null, ordering(parts.at(-1)), row.principal ?? null, row.policy ?? null, json]);
+            wrote(table, row.key, json);
           },
-          delete: (table, key) => driver.run(`DELETE FROM ${tableName(table)} WHERE key = ?`, [encoded(key)]),
+          async delete(table, key) {
+            await driver.run(`DELETE FROM ${tableName(table)} WHERE key = ?`, [encoded(key)]);
+            wrote(table, key, null);
+          },
           async byIndex(table, index, value, limit = 101) {
             if (!['principal', 'policy'].includes(index) || !Number.isInteger(limit) || limit < 1 || limit > 1001) throw storageError('unserializable');
             return decoded(await driver.query(`SELECT payload FROM ${tableName(table)} WHERE ${index} = ? ORDER BY key LIMIT ?`, [value, limit]));
@@ -91,15 +137,29 @@ export function createSqliteDatabase({ driver }) {
             const where = prefixWhere(prefix);
             return decoded(await driver.query(`SELECT payload FROM ${tableName(table)} WHERE ${where}${after === null ? '' : ' AND row_order > ?'} ORDER BY row_order LIMIT ?`, [...prefix, ...(after === null ? [] : [ordering(after)]), limit]));
           },
-          deletePrefix: (table, prefix) => driver.run(`DELETE FROM ${tableName(table)} WHERE ${prefixWhere(prefix)}`, prefix),
+          async deletePrefix(table, prefix) {
+            await driver.run(`DELETE FROM ${tableName(table)} WHERE ${prefixWhere(prefix)}`, prefix);
+            if (heldRows(table)) clearedHeld = true;
+          },
         };
-        try { const value = await work(tx); await driver.run('COMMIT', []); return value; } catch (error) { await driver.run('ROLLBACK', []).catch(() => {}); throw error; }
+        try {
+          const value = await work(tx);
+          if (!bare) await driver.run('COMMIT', []);
+          if (clearedHeld) forgetHeld();
+          else written.forEach((rows, table) => rows.forEach((json, id) => held.get(table).set(id, json)));
+          return value;
+        } catch (error) {
+          // What it wrote is undone; what is held may have been read inside it.
+          if (written.size || clearedHeld) forgetHeld();
+          if (!bare) await driver.run('ROLLBACK', []).catch(() => {});
+          throw error;
+        }
       });
       tail = result.catch(() => {});
       return result;
     },
     close() {
-      const closing = tail.then(async () => { initialized = undefined; await driver.close?.(); });
+      const closing = tail.then(async () => { initialized = undefined; forgetHeld(); await driver.close?.(); });
       tail = closing.catch(() => {});
       return closing;
     },
