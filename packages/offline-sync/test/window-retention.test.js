@@ -3,9 +3,8 @@
  *
  * Scoped reconcile leaves out-of-scope rows alone BY DESIGN, so a window-paging
  * store accumulates every window ever viewed and the row cap is the only bound.
- * In memory that lasts a session. Persisted, it is an archive on the user's disk
- * — the 50-200MB problem that made the legacy Vuex plugin refuse to persist
- * these very collections (`core/src/store/plugins/indexeddb.js`).
+ * In memory that lasts a session. Persisted, it is an archive on the user's disk:
+ * date-ranged workforce windows alone run to 50-200MB.
  *
  * These tests pin the retention pass that makes persistence safe for them.
  */
