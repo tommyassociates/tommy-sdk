@@ -511,12 +511,14 @@ export function createDataService({
   // `readWhole`); 0 reads it every time.
   wholeReadReuseMs = 0,
   // A mark of this device's writes (any value that changes whenever a write
-  // is sent or settles), or null: with one, a `fromNow` method read joins a
-  // read of the same params begun since the last write (see refreshMethodAs).
+  // is sent or settles), or null: with one, a method read asked `fromNow`
+  // and `sinceWrite` joins a read of the same params begun since the last
+  // write (see refreshMethodAs).
   writeMark = null,
   // With a `writeMark`, how long after a method read of some params ended a
-  // `fromNow` ask of the same params is answered by it (its keys, as the rows
-  // are now), while no write was sent or settled since it began; 0 never.
+  // `fromNow` and `sinceWrite` ask of the same params is answered by it (its
+  // keys, as the rows are now), while no write was sent or settled since it
+  // began; 0 never.
   reuseSinceWriteMs = 0,
   // The durable owner pinned by the host; account forms and client subjects
   // may share collection labels but never share completeness.
@@ -1815,7 +1817,7 @@ export function createDataService({
    * principal in `context`: see `refresh`.
    */
   function refreshMethodAs(wanted, {
-    mode = 'silent', priority = 'normal', maxAge = 0, reason = null, fromNow = false,
+    mode = 'silent', priority = 'normal', maxAge = 0, reason = null, fromNow = false, sinceWrite = false,
   } = {}, context) {
     live();
     const {
@@ -2076,26 +2078,30 @@ export function createDataService({
       if (!batchParam) {
         if (fresh(group.state.syncedAt) && group.state.state === 'fresh') return Promise.resolve();
         if (!fromNow && group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return group.state.flight.attempts.answer(group.state.flight.promise);
-        // A read of these params on its way answers a `fromNow` ask as well
-        // when it is a read begun after the ask's last write: one still
-        // queued (it begins after the ask), or, with a `writeMark`, one that
-        // began since the last write this device sent or settled. One weaker
-        // than the ask (a visible ask would wait behind it), one failing (an
-        // own read answers sooner than its retry), or one from before a
-        // purge or trim is not joined. A burst of the same ask (every panel
-        // revalidating at once) is then one read.
+        // A `fromNow` ask that also asks `sinceWrite` needs a read begun
+        // after its last write, not one of its own: a read of these params on
+        // its way answers it when it is one still queued (it begins after the
+        // ask), or, with a `writeMark`, one that began since the last write
+        // this device sent or settled. One weaker than the ask (a visible ask
+        // would wait behind it), one failing (an own read answers sooner than
+        // its retry), or one from before a purge or trim is not joined. A
+        // burst of the same ask (every panel revalidating at once) is then one
+        // read.
         // Likewise the last read of these params, ended within
         // `reuseSinceWriteMs`, while no write was sent or settled since it
         // began and nothing purged or trimmed the collection: its keys answer,
         // as the rows are now (a strict receipt is always read again).
+        // A `fromNow` ask without it reads on its own: it replaces a flight
+        // still queued, whose callers are dropped as superseded.
+        const sharesSinceWrite = fromNow && sinceWrite === true;
         const last = group.state.answered;
-        if (fromNow && reuseSinceWriteMs > 0 && last && method.strictReceipt !== true && group.state.state === 'fresh'
+        if (sharesSinceWrite && reuseSinceWriteMs > 0 && last && method.strictReceipt !== true && group.state.state === 'fresh'
           && !group.state.flight && last.writeMark !== null && last.writeMark === writeMarkNow()
           && last.voidAt === voidOf(name) && at - last.at < reuseSinceWriteMs) {
           return Promise.resolve();
         }
         const flying = group.state.flight;
-        if (fromNow && flying && !flying.settled && flying.rank <= askRank && flying.voidAtAsk === voidOf(name)
+        if (sharesSinceWrite && flying && !flying.settled && flying.rank <= askRank && flying.voidAtAsk === voidOf(name)
           && !flying.attempts.failing() && at - flying.at < METHOD_SHARE_MS
           && (!flying.begun || (flying.writeMark !== null && flying.writeMark === writeMarkNow()))) {
           return flying.attempts.answer(flying.promise);
@@ -2230,7 +2236,7 @@ export function createDataService({
 
   /** A refresh of `target` as the principal in `context` (taken when it was asked). */
   function refreshAs(target, {
-    mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false, fromNow = false, nextAttempt = false,
+    mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false, fromNow = false, sinceWrite = false, nextAttempt = false,
   } = {}, context) {
     live();
     const wanted = targetOf(target);
@@ -2240,7 +2246,7 @@ export function createDataService({
     }
     if (wanted.method !== undefined) {
       return refreshMethodAs(wanted, {
-        mode, priority, maxAge, reason, fromNow,
+        mode, priority, maxAge, reason, fromNow, sinceWrite,
       }, context);
     }
     const { name, label, store, decl } = local(wanted.collection);
@@ -2627,7 +2633,11 @@ export function createDataService({
      * often than the method's `cadenceMs` (per id for a batched method),
      * whatever `maxAge` asks; a whole read fresh within that, or one in
      * flight as this principal, answers it. Silent mode resolves the
-     * method's own status.
+     * method's own status. A method asked `fromNow` reads on its own (a newer
+     * such ask replaces one still queued, whose callers are dropped);
+     * `sinceWrite: true` with it asks only for a read begun after this
+     * device's last write, so one of the same params still queued, or begun
+     * since that write, or ended within `reuseSinceWriteMs`, answers it.
      */
     refresh(target, options = {}) {
       // Where a visible read was asked, for a timeout that reaches its caller.

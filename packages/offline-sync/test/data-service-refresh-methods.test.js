@@ -985,18 +985,21 @@ describe('refresh methods', () => {
 
     // A scheduler that holds every job until it is let go: the queue a burst
     // of asks waits in.
-    function heldService({ writeMark } = {}) {
+    function heldService({ writeMark, reuseSinceWriteMs } = {}) {
       const held = [];
       const scheduler = { request: (job) => new Promise((resolve, reject) => { held.push(() => Promise.resolve(job.run(() => true)).then(resolve, reject)); }) };
       const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
       const data = createDataService({
-        resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: () => 1_000_000, principal: { id: 'p1' }, scheduler, writeMark,
+        resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: () => 1_000_000, principal: { id: 'p1' }, scheduler, writeMark, reuseSinceWriteMs,
       });
-      const ask = (options = {}) => data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible', priority: 'high', fromNow: true, ...options });
+      // A panel's ask: a read begun since this device's last write answers it.
+      const ask = (options = {}) => data.refresh(range('2026-10-05', '2026-10-11'), {
+        mode: 'visible', priority: 'high', fromNow: true, sinceWrite: true, ...options,
+      });
       return { data, held, ask };
     }
 
-    it('fromNow joins a read of the same params still queued, unless the read is weaker than the ask', async () => {
+    it('fromNow with sinceWrite joins a read of the same params still queued, unless the read is weaker than the ask', async () => {
       const { data, held, ask } = heldService();
       const byRange = vi.fn(async () => ({ rows: [] }));
       declare(data, byRange, { cadenceMs: 0 });
@@ -1014,7 +1017,7 @@ describe('refresh methods', () => {
       weak.catch(() => {});
     });
 
-    it('fromNow joins a read already begun only while no write was sent or settled since it began', async () => {
+    it('fromNow with sinceWrite joins a read already begun only while no write was sent or settled since it began', async () => {
       let mark = 0;
       const { data, held, ask } = heldService({ writeMark: () => mark });
       let release;
@@ -1039,7 +1042,7 @@ describe('refresh methods', () => {
       expect(byRange).toHaveBeenCalledTimes(2);
     });
 
-    it('fromNow is answered by the last read of the same params within reuseSinceWriteMs, until a write', async () => {
+    it('fromNow with sinceWrite is answered by the last read of the same params within reuseSinceWriteMs, until a write', async () => {
       let mark = 0;
       let at = 1_000_000;
       const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
@@ -1049,7 +1052,7 @@ describe('refresh methods', () => {
       });
       const byRange = vi.fn(async () => ({ rows: [shift(1, '2026-10-05')] }));
       declare(data, byRange, { cadenceMs: 0 });
-      const ask = () => data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible', fromNow: true });
+      const ask = () => data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible', fromNow: true, sinceWrite: true });
       await ask();
       at += 3000;
       // No write since it began, ended 3 s ago: answered by it, with its keys.
@@ -1076,15 +1079,15 @@ describe('refresh methods', () => {
         return { data, byRange };
       };
       const twice = async ({ data, byRange }) => {
-        await data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible', fromNow: true });
-        await data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible', fromNow: true });
+        await data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible', fromNow: true, sinceWrite: true });
+        await data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible', fromNow: true, sinceWrite: true });
         return byRange.mock.calls.length;
       };
       expect(await twice(make({ reuseSinceWriteMs: 5000 }))).toBe(2);
       expect(await twice(make({ writeMark: () => 0 }))).toBe(2);
     });
 
-    it('fromNow never joins a read already begun without a write mark', async () => {
+    it('fromNow with sinceWrite never joins a read already begun without a write mark', async () => {
       const { data, held, ask } = heldService();
       let release;
       const gate = new Promise((resolve) => { release = resolve; });
@@ -1100,6 +1103,46 @@ describe('refresh methods', () => {
       await held[1]();
       await Promise.all([first.catch(() => {}), after]);
       expect(byRange).toHaveBeenCalledTimes(2);
+    });
+
+    it('fromNow without sinceWrite reads on its own: a newer ask replaces one still queued, whose caller is dropped', async () => {
+      // A write mark and a reuse window as the host gives them: neither lets
+      // a forced read share.
+      const { data, held, ask } = heldService({ writeMark: () => 0, reuseSinceWriteMs: 5000 });
+      const byRange = vi.fn(async () => ({ rows: [] }));
+      declare(data, byRange, { cadenceMs: 0 });
+      const older = ask({ sinceWrite: false }).catch((error) => error);
+      const newer = ask({ sinceWrite: false });
+      expect(held).toHaveLength(2);
+      await held[0]().catch(() => {});
+      await held[1]();
+      expect(await older).toMatchObject({ code: 'REFRESH_DROPPED', retryable: false });
+      expect(await newer).toMatchObject({ state: 'fresh' });
+      expect(byRange).toHaveBeenCalledTimes(1);
+      // Ended a moment ago with no write since: a forced ask still reads again.
+      const again = ask({ sinceWrite: false });
+      expect(held).toHaveLength(3);
+      await held[2]();
+      expect(await again).toMatchObject({ state: 'fresh' });
+      expect(byRange).toHaveBeenCalledTimes(2);
+      // A panel's ask is answered by that read.
+      expect(await ask()).toMatchObject({ state: 'fresh' });
+      expect(held).toHaveLength(3);
+    });
+
+    it('a forced fromNow ask replaces a queued sinceWrite read and the panels that joined it', async () => {
+      const { data, held, ask } = heldService({ writeMark: () => 0 });
+      const byRange = vi.fn(async () => ({ rows: [] }));
+      declare(data, byRange, { cadenceMs: 0 });
+      const panels = [ask(), ask()].map((asked) => asked.catch((error) => error));
+      expect(held).toHaveLength(1);
+      const forced = ask({ sinceWrite: false });
+      expect(held).toHaveLength(2);
+      await held[0]().catch(() => {});
+      await held[1]();
+      expect((await Promise.all(panels)).map((answer) => answer.code)).toEqual(['REFRESH_DROPPED', 'REFRESH_DROPPED']);
+      expect(await forced).toMatchObject({ state: 'fresh' });
+      expect(byRange).toHaveBeenCalledTimes(1);
     });
 
     it('fromNow on a batched method fetches ids fresh within the cadence again', async () => {

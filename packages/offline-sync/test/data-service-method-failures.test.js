@@ -179,8 +179,7 @@ describe('non-batched method failure authority', () => {
     const { data, store } = setup({ scheduler });
     const fetch = vi.fn().mockResolvedValue(answer('new scheduled body'));
     data.source('plans', source(fetch));
-    // Weaker than the read after it, which therefore never joins it while it waits.
-    const first = data.refresh(target('1'), { mode: 'visible', priority: 'background', fromNow: true }).catch((error) => error);
+    const first = forced(data).catch((error) => error);
     expect(jobs[0].valid()).toBe(true);
     await forced(data);
     const before = await proof(data, store);
@@ -205,8 +204,7 @@ describe('non-batched method failure authority', () => {
     const { data, store } = setup({ scheduler });
     const fetch = vi.fn().mockResolvedValue(answer('new scheduled body'));
     data.source('plans', source(fetch));
-    // Weaker than the read after it, which therefore never joins it while it waits.
-    const first = data.refresh(target('1'), { mode: 'visible', priority: 'background', fromNow: true }).catch((error) => error);
+    const first = forced(data).catch((error) => error);
     await forced(data);
     const before = await proof(data, store);
     const late = await jobs[0].run(() => true).catch((error) => error);
