@@ -170,6 +170,23 @@ describe('D.43 — the offline queue survives a reload', () => {
     expect(quota.all()).toHaveLength(0);             // never reported as queued
   });
 
+  it('two queues over the same storage (two warm worlds) never drop or bring back each other\'s rows', () => {
+    const a = createDurableQueue({ storage });
+    const b = createDurableQueue({ storage });
+    const seqA = a.push({ sourceMpId: 'timesheets', envelope: { args: { week: 'a' } }, bytes: 2 });
+    const seqB = b.push({ sourceMpId: 'timesheets', envelope: { args: { week: 'b' } }, bytes: 2 });
+    expect(seqB).not.toBe(seqA);
+    const weeks = () => JSON.parse(storage.getItem('mp-offline-queue')).rows.map((row) => row.envelope.args.week);
+    expect(weeks()).toEqual(['a', 'b']);
+    expect(a.all().map((row) => row.envelope.args.week)).toEqual(['a', 'b']);
+
+    a.remove(seqA);
+    b.push({ sourceMpId: 'timesheets', envelope: { args: { week: 'c' } }, bytes: 2 });
+    expect(weeks()).toEqual(['b', 'c']);             // a's sent row is not brought back by b
+    storage.removeItem('mp-offline-queue');          // sign-out removes the queue
+    expect(a.all()).toEqual([]);
+  });
+
   it('persistence can be turned OFF, and then a reload loses the row (the OLD behaviour)', async () => {
     const first = await makeBroker({ queue: null });
     await first.call('w1', 'k-1');

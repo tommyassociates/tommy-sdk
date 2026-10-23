@@ -113,6 +113,7 @@ export const DOMAIN_SCOPE_BY_MP = Object.freeze({
   invoicing: 'invoices',
   team: 'team_members',
   'team-comms': 'messages',
+  payroll: 'pay_templates',
 });
 
 /** `mpId` → the catalogue domain read-scope that covers it. */
