@@ -18,8 +18,10 @@ export class TommyError extends Error {
    * @param {boolean} [opts.retryable]
    * @param {string} [opts.runId]
    * @param {unknown} [opts.cause]
+   * @param {number} [opts.retryAfterMs] on a `RateLimited` refusal: how long
+   *   until the broker has a token for the caller. Set only when known.
    */
-  constructor({ code, message, rule, retryable, runId, cause }) {
+  constructor({ code, message, rule, retryable, runId, cause, retryAfterMs }) {
     super(message);
     this.name = 'TommyError';
     this.code = code;
@@ -27,6 +29,7 @@ export class TommyError extends Error {
     this.retryable = retryable !== undefined ? retryable : RETRYABLE_CODES.has(code);
     this.runId = runId;
     this.cause = cause;
+    if (Number.isFinite(retryAfterMs) && retryAfterMs >= 0) this.retryAfterMs = retryAfterMs;
   }
 }
 
