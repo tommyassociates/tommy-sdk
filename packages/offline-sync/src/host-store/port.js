@@ -2,7 +2,7 @@ import {
   HOST_STORE_VERSION, MAX_ROWS, MAX_READ_BYTES, bytes, closed, integer,
   validateOpen, validateRead, validateCommit, storageError, failureReason, fail, readFailure,
   retirementMatcher, validateQuery, validateMigration, validateInspect, validatePurge,
-  indexedValues, indexValues, indexEntry, lruEntry, namespaceLabel, labelDomain, ownerKey, HOST_STORE_FEATURES,
+  indexedValues, indexValues, indexEntry, lruEntry, namespaceLabel, labelDomain, ownerKey, HOST_STORE_FEATURES, FRAGMENT_LABEL,
 } from './protocol.js';
 
 const handleRegistry = new Set();
@@ -747,6 +747,21 @@ export function createHostStoreChangeFeed({
 }
 
 /** Wraps a port (local or bridged) so its successful mutations reach the feed. */
+/**
+ * What a removal of a viewer's rows took, as the change feed announces it.
+ * The whole viewer (sign-out): every collection of every account of theirs
+ * hears its rows went. One session's chat fragments (`cacheSession`): only
+ * those, so no whole read of another collection in flight is taken to have
+ * lost rows. One client subject's namespace (`subjectKey`) is announced as
+ * the whole viewer: that subject's MP worlds must hear it, and the feed
+ * cannot name a subject.
+ */
+export function retirementEvent(selector) {
+  const principal = JSON.stringify([selector.authorityOrigin, selector.viewerId]);
+  if (Object.hasOwn(selector, 'cacheSession')) return { type: 'purge', principal, label: FRAGMENT_LABEL };
+  return { type: 'purge', principal };
+}
+
 export function observeHostStorePort(port, feed) {
   const opened = new Map();
   const principalOf = (selector) => JSON.stringify([selector.authorityOrigin, selector.viewerId]);
@@ -808,7 +823,7 @@ export function observeHostStorePort(port, feed) {
   if (typeof port.retirePrincipal === 'function') {
     wrapped.retirePrincipal = async (selector) => {
       const result = await port.retirePrincipal(selector);
-      feed.publish({ type: 'purge', principal: principalOf(selector) });
+      feed.publish(retirementEvent(selector));
       return result;
     };
   }

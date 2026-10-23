@@ -23,7 +23,7 @@ import { TommyError, isTommyError, DEFAULT_RPC_TIMEOUT_MS } from '@tommy/sdk';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import {
-  DEFAULT_THROTTLE_PROFILE, QUEUE_MAX_ENTRIES, QUEUE_MAX_BYTES, SYNC_EMIT_TIMEOUT_MS, DEFAULT_RETRY,
+  DEFAULT_THROTTLE_PROFILE, QUERY_RATE_WAIT_MAX_MS, QUEUE_MAX_ENTRIES, QUEUE_MAX_BYTES, SYNC_EMIT_TIMEOUT_MS, DEFAULT_RETRY,
   retryDelayMs,
   SENSITIVE_CONDITIONS, domainScopeForMp,
 } from './constants.js';
@@ -310,7 +310,15 @@ export function createBroker({
     return { ...DEFAULT_THROTTLE_PROFILE, ...(throttleOverrides[mpId] || {}) };
   }
 
-  function takeToken(mpId, kind) {
+  /**
+   * Take one of `mpId`'s `kind` tokens, waiting up to `maxWaitMs` for it.
+   * Returns how long the caller must wait before it runs (0 with a token in
+   * hand). A token that is not there yet is reserved by letting the bucket go
+   * below zero, so the next caller waits behind this one rather than taking
+   * the same token. Past `maxWaitMs` nothing is reserved and the call is
+   * refused with `retryAfterMs`: how long until a token is free for it.
+   */
+  function reserveToken(mpId, kind, maxWaitMs = 0) {
     const profile = throttleProfileFor(mpId);
     const perMin = { emit: profile.emitsPerMin, query: profile.queriesPerMin, invoke: profile.invokesPerMin }[kind];
     const key = `${mpId}:${kind}`;
@@ -318,12 +326,33 @@ export function createBroker({
     const elapsed = (now() - bucket.updatedAt) / 60000;
     bucket.tokens = Math.min(profile.burst, bucket.tokens + elapsed * perMin);
     bucket.updatedAt = now();
-    if (bucket.tokens < 1) {
+    if (bucket.tokens >= 1) {
+      bucket.tokens -= 1;
       buckets.set(key, bucket);
-      throw err('RateLimited', `mp '${mpId}' exceeded ${kind} rate (${perMin}/min, burst ${profile.burst})`, { retryable: true });
+      return 0;
+    }
+    const waitMs = perMin > 0 ? Math.ceil(((1 - bucket.tokens) * 60000) / perMin) : Infinity;
+    buckets.set(key, bucket);
+    if (waitMs > maxWaitMs) {
+      throw err('RateLimited', `mp '${mpId}' exceeded ${kind} rate (${perMin}/min, burst ${profile.burst})`, {
+        retryable: true,
+        ...(Number.isFinite(waitMs) ? { retryAfterMs: waitMs } : {}),
+      });
     }
     bucket.tokens -= 1;
-    buckets.set(key, bucket);
+    return waitMs;
+  }
+
+  function takeToken(mpId, kind) {
+    reserveToken(mpId, kind, 0);
+  }
+
+  /** A query's token: waits for the next one up to QUERY_RATE_WAIT_MAX_MS. */
+  async function awaitQueryToken(mpId) {
+    const waitMs = reserveToken(mpId, 'query', QUERY_RATE_WAIT_MAX_MS);
+    if (waitMs <= 0) return;
+    await sleep(waitMs);
+    if (retired) throw err('ActivityFailed', 'MP runtime retired', { retryable: false });
   }
 
   function checkChain(mpId, actionName, chain) {
@@ -965,7 +994,6 @@ export function createBroker({
   async function dispatchQueryInnerTracked(envelope) {
     const identity = envelope.identity || authenticate(envelope);
     const tenantId = envelope.tenantId || identity.tenantId;
-    takeToken(envelope.sourceMpId, 'query');
 
     const [ownerMpId, conditionName] = splitQualified(envelope.condition);
     const ownerEntry = await resolveMpEntry(ownerMpId);
@@ -983,6 +1011,11 @@ export function createBroker({
       // entry sat in the map until the next owner server_write, if ever.
       if (hit) conditionCache.delete(cacheKey);
     }
+
+    // The rate token is taken here, after the cache: an answer the broker
+    // already holds runs nothing, so it is not throttled. A read that runs
+    // the handler waits briefly for a token rather than failing at once.
+    await awaitQueryToken(envelope.sourceMpId);
 
     const handler = ownerEntry.handlers?.conditions?.[conditionName];
     if (!handler) throw err('ConditionError', `condition '${envelope.condition}' has no registered handler`, { retryable: false });

@@ -4,7 +4,7 @@
 // or JSON import attributes.
 export default {
   "_comment": "VENDORED FROM plans/refactor-plan/05-deliverables/02-manifest-tooling/permission-catalogue.sample.json — this copy is the runtime source of truth shipped inside @tommy/manifest (a pinned @tommy/manifest version = a pinned catalogue version). The catalogue is FIXED and versioned (Phase 3 Q2) — MPs may only request scopes that appear here; @tommy/manifest validate layer 3 rejects any non-member with the named rule 'permission-not-in-catalogue'. This is the M1 STARTER set (covers every scope the reference manifest uses); the EXHAUSTIVE production catalogue is a deliberate, reviewed Tommy authoring task before M4 (README:68, security-model.md §2) — NOT an M1 gate. Growing it: add entries here, bump catalogueVersion, review. Scope form: verb:resource (verb in read|write|invoke). sensitivity (low|medium|high) drives review attention; deviceCapabilityRequired is checked against the device by the production manifest strip.",
-  "catalogueVersion": "0.5.0-starter",
+  "catalogueVersion": "0.7.0-starter",
   "categories": [
     "team",
     "directory",
@@ -115,8 +115,29 @@ export default {
       "scope": "read:pay_templates",
       "category": "timesheets",
       "title": "Read pay templates",
-      "description": "View the team's pay templates (rates and allowances) for pickers and pay estimates. Read-only: no MP owns this domain — there is no payroll MP, so it is served as a platform read.",
+      "description": "View the team's pay templates (rates and allowances) for pickers and pay estimates. Served as a platform read to every MP that needs a pay template picker; the `payroll` MP owns the domain and holds the write scope.",
       "sensitivity": "medium"
+    },
+    {
+      "scope": "write:pay_templates",
+      "category": "timesheets",
+      "title": "Manage pay templates",
+      "description": "Create, edit, copy and delete the team's pay templates and their pay rules, install templates from an award library and move them to a newer library version. Pay templates decide what every shift and timesheet costs, so a change is felt across scheduling, timesheets and payroll exports. Held by the `payroll` MP, which owns the pay template settings.",
+      "sensitivity": "high"
+    },
+    {
+      "scope": "read:employee_facts",
+      "category": "timesheets",
+      "title": "Read employee pay facts",
+      "description": "View the facts recorded about team members for their pay (agreed hours, agreements, qualifications, trainee and apprentice details), the facts the team can record, and which ones a pay template is missing. The host serves a fact only to a viewer who may see it: sensitive facts (rates, salary, schooling) also need the viewer's wage access.",
+      "sensitivity": "high"
+    },
+    {
+      "scope": "write:employee_facts",
+      "category": "timesheets",
+      "title": "Record employee pay facts",
+      "description": "Record and change team members' pay facts by date, answer what a pay template needs for the people it reaches, and add the team's own custom facts. These facts change what shifts and timesheets cost.",
+      "sensitivity": "high"
     },
     {
       "scope": "write:timesheets",
