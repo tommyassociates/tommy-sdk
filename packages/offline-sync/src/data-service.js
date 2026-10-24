@@ -2453,18 +2453,24 @@ export function createDataService({
       });
     },
     /**
-     * Calls `listener()` whenever the collection may have changed (a write
-     * here, another tab's, an eviction or a purge), without reading it: for a
-     * caller that keeps something derived from the rows and reads again only
-     * when told.
+     * Calls `listener(notice)` whenever the collection may have changed (a
+     * write here, another tab's, an eviction or a purge), without reading it:
+     * for a caller that keeps something derived from the rows and reads again
+     * only when told. `notice` is `{ keys }` when every changed row's key is
+     * known (only those rows may differ), else null (any row may have).
      */
     watch(collection, listener) {
       live();
       const { store, label } = local(collection);
-      const fire = () => { try { listener(); } catch (_) { /* isolated */ } };
-      const offStore = typeof store.onChange === 'function' ? store.onChange(fire) : store.subscribe(fire);
+      const fire = (notice) => {
+        const keyed = Array.isArray(notice?.keys) ? { keys: notice.keys.map(String) } : null;
+        try { listener(keyed); } catch (_) { /* isolated */ }
+      };
+      const offStore = typeof store.onChange === 'function' ? store.onChange(fire) : store.subscribe(() => fire(null));
       const offFeed = feed?.subscribe((event) => {
-        if (event.label === label || event.labels?.includes(label) || (event.type === 'purge' && !event.label)) fire();
+        if (event.type === 'purge' && !event.label) fire(null);
+        else if (event.label === label) fire(event.type === 'purge' ? null : event);
+        else if (event.labels?.includes(label)) fire(null);
       });
       return held(() => { offStore?.(); offFeed?.(); });
     },

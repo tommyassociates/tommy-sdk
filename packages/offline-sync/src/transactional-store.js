@@ -53,6 +53,8 @@ const upsertBatches = (incoming) => boundedBatches([...incoming], { maxItems: MA
 // A write of several keys whose stored rows, or whose changes, would not fit
 // one keyed read or one commit: it is split before anything is sent.
 const TOO_LARGE = Symbol('too large for one commit');
+// A change notice names at most this many keys; past it, any row may have changed.
+const NOTICE_KEYS = 1000;
 const nextRevision = (value = 0) => { if (!Number.isSafeInteger(value) || value < 0 || value >= Number.MAX_SAFE_INTEGER) throw new StorageReadError('write-failed'); return value + 1; };
 // A row's next revision: above its own and above the store's, which every
 // commit moves on, so a key written again after it was removed never takes a
@@ -126,9 +128,19 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     // limits they go, and the next whole read is refused as it would be.
     if (held.rows.size > WHOLE_READ_ROWS || held.bytes > WHOLE_READ_BYTES) held = null;
   }
+  // The keys committed since change listeners were last told, or null once
+  // they cannot all be named (an eviction, or more than NOTICE_KEYS).
+  let noticeKeys = new Set();
+  function noted(changes, result) {
+    if (result?.ok === false || noticeKeys === null) return;
+    if (result?.evicted?.length) { noticeKeys = null; return; }
+    changes.forEach((change) => noticeKeys.add(change.key));
+    if (noticeKeys.size > NOTICE_KEYS) noticeKeys = null;
+  }
   async function commit(snapshot, changes, extra) {
     const result = await backend.commit(snapshot, changes, extra);
     track(snapshot, changes, result);
+    noted(changes, result);
     return result;
   }
   // A write of more than one key throws TOO_LARGE, before it commits, when
@@ -259,13 +271,17 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
   // Reads of the rows back after a change that another writer's commit
   // interrupted (a conflict) are tried again this many times in all.
   const NOTIFY_READS = 3;
-  async function notify() {
+  async function notify({ unknown = false } = {}) {
     live();
     publication += 1;
     const mine = publication;
     // Change listeners read only what they need (a key or an index range), so
     // a collection too large for a complete read still tells them it changed.
-    for (const listener of changeListeners) { try { listener(); } catch (_) { /* isolated consumer */ } }
+    // The notice names the keys written since the last one (`{ keys }`), or
+    // is null when any row may have changed.
+    const notice = unknown || noticeKeys === null ? null : { keys: [...noticeKeys] };
+    noticeKeys = new Set();
+    for (const listener of changeListeners) { try { listener(notice); } catch (_) { /* isolated consumer */ } }
     if (!queries.size && !subscribers.size) return;
     let rows;
     for (let attempt = 1; ; attempt += 1) {
@@ -619,9 +635,13 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       return { rows: page, nextCursor: more ? keyString(page.at(-1)[keyPath]) : null, complete: !more };
     },
     // Another tab or handle changed this store: subscribers read it again.
-    revalidateSubscribers() { return notify(); },
+    revalidateSubscribers() { return notify({ unknown: true }); },
     subscribe(handler) { live(); subscribers.add(handler); return () => subscribers.delete(handler); },
-    /** Called after every change, with nothing read: the listener reads what it needs. */
+    /**
+     * Called after every change, with nothing read: the listener reads what
+     * it needs. It is given `{ keys }`, the keys written since the last call,
+     * or null when any row may have changed.
+     */
     onChange(listener) { live(); changeListeners.add(listener); return () => changeListeners.delete(listener); },
     subscribeQuery(selector, handler, { onError } = {}) {
       live();

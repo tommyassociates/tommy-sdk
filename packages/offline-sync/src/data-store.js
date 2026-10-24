@@ -877,8 +877,9 @@ export function createDataStore({
   async function notify(changed) {
     const changedKeys = new Set([...((changed && typeof changed !== 'string' && typeof changed[Symbol.iterator] === 'function')
       ? changed : [changed])].map(String));
+    const notice = changed == null ? null : { keys: [...changedKeys] };
     for (const listener of changeListeners) {
-      try { listener(); } catch (_) { /* listener errors are theirs */ }
+      try { listener(notice); } catch (_) { /* listener errors are theirs */ }
     }
     // Subscribers see what a read would: rows that paint (never an unsent
     // delete's tombstone, never a row past the paint ceiling).
@@ -1489,7 +1490,10 @@ export function createDataStore({
       wholeStoreSubscribers.add(handler);
       return () => wholeStoreSubscribers.delete(handler);
     },
-    /** Called after every change, before subscribers read the store. */
+    /**
+     * Called after every change, before subscribers read the store, with
+     * `{ keys }` (the keys changed) or null when any row may have changed.
+     */
     onChange(listener) {
       changeListeners.add(listener);
       return () => changeListeners.delete(listener);
