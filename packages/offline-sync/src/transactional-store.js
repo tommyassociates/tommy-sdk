@@ -31,6 +31,11 @@ export const copyStorageRow = (row) => {
   return JSON.parse(JSON.stringify(row));
 };
 const copy = copyStorageRow;
+// Whole reads (`getAll`, `getAllRaw`) answer rows copied for that caller alone;
+// a caller that hands them on unshared need not copy them again.
+const ownCopies = new WeakSet();
+export const isOwnCopy = (rows) => ownCopies.has(rows);
+const owned = (rows) => { ownCopies.add(rows); return rows; };
 export function assertCompleteSet(rows, { maxRows = 1000, maxBytes = 8 * 1024 * 1024 } = {}) {
   if (!Array.isArray(rows) || rows.length > maxRows) throw new StorageReadError('scan-required');
   let bytes = 2;
@@ -336,8 +341,8 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     },
     async get(key) { live(); const row = await backend.get(keyString(key)); live(); return paintable(row) ? copy(row) : undefined; },
     async getRaw(key) { live(); const row = await backend.get(keyString(key), { aged: true }); live(); return copy(row); },
-    async getAll() { live(); const rows = await wholeRows(); live(); return freshRows.has(rows) ? rows.filter(paintable) : rows.filter(paintable).map(copy); },
-    async getAllRaw() { live(); const rows = await wholeRows({ aged: true }); live(); return freshRows.has(rows) ? rows : rows.map(copy); },
+    async getAll() { live(); const rows = await wholeRows(); live(); return owned(freshRows.has(rows) ? rows.filter(paintable) : rows.filter(paintable).map(copy)); },
+    async getAllRaw() { live(); const rows = await wholeRows({ aged: true }); live(); return owned(freshRows.has(rows) ? rows : rows.map(copy)); },
     async readWhere(predicate = () => true) { return (await api.getAll()).filter(predicate).map(strip); },
     /** What `readWhere(predicate)` would answer, from rows a subscriber was just given. */
     selectFrom(rows, predicate = () => true) { return (rows || []).filter(paintable).filter(predicate).map(strip); },

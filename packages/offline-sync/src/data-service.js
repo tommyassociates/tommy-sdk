@@ -53,7 +53,7 @@
 import {
   reconcileFetched, windowKeyOf, previousByKey, reportRejected,
 } from './reconcile.js';
-import { copyStorageRow } from './transactional-store.js'; // eslint-disable-line import/extensions
+import { copyStorageRow, isOwnCopy } from './transactional-store.js'; // eslint-disable-line import/extensions
 import { boundedBatches } from './bytes.js';
 import { storeMutationOrigin, withStoreMutationOrigin } from './store-mutation-origin.js';
 import createTargetStateBudget from './target-state-budget.js'; // eslint-disable-line import/extensions
@@ -303,6 +303,7 @@ const same = (a, b) => {
 const clean = (row) => (row && typeof row === 'object'
   ? JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(row).filter(([field]) => !field.startsWith('_'))))) : row ?? null);
 const copyRow = (row) => (row && typeof row === 'object' ? JSON.parse(JSON.stringify(row)) : row ?? null);
+const asIs = (row) => row ?? null;
 /**
  * A query: by a declared index (paged by the index cursor; a row filter is
  * refused, since a page could not honour both it and the limit), or over the
@@ -2348,21 +2349,26 @@ export function createDataService({
   // several native SQLite calls in one queue, and at boot that queue held a
   // screen's reads for a minute. Kept briefly, so the store's time-based
   // limits (the paint ceiling, the age limit) still apply.
+  // Answers `{ rows, own }`: `own` when the rows were copied for this caller
+  // alone (a direct read from a store that copies), never for kept rows.
   const wholeReads = new Map();
   async function readWhole(name, store, raw) {
     const id = `${raw ? 'raw' : 'paint'}:${name}`;
     const direct = () => (raw ? store.getAllRaw() : store.getAll());
-    if (!(wholeReadReuseMs > 0) || !feed || !watchChanges(name, store)) return direct();
+    if (!(wholeReadReuseMs > 0) || !feed || !watchChanges(name, store)) {
+      const rows = await direct();
+      return { rows, own: isOwnCopy(rows) };
+    }
     const generation = generationOf(name);
     const kept = wholeReads.get(id);
-    if (kept && kept.generation === generation && now() - kept.at < wholeReadReuseMs) return kept.rows;
+    if (kept && kept.generation === generation && now() - kept.at < wholeReadReuseMs) return { rows: kept.rows, own: false };
     const entry = { generation, at: now(), rows: direct() };
     wholeReads.set(id, entry);
     try { entry.rows = await entry.rows; } catch (error) {
       if (wholeReads.get(id) === entry) wholeReads.delete(id);
       throw error;
     }
-    return entry.rows;
+    return { rows: entry.rows, own: false };
   }
 
   const service = {
@@ -2378,7 +2384,10 @@ export function createDataService({
       const one = async (item) => (raw ? copyRow(await store.getRaw(String(item))) : project(await store.get(String(item))));
       if (Array.isArray(key)) return Promise.all(key.map(one));
       if (key !== undefined && key !== null) return one(key);
-      return (await readWhole(name, store, raw)).map(raw ? copyRow : project);
+      const { rows, own } = await readWhole(name, store, raw);
+      // Rows copied for this caller alone: only their metadata is dropped.
+      if (own) return rows.map(raw || storageMetadata ? asIs : bare);
+      return rows.map(raw ? copyRow : project);
     },
     // `raw: true` answers as writers see the collection (rows past the paint
     // ceiling and the age limit included), for a caller deciding what to remove.
