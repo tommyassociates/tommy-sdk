@@ -510,6 +510,16 @@ export function createDataService({
   // How long an unchanged collection's whole read is answered again (see
   // `readWhole`); 0 reads it every time.
   wholeReadReuseMs = 0,
+  // A mark of this device's writes (any value that changes whenever a write
+  // is sent or settles), or null: with one, a method read asked `fromNow`
+  // and `sinceWrite` joins a read of the same params begun since the last
+  // write (see refreshMethodAs).
+  writeMark = null,
+  // With a `writeMark`, how long after a method read of some params ended a
+  // `fromNow` and `sinceWrite` ask of the same params is answered by it (its
+  // keys, as the rows are now), while no write was sent or settled since it
+  // began; 0 never.
+  reuseSinceWriteMs = 0,
   // The durable owner pinned by the host; account forms and client subjects
   // may share collection labels but never share completeness.
   changeOwner = null,
@@ -545,6 +555,11 @@ export function createDataService({
   // that the request is background work (never reported by the request layer).
   const principalNow = typeof principal === 'function' ? principal : () => principal;
   const jobContextNow = () => Object.freeze({ principal: principalNow(), background: true });
+  // This device's write mark now, or null (none, or one that could not be read).
+  const writeMarkNow = () => {
+    if (typeof writeMark !== 'function') return null;
+    try { const mark = writeMark(); return mark === undefined ? null : mark; } catch (_) { return null; }
+  };
   // Which principal a context names, to tell two forms of one account apart.
   const formOf = (context) => { try { return JSON.stringify(context.principal ?? null); } catch (_) { return null; } };
   const laned = (label) => (lane === null ? label : `${lane}|${label}`);
@@ -1802,7 +1817,7 @@ export function createDataService({
    * principal in `context`: see `refresh`.
    */
   function refreshMethodAs(wanted, {
-    mode = 'silent', priority = 'normal', maxAge = 0, reason = null, fromNow = false,
+    mode = 'silent', priority = 'normal', maxAge = 0, reason = null, fromNow = false, sinceWrite = false,
   } = {}, context) {
     live();
     const {
@@ -2042,14 +2057,18 @@ export function createDataService({
       // circuit) is reported in the method's status too. Its callers are
       // answered by its first failed attempt (`attempts`); the flight itself
       // rides the scheduler's retries.
+      // Where this ask's job stands in the scheduler (lower goes first): its
+      // priority, and visible work ahead of the rest.
+      const standing = inForeground(name)
+        ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
+        : { priority: PRIORITIES.background, visible: false };
+      const askRank = standing.priority - (standing.visible ? PRIORITIES.background + 1 : 0);
       const job = (key, work, attempts, isCurrent = null) => Promise.resolve(scheduler.request({
         key: lanedKey('data', `${label}:${wanted.method}:${key}`),
         target: laned(label),
         budgetKey: spec.budgetKey || budgetKey,
         reason,
-        ...(inForeground(name)
-          ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
-          : { priority: PRIORITIES.background, visible: false }),
+        ...standing,
         // A read other runs wait on from inside their own starts past the visible cap.
         ...(spec.gate === true ? { gate: true } : {}),
         // Never run, or run again, once this service retired or its reads paused.
@@ -2059,16 +2078,55 @@ export function createDataService({
       if (!batchParam) {
         if (fresh(group.state.syncedAt) && group.state.state === 'fresh') return Promise.resolve();
         if (!fromNow && group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return group.state.flight.attempts.answer(group.state.flight.promise);
+        // A `fromNow` ask that also asks `sinceWrite` needs a read begun
+        // after its last write, not one of its own: a read of these params on
+        // its way answers it when it is one still queued (it begins after the
+        // ask), or, with a `writeMark`, one that began since the last write
+        // this device sent or settled. One weaker than the ask (a visible ask
+        // would wait behind it), one failing (an own read answers sooner than
+        // its retry), or one from before a purge or trim is not joined. A
+        // burst of the same ask (every panel revalidating at once) is then one
+        // read.
+        // Likewise the last read of these params, ended within
+        // `reuseSinceWriteMs`, while no write was sent or settled since it
+        // began and nothing purged or trimmed the collection: its keys answer,
+        // as the rows are now (a strict receipt is always read again).
+        // A `fromNow` ask without it reads on its own: it replaces a flight
+        // still queued, whose callers are dropped as superseded.
+        const sharesSinceWrite = fromNow && sinceWrite === true;
+        const last = group.state.answered;
+        if (sharesSinceWrite && reuseSinceWriteMs > 0 && last && method.strictReceipt !== true && group.state.state === 'fresh'
+          && !group.state.flight && last.writeMark !== null && last.writeMark === writeMarkNow()
+          && last.voidAt === voidOf(name) && at - last.at < reuseSinceWriteMs) {
+          return Promise.resolve();
+        }
+        const flying = group.state.flight;
+        if (sharesSinceWrite && flying && !flying.settled && flying.rank <= askRank && flying.voidAtAsk === voidOf(name)
+          && !flying.attempts.failing() && at - flying.at < METHOD_SHARE_MS
+          && (!flying.begun || (flying.writeMark !== null && flying.writeMark === writeMarkNow()))) {
+          return flying.attempts.answer(flying.promise);
+        }
         methodBatches += 1;
         // Only the newest flight for these params stores and answers: one a
         // later flight replaced (past the share window) is dropped. One whose
         // callers were answered at its deadline still stores what its retry
         // reads, unless a newer flight began (`flightSeq`, numbered across
         // the service, so a group cleared and made again never matches it).
-        const flight = {
-          at, seq: methodBatches, promise: null, attempts: readAttempts(), settled: false, deadlineRetry: false,
-        };
         const voidAtAsk = voidOf(name);
+        const flight = {
+          at,
+          seq: methodBatches,
+          promise: null,
+          attempts: readAttempts(),
+          settled: false,
+          deadlineRetry: false,
+          // Whether its run began, where it stands in the scheduler, the
+          // purge or trim it was asked after, and the writes it reads after.
+          begun: false,
+          rank: askRank,
+          voidAtAsk,
+          writeMark: null,
+        };
         group.state.flightSeq = flight.seq;
         group.state.flight = flight;
         // The joinable flight ends at its caller's deadline. Only a retryable
@@ -2090,7 +2148,22 @@ export function createDataService({
         group.state.error = null;
         let scheduled;
         try {
-          scheduled = job(String(flight.seq), (isCurrent) => run(params, null, () => isCurrent() && current(), afterDeadline), flight.attempts, current);
+          scheduled = job(String(flight.seq), (isCurrent) => {
+            // The writes it reads after: taken once, as it first begins (a
+            // retry reads after the same ones).
+            if (!flight.begun) flight.writeMark = writeMarkNow();
+            flight.begun = true;
+            return run(params, null, () => isCurrent() && current(), afterDeadline).then((value) => {
+              // What a later ask may be answered by (see `reuseSinceWriteMs`):
+              // the newest read of these params, stored fresh.
+              if (group.state.flight === flight && group.state.state === 'fresh') {
+                group.state.answered = {
+                  writeMark: flight.writeMark, at: now(), voidAt: voidAtAsk,
+                };
+              }
+              return value;
+            });
+          }, flight.attempts, current);
         } catch (error) {
           flight.attempts.settled();
           scheduled = Promise.reject(failed(error, current));
@@ -2163,7 +2236,7 @@ export function createDataService({
 
   /** A refresh of `target` as the principal in `context` (taken when it was asked). */
   function refreshAs(target, {
-    mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false, fromNow = false, nextAttempt = false,
+    mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false, fromNow = false, sinceWrite = false, nextAttempt = false,
   } = {}, context) {
     live();
     const wanted = targetOf(target);
@@ -2173,7 +2246,7 @@ export function createDataService({
     }
     if (wanted.method !== undefined) {
       return refreshMethodAs(wanted, {
-        mode, priority, maxAge, reason, fromNow,
+        mode, priority, maxAge, reason, fromNow, sinceWrite,
       }, context);
     }
     const { name, label, store, decl } = local(wanted.collection);
@@ -2560,7 +2633,11 @@ export function createDataService({
      * often than the method's `cadenceMs` (per id for a batched method),
      * whatever `maxAge` asks; a whole read fresh within that, or one in
      * flight as this principal, answers it. Silent mode resolves the
-     * method's own status.
+     * method's own status. A method asked `fromNow` reads on its own (a newer
+     * such ask replaces one still queued, whose callers are dropped);
+     * `sinceWrite: true` with it asks only for a read begun after this
+     * device's last write, so one of the same params still queued, or begun
+     * since that write, or ended within `reuseSinceWriteMs`, answers it.
      */
     refresh(target, options = {}) {
       // Where a visible read was asked, for a timeout that reaches its caller.
