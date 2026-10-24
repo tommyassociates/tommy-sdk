@@ -128,12 +128,17 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     // limits they go, and the next whole read is refused as it would be.
     if (held.rows.size > WHOLE_READ_ROWS || held.bytes > WHOLE_READ_BYTES) held = null;
   }
-  // The keys committed since change listeners were last told, or null once
-  // they cannot all be named (an eviction, or more than NOTICE_KEYS).
+  // The keys committed since change listeners were last told, with the rows
+  // a commit's eviction removed (`{ label, key }` from the host store, or the
+  // key itself), or null once they cannot all be named (an evicted row
+  // without a key, or more than NOTICE_KEYS). A key evicted from a sibling
+  // store of the same domain is named too: re-reading it here is harmless.
   let noticeKeys = new Set();
   function noted(changes, result) {
     if (result?.ok === false || noticeKeys === null) return;
-    if (result?.evicted?.length) { noticeKeys = null; return; }
+    const evicted = (result?.evicted || []).map((row) => (row && typeof row === 'object' ? row.key : row));
+    if (evicted.some((key) => key === undefined || key === null)) { noticeKeys = null; return; }
+    evicted.forEach((key) => noticeKeys.add(key));
     changes.forEach((change) => noticeKeys.add(change.key));
     if (noticeKeys.size > NOTICE_KEYS) noticeKeys = null;
   }

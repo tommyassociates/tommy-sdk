@@ -730,8 +730,14 @@ export function createHostStoreChangeFeed({
     // (at most MAX_KEYS). Without `keys`, every row of the store(s) it names
     // may have changed; `truncated` says a list was too long to carry.
     publish(event) {
-      const { keys, truncated: _truncated, ...rest } = event;
+      const { keys, truncated: _truncated, keysByLabel, ...rest } = event;
       const listed = Array.isArray(keys) ? (keys.length <= MAX_KEYS ? { keys: [...keys] } : { truncated: true }) : {};
+      // An eviction can span the stores of a domain: `keysByLabel` names each
+      // store's keys, carried only while they fit the same limit.
+      const lists = keysByLabel && typeof keysByLabel === 'object' ? Object.entries(keysByLabel) : [];
+      if (lists.length && lists.every(([, list]) => Array.isArray(list)) && lists.reduce((sum, [, list]) => sum + list.length, 0) <= MAX_KEYS) {
+        listed.keysByLabel = Object.fromEntries(lists.map(([label, list]) => [label, [...list]]));
+      }
       const stamped = { ...rest, ...listed, origin, at: now() };
       if (!eventValid(stamped)) return;
       deliver({ ...stamped, remote: false });
@@ -782,8 +788,10 @@ export function observeHostStorePort(port, feed) {
     if (result?.ok !== false && namespace) {
       feed.publish({ type: 'commit', ...namespace, keys: input.changes.map((change) => change.key), storeRevision: result.storeRevision });
       if (result.evicted?.length) {
-        feed.publish({ type: 'evict', principal: namespace.principal, owner: namespace.owner, labels: [...new Set(result.evicted.map((row) => row.label))],
-          keys: result.evicted.map((row) => row.key) });
+        const keysByLabel = {};
+        result.evicted.forEach((row) => { (keysByLabel[row.label] ||= []).push(row.key); });
+        feed.publish({ type: 'evict', principal: namespace.principal, owner: namespace.owner, labels: Object.keys(keysByLabel),
+          keys: result.evicted.map((row) => row.key), keysByLabel });
       }
     }
     return result;

@@ -2457,7 +2457,8 @@ export function createDataService({
      * write here, another tab's, an eviction or a purge), without reading it:
      * for a caller that keeps something derived from the rows and reads again
      * only when told. `notice` is `{ keys }` when every changed row's key is
-     * known (only those rows may differ), else null (any row may have).
+     * known (only those rows may differ; an evicted row reads absent), else
+     * null (any row may have).
      */
     watch(collection, listener) {
       live();
@@ -2470,7 +2471,7 @@ export function createDataService({
       const offFeed = feed?.subscribe((event) => {
         if (event.type === 'purge' && !event.label) fire(null);
         else if (event.label === label) fire(event.type === 'purge' ? null : event);
-        else if (event.labels?.includes(label)) fire(null);
+        else if (event.labels?.includes(label)) fire(Array.isArray(event.keysByLabel?.[label]) ? { keys: event.keysByLabel[label] } : null);
       });
       return held(() => { offStore?.(); offFeed?.(); });
     },

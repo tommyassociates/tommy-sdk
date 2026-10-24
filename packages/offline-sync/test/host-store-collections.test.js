@@ -575,6 +575,8 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
       ['commit', 'chats.rows', ['1']], ['commit', 'chats.rows', ['2']], ['evict', null, ['1']], ['purge', 'chats.rows', ['2']],
     ]);
     // A cleared store is named with its account, so no other account's reads hear it.
+    expect(local[2].keysByLabel).toEqual({ 'chats.rows': ['1'] });
+    expect(remote[2].keysByLabel).toEqual({ 'chats.rows': ['1'] });
     const [commit, , , purge] = local;
     expect(purge.owner).toBe(commit.owner);
     expect(purge.store).toBe(cache.id);

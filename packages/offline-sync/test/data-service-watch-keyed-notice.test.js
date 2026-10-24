@@ -2,8 +2,9 @@
 /**
  * A watcher of a collection hears which rows changed: `watch` calls its
  * listener with `{ keys }` when every changed row's key is known (this tab's
- * writes, and change-feed commits that list their keys), and with null when
- * any row may have changed (another handle's change, an eviction, a purge),
+ * writes and the rows their evictions removed, change-feed commits that list
+ * their keys, and evictions that list each store's keys), and with null when
+ * any row may have changed (another handle's change, a purge),
  * so a caller keeping rows derived from the collection can re-read only the
  * keys named.
  */
@@ -43,14 +44,14 @@ function transactionalBackend(port, options) {
 const closers = [];
 afterEach(async () => { await Promise.all(closers.splice(0).map((close) => close())); });
 
-function open(create) {
+function open(create, { maxRows = 1000, evict } = {}) {
   let store;
   if (create) {
     const database = create();
     closers.push(() => database.close());
     const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
     const options = { identity: identity(), storeName: 'shifts', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
-      limits: { maxRows: 1000, maxAgeMs: 30 * 86400000, maxBytes: null } };
+      limits: { maxRows, maxAgeMs: 30 * 86400000, maxBytes: null, ...(evict ? { evict } : {}) } };
     store = createDataStore({ name: 'shifts', backend: transactionalBackend(port, options) });
   } else store = createDataStore({ name: 'shifts', backend: createMemoryStoreBackend() });
   const listeners = new Set();
@@ -94,9 +95,30 @@ describe.each([...DATABASES, ['memory', null]])('watching a collection (%s)', (_
     expect(heard.at(-1)).toBeNull();
     emit({ type: 'evict', labels: ['shifts'], keys: ['101'] });
     expect(heard.at(-1)).toBeNull();
+    emit({ type: 'evict', labels: ['shifts', 'tags'], keys: ['101', '7'], keysByLabel: { shifts: ['101'], tags: ['7'] } });
+    expect(heard.at(-1)).toEqual({ keys: ['101'] });
+    emit({ type: 'evict', labels: ['shifts'], keys: ['101'], keysByLabel: { tags: ['7'] } });
+    expect(heard.at(-1)).toBeNull();
     emit({ type: 'purge', label: 'shifts', keys: ['101'] });
     expect(heard.at(-1)).toBeNull();
     emit({ type: 'purge' });
     expect(heard.at(-1)).toBeNull();
+  });
+});
+
+describe.each(DATABASES)('a write that evicts rows (%s)', (_name, create) => {
+  it('names the rows it wrote and the rows the eviction removed', async () => {
+    const { data } = open(create, { maxRows: 5, evict: 'lru' });
+    await data.ingest('shifts', ROWS);
+    const heard = [];
+    data.watch('shifts', (notice) => heard.push(notice));
+    await data.writer('shifts').put({ id: '200', user_id: 'new' });
+    const notice = heard.at(-1);
+    expect(notice).not.toBeNull();
+    expect(notice.keys).toContain('200');
+    expect(notice.keys).toHaveLength(2);
+    const evicted = notice.keys.find((key) => key !== '200');
+    expect(ROWS.map((row) => row.id)).toContain(evicted);
+    expect(await data.read('shifts', [evicted])).toEqual([null]);
   });
 });
