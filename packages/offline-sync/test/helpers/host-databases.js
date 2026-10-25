@@ -24,7 +24,7 @@ const copy = (value) => (value === undefined ? undefined : JSON.parse(JSON.strin
  * ranges bounded by `[...prefix, []]`, all-or-nothing transactions), for
  * exercising the port as the web adapter drives it.
  */
-export function createMemoryIndexedDb() {
+export function createMemoryIndexedDb({ turn = null } = {}) {
   let tables = { owners: new Map(), stores: new Map(), rows: new Map() };
   let tail = Promise.resolve();
   const encode = (key) => JSON.stringify(key);
@@ -34,10 +34,13 @@ export function createMemoryIndexedDb() {
     const lowerOk = after === null ? compare(key, lower) >= 0 : compare(key, lower) > 0;
     return lowerOk && compare(key, [...prefix, []]) < 0;
   };
+  // With `turn`, each request answers on a later turn of the event loop, as
+  // a browser's does; its effect still lands in the order it was asked.
+  const answer = (value) => (turn ? turn(value) : value);
   const api = {
-    get: async (table, key) => copy(tables[table].get(encode(key))),
-    put: async (table, row) => { tables[table].set(encode(row.key), copy(row)); },
-    delete: async (table, key) => { tables[table].delete(encode(key)); },
+    get: async (table, key) => answer(copy(tables[table].get(encode(key)))),
+    put: async (table, row) => { tables[table].set(encode(row.key), copy(row)); return answer(undefined); },
+    delete: async (table, key) => { tables[table].delete(encode(key)); return answer(undefined); },
     byIndex: async (table, index, value, limit = 101) => sorted(table).filter((row) => row[index] === value).slice(0, limit).map(copy),
     async eachIndex(table, index, value, visit) {
       for (const row of sorted(table).filter((entry) => entry[index] === value)) await visit(copy(row));
@@ -50,6 +53,7 @@ export function createMemoryIndexedDb() {
   };
   return {
     kind: 'indexeddb',
+    ordered: true,
     transaction(mode, work) {
       const result = tail.then(async () => {
         const saved = Object.fromEntries(Object.entries(tables).map(([name, rows]) => [name, new Map(rows)]));

@@ -15,6 +15,29 @@ const getMany = (tx, table, keys) => (typeof tx.getMany === 'function'
   ? tx.getMany(table, keys)
   : Promise.all(keys.map((key) => tx.get(table, key))));
 const SCAN = 100;
+// A commit's row writes on a database that runs a transaction's requests in
+// the order they were asked (`database.ordered`, IndexedDB): each put and
+// delete is asked without waiting for the one before it, and `settle()` waits
+// for them all. Elsewhere (SQLite, whose held rows follow each write's own
+// outcome) every request is waited for in turn and `settle()` has nothing left.
+function rowWriter(tx, ordered) {
+  if (!ordered) return { tx, settle: async () => {} };
+  const asked = [];
+  const ask = (operation) => {
+    const pending = operation();
+    pending.catch(() => {});
+    asked.push(pending);
+    return undefined;
+  };
+  return {
+    tx: {
+      ...tx,
+      put: (table, row) => ask(() => tx.put(table, row)),
+      delete: (table, key) => ask(() => tx.delete(table, key)),
+    },
+    settle: () => Promise.all(asked.splice(0)),
+  };
+}
 // How long a migration's opener holds the store; each write renews it. A
 // lease that runs out is a crashed opener, and the next one starts over.
 export const MIGRATION_LEASE_MS = 30000;
@@ -30,6 +53,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
   // Open handles by id. A closed or retired handle is forgotten when its
   // owner closes it, or on its next use, so the map holds only live ones.
   const handles = new Map();
+  const ordered = database.ordered === true;
   function forget(id, handle) {
     handles.delete(id);
     handleRegistry.delete(handle);
@@ -448,8 +472,10 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
           const plans = [];
           let rowCount = store.rowCount;
           let totalBytes = store.bytes;
-          for (const change of changes) {
-            const old = await tx.get('rows', rowKey(handle.owner, handle.namespace, store.generation, META, change.key));
+          const metaKeys = changes.map((change) => rowKey(handle.owner, handle.namespace, store.generation, META, change.key));
+          const olds = ordered ? await getMany(tx, 'rows', metaKeys) : null;
+          for (const [index, change] of changes.entries()) {
+            const old = ordered ? olds[index] : await tx.get('rows', metaKeys[index]);
             const valueBytes = change.op === 'put' ? bytes(change.json) : 0;
             rowCount += change.op === 'put' ? (old ? 0 : 1) : (old ? -1 : 0);
             totalBytes += valueBytes - (old?.bytes || 0);
@@ -475,14 +501,16 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
           totalBytes -= own.bytes;
           await cacheCapacity(tx, store, totalBytes);
           let dirtyCount = store.dirtyCount || 0;
+          const writer = rowWriter(tx, ordered);
           for (const { change, old } of plans) {
             if (change.op === 'delete') {
-              if (old) { await discard(tx, store, old, { count: false }); dirtyCount -= old.dirty ? 1 : 0; }
+              if (old) { await discard(writer.tx, store, old, { count: false }); dirtyCount -= old.dirty ? 1 : 0; }
               continue;
             }
-            const { dirty } = await writeRow(tx, store, store.generation, change, old, { syncedAt: input.syncedAt });
+            const { dirty } = await writeRow(writer.tx, store, store.generation, change, old, { syncedAt: input.syncedAt });
             dirtyCount += (dirty ? 1 : 0) - (old?.dirty ? 1 : 0);
           }
+          await writer.settle();
           if (handle.closed) throw storageError('retired');
           store.rowCount = rowCount;
           store.bytes = totalBytes;
