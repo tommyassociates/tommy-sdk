@@ -12,6 +12,7 @@
  * through the budget-hook event stream.
  */
 import { defineComponent, h, ref, onMounted, onBeforeUnmount, onErrorCaptured } from 'vue';
+import { isStaleWorldRefusal } from './stale-world.js';
 
 export const LOAD_TIMEOUT_MS = 5000;
 export const MAX_CONSECUTIVE_FAILURES = 3;
@@ -284,7 +285,21 @@ export const PanelTile = defineComponent({
     // The tile IS the error boundary: a component-path child (or a Vue-in-shadow
     // render-path MP) that throws during render/setup/lifecycle is contained
     // here — the tile enters its error/retry state, siblings keep running.
+    //
+    // Except a stale-world refusal (stale-world.js): the store displays another
+    // account while this tile's world is still mounted, so the panel's time
+    // display and host reads refuse. That is not a fault of the panel, so the
+    // tile neither shows the error card, nor emits `panel-error`, nor lets the
+    // error reach the app's error handler. It changes nothing either: the child
+    // stays mounted with its state, and the throw that failed its render left
+    // it empty (Vue renders a failed render as nothing) while a throwing watcher
+    // leaves its last frame. Changing nothing is what keeps this quiet — no tile
+    // re-render, so nothing re-runs the child but the store changes it already
+    // reads — and what brings it back: when the same world is displayed again
+    // those store changes re-render the child, which answers normally. When the
+    // world is left for good, the loader unmounts the surface.
     onErrorCaptured((err) => {
+      if (isStaleWorldRefusal(err)) return false;
       if (alive) fail(err);
       return false;
     });
