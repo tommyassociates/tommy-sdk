@@ -754,6 +754,21 @@ export function createDataService({
     });
   }
   const metaOf = async (name) => { try { return await sourceMeta.get(name); } catch (_) { return null; } };
+  /**
+   * When the collection's last whole declared read ran, as its source meta
+   * recorded it, while the stored rows are still the whole set that read
+   * left (their count and key digest); otherwise, or when either cannot be
+   * read, null. What stands for a read this service has not run itself (the
+   * app opened again) when a refresh asks for one within a `maxAge`.
+   */
+  async function storedFreshAt(name, store, keyPath) {
+    try {
+      const [meta, rows] = await Promise.all([metaOf(name), rawRows(store)]);
+      if (!meta || !Number.isFinite(meta.fullAt) || meta.fullAt > now() || typeof meta.digest !== 'string') return null;
+      const keys = rows.map((row) => String(row[keyPath]));
+      return meta.count === keys.length && meta.digest === keysDigest(keys) ? meta.fullAt : null;
+    } catch (_) { return null; }
+  }
   // Per collection, a count of changes to its rows as this page hears of
   // them (its store's own notices, and the change feed's for other tabs,
   // evictions and purges): a declared read reuses the rows it read before
@@ -1422,7 +1437,9 @@ export function createDataService({
    * uses), and its record's key decides. A read of changes removes the rows
    * `removedField` marks and stores the rest; a whole read stores every row,
    * then removes the rows it left out (unsent ones stay). The source meta is
-   * written last:
+   * written last, for a source with a cursor or without one (whose cursor is
+   * always null; its meta records when the last whole read ran, for
+   * `storedFreshAt`):
    *   - every row of the answer stored: the new cursor, and the digest of the
    *     keys the read left (none when a read of changes found the rows no
    *     longer the whole set its cursor describes);
@@ -1475,10 +1492,10 @@ export function createDataService({
     }
     // A job no longer current, or whose protection was dropped, stops between
     // commits: the rows it wrote stay, and the collection's source meta is
-    // forgotten, so the next read is whole.
+    // forgotten, so the next read is whole and nothing vouches for the rows.
     const halted = () => !isCurrent() || protectionLost(name, startedAt);
     const stop = async () => {
-      if (keepsCursor) await sourceMeta.set(name, null).catch(() => {});
+      await sourceMeta.set(name, null).catch(() => {});
       return isCurrent() ? 'read_again' : 'dropped';
     };
     const written = new Set();
@@ -1572,14 +1589,13 @@ export function createDataService({
     }
     if (halted()) return stopHere();
     recordCommit(!changesOnly);
-    if (!keepsCursor) return 'stored';
     // The keys the read leaves: what it stored, and the rows it kept as
     // they were (unsent, or changed by anything else since it began); a row
     // the store could not keep is there only if it was before.
     const touched = touchedAfter(name, startedAt);
     const kept = rows.filter((row) => row._dirty || touched.has(keyOf(row)) || (changesOnly && !removed.includes(keyOf(row)))).map(keyOf);
     const left = new Set([...kept, ...written, ...[...unsaved].filter((key) => present.has(key))]);
-    const cursor = typeof answer?.cursor === 'string' && answer.cursor ? answer.cursor : null;
+    const cursor = keepsCursor && typeof answer?.cursor === 'string' && answer.cursor ? answer.cursor : null;
     const before = await metaOf(name);
     const allSaved = unsaved.size === 0;
     // A read of changes leaves the whole set only if the rows were the whole
@@ -2238,6 +2254,7 @@ export function createDataService({
   /** A refresh of `target` as the principal in `context` (taken when it was asked). */
   function refreshAs(target, {
     mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false, fromNow = false, sinceWrite = false, nextAttempt = false,
+    storedChecked = false,
   } = {}, context) {
     live();
     const wanted = targetOf(target);
@@ -2266,6 +2283,31 @@ export function createDataService({
       if (factor === Infinity) return settle(Promise.resolve());
       const age = maxAge > 0 ? maxAge * factor : 0;
       if (!fromNow && age > 0 && state.syncedAt !== null && now() - state.syncedAt < age && state.state !== 'error') return settle(Promise.resolve());
+      // A whole declared read this service has not run: the one the source
+      // meta records stands for it. The stored rows are checked once a target
+      // state, before any read of it is on its way; asks that come meanwhile
+      // wait for the same check.
+      if (!storedChecked && !fromNow && age > 0 && state.syncedAt === null && !state.flight && state.state !== 'error'
+        && spec?.read && !wanted.query && !wanted.window && (wanted.key === undefined || wanted.key === null) && typeof spec.scope !== 'function'
+        && (!state.storedCheck || state.storedCheck.pending)) {
+        if (!state.storedCheck) {
+          const check = { pending: true, at: null };
+          check.done = storedFreshAt(name, store, decl?.keyPath || 'id').then((at) => { check.at = at; check.pending = false; });
+          state.storedCheck = check;
+        }
+        const check = state.storedCheck;
+        const asked = {
+          mode, priority, maxAge, reason, full, fromNow, sinceWrite, nextAttempt, storedChecked: true,
+        };
+        return settle(check.done.then(() => {
+          if (check.at !== null && now() - check.at < age && state.syncedAt === null && !state.flight && state.state !== 'error') {
+            state.state = 'fresh'; state.syncedAt = check.at; state.error = null;
+            emitStatus();
+            return undefined;
+          }
+          return refreshAs(target, asked, context);
+        }));
+      }
       if (!isOnline()) {
         state.state = 'offline';
         emitStatus();
