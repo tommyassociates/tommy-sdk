@@ -10,11 +10,35 @@
  */
 import { createApp, h } from 'vue';
 import { PanelTile } from './panel-tile.js';
+import { isStaleWorldRefusal } from './stale-world.js';
 import { layoutFor, normalizePanels } from './layout.js';
 
 /** Advisory surface budget (a tunable default). */
 export const SURFACE_PANEL_BUDGET = 24;
 export const SURFACE_MP_BUDGET = 12;
+
+/**
+ * Takes a stale-world refusal that Vue attributes to a panel tile itself
+ * quietly, as the tile's `onErrorCaptured` takes a child's (panel-tile.js).
+ * Vue runs an Options-API `data()` outside its error wrapping, so a panel
+ * whose `data()` reads its world's time display while the tile mounts it
+ * during an account switch throws as the tile's own "component update"
+ * error, which the tile's boundary never sees. Every other error goes to the
+ * host's own handler when it installed one, or to the console.
+ */
+function quietStaleTileErrors(app) {
+  const hostHandler = app.config.errorHandler;
+  app.config.errorHandler = (err, instance, info) => {
+    if (isStaleWorldRefusal(err)) {
+      for (let c = instance && instance.$ ? instance.$ : instance; c; c = c.parent) {
+        if (c.type === PanelTile) return;
+      }
+    }
+    if (hostHandler) { hostHandler(err, instance, info); return; }
+    // eslint-disable-next-line no-console
+    console.error(err);
+  };
+}
 
 /**
  * @param {object} [opts]
@@ -252,6 +276,7 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
       if (installComponentRuntime) {
         try { installComponentRuntime(app); } catch (e) { if (onEvent) onEvent({ type: 'surface-runtime-install-failed', surface, message: String(e && e.message), at: Date.now() }); }
       }
+      quietStaleTileErrors(app);
       try { app.mount(el); } catch (error) {
         try { onDispose?.(); } finally { app.unmount(); }
         throw error;
