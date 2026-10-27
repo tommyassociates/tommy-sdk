@@ -335,6 +335,13 @@ export const METHOD_SHARE_MS = 30 * 1000;
 // how many groups are kept (the oldest idle ones go).
 const METHOD_FRESH_KEPT = 5000;
 const METHOD_GROUPS_KEPT = 500;
+// An answer of a method's params refused on this device (rows outside its
+// params, an entry with no key, too many rows) is not read again for those
+// params for this long, doubling each time it is refused again up to the
+// longest; an answer of them ends the hold. Holds kept: the oldest go.
+export const METHOD_REFUSAL_HOLD_MS = Object.freeze([30 * 1000, 5 * 60 * 1000]);
+const METHOD_REFUSALS_KEPT = 200;
+const HELD_REFUSAL_CODES = new Set(['DATA_INVALID', 'DATA_TOO_LARGE']);
 const METHOD_NAME = /^[a-z][A-Za-z0-9]{0,63}$/;
 // The longest a string param may be.
 const MAX_METHOD_STRING = 200;
@@ -1620,6 +1627,18 @@ export function createDataService({
   // when each id was last fetched, and the group's last outcome.
   const methodGroups = new Map();
   let methodBatches = 0;
+  // Non-batched method params whose answer was refused on this device, by
+  // group key: { until, holdMs, error }.
+  const methodRefusals = new Map();
+  const holdRefusal = (key, error) => {
+    if (error?.retryable !== false || !HELD_REFUSAL_CODES.has(error?.code)) return;
+    const last = methodRefusals.get(key);
+    const [first, longest] = METHOD_REFUSAL_HOLD_MS;
+    const holdMs = last ? Math.min(last.holdMs * 2, longest) : first;
+    methodRefusals.delete(key);
+    if (methodRefusals.size >= METHOD_REFUSALS_KEPT) methodRefusals.delete(methodRefusals.keys().next().value);
+    methodRefusals.set(key, { until: now() + holdMs, holdMs, error });
+  };
   function methodGroup(key, collection) {
     if (!methodGroups.has(key)) {
       // Idle groups beyond the bound go, oldest first.
@@ -1831,10 +1850,11 @@ export function createDataService({
   }
   /**
    * A refresh method's run (`{ collection, method, params }`) as the
-   * principal in `context`: see `refresh`.
+   * principal in `context`: see `refresh`. `retry`: a person asked again, so
+   * params whose answer was refused are read again now (their hold ends).
    */
   function refreshMethodAs(wanted, {
-    mode = 'silent', priority = 'normal', maxAge = 0, reason = null, fromNow = false, sinceWrite = false,
+    mode = 'silent', priority = 'normal', maxAge = 0, reason = null, fromNow = false, sinceWrite = false, retry = false,
   } = {}, context) {
     live();
     const {
@@ -2059,6 +2079,7 @@ export function createDataService({
           }
           group.state.state = 'fresh';
           group.state.error = null;
+          if (!batchParam) methodRefusals.delete(groupKey);
           if (voidOf(name) !== voidAtStart) return;
           if (ids) {
             const absent = Array.isArray(stored.absent) ? new Set(stored.absent.map(String)) : null;
@@ -2067,7 +2088,9 @@ export function createDataService({
           group.state.syncedAt = now();
           if (!batchParam) emitStatus();
         } catch (error) {
-          throw failed(error, batchParam ? null : current);
+          const reported = failed(error, batchParam ? null : current);
+          if (!batchParam && reported === error) holdRefusal(groupKey, error);
+          throw reported;
         }
       };
       // A job the scheduler refuses without running it (a full queue, an open
@@ -2094,6 +2117,16 @@ export function createDataService({
       })).catch((error) => { throw failed(error, isCurrent); }).finally(() => attempts.settled());
       if (!batchParam) {
         if (fresh(group.state.syncedAt) && group.state.state === 'fresh') return Promise.resolve();
+        // Params whose answer this device refused are answered by that
+        // refusal until its hold ends: asking again reads the same answer.
+        const held = methodRefusals.get(groupKey);
+        if (held && retry === true) held.until = at;
+        if (held && at < held.until) {
+          group.state.state = 'error';
+          group.state.error = { code: held.error.code, status: held.error.status ?? null, message: held.error.message };
+          emitStatus();
+          return Promise.reject(Object.assign(serviceError(held.error.message, held.error.code), { retryable: false, held: true }));
+        }
         if (!fromNow && group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return group.state.flight.attempts.answer(group.state.flight.promise);
         // A `fromNow` ask that also asks `sinceWrite` needs a read begun
         // after its last write, not one of its own: a read of these params on
@@ -2254,7 +2287,7 @@ export function createDataService({
   /** A refresh of `target` as the principal in `context` (taken when it was asked). */
   function refreshAs(target, {
     mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false, fromNow = false, sinceWrite = false, nextAttempt = false,
-    storedChecked = false,
+    storedChecked = false, retry = false,
   } = {}, context) {
     live();
     const wanted = targetOf(target);
@@ -2264,7 +2297,7 @@ export function createDataService({
     }
     if (wanted.method !== undefined) {
       return refreshMethodAs(wanted, {
-        mode, priority, maxAge, reason, fromNow, sinceWrite,
+        mode, priority, maxAge, reason, fromNow, sinceWrite, retry,
       }, context);
     }
     const { name, label, store, decl } = local(wanted.collection);
@@ -2701,6 +2734,10 @@ export function createDataService({
      * `sinceWrite: true` with it asks only for a read begun after this
      * device's last write, so one of the same params still queued, or begun
      * since that write, or ended within `reuseSinceWriteMs`, answers it.
+     * Non-batched params whose answer was refused on this device are answered
+     * by that refusal, without a read, until its hold ends
+     * (`METHOD_REFUSAL_HOLD_MS`); `retry: true` (a person asked again) reads
+     * them now.
      */
     refresh(target, options = {}) {
       // Where a visible read was asked, for a timeout that reaches its caller.
@@ -3107,6 +3144,7 @@ export function createDataService({
       states.clear();
       targetStates.clear();
       methodGroups.clear();
+      methodRefusals.clear();
       coverageVoid.clear();
       coverageLoss.clear();
       wholeCovers.clear();
