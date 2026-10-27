@@ -278,10 +278,19 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
     /** Unmount the app hosted in `el` (the host element the surface mounted into). */
     unmountSurface(el) {
       const entry = mounted.get(el);
-      if (entry) {
-        try { entry.onDispose?.(); } catch (_) { /* host cleanup isolation */ }
+      if (!entry) return;
+      mounted.delete(el);
+      try { entry.onDispose?.(); } catch (_) { /* host cleanup isolation */ }
+      try {
         entry.app.unmount();
-        mounted.delete(el);
+      } catch (error) {
+        // A tree left broken by an update that threw part-way cannot unmount.
+        // Clear what the app left on the element so the next surface mounted
+        // here starts fresh instead of patching against the broken tree.
+        el._vnode = null;
+        delete el.__vue_app__;
+        el.replaceChildren();
+        if (onEvent) onEvent({ type: 'surface-unmount-failed', surface: entry.surface, message: String(error && error.message), at: Date.now() });
       }
     },
 
