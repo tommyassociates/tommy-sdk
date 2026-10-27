@@ -44,7 +44,7 @@ function transactionalBackend(port, options) {
 const closers = [];
 afterEach(async () => { await Promise.all(closers.splice(0).map((close) => close())); });
 
-function open(create, { maxRows = 1000, evict } = {}) {
+function open(create, { maxRows = 1000, evict, changeOwner = null } = {}) {
   let store;
   if (create) {
     const database = create();
@@ -56,7 +56,7 @@ function open(create, { maxRows = 1000, evict } = {}) {
   } else store = createDataStore({ name: 'shifts', backend: createMemoryStoreBackend() });
   const listeners = new Set();
   const feed = { subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); } };
-  const data = createDataService({ feed, resolve: (name) => (name === 'shifts' ? { store, decl: { keyPath: 'id' } } : null) });
+  const data = createDataService({ feed, changeOwner, resolve: (name) => (name === 'shifts' ? { store, decl: { keyPath: 'id' } } : null) });
   closers.push(() => data.dispose());
   const emit = (event) => [...listeners].forEach((fn) => fn(event));
   return { data, store, emit };
@@ -103,6 +103,46 @@ describe.each([...DATABASES, ['memory', null]])('watching a collection (%s)', (_
     expect(heard.at(-1)).toBeNull();
     emit({ type: 'purge' });
     expect(heard.at(-1)).toBeNull();
+  });
+});
+
+describe.each([...DATABASES, ['memory', null]])('another owner\'s change (%s)', (_name, create) => {
+  it('is not heard, and every notice heard moves the revision by one', async () => {
+    const own = JSON.stringify(['https://api.test', '3', 'Team', '743', null]);
+    const other = JSON.stringify(['https://api.test', '3', 'Team', '743', 'member']);
+    const { data, emit } = open(create, { changeOwner: own });
+    await data.ingest('shifts', ROWS);
+    const start = data.status('shifts', { receipt: true }).revision;
+    const heard = [];
+    data.watch('shifts', (notice) => heard.push(notice));
+    emit({ type: 'commit', label: 'shifts', owner: other, keys: ['900'] });
+    emit({ type: 'evict', labels: ['shifts'], owner: other, keys: ['101'], keysByLabel: { shifts: ['101'] } });
+    emit({ type: 'purge', owner: other, principal: JSON.stringify(['https://api.test', '9']) });
+    expect(heard).toEqual([]);
+    expect(data.status('shifts', { receipt: true }).revision).toBe(start);
+    emit({ type: 'commit', label: 'shifts', owner: own, keys: ['901'] });
+    expect(heard).toEqual([{ keys: ['901'] }]);
+    expect(data.status('shifts', { receipt: true }).revision).toBe(start + 1);
+  });
+
+  it('does not re-read a subscribed target', async () => {
+    const own = JSON.stringify(['https://api.test', '3', 'Team', '743', null]);
+    const other = JSON.stringify(['https://api.test', '3', 'Team', '743', 'member']);
+    const { data, store, emit } = open(create, { changeOwner: own });
+    await data.ingest('shifts', ROWS);
+    let reads = 0;
+    const getAll = store.getAll.bind(store);
+    store.getAll = (...args) => { reads += 1; return getAll(...args); };
+    const off = data.subscribe('shifts', () => {});
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
+    const settled = reads;
+    emit({ type: 'commit', label: 'shifts', owner: other, keys: ['900'] });
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
+    expect(reads).toBe(settled);
+    emit({ type: 'commit', label: 'shifts', owner: own, keys: ['901'] });
+    await new Promise((resolve) => { setTimeout(resolve, 20); });
+    expect(reads).toBeGreaterThan(settled);
+    off();
   });
 });
 

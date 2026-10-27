@@ -2569,7 +2569,8 @@ export function createDataService({
     },
     /**
      * Calls `listener(notice)` whenever the collection may have changed (a
-     * write here, another tab's, an eviction or a purge), without reading it:
+     * write here, another tab's, an eviction or a purge of this service's
+     * owner; never another owner's change feed event), without reading it:
      * for a caller that keeps something derived from the rows and reads again
      * only when told. `notice` is `{ keys }` when every changed row's key is
      * known (only those rows may differ; an evicted row reads absent), else
@@ -2584,6 +2585,9 @@ export function createDataService({
       };
       const offStore = typeof store.onChange === 'function' ? store.onChange(fire) : store.subscribe(() => fire(null));
       const offFeed = feed?.subscribe((event) => {
+        // Another owner's change (an account's other form, a client subject)
+        // shares the label but none of this service's rows.
+        if (!ownsChange(event)) return;
         if (event.type === 'purge' && !event.label) fire(null);
         else if (event.label === label) fire(event.type === 'purge' ? null : event);
         else if (event.labels?.includes(label)) fire(Array.isArray(event.keysByLabel?.[label]) ? { keys: event.keysByLabel[label] } : null);
@@ -2616,6 +2620,7 @@ export function createDataService({
       // A change listener reads only this target, however large the collection.
       const offStore = typeof store.onChange === 'function' ? store.onChange(() => emit()) : store.subscribe(() => emit());
       const offFeed = feed?.subscribe((event) => {
+        if (!ownsChange(event)) return;
         if (event.label === label || event.labels?.includes(label) || (event.type === 'purge' && !event.label)) emit();
       });
       emit();
