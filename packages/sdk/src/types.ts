@@ -324,6 +324,13 @@ export interface MpInit {
   readonly mpConfig: Readonly<Record<string, unknown>>;
   /** Exact shared-dependency versions the host expects (kills version drift, audit 1.7). */
   readonly sharedDeps: Readonly<Record<string, string>>;
+  /**
+   * The host's MP API level (core `HOST_API_LEVEL`, the level it sends as `X-Host-Api`).
+   * Feature-detect host capabilities with it, e.g. `init.hostApi >= 5` for `tommy.prefs`.
+   * Hosts that predate it leave it out; treat a missing value as below every level a
+   * capability needs.
+   */
+  readonly hostApi?: number;
 }
 
 // ============================================================================
