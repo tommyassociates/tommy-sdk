@@ -67,7 +67,7 @@ const WRITE_METHODS = new Set(['put', 'delete', 'deleteMany', 'markRow', 'markSy
  * tracked from its call to its end (`idle()` is false meanwhile).
  */
 export const DATA_SERVICE_SYNC_METHODS = Object.freeze([
-  'writer', 'watch', 'subscribe', 'source', 'sends', 'hasSource', 'pending', 'fence', 'status', 'statuses', 'onStatusChange', 'idle', 'dispose',
+  'writer', 'watch', 'subscribe', 'source', 'sends', 'hasSource', 'pending', 'fence', 'status', 'statuses', 'methodStatuses', 'onStatusChange', 'idle', 'dispose',
 ]);
 const PRIORITIES = { visible: 0, high: 1, normal: 2, background: 3 };
 export const DEFAULT_STALE_AFTER_MS = 5 * 60000;
@@ -1295,7 +1295,7 @@ export function createDataService({
   // page also vouches that an older answer must not introduce unseen keys.
   // Frames retain only counters and disappear when the last reader settles.
   const windowReads = new Map();
-  async function guardedRead(name, read, commit, { isCurrent = () => true } = {}) {
+  async function guardedRead(name, read, commit, { isCurrent = () => true, storing = null } = {}) {
     for (let attempt = 0; attempt < READ_TRIES; attempt += 1) {
       // Each read begins at its own point: what a read that began later
       // records is later than it, and what one that began earlier records
@@ -1305,17 +1305,26 @@ export function createDataService({
       // eslint-disable-next-line no-await-in-loop
       const answer = await read(startedAt);
       if (!isCurrent()) return undefined;
-      // What it stores is recorded as of the read's start: a read that began
-      // later and answers after it is not taken for a local edit.
-      // eslint-disable-next-line no-await-in-loop
-      const outcome = await inTurn(name, async (turn) => {
-        // Still wanted, checked again in the turn, just before it commits.
-        if (!isCurrent()) return { dropped: true };
-        if (replacedAfter(name, startedAt)) return { dropped: true, replaced: true };
-        if (protectionLost(name, startedAt)) return null;
-        const value = await commit(answer, touchedAfter(name, startedAt), startedAt, turn);
-        return value === READ_AGAIN ? null : { value };
-      }, { at: startedAt });
+      // From here the answer is in hand: waiting for the collection's turn and
+      // storing it is this device's own work, which a scheduler does not count
+      // against a visible read's wait for its server.
+      const stored = typeof storing === 'function' ? storing() : null;
+      let outcome;
+      try {
+        // What it stores is recorded as of the read's start: a read that began
+        // later and answers after it is not taken for a local edit.
+        // eslint-disable-next-line no-await-in-loop
+        outcome = await inTurn(name, async (turn) => {
+          // Still wanted, checked again in the turn, just before it commits.
+          if (!isCurrent()) return { dropped: true };
+          if (replacedAfter(name, startedAt)) return { dropped: true, replaced: true };
+          if (protectionLost(name, startedAt)) return null;
+          const value = await commit(answer, touchedAfter(name, startedAt), startedAt, turn);
+          return value === READ_AGAIN ? null : { value };
+        }, { at: startedAt });
+      } finally {
+        if (typeof stored === 'function') stored();
+      }
       if (outcome?.replaced) return DROPPED;
       if (outcome) return outcome.dropped ? undefined : outcome.value;
     }
@@ -1387,7 +1396,7 @@ export function createDataService({
       }
     }
   }
-  async function readDeclared(target, spec, wanted, isCurrent, { full = false, context = jobContextNow() } = {}) {
+  async function readDeclared(target, spec, wanted, isCurrent, { full = false, context = jobContextNow(), storing = null } = {}) {
     const { name, store, keyPath } = target;
     const { cursor: keepsCursor = false, fullEveryMs = FULL_EVERY_MS, forbidden = 'purge' } = spec.read;
     // Through the one read guard; each attempt decides afresh from the
@@ -1429,7 +1438,7 @@ export function createDataService({
         startedAt, since, isCurrent, read, turn,
       });
       return stored === 'read_again' ? READ_AGAIN : undefined;
-    }, { isCurrent });
+    }, { isCurrent, storing });
     return outcome === NO_SNAPSHOT || outcome === DROPPED ? outcome : undefined;
   }
 
@@ -2021,7 +2030,7 @@ export function createDataService({
       } : null);
       // One fetch: through the read guard, merged in the collection's turn. A
       // purge or trim while it was out leaves what it asked for not fetched.
-      const run = async (asked, ids, isCurrent, afterDeadline = () => false) => {
+      const run = async (asked, ids, isCurrent, afterDeadline = () => false, storing = null) => {
         const current = () => !disposed && isCurrent();
         if (!batchParam && !current()) {
           if (afterDeadline()) return;
@@ -2059,7 +2068,7 @@ export function createDataService({
               touched, turn, startedAt, current, unanswered: unansweredBy(ids) || unansweredOf(asked), strictReceipt: method.strictReceipt === true,
             });
             if (stored && method.strictReceipt === true) stored.receiptRevision = generationOf(name);
-          }, { isCurrent: current });
+          }, { isCurrent: current, storing });
           if (!batchParam && !current()) {
             if (afterDeadline()) return;
             throw dropped();
@@ -2198,12 +2207,12 @@ export function createDataService({
         group.state.error = null;
         let scheduled;
         try {
-          scheduled = job(String(flight.seq), (isCurrent) => {
+          scheduled = job(String(flight.seq), (isCurrent, helpers) => {
             // The writes it reads after: taken once, as it first begins (a
             // retry reads after the same ones).
             if (!flight.begun) flight.writeMark = writeMarkNow();
             flight.begun = true;
-            return run(params, null, () => isCurrent() && current(), afterDeadline).then((value) => {
+            return run(params, null, () => isCurrent() && current(), afterDeadline, helpers?.storing).then((value) => {
               // What a later ask may be answered by (see `reuseSinceWriteMs`):
               // the newest read of these params, stored fresh.
               if (group.state.flight === flight && group.state.state === 'fresh') {
@@ -2273,11 +2282,11 @@ export function createDataService({
       // Each batch answers this ask by its outcome or its first failed attempt.
       const answers = [...waits].map((batch) => batch.attempts.answer(batch.promise));
       started.forEach((batch) => {
-        job(batch.key, (isCurrent) => {
+        job(batch.key, (isCurrent, helpers) => {
           // A batch takes no more ids once it runs.
           if (group.open === batch) group.open = null;
           const ids = [...batch.ids].sort(idOrder);
-          return run({ ...shared, [batchParam]: ids }, ids, isCurrent);
+          return run({ ...shared, [batchParam]: ids }, ids, isCurrent, undefined, helpers?.storing);
         }, batch.attempts).then(batch.settle.resolve, batch.settle.reject);
       });
       return Promise.all(answers).then(() => undefined);
@@ -2367,7 +2376,7 @@ export function createDataService({
       emitStatus();
       const keyPath = decl?.keyPath || 'id';
       // A server copy never replaces a row with an unsent local change.
-      const run = async (isCurrent) => {
+      const run = async (isCurrent, storing = null) => {
         if (wanted.key !== undefined && wanted.key !== null) {
           const rowKey = String(wanted.key);
           // Stored through the one read guard (a change to the row since the
@@ -2390,11 +2399,11 @@ export function createDataService({
             const record = (spec.toRecord || ((value) => value))(dto, prev ? previousByKey([prev], keyPath).get(rowKey) : prev);
             // One record leaves the collection's synced stamp as it was.
             await writer.reconcile([record], { prune: false, keepDirty: true, syncedAt: null });
-          }, { isCurrent });
+          }, { isCurrent, storing });
           return;
         }
         if (spec.read && !wanted.query && !wanted.window && typeof spec.scope !== 'function') {
-          return readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent, { full, context });
+          return readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent, { full, context, storing });
         }
         // A query target prunes only the rows of that query; a list or window
         // target the source's scope (the whole collection without one).
@@ -2413,7 +2422,7 @@ export function createDataService({
           : reconcileFetched(turn.store, keyPath, { fetch: () => dtos, toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
             scope, wanted.window, windowKeyOf(wanted.window), {
               onPersistError, rethrow: true, keepDirty: true, skip: touched, ...(whole ? {} : { syncedAt: null }),
-            })), { isCurrent });
+            })), { isCurrent, storing });
       };
       state.flightForm = form;
       state.flightFull = full === true;
@@ -2433,27 +2442,9 @@ export function createDataService({
       state.flightSeq = flightSeq;
       // Only a read of every row answers a batched method that joins it.
       state.flightWhole = wholeRead;
-      state.flight = scheduler.request({
-        key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
-        ...(inForeground(name)
-          ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
-          : { priority: PRIORITIES.background, visible: false }),
-        // A read other runs wait on from inside their own starts past the visible cap.
-        ...(spec.gate === true ? { gate: true } : {}),
-        // Never run, or run again, once this service retired or its reads paused.
-        valid: () => !disposed && cadenceFactor(name) !== Infinity,
-        // An attempt that found itself no longer wanted on its way stopped
-        // there (`STOPPED`).
-        run: attempts.run(async (isCurrent) => {
-          let stopped = false;
-          const value = await run(() => {
-            const wantedNow = isCurrent();
-            if (!wantedNow) stopped = true;
-            return wantedNow;
-          });
-          return stopped ? STOPPED : value;
-        }),
-      }).then((outcome) => {
+      // What a read's outcome makes of the collection: fresh with what it
+      // stored, or as it was (a read that stored nothing, or lost rows).
+      const landed = (outcome) => {
         // A read a purge or replacement overtook stored nothing: not run, not fresh.
         if (outcome === DROPPED) {
           if (state.state === 'refreshing') state.state = 'stale';
@@ -2474,8 +2465,42 @@ export function createDataService({
         }
         state.state = 'fresh'; state.syncedAt = now(); state.error = null;
         if (wholeRead) wholeCovers.set(coverKey(form, name), Math.max(wholeCovers.get(coverKey(form, name)) || 0, flightSeq));
-      }, (error) => {
+      };
+      // Callers answered at the read's deadline (REFRESH_TIMEOUT) while it
+      // goes on: the scheduler finishes storing an answer it had, or reads
+      // again in the background. What that stores lands here, as any read's
+      // outcome does, unless a later read of the target has begun since.
+      let answeredLate = false;
+      const landLate = (outcome) => {
+        if (!answeredLate || disposed || states.get(key) !== state || state.flight || state.flightSeq !== flightSeq) return;
+        try { landed(outcome); } catch (_) { /* what it stored stands; its status says so */ }
+        emitStatus();
+      };
+      state.flight = scheduler.request({
+        key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
+        ...(inForeground(name)
+          ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
+          : { priority: PRIORITIES.background, visible: false }),
+        // A read other runs wait on from inside their own starts past the visible cap.
+        ...(spec.gate === true ? { gate: true } : {}),
+        // Never run, or run again, once this service retired or its reads paused.
+        valid: () => !disposed && cadenceFactor(name) !== Infinity,
+        // An attempt that found itself no longer wanted on its way stopped
+        // there (`STOPPED`).
+        run: attempts.run(async (isCurrent, helpers) => {
+          let stopped = false;
+          const value = await run(() => {
+            const wantedNow = isCurrent();
+            if (!wantedNow) stopped = true;
+            return wantedNow;
+          }, helpers?.storing);
+          const outcome = stopped ? STOPPED : value;
+          landLate(outcome);
+          return outcome;
+        }),
+      }).then(landed, (error) => {
         state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
+        if (error?.code === 'REFRESH_TIMEOUT' && error?.retryable === true) answeredLate = true;
         throw error;
       }).finally(() => {
         attempts.settled();
@@ -3114,6 +3139,25 @@ export function createDataService({
       return [...states.entries()].map(([key, state]) => {
         const [collection, rowKey, window] = JSON.parse(key);
         return { collection, label: labelOf(collection), key: rowKey, window, ...describeState(state) };
+      });
+    },
+    /**
+     * Status of every refresh method read (`{ collection, method, params }`)
+     * this service has asked as its current account form. Batched (by-id)
+     * methods are left out: one group answers many id sets, each to its own
+     * asker, so it has no one read to ask again.
+     */
+    methodStatuses() {
+      const form = formOf(jobContextNow());
+      return [...methodGroups.entries()].flatMap(([groupKey, group]) => {
+        const [groupForm, collection, method, params] = JSON.parse(groupKey);
+        if (groupForm !== form) return [];
+        let declared = null;
+        try { declared = (sources.get(collection) || local(collection).decl?.source)?.methods?.[method] || null; } catch (_) { declared = null; }
+        if (!declared || declared.batch) return [];
+        return [{
+          collection, label: labelOf(collection), method, params, ...describeState(group.state),
+        }];
       });
     },
     onStatusChange(listener) { listeners.add(listener); return () => listeners.delete(listener); },
