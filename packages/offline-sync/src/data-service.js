@@ -2481,6 +2481,9 @@ export function createDataService({
         ...(inForeground(name)
           ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
           : { priority: PRIORITIES.background, visible: false }),
+        // A read of the whole collection: the scheduler keeps a visible place
+        // free beside it for bounded reads (`boundedReserve`).
+        whole: true,
         // A read other runs wait on from inside their own starts past the visible cap.
         ...(spec.gate === true ? { gate: true } : {}),
         // Never run, or run again, once this service retired or its reads paused.

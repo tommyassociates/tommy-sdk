@@ -368,6 +368,18 @@ describe('refresh methods', () => {
     expect(api.byUserIds).not.toHaveBeenCalled();
   });
 
+  it('marks a whole-collection read as whole for the scheduler, and a method read as bounded', async () => {
+    const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
+    const jobs = [];
+    const scheduler = { request: (job) => { jobs.push(job); return Promise.resolve().then(() => job.run(() => true)); } };
+    const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), scheduler, principal: { id: 'p1' } });
+    const api = server([member(1)]);
+    data.source('members', { fetch: api.whole, read: {}, methods: methods(api) });
+    await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible', priority: 'high' });
+    await data.refresh('members', { mode: 'visible', priority: 'high' });
+    expect(jobs.map((job) => [job.visible, job.whole === true])).toEqual([[true, false], [true, true]]);
+  });
+
   it('refuses a string param longer than its declared bound', async () => {
     const { data } = service();
     const search = vi.fn(async () => []);
