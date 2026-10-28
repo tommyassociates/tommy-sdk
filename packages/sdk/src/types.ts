@@ -1876,8 +1876,13 @@ export interface PrefsApi {
    * MP's first use; read choices again when this resolves.
    */
   ready(): Promise<void>;
-  /** The stored value (a copy), or `fallback` when none is stored or none has loaded yet. */
-  get<T = unknown>(key: string, fallback?: T): T;
+  /** The stored value (a copy), or null when none is stored or none has loaded yet. */
+  get<T = unknown>(key: string): T | null;
+  /**
+   * The stored value (a copy), or `fallback` when none is stored or none has
+   * loaded yet. An `undefined` fallback is no fallback: the read is null.
+   */
+  get<T>(key: string, fallback: T): T | (undefined extends T ? null : never);
   /**
    * Stores a JSON value; the next `get` returns it at once. Rejects with
    * `DATA_NOT_SAVED` when the device could not keep it (its storage full or
