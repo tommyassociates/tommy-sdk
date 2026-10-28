@@ -547,6 +547,8 @@ describe('refresh methods', () => {
     let held = Promise.resolve({ rows: [] });
     expect((await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } })).state).toBe('fresh');
     held = new Promise((resolve, reject) => { fail = reject; });
+    // Retired before its turn, the whole read never starts: nothing else hears its failure.
+    held.catch(() => {});
     const reading = data.refresh('members').catch(() => {});
     const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['102'] } });
     data.dispose();
@@ -660,6 +662,8 @@ describe('refresh methods', () => {
     const { data } = service();
     let fail;
     const held = new Promise((resolve, reject) => { fail = reject; });
+    // Retired before its turn, the whole read never starts: nothing else hears its failure.
+    held.catch(() => {});
     const api = server([member(1)]);
     data.source('members', { fetch: () => held, read: {}, methods: methods(api) });
     const reading = data.refresh('members').catch(() => {});
