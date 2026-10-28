@@ -192,6 +192,41 @@ export function applyPanelBaseStyles(shadowRoot) {
   shadowRoot.append(style);
 }
 
+/**
+ * The panel's component with its Options-API `data()` guarded. Vue runs
+ * `data()` outside its error wrapping, so a throw there escapes as the tile's
+ * own update error, which the tile's `onErrorCaptured` never sees, and leaves
+ * a half-mounted child the tile's next patch cannot remove. The guard catches
+ * an ordinary error, answers empty data, renders the child as nothing and
+ * hands the error to `onDataError`, so the child mounts whole and the tile
+ * shows its error card. A stale-world refusal is rethrown: the surface app's
+ * error handler takes it quietly (host.js `quietStaleTileErrors`).
+ */
+function guardPanelData(component, onDataError) {
+  if (!component || typeof component !== 'object' || typeof component.data !== 'function') return component;
+  const failed = new WeakSet();
+  const { data, render } = component;
+  const guarded = {
+    ...component,
+    data(vm) {
+      try {
+        return data.call(this, vm);
+      } catch (err) {
+        if (isStaleWorldRefusal(err)) throw err;
+        failed.add(this.$);
+        onDataError(err);
+        return {};
+      }
+    },
+  };
+  if (typeof render === 'function') {
+    guarded.render = function guardedRender(...args) {
+      return failed.has(this.$) ? null : render.apply(this, args);
+    };
+  }
+  return guarded;
+}
+
 export const PanelTile = defineComponent({
   name: 'MpPanelTile',
   props: {
@@ -306,6 +341,8 @@ export const PanelTile = defineComponent({
 
     expose({ retry, fail });
 
+    const panelComponent = guardPanelData(props.def.component, (err) => { if (alive) fail(err); });
+
     return () => h('div', { class: ['mp-panel-tile', `mp-panel-tile--${status.value}`], 'data-panel-id': props.def.id }, [
       // Component path: the registered Vue/F7 component mounts as a light-DOM
       // child once ready (only then — so a re-throw can't reopen after fail()).
@@ -313,7 +350,7 @@ export const PanelTile = defineComponent({
       // targets it); skeleton/fallback overlays it while not ready.
       props.def.component
         ? h('div', { class: 'mp-panel-tile__content', style: status.value === 'ready' ? undefined : { display: 'none' } },
-          status.value === 'ready' ? [h(props.def.component, { tommy: props.ctx && props.ctx.tommy, ctx: props.ctx })] : [])
+          status.value === 'ready' ? [h(panelComponent, { tommy: props.ctx && props.ctx.tommy, ctx: props.ctx })] : [])
         : h('div', { class: 'mp-panel-tile__content', ref: mountEl, style: status.value === 'ready' ? undefined : { display: 'none' } }),
       status.value === 'loading'
         ? h('div', { class: 'mp-panel-tile__skeleton', 'aria-busy': 'true' }, [h('div', { class: 'mp-panel-skeleton-bar' }), h('div', { class: 'mp-panel-skeleton-bar' })])

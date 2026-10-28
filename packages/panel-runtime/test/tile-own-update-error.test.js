@@ -6,7 +6,8 @@
  * the TILE's own "component update" error and never reaches the tile's
  * `onErrorCaptured`. The surface app's error handler takes a stale-world
  * refusal (an account switch landing while the tile mounts its panel)
- * quietly; any other error still reaches the host's handler.
+ * quietly. The data() guard (panel-tile.js) hands any other error to the tile,
+ * which shows its error card.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { h, nextTick } from 'vue';
@@ -86,12 +87,21 @@ describe('a panel whose data() throws while its tile mounts it', () => {
     } finally { consoleError.mockRestore(); }
   });
 
-  it('any other error still reaches the host handler', async () => {
+  it('an ordinary error shows the tile its error card, and Retry mounts the panel once data() answers', async () => {
     const errorHandler = vi.fn();
     refusal = () => new Error('boom');
     mount((app) => { app.config.errorHandler = errorHandler; });
     await flush();
-    expect(errorHandler.mock.calls.map((c) => [String(c[0]), c[2]])).toEqual([['Error: boom', 'component update']]);
+    expect(tile().querySelector('.mp-panel-tile__error')).toBeTruthy();
+    expect(panelErrors().map((e) => e.message)).toEqual(['boom']);
+    expect(errorHandler).not.toHaveBeenCalled();
     expect(el.querySelector('.sibling-body')).toBeTruthy();
+
+    refusal = null;
+    tile().querySelector('.mp-panel-tile__retry').click();
+    await flush();
+    expect(errorHandler).not.toHaveBeenCalled();
+    expect(tile().querySelector('.mp-panel-tile__error')).toBeNull();
+    expect(tile().querySelector('.panel-body').textContent).toBe('Australia/Sydney');
   });
 });
