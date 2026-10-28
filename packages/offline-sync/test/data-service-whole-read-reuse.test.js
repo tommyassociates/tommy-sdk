@@ -70,3 +70,44 @@ describe('a whole read of an unchanged collection', () => {
     }
   );
 });
+
+describe('whole reads asked while the first is still reading the store', () => {
+  it('answer every caller with rows, not the read on its way, and read the store once', async () => {
+    const { data, store, getAll } = fixture();
+    await data.ingest('products', [{ id: '1', title: 'One' }, { id: '2', title: 'Two' }]);
+    // The store answers slowly, as a phone's does at boot.
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    const rows = await store.getAll();
+    getAll.mockClear();
+    getAll.mockImplementationOnce(() => held.then(() => rows));
+    const first = data.read('products');
+    const second = data.read('products');
+    const third = data.read('products');
+    release();
+    const answers = await Promise.all([first, second, third]);
+    answers.forEach((answer) => {
+      expect(Array.isArray(answer)).toBe(true);
+      expect(answer.map((row) => row.title).sort()).toEqual(['One', 'Two']);
+    });
+    expect(getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('share the store read\'s failure, and the next read reads the store again', async () => {
+    const { data, store, getAll } = fixture();
+    await data.ingest('products', [{ id: '1', title: 'One' }]);
+    const rows = await store.getAll();
+    getAll.mockClear();
+    let fail;
+    getAll.mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject; }));
+    const first = data.read('products');
+    const second = data.read('products');
+    await vi.waitFor(() => expect(typeof fail).toBe('function'));
+    fail(Object.assign(new Error('Storage read failed (unavailable)'), { reason: 'unavailable' }));
+    await expect(first).rejects.toMatchObject({ reason: 'unavailable' });
+    await expect(second).rejects.toMatchObject({ reason: 'unavailable' });
+    getAll.mockImplementationOnce(async () => rows);
+    expect((await data.read('products')).map((row) => row.title)).toEqual(['One']);
+    expect(getAll).toHaveBeenCalledTimes(2);
+  });
+});

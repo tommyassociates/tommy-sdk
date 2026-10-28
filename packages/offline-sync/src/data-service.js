@@ -2534,14 +2534,18 @@ export function createDataService({
     }
     const generation = generationOf(name);
     const kept = wholeReads.get(id);
-    if (kept && kept.generation === generation && now() - kept.at < wholeReadReuseMs) return { rows: kept.rows, own: false };
-    const entry = { generation, at: now(), rows: direct() };
+    // A kept read still reading the store answers when it has read: its
+    // callers wait for its rows (or its failure), never take the read itself.
+    if (kept && kept.generation === generation && now() - kept.at < wholeReadReuseMs) return { rows: await kept.reading, own: false };
+    const entry = { generation, at: now(), reading: null };
+    entry.reading = Promise.resolve().then(direct);
     wholeReads.set(id, entry);
-    try { entry.rows = await entry.rows; } catch (error) {
+    try {
+      return { rows: await entry.reading, own: false };
+    } catch (error) {
       if (wholeReads.get(id) === entry) wholeReads.delete(id);
       throw error;
     }
-    return { rows: entry.rows, own: false };
   }
 
   const service = {
