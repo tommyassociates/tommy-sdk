@@ -12,7 +12,7 @@
  * not silent (the manifest still declares them; the fabric engine consumes
  * them from M1's fabric work onward).
  */
-import { databaseName } from './names.js';
+import { databaseName, viewerDatabaseName } from './names.js';
 import { reconcileFetched, windowKeyOf } from './reconcile.js';
 import { createDataService } from './data-service.js';
 
@@ -46,15 +46,20 @@ import {
  * Default backend for a store when the host injects no `backendFactory`:
  * client-owned stores (manifest `syncStrategy: last_write_wins`, e.g. an MP's
  * view `settings`) PERSIST across a shell reload when the runtime has Web
- * Storage; everything else (server-authoritative caches) stays in memory —
+ * Storage and the host names the viewer (`viewerDb`, the database name keyed
+ * by viewer); everything else (server-authoritative caches) stays in memory —
  * re-seeded from the server on mount, so it must not accumulate stale rows
  * across sessions. In node (no localStorage) every store falls back to memory.
+ * Without a viewer a client-owned store is kept in memory too: one browser
+ * may be used by several people, and Web Storage keyed by tenant and MP alone
+ * would show one person's choices to the next.
  */
-function defaultBackend(dbName, storeName, syncStrategy) {
-  if (syncStrategy === 'last_write_wins' && hasWebStorage()) {
+const persistsByDefault = (syncStrategy, viewerDb) => syncStrategy === 'last_write_wins' && !!viewerDb && hasWebStorage();
+function defaultBackend(viewerDb, storeName, syncStrategy) {
+  if (persistsByDefault(syncStrategy, viewerDb)) {
     // Its rows are the only copy: a write that does not fit is refused, never
     // made room for by dropping another.
-    return createLocalStorageBackend(dbName, storeName, { evict: false });
+    return createLocalStorageBackend(viewerDb, storeName, { evict: false });
   }
   // ⚠ A `persist: true` SERVER-AUTHORITATIVE STORE STILL LANDS IN MEMORY HERE,
   // and that is deliberate. Durable caching needs a store far larger than Web
@@ -95,6 +100,11 @@ export function manifestIndexes(indexes) {
  *   always took its early return, and EVERY MP store in the shell was a memory
  *   store — MP persistence silently off, measured as zero `mp-store:*` keys after a
  *   five-surface walk. Do not drop it again.
+ * @param {string} [opts.viewer] who the MP is shown to (any stable string
+ *   the host keys a person by). Only the default backend reads it: with no
+ *   `backendFactory`, client-owned stores (prefs among them) are kept in Web
+ *   Storage under this viewer, and in memory when it is not given. A host
+ *   factory keys its own storage.
  * @param {function} [opts.now]
  * @param {function} [opts.onPersistError] called when a write could not be
  *   persisted — `{ store, key, reason, bytes, budget, evicted }`. The SDK cannot
@@ -129,10 +139,11 @@ const clone = (value) => (value === undefined ? undefined : JSON.parse(JSON.stri
 // tenant does.
 export function createDataManager({
   capabilityToken, mpId, localData: declaredData = {}, backendFactory, now, onPersistError,
-  scheduler, feed = null, changeOwner = null, isOnline, lane = null,
+  scheduler, feed = null, changeOwner = null, isOnline, lane = null, viewer = null,
 }) {
   const localData = { ...declaredData, [PREFS_STORE]: PREFS_DECL };
   const dbName = databaseName(capabilityToken, mpId);
+  const viewerDb = !backendFactory && typeof viewer === 'string' && viewer ? viewerDatabaseName(capabilityToken, mpId, viewer) : null;
   const stores = new Map();
   // Each store's handle for the MP: its writes go in the store's turn.
   const writers = new Map();
@@ -150,8 +161,8 @@ export function createDataManager({
     // widening discipline the `syncStrategy` argument itself went through.
     const backend = backendFactory
       ? backendFactory(dbName, storeName, decl.syncStrategy, decl)
-      : defaultBackend(dbName, storeName, decl.syncStrategy);
-    if (backendFactory || (decl.syncStrategy === 'last_write_wins' && hasWebStorage())) durableStores.add(storeName);
+      : defaultBackend(viewerDb, storeName, decl.syncStrategy);
+    if (backendFactory || persistsByDefault(decl.syncStrategy, viewerDb)) durableStores.add(storeName);
     stores.set(storeName, createDataStore({
       name: storeName,
       keyPath: decl.keyPath || 'id',

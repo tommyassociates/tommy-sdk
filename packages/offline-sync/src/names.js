@@ -20,5 +20,15 @@ export function databaseName(issuedToken, mpId) {
   return ['tommy-mp', tenantId, mpId].join(':');
 }
 
+/**
+ * The name a store the device keeps for one viewer is opened under when no
+ * host backend is given: the MP's database name with the viewer the host
+ * names (any stable string; it is encoded, so it cannot reach another name).
+ */
+export function viewerDatabaseName(issuedToken, mpId, viewer) {
+  if (typeof viewer !== 'string' || !viewer) throw new Error('viewerDatabaseName: viewer required');
+  return [databaseName(issuedToken, mpId), `viewer=${encodeURIComponent(viewer)}`].join(':');
+}
+
 /** The broker's own store — action-run records + trigger queue; not MP-reachable. */
 export const BROKER_DATABASE = ['tommy', 'broker'].join('-');
