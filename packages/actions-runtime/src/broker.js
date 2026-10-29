@@ -1,23 +1,9 @@
 /**
- * broker.js — the host broker (actions-runtime.md §§1-9, mode-independent).
- *
- * The trusted mediator: every cross-MP message passes through here.
- * Enforcement — capability tokens, default-deny authz, throttle profiles,
- * loop/cascade caps, schema validation, action-run records — lives HERE,
- * never in SDK code (the SDK validates for DX only).
- *
- * M1 scope (sdk-broker spec + harden round-1):
- *  - direct-adapter entry points (emit/query/invoke/rollbackTransaction/subscribe)
- *  - emission modes async/debounced/sync; condition memoisation §2.5
- *  - inputMap: base four sources + default EXECUTED; E1–E7 shapes carried in
- *    types but rejected with a named not-implemented error
- *  - Active Trigger Index (D21): emit-side short-circuit + per-(trigger,day)
- *    suppression tally; never applied to non-Action data/security signals
- *    (M1 broker carries Actions only, so the exemption is structural)
- *  - offline queue (FIFO per source MP, caps 500/5MB, original-key replay)
- *  - action-run records + the query/replay surface the inspector consumes
- *  - server_write forwards to the injected `serverInvoke` seam (the F0 typed
- *    client's invoke — contract envelope; NEVER an endpoint literal here)
+ * The host broker: the trusted mediator every cross-MP message passes through.
+ * Enforcement (capability tokens, default-deny authz, throttles, loop/cascade
+ * caps, schema validation, action-run records) lives here, never in SDK code;
+ * the SDK validates for DX only. server_write goes through the injected
+ * `serverInvoke` seam, never an endpoint literal.
  */
 import { TommyError, isTommyError, DEFAULT_RPC_TIMEOUT_MS } from '@tommy/sdk';
 import Ajv from 'ajv';
@@ -37,17 +23,15 @@ const err = (code, message, extra = {}) => new TommyError({ code, message, ...ex
 
 const dayKey = (ts) => new Date(ts).toISOString().slice(0, 10);
 
-/** inputMap sources the M1 broker EXECUTES (harden round-1: base four + default). */
+/** inputMap sources the broker executes (plus the default). */
 const M1_SOURCES = new Set(['trigger', 'condition', 'option']);
 
 /**
- * Memory bounds (memory audit, 2026-08): broker-lifetime maps are CACHES, not
- * ledgers — a day-long session grew both without limit. Each carries a hard
- * cap; eviction changes cost (a recompute / a re-apply), never correctness.
+ * Broker-lifetime maps are caches, not ledgers, so each has a hard cap;
+ * eviction costs a recompute or re-apply, never correctness.
  */
 const CONDITION_CACHE_MAX = 500;
-/** Mirrors the idempotency-ledger's DEFAULT_MAX idiom: insertion order IS
- *  eviction order (FIFO). */
+/** Insertion order is eviction order (FIFO). */
 const PROCESSED_KEYS_MAX = 1000;
 /** Keys whose RESULT was released but whose already-applied fact must survive
  *  — far cheaper per entry, so it holds an order of magnitude more. */
@@ -57,21 +41,13 @@ const APPLIED_KEYS_OVERFLOW_MAX = 10000;
  *  joinable and a stuck MP cannot pile up work without limit. */
 const INFLIGHT_RUNS_MAX = 500;
 
-// Server-write activities whose host adapter needs replay provenance (see
-// executeInvoke). Additive: an activity in neither set gets exactly the envelope
-// it gets today.
-//  - ALWAYS: `team.update_member` — the member-restore gate reads deadlineAt on
-//    live calls too, so it has always received a restoreContext (replayed:false).
-//  - ON REPLAY ONLY: `time-clock.record_attendance` (scope 11 D23) — the marker
-//    is present on a DRAINED punch and absent on a live one, so the server can
-//    treat "restoreContext present" as "this write waited in the durable queue"
-//    and honour its captured timestamp. A live punch carrying replayed:false would
-//    put the field on every call and blunt that rule.
+// Server-write activities whose host adapter gets replay provenance (see
+// executeInvoke). `team.update_member` always gets it: the member-restore gate
+// reads deadlineAt on live calls too.
 const RESTORE_CONTEXT_ALWAYS = new Set(['team.update_member']);
-// Activities that get restoreContext ONLY when the invoke is a durable-queue
-// DRAIN (`restoreDrain`, stamped by drainOfflineQueue). An inspector replay of a
-// live failure also sets `restoreReplay` but never waited in the queue, so it
-// must not be classified as an offline write.
+// These get it only on a durable-queue drain (`restoreDrain`), so the server can
+// read "restoreContext present" as "this write waited in the queue" and honour
+// its captured time. An inspector replay sets `restoreReplay` but never waited.
 const RESTORE_CONTEXT_ON_DRAIN = new Set(['time-clock.record_attendance']);
 const wantsRestoreContext = (envelope) => RESTORE_CONTEXT_ALWAYS.has(envelope.activity)
   || (RESTORE_CONTEXT_ON_DRAIN.has(envelope.activity) && envelope.restoreDrain === true);
@@ -79,13 +55,8 @@ const wantsRestoreContext = (envelope) => RESTORE_CONTEXT_ALWAYS.has(envelope.ac
 const wantsQueuedAt = (envelope) => RESTORE_CONTEXT_ON_DRAIN.has(envelope.activity) && envelope.restoreDrain === true;
 
 /**
- * Platform-provided triggers, available on EVERY registered MP's namespace
- * without the MP declaring them. Closed set, in-binary — the same firewall the
- * predicate operators sit behind.
- *
- * `settings.changed` — the manifest-driven settings engine fires it after a
- * setting of that MP actually moves, carrying { changedKeys }. A no-op write
- * fires nothing.
+ * Platform triggers on every registered MP's namespace, undeclared; a closed,
+ * in-binary set. `settings.changed` fires only when a setting actually moves.
  */
 const SYSTEM_TRIGGERS = Object.freeze({
   'settings.changed': Object.freeze({
@@ -110,10 +81,9 @@ function stableStringify(value) {
 }
 
 /**
- * FNV-1a 32-bit over the stable form — the derived Action key must fit the
- * frozen invoke-envelope's idempotencyKey maxLength (128); raw JSON does not.
- * Same logical event ⇒ same hash; the server's (member, shift|day) upsert is
- * the true duplicate guard, the key is the exactly-once ledger handle.
+ * FNV-1a 32-bit over the stable form, so a derived Action key fits the
+ * envelope's idempotencyKey maxLength (128). The server's upsert is the real
+ * duplicate guard; the key is the exactly-once ledger handle.
  */
 function stableHash(value) {
   const text = stableStringify(value);
@@ -140,83 +110,58 @@ export function createBroker({
   // Trusted host aliases for in-memory configuration only; wire and durable
   // identities retain the tenant identifier supplied by the authenticated call.
   tenantStateKey = (tenantId) => tenantId,
-  // --- enforcement flags (Class F). Default OFF: turning one ON requires the
-  // matching manifest declarations to exist first (grants / read: scopes), so
-  // each flips in its own wave once the estate declares them. ---
+  // Enforcement flags, default off: turning one on needs the matching manifest
+  // declarations (grants / read: scopes) to exist first.
   /**
-   * F1: treat `authorizedCallers: []` as deny-all-cross-MP, not "unset".
-   * Governs ONLY that legacy spelling — `callerPolicy: owner_only` says the same
-   * thing unconditionally and is not gated on this flag (D.40).
+   * Treat `authorizedCallers: []` as deny-all-cross-MP, not "unset".
+   * `callerPolicy: owner_only` says the same thing and is not gated on this.
    */
   strictEmptyCallers = false,
-  /** F2: cross-MP condition reads require a `read:<owner>.<condition>` scope. */
+  /** Cross-MP condition reads require a `read:<owner>.<condition>` scope. */
   enforceConditionScopes = false,
-  /** F3/F4: emit must own the trigger namespace; subscribe must be granted. */
+  /** Emit must own the trigger namespace; subscribe must be granted. */
   strictEmitOwnership = false,
   /**
    * `(mpId, tenantId) => string[]`: the scopes that MP's install holds in that
-   * tenant (its capability token's `effectiveScopes`, the authority invoke and
-   * query judge). The paths that carry no token read it: `subscribe()` when it
-   * registers and again at every delivery, an Action's trigger binding, and the
-   * identity an Action's dispatches run under. `tenantId` is the emit's tenant,
-   * or the subscription's own when it registers (undefined if the caller gave
-   * none). An MP it returns no array for holds no scopes. Omitted, those paths
-   * read the registered manifest's declared `permissions.scopes`.
+   * tenant (its token's `effectiveScopes`), for the paths that carry no token:
+   * `subscribe()` and its deliveries, Action trigger bindings and Action
+   * dispatches. No array means no scopes; omitted, the manifest's declared
+   * `permissions.scopes` are used.
    */
   grantedScopes,
-  /** C1/Option B: `{ mpId: 'domain' }` overrides for read-scope derivation. */
+  /** `{ mpId: 'domain' }` overrides for read-scope derivation. */
   domainScopeOverrides = {},
-  /** C1/Option B: primitives derivation must not grant (defaults to the exported set). */
+  /** Conditions the primitives derivation must not grant. */
   sensitiveConditions = SENSITIVE_CONDITIONS,
   /**
-   * D.39 (c) — the DURABLE half of the idempotency ledger. Defaults to a
-   * storage-detecting ledger, so the shell gets persistence with no wiring and
-   * node/tests keep exactly today's memory-only behaviour. Injectable for tests.
-   * Pass `null` to disable persistence outright.
+   * The durable half of the idempotency ledger. It detects storage itself, so
+   * node/tests stay memory-only; `null` disables persistence.
    */
   idempotencyLedger = createIdempotencyLedger(),
   invalidationEpochs = createInvalidationEpochs(),
-  /**
-   * D.43 — the offline queue's durable half. Same seam and same reasoning as
-   * the ledger above: it detects storage itself, so the shell gets persistence
-   * with no wiring and node/tests keep today's memory-only behaviour. Pass
-   * `null` to disable persistence outright.
-   */
+  /** The offline queue's durable half; same seam as the ledger above. */
   offlineQueue = createDurableQueue({ now }),
   /**
    * `() => ({ person, accountType, accountId, tenantId })`: who this broker
-   * queues and sends offline writes for. The queue is one store on the device;
-   * each row is stamped with the tenant, person and account that queued it and
-   * only a broker of the same ones sends it (see `ownsQueuedRow`). A row from
-   * before stamping is sent by a broker of its tenant. Without it every row
-   * is this broker's.
+   * queues and sends offline writes for. The queue is one store per device, so
+   * only a broker of the same owner sends a row (see `ownsQueuedRow`); an
+   * unstamped row goes to a broker of its tenant. Without it every row is ours.
    */
   queueOwner = null,
   /**
-   * How long a dispatch waits for an EXPECTED-but-unregistered MP (see
-   * `expectedMps` below) before giving up and raising the ordinary
-   * Unknown{Condition,Activity}. Only ever applies to an MP the host announced
-   * through `expectMps()` and only while it has not registered, so it can never
-   * delay a call to an MP that is genuinely absent. Deliberately larger than a
-   * condition's own `latencyBudgetMs`: this is bundle fetch + eval on a cold
-   * radio, not a query.
+   * How long a dispatch waits for an MP announced through `expectMps()` but not
+   * yet registered before raising Unknown{Condition,Activity}. Larger than a
+   * condition's `latencyBudgetMs`: it covers bundle fetch + eval on a cold radio.
    */
   registrationTimeoutMs = 8000,
   /**
-   * How long an invoke that joins a run already in flight with its idempotency
-   * key waits for that run before rejecting with a non-retryable `Timeout`.
-   * An envelope carrying `rpcDeadlineAt` (the SDK adapter's own deadline) waits
-   * less: the join gives up shortly before that deadline (`joinWaitMs`), so the
-   * caller receives this error rather than the adapter's generic timeout.
-   * The bound also ends a handler invoking its own activity with its own key,
-   * which would otherwise wait on itself.
+   * How long an invoke joining an in-flight run with the same idempotency key
+   * waits before a non-retryable `Timeout`. With `rpcDeadlineAt` it gives up just
+   * before that deadline, so the caller gets this error, not the adapter's. It
+   * also ends a handler invoking its own activity with its own key.
    */
   inflightJoinTimeoutMs = DEFAULT_RPC_TIMEOUT_MS,
-  /**
-   * How the retry loop waits between attempts. Injectable so a test can assert
-   * the SCHEDULE rather than sit through it — the delays are small by design,
-   * but a suite that waits them out is a suite that gets them shortened.
-   */
+  /** Injectable so a test asserts the retry schedule instead of waiting it out. */
   sleep = (ms) => (ms > 0 ? new Promise((resolve) => { setTimeout(resolve, ms); }) : Promise.resolve()),
 } = {}) {
   if (!capabilityService || typeof capabilityService.validate !== 'function') {
@@ -236,24 +181,10 @@ export function createBroker({
 
   // --- registries -----------------------------------------------------------
   const mps = new Map();              // mpId -> { manifest, handlers, firstParty }
-  // PROVIDER READINESS — the registration race, made waitable.
-  //
-  // An MP registers only once its bundle has been fetched and evaluated, and the
-  // host mounts each MP's surfaces AS SOON AS THAT MP registers rather than
-  // blocking the route on the whole fan-out (mp-loader/index.js
-  // `mountReadySurfacesFor`, the instant-boot optimisation). So a panel can be
-  // live and querying while a DIFFERENT MP it consumes is still mid-fetch — and
-  // the consumer sees `UnknownCondition`, which is indistinguishable from
-  // "that MP is not installed" and is usually swallowed by a safeQuery default.
-  // Measured on `availability/main`, 2026-08-21: all four `leave.*` reads failed
-  // with `condition 'leave.leave_requests' is not registered` while the SAME
-  // boot summary reported `mps: 2, mounted: 2` — leave was installed, loading,
-  // and simply had not got there yet.
-  //
-  // `expectMps()` lets the host declare the set it is ABOUT to register, so the
-  // broker can tell "not yet" from "not installed" and await the first rather
-  // than failing it. Nothing waits on an MP the host never announced, so an
-  // absent MP still fails fast, exactly as before.
+  // The host mounts each MP's surfaces as soon as that MP registers, so a panel
+  // can query an MP that is still loading and get `UnknownCondition`, which looks
+  // like "not installed". `expectMps()` declares the set about to register so
+  // the broker awaits "not yet"; an MP never announced still fails fast.
   const expectedMps = new Set();      // announced by the host, not yet registered
   const registrationWaiters = new Map(); // mpId -> Set<resolve>
   const subscribers = new Map();      // trigger -> Set<{mpId, handler}>
@@ -263,9 +194,8 @@ export function createBroker({
 
   const appliedKeysOverflow = new Set(); // keys evicted from processedKeys — the fact survives, the result does not
   const conditionCache = new Map();   // `${tenantId}:${condition}:${argsJson}` -> {value, expiresAt} (cap CONDITION_CACHE_MAX)
-  // Bumped by EVERY condition-cache invalidation. The late-value salvage runs
-  // detached, long after its dispatch returned, so it must be able to tell that
-  // the world moved underneath it — see `conditionCacheEpoch` at its call site.
+  // Bumped by every condition-cache invalidation, so the detached late-value
+  // salvage can tell the cache moved after its dispatch returned.
   let conditionCacheEpoch = 0;
   const suppressionTally = new Map(); // `${tenantId}:${trigger}:${day}` -> count
   const debouncePending = new Map();  // `${trigger}:${emitterMpId}` -> {timer, resolvers}
@@ -314,12 +244,10 @@ export function createBroker({
   }
 
   /**
-   * Take one of `mpId`'s `kind` tokens, waiting up to `maxWaitMs` for it.
-   * Returns how long the caller must wait before it runs (0 with a token in
-   * hand). A token that is not there yet is reserved by letting the bucket go
-   * below zero, so the next caller waits behind this one rather than taking
-   * the same token. Past `maxWaitMs` nothing is reserved and the call is
-   * refused with `retryAfterMs`: how long until a token is free for it.
+   * Take one of `mpId`'s `kind` tokens; returns how long to wait before running.
+   * A future token is reserved by taking the bucket below zero, so the next
+   * caller queues behind this one. Past `maxWaitMs` nothing is reserved and the
+   * call is refused with `retryAfterMs`.
    */
   function reserveToken(mpId, kind, maxWaitMs = 0) {
     const profile = throttleProfileFor(mpId);
@@ -390,40 +318,12 @@ export function createBroker({
     const policy = activityDef.callerPolicy;
     const callerIsTarget = callerMpId === targetMpId;
     const callerFirstParty = mps.get(callerMpId)?.firstParty === true;
-    // `callerPolicy` (D.40, ruled 2026-08-12) states the answer outright and is
-    // AUTHORITATIVE wherever it appears. `authorizedCallers` alone can only say
-    // `listed` unambiguously — its other two cases are carried by the SHAPE of
-    // the value (empty array / absent field), which is indistinguishable from an
-    // author who forgot. The estate's 58 owner-only activities were migrated to
-    // `callerPolicy: owner_only`, so the explicit-[] branch below is legal but
-    // unpopulated; it is kept so nothing that validated before stops validating.
-    //
-    // Three distinct cases either way (F1 — they used to be two):
-    //  - non-empty list  -> that list (plus the owner itself)      = `listed`
-    //  - EXPLICIT []     -> the author said "nobody may call this cross-MP";
-    //                       only the owner. Gated on `strictEmptyCallers`,
-    //                       which tommy-app's mp-loader sets ON. Spell this
-    //                       `callerPolicy: owner_only` instead.
-    //  - unset           -> first-party default (NOT default-deny: any
-    //                       registered first-party MP may call it)
-    //                                                              = `first_party`
+    // A declared `callerPolicy` is authoritative. Without one, the shape of
+    // `authorizedCallers` decides: a non-empty list is `listed`, an explicit []
+    // is `owner_only` under `strictEmptyCallers`, and an absent field is
+    // `first_party` (not default-deny). `callerPolicy` stays optional in v1, so
+    // a manifest omitting it must keep that default rather than become uninvokable.
     const explicitEmpty = Array.isArray(callers) && callers.length === 0;
-
-    // ONE CODE PATH (totality step 3, ruled 2026-08-14). This used to be a
-    // declared-policy table with a THREE-CASE FALLBACK beside it for activities
-    // declaring no `callerPolicy`, so the same three answers were spelled twice
-    // and could drift apart. Step 3 as originally filed said DELETE the
-    // fallback — but `callerPolicy` is deliberately still OPTIONAL (making it
-    // `required` breaks a published v1 contract, so it is deferred to the next
-    // manifestVersion bump), and deleting the fallback would leave `allowed`
-    // UNDEFINED for a manifest that legally omits the field: default-DENY, for
-    // exactly the third-party author the deferral was protecting.
-    //
-    // So NORMALISE instead of deleting. The effective policy is derived once,
-    // from the declared value or from what the legacy shape MEANT, and the
-    // single table below decides. Same one path, no unreachable branch, and an
-    // omitting manifest keeps its documented default instead of silently
-    // becoming uninvokable.
     const effectivePolicy = policy
       || (Array.isArray(callers) && callers.length ? 'listed' : null)
       || ((explicitEmpty && strictEmptyCallers) ? 'owner_only' : 'first_party');
@@ -433,9 +333,7 @@ export function createBroker({
       listed: () => callerIsTarget || (Array.isArray(callers) && callers.includes(callerMpId)),
     }[effectivePolicy]();
     if (!allowed) {
-      // The rule cited stays the one the AUTHOR wrote — an activity that said
-      // `listed` through a bare `authorizedCallers` must not be told it failed
-      // a `callerPolicy` it never declared.
+      // Cite the field the author wrote, not a `callerPolicy` it never declared.
       const rule = policy
         ? `activities.${activityName}.callerPolicy`
         : `activities.${activityName}.authorizedCallers`;
@@ -460,23 +358,10 @@ export function createBroker({
     : (sensitiveConditions || []).includes(qualified));
 
   /**
-   * Shared read-grant test for F2 (conditions) and F4 (triggers) — council C1
-   * resolved to DERIVED scopes (Option B). A read of `{owner}.{primitive}` is
-   * granted by ANY of:
-   *
-   *   1. the explicit per-primitive scope `read:{owner}.{primitive}` — mirrors
-   *      the invoke convention (`invoke:{owner}.{activity}`) and stays valid as
-   *      a strict superset of the derived form;
-   *   2. the owner's DOMAIN scope from the fixed catalogue (`read:shifts` for
-   *      scheduling, `read:attendance` for time-clock, …) — the vocabulary the
-   *      manifests already declare, so most of the estate needs no new
-   *      declaration at all;
-   *   3. '*', the HOST authority marker (inspector replay, txn compensation) —
-   *      never issuable to an MP through a capability token.
-   *
-   * EXCEPT for SENSITIVE_CONDITIONS, where (2) does not apply: those demand the
-   * explicit per-primitive scope. Holding `read:attendance` must not hand a
-   * caller `time-clock.kiosk_pin`.
+   * Read grant for a condition or trigger `{owner}.{primitive}`: the explicit
+   * `read:{owner}.{primitive}`, the owner's catalogue domain scope
+   * (`read:shifts`, …), or the host's '*'. Sensitive conditions accept only the
+   * explicit scope: `read:attendance` must not hand out `time-clock.kiosk_pin`.
    */
   function readGrant(ownerMpId, primitiveName) {
     const qualified = qualify(ownerMpId, primitiveName);
@@ -505,15 +390,7 @@ export function createBroker({
     return Array.isArray(held) ? held : [];
   }
 
-  /**
-   * F2 — condition reads were unmediated: no authz, no scope, no equivalent of
-   * `authorizeInvoke`, so any MP could read any other MP's conditions
-   * (kiosk PINs, vendor settings, client records). Grant resolution per
-   * `readGrant` above; the same-MP (callerIsTarget) exemption mirrors invoke.
-   *
-   * Gated on `enforceConditionScopes` (default OFF) until the last callers
-   * declare their owner-domain scopes (HANDOFF-m1-grants.md §A).
-   */
+  /** Cross-MP condition reads need a `readGrant`; gated on `enforceConditionScopes`. */
   function authorizeQuery(callerMpId, ownerMpId, conditionName, scopes) {
     if (!enforceConditionScopes) return;
     if (callerMpId === ownerMpId) return; // an MP always reads its own conditions
@@ -524,23 +401,9 @@ export function createBroker({
   }
 
   /**
-   * F4 — `subscribe()` was completely unauthorized: any MP could subscribe to
-   * any trigger and receive its payload (passive cross-MP exfiltration).
-   * Subscription is a REGISTRATION, not an RPC — there is no envelope and no
-   * capability token on this path — so the grant is the subscriber's
-   * `tokenlessScopes`: its install's grants, or its declared manifest scopes
-   * when the host supplies none. Under council C1's derived-scope resolution
-   * the owner's catalogue DOMAIN scope grants its triggers, with the explicit
-   * per-primitive form still accepted and SENSITIVE_CONDITIONS still excluded
-   * from derivation. Trigger ownership is the other way through, mirroring the
-   * same-MP exemption used by invoke/query.
-   *
-   * Shares `strictEmitOwnership` with F3: emit-side and subscribe-side trigger
-   * authority land (and flip) together.
-   *
-   * This is the registration check. Every delivery re-tests the grant for the
-   * emit's tenant (`subscriberHears`), so a grant that narrows later stops the
-   * payloads without the subscriber unsubscribing.
+   * Registration check for `subscribe()`. It carries no capability token, so
+   * the grant comes from `tokenlessScopes`. Every delivery re-tests it
+   * (`subscriberHears`), so a grant that narrows later stops the payloads.
    */
   function authorizeSubscribe(subscriberMpId, triggerQualified, tenantId) {
     if (triggerGranted(subscriberMpId, triggerQualified, tenantId)) return;
@@ -551,7 +414,7 @@ export function createBroker({
     });
   }
 
-  // --- Active Trigger Index (D21) -------------------------------------------
+  // --- Active Trigger Index ---------------------------------------------------
 
   function actionKey(tenantId, mpId, actionId, locationId = null) {
     return `${tenantStateKey(tenantId)}:${mpId}:${actionId}${locationId == null ? '' : `:location:${locationId}`}`;
@@ -578,23 +441,10 @@ export function createBroker({
   }
 
   /**
-   * Whether `mpId` may hear `triggerQualified` in `tenantId`: always for its own
-   * triggers, otherwise only with a read grant in its `tokenlessScopes`. One
-   * test for `subscribe()` (at registration and at each delivery) and for the
-   * DECLARATIVE binding.
-   *
-   * D.36 — `subscribe()` is grant-tested (F4) and the DECLARATIVE binding was
-   * not, so an MP could consume another MP's trigger simply by naming it in an
-   * Action. Same test, same vocabulary, same source, since neither path
-   * carries a capability token.
-   *
-   * A binding that fails the test is DROPPED from the wiring rather than
-   * throwing. The imperative path can reject at `subscribe()` because a caller
-   * is waiting; here the caller is an unrelated MP's emit, and failing its emit
-   * because a third party declared an ungranted Action would make one MP's
-   * manifest able to break another's writes. Dropping also keeps
-   * `triggerIsActive` honest — an ungranted binding is not a consumer, so the
-   * emit suppresses exactly as it would with no binding at all.
+   * Whether `mpId` may hear `triggerQualified` in `tenantId`, for `subscribe()`
+   * and Action trigger bindings alike. An ungranted binding is dropped, not
+   * thrown: the emit belongs to an unrelated MP, and one MP's manifest must not
+   * break another's writes.
    */
   function triggerGranted(mpId, triggerQualified, tenantId) {
     if (!strictEmitOwnership) return true;
@@ -641,21 +491,10 @@ export function createBroker({
   // --- dispatch internals ----------------------------------------------------
 
   /**
-   * D.35 — an Action's dispatches run as the MP that OWNS the Action, not as
-   * whoever emitted the trigger.
-   *
-   * `sourceMpId` was already the action owner, but the IDENTITY handed down was
-   * the emitter's, and `identity.scopes` is what `authorizeQuery` judges. So an
-   * Action owned by A, fired by B's emit, read A's cross-MP condition gates
-   * with B's grants — wrongly allowing when B held a grant A does not, and
-   * wrongly denying when A held one B does not. The attribution was wrong the
-   * same way: the run record carried B's capability token.
-   *
-   * There is no capability token on this path (nobody made an RPC — the broker
-   * is running a declared wiring), so the scopes are the executing MP's
-   * `tokenlessScopes`, exactly as `authorizeSubscribe` reads them for the
-   * other tokenless path. The emitter's token id is kept as `causedByTokenId`
-   * so the chain is still traceable to the emit that caused it.
+   * An Action's dispatches run as the MP that owns the Action, not the emitter,
+   * so its condition gates are judged by the owner's grants. No RPC carries a
+   * token here, so scopes are the owner's `tokenlessScopes`; the emitter's token
+   * id stays as `causedByTokenId` for tracing.
    */
   function identityForAction(executingMpId, emitterIdentity) {
     return {
@@ -671,10 +510,9 @@ export function createBroker({
     const { mpId, actionId, action, options } = wiredAction;
     const identity = identityForAction(mpId, emitterIdentity);
 
-    // Shared inputMap source resolver — base four (trigger/option/const/
-    // condition) + default EXECUTED; E2 (transform) / E3 (template) rejected.
-    // `conditionValues` grows as earlier condition gates resolve, so a later
-    // gate's E1 input may reference an earlier gate's return (DAG order).
+    // inputMap source resolver: trigger/option/const/condition plus default;
+    // transforms and templates are rejected. `conditionValues` grows gate by
+    // gate, so a later gate's input may read an earlier gate's return.
     const conditionValues = {};
     const resolveSource = (source) => {
       if (source.transform) throw err('InvalidPayload', `Action '${actionId}': transform chains (E2) not implemented at M1`, { rule: 'not-implemented:2.22-E2', retryable: false });
@@ -693,9 +531,8 @@ export function createBroker({
       return value;
     };
 
-    // Condition gates — all must pass; returns readable for inputMap 'condition'
-    // sources. Per 2.22 E1 a gate may PARAMETERIZE its condition via `input`
-    // (assembled from the base-four sources); `args` remains valid for literals.
+    // Every condition gate must pass. A gate parameterises its condition via
+    // `input` (resolved sources) or literal `args`.
     for (const gate of action.conditions || []) {
       const ref = gate.ref || gate.name;
       const owner = gate.mp || mpId;
@@ -718,7 +555,6 @@ export function createBroker({
       if (!value) return { skipped: true, reason: `condition '${ref}' gated` };
     }
 
-    // inputMap assembly — base four + default (harden round-1); E4-E7 rejected.
     const binding = action.activity;
     if (binding.select || action.forEach || action.serviceReads) {
       throw err('InvalidPayload', `Action '${actionId}': select/forEach/serviceReads (E4/E5/E6) not implemented at M1`, {
@@ -732,13 +568,10 @@ export function createBroker({
     if (!binding.inputMap) args = triggerPayload;
 
     const targetMp = binding.mp || mpId;
-    // An Action-dispatched client_key activity has no caller to supply the
-    // key — derive it DETERMINISTICALLY from (action, trigger payload,
-    // assembled args) so a replayed emission of the same logical event
-    // (offline drain, retry) carries the SAME key and the server's
-    // exactly-once ledger absorbs it. The trigger payload is part of the key
-    // because args alone can repeat across distinct events (a constant
-    // prompt), and those are separate writes, not replays.
+    // A client_key activity dispatched by an Action has no caller to supply the
+    // key, so derive it from (action, trigger payload, args): a replay of the
+    // same event carries the same key. The payload is in it because args alone
+    // can repeat across distinct events.
     const targetDef = mps.get(targetMp)?.manifest.activities?.[binding.name];
     const derivedKey = targetDef?.idempotency === 'client_key'
       ? `act-${mpId}-${actionId}-${stableHash({ trigger: triggerPayload ?? null, args })}`.slice(0, 128)
@@ -830,24 +663,15 @@ export function createBroker({
     const triggerQualified = qualify(ownerMpId, triggerName);
     const ownerEntry = mps.get(ownerMpId);
     const triggerDef = ownerEntry?.manifest.triggers?.[triggerName]
-      // SYSTEM triggers are provided BY the platform ON every registered MP's
-      // namespace, so no manifest declares them (and none should have to —
-      // `<mpId>.settings.changed` fires because the host changed that MP's
-      // settings, not because the MP asked). Only for a registered MP: an
-      // unknown owner is still UnknownTrigger.
+      // System triggers exist on every registered MP undeclared; an unknown
+      // owner is still UnknownTrigger.
       || (ownerEntry && SYSTEM_TRIGGERS[triggerName]);
     if (!triggerDef) throw err('UnknownTrigger', `trigger '${triggerQualified}' is not declared by any registered MP`, { retryable: false });
 
-    // F3 — owner assert. The owner is resolved from the trigger STRING and was
-    // never checked against the emitter, so any MP could emit
-    // `time-clock.shift_marked_absent` (or `scheduling.shift_assigned`) and
-    // drive another MP's Actions. EXEMPT: the platform-emit / host-injection
-    // intake — those envelopes are authenticated at the socket boundary and
-    // carry a host-supplied `identity` with NO capability token, legitimately
-    // emitting on the owning MP's behalf (tommy-app mp-loader/platform-emit.js).
-    // Asserted BEFORE the offline enqueue, so a queued emit is checked once at
-    // enqueue and its drain (which replays with `identity` attached) is not
-    // re-judged.
+    // Only the owner may emit its trigger, or one MP could drive another's
+    // Actions. Host-originated emits (a host `identity`, no token) act for the
+    // owner and are exempt. Checked before the offline enqueue, so a drain
+    // (which replays with `identity`) is not re-judged.
     const hostOriginated = !envelope.capabilityToken && !!envelope.identity;
     if (strictEmitOwnership && ownerMpId !== emitterMp && !hostOriginated) {
       throw err('PermissionDenied', `mp '${emitterMp}' may not emit '${triggerQualified}' — the trigger is owned by '${ownerMpId}'`, {
@@ -856,14 +680,13 @@ export function createBroker({
     }
     validateAgainst(triggerDef.payloadSchema, envelope.payload, 'InvalidPayload', `trigger '${triggerQualified}' payload`);
 
-    // D21 emit-side short-circuit: no enabled consumer -> suppress (tally only).
+    // No enabled consumer: suppress, tally only.
     if (!triggerIsActive(tenantId, triggerQualified, envelope.payload)) {
       const key = `${tenantId}:${triggerQualified}:${dayKey(now())}`;
       suppressionTally.set(key, (suppressionTally.get(key) || 0) + 1);
       return { emitId: `suppressed-${key}`, deliveredTo: 0, queuedFor: 0, suppressed: true };
     }
 
-    // Offline: durable queue, resolve queuedFor (actions-runtime.md §1.5).
     if (!isOnline) {
       const queuedSeq = enqueueOffline(emitterMp, { ...envelope, identity });
       return { emitId: `queued-${queuedSeq}`, deliveredTo: 0, queuedFor: 1 };
@@ -886,7 +709,6 @@ export function createBroker({
       chainPath: chain.chainPath,
       online: isOnline,
     });
-    // Emission modes.
     const emission = triggerDef.emission || 'async';
     if (emission === 'debounced') {
       return debouncedEmit(triggerQualified, emitterMp, triggerDef.debounceMs || 0, record, envelope.payload, tenantId, identity);
@@ -927,15 +749,9 @@ export function createBroker({
   }
 
   /**
-   * Resolve an MP entry, WAITING for registration if the host has announced the
-   * MP but its bundle has not finished loading. Returns the entry, or undefined
-   * when the MP is absent, never announced, or failed to arrive in time — in
-   * which case the caller raises exactly the error it raised before.
-   *
-   * ⚠ THE WAIT IS GATED ON THE MP BEING WHOLLY UNREGISTERED, deliberately. A
-   * REGISTERED MP that lacks the named condition/activity is a manifest error,
-   * and waiting on it would turn an instant, accurate failure into a timeout
-   * that lies about the cause. Only "not here YET" waits.
+   * An MP's entry, waiting for registration if the host announced it; undefined
+   * if absent, unannounced or late. Only a wholly unregistered MP waits: a
+   * registered one missing the named primitive is a manifest error, failed at once.
    */
   async function resolveMpEntry(mpId) {
     const entry = mps.get(mpId);
@@ -957,34 +773,22 @@ export function createBroker({
   }
 
   /**
-   * Cap the condition cache (memory audit): on every set, once the cache
-   * exceeds CONDITION_CACHE_MAX, drop EXPIRED entries first, then evict
-   * oldest-by-expiresAt until within bound. Eviction costs a recompute on the
-   * next read — never a wrong value.
-   */
-  /**
-   * Is this answer a report about the READ rather than a value about the world?
-   * The estate-wide `unresolved` contract lets a condition degrade without
-   * lying — it resolves with an empty payload plus the flag instead of throwing.
-   * Caching that pins the ignorance for the whole TTL: retries stop reaching the
-   * handler, so a surface holds its error state long after the cause has passed.
-   * Both cache-write paths in `query` consult this.
+   * An `unresolved` answer reports on the read, not the world. Caching it would
+   * pin the failure for the whole TTL, so neither cache write in `query` does.
    */
   function isKnownUnknown(value) {
     return !!(value && typeof value === 'object' && value.unresolved);
   }
 
+  /** Over CONDITION_CACHE_MAX: drop expired entries, then the oldest inserted. */
   function pruneConditionCache(justSetKey = null) {
     if (conditionCache.size <= CONDITION_CACHE_MAX) return;
     const t = now();
     for (const [key, entry] of conditionCache) {
       if (entry.expiresAt <= t) conditionCache.delete(key);
     }
-    // Oldest-INSERTED first (Map order — the idempotency-ledger idiom), never
-    // the entry this call just stored. Ranking by expiresAt instead meant a
-    // short-TTL condition was deleted by the very prune its own set()
-    // triggered, starving it on EVERY read for the rest of the session
-    // (adversarial review 2026-08-31).
+    // Never the entry just stored, or a short-TTL condition evicts itself on
+    // every read.
     for (const key of conditionCache.keys()) {
       if (conditionCache.size <= CONDITION_CACHE_MAX) break;
       if (key === justSetKey) continue;
@@ -1010,8 +814,7 @@ export function createBroker({
     if (conditionDef.cacheable) {
       const hit = conditionCache.get(cacheKey);
       if (hit && hit.expiresAt > now()) return hit.value;
-      // Expired: RECLAIM it, don't just skip it (memory audit) — a skipped
-      // entry sat in the map until the next owner server_write, if ever.
+      // Reclaim an expired entry rather than skip it.
       if (hit) conditionCache.delete(cacheKey);
     }
 
@@ -1059,43 +862,18 @@ export function createBroker({
         if (!deadlinePassed) return late;
         Promise.resolve()
           .then(async () => {
-            // ⚠ VALIDATE THE LATE VALUE TOO. The on-time path runs the
-            // returnSchema gate BEFORE caching, and the read path serves a cache
-            // hit without re-validating — so caching an unvalidated late value
-            // made the schema guarantee conditional on the handler having been
-            // FAST, and a handler that misbehaves only when slow could poison
-            // every caller for the whole TTL (review round-1 finding F4). A late
-            // value that fails its own contract is not worth healing with.
+            // A cache hit is served unvalidated, so a late value must pass
+            // returnSchema before it may warm the cache.
             validateAgainst(conditionDef.returnSchema, late, 'ConditionError', `condition '${envelope.condition}' late return`);
-            // ⚠ THE RUN STAYS FAILED. The caller experienced a Timeout, and the
-            // catch below has already recorded it; flipping the SAME runId to
-            // `succeeded` erased that error, so a later triage of "the surface
-            // failed to load" found a clean history — the same invisibility this
-            // spec exists to end (review round-1 finding F5). Record the salvage
-            // as its own outcome instead.
-            // The status STAYS `failed` — a new vocabulary value would drop the
-            // run out of every `status: 'failed'` filter an engineer would use to
-            // find it, which is the opposite of the fix. The salvage rides its own
-            // fields, so the timeout and its error are both still on the record.
+            // The run stays `failed` (the caller saw a Timeout); the salvage
+            // rides its own fields so status filters still find the run.
             await records.update(record.runId, {
               lateResult: late,
               note: 'resolved after latency budget; the caller had already timed out',
             });
-            // ⚠ ONLY IF THE WORLD DID NOT MOVE. This branch runs DETACHED, an
-            // unbounded time after its dispatch returned — that is the whole
-            // point of it. So a `server_write` that deleted these very rows can
-            // land in between, sweep the cache, and then be undone by this write
-            // putting the pre-delete value back for a full TTL: deleted rows
-            // reappear on the next read and stay for a minute (round-2 finding
-            // R2-F3). The epoch is bumped by every invalidation, so an unchanged
-            // epoch is proof that nothing invalidated while this read was in
-            // flight. If it moved, the value is stale by definition — drop it.
+            // A moved epoch means an invalidation (say a delete) landed during
+            // the read, so this value is stale and must not refill the cache.
             if (conditionCacheEpoch !== epochAtDispatch) return;
-            // ⚠ AND NOT A KNOWN-UNKNOWN, same as the on-time path below. A late
-            // value is salvaged so the NEXT read is warm; salvaging an
-            // `unresolved` answer makes the next read cold-in-name-only — it
-            // serves the recorded ignorance instead of retrying. There are two
-            // cache writes in this function and the first fix only covered one.
             if (conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !isKnownUnknown(late)) {
               conditionCache.set(cacheKey, { value: late, expiresAt: now() + conditionDef.cacheTtlMs });
               pruneConditionCache(cacheKey);
@@ -1113,20 +891,8 @@ export function createBroker({
       const value = await Promise.race([deadlineAwareResult, timeout]);
       validateAgainst(conditionDef.returnSchema, value, 'ConditionError', `condition '${envelope.condition}' return`);
       await records.update(record.runId, { status: 'succeeded', result: value });
-      // A zero/absent TTL entry is born expired — the read path above can
-      // never serve it, so storing it is pure retention (memory audit).
-      //
-      // ⚠ AND NEVER CACHE AN ANSWER THAT SAYS IT DOES NOT KNOW. The estate-wide
-      // `unresolved` contract lets a condition degrade without lying — it
-      // resolves with an empty payload plus the flag rather than throwing. That
-      // is a report about the READ, not a value about the world, and caching it
-      // pins the failure for the whole TTL: every retry the user presses re-reads
-      // the same flagged answer from cache without the handler ever running, so
-      // a surface stays on its error state for up to a minute after connectivity
-      // returns. Caching a known-unknown is the one case where a cache makes the
-      // system less correct rather than merely staler.
-      // Invalidation can also land before the deadline or while the run record
-      // is being persisted. Neither path may refill the cache with older data.
+      // A zero TTL entry could never be served, and a known-unknown must not be
+      // cached. An invalidation during the read or record write also skips it.
       if (conditionCacheEpoch === epochAtDispatch && conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !isKnownUnknown(value)) {
         conditionCache.set(cacheKey, { value, expiresAt: now() + conditionDef.cacheTtlMs });
         pruneConditionCache(cacheKey);
@@ -1143,21 +909,10 @@ export function createBroker({
   }
 
   function idempotencyKeyFor(activityDef, envelope, epoch = 0) {
-    // ⚠ THE EPOCH IS FOLDED INTO EVERY BROKER-DERIVED KEY, and never into a
-    // `client_key`. The caller owns that one and the server's durable ledger is
-    // keyed on it; rewriting it under the caller would break exactly-once for
-    // the single idempotency mode that actually has a durable client ledger.
-    //
-    // `derived_from_input`, `natural_key` AND `correlationKey` are all derived
-    // by this function and none of them has a client ledger behind it, so all
-    // three take the stamp. `correlationKey` was missed on the first pass
-    // (review BSC-6), which left the two host-owned scheduled-write activities —
-    // `tommy.clock.schedule_follow_up` / `cancel_follow_up`, both also
-    // `offlineReplayable` — with no client ledger AND no invalidation.
-    //
-    // At epoch 0 the key is byte-identical to what it has always been, so
-    // nothing changes for an install that has never invalidated — no new
-    // `Mp::Invocation` rows, no cache churn.
+    // The invalidation epoch is folded into every broker-derived key, never a
+    // `client_key`: the caller owns that one and the server's ledger is keyed on
+    // it. At epoch 0 keys carry no stamp, so an install that never invalidated
+    // keeps its keys.
     const stamp = epoch > 0 ? `e${epoch}.` : '';
     switch (activityDef.idempotency) {
       case 'client_key': {
@@ -1169,39 +924,21 @@ export function createBroker({
       case 'natural_key': {
         const field = activityDef.naturalKeyField || 'id';
         const value = dottedGet(envelope.args, field);
-        // No such field ⇒ EVERY invocation would collide on 'n-undefined' and
-        // the second distinct write would replay the first's stored result
-        // (found at M3: set_mileage_status approve→reject swallowed). Fall
-        // back to whole-args derivation — identical retries still replay,
-        // distinct writes still apply.
+        // Without the field every call would collide on 'n-undefined' and a
+        // distinct write would replay the first's result, so fall back to the
+        // whole args.
         return value !== undefined ? `${stamp}n-${value}` : `${stamp}n-${JSON.stringify(envelope.args)}`;
       }
-      // D.37 — `correlationKey` is what the two host-owned scheduled-write
-      // system activities declare (`tommy.clock.schedule_follow_up` /
-      // `cancel_follow_up`, api `Mp::Activities::SYSTEM_DEFINITIONS`). It fell
-      // through to `default` and behaved EXACTLY as `none` — and because both
-      // also declare `offlineReplayable: true`, that is precisely the
-      // unkeyed-yet-replayable combination the schema forbids, hidden in the
-      // one place the manifest checker cannot see (system activities bypass
-      // it). A follow-up and its cancellation are the same FAMILY of fact, so
-      // the key is the caller's correlation key, which both inputSchemas
-      // REQUIRE — a replayed drain of the same scheduling carries the same key
-      // and the ledger absorbs it.
+      // Declared by the host's scheduled-write system activities
+      // (`tommy.clock.schedule_follow_up` / `cancel_follow_up`), which are
+      // offline-replayable, so a replayed drain must carry the same key.
       case 'correlationKey': {
         const value = envelope.args?.correlationKey;
         if (value === undefined || value === null || value === '') {
           throw err('InvalidPayload', 'idempotency=correlationKey requires args.correlationKey', { retryable: false });
         }
-        // ⚠ THE KEY IS THE CORRELATION KEY *AND* THE REST OF THE ARGS, which is
-        // a deliberate deviation from the parked note's "key on
-        // args.correlationKey". Keying on the correlation key ALONE would make
-        // `schedule_follow_up({correlationKey, fireAt})` un-rescheduable: moving
-        // an existing follow-up to a new time is a distinct write that would be
-        // swallowed and replay the first scheduling's stored result, silently.
-        // That is the M3 `set_mileage_status` approve→reject failure exactly,
-        // and it is why `natural_key` carries the same whole-args fallback a few
-        // lines above. Identical retries and offline drains still carry
-        // identical args, so they still collapse — which is the whole point.
+        // The key includes the rest of the args: on the correlation key alone,
+        // rescheduling a follow-up to a new time would replay the first result.
         const rest = { ...envelope.args };
         delete rest.correlationKey;
         const tail = Object.keys(rest).length ? `-${JSON.stringify(rest)}` : '';
@@ -1221,13 +958,8 @@ export function createBroker({
         kind: 'invoke',
         activity: envelope.activity,
         args: envelope.args,
-        // Replay provenance rides to the host for the activities that need to
-        // tell a live write from a drained one. `team.update_member` uses it for
-        // the member-restore gate; `time-clock.record_attendance` uses it so a
-        // punch that was queued offline can carry its CAPTURED time and the
-        // moment it was queued to the server (scope 11 D23 — the server honours
-        // the captured timestamp only when this runtime-set marker is present,
-        // never on a bare client claim). Set by the drain, not by MP args.
+        // Replay provenance, set by the runtime and never by MP args: the server
+        // honours a queued punch's captured time only with this marker.
         ...(wantsRestoreContext(envelope) ? {
           restoreContext: {
             mpId: record.sourceMpId, instanceId: envelope.instanceId, tenantId: record.tenantId,
@@ -1246,16 +978,10 @@ export function createBroker({
   }
 
   /**
-   * F6 — re-entrancy. The chain for `mpId` is "executing" for exactly as long
-   * as one of its dispatches is inside an activity handler/executor. A nested
-   * invoke is issued from THERE (handler code calling `tommy.actions.invoke`
-   * again), and queueing it behind the dispatch holding the chain would
-   * deadlock, so every invoke that arrives while its MP's chain is executing
-   * runs INLINE. The broker cannot tell a nested invoke from an unrelated one
-   * the MP issues while a handler awaits, so an unrelated invoke in that window
-   * also runs inline and can overlap the running one. One that repeats the
-   * running write's idempotency key joins that run instead of applying it
-   * again (`joinInflightInvoke`).
+   * Re-entrancy: while one of `mpId`'s dispatches is inside a handler, its new
+   * invokes run inline, since queueing a nested invoke behind its own ancestor
+   * would deadlock. An unrelated invoke in that window also runs inline; one
+   * repeating the running key joins it (`joinInflightInvoke`).
    */
   function enterExecution(mpId) { executingChains.set(mpId, (executingChains.get(mpId) || 0) + 1); }
   function exitExecution(mpId) {
@@ -1269,7 +995,7 @@ export function createBroker({
     const sourceMpId = envelope.sourceMpId;
     // Re-entrant (nested) dispatch: run inline, never behind our own ancestor.
     if (executingChains.has(sourceMpId)) return dispatchInvokeInner(envelope);
-    // FIFO per source MP (§3.3): chain this dispatch after the previous one.
+    // FIFO per source MP.
     const tail = invokeChains.get(sourceMpId) || Promise.resolve();
     const run = tail.catch(() => {}).then(() => dispatchInvokeInner(envelope));
     invokeChains.set(sourceMpId, run);
@@ -1284,10 +1010,7 @@ export function createBroker({
     takeToken(envelope.sourceMpId, 'invoke');
 
     const [ownerMpId, activityName] = splitQualified(envelope.activity);
-    // The WRITE half of the same race. A cross-MP write usually happens long
-    // after boot, so it is far less likely to hit it than a panel's first read —
-    // but "less likely" is how the read half survived unnoticed behind a
-    // safeQuery default, and a half-fixed race is worse than a known one.
+    // Writes wait for an announced MP's registration too.
     const ownerEntry = await resolveMpEntry(ownerMpId);
     const activityDef = ownerEntry?.manifest.activities?.[activityName];
     if (!activityDef) throw err('UnknownActivity', `activity '${envelope.activity}' is not registered`, { retryable: false });
@@ -1296,54 +1019,35 @@ export function createBroker({
     validateAgainst(activityDef.inputSchema, envelope.args, 'InvalidPayload', `activity '${envelope.activity}' args`);
 
     const chain = envelope.chain || { rootRunId: undefined, depth: 0, chainPath: [] };
-    // A fresh caller-invoke IS its own chain root (record.rootRunId = runId);
-    // loop/fan-out caps bound the causal TREE, so they apply to chained
-    // dispatches only (§7.1 — "the full causal tree rooted at one ... emit").
+    // A fresh caller-invoke is its own chain root; loop/fan-out caps bound the
+    // causal tree, so they apply to chained dispatches only.
     if (chain.rootRunId) checkChain(envelope.sourceMpId, `invoke(${envelope.activity})`, chain);
 
     const idempotencyKey = idempotencyKeyFor(
       activityDef, envelope, invalidationEpochs.get(`${tenantId}:${envelope.activity}`),
     );
-    // F5 — TENANT-SCOPED. The ledger key used to be (activity, key) only, and
-    // `derived_from_input` keys are a hash of the args alone, so the same
-    // logical write in two tenants collided and the second replayed the
-    // first tenant's stored result. Mirrors conditionCache/suppressionTally,
-    // which were already tenant-scoped. `processedKeys` lives only for the
-    // lifetime of this broker (no persistence, and the offline queue stores
-    // ENVELOPES, not ledger keys), so the format change replays nothing.
+    // Tenant-scoped: `derived_from_input` keys hash the args alone, so the same
+    // write in two tenants would otherwise replay the other's result.
     const processedKey = idempotencyKey && `${tenantId}:${envelope.activity}:${idempotencyKey}`;
     if (processedKey && processedKeys.has(processedKey)) {
-      // Repeat key -> stored prior result, not re-applied (§3.2).
+      // A repeat key replays the stored result, not re-applied.
       return { ...processedKeys.get(processedKey), idempotentReplay: true };
     }
     if (processedKey && appliedKeysOverflow.has(processedKey)) {
-      // Applied earlier this session; its result was released by the cap. The
-      // write is still SUPPRESSED — the same degraded shape the durable-ledger
-      // path returns when it knows the key but not the result.
+      // Applied this session but its result was released by the cap: still
+      // suppressed, in the durable-ledger hit's shape.
       return { status: 'succeeded', idempotentReplay: true, resultRetained: false };
     }
 
-    // D.39 (c) — the DURABLE half, consulted only after the in-memory Map
-    // misses, so in-session behaviour (full replay, with the stored result) is
-    // completely unchanged. A hit here means "this key was processed in an
-    // EARLIER session", which the Map could never know: `client_key` promised
-    // exactly-once and delivered it only until the next reload.
-    //
-    // The response is SUPPRESSION, not replay — there is no stored result to
-    // return, because results are deliberately never persisted (the ledger
-    // header explains why: `issue_kiosk_pin` returns a live PIN). Callers get
-    // `idempotentReplay: true` as before, plus `resultRetained: false` so the
-    // absence of `result` is a declared outcome rather than a surprise.
-    //
-    // ⚠ Scoped to `client_key` at the CALL SITE as well as inside the ledger.
-    // Other strategies derive their key from the args, so persisting them would
-    // put tenant data (a PIN, an id) on disk inside the key itself — and D.39
-    // is about the caller-supplied-key case regardless.
+    // The durable ledger catches a `client_key` processed in an earlier session.
+    // Results are never persisted (one may be a live PIN), so a hit suppresses
+    // with `resultRetained: false`. Only `client_key`: other keys derive from
+    // the args and would put tenant data on disk.
     if (processedKey && activityDef.idempotency === 'client_key' && idempotencyLedger?.has(processedKey)) {
       return { status: 'succeeded', idempotentReplay: true, resultRetained: false };
     }
 
-    // Offline (§7 + queue §3): replayable -> queue; else typed Offline reject.
+    // Offline: a replayable write queues; anything else is a typed Offline reject.
     if (!isOnline && activityDef.sideEffect !== 'local_write') {
       if (activityDef.offlineReplayable) {
         enqueueOffline(envelope.sourceMpId, { ...envelope, identity, idempotencyKey });
@@ -1371,10 +1075,8 @@ export function createBroker({
       envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, chain, idempotencyKey, processedKey,
     };
     if (!processedKey) return runAdmittedInvoke(admitted);
-    // Same key, same tenant, still running: join that run rather than apply the
-    // write a second time. A second invoke can get here while the first is
-    // mid-handler, because an MP's invokes run inline while one of its handlers
-    // is executing (see `dispatchInvokeInnerTracked`).
+    // Same key still running (possible via inline re-entrant invokes): join it
+    // rather than apply the write twice.
     const running = inflightInvokes.get(processedKey);
     if (running) return joinInflightInvoke(running, envelope);
     if (inflightInvokes.size >= INFLIGHT_RUNS_MAX) {
@@ -1397,12 +1099,9 @@ export function createBroker({
   }
 
   /**
-   * How long a join may wait: until shortly before the earlier of the joining
-   * call's deadline and the deadline of the call that started the run. The
-   * second bounds a handler that invokes its own activity with its own key,
-   * whose nested call carries a later deadline than the call it is part of.
-   * The adapter stamps `rpcDeadlineAt` from the wall clock, so the time left
-   * is read from the wall clock too, not from `now`.
+   * How long a join may wait: until just before the earlier of its own and the
+   * running call's deadline (the latter bounds a handler joining itself).
+   * `rpcDeadlineAt` is wall-clock time, so this reads Date.now(), not `now`.
    */
   function joinWaitMs(envelope, running) {
     const deadlines = [envelope.rpcDeadlineAt, running.deadlineAt].filter(Number.isFinite);
@@ -1436,16 +1135,11 @@ export function createBroker({
   async function runAdmittedInvoke({
     envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, chain, idempotencyKey, processedKey,
   }) {
-    // A replayable server write is kept on the device BEFORE its
-    // request goes, not only once the request has failed. On a hung
-    // connection the request neither answers nor fails, so a write kept only
-    // on failure lived in memory alone and closing the app lost it. The row is
-    // held: no drain in this page sends it while this run is in flight (a
-    // restart replays it, with its original key), an answered write takes it
-    // out again, and a request that never reached the server leaves it queued.
-    // A device that cannot keep the row (queue full, storage spent) still
-    // runs the write, held in memory as before. A drained replay is its own
-    // row already.
+    // A replayable server write is queued on the device before its request
+    // goes, since a hung request neither answers nor fails and closing the app
+    // would lose it. The row is held (no drain here sends it, a restart replays
+    // it with its key); an answered write removes it. If it cannot be kept the
+    // write still runs. A drained replay is its own row already.
     const heldSeq = activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable
       && !envelope.restoreDrain && typeof queueStore.isHeld === 'function'
       ? holdInQueue(envelope.sourceMpId, { ...envelope, identity, idempotencyKey })
@@ -1500,17 +1194,13 @@ export function createBroker({
     let lastError;
     while (attempt < Math.max(1, retry.maxAttempts)) {
       attempt += 1;
-      // ⚠ THE DECLARED BACKOFF, ACTUALLY APPLIED. `retry.backoff` was a
-      // schema-validated field that nothing read, so three attempts fired in
-      // the same millisecond — useless against `RateLimited`, which is the one
-      // retryable error this runtime raises itself. Capped in constants.js so
-      // a dead-letter still lands well inside a second.
+      // The declared backoff, capped in constants.js so a dead-letter still
+      // lands well inside a second.
       // eslint-disable-next-line no-await-in-loop
       if (attempt > 1) await sleep(retryDelayMs(retry.backoff, attempt));
       await records.update(record.runId, { status: 'running', attempts: attempt });
       try {
-        // The handler window IS the re-entrancy window (F6): a nested invoke
-        // can only originate from inside it.
+        // The handler window is the re-entrancy window.
         enterExecution(envelope.sourceMpId);
         let result;
         try {
@@ -1524,17 +1214,10 @@ export function createBroker({
         await records.update(record.runId, { status: 'succeeded', result: result.result });
         if (processedKey) {
           processedKeys.set(processedKey, final);
-          // ⚠ A RECORDED RESULT OUTLIVES THE STATE IT DESCRIBES unless something
-          // says otherwise. `derived_from_input` hashes the args, so it replays
-          // for identical args forever — right while the state still holds,
-          // wrong the moment a sibling activity clears it. `lock_window_for_shift`
-          // records `{locked: true}`; `unlock_window_for_shift` clears the flags
-          // under a DIFFERENT activity name, so a re-assign hit the recorded key
-          // and returned `{locked: true}` with no read and no write. The MP names
-          // the dependency (`invalidatesIdempotency`) because the broker cannot
-          // know which activities are inverses of each other, and a blanket
-          // "any write clears every key" rule would delete the duplicate
-          // suppression the fan-out depends on.
+          // A recorded result outlives the state it describes once a sibling
+          // activity undoes it (lock vs unlock). The MP names those siblings in
+          // `invalidatesIdempotency`; the broker cannot know inverses, and
+          // clearing every key on any write would break fan-out de-duplication.
           for (const staleActivity of activityDef.invalidatesIdempotency || []) {
             const qualified = `${ownerMpId}.${staleActivity}`;
             const prefix = `${tenantId}:${qualified}:`;
@@ -1544,16 +1227,12 @@ export function createBroker({
             for (const key of [...appliedKeysOverflow]) {
               if (key.startsWith(prefix)) appliedKeysOverflow.delete(key);
             }
-            // ...and make the SERVER's ledger miss too, by moving the epoch the
-            // next derived key for this activity is stamped with.
+            // Move the epoch so the server's ledger misses too.
             invalidationEpochs.bump(`${tenantId}:${qualified}`);
           }
-          // FIFO cap (memory audit): each entry holds a FULL activity result.
-          // The RESULT is what is released — the KEY moves to a keys-only
-          // overflow set, because dropping it outright silently RE-APPLIED the
-          // write for natural_key/derived_from_input, which have no durable
-          // ledger behind them (adversarial review 2026-08-31: a second PIN
-          // rotation, a duplicate follow-up). Keys are small; results are not.
+          // FIFO cap: release the result but keep the key in the overflow set,
+          // or a natural_key/derived_from_input write (no durable ledger) would
+          // re-apply.
           while (processedKeys.size > PROCESSED_KEYS_MAX) {
             const oldest = processedKeys.keys().next();
             if (oldest.done) break;
@@ -1566,8 +1245,7 @@ export function createBroker({
             }
           }
         }
-        // D.39 (c) — record the KEY durably (never `final`, which holds the
-        // result). Only for client_key; see the read side above.
+        // Record the key durably, never the result; client_key only.
         if (processedKey && activityDef.idempotency === 'client_key') idempotencyLedger?.add(processedKey);
         // Applied: its held row goes (after the ledger has the key, so a restart
         // in between suppresses the replay rather than sending it again).
@@ -1577,7 +1255,7 @@ export function createBroker({
           steps.push({ activity: envelope.activity, args: envelope.args, idempotencyKey });
           txnSteps.set(envelope.txnId, steps);
         }
-        // §2.5 cache invalidation: owner's server_write invalidates its condition cache.
+        // The owner's server_write invalidates its condition cache.
         if (activityDef.sideEffect === 'server_write') {
           conditionCacheEpoch += 1;
           for (const key of conditionCache.keys()) {
@@ -1603,7 +1281,7 @@ export function createBroker({
       return { rpcId: record.runId, status: 'queued_offline' };
     }
 
-    // Budget exhausted or non-retryable: dead-letter (§3.4). The server
+    // Budget exhausted or non-retryable: dead-letter. The server
     // answered (or the write failed for good), so its held row goes.
     if (heldSeq !== null) queueStore.remove(heldSeq);
     await records.update(record.runId, {
@@ -1622,10 +1300,8 @@ export function createBroker({
     const identity = envelope.identity || authenticate(envelope);
     const steps = txnSteps.get(envelope.txnId) || [];
     txnSteps.delete(envelope.txnId);
-    // Reverse-order compensation via the undo_* convention (§4). Compensation
-    // is dispatched BY THE BROKER with the OWNING MP's authority — undoing an
-    // applied step is the owner's own activity, not a caller privilege, so
-    // the caller's scope set is irrelevant here.
+    // Reverse-order compensation via `undo_*`, run with the owning MP's
+    // authority: undoing a step is the owner's activity, not a caller privilege.
     for (const step of steps.reverse()) {
       const [ownerMpId, name] = splitQualified(step.activity);
       const undoName = `undo_${name}`;
@@ -1711,18 +1387,8 @@ export function createBroker({
     'ACCOUNT_NOT_DISPLAYED', 'ACCOUNT_PERMISSIONS_UNKNOWN',
   ]);
 
-  /**
-   * A queued row is settled when it was applied or refused for good:
-   * - the server answered a 4xx other than 401, 408 and 429 (found on the
-   *   error or its causes); any other HTTP status leaves the row queued;
-   * - with no HTTP answer, the activity's own error is a final refusal
-   *   (not retryable, and not one of UNSETTLED_CODES).
-   * Anything else (no answer, a timeout, 401, 429, 5xx, an account not on
-   * screen, a Mini Program not loaded yet) leaves the row to be sent again.
-   */
-  // No answer came back at all: no connection, or the request was cut off
-  // before a response (status 0, or the fetch itself threw). Any HTTP status
-  // means the server answered.
+  // No answer came back at all: status 0, or the fetch itself threw. Any HTTP
+  // status means the server answered.
   function neverReachedServer(error) {
     let cause = error;
     for (let depth = 0; cause && depth < 8; depth += 1) {
@@ -1735,6 +1401,11 @@ export function createBroker({
     return false;
   }
 
+  /**
+   * A queued row is settled when the server answered a 4xx other than 401, 408
+   * and 429, or, with no HTTP answer, the activity's own error is final (not
+   * retryable and not in UNSETTLED_CODES). Anything else is sent again.
+   */
   function refusedForGood(error) {
     let cause = error;
     for (let depth = 0; cause && depth < 8; depth += 1) {
@@ -1799,7 +1470,7 @@ export function createBroker({
   // --- public surface ---------------------------------------------------------
 
   return {
-    /** Register a VALIDATED manifest (validation is @tommy/manifest's job). */
+    /** Register a manifest already validated by @tommy/manifest. */
     registerMp(manifest, { handlers, firstParty } = {}) {
       mps.set(manifest.id, {
         manifest,
@@ -1816,26 +1487,16 @@ export function createBroker({
     },
 
     /**
-     * Announce the MPs the host is ABOUT to register — the loading set, declared
-     * before the fan-out that registers them. A dispatch to one of these waits
-     * for it to arrive instead of failing as unknown; a dispatch to anything
-     * else is unaffected and still fails immediately.
-     *
-     * Announcing is a promise the host must keep: an MP announced and never
-     * registered costs every caller `registrationTimeoutMs` before failing, so
-     * announce the set that is genuinely being loaded, and call
-     * `stopExpecting()` for any that drops out (a failed bundle fetch, a flag
-     * that resolves off). Ids already registered are ignored.
+     * Announce the MPs the host is about to register; a dispatch to one waits
+     * for it instead of failing as unknown. An MP announced and never registered
+     * costs every caller `registrationTimeoutMs`, so call `stopExpecting()` for
+     * any that drops out.
      */
     expectMps(mpIds = []) {
       for (const mpId of mpIds) if (mpId && !mps.has(mpId)) expectedMps.add(mpId);
     },
 
-    /**
-     * Withdraw an announcement — the MP is not coming after all. Releases every
-     * waiter at once so they fail NOW with the honest "not registered" rather
-     * than each burning the full timeout on an MP already known to be absent.
-     */
+    /** Withdraw an announcement, releasing its waiters to fail now as not registered. */
     stopExpecting(mpId) {
       expectedMps.delete(mpId);
       const waiters = registrationWaiters.get(mpId);
@@ -1877,38 +1538,26 @@ export function createBroker({
         options: options !== undefined ? options : prev.options, revision, inherited: false });
     },
 
-    // --- manifest-driven settings (P1 engine) --------------------------------
-    // The per-tenant SETTINGS projection. The system of record is wherever the
-    // field's declared `store` says it is (the existing workforce/team/vendor
-    // stores at P1 — nothing migrated); this is the device-side read model the
-    // renderer, `tommy.settings.get()` and `{ from: setting }` predicates all
-    // share, so a write is live everywhere without a reload.
+    // --- manifest-driven settings ---------------------------------------------
+    // The device-side per-tenant settings read model shared by the renderer,
+    // `tommy.settings.get()` and `{ from: setting }` predicates; the system of
+    // record is each field's declared `store`.
     setSettingState(tenantId, mpId, values = {}) {
       const key = `${tenantStateKey(tenantId)}:${mpId}`;
       settingState.set(key, { ...(settingState.get(key) || {}), ...values });
-      // A condition may read a setting, so a settings write invalidates this
-      // tenant's memoised condition results — otherwise a cacheable condition
-      // keeps answering from the pre-write world for its whole TTL.
+      // A condition may read a setting.
       invalidateConditionCache(tenantId);
     },
 
     /**
-     * This MP's OWN settings document (a copy — callers must not mutate the
-     * projection). Cross-MP reads are NOT served here: an MP reads another
-     * MP's setting only through a declared `{ from: setting, mp }` source,
-     * whose dependency the manifest states, never by asking for a namespace
-     * it did not declare.
+     * A copy of this MP's own settings. Another MP's settings are read only
+     * through a declared `{ from: setting, mp }` source.
      */
     settingsFor(tenantId, mpId) {
       return { ...(settingState.get(`${tenantStateKey(tenantId)}:${mpId}`) || {}) };
     },
 
-    /**
-     * Declared settings PAGES from the registered manifests — the display side
-     * the projection omits (titles, sections, field types, predicates). The
-     * `actionCatalog()` precedent: state and declaration are joined on the
-     * device, not duplicated over the wire.
-     */
+    /** Declared settings pages: the display side the projection omits. */
     settingsCatalog() {
       const out = [];
       for (const [mpId, entry] of mps) {
@@ -1920,10 +1569,8 @@ export function createBroker({
     },
 
     /**
-     * THE predicate evaluator (R4). Exposed on the broker so every gate in the
-     * platform — Action `when`, interaction visibleWhen, settings
-     * visibleWhen/readOnlyWhen — reaches the SAME implementation. Callers pass
-     * a context bag of resolved source values; they never compare.
+     * The one predicate evaluator every platform gate uses. Callers pass
+     * resolved source values; they never compare.
      */
     evaluatePredicate: evaluateDeclaredPredicate,
 
@@ -1946,16 +1593,15 @@ export function createBroker({
     invoke: dispatchInvoke,
     rollbackTransaction,
 
-    /** Inspector surface: query + replay (actions-runtime.md §5). */
+    /** Inspector surface: query + replay. */
     records: {
       query: (filter) => records.query(filter),
       get: (runId) => records.get(runId),
     },
 
     /**
-     * Re-dispatch a failed/dead-lettered invoke with its original args (same
-     * key to test idempotency, or a new one). HOST-initiated (the inspector) —
-     * runs with host authority, attributed to the original source MP.
+     * Re-dispatch a failed invoke with its original args (same key or a new
+     * one), with host authority, attributed to the original source MP.
      */
     async replay(runId, { newIdempotencyKey } = {}) {
       const record = await records.get(runId);
@@ -1977,13 +1623,8 @@ export function createBroker({
     },
 
     /**
-     * Registered-Action metadata for the Settings → Actions management UI
-     * (actions-runtime.md §10 / W4) — a READ projection of the registered
-     * manifests, keyed (mpId, actionId). The server `index_mp` payload carries
-     * the per-tenant STATE (enabled/required/options/availability/usage); this
-     * supplies the manifest-side DISPLAY metadata it omits (title/description/
-     * optionsSchema/optionsDefault — the Configure form's schema). Read-only;
-     * touches no state.
+     * Manifest-side display metadata for each registered Action, which the
+     * server's per-tenant state payload omits. Read-only.
      */
     actionCatalog() {
       const out = [];
@@ -2014,11 +1655,8 @@ export function createBroker({
         bySource[row.sourceMpId] = (bySource[row.sourceMpId] || 0) + 1;
         bytesBySource[row.sourceMpId] = (bytesBySource[row.sourceMpId] || 0) + (row.bytes || 0);
       }
-      // `expiredOnLoad` is reported rather than swallowed: dropping a row past
-      // its TTL is the one path that discards an accepted write (D.43), so the
-      // host can surface it instead of the write silently never appearing.
-      // Byte usage and the per-partition caps ride along so a host read can
-      // show queue pressure for one MP without exposing another's rows.
+      // `expiredOnLoad` is the one path that discards an accepted write, so it
+      // is reported for the host to surface.
       return {
         total: rows.length,
         bySource,

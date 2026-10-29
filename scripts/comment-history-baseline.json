@@ -1,12 +1,9 @@
 {
-  "packages/actions-runtime/src/broker.js": 21,
   "packages/manifest/scripts/check-schema-drift.mjs": 1,
   "packages/manifest/src/index.d.ts": 2,
   "packages/manifest/src/legacy-packages.js": 5,
   "packages/manifest/src/schema.js": 1,
   "packages/manifest/src/validate.js": 2,
-  "packages/offline-sync/src/data-service.js": 21,
-  "packages/offline-sync/src/data-store.js": 12,
   "packages/offline-sync/src/host-store/port.js": 4,
   "packages/offline-sync/src/host-store/protocol.js": 1,
   "packages/offline-sync/src/manager.js": 9,

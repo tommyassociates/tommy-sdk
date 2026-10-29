@@ -2,17 +2,11 @@ import { createTransactionalDataStore, copyStorageRow } from './transactional-st
 import { utf16Units } from './bytes.js';
 import { unchangedServerRow, heldProvenance } from './unchanged-row.js';
 /**
- * data-store.js — the DataStore behind `tommy.data.store(name)`
- * (sdk-types.ts DataStore/DataApi; offline-sync.md §1/§4).
- *
- * The MP never touches raw IndexedDB: this wrapper enforces the manifest
+ * The DataStore behind `tommy.data.store(name)`: enforces the manifest
  * `recordSchema` on every put, stamps sync metadata `{_rev, _updatedAt,
- * _dirty}` (+ `_dedupeKey` when supplied — the fabric's per-write identity),
- * and provides the whole-store `subscribe` plus the additive selector
- * `subscribeQuery` (fires only when an entity the selector read changes).
- *
- * Backends are injected: MemoryBackend for tests/node, an IndexedDB backend
- * in the shell. Store creation/upgrade from the manifest is the manager's job.
+ * _dirty}` (+ `_dedupeKey`, the per-write identity), and serves `subscribe`
+ * and `subscribeQuery`. Backends are injected; store creation from the
+ * manifest is the manager's job.
  */
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
@@ -30,11 +24,9 @@ export function recordSchemaCheck(recordSchema) {
     ? (validate.errors || []).map((e) => `${e.instancePath || '$'} ${e.message}`).join('; ') : null);
 }
 
-/** Rows by key, keyed as strings like every other backend (a numeric id and its text find the same row). */
 // Per backend: the pending write turn of each row key (see `rowTurn`). A
 // backend over shared storage names it (`turnKey`), so every handle over that
-// storage in this page takes the same turns, and every tab takes that
-// storage's Web Lock for each turn (see `acrossTabs`).
+// storage in this page takes the same turns.
 const backendTurns = new WeakMap();
 const sharedTurns = new Map();
 function turnsFor(backend) {
@@ -57,16 +49,15 @@ function webLocks() {
 }
 /**
  * Runs `task` holding the Web Lock for shared storage `name`, so a read-check-
- * write in one tab never interleaves with a write to that storage from
- * another. The storage is one blob per store, so the lock is per store.
- * Without Web Locks the task runs as it is; the fenced delete then compares
- * and deletes in one synchronous step on the storage (`deleteIf`).
+ * write in one tab never interleaves with another tab's write. Without Web
+ * Locks the fenced delete relies on `deleteIf` being one synchronous step.
  */
 function acrossTabs(name, task) {
   const locks = webLocks();
   return locks ? locks.request(`offline-sync:${name}`, () => task()) : task();
 }
 
+/** Rows keyed as strings like every other backend (a numeric id and its text find the same row). */
 export function createMemoryStoreBackend() {
   const rows = new Map();
   return {
@@ -94,45 +85,22 @@ export function hasWebStorage() {
 }
 
 /**
- * Default byte budget for ONE localStorage-backed store.
- *
- * Chosen from measurement, not from a round number (spec mp-store-quota-guard,
- * Phase 0, Team 3): the whole app was using 27,647 bytes across 26 keys — about
- * 0.5% of the ~5MB origin quota — and almost all of it was capability tokens.
- * 512KB is therefore ~10% of the origin quota per store, roughly 1,260 mileage
- * drafts, while leaving the other fifteen stores and the app's own keys room to
- * breathe.
- *
- * ⚠ ROWS WOULD HAVE BEEN THE WRONG UNIT, BY TWO ORDERS OF MAGNITUDE. A fully
- * populated mileage draft is 415 bytes; a form draft carrying one signature is a
- * base64 PNG data URI — `drawable-image.vue` produces `toDataURL('image/png')` —
- * so ~40KB, about a hundred times bigger. A row cap tuned for one is useless for
- * the other, which is why the guard that protects a drafts store counts bytes.
+ * Default byte budget for ONE localStorage-backed store: ~10% of the ~5MB
+ * origin quota. Budgeted in bytes, not rows, because a signed form draft
+ * (base64 PNG, ~40KB) is ~100x a mileage draft (~415 bytes).
  */
 const DEFAULT_MAX_BYTES = 512 * 1024;
 
 /**
- * How much bigger than the store's byte budget the RETAINED (undisked) map may
- * get before the retention bound starts dropping the oldest rows.
- *
- * ⚠ NOT A TUNING KNOB, AND NOT 1. At 1 the bound fires on the first refused
- * write and deletes a draft the quota guard had just chosen to keep — the
- * opposite of that spec's decision, and it broke its invariant test. The
- * headroom is what makes "refuse rather than drop" still true for the case it
- * was written about, while a session that refuses thousands of writes is still
- * bounded rather than growing one row at a time forever.
+ * How much bigger than the byte budget the RETAINED (undisked) map may get
+ * before the oldest rows are dropped. Must stay above 1: at 1 the very first
+ * refused write would delete a draft the quota guard chose to keep.
  */
 const RETAINED_BUDGET_MULTIPLE = 2;
 
 /**
- * Rows a failed save is holding in memory, keyed by store key.
- *
- * ⚠ THIS IS WHAT MADE THE OLD COMMENT TRUE. `save()` used to swallow the quota
- * throw under a comment promising it would "degrade to in-memory-until-reload",
- * and it did no such thing: every operation begins with `load()`, which reads
- * from storage, so there was no in-memory map for the write to survive in. The
- * row was gone by the next read and `put()` had already resolved. Retaining the
- * map here is what the comment always described.
+ * Rows a failed save is holding in memory, keyed by store key. `load()` reads
+ * this first, so a write that missed disk survives until reload.
  */
 const memoryFallback = new Map();
 
@@ -149,29 +117,18 @@ const entryBytes = (key, record) => utf16Units(JSON.stringify(String(key)))
   + utf16Units(JSON.stringify(record)) + 1;
 
 /**
- * A localStorage-backed store backend — the same async contract as
- * createMemoryStoreBackend, but the whole store PERSISTS across a shell reload
- * under a stable `mp-store:{dbName}:{storeName}` key. Sized for small
- * client-owned stores (manifest `syncStrategy: last_write_wins`, e.g. an MP's
- * `settings`): the whole store is a single JSON blob.
+ * A localStorage-backed backend: the memory backend's contract, persisted as
+ * one JSON blob under `mp-store:{dbName}:{storeName}`. Sized for small
+ * client-owned stores (`syncStrategy: last_write_wins`).
  *
- * WRITES CAN FAIL, AND SAY SO. `put`/`delete` resolve to `{ ok: true }` or to
- * `{ ok: false, reason, bytes, budget, evicted }`. They do NOT throw — the
- * DataStore above decides what a failed persist means to a caller — but they no
- * longer pretend to have succeeded either, which is the defect this closes.
- *
- * READS CANNOT BE TAKEN FOR EMPTY EITHER. Storage that cannot be reached
- * (gone, or throwing on read) rejects with DATA_UNAVAILABLE, so a caller never
- * mistakes an unknown store for an empty one (a removal that removed nothing
- * would report success). A blob that is there but corrupt reads as empty,
- * and the next write replaces it.
+ * `put`/`delete` never throw; they resolve `{ ok: true }` or
+ * `{ ok: false, reason, bytes, budget, evicted }` and the DataStore decides
+ * what a failed persist means. Unreachable storage rejects reads with
+ * DATA_UNAVAILABLE so an unknown store is never taken for an empty one; a
+ * corrupt blob reads as empty and the next write replaces it.
  */
 export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAULT_MAX_BYTES, evict = true } = {}) {
   const storeKey = `mp-store:${dbName}:${storeName}`;
-  // Storage that cannot be reached is never taken for an empty store: the
-  // read rejects (DATA_UNAVAILABLE), and so does every write that needs it. A
-  // blob that is there but cannot be parsed holds nothing that can be read,
-  // and the next write replaces it.
   function load() {
     if (memoryFallback.has(storeKey)) return new Map(memoryFallback.get(storeKey));
     const store = webStorage();
@@ -188,16 +145,10 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
 
   /**
    * Bring `map` under the byte budget by dropping the OLDEST evictable rows.
-   *
-   * Same two exemptions the row cap uses, for the same reasons: `_dirty` rows
-   * are unpushed local edits and `protect` is the row being written right now.
-   * Which means an all-dirty store cannot be shrunk at all — and that is the
-   * point. A drafts store over budget FAILS THE WRITE rather than deleting
-   * somebody's unsent work to make room for the next one.
-   *
-   * With `evict: false` (a store the device authors, such as preferences) no
-   * row is evictable: each is the only copy, so a write that does not fit is
-   * refused instead.
+   * `_dirty` rows (unsent edits) and `protect` (the row being written) are
+   * never evicted, so an all-dirty store over budget fails the write rather
+   * than deleting unsent work. With `evict: false` (device-authored stores)
+   * nothing is evictable: each row is the only copy.
    */
   function evictToFit(map, protect) {
     let total = 0;
@@ -229,33 +180,10 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
   }
 
   /**
-   * Bound the map we RETAIN in memory when a save could not reach disk.
-   *
-   * ⚠ THIS WALKS BACK A DELIBERATE DECISION, AND IT IS THE POINT. The quota
-   * guard chose "refuse rather than drop a draft", which is right for the WRITE
-   * — but it said nothing about what the refusal accumulates. `load()` prefers
-   * the retained map, so every refused write copied it, added a row, and
-   * re-retained it ONE ROW LARGER, for the life of the session. The row cap
-   * cannot help: `put` stamps `_dirty` on every write, the cap never evicts a
-   * dirty row, and `capSaturated` then latches. So the degraded state grew
-   * without any bound at all — the "no unbounded store" objective the quota
-   * guard declared and did not deliver.
-   *
-   * ⚠ THE CEILING HAS HEADROOM ON PURPOSE, and the first cut of this did not.
-   * Bounding at `maxBytes` itself made the VERY FIRST refused write start
-   * dropping drafts — which does not bound a leak, it just deletes the work the
-   * quota guard had deliberately kept, immediately. The failing case was the
-   * finalized spec's own invariant test. So the retained map gets its own
-   * ceiling at a multiple of the store budget: an over-budget store still keeps
-   * every draft through the refusals a member can realistically produce, and
-   * only genuinely unbounded growth is trimmed.
-   *
-   * It drops OLDEST-FIRST, and unlike `evictToFit` it may drop a `_dirty` row —
-   * past this point every row is dirty and the alternative is unbounded growth.
-   * That is a real cost: a member's oldest unsent draft can go. It is therefore
-   * never silent — the keys come back to `put`, which tells subscribers and the
-   * host. Silently discarding typed work would be a worse defect than the leak
-   * this closes.
+   * Bound the map RETAINED in memory when a save could not reach disk, which
+   * otherwise grows a row per refused write (the row cap skips dirty rows).
+   * Past the ceiling rows go oldest-first, dirty included, never silently:
+   * the keys return to `put`, which tells subscribers and the host.
    */
   function boundRetained(map, protect) {
     const ceiling = maxBytes * RETAINED_BUDGET_MULTIPLE;
@@ -286,10 +214,8 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
 
   /**
    * Retain `map` for the session, bounded, and report what the bound cost.
-   *
-   * With `evict: false` nothing is held: the write is refused (`refused`) and
-   * the store stays as it was saved, so a refused row never counts against a
-   * later write and no saved row is ever trimmed to bound what is held.
+   * With `evict: false` nothing is held: the write is refused and the store
+   * stays as saved, so no saved row is ever trimmed to bound what is held.
    */
   function retain(map, protect) {
     if (!evict) return { discarded: [], refused: true };
@@ -299,13 +225,8 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
   }
 
   /**
-   * Patch a row already held in the retained map, WITHOUT a second save.
-   *
-   * `put` flags a refused row `_persistFailed` so a surface can say so. Doing
-   * that through `backend.put` ran the whole save path a second time per refused
-   * write — `evictToFit`, a full `JSON.stringify` of the store, the retention
-   * copy — so a store under pressure paid twice the cost exactly when it could
-   * least afford it. The row is already in memory; patch it there.
+   * Patch a row already held in the retained map, WITHOUT a second save: going
+   * through `put` would rerun the whole save path for every refused write.
    */
   function patchRetained(key, patch) {
     const map = memoryFallback.get(storeKey);
@@ -323,13 +244,8 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
   function save(map, protect) {
     const store = webStorage();
     if (!store) {
-      // NOT `{ ok: true }`. This backend is only ever chosen because Web Storage
-      // existed at construction, so reaching here means it went away mid-session
-      // (a WKWebView data store cleared, a permission revoked) — and answering
-      // "ok" to a write that reached nothing is the exact silent-loss shape this
-      // store's quota path was written to end (review finding F4). Retain the
-      // rows for the session and tell the caller, the same way the quota branch
-      // does.
+      // Web Storage went away mid-session (data store cleared, permission
+      // revoked): retain the rows and report the failure, as the quota branch does.
       const { discarded, refused } = retain(map, protect);
       return {
         ok: false, reason: 'unavailable', budget: maxBytes, evicted: [], discarded, ...(refused ? { retained: false } : {}),
@@ -337,8 +253,7 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
     }
     const { total, evicted } = evictToFit(map, protect);
     if (total > maxBytes) {
-      // Over budget with nothing left to give — every remaining row is either
-      // dirty or the row being written. Refuse rather than drop a draft.
+      // Every remaining row is dirty or being written: refuse rather than drop a draft.
       const { discarded, refused } = retain(map, protect);
       return {
         ok: false, reason: 'budget', bytes: total, budget: maxBytes, evicted, discarded, ...(refused ? { retained: false } : {}),
@@ -346,13 +261,10 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
     }
     try {
       store.setItem(storeKey, JSON.stringify(Object.fromEntries(map)));
-      // Back on disk: whatever we were holding in memory is now redundant.
       memoryFallback.delete(storeKey);
       return { ok: true, ...(evicted.length ? { evicted } : {}) };
     } catch (e) {
-      // The ORIGIN quota, not our own budget — some other key filled the 5MB, or
-      // storage is disabled. Keep the rows for the session so the write is not
-      // simply lost, and tell the caller it did not reach disk.
+      // The ORIGIN quota (another key filled it) or storage disabled.
       const { discarded, refused } = retain(map, protect);
       return {
         ok: false, reason: 'quota', bytes: total, budget: maxBytes, evicted, discarded, error: e?.name || 'Error', ...(refused ? { retained: false } : {}),
@@ -360,9 +272,8 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
     }
   }
 
-  // A write whose store cannot be read writes nothing and keeps nothing: it
-  // does not know the rows beside it, so holding a partial map would later
-  // read as the whole store.
+  // A write whose store cannot be read keeps nothing: a partial map would
+  // later read as the whole store.
   const unreadable = (error) => {
     if (error?.code !== 'DATA_UNAVAILABLE') throw error;
     return { ok: false, reason: 'unavailable', budget: maxBytes, evicted: [], discarded: [], retained: false };
@@ -406,55 +317,34 @@ export function createLocalStorageBackend(dbName, storeName, { maxBytes = DEFAUL
 }
 
 /**
- * Default row cap for a store (memory audit 2026-08-31). `reconcile` prunes
- * only rows in the CURRENT scope, so a store fed one window after another
- * (schedule/attendance/timesheet caches paging through weeks) accumulated
- * every window ever viewed for the world's lifetime.
- *
- * DELIBERATELY GENEROUS (owner ruling 2026-08-31: optimise for fast toggle,
- * not minimum memory). This is a backstop against UNBOUNDED growth, never a
- * working-set limit: a large tenant's real working set (the bench's 401
- * members / 8,865 events) must stay resident so returning to a team repaints
- * warm instead of re-fetching. Callers needing a tighter bound pass `maxRows`.
+ * Default row cap: a backstop against UNBOUNDED growth (reconcile prunes only
+ * the current scope, so a window-paging cache keeps every window it saw),
+ * never a working-set limit. Deliberately generous so a large tenant's working
+ * set stays resident and repaints warm. Pass `maxRows` for a tighter bound.
  */
 const DEFAULT_MAX_ROWS = 50000;
 
 /**
- * How many WINDOWS a window-paging store keeps (spec mp-durable-instant-surfaces
- * round-5). Three, because the experience being bought is instant
- * back-navigation: the window you are on plus the one either side of it covers
- * "back to last week and forward again" without a fetch, and every window beyond
- * that is an archive nobody asked to keep. Only applies to reconciles that pass a
- * `windowKey`; a store that never does is unaffected.
+ * Windows a window-paging store keeps: the current one plus one either side,
+ * for instant back/forward navigation. Applies only to reconciles that pass a
+ * `windowKey`.
  */
 const DEFAULT_MAX_WINDOWS = 3;
 
 /**
- * How old a row may be and still be PAINTED — a platform promise for every
- * cache, not a tuning knob. A device left closed for a fortnight must start cold
- * rather than confident: a stale roster or compliance surface with nothing on it
- * saying it is stale is worse than an empty one.
- *
- * The age is the same for every store. A cache opts out in one way only, by
- * declaring `paintCeiling: false` at `createDataStore`: for rows that stay as
- * valid at any age as when they were read (pages a later read checks by content
- * hash, and the inputs computed with them). Such a store's rows paint at any
- * age; its row cap, window retention and the backend's age limit apply as to
- * any cache. A client-owned (`last_write_wins`) store is not a cache and the
- * ceiling never applies to it.
+ * How old a cached row may be and still be PAINTED, the same for every store:
+ * a device closed for a fortnight starts cold rather than confidently stale.
+ * A cache opts out only with `paintCeiling: false` (rows valid at any age,
+ * e.g. pages checked by content hash); its other limits still apply. A
+ * client-owned (`last_write_wins`) store is not a cache and is exempt.
  */
 export const PAINT_CEILING_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Thrown by `put`/`delete` when the write could not be persisted.
- *
- * ⚠ IT REJECTS *AND* THE ROW IS FLAGGED, DELIBERATELY BOTH. Rejecting alone
- * rides the MP panel boundary, which swallows async handler rejections, so a
- * caller that fires and forgets would learn nothing. Flagging alone leaves every
- * existing `await store.put(...)` believing it succeeded. The two audiences are
- * different: the CALLER needs the truth, and the USER needs a surface able to
- * say "saved on this device only". `_persistFailed` on the retained row is what
- * lets a surface say it.
+ * Thrown by `put`/`delete` when the write could not be persisted. The row is
+ * also flagged `_persistFailed`: the caller needs the rejection, while a
+ * fire-and-forget caller (the MP panel boundary swallows rejections) leaves
+ * the flag as the only way a surface can say "saved on this device only".
  */
 export class PersistError extends Error {
   constructor(storeName, result) {
@@ -508,46 +398,26 @@ export function createDataStore({
   const changeListeners = new Set();
 
   /**
-   * Resident row count, so `put` can bound the store WITHOUT walking it.
-   *
-   * ⚠ THE CAP HAS TO BE FREE ON THE STEADY-STATE PATH. `enforceRowCap` opens
-   * with `backend.getAll()`; calling it on every put would add an O(store)
-   * array build to every optimistic write, and the stores nearest the cap are
-   * exactly the hot ones — a windowed cache holding thousands of rows, written
-   * per-row inside loops by the flows that drag, publish and assign shifts. So
-   * the count is tracked instead and the walk happens only when it is exceeded.
-   *
-   * Null until first use: seeding it costs a `keys()` call, which a
-   * localStorage-backed store answers by parsing its whole blob. Doing that at
-   * construction would tax every manager build, including for MPs the user
-   * never opens.
+   * Resident row count, so `put` only walks the store (`enforceRowCap`) when
+   * the cap is exceeded: hot windowed caches are written per-row in loops.
+   * Null until first use, because seeding it parses a localStorage blob.
    */
   let residentCount = null;
-  // ⚠ THE CAP CAN BE SATURATED, AND THEN IT MUST STOP TRYING. `enforceRowCap`
-  // evicts nothing when every resident row is dirty (an unsynced drafts store is
-  // exactly that by definition — Phase 2 documents it as the expected steady
-  // state). `residentCount` therefore stays above `maxRows` forever, and without
-  // this latch EVERY later put paid a full `backend.getAll()` walk that could
-  // not help — quietly breaking the "no extra store walk per write" constraint in
-  // the configuration most likely to hit it (review finding F5). Anything that
-  // can make a row evictable again — a delete, a markSynced clearing `_dirty` —
-  // clears the latch.
+  // Set when the cap could evict nothing (every row dirty, the normal state of
+  // an unsynced drafts store), so later puts skip a walk that cannot help.
+  // Anything that can make a row evictable again clears it.
   let capSaturated = false;
-  // The highest revision this store has written or removed. A row's next
-  // revision is above it, so a key written again after it was removed never
-  // takes a revision it held (a push still on its way cannot settle the new
-  // row).
+  // The highest revision written or removed. A key rewritten after removal
+  // takes a revision above it, so a push still in flight cannot settle the
+  // new row.
   let revisionTop = 0;
   const noteRevision = (row) => { if (Number.isSafeInteger(row?._rev) && row._rev > revisionTop) revisionTop = row._rev; };
   const nextRowRevision = (previous) => { revisionTop = Math.max(revisionTop, previous?._rev || 0) + 1; return revisionTop; };
-  // A write reads the row and writes it back as one step per key: `put`,
-  // `delete` and `markSynced` on the same key take turns, so a check against
-  // the stored row (dirty, revision) still holds when the write lands. The
-  // turns belong to the backend, so every store handle over it in this page
-  // takes turns with the others; over shared storage (Web Storage) each turn
-  // also holds that storage's Web Lock, so other tabs' writes wait for it.
-  // Durable collections use the transactional host store, which checks inside
-  // its commit.
+  // `put`, `delete` and `markSynced` on the same key take turns, so a check
+  // against the stored row (dirty, revision) still holds when the write lands.
+  // Turns belong to the backend (every handle shares them); over Web Storage
+  // each turn also holds the cross-tab Web Lock. Durable collections use the
+  // transactional host store, which checks inside its commit.
   const rowTurns = turnsFor(backend);
   const sharedStorage = typeof backend.turnKey === 'string' ? backend.turnKey : null;
   function rowsTurn(keys, task) {
@@ -562,10 +432,8 @@ export function createDataStore({
   const rowTurn = (key, task) => rowsTurn([key], task);
 
   /**
-   * Tell the host a write did not reach disk. One channel, not two: the host
-   * decides where it goes (a once-per-store log, telemetry, a user-facing
-   * warning) because the SDK cannot know. A throwing handler must never turn a
-   * failed write into a different failure.
+   * Tell the host a write did not reach disk; the host decides where that
+   * goes. A throwing handler must never turn a failed write into another failure.
    */
   const reportPersistFailure = (result, key) => {
     if (typeof onPersistError !== 'function') return;
@@ -583,35 +451,11 @@ export function createDataStore({
   };
 
   /**
-   * Account for the rows a backend result says are GONE — byte-evicted on a
-   * successful save, or discarded by the retention bound on a failed one.
-   *
-   * ⚠ THE OWNER FOR EVERY `backend.put`/`delete` RESULT IN THIS FILE — and this
-   * comment has now been wrong three times, which is worth recording rather
-   * than quietly fixing again. It first claimed "one owner for all three call
-   * sites" while three paths were uncovered; the correction claimed those paths
-   * "do not receive a result carrying evicted or discarded", which was false
-   * too; the rewrite after that said "every path" while `reconcile`'s own two
-   * direct `backend.put` calls still dropped theirs (reviews MSRB-3, BSC-5,
-   * BSC3-4).
-   *
-   * The claim is now a RULE rather than a count, because a count is the thing
-   * that keeps going stale: EVERY `backend.put(...)` and `backend.delete(...)`
-   * result in this file is fed to `accountForGoneRows`. A new call site that
-   * ignores its result is the defect, and `grep 'await backend\.\(put\|delete\)'`
-   * against this function's call sites is how to check it.
-   *
-   * Phase 1 handled only `put`'s success branch, so the other paths kept the
-   * original defect (review MSRB-3):
-   * `put`'s FAILURE branch, where `save()` returns a non-empty `evicted`
-   * alongside `ok:false` whenever the byte guard cleared every clean row and the
-   * store was still over budget; and `delete()`, which can byte-evict on success
-   * and can trip the retention bound on failure, and read neither field. In both
-   * cases `residentCount` inflated and the keys were missing from the notify
-   * batch, so selector subscribers watching those rows never fired.
-   *
-   * Returns the keys, for the caller to fold into the ONE notify it already
-   * makes — never a notify per row.
+   * Account for the rows a backend result says are GONE: byte-evicted on a
+   * save, or discarded by the retention bound on a failed one. RULE: every
+   * `backend.put(...)`/`backend.delete(...)` result in this file goes through
+   * here, success or failure, or `residentCount` drifts and subscribers to
+   * those rows never fire. Returns the keys, to fold into the caller's one notify.
    */
   function accountForGoneRows(persisted, key) {
     const byteEvicted = persisted?.evicted || [];
@@ -619,32 +463,18 @@ export function createDataStore({
     const gone = byteEvicted.length + discarded.length;
     if (!gone) return [];
     if (residentCount !== null) residentCount -= gone;
-    // Rows actually went, so the cap may be able to act again.
     capSaturated = false;
-    // ⚠ ONLY ON A WRITE THAT ACTUALLY SUCCEEDED. The eviction sentence says "the
-    // write SUCCEEDED", so emitting it for a REFUSED write asserts something
-    // false and contradicts the persist_failure report for the same operation —
-    // the harden round's blocking rule, in the mirror direction. It is also
-    // redundant: `reportPersistFailure` already forwards `evicted`, and the
-    // failure sentence already appends ", N older row(s) evicted", so the count
-    // reaches the host truthfully without a second contradictory report.
+    // The eviction report says the write succeeded; a refused write's
+    // evictions already ride its persist_failed report.
     if (byteEvicted.length && persisted?.ok !== false) reportPersistEviction(persisted, key);
     if (discarded.length) reportRetentionDiscard(persisted, key);
     return [...byteEvicted, ...discarded];
   }
 
   /**
-   * Tell the host the RETENTION BOUND dropped rows from the in-memory fallback.
-   *
-   * The most serious of the three reports: these rows are gone from this device
-   * entirely — including `_dirty` ones, which no other path will drop — and
-   * anything unsynced in them was never pushed.
-   *
-   * ⚠ IT CANNOT SAY THEY NEVER REACHED DISK, and this comment used to. A row may
-   * have been persisted by an earlier successful write and then dropped from the
-   * retained map when the bound fired. The emitted sentence was narrowed for
-   * exactly that reason (review MSRB-R1-1); the comment stating the old claim as
-   * fact outlived it (review BSC-R2-6).
+   * Tell the host the RETENTION BOUND dropped rows from the in-memory fallback,
+   * `_dirty` ones included, so anything unsynced in them is lost. It cannot
+   * claim they never reached disk: an earlier write may have saved them.
    */
   const reportRetentionDiscard = (result, key) => {
     if (typeof onPersistError !== 'function') return;
@@ -662,17 +492,9 @@ export function createDataStore({
   };
 
   /**
-   * Tell the host the byte guard DELETED rows on a write that SUCCEEDED.
-   *
-   * ⚠ IT SHARES THE CHANNEL AND NOT THE MESSAGE, and the `event` discriminator
-   * is what keeps those apart. Routing an eviction through the failure shape
-   * would have been wrong twice over. Its text is hard-wired to failure language
-   * — "write not persisted", "rows are retained in memory ... flagged
-   * _persistFailed" — none of which is true here: the write reached disk and
-   * OTHER rows were dropped to make room. And the host de-dupes once per
-   * `mpId:store` for the session, so an eviction reported first would have
-   * permanently SUPPRESSED a later genuine persist failure on that same store —
-   * silencing the more serious event with the less serious one.
+   * Tell the host the byte guard DELETED rows on a write that SUCCEEDED. Its
+   * own `event`, not the failure shape: the host de-dupes failures once per
+   * `mpId:store`, so an eviction must never suppress a later real failure.
    */
   const reportPersistEviction = (result, key) => {
     if (typeof onPersistError !== 'function') return;
@@ -691,8 +513,7 @@ export function createDataStore({
 
   const keyOf = (record) => record[keyPath];
 
-  /** Drop the sync-metadata stamps (_rev/_dirty/_updatedAt/_dedupeKey) so a read
-   *  returns clean, re-put-safe domain rows. */
+  /** Drop the `_` sync-metadata stamps so a read returns re-put-safe domain rows. */
   const stripMeta = (record) => Object.fromEntries(
     Object.entries(record).filter(([key]) => !key.startsWith('_')),
   );
@@ -700,47 +521,12 @@ export function createDataStore({
   async function snapshot() { return backend.getAll(); }
 
   /**
-   * Evict the OLDEST evictable rows once the store exceeds `maxRows`.
-   *
-   * NEVER evictable:
-   *   · `_dirty` rows — unpushed local writes; dropping one silently loses a
-   *     user's edit. A store whose rows are all dirty stays OVER the cap:
-   *     the sync engine, not eviction, is what relieves it.
-   *   · `protect` — the keys the in-flight reconcile just fetched. Without
-   *     this the budget was computed against ALL rows (dirty included) but
-   *     spent on the only candidates available, which are the freshest ones:
-   *     a store holding many dirty rows strip-mined the CURRENT window and the
-   *     grid silently painted half of it (adversarial review 2026-08-31).
-   *   · every row of a client-owned (`last_write_wins`) store — each is the
-   *     only copy, so such a store has no row cap at all.
-   *
-   * Rows lacking `_updatedAt` sort as UNKNOWN age, not as epoch-zero, so they
-   * are evicted only after genuinely-older stamped rows.
-   *
-   * Deletion is always SILENT and the evicted keys are RETURNED, so the caller
-   * folds them into whatever notify it was going to fire anyway and one logical
-   * change costs one subscriber pass: a notify per deleted row fired a full
-   * pass each (202 repaints for one logical change, measured).
+   * A delete the STORE performs (prune, row cap, window retention). It must not
+   * throw: its callers loop mid-reconcile, and one rejection would abort the
+   * reconcile before it notifies. A failed persist is already reported by
+   * `delete()`; the row just stays. With `expectedRevision`, a row written
+   * since it was read is kept. Resolves whether the row left memory.
    */
-  /**
-   * Internal eviction — a delete the STORE performs, not one a caller asked for.
-   *
-   * ⚠ IT MUST NOT THROW. `delete()` rejects with a `PersistError` when the
-   * backend cannot reach disk, and the three internal call sites all run inside
-   * loops in the middle of a reconcile: the prune, the row cap and window
-   * retention. One failed eviction there aborted the WHOLE reconcile — after
-   * the rows had merged, before `if (changed.size) await notify(changed)`. So
-   * subscribers never woke, the cap and retention never finished, and the store
-   * was left half-pruned; `fetchAndReconcile` swallows the rejection to keep the
-   * cache intact, which made the whole thing invisible. Exactly the storage
-   * pressure this store exists to survive was the trigger.
-   *
-   * The failure is still REPORTED — `delete()` calls `reportPersistFailure`
-   * before it throws — and the row simply stays resident, which is the same
-   * outcome the cap already tolerates for a `_dirty` row.
-   */
-  // With `expectedRevision`, a row written since it was read is kept.
-  // Resolves whether the row left memory.
   async function evict(key, expectedRevision) {
     try {
       await api.delete(key, { silent: true, ...(expectedRevision !== undefined ? { expectedRevision } : {}) });
@@ -751,6 +537,14 @@ export function createDataStore({
     }
   }
 
+  /**
+   * Evict the OLDEST evictable rows once the store exceeds `maxRows`. Never
+   * evicted: `_dirty` rows (unsent edits; an all-dirty store stays over the
+   * cap), `protect` (keys the running reconcile just fetched, else the current
+   * window is the one eaten), and any row of a `last_write_wins` store.
+   * Unstamped rows count as unknown age and go last. Deletes are silent and
+   * the keys are returned, so one logical change costs one notify.
+   */
   async function enforceRowCap({ protect, changed } = {}) {
     if (!evictsRows || !Number.isFinite(maxRows) || maxRows <= 0) return [];
     const rows = await backend.getAll();
@@ -776,42 +570,16 @@ export function createDataStore({
     return evicted;
   }
 
-  /**
-   * Keep the K most recently touched WINDOWS; delete the rows of older ones.
-   *
-   * ⚠ THE ROW CAP CANNOT DO THIS JOB. `enforceRowCap` sorts by `_updatedAt` and
-   * drops the oldest ROWS, which on a window-paging store strip-mines whichever
-   * window happens to hold the least recently written rows — potentially half of
-   * the window the user is looking at. Retention has to be by window or it is
-   * not retention, it is corruption of an arbitrary page.
-   *
-   * The current window is never dropped, dirty rows are never dropped (they are
-   * unsynced local writes, same exemption as everywhere else), and untagged rows
-   * are invisible to this pass — a store that never passes `windowKey` behaves
-   * exactly as it did before.
-   *
-   * Recency is per WINDOW, and it is a VISIT COUNTER, not a timestamp.
-   *
-   * ⚠ `_updatedAt` IS NOT GOOD ENOUGH FOR THIS AND THE TEST CAUGHT IT. Paging
-   * quickly (or any run of reconciles inside one millisecond) stamps several
-   * windows identically, and with tied stamps "most recent" collapses to
-   * whatever order the backend happens to iterate in — which dropped the middle
-   * window and kept the oldest. `windowVisits` records the order windows were
-   * actually reconciled in, so recency is exact regardless of clock resolution.
-   * `_updatedAt` remains the tie-break for windows this session has not visited
-   * (rows rehydrated from disk carry no visit number).
-   */
-  // Visit order for window retention: windowKey -> monotonically increasing
-  // sequence, bumped every time a reconcile names that window. Per store
-  // instance and deliberately NOT persisted — it describes this session's
-  // navigation, and a rehydrated store falls back to `_updatedAt`.
+  // Visit order for window retention: windowKey -> sequence, bumped whenever a
+  // reconcile names that window. `_updatedAt` ties within a millisecond, so
+  // recency needs the counter; it is per session, and unvisited (rehydrated)
+  // windows fall back to `_updatedAt`.
   const windowVisits = new Map();
   let windowVisitSeq = 0;
 
   /**
-   * Whether a row may be PAINTED. Caches age out at the platform ceiling unless
-   * the store declared `paintCeiling: false`; client-owned (`last_write_wins`)
-   * rows never do — they are the only copy.
+   * Whether a row may be PAINTED: caches age out at the paint ceiling unless
+   * declared `paintCeiling: false`; client-owned rows and dirty rows never do.
    */
   const ceilingApplies = evictsRows && paintCeiling;
   // A local delete waiting to be sent (`_deleted`) never paints.
@@ -825,6 +593,12 @@ export function createDataStore({
   if (backend.transactional) return createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows: evictsRows ? maxWindows : Infinity, indexes, queryRows });
 
 
+  /**
+   * Keep the K most recently visited WINDOWS; delete the rows of older ones.
+   * The row cap cannot do this: oldest-rows-first eats an arbitrary part of a
+   * window. The current window and dirty rows are never dropped; untagged rows
+   * are not touched.
+   */
   async function enforceWindowRetention({ current, changed, keep = maxWindows } = {}) {
     if (!evictsRows || !Number.isFinite(keep) || keep <= 0) return [];
     const rows = await backend.getAll();
@@ -845,8 +619,7 @@ export function createDataStore({
         return b[1].localeCompare(a[1]);
       })
       .map(([w]) => w);
-    // The current window is retained regardless of stamp order — it is the one
-    // the user is looking at, and on a first visit its rows may be the oldest.
+    // On a first visit the current window's rows may be the oldest.
     const kept = new Set([current, ...ordered.filter((w) => w !== current).slice(0, Math.max(0, keep - 1))]);
     const doomed = ordered.filter((w) => !kept.has(w));
     if (!doomed.length) return [];
@@ -870,9 +643,8 @@ export function createDataStore({
   }
 
   /**
-   * Fan a change out to subscribers. `changed` is ONE key or an iterable of
-   * them — reconcile passes the whole batch so a merge of N records wakes
-   * every subscriber exactly once instead of N times (see reconcile below).
+   * Fan a change out to subscribers. `changed` is one key or an iterable, so
+   * a batch wakes each subscriber once.
    */
   async function notify(changed) {
     const changedKeys = new Set([...((changed && typeof changed !== 'string' && typeof changed[Symbol.iterator] === 'function')
@@ -911,9 +683,7 @@ export function createDataStore({
       const fields = indexFields[index];
       const refuse = (why) => { throw Object.assign(new Error(`store '${name}': ${why}`), { name: 'StorageReadError', reason: 'unserializable' }); };
       if (!fields) refuse(`index '${index}' is not declared`);
-      // The ranges the host store takes, and no others: `equals` names every
-      // field of the index; a `prefix` names leading fields, bounded on the
-      // next one when there is one.
+      // Only the ranges the host store takes.
       const head = range.equals || range.prefix || [];
       const bounded = range.lower !== undefined || range.upper !== undefined;
       if ((range.equals && (range.prefix || bounded)) || head.length > fields.length
@@ -926,7 +696,6 @@ export function createDataStore({
       const more = start + limit < rows.length;
       return { rows: page, nextCursor: more ? String(keyOf(page.at(-1))) : null, complete: !more };
     },
-    /** Subscribers read the store again after a change made elsewhere. */
     /** Subscribers read the store again; `removed` names rows that went, so a subscriber watching one hears it. */
     async revalidateSubscribers(removed = []) { await notify([...(backend.keys?.() || []), ...removed.map(String)]); },
     dispose(options) {
@@ -939,15 +708,9 @@ export function createDataStore({
     /** The declared store name — so a report can say WHICH store rejected. */
     name,
     /**
-     * ⚠ THE THIRD READ API, AND THE THIRD TIME. The ceiling went to `readWhere`
-     * (round 6), then `getAll` (round 7), and `get(key)` was still uncovered —
-     * so a persisted store could prefill an EDIT FORM or answer a by-id
-     * condition from a row up to the 30-day store TTL (review
-     * PAINT-CEILING-GET-KEY). A form prefilled from a fortnight-old row is worse
-     * than an empty one: the operator saves it back as current.
-     *
-     * Every read a surface can reach is now ceilinged by default, and each has a
-     * `Raw` twin for the writers that must see what they may not paint.
+     * Every read a surface can reach applies the paint ceiling (a form
+     * prefilled from a stale row would be saved back as current); each has a
+     * `Raw` twin for writers that must see what they may not paint.
      */
     async get(key) {
       const row = await backend.get(key);
@@ -962,38 +725,15 @@ export function createDataStore({
       return (await snapshot()).filter(paintable);
     },
     /**
-     * The WRITERS' view: every row, past the paint ceiling and the host
-     * store's age limit too. A writer building a merge map (`prevById`),
-     * reconciling or deciding what to purge must see rows it may not paint, or
-     * it will delete or duplicate what it cannot see, or leave behind what it
-     * reports removed.
+     * The WRITERS' view: every row, past the paint ceiling and the host store's
+     * age limit. Merge, reconcile and purge must see rows they may not paint.
      */
     async getAllRaw() {
       return snapshot();
     },
-    /** Cache-read half of SWR: the stored records matching `predicate(record)`,
-     *  meta stamps stripped (clean domain rows). Sorting is the caller's job. */
     /**
-     * ⚠ THE PAINT CEILING LIVES AT THE READ, AND IT IS THE DEFAULT.
-     *
-     * It was written into `liveQuery`, widened to `windowCache`, then moved
-     * here to `readWhere` — and each time it was still one path among several,
-     * because MPs also read through `getAll()` (time-clock derives clock-in
-     * state that way, off a persisted cache). Three rounds of the same
-     * correction. So the ceiling now governs BOTH read APIs and the unfiltered
-     * view is the one that must be asked for by name: `getAllRaw()`. The unsafe
-     * behaviour requires an explicit opt-in, rather than the safe behaviour
-     * requiring twenty-nine call sites to remember it.
-     *
-     * ⚠ AND IT APPLIES TO CACHES ONLY. A `last_write_wins` store is not stale
-     * server data going off — it is the user's OWN row, the truth, and the only
-     * copy. Ageing a member's saved settings or a half-typed draft out of a read
-     * would be data loss dressed as a freshness guarantee, so the store's
-     * `syncStrategy` tells a cache from a client-owned record. A cache declared
-     * `paintCeiling: false` (see PAINT_CEILING_MS) paints its rows at any age.
-     *
-     * A `_dirty` row is exempt regardless: it has not reached the server, and
-     * its age is not a reason to hide it from its author.
+     * Cache-read half of SWR: paintable records matching `predicate(record)`,
+     * meta stamps stripped. Sorting is the caller's job.
      */
     async readWhere(predicate = () => true) {
       return (await snapshot()).filter(paintable).filter(predicate).map(stripMeta);
@@ -1003,13 +743,8 @@ export function createDataStore({
       return (rows || []).filter(paintable).filter(predicate).map(stripMeta);
     },
     /**
-     * Why a record would be REFUSED by `put`, or null if it would be accepted.
-     *
-     * A caller writing many records at once needs to know this BEFORE the write,
-     * not by catching partway through: `reconcile` puts row by row and prunes
-     * afterwards, so one bad record used to abort the batch with valid rows
-     * already written and the prune never run. There is no other way to ask —
-     * the schema is compiled in here and deliberately not exposed.
+     * Why a record would be REFUSED by `put`, or null: lets a batch writer
+     * check before writing rather than fail partway through.
      */
     validateRecord(record) {
       if (validate && !validate(record)) {
@@ -1034,9 +769,7 @@ export function createDataStore({
         if (when && when(previous, guard) !== true) return null;
         if (server && previous?._dirty) return null;
         if (residentCount === null) {
-          // `keys()` is the cheap route (both shipped backends answer it without
-          // deserialising rows), but it is not part of the documented
-          // backendFactory contract, so fall back rather than throw on a custom one.
+          // `keys()` is cheap but optional in the backendFactory contract.
           residentCount = typeof backend.keys === 'function'
             ? backend.keys().length
             : (await backend.getAll()).length;
@@ -1044,15 +777,8 @@ export function createDataStore({
         const stamped = {
           ...record,
           ...(receipt !== null ? { _writeReceipt: receipt } : {}), // eslint-disable-line no-underscore-dangle
-          // ⚠ CARRY `_window` FORWARD. It is store metadata of the same class as
-          // `_rev` — the caller's record never contains it — so spreading the
-          // record over the row DROPPED it, and any writer that reconciles
-          // without a `windowKey` (a filtered read, an optimistic form write)
-          // silently un-tagged rows a windowed read had tagged. Retention only
-          // sees `_window` rows (enforceWindowRetention), so a store with mixed
-          // writers leaked out of its own retention bound one row at a time. A
-          // reconcile that DOES carry a windowKey re-stamps the row afterwards,
-          // so this preserves without ever pinning a row to a stale window.
+          // Carry `_window` forward: callers never include it, and an untagged
+          // row escapes window retention. A windowed reconcile re-stamps it.
           ...(previous?._window != null ? { _window: previous._window } : {}),
           // What a push acknowledged of this row stays known through later writes.
           ...(Number.isSafeInteger(previous?._ackRev) ? { _ackRev: previous._ackRev } : {}),
@@ -1073,68 +799,34 @@ export function createDataStore({
       if (turn === null) return undefined;
       const { stamped, persisted } = turn;
       if (persisted && persisted.ok === false) {
-        // The row IS in the store — the backend retained it in memory — but it
-        // is not on disk. Flag it so a surface can say so, notify so the flag
-        // reaches that surface, tell the host, and only then reject.
-        //
-        // ⚠ FLAG IT IN PLACE WHERE THE BACKEND CAN. Re-putting ran the entire
-        // save path a second time per refused write — evictToFit, a full
-        // stringify of the store, the retention copy — doubling the cost of a
-        // store already under pressure. `patchRetained` is optional, so a custom
-        // backend without it keeps the old behaviour rather than losing the flag.
-        // The re-put fallback runs the whole save path again, so its result can
-        // carry gone rows of its own — dropped on the floor until BSC-5.
-        // A write the backend did not hold (`retained: false`) left the row
-        // as it was: there is nothing to flag.
+        // Retained in memory, not on disk: flag it (in place where the backend
+        // can; `patchRetained` is optional, so fall back to a re-put), notify,
+        // tell the host, then reject. A row not retained has nothing to flag.
         let reput = null;
         if (persisted.retained !== false) {
           if (typeof backend.patchRetained !== 'function' || !backend.patchRetained(key, { _persistFailed: true })) {
             reput = await backend.put(key, { ...stamped, _persistFailed: true });
           }
         }
-        // ⚠ ITS KEYS JOIN THE BATCH TOO. Counting and reporting them while
-        // leaving them out of the notify meant a selector subscriber watching a
-        // row the re-put displaced never woke — the row vanished from under a
-        // surface that had asked to be told (review BSC5-2).
+        // Rows can go even on the failure path (retention bound, byte guard,
+        // the re-put's own save); all of them join the one notify.
         const reputGone = reput ? accountForGoneRows(reput, key) : [];
-        // Rows may be gone even on the FAILURE path: the retention bound drops
-        // the oldest, and the byte guard can have evicted every clean row and
-        // still left the store over budget. Both are accounted for the same way
-        // — counter, subscribers, host — never silence.
         const gone = [...accountForGoneRows(persisted, key), ...reputGone];
         if (!silent) await notify(gone.length ? [key, ...gone] : key);
         reportPersistFailure(persisted, key);
         throw new PersistError(name, persisted);
       }
-      // Bound a store nothing reconciles. Until this existed the cap ran from
-      // `reconcile` and nowhere else, so every put-only store — which is every
-      // client-owned one, there being no server set to reconcile a drafts store
-      // against — grew without a ceiling for the life of the installation.
-      //
-      // `deferCap` is for reconcile, which puts each record in turn and then
-      // enforces once at the end: without it a merge would trim itself row by
-      // row while it was still arriving, evicting rows the same merge was about
-      // to add.
-      // ⚠ THE BYTE GUARD'S OWN DELETIONS, ACCOUNTED FOR. `save()` has always
-      // RETURNED the keys `evictToFit` dropped on the success path, and `put`
-      // read only `ok === false` — so a successful write that deleted rows told
-      // nobody. Three things were wrong at once: subscribers never woke for rows
-      // that had vanished from under them, `residentCount` kept counting rows
-      // that no longer existed (inflating it until the row cap ran on a store
-      // that had not saturated, or latched `capSaturated` against a phantom),
-      // and the host heard nothing about storage pressure that HAD cost data.
+      // The cap also runs here so a put-only store is bounded. `deferCap` is for
+      // reconcile, which enforces once at the end rather than trimming its own
+      // merge row by row.
       const byteEvicted = accountForGoneRows(persisted, key);
       let evicted = [];
       if (!deferCap && evictsRows && residentCount > maxRows && !capSaturated) {
-        // `protect` the row just written — it is the newest thing in the store,
-        // and eviction spending its budget on it would undo the write.
+        // Protect the row just written, or eviction could undo the write.
         evicted = await enforceRowCap({ protect: new Set([String(key)]) });
-        // Nothing could go: the walk cannot help until something becomes
-        // evictable, so stop repeating it (see `capSaturated`).
         capSaturated = evicted.length === 0;
       }
-      // One notify for the write AND anything it displaced — by the byte guard
-      // or the row cap. Still ONE subscriber pass for one logical change.
+      // One notify for the write and anything it displaced.
       const displaced = byteEvicted.length ? [...byteEvicted, ...evicted] : evicted;
       if (!silent) await notify(displaced.length ? [key, ...displaced] : key);
       return key;
@@ -1176,10 +868,7 @@ export function createDataStore({
         if (residentCount !== null && current !== undefined && !(result?.ok === false && result.retained === false)) residentCount -= 1;
         return result;
       });
-      // `backend.delete` runs the same `save()` as a put, so it can byte-evict
-      // on success and trip the retention bound on failure. This path read
-      // neither field, so a delete that displaced other rows inflated the
-      // counter and left subscribers watching those rows asleep.
+      // A delete runs the same `save()` as a put, so it can displace rows too.
       if (persisted === null) return false;
       const gone = accountForGoneRows(persisted, key);
       if (!silent) await notify(gone.length ? [key, ...gone] : key);
@@ -1245,15 +934,10 @@ export function createDataStore({
         const record = await backend.get(key);
         if (!record) return null;
         if (expectedRevision !== undefined && record._rev !== expectedRevision) return null;
-        // Drop `_persistFailed` alongside `_dirty`: a row that reached the server
-        // is no longer "saved on this device only", whatever happened to the local
-        // copy on the way. A refusal for access set meanwhile stays: only a
-        // person's retry clears it.
+        // A row on the server is not "saved on this device only".
+        // `_pushRefused` stays: only a person's retry clears it.
         const { _persistFailed: _pf, ...rest } = record;
-        // ⚠ THIS WRITE CAN DISPLACE ROWS TOO. Marking a row synced makes it
-        // evictable, which is exactly when the byte guard can act — and this path
-        // discarded the result unconditionally, so those keys were never counted,
-        // never notified and never reported (review BSC-5).
+        // A now-evictable row lets the byte guard act, so this can displace rows.
         return backend.put(key, { ...rest, _dirty: false, ...(pushed ? { _ackRev: record._rev } : {}) });
       });
       if (persisted === null) return;
@@ -1263,10 +947,8 @@ export function createDataStore({
 
     },
     /**
-     * Sets `patch`'s fields on the stored rows of `keys` as a server change:
-     * each row is read and written in one turn (other handles in this page,
-     * and other tabs over shared storage, wait for it), so a write or delete
-     * that lands first is what the patch applies to. A row that is gone or
+     * Sets `patch`'s fields on the stored rows of `keys` as a server change,
+     * each read and written in one row turn. A row that is gone or
      * holds an unsent local write is left as it is; a row the record schema
      * refuses once patched is not written. Resolves `{ patched, unsaved,
      * skipped: [{ key, reason: 'gone' | 'unsent' }], refused: [{ key, reason }] }`;
@@ -1309,33 +991,18 @@ export function createDataStore({
       return { patched, unsaved, skipped, refused };
     },
     /**
-     * SWR reconcile — merge a fresh AUTHORITATIVE set of records into the store,
-     * the read-through pattern every windowed MP grid needs: upsert each record
-     * and mark it synced (it came from the server, not a local edit), then prune
-     * rows the fresh set dropped. Two invariants baked in so each MP can't get
-     * them subtly wrong: locally-dirty (unsynced/optimistic) rows are NEVER
-     * pruned, and only rows matching `scope` are prune-candidates (e.g. "in this
-     * window") — omit `scope` for a whole-store authoritative replace. Returns
-     * `{ upserted, pruned }`.
+     * SWR reconcile: merge a fresh AUTHORITATIVE set into the store, upserting
+     * each record as synced, then pruning rows the set dropped. Dirty rows are
+     * never pruned, and only rows matching `scope` are prune candidates (omit
+     * it for a whole-store replace). Returns `{ upserted, pruned, ... }`.
      *
-     * `windowKey` (optional) TAGS the rows this reconcile wrote with the window
-     * they belong to, which is what makes bounded retention possible on a
-     * PERSISTED store. Scoped reconcile deliberately leaves out-of-scope rows
-     * alone — that is what scoping means — so paging week to week ACCUMULATES
-     * every week ever viewed, bounded only by the row cap. In memory that lasts
-     * a session; on disk it is forever, which is precisely the 50-200MB archive
-     * the legacy Vuex plugin refused to keep (`core/src/store/plugins/
-     * indexeddb.js`). With a `windowKey`, `enforceWindowRetention` keeps the K
-     * most recently touched windows and drops the rest. Untagged rows are never
-     * touched by it: a non-windowed store behaves exactly as before.
-     *
-     * `prune: false` only upserts: no row the set leaves out is removed.
-     * `keepDirty: true` leaves a row with an unsent local write as it is
-     * (its key listed in `skipped`) instead of overwriting it with the
-     * server's copy.
+     * `windowKey` tags the written rows with their window so
+     * `enforceWindowRetention` can bound a persisted window-paging store, which
+     * scoped pruning alone never would. `prune: false` only upserts.
+     * `keepDirty: true` leaves a row with an unsent local write as it is (listed
+     * in `skipped`). `protect`: keys the row cap never evicts for this reconcile
+     * (rows a whole read answered that it did not write again).
      */
-    // `protect`: keys the row cap never evicts for this reconcile (rows a
-    // whole read answered that it did not write again).
     async reconcile(submittedRecords = [], { scope, windowKey, prune = true, keepDirty = false, protect = [] } = {}) {
       const records = submittedRecords.map((record) => {
         if (!record || typeof record !== 'object' || !Object.hasOwn(record, '_writeReceipt')) return record;
@@ -1347,13 +1014,8 @@ export function createDataStore({
       const skipped = [];
       // Rows kept in memory only: their device storage refused them.
       const unsaved = [];
-      // ONE notify for the whole merge, at the end. Per-record notifies made a
-      // reconcile of N rows wake every subscriber N times, each with a
-      // partially-merged snapshot — so an instant-data surface repainted N
-      // times on a single revalidate, and anything its render kicks off (the
-      // Forms activity pane's per-subject reads) ran N times over a list that
-      // grew by one row each pass. Quadratic, and every intermediate paint was
-      // a lie about the store's contents.
+      // ONE notify for the whole merge, at the end: per-record notifies repaint
+      // N times over partially merged snapshots.
       const changed = new Set();
       for (const record of records) {
         // A row the server answered as it is held is left as it is, unwritten
@@ -1374,48 +1036,25 @@ export function createDataStore({
           // in memory (PersistError) is handled here; any other failure is the
           // storage's, and fails the whole merge rather than be counted stored.
           if (e?.name !== 'PersistError' && e?.code !== 'DATA_INVALID') throw e;
-          // ⚠ TWO DIFFERENT FAILURES ARRIVE HERE AND THEY ARE NOT THE SAME ROW.
-          //
-          // A `PersistError` means the row IS in the store — the backend kept it
-          // in memory and flagged `_persistFailed` — it just did not reach disk
-          // (unless it says `retained: false`: nothing was kept, and the row is
-          // as it was saved).
-          // Skipping it here left it out of `incoming`, so the prune below then
-          // DELETED it as absent, microseconds after the retain contract promised
-          // to keep it. On a durable cache under storage pressure, which is the
-          // one place this failure is likely at scale, `_persistFailed` was
-          // therefore unobservable and the Phase 3 guarantee did not hold on the
-          // reconcile path (review finding F2). Count it as present.
-          //
-          // Anything else — a `recordSchema` rejection — genuinely is not in the
-          // store, and skipping it is correct: ONE bad record must not cost the
-          // whole merge. The throw used to abort the loop mid-way, which with a
-          // single notify at the end would paint NOTHING — a surface going blank
-          // because row 12 of 31 had a number where the schema wants a string.
+          // A PersistError row IS in the store (retained in memory, flagged), so
+          // count it as present or the prune below deletes it. A schema
+          // rejection is not in the store and is skipped: one bad record must
+          // not cost the whole merge.
           if (e?.name === 'PersistError') {
             const failedKey = keyOf(record);
             if (failedKey !== undefined) {
               incoming.add(String(failedKey));
               changed.add(failedKey);
               unsaved.push(String(failedKey));
-              // ...and clear `_dirty`, which `put` stamped on the way in. This
-              // row came from the SERVER; leaving it dirty misuses the flag that
-              // means "unpushed user work" and makes the row untouchable — dirty
-              // rows are exempt from the prune, from the row cap and from window
-              // retention, and this one is never `_window`-tagged either, so a
-              // store under storage pressure would accumulate rows nothing could
-              // ever collect (round-2 finding QG-R2-2, a consequence of the F2
-              // repair above). `_persistFailed` is deliberately KEPT: not on disk
-              // is still true.
+              // Clear the `_dirty` `put` stamped: a server row left dirty is
+              // exempt from every bound and would never be collected. Keep
+              // `_persistFailed`: it is still not on disk.
               // eslint-disable-next-line no-await-in-loop
               const retained = e.retained === false ? null : await backend.get(failedKey);
               if (retained) {
                 // eslint-disable-next-line no-await-in-loop
                 const cleared = await backend.put(failedKey, { ...retained, _dirty: false });
-                // Clearing `_dirty` makes the row EVICTABLE, so this write can
-                // displace others — the same reason `markSynced` had to be
-                // routed through here (review BSC3-4). Its keys join the batch
-                // `reconcile` already notifies at the end.
+                // Now evictable, so this write can displace others.
                 for (const k of accountForGoneRows(cleared, failedKey)) changed.add(k);
               }
             }
@@ -1431,11 +1070,8 @@ export function createDataStore({
         // A `server` put already stored the row synced.
         // eslint-disable-next-line no-await-in-loop
         if (!keepDirty) await api.markSynced(key);
-        // Tag the row with the window it was fetched under, so retention can
-        // drop whole windows later. Written straight to the backend rather than
-        // through `put` so it costs no schema validation and no extra notify —
-        // `_window` is store metadata, the same class as `_updatedAt`, and must
-        // never reach a recordSchema.
+        // Tag the row's window straight on the backend: `_window` is store
+        // metadata, never validated and never its own notify.
         if (windowKey != null) {
           // eslint-disable-next-line no-await-in-loop
           const stamped = await rowTurn(key, async () => {
@@ -1460,11 +1096,8 @@ export function createDataStore({
         pruned += 1;
         prunedKeys.push(String(key));
       }
-      // Out-of-scope rows survive the prune above BY DESIGN (that is what
-      // scoped reconcile means), so the cap is the only thing standing
-      // between a window-paging store and unbounded growth. Evictions join
-      // the SAME `changed` batch as the upserts and prunes, so the whole
-      // reconcile still costs exactly one notify.
+      // Out-of-scope rows survive the prune, so retention and the cap bound
+      // the store; their evictions join the same one notify.
       if (windowKey != null) {
         windowVisitSeq += 1;
         windowVisits.set(String(windowKey), windowVisitSeq);
