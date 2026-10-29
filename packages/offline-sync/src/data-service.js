@@ -76,8 +76,8 @@ const FULL_EVERY_MS = 24 * 60 * 60000;
 
 /**
  * Runs work at once, one flight per key. Hosts inject their scheduler instead.
- * As the host's does, it never runs a job that is no longer `valid()` (its
- * service retired, its reads paused): one no longer valid when its turn comes
+ * As the host's does, it never runs a job whose `valid()` is false (its
+ * service disposed, its reads paused): a job invalid when its turn comes
  * settles dropped without running. A run on its way checks for itself.
  */
 export function createImmediateScheduler() {
