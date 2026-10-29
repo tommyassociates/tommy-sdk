@@ -624,7 +624,7 @@ describe('MP data API confinement', () => {
     const kept = new Map();
     globalThis.localStorage = { getItem: (k) => (kept.has(k) ? kept.get(k) : null), setItem: (k, v) => { kept.set(k, String(v)); }, removeItem: (k) => { kept.delete(k); } };
     try {
-      const data = createDataManager({ capabilityToken: { tenantId: 'team-45', mpId: 'scheduling' }, mpId: 'scheduling', localData: {} });
+      const data = createDataManager({ capabilityToken: { tenantId: 'team-45', mpId: 'scheduling' }, mpId: 'scheduling', localData: {}, viewer: 'user-7' });
       await data.prefs.set('a', 'x'.repeat(200000));
       await data.prefs.set('b', 'x'.repeat(200000));
       await expect(data.prefs.set('c', 'x'.repeat(200000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
@@ -639,7 +639,7 @@ describe('MP data API confinement', () => {
     globalThis.localStorage = { getItem: (k) => (kept.has(k) ? kept.get(k) : null), setItem: (k, v) => { kept.set(k, String(v)); }, removeItem: (k) => { kept.delete(k); } };
     const token = { tenantId: 'team-47', mpId: 'scheduling' };
     try {
-      const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {} });
+      const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, viewer: 'user-7' });
       await data.prefs.set('layout', 'grid');
       // Each too big to save; the second past what the refused ones may hold.
       await expect(data.prefs.set('big1', 'x'.repeat(600000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
@@ -648,7 +648,7 @@ describe('MP data API confinement', () => {
       await data.prefs.remove('big2');
       const [storeKey] = [...kept.keys()].filter((key) => key.endsWith(':prefs'));
       expect(Object.keys(JSON.parse(kept.get(storeKey)))).toEqual(['layout']);
-      const reloaded = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {} });
+      const reloaded = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, viewer: 'user-7' });
       await reloaded.prefs.ready();
       expect(reloaded.prefs.get('layout')).toBe('grid');
     } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
@@ -676,7 +676,7 @@ describe('MP data API confinement', () => {
       removeItem: (k) => { kept.delete(k); },
     };
     try {
-      const data = createDataManager({ capabilityToken: { tenantId: 'team-50', mpId: 'scheduling' }, mpId: 'scheduling', localData: {} });
+      const data = createDataManager({ capabilityToken: { tenantId: 'team-50', mpId: 'scheduling' }, mpId: 'scheduling', localData: {}, viewer: 'user-7' });
       await data.prefs.set('layout', 'grid');
       full = true;
       const first = data.prefs.set('layout', 'list').catch((error) => error);
@@ -721,7 +721,7 @@ describe('MP data API confinement', () => {
     const saved = globalThis.localStorage;
     delete globalThis.localStorage;
     try {
-      const data = createDataManager({ capabilityToken: { tenantId: 'team-51', mpId: 'scheduling' }, mpId: 'scheduling', localData: {} });
+      const data = createDataManager({ capabilityToken: { tenantId: 'team-51', mpId: 'scheduling' }, mpId: 'scheduling', localData: {}, viewer: 'user-7' });
       await expect(data.prefs.set('layout', 'grid')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
       expect(data.prefs.get('layout', 'none')).toBe('none');
       await expect(data.prefs.remove('layout')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
@@ -734,7 +734,7 @@ describe('MP data API confinement', () => {
     globalThis.localStorage = { getItem: (k) => (kept.has(k) ? kept.get(k) : null), setItem: (k, v) => { kept.set(k, String(v)); }, removeItem: (k) => { kept.delete(k); } };
     const token = { tenantId: 'team-48', mpId: 'scheduling' };
     try {
-      const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {} });
+      const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, viewer: 'user-7' });
       await data.prefs.set('layout', 'grid');
       await expect(data.prefs.set('big', 'x'.repeat(600000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
       await expect(data.prefs.set('layout', 'x'.repeat(600000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
@@ -742,7 +742,7 @@ describe('MP data API confinement', () => {
       expect(data.prefs.get('big', 'none')).toBe('none');
       expect(data.prefs.get('layout')).toBe('grid');
       await data.prefs.set('theme', 'dark');
-      const reloaded = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {} });
+      const reloaded = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, viewer: 'user-7' });
       await reloaded.prefs.ready();
       expect([reloaded.prefs.get('layout'), reloaded.prefs.get('theme'), reloaded.prefs.get('big', 'none')]).toEqual(['grid', 'dark', 'none']);
     } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
@@ -774,7 +774,7 @@ describe('MP data API confinement', () => {
       removeItem: (k) => { kept.delete(k); },
     };
     try {
-      const data = createDataManager({ capabilityToken: { tenantId: 'team-46', mpId: 'scheduling' }, mpId: 'scheduling', localData: {} });
+      const data = createDataManager({ capabilityToken: { tenantId: 'team-46', mpId: 'scheduling' }, mpId: 'scheduling', localData: {}, viewer: 'user-7' });
       await data.prefs.set('a', 1);
       full = true;
       await expect(data.prefs.remove('a')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });

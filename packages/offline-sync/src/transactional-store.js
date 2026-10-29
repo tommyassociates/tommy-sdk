@@ -653,7 +653,9 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       const query = { selector, handler, onError, previous: undefined };
       queries.add(query);
       const captured = publication;
-      backend.getAll().then((rows) => {
+      // The same whole read (paged past a complete read) that a change's
+      // notify compares against, so its first value is the one later changes see.
+      wholeRows().then((rows) => {
         if (retired || !queries.has(query) || publication !== captured) return;
         const visible = rows.filter(paintable);
         const value = selector({ get: (key) => visible.find((row) => keyString(row[keyPath]) === keyString(key)), getAll: () => visible, readWhere: (predicate) => visible.filter(predicate) });

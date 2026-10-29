@@ -117,14 +117,48 @@ describe('createDataManager default backend selection', () => {
   };
 
   it('persists last_write_wins stores across a re-created manager; keeps server_authoritative in memory', async () => {
-    const first = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    const first = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData, viewer: 'user-3' });
     await first.store('settings').put({ key: 'view', value: { durationType: 'day' } });
     await first.store('schedule_cache').put({ id: 's1' });
 
     // Re-create the manager = a shell reload: new in-memory stores, same localStorage.
-    const afterReload = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    const afterReload = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData, viewer: 'user-3' });
     expect((await afterReload.store('settings').get('view')).value).toEqual({ durationType: 'day' });
     expect(await afterReload.store('schedule_cache').get('s1')).toBeUndefined(); // memory — gone
+  });
+
+  it('keeps each viewer\'s prefs and client-owned rows apart in one browser', async () => {
+    const as = (viewer) => createDataManager({ capabilityToken: token, mpId: 'scheduling', localData, viewer });
+    const alice = as('user-1');
+    await alice.prefs.set('layout', 'grid');
+    await alice.store('settings').put({ key: 'view', value: 'week' });
+
+    const bob = as('user-2');
+    await bob.prefs.ready();
+    expect(bob.prefs.get('layout')).toBeNull();
+    expect(await bob.store('settings').get('view')).toBeUndefined();
+    await bob.prefs.set('layout', 'list');
+
+    const aliceAgain = as('user-1');
+    await aliceAgain.prefs.ready();
+    expect(aliceAgain.prefs.get('layout')).toBe('grid');
+    expect((await aliceAgain.store('settings').get('view')).value).toBe('week');
+    const bobAgain = as('user-2');
+    await bobAgain.prefs.ready();
+    expect(bobAgain.prefs.get('layout')).toBe('list');
+  });
+
+  it('keeps no prefs in Web Storage when the host names no viewer', async () => {
+    const setItem = vi.spyOn(globalThis.localStorage, 'setItem');
+    const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData });
+    await expect(data.prefs.set('layout', 'grid')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
+    await data.store('settings').put({ key: 'view', value: 'week' });
+    expect(setItem).not.toHaveBeenCalled();
+    // Nor does it read what the same tenant and MP kept before viewers were named.
+    globalThis.localStorage.setItem(`mp-store:${databaseName(token, 'scheduling')}:prefs`, JSON.stringify({ layout: { key: 'layout', value: 'grid', _rev: 1, _dirty: false } }));
+    const named = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData, viewer: 'user-1' });
+    await named.prefs.ready();
+    expect(named.prefs.get('layout')).toBeNull();
   });
 });
 
@@ -179,12 +213,12 @@ describe('a pref removed while storage cannot be read', () => {
       removeItem: (k) => { kept.delete(k); },
     };
     try {
-      const data = createDataManager({ capabilityToken: { tenantId: 'team-48', mpId: 'scheduling' }, mpId: 'scheduling', localData: {} });
+      const data = createDataManager({ capabilityToken: { tenantId: 'team-48', mpId: 'scheduling' }, mpId: 'scheduling', localData: {}, viewer: 'user-48' });
       await data.prefs.set('layout', 'grid');
       readable = false;
       await expect(data.prefs.remove('layout')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
       readable = true;
-      const reloaded = createDataManager({ capabilityToken: { tenantId: 'team-48', mpId: 'scheduling' }, mpId: 'scheduling', localData: {} });
+      const reloaded = createDataManager({ capabilityToken: { tenantId: 'team-48', mpId: 'scheduling' }, mpId: 'scheduling', localData: {}, viewer: 'user-48' });
       await reloaded.prefs.ready();
       expect(reloaded.prefs.get('layout')).toBe('grid');
     } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
