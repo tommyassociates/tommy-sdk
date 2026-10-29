@@ -208,6 +208,20 @@ export function createDurableQueue({
       return true;
     },
 
+    /**
+     * A drain sent this row and it was not settled: count the attempt on the
+     * row, so its receipt reads as tried and not sent, after a reload too.
+     * Best effort: a row storage cannot rewrite keeps the count in memory.
+     */
+    noteAttempt(rowSeq) {
+      refresh();
+      const row = rows[rowAt(rowSeq)];
+      if (!row) return false;
+      row.attempts = (Number(row.attempts) || 0) + 1;
+      persist();
+      return true;
+    },
+
     /** The write holding this row stopped running here; the row stays queued. */
     release,
 
