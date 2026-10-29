@@ -282,6 +282,9 @@ export function createBroker({
   // owns the array and persists it (D.43); `null` opts out of persistence, and
   // gets a storage-less instance rather than a second code path.
   const queueStore = offlineQueue || createDurableQueue({ now, storage: null });
+  // Ids of the queued rows a drain of this broker is sending now: their
+  // receipts read `sending`, and they cannot be discarded meanwhile.
+  const drainingRows = new Set();
   let isOnline = online;
   let pendingWork = 0;
   let retired = false;
@@ -1760,6 +1763,7 @@ export function createBroker({
         // Its write was answered while this drain sent the rows before it.
         if (!queueStore.all().some((queued) => queued.seq === row.seq)) continue;
         const envelope = row.envelope;
+        if (row.id) drainingRows.add(row.id);
         // eslint-disable-next-line no-await-in-loop
         const outcome = await (envelope.trigger
           ? dispatchEmit(envelope)
@@ -1771,11 +1775,16 @@ export function createBroker({
             ...envelope, rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
           }))
           .then((result) => ({ ok: true, result }))
-          .catch((error) => ({ ok: false, error }));
+          .catch((error) => ({ ok: false, error }))
+          .finally(() => { if (row.id) drainingRows.delete(row.id); });
         results.push(outcome);
         // A row not settled stays queued, and so do the rows its Mini Program
-        // queued after it (a clock-out never goes before its clock-in).
-        if (!outcome.ok && !refusedForGood(outcome.error)) break;
+        // queued after it (a clock-out never goes before its clock-in). Its
+        // receipt reads as tried and not sent.
+        if (!outcome.ok && !refusedForGood(outcome.error)) {
+          queueStore.noteAttempt?.(row.seq);
+          break;
+        }
         queueStore.remove(row.seq);
         if (typeof onOfflineOutcome === 'function') {
           try {
@@ -2018,6 +2027,46 @@ export function createBroker({
         entriesCap: QUEUE_MAX_ENTRIES,
         expiredOnLoad: queueStore.expiredOnLoad(),
       };
+    },
+
+    /**
+     * One Mini Program's waiting writes, as receipts its own surface can show
+     * after a reload (the queue's own receipts, never a second draft
+     * list): `[{ id, activity, args, queuedAt, attempts, state }]` in the
+     * order they will be sent. `state` is `sending` (on its way now),
+     * `failed` (sent and not settled; it is sent again) or `queued`. Only
+     * rows of this broker's person and account; `args` are a copy.
+     */
+    queuedWrites(sourceMpId) {
+      return ownQueuedRows()
+        .filter((row) => row.sourceMpId === sourceMpId && row.envelope?.activity && row.id)
+        .sort((a, b) => a.seq - b.seq)
+        .map((row) => {
+          const attempts = Number(row.attempts) || 0;
+          let state = attempts > 0 ? 'failed' : 'queued';
+          if (queueStore.isHeld?.(row) || drainingRows.has(row.id)) state = 'sending';
+          return {
+            id: row.id,
+            activity: row.envelope.activity,
+            args: JSON.parse(JSON.stringify(row.envelope.args ?? {})),
+            queuedAt: row.queuedAt,
+            attempts,
+            state,
+          };
+        });
+    },
+
+    /**
+     * Discard one of this Mini Program's waiting writes by its receipt id, so
+     * it is never sent. False, and nothing changes, for a row on its way
+     * (held by its running write, or being sent by a drain), another Mini
+     * Program's, another person's or account's, or one that has left the queue.
+     */
+    discardQueuedWrite(sourceMpId, id) {
+      if (typeof id !== 'string' || !id) return false;
+      const row = ownQueuedRows().find((queued) => queued.id === id && queued.sourceMpId === sourceMpId);
+      if (!row || !row.envelope?.activity || queueStore.isHeld?.(row) || drainingRows.has(row.id)) return false;
+      return queueStore.remove(row.seq);
     },
 
     /** Diagnostics: idempotent runs in flight, and the joins waiting on them. */
