@@ -817,9 +817,11 @@ export function createDataService({
    * meta has nothing to keep.
    */
   async function adjustMeta(name, toggled) {
-    // Only a collection whose declared read keeps a cursor has source meta.
+    // Only a collection whose declared read keeps a cursor keeps its meta in
+    // step; any declared read's meta is forgotten, so the rows it described
+    // stop standing for a read (`storedFreshAt`).
     const spec = sources.get(name) || resolve(name)?.decl?.source;
-    if (!spec?.read?.cursor) return;
+    if (!spec?.read || (!spec.read.cursor && toggled !== null)) return;
     const meta = await metaOf(name);
     if (!meta) return;
     if (toggled === null || meta.digest === null) { await sourceMeta.set(name, null); return; }
@@ -1728,6 +1730,20 @@ export function createDataService({
     emitStatus();
   };
   const voidOf = (name) => coverageVoid.get(name) || 0;
+  // Per collection, when (in `coverageSeq`) a whole purge last emptied it:
+  // every target of it reads again when next asked, whatever `maxAge` it asks
+  // with, and a read begun before then never marks it fresh, even one that
+  // stored before the purge and lands after it.
+  const purgedAt = new Map();
+  function voidReads(name) {
+    coverageSeq += 1;
+    purgedAt.set(name, coverageSeq);
+    states.forEach((state, key) => {
+      if (JSON.parse(key)[0] !== name) return;
+      state.syncedAt = null;
+      if (state.state === 'fresh') state.state = 'stale';
+    });
+  }
   const lossOf = (name) => coverageLoss.get(name) || 0;
   const ownsChange = (event) => {
     if (changeOwner === null) return true;
@@ -2467,6 +2483,11 @@ export function createDataService({
         }
         // A read that answered no list leaves the collection as it was, not fresh.
         if (outcome === NO_SNAPSHOT) { if (state.state === 'refreshing') state.state = 'stale'; return; }
+        // What it stored a whole purge since removed: not fresh either.
+        if (flightSeq < (purgedAt.get(name) || 0)) {
+          if (state.state === 'refreshing') state.state = 'stale';
+          throw Object.assign(serviceError(`'${wanted.collection}' was purged while it was read`, 'REFRESH_DROPPED'), { retryable: false });
+        }
         if (wholeRead && flightSeq <= lossOf(name)) {
           const error = Object.assign(serviceError(`'${wanted.collection}' lost rows while it was read`, 'DATA_INCOMPLETE'), { retryable: false });
           state.state = isOnline() ? 'error' : 'offline'; state.syncedAt = null;
@@ -3085,6 +3106,10 @@ export function createDataService({
         // not held yet, never arrives after it.
         if (Array.isArray(keys)) recordEffect(name, { changedKeys: keys.map(String) });
         else recordEffect(name, { whole: true });
+        // A whole purge leaves the collection not read; one of keys or a
+        // range removes only those rows, and what the last read covered of
+        // the rest stands.
+        if (whole) voidReads(name);
         let entries;
         if (Array.isArray(keys)) {
           entries = (await Promise.all(keys.map((key) => store.getRaw(String(key))))).filter(Boolean)
