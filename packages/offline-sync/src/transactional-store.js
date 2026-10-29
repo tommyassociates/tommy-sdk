@@ -197,6 +197,21 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     freshRows.add(fresh);
     return fresh;
   }
+  // A complete read spans several port reads and is refused when a write
+  // moves the store in between: like a paged read, it starts over, three
+  // times in all, before the conflict is the answer.
+  async function completeRows(aged) {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        // Each attempt reads only after the one before it was refused.
+        // eslint-disable-next-line no-await-in-loop
+        return await backend.getAll({ aged });
+      } catch (error) {
+        if (error?.reason !== 'conflict' || attempt === 3) throw error;
+        live();
+      }
+    }
+  }
   async function wholeRows({ aged = false } = {}) {
     if (held && typeof backend.page === 'function') {
       const head = await backend.page({ afterKey: null, limit: 1, aged: true, metadataOnly: true });
@@ -207,7 +222,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       } else held = null;
     }
     if (!paged || typeof backend.page !== 'function') {
-      try { return await backend.getAll({ aged }); } catch (error) {
+      try { return await completeRows(aged); } catch (error) {
         if (error?.reason !== 'scan-required' || typeof backend.page !== 'function') throw error;
       }
     }
