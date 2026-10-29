@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import {
   databaseName, BROKER_DATABASE, createDataManager, createDataStore,
 } from '../src/index.js';
+import { viewerDatabaseName } from '../src/names.js';
 
 const token = { tenantId: 'team-4401', mpId: 'time-clock' };
 
@@ -28,6 +29,12 @@ describe('per-(tenant, MP) naming', () => {
     expect(databaseName(token, 'time-clock')).toBe('tommy-mp:team-4401:time-clock');
     expect(() => databaseName({}, 'time-clock')).toThrow(/tenantId must come from the capability token/);
     expect(() => databaseName({ tenantId: 't', mpId: 'other' }, 'time-clock')).toThrow(/bound to mp 'other'/);
+  });
+
+  it('names a viewer\'s own store under the MP\'s, with the viewer encoded', () => {
+    expect(viewerDatabaseName(token, 'time-clock', '5')).toBe('tommy-mp:team-4401:time-clock:viewer=5');
+    expect(viewerDatabaseName(token, 'time-clock', 'a:b')).toBe('tommy-mp:team-4401:time-clock:viewer=a%3Ab');
+    expect(() => viewerDatabaseName(token, 'time-clock', '')).toThrow(/viewer required/);
   });
 
   it("the broker's own store is not an MP store", () => {

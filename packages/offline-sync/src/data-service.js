@@ -74,13 +74,23 @@ export const DEFAULT_STALE_AFTER_MS = 5 * 60000;
 // A declared read with a cursor reads the whole collection at least this often.
 const FULL_EVERY_MS = 24 * 60 * 60000;
 
-/** Runs work at once, one flight per key. Hosts inject their scheduler instead. */
+/**
+ * Runs work at once, one flight per key. Hosts inject their scheduler instead.
+ * As the host's does, it never runs a job that is no longer `valid()` (its
+ * service retired, its reads paused): one no longer valid when its turn comes
+ * settles dropped without running. A run on its way checks for itself.
+ */
 export function createImmediateScheduler() {
   const flights = new Map();
+  const valid = (job) => { try { return !job.valid || !!job.valid(); } catch (_) { return false; } };
+  const dropped = () => Object.assign(new Error('Refresh no longer current'), { code: 'REFRESH_DROPPED' });
   return {
     request(job) {
       if (flights.has(job.key)) return flights.get(job.key);
-      const flight = Promise.resolve().then(() => job.run(() => true)).finally(() => flights.delete(job.key));
+      const flight = Promise.resolve().then(() => {
+        if (!valid(job)) throw dropped();
+        return job.run(() => true);
+      }).finally(() => flights.delete(job.key));
       flights.set(job.key, flight);
       return flight;
     },
@@ -807,9 +817,11 @@ export function createDataService({
    * meta has nothing to keep.
    */
   async function adjustMeta(name, toggled) {
-    // Only a collection whose declared read keeps a cursor has source meta.
+    // Only a collection whose declared read keeps a cursor keeps its meta in
+    // step; any declared read's meta is forgotten, so the rows it described
+    // stop standing for a read (`storedFreshAt`).
     const spec = sources.get(name) || resolve(name)?.decl?.source;
-    if (!spec?.read?.cursor) return;
+    if (!spec?.read || (!spec.read.cursor && toggled !== null)) return;
     const meta = await metaOf(name);
     if (!meta) return;
     if (toggled === null || meta.digest === null) { await sourceMeta.set(name, null); return; }
@@ -1718,6 +1730,20 @@ export function createDataService({
     emitStatus();
   };
   const voidOf = (name) => coverageVoid.get(name) || 0;
+  // Per collection, when (in `coverageSeq`) a whole purge last emptied it:
+  // every target of it reads again when next asked, whatever `maxAge` it asks
+  // with, and a read begun before then never marks it fresh, even one that
+  // stored before the purge and lands after it.
+  const purgedAt = new Map();
+  function voidReads(name) {
+    coverageSeq += 1;
+    purgedAt.set(name, coverageSeq);
+    states.forEach((state, key) => {
+      if (JSON.parse(key)[0] !== name) return;
+      state.syncedAt = null;
+      if (state.state === 'fresh') state.state = 'stale';
+    });
+  }
   const lossOf = (name) => coverageLoss.get(name) || 0;
   const ownsChange = (event) => {
     if (changeOwner === null) return true;
@@ -2457,6 +2483,11 @@ export function createDataService({
         }
         // A read that answered no list leaves the collection as it was, not fresh.
         if (outcome === NO_SNAPSHOT) { if (state.state === 'refreshing') state.state = 'stale'; return; }
+        // What it stored a whole purge since removed: not fresh either.
+        if (flightSeq < (purgedAt.get(name) || 0)) {
+          if (state.state === 'refreshing') state.state = 'stale';
+          throw Object.assign(serviceError(`'${wanted.collection}' was purged while it was read`, 'REFRESH_DROPPED'), { retryable: false });
+        }
         if (wholeRead && flightSeq <= lossOf(name)) {
           const error = Object.assign(serviceError(`'${wanted.collection}' lost rows while it was read`, 'DATA_INCOMPLETE'), { retryable: false });
           state.state = isOnline() ? 'error' : 'offline'; state.syncedAt = null;
@@ -3075,6 +3106,10 @@ export function createDataService({
         // not held yet, never arrives after it.
         if (Array.isArray(keys)) recordEffect(name, { changedKeys: keys.map(String) });
         else recordEffect(name, { whole: true });
+        // A whole purge leaves the collection not read; one of keys or a
+        // range removes only those rows, and what the last read covered of
+        // the rest stands.
+        if (whole) voidReads(name);
         let entries;
         if (Array.isArray(keys)) {
           entries = (await Promise.all(keys.map((key) => store.getRaw(String(key))))).filter(Boolean)
