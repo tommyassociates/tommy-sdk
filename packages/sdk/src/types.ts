@@ -1920,12 +1920,26 @@ export interface TimeDisplayOptions {
   readonly locale?: string;
   readonly kind?: 'datetime' | 'date' | 'time';
   readonly includeZone?: 'auto' | 'always';
+  /**
+   * The zone label names the business city alone, with no difference from
+   * the viewer: for output other people read (exports, PDFs, shared files).
+   */
+  readonly absoluteZone?: boolean;
 }
 
 export interface ZonedTimeText {
   readonly text: string;
   readonly timezone: string;
+  /** The UTC offset at that instant ("UTC+11:00"). */
   readonly offset: string;
+  /** The zone's city in the display language ("Sydney"). */
+  readonly city: string;
+  /** Hours this clock is ahead of the viewer's (negative behind); 0 with `absoluteZone`. */
+  readonly diffHours: number;
+  /**
+   * "Sydney (+1 hour)"; the city alone when the clocks agree or with
+   * `absoluteZone`; the UTC offset for viewers whose preference is offset labels.
+   */
   readonly zoneLabel: string;
 }
 
@@ -1941,6 +1955,22 @@ export interface TimeDisplay extends ZonedTimeText {
 export interface TimeRangeDisplay extends TimeDisplay {
   readonly start: TimeDisplay;
   readonly end: TimeDisplay;
+}
+
+/** A business zone against the viewer's clock: what one "Times are in Sydney time — 1 hour ahead of you" notice says. */
+export interface ZoneSummary {
+  readonly timezone: string;
+  /** The zone's city in the display language. */
+  readonly city: string;
+  /** Whether the zone is not the viewer's. */
+  readonly mismatch: boolean;
+  /** Hours the zone's clock is ahead of the viewer's; negative behind. */
+  readonly diffHours: number;
+  /** The signed difference in the display language ("+1 hour", "-4.5 hours"). */
+  readonly diffText: string;
+  /** The unsigned difference ("1 hour"). */
+  readonly distanceText: string;
+  readonly ahead: boolean;
 }
 
 export interface ResolvedWallTime {
@@ -1994,6 +2024,12 @@ export interface TimeApi {
   formatInstant(value: Iso8601, options: TimeDisplayOptions): TimeDisplay;
   formatRange(start: Iso8601, end: Iso8601, options: TimeDisplayOptions): TimeRangeDisplay;
   formatDateOnly(value: string, options?: { readonly locale?: string }): string;
+  /**
+   * The zone (the team's when omitted) against the viewer's clock now, or at
+   * `at`. An unknown zone throws TIMEZONE_INVALID. The `<zone-notice>`
+   * surface component shows it.
+   */
+  zoneSummary(timezone?: string | null, options?: { readonly locale?: string; readonly at?: Iso8601 }): ZoneSummary;
   viewer(): ViewerTimezone;
   context(): Readonly<{ teamTimezone: string | null; enabled: boolean }>;
   zones(): ReadonlyArray<string>;

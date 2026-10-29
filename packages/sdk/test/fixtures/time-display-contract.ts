@@ -1,4 +1,4 @@
-import type { TommySdk, TimeDisplay, TimeRangeDisplay, ViewerTimezone, ResolvedWallTime, CalendarDayBounds } from '../../src/types';
+import type { TommySdk, TimeDisplay, TimeRangeDisplay, ViewerTimezone, ResolvedWallTime, CalendarDayBounds, ZoneSummary } from '../../src/types';
 
 declare const sdk: TommySdk;
 const display: TimeDisplay = sdk.time.formatInstant('2026-10-15T00:00:00Z', { timezone: 'Australia/Brisbane', kind: 'time' });
@@ -11,7 +11,13 @@ const enabled: boolean = sdk.time.context().enabled;
 const zones: readonly string[] = sdk.time.zones();
 const bounds: CalendarDayBounds = sdk.time.dayBounds('2026-09-06', { timezone: 'America/Santiago' });
 const duration: number = bounds.durationMinutes;
-void [range, viewer, date, weekday, enabled, zones, duration];
+const city: string = display.city;
+const diffHours: number = display.diffHours;
+const exported: TimeRangeDisplay = sdk.time.formatRange(display.datetime, display.datetime, { timezone: display.timezone, includeZone: 'always', absoluteZone: true });
+const summary: ZoneSummary = sdk.time.zoneSummary('Australia/Sydney', { at: display.datetime });
+const teamSummary: ZoneSummary = sdk.time.zoneSummary();
+const notice: [string, boolean, boolean, number, string, string] = [summary.city, summary.mismatch, summary.ahead, summary.diffHours, summary.diffText, summary.distanceText];
+void [range, viewer, date, weekday, enabled, zones, duration, city, diffHours, exported, teamSummary, notice];
 // @ts-expect-error Civil-day boundaries require an explicit business timezone.
 sdk.time.dayBounds('2026-09-06', {});
 // @ts-expect-error An offset-free instant must still name its business timezone.
@@ -20,3 +26,5 @@ sdk.time.formatInstant('2026-10-15T00:00:00Z', {});
 sdk.time.formatInstant('2026-10-15T00:00:00Z', { timezone: 'UTC', preferences: { timezone_mode: 'manual' } });
 // @ts-expect-error Silent ambiguity resolution is not a supported operation.
 sdk.time.resolveWallTime({ date: '2026-11-01', time: '01:30', timezone: 'America/New_York', disambiguation: 'compatible' });
+// @ts-expect-error A zone summary is read-only.
+summary.diffHours = 2;
