@@ -2,7 +2,7 @@
 export const HOST_STORE_VERSION = 1;
 // What this engine accepts beyond version 1's open/read/commit/retire. A port
 // without a feature (an older desktop engine) is never sent its inputs.
-export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at', 'schema-fingerprint', 'aged-reads', 'open-epoch', 'subject-retire']);
+export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at', 'schema-fingerprint', 'aged-reads', 'open-epoch', 'subject-retire', 'synced-commit']);
 export const HOST_STORE_DATABASE = 'tommy-host-store-v2';
 export const MAX_ROWS = 100;
 export const MAX_READ_BYTES = 8 * 1024 * 1024;
@@ -205,7 +205,7 @@ export function validateCommit(input) {
   if (!closed(input, ['handle', 'expectedEpoch', 'expectedStoreRevision', 'changes'], ['syncedAt'])
     || (input.syncedAt !== undefined && !integer(input.syncedAt))
     || !integer(input.expectedEpoch) || !integer(input.expectedStoreRevision)
-    || !Array.isArray(input.changes) || !input.changes.length || input.changes.length > MAX_ROWS
+    || !Array.isArray(input.changes) || (!input.changes.length && input.syncedAt === undefined) || input.changes.length > MAX_ROWS
     || new Set(input.changes.map((change) => change?.key)).size !== input.changes.length) throw storageError('unserializable');
   const changes = input.changes.map((change) => {
     if (!keyValid(change?.key)) throw storageError('unserializable');
