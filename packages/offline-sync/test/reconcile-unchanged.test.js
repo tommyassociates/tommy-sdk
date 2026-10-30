@@ -38,15 +38,17 @@ function transactionalBackend(port, options) {
   };
 }
 
-function open(create, feed = null) {
+function open(create, feed = null, { maxAgeMs = 30 * 86400000, now } = {}) {
   if (!create) return { database: { close: async () => {} }, store: createDataStore({ name: 'docs', backend: createMemoryStoreBackend() }) };
   const database = create();
   const raw = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
   const port = feed ? observeHostStorePort(raw, feed) : raw;
   const options = { identity: identity(), storeName: 'docs', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
-    limits: { maxRows: 1000, maxAgeMs: 30 * 86400000, maxBytes: null } };
-  const store = createDataStore({ name: 'docs', backend: transactionalBackend(port, options) });
-  return { database, store };
+    limits: { maxRows: 1000, maxAgeMs, maxBytes: null } };
+  const backend = transactionalBackend(port, options);
+  const commit = vi.spyOn(backend, 'commit');
+  const store = createDataStore({ name: 'docs', backend, ...(now ? { now } : {}) });
+  return { database, store, port, commit };
 }
 
 const mine = [{ id: '1', user_id: '5', status: 'approved', meta: { a: 1, b: 2 } }];
@@ -202,15 +204,55 @@ describe.each(STORES)('reconcile of unchanged server rows (%s)', (_name, create)
 });
 
 describe.each(DATABASES)('reconcile of unchanged server rows that stamp the collection synced (%s)', (_name, create) => {
-  it('restamps an identical row, keeping its revision, for a read that stamps the collection synced', async () => {
-    const { database, store } = open(create);
-    await store.reconcile(team, { prune: false, keepDirty: true, syncedAt: null });
+  it('stamps freshness without writing identical rows or moving their revisions', async () => {
+    const feed = createHostStoreChangeFeed({ BroadcastChannelImpl: null });
+    const { database, store, port, commit } = open(create, feed);
+    await store.reconcile(team, { keepDirty: true, syncedAt: 1000 });
+    const notice = vi.fn();
+    feed.subscribe(notice);
+    const before = await store.getAllRaw();
+    commit.mockClear();
+    const heard = vi.fn();
+    store.onChange(heard);
+    await store.reconcile(team, { keepDirty: true, syncedAt: 2000 });
+    expect(commit.mock.calls.flatMap(([, changes]) => changes)).toEqual([]);
+    expect(await store.getAllRaw()).toEqual(before);
+    expect(heard).not.toHaveBeenCalled();
+    const inspected = await port.inspect({ op: 'stores', selector: { authorityOrigin: 'https://api.example.test', viewerId: '7' } });
+    expect(inspected.stores[0].syncedAt).toBe(2000);
+    expect(notice).not.toHaveBeenCalled();
+    feed.close();
+    await database.close();
+  });
+
+  it('restamps an identical row past half a short age limit, keeping its revision, and nothing before', async () => {
+    let at = Date.UTC(2026, 9, 30, 9);
+    const { database, store, commit } = open(create, null, { maxAgeMs: 60 * 60 * 1000, now: () => at });
+    await store.reconcile(team, { keepDirty: true });
     const before = await store.getRaw('1');
-    await new Promise((resolve) => { setTimeout(resolve, 5); });
-    await store.reconcile(team, { prune: false, keepDirty: true });
+    commit.mockClear();
+    at += 20 * 60 * 1000;
+    await store.reconcile(team, { keepDirty: true });
+    expect(commit.mock.calls.flatMap(([, changes]) => changes)).toEqual([]);
+    at += 15 * 60 * 1000;
+    await store.reconcile(team, { keepDirty: true });
+    expect(commit.mock.calls.flatMap(([, changes]) => changes).map((change) => [change.op, change.key])).toEqual([['put', '1'], ['put', '2']]);
     const after = await store.getRaw('1');
     expect(after._rev).toBe(before._rev);
-    expect(after._updatedAt > before._updatedAt).toBe(true);
+    expect(after._updatedAt).toBe(new Date(at).toISOString());
+    await database.close();
+  });
+
+  it('writes only the changed row and still prunes a missing row', async () => {
+    const { database, store, commit } = open(create);
+    await store.reconcile(team, { keepDirty: true });
+    commit.mockClear();
+    await store.reconcile([team[0], { ...team[1], status: 'approved' }], { keepDirty: true });
+    expect(commit.mock.calls.flatMap(([, changes]) => changes).filter((change) => change.op === 'put').map((change) => change.key)).toEqual(['2']);
+    commit.mockClear();
+    await store.reconcile(mine, { keepDirty: true });
+    expect(commit.mock.calls.flatMap(([, changes]) => changes)).toEqual([{ op: 'delete', key: '2' }]);
+    expect(await store.getRaw('2')).toBeUndefined();
     await database.close();
   });
 });

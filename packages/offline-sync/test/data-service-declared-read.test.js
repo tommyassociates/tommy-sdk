@@ -271,10 +271,12 @@ describe('a declared read', () => {
     expect((await data.read('members')).length).toBe(999);
     expect((await data.read('members', 'm7')).name).toBe('Renamed');
     expect(await data.read('members', 'm5')).toBeNull();
-    // Nothing changed: one row is written, which stamps the collection synced.
+    // Nothing changed: freshness advances without submitting a row write.
     written = 0;
+    at += 60 * 1000;
     await data.refresh('members', { mode: 'visible' });
-    expect(written).toBe(1);
+    expect(written).toBe(0);
+    expect(data.status('members')).toMatchObject({ state: 'fresh', syncedAt: at });
     // A day on, every row is confirmed again.
     written = 0;
     at += 25 * 60 * 60 * 1000;
