@@ -161,7 +161,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       }
       const previous = new Map(snapshot.rows.map((row) => [row.key, row.value]));
       const changes = transform(previous, snapshot.storeRevision);
-      if (!changes.length) return;
+      if (!changes.length && (keys.length || syncedAt === undefined || syncedAt === null)) return;
       if (keys.length > 1 && jsonBytes(changes) > WRITE_BATCH_BYTES) throw TOO_LARGE;
       const result = await commit(snapshot, changes, syncedAt === undefined || syncedAt === null ? undefined : { syncedAt });
       live();
@@ -577,33 +577,50 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         };
         const stamp = (row, previous, storeRevision) => ({ ...heldProvenance(row, previous), ...row, ...acknowledged(previous), _rev: rowRevision(previous, storeRevision), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...windowOf(previous) });
         // A row the server answered as it is held is not written (every commit
-        // is announced on the change feed), unless this read stamps the
-        // collection synced (`syncedAt`), which only a commit carries: then it
-        // is restamped, keeping its revision. See unchangedServerRow.
+        // is announced on the change feed): a read that stamps the collection
+        // synced (`syncedAt`) stamps the store alone, in a commit of no rows
+        // that is not announced. Only a row past half the store's age limit is
+        // restamped, keeping its revision, so the limit counts from a recent
+        // confirmation. See unchangedServerRow.
         const unchanged = (row, previous) => unchangedServerRow(row, previous, { paintable, now, windowKey });
         const restamp = (previous) => ({ ...previous, _updatedAt: new Date(now()).toISOString() });
         const quiet = syncedAt === null || syncedAt === undefined;
+        const confirms = (previous) => !quiet && ageLimit() !== null && !(Date.parse(previous._updatedAt) + ageLimit() / 2 >= now());
         let changed = false;
+        let wrote = false;
         for (const batch of upsertBatches(incoming)) {
           // eslint-disable-next-line no-await-in-loop
           await inParts(batch.map(([key]) => key), async (keys) => {
             const part = batch.filter(([key]) => keys.includes(key));
             let left = [];
             let partChanged = false;
+            let partWrote = false;
             await mutation(keys, (rows, storeRevision) => {
               left = keepDirty ? part.filter(([key]) => rows.get(key)?._dirty).map(([key]) => key) : [];
               partChanged = false;
+              partWrote = false;
               return part.filter(([key]) => !left.includes(key)).flatMap(([key, row]) => {
                 const previous = rows.get(key);
-                if (unchanged(row, previous)) return quiet ? [] : [{ op: 'put', key, value: restamp(previous) }];
+                if (unchanged(row, previous)) {
+                  if (!confirms(previous)) return [];
+                  partWrote = true;
+                  return [{ op: 'put', key, value: restamp(previous) }];
+                }
                 partChanged = true;
+                partWrote = true;
                 return [{ op: 'put', key, value: stamp(row, previous, storeRevision) }];
               });
             }, { syncedAt, retry: true });
             upserted += part.length - left.length;
             if (partChanged) changed = true;
+            if (partWrote) wrote = true;
             left.forEach((key) => skipped.add(key));
           });
+        }
+        // Rows answered unchanged (or, with `prune: false`, a call that only
+        // stamps): the store is stamped synced without writing a row.
+        if (!wrote && !quiet && (incoming.size ? upserted : !prune)) {
+          await mutation([], () => [], { syncedAt, retry: true });
         }
         const counts = skipped.size ? { skipped: [...skipped] } : {};
         if (windowKey != null) { windows.delete(String(windowKey)); windows.set(String(windowKey), now()); }
