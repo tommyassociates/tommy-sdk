@@ -48,7 +48,7 @@ const RESTORE_CONTEXT_ALWAYS = new Set(['team.update_member']);
 // These get it only on a durable-queue drain (`restoreDrain`), so the server can
 // read "restoreContext present" as "this write waited in the queue" and honour
 // its captured time. An inspector replay sets `restoreReplay` but never waited.
-const RESTORE_CONTEXT_ON_DRAIN = new Set(['time-clock.record_attendance']);
+const RESTORE_CONTEXT_ON_DRAIN = new Set(['time-clock.record_attendance', 'time-clock.record_booking_clock']);
 const wantsRestoreContext = (envelope) => RESTORE_CONTEXT_ALWAYS.has(envelope.activity)
   || (RESTORE_CONTEXT_ON_DRAIN.has(envelope.activity) && envelope.restoreDrain === true);
 // `queuedAt` is part of the drain-only context; the member-restore wire shape is unchanged.
