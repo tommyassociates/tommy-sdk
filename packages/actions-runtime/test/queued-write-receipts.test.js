@@ -128,7 +128,7 @@ describe('queued write receipts survive a reload and belong to their Mini Progra
     await settle();
     const [receipt] = first.broker.queuedWrites('timesheets');
     expect(receipt.state).toBe('sending');
-    expect(first.broker.discardQueuedWrite('timesheets', receipt.id)).toBe(false);
+    expect(await first.broker.discardQueuedWrite('timesheets', receipt.id)).toBe(false);
     calls[0]({ ok: true });
     await running;
     expect(first.broker.queuedWrites('timesheets')).toEqual([]);
@@ -143,7 +143,7 @@ describe('queued write receipts survive a reload and belong to their Mini Progra
     await settle();
     const [receipt] = reloaded.broker.queuedWrites('timesheets');
     expect(receipt.state).toBe('sending');
-    expect(reloaded.broker.discardQueuedWrite('timesheets', receipt.id)).toBe(false);
+    expect(await reloaded.broker.discardQueuedWrite('timesheets', receipt.id)).toBe(false);
     calls[0]({ ok: true });
     await drain;
     expect(reloaded.broker.queuedWrites('timesheets')).toEqual([]);
@@ -157,10 +157,11 @@ describe('queued write receipts survive a reload and belong to their Mini Progra
 
     const reloaded = await page(async (envelope) => { sent.push(envelope.args); return { ok: true }; });
     const [leaveRow] = reloaded.broker.queuedWrites('leave');
-    expect(reloaded.broker.discardQueuedWrite('timesheets', leaveRow.id)).toBe(false);
-    expect(reloaded.broker.discardQueuedWrite('timesheets', 'no-such-row')).toBe(false);
+    expect(await reloaded.broker.discardQueuedWrite('timesheets', leaveRow.id)).toBe(false);
+    expect(await reloaded.broker.discardQueuedWrite('timesheets', 'no-such-row')).toBe(false);
     const [mine] = reloaded.broker.queuedWrites('timesheets');
-    expect(reloaded.broker.discardQueuedWrite('timesheets', mine.id)).toBe(true);
+    expect(reloaded.broker.discardQueuedWrite('timesheets', 'missing')).toBeInstanceOf(Promise);
+    expect(await reloaded.broker.discardQueuedWrite('timesheets', mine.id)).toBe(true);
     expect(reloaded.broker.queuedWrites('timesheets')).toEqual([]);
     expect(reloaded.broker.queueStats().bySource).toEqual({ leave: 1 });
 
@@ -174,7 +175,7 @@ describe('queued write receipts survive a reload and belong to their Mini Progra
     await theirs.invoke('timesheets', { timesheetId: '11' }, 'k-1');
     const [row] = theirs.broker.queuedWrites('timesheets');
     const mine = await page(async () => ({ ok: true }));
-    expect(mine.broker.discardQueuedWrite('timesheets', row.id)).toBe(false);
+    expect(await mine.broker.discardQueuedWrite('timesheets', row.id)).toBe(false);
     expect(theirs.broker.queuedWrites('timesheets')).toHaveLength(1);
   });
 });
