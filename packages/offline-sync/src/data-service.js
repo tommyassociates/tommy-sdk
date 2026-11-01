@@ -2318,11 +2318,13 @@ export function createDataService({
     subscribe(target, callback, { onError, storageMetadata = false } = {}) {
       live();
       const wanted = targetOf(target);
-      const { store, label } = local(wanted.collection);
+      const { store, label, decl } = local(wanted.collection);
       if (wanted.query) checkQuery(wanted.query);
+      const whole = !wanted.query && (wanted.key === undefined || wanted.key === null);
       let active = true;
       let last;
       let seq = 0;
+      const report = (error) => { if (active) { try { onError?.(error); } catch (_) { /* isolated */ } } };
       const emit = () => {
         if (!active) return;
         seq += 1;
@@ -2331,15 +2333,124 @@ export function createDataService({
           if (!active || mine !== seq || (last !== undefined && same(value, last))) return;
           last = value;
           callback(value);
-        }).catch((error) => { if (active) { try { onError?.(error); } catch (_) { /* isolated */ } } });
+        }).catch(report);
+      };
+      // A whole-collection subscription keeps the keys of its last value in
+      // the same order, so a change that names its keys re-reads only those
+      // rows. A change with unknown keys, or a new key in a store that does
+      // not read in key order (`keyOrdered`), reads the collection again.
+      // Changes that arrive while a read runs are read together after it.
+      const keyPath = decl?.keyPath || 'id';
+      const project = storageMetadata ? copyRow : clean;
+      let lastKeys = null;
+      let keyOrdered = false;
+      let pending = new Set();
+      let pendingWhole = true;
+      let draining = false;
+      let shown;
+      let behind = false;
+      let skipped = false;
+      const readEveryRow = async () => {
+        const rows = await store.getAll();
+        const keys = rows.map((row) => String(row?.[keyPath]));
+        const value = rows.map(project);
+        const ordered = store.keyOrdered === true && keys.every((key, at) => at === 0 || keys[at - 1] < key);
+        return { value, keys, ordered, changed: last === undefined || !same(value, last) };
+      };
+      const readKeys = async (keys) => {
+        const found = await Promise.all(keys.map((key) => store.get(key)));
+        const at = new Map(lastKeys.map((key, index) => [key, index]));
+        const value = last.slice();
+        const removed = new Set();
+        const added = [];
+        let changed = false;
+        keys.forEach((key, index) => {
+          const row = found[index];
+          const place = at.get(key);
+          if (place === undefined) {
+            if (row !== undefined && row !== null) added.push([key, project(row)]);
+          } else if (row === undefined || row === null) {
+            removed.add(place);
+            changed = true;
+          } else {
+            const next = project(row);
+            if (!same(next, value[place])) { value[place] = next; changed = true; }
+          }
+        });
+        if (added.length && !keyOrdered) return null;
+        const kept = removed.size ? value.filter((_, index) => !removed.has(index)) : value;
+        const order = removed.size ? lastKeys.filter((_, index) => !removed.has(index)) : lastKeys.slice();
+        added.forEach(([key, row]) => {
+          let low = 0;
+          let high = order.length;
+          while (low < high) {
+            const mid = Math.floor((low + high) / 2);
+            if (order[mid] < key) low = mid + 1; else high = mid;
+          }
+          order.splice(low, 0, key);
+          kept.splice(low, 0, row);
+          changed = true;
+        });
+        return { value: kept, keys: order, ordered: keyOrdered, changed };
+      };
+      const catchUp = async () => {
+        if (draining || !active) return;
+        draining = true;
+        let failed = false;
+        try {
+          while (active && (pendingWhole || pending.size)) {
+            const readAll = pendingWhole || lastKeys === null;
+            const keys = [...pending];
+            pending = new Set();
+            pendingWhole = false;
+            // Each read starts from the value the previous one delivered.
+            // eslint-disable-next-line no-await-in-loop
+            const next = readAll ? await readEveryRow() : await readKeys(keys);
+            if (!active) return;
+            if (next === null) pendingWhole = true;
+            else {
+              lastKeys = next.keys;
+              keyOrdered = next.ordered;
+              if (next.changed) { skipped = behind; behind = true; last = next.value; }
+            }
+            // A value a newer change already supersedes is not delivered; once
+            // caught up, the caller gets the latest (in its own array, so
+            // sorting it leaves the kept order alone) unless it is the one
+            // delivered last.
+            if (behind && active && !pendingWhole && !pending.size) {
+              behind = false;
+              const repeat = skipped && shown !== undefined && same(last, shown);
+              skipped = false;
+              if (!repeat) { shown = last; callback(last.slice()); }
+            }
+          }
+        } catch (error) {
+          failed = true;
+          pendingWhole = true;
+          report(error);
+        } finally {
+          draining = false;
+        }
+        // After a failure the next change reads again; nothing retries on its own.
+        if (!failed && active && (pendingWhole || pending.size)) catchUp();
+      };
+      const changed = (keys) => {
+        if (!active) return;
+        if (!whole) { emit(); return; }
+        if (Array.isArray(keys) && lastKeys !== null) keys.forEach((key) => pending.add(String(key)));
+        else pendingWhole = true;
+        catchUp();
       };
       // A change listener reads only this target, however large the collection.
-      const offStore = typeof store.onChange === 'function' ? store.onChange(() => emit()) : store.subscribe(() => emit());
+      const offStore = typeof store.onChange === 'function'
+        ? store.onChange((notice) => changed(notice?.keys)) : store.subscribe(() => changed(null));
       const offFeed = feed?.subscribe((event) => {
         if (!ownsChange(event)) return;
-        if (event.label === label || event.labels?.includes(label) || (event.type === 'purge' && !event.label)) emit();
+        if (event.type === 'purge' && !event.label) changed(null);
+        else if (event.label === label) changed(event.type === 'purge' ? null : event.keys);
+        else if (event.labels?.includes(label)) changed(event.keysByLabel?.[label]);
       });
-      emit();
+      if (whole) catchUp(); else emit();
       return held(() => { active = false; offStore?.(); offFeed?.(); });
     },
     /**

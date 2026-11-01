@@ -375,6 +375,8 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       }
       return null;
     },
+    // A whole read pages the host port's rows by key, so getAll answers in key order.
+    keyOrdered: true,
     async get(key) { live(); const row = await backend.get(keyString(key)); live(); return paintable(row) ? copy(row) : undefined; },
     async getRaw(key) { live(); const row = await backend.get(keyString(key), { aged: true }); live(); return copy(row); },
     async getAll() { live(); const rows = await wholeRows(); live(); return owned(freshRows.has(rows) ? rows.filter(paintable) : rows.filter(paintable).map(copy)); },

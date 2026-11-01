@@ -132,7 +132,10 @@ describe.each([...DATABASES, ['memory', null]])('another owner\'s change (%s)', 
     await data.ingest('shifts', ROWS);
     let reads = 0;
     const getAll = store.getAll.bind(store);
+    const get = store.get.bind(store);
     store.getAll = (...args) => { reads += 1; return getAll(...args); };
+    // A whole subscription re-reads a change's named keys, not the collection.
+    store.get = (...args) => { reads += 1; return get(...args); };
     const off = data.subscribe('shifts', () => {});
     await new Promise((resolve) => { setTimeout(resolve, 20); });
     const settled = reads;
