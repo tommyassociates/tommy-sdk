@@ -459,7 +459,8 @@ export function createDataService({
   resolve,
   scheduler = createImmediateScheduler(),
   feed = null,
-  // How long an unchanged collection's whole read is reused; 0 never.
+  // How long an unchanged collection's whole read is reused; 0 never. A
+  // function of the collection name sets it per collection.
   wholeReadReuseMs = 0,
   // A value that changes whenever a write is sent or settles: a `fromNow` +
   // `sinceWrite` method read may join or reuse (for `reuseSinceWriteMs`) a
@@ -2207,13 +2208,14 @@ export function createDataService({
   async function readWhole(name, store, raw) {
     const id = `${raw ? 'raw' : 'paint'}:${name}`;
     const direct = () => (raw ? store.getAllRaw() : store.getAll());
-    if (!(wholeReadReuseMs > 0) || !feed || !watchChanges(name, store)) {
+    const reuseMs = typeof wholeReadReuseMs === 'function' ? wholeReadReuseMs(name) : wholeReadReuseMs;
+    if (!(reuseMs > 0) || !feed || !watchChanges(name, store)) {
       const rows = await direct();
       return { rows, own: isOwnCopy(rows) };
     }
     const generation = generationOf(name);
     const kept = wholeReads.get(id);
-    if (kept && kept.generation === generation && now() - kept.at < wholeReadReuseMs) return { rows: await kept.reading, own: false };
+    if (kept && kept.generation === generation && now() - kept.at < reuseMs) return { rows: await kept.reading, own: false };
     const entry = { generation, at: now(), reading: null };
     entry.reading = Promise.resolve().then(direct);
     wholeReads.set(id, entry);

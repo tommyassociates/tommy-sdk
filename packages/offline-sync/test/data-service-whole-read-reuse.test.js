@@ -1,8 +1,9 @@
 // @vitest-environment node
 /**
- * With `wholeReadReuseMs` (the host sets it on a phone), a whole read of a
+ * With `wholeReadReuseMs` (the host sets it for every collection on a phone,
+ * and for its attendance collections in a browser), a whole read of a
  * collection nothing changed is answered again without reading the store
- * (there, several native SQLite calls each): only by a service that hears
+ * (on a phone, several native SQLite calls each): only by a service that hears
  * other tabs' changes (its feed), only while no change was heard, and only
  * for that long. Without it every read reads the store.
  */
@@ -31,6 +32,18 @@ function fixture({ withFeed = true, scheduler, wholeReadReuseMs = 15000 } = {}) 
 }
 
 describe('a whole read of an unchanged collection', () => {
+  it('is reused only for the collections a per-collection reuse names', async () => {
+    const kept = fixture({ wholeReadReuseMs: (name) => (name === 'products' ? 15000 : 0) });
+    await kept.data.ingest('products', [{ id: '1', title: 'One' }]);
+    await kept.data.read('products');
+    await kept.data.read('products');
+    expect(kept.getAll).toHaveBeenCalledTimes(1);
+    const unnamed = fixture({ wholeReadReuseMs: () => 0 });
+    await unnamed.data.ingest('products', [{ id: '1', title: 'One' }]);
+    await unnamed.data.read('products');
+    await unnamed.data.read('products');
+    expect(unnamed.getAll).toHaveBeenCalledTimes(2);
+  });
   it('is answered again until a change is heard, here or from another tab', async () => {
     const { data, getAll, elsewhere } = fixture();
     await data.ingest('products', [{ id: '1', title: 'One' }]);
