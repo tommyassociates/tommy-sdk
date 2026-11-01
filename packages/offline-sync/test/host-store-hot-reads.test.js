@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { createHostStorePort } from '../src/host-store/index.js';
 import { DATABASES, identity } from './helpers/host-databases.js';
+import { storageError } from '../src/host-store/protocol.js';
 
 function counted(database) {
   const counts = { transactions: 0, rows: 0 };
@@ -21,6 +22,55 @@ const options = name => ({ identity: identity(), storeName: name, policy: 'cache
 const change = title => [{ op: 'put', key: '1', value: { id: '1', title } }];
 
 describe.each(DATABASES)('hot port reads on %s', (_name, create) => {
+  it.each(['payload-capacity', 'quota'])('propagates %s after a successful hot read and coalesces only that failure', async reason => {
+    const db = create();
+    try {
+      let failure = null;
+      const { counts, database } = counted({ ...db, transaction(mode, work) {
+        return db.transaction(mode, tx => {
+          if (mode === 'readonly' && failure) throw storageError(failure);
+          return work(tx);
+        });
+      } });
+      const port = createHostStorePort({ database });
+      const opened = await port.open(options('person.accounts'));
+      await port.commit({ handle: opened.handle, expectedEpoch: opened.epoch, expectedStoreRevision: 0, changes: change('One') });
+      const ask = { handle: opened.handle, expectedEpoch: opened.epoch, keys: ['1'] };
+      expect((await port.read(ask)).rows[0].value.title).toBe('One');
+      failure = reason;
+      counts.transactions = 0;
+      counts.rows = 0;
+      const failed = await Promise.all(Array.from({ length: 26 }, () => port.read(ask)));
+      expect(failed).toEqual(Array.from({ length: 26 }, () => ({ ok: false, reason })));
+      expect(counts.transactions).toBe(1);
+      expect(counts.rows).toBe(0);
+      failure = null;
+      expect((await port.read(ask)).rows[0].value.title).toBe('One');
+      expect(counts.rows).toBeGreaterThan(0);
+    } finally { await db.close(); }
+  });
+
+  it.each([false, true])('forgets hot rows evicted by a sibling namespace (another port: %s)', async anotherPort => {
+    const db = create();
+    try {
+      let clock = 0;
+      const port = createHostStorePort({ database: db, now: () => ++clock });
+      const writer = anotherPort ? createHostStorePort({ database: db, now: () => ++clock }) : port;
+      const limited = name => ({ ...options(name), limits: { ...options(name).limits, evict: 'lru', domainMaxBytes: 100 } });
+      const shifts = await port.open(limited('workforce.shifts'));
+      const sibling = await writer.open(limited('workforce.timesheets_window'));
+      const put = opened => ({ handle: opened.handle, expectedEpoch: opened.epoch, expectedStoreRevision: 0, changes: change('x'.repeat(60)) });
+      expect(await port.commit(put(shifts))).toMatchObject({ ok: true });
+      const scan = { handle: shifts.handle, expectedEpoch: shifts.epoch, afterKey: null, limit: 100 };
+      const keyed = { handle: shifts.handle, expectedEpoch: shifts.epoch, keys: ['1'] };
+      expect((await port.read(scan)).rows.map(row => row.key)).toEqual(['1']);
+      expect((await port.read(keyed)).rows.map(row => row.key)).toEqual(['1']);
+      expect(await writer.commit(put(sibling))).toMatchObject({ ok: true, evicted: [expect.objectContaining({ key: '1' })] });
+      expect((await port.read(scan)).rows).toEqual([]);
+      expect((await port.read(keyed)).rows).toEqual([]);
+    } finally { await db.close(); }
+  });
+
   it.each(['workforce.timesheets_window', 'person.accounts'])('holds %s metadata and bodies between commits', async name => {
     const db = create();
     try {
