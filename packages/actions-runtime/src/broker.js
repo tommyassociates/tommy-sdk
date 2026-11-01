@@ -148,6 +148,7 @@ export function createBroker({
    * unstamped row goes to a broker of its tenant. Without it every row is ours.
    */
   queueOwner = null,
+  replayEnvelope = (envelope) => envelope,
   /**
    * How long a dispatch waits for an MP announced through `expectMps()` but not
    * yet registered before raising Unknown{Condition,Activity}. Larger than a
@@ -688,7 +689,7 @@ export function createBroker({
     }
 
     if (!isOnline) {
-      const queuedSeq = enqueueOffline(emitterMp, { ...envelope, identity });
+      const queuedSeq = await enqueueOffline(emitterMp, { ...envelope, identity });
       return { emitId: `queued-${queuedSeq}`, deliveredTo: 0, queuedFor: 1 };
     }
 
@@ -1050,7 +1051,7 @@ export function createBroker({
     // Offline: a replayable write queues; anything else is a typed Offline reject.
     if (!isOnline && activityDef.sideEffect !== 'local_write') {
       if (activityDef.offlineReplayable) {
-        enqueueOffline(envelope.sourceMpId, { ...envelope, identity, idempotencyKey });
+        await enqueueOffline(envelope.sourceMpId, { ...envelope, identity, idempotencyKey });
         const queuedRecord = await records.open({
           kind: 'invoke',
           activityName: envelope.activity,
@@ -1142,7 +1143,7 @@ export function createBroker({
     // write still runs. A drained replay is its own row already.
     const heldSeq = activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable
       && !envelope.restoreDrain && typeof queueStore.isHeld === 'function'
-      ? holdInQueue(envelope.sourceMpId, { ...envelope, identity, idempotencyKey })
+      ? await holdInQueue(envelope.sourceMpId, { ...envelope, identity, idempotencyKey })
       : null;
     try {
       const record = await records.open({
@@ -1166,7 +1167,7 @@ export function createBroker({
       });
     } finally {
       // Whatever ended the run, its row (if it is still queued) is a waiting write now.
-      if (heldSeq !== null) queueStore.release(heldSeq);
+      if (heldSeq !== null) await queueStore.release(heldSeq);
     }
   }
 
@@ -1175,12 +1176,13 @@ export function createBroker({
    * kept, or when a row of this write (same activity and key) is queued
    * already, which a restart replays in its place.
    */
-  function holdInQueue(sourceMpId, envelope) {
-    const queued = ownQueuedRows().some((row) => row.sourceMpId === sourceMpId
-      && row.envelope?.activity === envelope.activity && row.envelope?.idempotencyKey === envelope.idempotencyKey);
-    if (queued) return null;
+  async function holdInQueue(sourceMpId, envelope) {
     try {
-      return enqueueOffline(sourceMpId, envelope, { held: true });
+      await queueStore.ready?.();
+      const queued = ownQueuedRows().some((row) => row.sourceMpId === sourceMpId
+        && row.envelope?.activity === envelope.activity && row.envelope?.idempotencyKey === envelope.idempotencyKey);
+      if (queued) return null;
+      return await enqueueOffline(sourceMpId, envelope, { held: true });
     } catch (_) {
       return null;
     }
@@ -1249,7 +1251,7 @@ export function createBroker({
         if (processedKey && activityDef.idempotency === 'client_key') idempotencyLedger?.add(processedKey);
         // Applied: its held row goes (after the ledger has the key, so a restart
         // in between suppresses the replay rather than sending it again).
-        if (heldSeq !== null) queueStore.remove(heldSeq);
+        if (heldSeq !== null) await queueStore.remove(heldSeq);
         if (envelope.txnId) {
           const steps = txnSteps.get(envelope.txnId) || [];
           steps.push({ activity: envelope.activity, args: envelope.args, idempotencyKey });
@@ -1276,14 +1278,14 @@ export function createBroker({
     if (activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable
       && !envelope.restoreDrain && neverReachedServer(lastError)) {
       // Its held row is already queued; the caller releases it.
-      if (heldSeq === null) enqueueOffline(envelope.sourceMpId, { ...envelope, identity, idempotencyKey });
+      if (heldSeq === null) await enqueueOffline(envelope.sourceMpId, { ...envelope, identity, idempotencyKey });
       await records.update(record.runId, { status: 'queued_offline', attempts: attempt });
       return { rpcId: record.runId, status: 'queued_offline' };
     }
 
     // Budget exhausted or non-retryable: dead-letter. The server
     // answered (or the write failed for good), so its held row goes.
-    if (heldSeq !== null) queueStore.remove(heldSeq);
+    if (heldSeq !== null) await queueStore.remove(heldSeq);
     await records.update(record.runId, {
       status: 'dead_letter',
       error: { code: lastError.code, message: lastError.message },
@@ -1349,11 +1351,11 @@ export function createBroker({
     return queueStore.all().filter((row) => ownsQueuedRow(row, holder));
   }
 
-  function enqueueOffline(sourceMpId, envelope, { held = false } = {}) {
-    // The queue is kept in Web Storage, whose quota the browser charges in
-    // UTF-16 code units: its caps count those, not UTF-8 bytes.
+  async function enqueueOffline(sourceMpId, envelope, { held = false } = {}) {
+    // Keep the existing payload budgets in UTF-16 code units on every backend.
     const bytes = utf16Units(JSON.stringify(envelope.args || envelope.payload || {}));
     const holder = currentQueueOwner();
+    await queueStore.ready?.();
     const partition = ownQueuedRows().filter((row) => row.sourceMpId === sourceMpId);
     const partitionBytes = partition.reduce((sum, row) => sum + row.bytes, 0);
     if (partition.length >= QUEUE_MAX_ENTRIES || partitionBytes + bytes > QUEUE_MAX_BYTES) {
@@ -1363,7 +1365,7 @@ export function createBroker({
       ? Object.fromEntries(['tenantId', ...OWNER_FIELDS].filter((key) => known(holder[key])).map((key) => [key, holder[key]]))
       : undefined;
     try {
-      return queueStore.push({ sourceMpId, envelope, bytes, owner, ...(held ? { held } : {}) });
+      return await queueStore.push({ sourceMpId, envelope, bytes, owner, ...(held ? { held } : {}) });
     } catch (cause) {
       if (cause?.name !== 'QueueNotKept') throw cause;
       throw err('Offline_QueueFull', `offline queue for mp '${sourceMpId}' could not be kept on this device`, { retryable: false, cause });
@@ -1418,6 +1420,7 @@ export function createBroker({
   }
 
   async function drainOfflineQueueInnerTracked() {
+    await queueStore.ready?.();
     const bySource = new Map();
     for (const row of ownQueuedRows()) {
       const list = bySource.get(row.sourceMpId) || [];
@@ -1436,15 +1439,15 @@ export function createBroker({
         const envelope = row.envelope;
         if (row.id) drainingRows.add(row.id);
         // eslint-disable-next-line no-await-in-loop
-        const outcome = await (envelope.trigger
-          ? dispatchEmit(envelope)
+        const outcome = await Promise.resolve().then(() => replayEnvelope(envelope)).then((restored) => (restored.trigger
+          ? dispatchEmit(restored)
           // ORIGINAL key. `restoreQueuedAt` is the moment the row entered the
           // durable queue (recorded by durable-queue.js on push) — the one fact a
           // replayed write can carry about how long it waited, and the runtime
           // sets it here so no MP can forge it.
           : dispatchInvoke({
-            ...envelope, rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
-          }))
+            ...restored, rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
+          })))
           .then((result) => ({ ok: true, result }))
           .catch((error) => ({ ok: false, error }))
           .finally(() => { if (row.id) drainingRows.delete(row.id); });
@@ -1453,10 +1456,10 @@ export function createBroker({
         // queued after it (a clock-out never goes before its clock-in). Its
         // receipt reads as tried and not sent.
         if (!outcome.ok && !refusedForGood(outcome.error)) {
-          queueStore.noteAttempt?.(row.seq);
+          await queueStore.noteAttempt?.(row.seq);
           break;
         }
-        queueStore.remove(row.seq);
+        await queueStore.remove(row.seq);
         if (typeof onOfflineOutcome === 'function') {
           try {
             Promise.resolve(onOfflineOutcome(envelope, outcome)).catch(() => {});
@@ -1699,12 +1702,16 @@ export function createBroker({
      * it is never sent. False, and nothing changes, for a row on its way
      * (held by its running write, or being sent by a drain), another Mini
      * Program's, another person's or account's, or one that has left the queue.
+     * Resolves true only after the queue confirms its removal.
      */
-    discardQueuedWrite(sourceMpId, id) {
-      if (typeof id !== 'string' || !id) return false;
-      const row = ownQueuedRows().find((queued) => queued.id === id && queued.sourceMpId === sourceMpId);
-      if (!row || !row.envelope?.activity || queueStore.isHeld?.(row) || drainingRows.has(row.id)) return false;
-      return queueStore.remove(row.seq);
+    async discardQueuedWrite(sourceMpId, id) {
+      try {
+        await queueStore.ready?.();
+        if (typeof id !== 'string' || !id || retired) return false;
+        const row = ownQueuedRows().find((queued) => queued.id === id && queued.sourceMpId === sourceMpId);
+        if (!row || !row.envelope?.activity || queueStore.isHeld?.(row) || drainingRows.has(row.id)) return false;
+        return (await queueStore.remove(row.seq)) === true;
+      } catch (_) { return false; }
     },
 
     /** Diagnostics: idempotent runs in flight, and the joins waiting on them. */
@@ -1719,6 +1726,7 @@ export function createBroker({
     async teardown(instanceId) {
       if (instanceId != null) return;
       retired = true;
+      await queueStore.close?.();
       for (const entry of debouncePending.values()) clearTimeout(entry.timer);
       debouncePending.clear();
       subscribers.clear();
