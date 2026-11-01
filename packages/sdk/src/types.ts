@@ -1238,6 +1238,8 @@ export interface HostFormSubmissionWindowRestoration {
   readonly queryComplete: false;
 }
 export interface HostApi {
+  /** Payload-free invalidation of this MP's committed queue in its account. */
+  onQueuedWritesChange(callback: () => void): () => void;
   restoreFormSubmissionWindow(options: {
     readonly window: string;
     readonly throughPage?: number;
