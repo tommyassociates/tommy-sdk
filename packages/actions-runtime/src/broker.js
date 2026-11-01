@@ -219,6 +219,7 @@ export function createBroker({
   let isOnline = online;
   let pendingWork = 0;
   let retired = false;
+  const queueSubscriptions = new Set();
   async function trackWork(run) {
     if (retired) throw err('ActivityFailed', 'MP runtime retired', { retryable: false });
     pendingWork += 1;
@@ -1650,6 +1651,29 @@ export function createBroker({
     setOnline(value) { isOnline = !!value; },
     isOnline: () => isOnline,
     drainOfflineQueue,
+    /** Committed changes to this MP's queue in this account; callback has no payload. */
+    onQueuedWritesChange(sourceMpId, callback) {
+      if (retired || typeof callback !== 'function') return () => {};
+      const captured = { ...currentQueueOwner() };
+      const sameOwner = () => {
+        const current = currentQueueOwner();
+        return ['tenantId', ...OWNER_FIELDS].every((key) => String(current?.[key] ?? '') === String(captured?.[key] ?? ''));
+      };
+      let active = true;
+      const offQueue = queueStore.onChange?.((rows) => {
+        if (!active || retired) return;
+        if (!sameOwner()) { off(); return; }
+        if (rows.some((row) => row?.sourceMpId === sourceMpId && ownsQueuedRow(row, captured))) callback();
+      });
+      const off = () => {
+        active = false;
+        offQueue?.();
+        queueSubscriptions.delete(off);
+      };
+      queueSubscriptions.add(off);
+      return off;
+    },
+
     queueStats() {
       const rows = ownQueuedRows();
       const bySource = {};
@@ -1726,6 +1750,7 @@ export function createBroker({
     async teardown(instanceId) {
       if (instanceId != null) return;
       retired = true;
+      [...queueSubscriptions].forEach((off) => off());
       await queueStore.close?.();
       for (const entry of debouncePending.values()) clearTimeout(entry.timer);
       debouncePending.clear();

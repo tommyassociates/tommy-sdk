@@ -1,3 +1,5 @@
+import { createQueueChanges } from './queue-changes.js';
+
 /**
  * durable-queue.js — the broker's offline queue survives a reload.
  *
@@ -51,6 +53,7 @@
 
 // Rows held by a write still running in this page (see HELD ROWS above).
 const HELD_IN_THIS_PAGE = new Set();
+const CHANGES_BY_STORAGE = new WeakMap();
 let rowIds = 0;
 const newRowId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}-${(rowIds += 1)}`;
 
@@ -87,6 +90,9 @@ export function createDurableQueue({
 } = {}) {
   const store = () => (storage === undefined ? webStorage() : storage);
 
+  const changeStorage = store();
+  if (changeStorage && !CHANGES_BY_STORAGE.has(changeStorage)) CHANGES_BY_STORAGE.set(changeStorage, createQueueChanges());
+  const changes = changeStorage ? CHANGES_BY_STORAGE.get(changeStorage) : createQueueChanges();
   let rows = [];
   let seq = 0;
   let expired = 0;
@@ -153,19 +159,23 @@ export function createDurableQueue({
     expired = parsed.rows.length - kept.length;
     rows = kept;
     seq = typeof parsed.seq === 'number' ? parsed.seq : kept.length;
-    if (expired) persist(); // reclaim the dropped rows' bytes immediately
+    if (expired && persist()) changes.committed(parsed.rows.filter((row) => !kept.includes(row))); // reclaim the dropped rows' bytes immediately
   }());
 
   const rowAt = (rowSeq) => rows.findIndex((row) => row.seq === rowSeq);
 
-  function release(rowSeq) {
+  function release(rowSeq, notify = true) {
     refresh();
     const id = heldHere.get(rowSeq) ?? rows[rowAt(rowSeq)]?.id;
     heldHere.delete(rowSeq);
-    if (id) held.delete(id);
+    if (id && held.delete(id) && notify) {
+      const row = rows.find((candidate) => candidate.id === id);
+      if (row) changes.committed([row]);
+    }
   }
 
   return {
+    onChange: (callback) => changes.subscribe(callback),
     /** Live rows — the dispatch path reads this array directly. */
     all() {
       refresh();
@@ -192,6 +202,7 @@ export function createDurableQueue({
         held.add(id);
         heldHere.set(seq, id);
       }
+      changes.committed([rows[rows.length - 1]]);
       return seq;
     },
 
@@ -200,11 +211,13 @@ export function createDurableQueue({
      * storage while they are being sent, so a reload mid-send still has them.
      */
     remove(rowSeq) {
-      release(rowSeq);
+      refresh();
       const at = rowAt(rowSeq);
-      if (at === -1) return false;
-      rows.splice(at, 1);
-      persist();
+      if (at === -1) { release(rowSeq, false); return false; }
+      const removed = rows.splice(at, 1);
+      if (!persist()) { rows.splice(at, 0, ...removed); return false; }
+      release(rowSeq, false);
+      changes.committed(removed);
       return true;
     },
 
@@ -218,7 +231,7 @@ export function createDurableQueue({
       const row = rows[rowAt(rowSeq)];
       if (!row) return false;
       row.attempts = (Number(row.attempts) || 0) + 1;
-      persist();
+      if (persist()) changes.committed([row]);
       return true;
     },
 
@@ -244,10 +257,11 @@ export function createDurableQueue({
       for (const row of rows) if (row.id) held.delete(row.id);
       for (const id of heldHere.values()) held.delete(id);
       heldHere.clear();
+      const removed = rows;
       rows = [];
       seq = 0;
       expired = 0;
-      persist();
+      if (persist()) changes.committed(removed);
     },
   };
 }
