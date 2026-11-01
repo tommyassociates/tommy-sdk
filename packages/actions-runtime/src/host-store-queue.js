@@ -1,3 +1,4 @@
+import { createQueueChanges } from './queue-changes.js';
 import { QUEUE_MAX_ENTRIES, QUEUE_MAX_BYTES } from './constants.js';
 
 const HELD = new Set();
@@ -19,6 +20,7 @@ const envelopeOf = (envelope) => copy(Object.fromEntries([
  * current revision and resolves only after the port confirms its commit.
  */
 export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, held = HELD } = {}) {
+  const changes = createQueueChanges();
   let rows = [];
   let seq = 0;
   let expired = 0;
@@ -55,6 +57,10 @@ export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, 
         }
         rows = action.rows.sort((a, b) => a.seq - b.seq);
         seq = Math.max(seq, ...rows.map((row) => row.seq), 0);
+        action.afterCommit?.();
+        if (action.changes.length) {
+          changes.committed(action.changes.map((change) => change.value || before.rows.find((row) => row.id === change.key)).filter(Boolean));
+        }
         return action.result;
       } catch (error) {
         if (error.reason !== 'conflict' || attempt >= 3) throw error;
@@ -88,7 +94,8 @@ export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, 
         const row = { id, seq: next, sourceMpId: input.sourceMpId, envelope: envelopeOf(input.envelope), bytes: input.bytes,
           queuedAt: imported ? input.queuedAt : now(), ...(input.owner ? { owner: copy(input.owner) } : {}),
           ...(imported && input.attempts ? { attempts: input.attempts } : {}) };
-        return { rows: [...found, row], changes: [{ op: 'put', key: id, value: row }], result: next };
+        return { rows: [...found, row], changes: [{ op: 'put', key: id, value: row }], result: next,
+          afterCommit: () => { if (input.held) { held.add(id); heldHere.set(next, id); } } };
       });
       if (input.held) { held.add(id); heldHere.set(assigned, id); }
       return assigned;
@@ -97,9 +104,13 @@ export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, 
   function release(rowSeq) {
     const id = heldHere.get(rowSeq) ?? rows.find((row) => row.seq === rowSeq)?.id;
     heldHere.delete(rowSeq);
-    if (id) held.delete(id);
+    if (id && held.delete(id)) {
+      const row = rows.find((candidate) => candidate.id === id);
+      if (row) changes.committed([row]);
+    }
   }
   return {
+    onChange: (callback) => changes.subscribe(callback),
     ready: () => serial(restore),
     all: () => rows,
     push: (input) => serial(() => admit(input)),
@@ -125,6 +136,6 @@ export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, 
     release,
     isHeld: (row) => !!row?.id && held.has(row.id),
     expiredOnLoad: () => expired,
-    close: () => backend.close?.(),
+    close() { changes.clear(); return backend.close?.(); },
   };
 }

@@ -43,3 +43,7 @@ host.followTimesheets({}, (rows: HostTimesheet[]) => { void rows; });
 host.fetchTimesheet(91);
 // @ts-expect-error A dashboard query is explicitly enabled.
 host.fetchTimesheets({ dashboard: false });
+const stopQueue: () => void = host.onQueuedWritesChange(() => {});
+stopQueue();
+// @ts-expect-error Queue invalidations expose no row data.
+host.onQueuedWritesChange((rows: unknown[]) => { void rows; });
