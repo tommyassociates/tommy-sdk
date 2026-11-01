@@ -1,4 +1,4 @@
-import { storageError } from './protocol.js';
+import { storageError, bytes } from './protocol.js';
 
 const TABLES = new Set(['owners', 'stores', 'rows']);
 const fields = ['owner', 'namespace', 'generation', 'kind'];
@@ -27,7 +27,20 @@ export function createSqliteDatabase({ driver, exclusive = false }) {
   // Owner and store rows as last read or committed here, by table and key:
   // their JSON, or null for a row known absent (exclusive only).
   const held = new Map([...HELD_TABLES].map((table) => [table, new Map()]));
-  const forgetHeld = () => held.forEach((rows) => rows.clear());
+  const scans = new Map();
+  let heldBytes = 0;
+  let heldCount = 0;
+  const forgetHeld = () => { held.forEach((rows) => rows.clear()); scans.clear(); heldBytes = 0; heldCount = 0; };
+  const remember = (rows, id, json) => {
+    const cost = bytes(id) + bytes(json);
+    if (cost > 4 * 1024 * 1024) return;
+    const previous = rows.get(id);
+    if (rows.has(id)) heldBytes -= bytes(id) + bytes(previous);
+    else heldCount += 1;
+    if (heldBytes + cost > 4 * 1024 * 1024 || heldCount > 4096) { forgetHeld(); heldCount = 1; }
+    rows.set(id, json);
+    heldBytes += cost;
+  };
   // A failed open is not remembered: the next transaction opens again.
   async function initialize() {
     if (!initialized) {
@@ -92,7 +105,7 @@ export function createSqliteDatabase({ driver, exclusive = false }) {
               return json === null ? undefined : JSON.parse(json);
             }
             const found = await driver.query(`SELECT payload FROM ${tableName(table)} WHERE key = ?`, [id]);
-            if (rows && !own) rows.set(id, found.length ? found[0].payload : null);
+            if (rows && !own) remember(rows, id, found.length ? found[0].payload : null);
             return decoded(found)[0];
           },
           // One query per 100 keys, not one per key: on Capacitor every query is a
@@ -135,7 +148,12 @@ export function createSqliteDatabase({ driver, exclusive = false }) {
           async scan(table, prefix, { after = null, limit = 101 } = {}) {
             if (!Number.isInteger(limit) || limit < 1 || limit > 1001) throw storageError('unserializable');
             const where = prefixWhere(prefix);
-            return decoded(await driver.query(`SELECT payload FROM ${tableName(table)} WHERE ${where}${after === null ? '' : ' AND row_order > ?'} ORDER BY row_order LIMIT ?`, [...prefix, ...(after === null ? [] : [ordering(after)]), limit]));
+            const id = encoded([tableName(table), prefix, after, limit]);
+            const reusable = heldRows(table) && !written.has(table) && !clearedHeld;
+            if (reusable && scans.has(id)) return JSON.parse(scans.get(id));
+            const result = decoded(await driver.query(`SELECT payload FROM ${table} WHERE ${where}${after === null ? '' : ' AND row_order > ?'} ORDER BY row_order LIMIT ?`, [...prefix, ...(after === null ? [] : [ordering(after)]), limit]));
+            if (reusable) remember(scans, id, JSON.stringify(result));
+            return result;
           },
           async deletePrefix(table, prefix) {
             await driver.run(`DELETE FROM ${tableName(table)} WHERE ${prefixWhere(prefix)}`, prefix);
@@ -146,7 +164,16 @@ export function createSqliteDatabase({ driver, exclusive = false }) {
           const value = await work(tx);
           if (!bare) await driver.run('COMMIT', []);
           if (clearedHeld) forgetHeld();
-          else written.forEach((rows, table) => rows.forEach((json, id) => held.get(table).set(id, json)));
+          else {
+            if (written.size) {
+              // Scan membership and order may change on any write to its table.
+              for (const [id, json] of scans) {
+                if (!written.has(JSON.parse(id)[0])) continue;
+                scans.delete(id); heldBytes -= bytes(id) + bytes(json); heldCount -= 1;
+              }
+            }
+            written.forEach((rows, table) => rows.forEach((json, id) => remember(held.get(table), id, json)));
+          }
           return value;
         } catch (error) {
           // What it wrote is undone; what is held may have been read inside it.
