@@ -71,6 +71,27 @@ describe('exclusive SQLite database', () => {
     } finally { native.dispose(); }
   });
 
+  it('holds identical owner/namespace scans until that table commits, and forgets rollback reads', async () => {
+    const native = nodeDriver();
+    try {
+      const database = createSqliteDatabase({ driver: native.driver, exclusive: true });
+      await database.transaction('readwrite', tx => tx.put('stores', { key: ['owner', 'namespace'], revision: 1 }));
+      const scan = () => database.transaction('readonly', tx => tx.scan('stores', ['owner'], { limit: 1001 }));
+      await scan();
+      native.statements.length = 0;
+      expect((await scan())[0].revision).toBe(1);
+      expect(native.statements).toEqual([]);
+      await database.transaction('readwrite', tx => tx.put('stores', { key: ['owner', 'namespace'], revision: 2 }));
+      expect((await scan())[0].revision).toBe(2);
+      await expect(database.transaction('readwrite', async tx => {
+        await tx.put('stores', { key: ['owner', 'namespace'], revision: 3 });
+        expect((await tx.scan('stores', ['owner'], { limit: 1001 }))[0].revision).toBe(3);
+        throw Error('rollback');
+      })).rejects.toThrow('rollback');
+      expect((await scan())[0].revision).toBe(2);
+    } finally { native.dispose(); }
+  });
+
   it('a database shared with other users keeps its transactions and reads every row', async () => {
     const native = nodeDriver();
     try {

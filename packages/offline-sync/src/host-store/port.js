@@ -47,14 +47,93 @@ const BODY = 'b';
 const INDEX = 'x';
 const LRU = 't';
 
+// Normalized read rows, shared by selectors, never by authority checks. Every
+// reader first checks the persisted owner epoch and store revision in its own
+// transaction, including on IndexedDB where another tab may have committed.
+function createReadProjection() {
+  const snapshots = new Map();
+  let size = 0;
+  let count = 0;
+  const clear = () => { snapshots.clear(); size = 0; count = 0; };
+  const drop = (id) => {
+    const entry = snapshots.get(id);
+    if (!entry) return;
+    size -= entry.bytes;
+    count -= entry.rows.size + entry.scans.size;
+    snapshots.delete(id);
+  };
+  function wrap(tx, store, epoch) {
+    const id = JSON.stringify(store.key);
+    const stamp = JSON.stringify([epoch, store.generation, store.revision, store.migration]);
+    if (snapshots.get(id)?.stamp !== stamp) drop(id);
+    const held = snapshots.get(id) || { stamp, rows: new Map(), scans: new Map(), bytes: 0 };
+    snapshots.delete(id);
+    snapshots.set(id, held);
+    const keep = (map, key, value) => {
+      if (snapshots.get(id) !== held) return;
+      const json = JSON.stringify(value ?? null);
+      const cost = bytes(key) + bytes(json);
+      if (cost > 8 * 1024 * 1024) return;
+      const old = map.get(key);
+      if (old) { size -= old.cost; held.bytes -= old.cost; } else count += 1;
+      map.set(key, { json, cost });
+      size += cost;
+      held.bytes += cost;
+      while (size > 8 * 1024 * 1024 || count > 4096 || snapshots.size > 64) drop(snapshots.keys().next().value);
+    };
+    const heldRow = (key) => {
+      const entry = held.rows.get(JSON.stringify(key));
+      return entry ? { found: true, value: JSON.parse(entry.json) ?? undefined } : { found: false };
+    };
+    const many = async (table, keys) => {
+      if (table !== 'rows') return getMany(tx, table, keys);
+      const missing = keys.filter(key => !heldRow(key).found);
+      if (missing.length) {
+        const rows = await getMany(tx, table, missing);
+        rows.forEach((row, index) => keep(held.rows, JSON.stringify(missing[index]), row));
+        // Oversized answers may not be held, but still answer this read.
+        const fetched = new Map(missing.map((key, index) => [JSON.stringify(key), rows[index]]));
+        return keys.map(key => fetched.has(JSON.stringify(key)) ? fetched.get(JSON.stringify(key)) : heldRow(key).value);
+      }
+      return keys.map(key => heldRow(key).value);
+    };
+    return {
+      ...tx,
+      getMany: many,
+      async scan(table, prefix, options) {
+        if (table !== 'rows') return tx.scan(table, prefix, options);
+        const key = JSON.stringify([prefix, options]);
+        const answer = held.scans.get(key);
+        if (answer) {
+          const keys = JSON.parse(answer.json);
+          if (keys.every(rowKey => heldRow(rowKey).found)) return keys.map(rowKey => heldRow(rowKey).value);
+        }
+        const rows = await tx.scan(table, prefix, options);
+        rows.forEach(row => keep(held.rows, JSON.stringify(row.key), row));
+        keep(held.scans, key, rows.map(row => row.key));
+        return rows;
+      },
+    };
+  }
+  return {
+    wrap, clear, forget: (owner, namespace) => drop(JSON.stringify([owner, namespace])),
+    forgetOwner(owner) {
+      for (const id of snapshots.keys()) if (JSON.parse(id)[0] === owner) drop(id);
+    },
+  };
+}
+
 /** A host-local port. Database transactions, not handle queues, serialize other tabs. */
 export function createHostStorePort({ database, backend = 'indexeddb', now = () => Date.now(), randomId = () => globalThis.crypto.randomUUID() } = {}) {
   if (!database?.transaction || !['indexeddb', 'capacitor_sqlite', 'electron_sqlite', 'volatile'].includes(backend)) throw storageError('unavailable');
   // Open handles by id. A closed or retired handle is forgotten when its
   // owner closes it, or on its next use, so the map holds only live ones.
   const handles = new Map();
+  const projection = createReadProjection();
+  const reading = new Map();
   const ordered = database.ordered === true;
   function forget(id, handle) {
+    projection.forget(handle.owner, handle.namespace);
     handles.delete(id);
     handleRegistry.delete(handle);
   }
@@ -397,8 +476,10 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
       if (!validateRead(input)) return readFailure('unserializable');
       try {
         const handle = getHandle(input.handle);
-        return await database.transaction('readonly', async (tx) => {
+        return await database.transaction('readonly', async (transaction) => {
+          let tx = transaction;
           const store = await current(tx, handle, input.expectedEpoch, { migrating: !!handle.migration });
+          tx = projection.wrap(tx, store, handle.epoch);
           const metadata = input.keys ? (await getMany(tx, 'rows', input.keys.map((key) => rowKey(handle.owner, handle.namespace, store.generation, META, key)))).filter(Boolean)
             : await tx.scan('rows', prefix(handle.owner, handle.namespace, store.generation, META), { after: input.afterKey, limit: input.limit + 1 });
           const result = await readRows(tx, handle, store, metadata, { limit: input.keys ? MAX_ROWS : input.limit, keyed: !!input.keys,
@@ -406,7 +487,11 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
           if (handle.closed) throw storageError('retired');
           return result;
         });
-      } catch (error) { return readFailure(failureReason(error, 'read-failed')); }
+      } catch (error) {
+        const handle = handles.get(input.handle);
+        if (handle) projection.forget(handle.owner, handle.namespace);
+        return readFailure(failureReason(error, 'read-failed'));
+      }
     },
     // Rows by a declared secondary index, in index order: `equals` (every
     // field), or a `prefix` of the leading fields and/or an inclusive
@@ -415,8 +500,10 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
       if (!validateQuery(input)) return readFailure('unserializable');
       try {
         const handle = getHandle(input.handle);
-        return await database.transaction('readonly', async (tx) => {
+        return await database.transaction('readonly', async (transaction) => {
+          let tx = transaction;
           const store = await current(tx, handle, input.expectedEpoch);
+          tx = projection.wrap(tx, store, handle.epoch);
           const fields = storeIndexes(store)[input.index];
           const head = input.equals || input.prefix || [];
           const bounded = Object.hasOwn(input, 'lower') || Object.hasOwn(input, 'upper');
@@ -458,7 +545,11 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
           if (handle.closed) throw storageError('retired');
           return result;
         });
-      } catch (error) { return readFailure(failureReason(error, 'read-failed')); }
+      } catch (error) {
+        const handle = handles.get(input.handle);
+        if (handle) projection.forget(handle.owner, handle.namespace);
+        return readFailure(failureReason(error, 'read-failed'));
+      }
     },
     async commit(input) {
       try {
@@ -691,7 +782,45 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
       } catch (error) { return fail(failureReason(error)); }
     },
   };
+  // Identical asks share one transaction until a mutation is asked. A read
+  // queued after that mutation always checks its new committed revision.
+  for (const name of ['read', 'query']) {
+    const read = port[name];
+    port[name] = async (input) => {
+      if (!(name === 'read' ? validateRead(input) : validateQuery(input))) return readFailure('unserializable');
+      const key = JSON.stringify([name, Object.keys(input).sort().map(field => [field, input[field]])]);
+      if (reading.size >= 128 && !reading.has(key)) return read(input);
+      if (!reading.has(key)) {
+        const pending = read(input);
+        reading.set(key, pending);
+        pending.finally(() => { if (reading.get(key) === pending) reading.delete(key); }).catch(() => {});
+      }
+      return clone(await reading.get(key));
+    };
+  }
+  for (const name of ['open', 'commit', 'retire', 'migration', 'purge']) {
+    const write = port[name];
+    port[name] = async (...args) => {
+      reading.clear();
+      const previous = handles.get(args[0]?.handle);
+      try {
+        const result = await write(...args);
+        if (result?.ok === false) projection.clear();
+        if (name === 'retire') {
+          if (args[0]?.mode === 'purge_owner' && previous) projection.forgetOwner(previous.owner);
+        } else if (name === 'purge' && result?.ok) projection.forget(...JSON.parse(args[0].store));
+        else {
+          const handle = handles.get(name === 'open' ? result?.handle : args[0]?.handle);
+          if (handle) projection.forget(handle.owner, handle.namespace);
+        }
+        return result;
+      } catch (error) { projection.clear(); throw error; }
+      finally { reading.clear(); }
+    };
+  }
   cleanupRegistry.add(async (selector) => {
+    reading.clear();
+    projection.clear();
     const { authorityOrigin, viewerId } = selector;
     const matchesSubject = retirementMatcher(selector);
     const principal = JSON.stringify([authorityOrigin, viewerId]);
