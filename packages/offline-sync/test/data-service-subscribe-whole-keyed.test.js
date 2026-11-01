@@ -156,6 +156,40 @@ describe.each([...DATABASES, ['memory', null]])('a whole-collection subscription
     off();
   });
 
+  it('reads by key the named changes that arrive during its first read', async () => {
+    const { data, store } = open(create);
+    await data.ingest('shifts', ROWS);
+    const { counts, whole } = counted(store);
+    const getAll = store.getAll;
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    store.getAll = async (...args) => { const rows = await getAll(...args); await held; return rows; };
+    const seen = [];
+    const off = data.subscribe('shifts', (rows) => seen.push(rows));
+    await settle();
+    await data.writer('shifts').put({ id: '102', user_id: 'during' });
+    await data.writer('shifts').delete('104');
+    release();
+    await settle();
+    expect(counts.getAll).toBe(1);
+    expect(seen.at(-1)).toEqual(await whole());
+    expect(seen.at(-1).find((row) => row.id === '102').user_id).toBe('during');
+    off();
+  });
+
+  it('reads the collection whole when more keys changed than it re-reads one at a time', async () => {
+    const { data, store, emit } = open(create);
+    await data.ingest('shifts', ROWS);
+    const { counts } = counted(store);
+    const off = data.subscribe('shifts', () => {});
+    await settle();
+    emit({ type: 'commit', label: 'shifts', keys: Array.from({ length: 501 }, (_, at) => String(1000 + at)) });
+    await settle();
+    expect(counts.getAll).toBe(2);
+    expect(counts.get).toBe(0);
+    off();
+  });
+
   it('reports a failed read once and reads again on the next change', async () => {
     const { data, store, emit } = open(create);
     await data.ingest('shifts', ROWS);

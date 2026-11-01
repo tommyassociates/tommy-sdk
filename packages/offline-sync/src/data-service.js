@@ -211,6 +211,9 @@ const TOUCHES_KEPT = 5000;
 const READ_TRIES = 3;
 // A physical index read returns at most this many rows per page.
 const PAGE_ROWS = 100;
+// A whole-collection subscription re-reads changed rows one key at a time up
+// to this many keys; more changed keys than this read the collection whole.
+const KEYED_REREAD_KEYS = 500;
 // The most rows one query or subscription returns, however it pages.
 export const MAX_QUERY_ROWS = 5000;
 function queryLimit(limit) {
@@ -2437,8 +2440,11 @@ export function createDataService({
       const changed = (keys) => {
         if (!active) return;
         if (!whole) { emit(); return; }
-        if (Array.isArray(keys) && lastKeys !== null) keys.forEach((key) => pending.add(String(key)));
+        // Keys named during the first read are read by key after it: a row
+        // the first read already holds is replaced by what the key reads now.
+        if (Array.isArray(keys)) keys.forEach((key) => pending.add(String(key)));
         else pendingWhole = true;
+        if (pending.size > KEYED_REREAD_KEYS) { pendingWhole = true; pending = new Set(); }
         catchUp();
       };
       // A change listener reads only this target, however large the collection.
