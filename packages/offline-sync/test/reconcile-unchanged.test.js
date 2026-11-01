@@ -38,15 +38,17 @@ function transactionalBackend(port, options) {
   };
 }
 
-function open(create, feed = null) {
-  if (!create) return { database: { close: async () => {} }, store: createDataStore({ name: 'docs', backend: createMemoryStoreBackend() }) };
+function open(create, feed = null, { maxAgeMs = 30 * 86400000, now, ...rowPolicy } = {}) {
+  if (!create) return { database: { close: async () => {} }, store: createDataStore({ name: 'docs', backend: createMemoryStoreBackend(), ...rowPolicy }) };
   const database = create();
   const raw = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
   const port = feed ? observeHostStorePort(raw, feed) : raw;
   const options = { identity: identity(), storeName: 'docs', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
-    limits: { maxRows: 1000, maxAgeMs: 30 * 86400000, maxBytes: null } };
-  const store = createDataStore({ name: 'docs', backend: transactionalBackend(port, options) });
-  return { database, store };
+    limits: { maxRows: 1000, maxAgeMs, maxBytes: null } };
+  const backend = transactionalBackend(port, options);
+  const commit = vi.spyOn(backend, 'commit');
+  const store = createDataStore({ name: 'docs', backend, ...(now ? { now } : {}), ...rowPolicy });
+  return { database, store, port, commit };
 }
 
 const mine = [{ id: '1', user_id: '5', status: 'approved', meta: { a: 1, b: 2 } }];
@@ -56,6 +58,47 @@ const team = [...mine, { id: '2', user_id: '6', status: 'pending', meta: { a: 3 
 const STORES = [...DATABASES, ['memory', null]];
 
 describe.each(STORES)('reconcile of unchanged server rows (%s)', (_name, create) => {
+  it('keeps omitted held fields through reconcile, put and conditional replacement', async () => {
+    const { database, store } = open(create, null, { heldFields: ['notification_count'] });
+    await store.reconcile([{ id: '1', title: 'Cafe', notification_count: 2 }], { keepDirty: true });
+    const before = await store.getRaw('1');
+    const heard = vi.fn(); store.onChange(heard);
+    await store.reconcile([{ id: '1', title: 'Cafe' }], { keepDirty: true });
+    expect(await store.getRaw('1')).toEqual(before);
+    expect(heard).not.toHaveBeenCalled();
+    await store.put({ id: '1', title: 'Bar' });
+    expect((await store.getRaw('1')).notification_count).toBe(2);
+    await store.markSynced('1');
+    await store.replaceSynced('1', { id: '1', title: 'Bakery' }, { when: () => true });
+    expect((await store.getRaw('1')).notification_count).toBe(2);
+    // Explicit values still replace what is held, including zero and null.
+    for (const notification_count of [0, null]) {
+      await store.reconcile([{ id: '1', title: 'Bakery', notification_count }], { keepDirty: true });
+      expect((await store.getRaw('1')).notification_count).toBe(notification_count);
+    }
+    await database.close();
+  });
+
+  it('ignores only declared response timestamps and writes real content or context changes', async () => {
+    const { database, store, commit } = open(create, null, { ignoredFields: ['context.server_time', 'recent.context.server_time'] });
+    const first = { id: '1', title: 'Chat', context: { server_time: 'old', access_context_version: 'v1' },
+      recent: { id: 9, context: { server_time: 'old', access_context_version: 'v1' } } };
+    await store.reconcile([first], { keepDirty: true });
+    const before = await store.getRaw('1');
+    commit?.mockClear();
+    const heard = vi.fn(); store.onChange(heard);
+    const refreshed = { ...first, context: { ...first.context, server_time: 'new' },
+      recent: { ...first.recent, context: { ...first.recent.context, server_time: 'new' } } };
+    await store.reconcile([refreshed], { keepDirty: true });
+    expect(await store.getRaw('1')).toEqual(before);
+    expect(heard).not.toHaveBeenCalled();
+    expect(commit?.mock.calls.flatMap((call) => call[1]) || []).toEqual([]);
+    await store.reconcile([{ ...refreshed, context: { ...refreshed.context, access_context_version: 'v2' } }], { keepDirty: true });
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect((await store.getRaw('1')).context).toEqual({ server_time: 'new', access_context_version: 'v2' });
+    await database.close();
+  });
+
   it('leaves an identical row unwritten and tells no one', async () => {
     const { database, store } = open(create);
     await store.reconcile(team, { prune: false, keepDirty: true, syncedAt: null });
@@ -202,15 +245,55 @@ describe.each(STORES)('reconcile of unchanged server rows (%s)', (_name, create)
 });
 
 describe.each(DATABASES)('reconcile of unchanged server rows that stamp the collection synced (%s)', (_name, create) => {
-  it('restamps an identical row, keeping its revision, for a read that stamps the collection synced', async () => {
-    const { database, store } = open(create);
-    await store.reconcile(team, { prune: false, keepDirty: true, syncedAt: null });
+  it('stamps freshness without writing identical rows or moving their revisions', async () => {
+    const feed = createHostStoreChangeFeed({ BroadcastChannelImpl: null });
+    const { database, store, port, commit } = open(create, feed);
+    await store.reconcile(team, { keepDirty: true, syncedAt: 1000 });
+    const notice = vi.fn();
+    feed.subscribe(notice);
+    const before = await store.getAllRaw();
+    commit.mockClear();
+    const heard = vi.fn();
+    store.onChange(heard);
+    await store.reconcile(team, { keepDirty: true, syncedAt: 2000 });
+    expect(commit.mock.calls.flatMap(([, changes]) => changes)).toEqual([]);
+    expect(await store.getAllRaw()).toEqual(before);
+    expect(heard).not.toHaveBeenCalled();
+    const inspected = await port.inspect({ op: 'stores', selector: { authorityOrigin: 'https://api.example.test', viewerId: '7' } });
+    expect(inspected.stores[0].syncedAt).toBe(2000);
+    expect(notice).not.toHaveBeenCalled();
+    feed.close();
+    await database.close();
+  });
+
+  it('restamps an identical row past half a short age limit, keeping its revision, and nothing before', async () => {
+    let at = Date.UTC(2026, 9, 30, 9);
+    const { database, store, commit } = open(create, null, { maxAgeMs: 60 * 60 * 1000, now: () => at });
+    await store.reconcile(team, { keepDirty: true });
     const before = await store.getRaw('1');
-    await new Promise((resolve) => { setTimeout(resolve, 5); });
-    await store.reconcile(team, { prune: false, keepDirty: true });
+    commit.mockClear();
+    at += 20 * 60 * 1000;
+    await store.reconcile(team, { keepDirty: true });
+    expect(commit.mock.calls.flatMap(([, changes]) => changes)).toEqual([]);
+    at += 15 * 60 * 1000;
+    await store.reconcile(team, { keepDirty: true });
+    expect(commit.mock.calls.flatMap(([, changes]) => changes).map((change) => [change.op, change.key])).toEqual([['put', '1'], ['put', '2']]);
     const after = await store.getRaw('1');
     expect(after._rev).toBe(before._rev);
-    expect(after._updatedAt > before._updatedAt).toBe(true);
+    expect(after._updatedAt).toBe(new Date(at).toISOString());
+    await database.close();
+  });
+
+  it('writes only the changed row and still prunes a missing row', async () => {
+    const { database, store, commit } = open(create);
+    await store.reconcile(team, { keepDirty: true });
+    commit.mockClear();
+    await store.reconcile([team[0], { ...team[1], status: 'approved' }], { keepDirty: true });
+    expect(commit.mock.calls.flatMap(([, changes]) => changes).filter((change) => change.op === 'put').map((change) => change.key)).toEqual(['2']);
+    commit.mockClear();
+    await store.reconcile(mine, { keepDirty: true });
+    expect(commit.mock.calls.flatMap(([, changes]) => changes)).toEqual([{ op: 'delete', key: '2' }]);
+    expect(await store.getRaw('2')).toBeUndefined();
     await database.close();
   });
 });

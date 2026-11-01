@@ -814,7 +814,7 @@ export function observeHostStorePort(port, feed) {
     const result = await port.commit(input);
     const namespace = opened.get(input?.handle);
     if (result?.ok !== false && namespace) {
-      feed.publish({ type: 'commit', ...namespace, keys: input.changes.map((change) => change.key), storeRevision: result.storeRevision });
+      if (input.changes.length) feed.publish({ type: 'commit', ...namespace, keys: input.changes.map((change) => change.key), storeRevision: result.storeRevision });
       if (result.evicted?.length) {
         const keysByLabel = {};
         result.evicted.forEach((row) => { (keysByLabel[row.label] ||= []).push(row.key); });

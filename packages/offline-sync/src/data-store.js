@@ -1,6 +1,6 @@
 import { createTransactionalDataStore, copyStorageRow } from './transactional-store.js';
 import { utf16Units } from './bytes.js';
-import { unchangedServerRow, heldProvenance } from './unchanged-row.js';
+import { unchangedServerRow, heldProvenance, holdRowFields } from './unchanged-row.js';
 /**
  * The DataStore behind `tommy.data.store(name)`: enforces the manifest
  * `recordSchema` on every put, stamps sync metadata `{_rev, _updatedAt,
@@ -387,6 +387,7 @@ export function createDataStore({
   name, keyPath = 'id', recordSchema, backend = createMemoryStoreBackend(),
   now = () => Date.now(), maxRows = DEFAULT_MAX_ROWS, maxWindows = DEFAULT_MAX_WINDOWS, onPersistError,
   syncStrategy = 'server_authoritative', indexes = {}, paintCeiling = true,
+  heldFields = [], ignoredFields = [],
 }) {
   if (typeof paintCeiling !== 'boolean') throw new TypeError(`store '${name}': paintCeiling must be true or false`);
   const validate = recordSchema ? ajv.compile(recordSchema) : null;
@@ -590,7 +591,7 @@ export function createDataStore({
     return !Number.isFinite(at) || at >= now() - PAINT_CEILING_MS;
   };
 
-  if (backend.transactional) return createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows: evictsRows ? maxWindows : Infinity, indexes, queryRows });
+  if (backend.transactional) return createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows: evictsRows ? maxWindows : Infinity, indexes, queryRows, heldFields, ignoredFields });
 
 
   /**
@@ -775,7 +776,7 @@ export function createDataStore({
             : (await backend.getAll()).length;
         }
         const stamped = {
-          ...record,
+          ...holdRowFields(record, previous, heldFields),
           ...(receipt !== null ? { _writeReceipt: receipt } : {}), // eslint-disable-line no-underscore-dangle
           // Carry `_window` forward: callers never include it, and an untagged
           // row escapes window retention. A windowed reconcile re-stamps it.
@@ -908,7 +909,7 @@ export function createDataStore({
         const record = await backend.get(key);
         if (!record) return null;
         const meta = Object.fromEntries(Object.entries(record).filter(([field]) => field.startsWith('_')));
-        const next = body ? { ...body, ...meta } : { ...record };
+        const next = body ? { ...holdRowFields(body, record, heldFields), ...meta } : { ...record };
         Object.entries(patch).forEach(([field, value]) => { if (value === null) delete next[field]; else next[field] = value; });
         if (dirty) Object.assign(next, { _dirty: true, _rev: nextRowRevision(record), _updatedAt: new Date(now()).toISOString() });
         return backend.put(key, next);
@@ -1023,14 +1024,14 @@ export function createDataStore({
         const heldKey = keyOf(record);
         // eslint-disable-next-line no-await-in-loop
         const held = heldKey === undefined ? undefined : await backend.get(heldKey);
-        if (heldKey !== undefined && unchangedServerRow(record, held, { paintable, now, windowKey })) {
+        if (heldKey !== undefined && unchangedServerRow(holdRowFields(record, held, heldFields), held, { paintable, now, windowKey, ignoredFields })) {
           incoming.add(String(heldKey));
           continue;
         }
         let key;
         try {
           // eslint-disable-next-line no-await-in-loop
-          key = await api.put({ ...heldProvenance(record, held), ...record }, { silent: true, deferCap: true, ...(keepDirty ? { server: true } : {}) });
+          key = await api.put({ ...heldProvenance(holdRowFields(record, held, heldFields), held), ...record }, { silent: true, deferCap: true, ...(keepDirty ? { server: true } : {}) });
         } catch (e) {
           // Only a record the store refused as a record (DATA_INVALID) or kept
           // in memory (PersistError) is handled here; any other failure is the

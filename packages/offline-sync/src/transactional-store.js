@@ -1,7 +1,7 @@
 /** Durable branch of DataStore. The injected backend owns physical CAS/epochs. */
 import { jsonBytes, utf8Bytes, boundedBatches, WRITE_BATCH_BYTES } from './bytes.js';
 import { MAX_ROW_BYTES } from './host-store/protocol.js';
-import { unchangedServerRow, heldProvenance } from './unchanged-row.js';
+import { unchangedServerRow, heldProvenance, holdRowFields } from './unchanged-row.js';
 // The most rows one whole-collection read returns, page by page.
 export const WHOLE_READ_ROWS = 20000;
 // A whole read that has to page stops at this many bytes too (a domain's
@@ -63,7 +63,7 @@ const nextRevision = (value = 0) => { if (!Number.isSafeInteger(value) || value 
 const acknowledged = (previous) => (Number.isSafeInteger(previous?._ackRev) ? { _ackRev: previous._ackRev } : {});
 const rowRevision = (previous, storeRevision) => nextRevision(Math.max(previous?._rev || 0, Number.isSafeInteger(storeRevision) ? storeRevision : 0));
 
-export function createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows, indexes = {}, queryRows = null }) {
+export function createTransactionalDataStore({ name, keyPath, backend, validate, paintable, now, PersistError, onPersistError, maxWindows, indexes = {}, queryRows = null, heldFields = [], ignoredFields = [] }) {
   let retired = false;
   let tail = Promise.resolve();
   const subscribers = new Set();
@@ -161,7 +161,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       }
       const previous = new Map(snapshot.rows.map((row) => [row.key, row.value]));
       const changes = transform(previous, snapshot.storeRevision);
-      if (!changes.length) return;
+      if (!changes.length && (keys.length || syncedAt === undefined || syncedAt === null)) return;
       if (keys.length > 1 && jsonBytes(changes) > WRITE_BATCH_BYTES) throw TOO_LARGE;
       const result = await commit(snapshot, changes, syncedAt === undefined || syncedAt === null ? undefined : { syncedAt });
       live();
@@ -394,7 +394,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
           // A local write keeps the row's window, what a push acknowledged,
           // and a refusal for access: the row stays refused until a retry.
           const refusal = previous?._pushRefused != null ? { _pushRefused: previous._pushRefused } : {};
-          const stamped = { ...submitted, ...(previous?._window != null ? { _window: previous._window } : {}), ...acknowledged(previous), ...refusal, _rev: rowRevision(previous, storeRevision), _dirty: true, _updatedAt: new Date(now()).toISOString(), ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}) };
+          const stamped = { ...holdRowFields(submitted, previous, heldFields), ...(previous?._window != null ? { _window: previous._window } : {}), ...acknowledged(previous), ...refusal, _rev: rowRevision(previous, storeRevision), _dirty: true, _updatedAt: new Date(now()).toISOString(), ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}) };
           return [{ op: 'put', key, value: stamped }];
         }, { retry: true });
         if (!silent) await notify();
@@ -461,7 +461,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
             op: 'put',
             key: keyString(key),
             value: {
-              ...submitted,
+              ...holdRowFields(submitted, previous, heldFields),
               ...(previous?._window != null ? { _window: previous._window } : {}),
               ...acknowledged(previous),
               ...(receipt !== null ? { _writeReceipt: receipt } : {}),
@@ -486,7 +486,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
           if (!row) return [];
           found = true;
           const meta = Object.fromEntries(Object.entries(row).filter(([field]) => field.startsWith('_')));
-          const next = body ? { ...body, ...meta } : { ...row };
+          const next = body ? { ...holdRowFields(body, row, heldFields), ...meta } : { ...row };
           Object.entries(patch).forEach(([field, value]) => { if (value === null) delete next[field]; else next[field] = value; });
           if (dirty) Object.assign(next, { _dirty: true, _rev: rowRevision(row, storeRevision), _updatedAt: new Date(now()).toISOString() });
           return [{ op: 'put', key: keyString(key), value: next }];
@@ -577,33 +577,51 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         };
         const stamp = (row, previous, storeRevision) => ({ ...heldProvenance(row, previous), ...row, ...acknowledged(previous), _rev: rowRevision(previous, storeRevision), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...windowOf(previous) });
         // A row the server answered as it is held is not written (every commit
-        // is announced on the change feed), unless this read stamps the
-        // collection synced (`syncedAt`), which only a commit carries: then it
-        // is restamped, keeping its revision. See unchangedServerRow.
-        const unchanged = (row, previous) => unchangedServerRow(row, previous, { paintable, now, windowKey });
+        // is announced on the change feed): a read that stamps the collection
+        // synced (`syncedAt`) stamps the store alone, in a commit of no rows
+        // that is not announced. Only a row past half the store's age limit is
+        // restamped, keeping its revision, so the limit counts from a recent
+        // confirmation. See unchangedServerRow.
+        const unchanged = (row, previous) => unchangedServerRow(row, previous, { paintable, now, windowKey, ignoredFields });
         const restamp = (previous) => ({ ...previous, _updatedAt: new Date(now()).toISOString() });
         const quiet = syncedAt === null || syncedAt === undefined;
+        const confirms = (previous) => !quiet && ageLimit() !== null && !(Date.parse(previous._updatedAt) + ageLimit() / 2 >= now());
         let changed = false;
+        let wrote = false;
         for (const batch of upsertBatches(incoming)) {
           // eslint-disable-next-line no-await-in-loop
           await inParts(batch.map(([key]) => key), async (keys) => {
             const part = batch.filter(([key]) => keys.includes(key));
             let left = [];
             let partChanged = false;
+            let partWrote = false;
             await mutation(keys, (rows, storeRevision) => {
               left = keepDirty ? part.filter(([key]) => rows.get(key)?._dirty).map(([key]) => key) : [];
               partChanged = false;
-              return part.filter(([key]) => !left.includes(key)).flatMap(([key, row]) => {
+              partWrote = false;
+              return part.filter(([key]) => !left.includes(key)).flatMap(([key, submitted]) => {
                 const previous = rows.get(key);
-                if (unchanged(row, previous)) return quiet ? [] : [{ op: 'put', key, value: restamp(previous) }];
+                const row = holdRowFields(submitted, previous, heldFields);
+                if (unchanged(row, previous)) {
+                  if (!confirms(previous)) return [];
+                  partWrote = true;
+                  return [{ op: 'put', key, value: restamp(previous) }];
+                }
                 partChanged = true;
+                partWrote = true;
                 return [{ op: 'put', key, value: stamp(row, previous, storeRevision) }];
               });
             }, { syncedAt, retry: true });
             upserted += part.length - left.length;
             if (partChanged) changed = true;
+            if (partWrote) wrote = true;
             left.forEach((key) => skipped.add(key));
           });
+        }
+        // Rows answered unchanged (or, with `prune: false`, a call that only
+        // stamps): the store is stamped synced without writing a row.
+        if (!wrote && !quiet && (incoming.size ? upserted : !prune)) {
+          await mutation([], () => [], { syncedAt, retry: true });
         }
         const counts = skipped.size ? { skipped: [...skipped] } : {};
         if (windowKey != null) { windows.delete(String(windowKey)); windows.set(String(windowKey), now()); }

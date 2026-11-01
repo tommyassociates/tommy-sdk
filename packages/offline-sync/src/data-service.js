@@ -1361,13 +1361,12 @@ export function createDataService({
           label, store: raw, keys: rows.filter((row) => !row._dirty && !answered.has(keyOf(row)) && !touchedBefore.has(keyOf(row))).map(keyOf), force: false,
         });
         if (halted()) return stopHere();
-        // Writes changed rows and stale confirmations; at least one row is
-        // always written, which stamps the collection synced.
+        // Writes changed rows and stale confirmations. An answer of only
+        // unchanged rows stamps the store synced without writing a row.
         const touched = touchedAfter(name, startedAt);
         const stored = new Map(rows.map((row) => [keyOf(row), row]));
         const confirmBefore = now() - confirmAfterMs(store);
         const toWrite = [];
-        let oldest = null;
         records.forEach((record) => {
           const key = keyOf(record);
           if (touched.has(key) || barred(record)) return;
@@ -1376,9 +1375,8 @@ export function createDataService({
           const at = Date.parse(row._updatedAt || '');
           if (!Number.isFinite(at) || at < confirmBefore) { toWrite.push(record); return; }
           written.add(key);
-          if (!oldest || at < oldest.at) oldest = { record, at };
         });
-        if (!toWrite.length && oldest) toWrite.push(oldest.record);
+        if (!toWrite.length && written.size) await commitChunk([], { prune: false, keepDirty: true });
         for (const batch of ingestChunks(toWrite)) {
           if (halted()) return stopHere();
           const touchedSince = touchedAfter(name, startedAt);
