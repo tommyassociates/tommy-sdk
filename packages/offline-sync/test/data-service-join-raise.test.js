@@ -70,3 +70,31 @@ describe('an ask joining a queued whole read', () => {
     await again;
   });
 });
+
+describe('an ask joining a queued method read', () => {
+  const methodService = () => {
+    const scheduler = heldScheduler();
+    const store = createDataStore({ name: 'plans', backend: createMemoryStoreBackend(), indexes: { id: 'id' } });
+    const data = createDataService({
+      resolve: () => ({ store, decl: { keyPath: 'id', indexes: { id: 'id' } } }), principal: { id: 'p1' }, foreground: () => true, scheduler,
+    });
+    const fetch = vi.fn(async () => ({ rows: [{ id: '1' }], more: false }));
+    data.source('plans', { fetch: async () => [], methods: { client: { params: { client: { type: 'id' } }, fetch } } });
+    return { data, scheduler, fetch };
+  };
+  const target = { collection: 'plans', method: 'client', params: { client: '7' } };
+
+  // The screen left behind asked it; the scheduler lowered it on leaving; the
+  // next screen asks the same read and shares the queued flight.
+  it('raises the queued flight to the joining ask, and still reads once', async () => {
+    const { data, scheduler, fetch } = methodService();
+    const left = data.refresh(target, { mode: 'visible', priority: 'normal' });
+    const shown = data.refresh(target, { mode: 'visible', priority: 'high' });
+    expect(scheduler.held).toHaveLength(1);
+    expect(scheduler.raises).toEqual([{ key: scheduler.held[0].job.key, visible: true, priority: 1 }]);
+    await scheduler.run();
+    await Promise.all([left, shown]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    data.dispose();
+  });
+});

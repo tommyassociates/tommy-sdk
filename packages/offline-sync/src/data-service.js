@@ -1869,7 +1869,19 @@ export function createDataService({
           emitStatus();
           return Promise.reject(Object.assign(serviceError(held.error.message, held.error.code), { retryable: false, held: true }));
         }
-        if (!fromNow && group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return group.state.flight.attempts.answer(group.state.flight.promise);
+        // An ask that shares a queued flight raises it to the ask's rank when
+        // that is higher (the scheduler keeps the stronger of the two), as when
+        // a screen joins a read the screen before it asked and the scheduler
+        // lowered on leaving.
+        const join = (flying) => {
+          if (!flying.begun && inForeground(name) && typeof scheduler.raise === 'function') {
+            try {
+              if (scheduler.raise(lanedKey('data', `${label}:${wanted.method}:${flying.seq}`), standing)) flying.rank = Math.min(flying.rank, askRank);
+            } catch (_) { /* the read keeps its rank */ }
+          }
+          return flying.attempts.answer(flying.promise);
+        };
+        if (!fromNow && group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return join(group.state.flight);
         // `fromNow` + `sinceWrite` needs only a read begun after the last write:
         // it joins a queued flight (or, by `writeMark`, one begun since the last
         // write) unless that flight ranks lower, is failing or predates a purge,
@@ -1886,7 +1898,7 @@ export function createDataService({
         if (sharesSinceWrite && flying && !flying.settled && flying.rank <= askRank && flying.voidAtAsk === voidOf(name)
           && !flying.attempts.failing() && at - flying.at < METHOD_SHARE_MS
           && (!flying.begun || (flying.writeMark !== null && flying.writeMark === writeMarkNow()))) {
-          return flying.attempts.answer(flying.promise);
+          return join(flying);
         }
         methodBatches += 1;
         // Only the newest flight stores and answers; `flightSeq` is numbered
