@@ -81,21 +81,25 @@ function createReadProjection() {
       held.bytes += cost;
       while (size > 8 * 1024 * 1024 || count > 4096 || snapshots.size > 64) drop(snapshots.keys().next().value);
     };
-    const heldRow = (key) => {
-      const entry = held.rows.get(JSON.stringify(key));
-      return entry ? { found: true, value: JSON.parse(entry.json) ?? undefined } : { found: false };
-    };
+    // Each key is encoded once and each held row decoded once per read. Held
+    // entries are taken before any database wait, so a row evicted meanwhile
+    // still answers this read.
+    const parsed = (entry) => (entry ? JSON.parse(entry.json) ?? undefined : undefined);
     const many = async (table, keys) => {
       if (table !== 'rows') return getMany(tx, table, keys);
-      const missing = keys.filter(key => !heldRow(key).found);
-      if (missing.length) {
-        const rows = await getMany(tx, table, missing);
-        rows.forEach((row, index) => keep(held.rows, JSON.stringify(missing[index]), row));
-        // Oversized answers may not be held, but still answer this read.
-        const fetched = new Map(missing.map((key, index) => [JSON.stringify(key), rows[index]]));
-        return keys.map(key => fetched.has(JSON.stringify(key)) ? fetched.get(JSON.stringify(key)) : heldRow(key).value);
-      }
-      return keys.map(key => heldRow(key).value);
+      const ids = keys.map(key => JSON.stringify(key));
+      const entries = ids.map(id => held.rows.get(id));
+      const missing = [];
+      entries.forEach((entry, index) => { if (!entry) missing.push(index); });
+      if (!missing.length) return entries.map(parsed);
+      const rows = await getMany(tx, table, missing.map(index => keys[index]));
+      // Oversized answers may not be held, but still answer this read.
+      const answer = entries.map(parsed);
+      rows.forEach((row, at) => {
+        keep(held.rows, ids[missing[at]], row);
+        answer[missing[at]] = row;
+      });
+      return answer;
     };
     return {
       ...tx,
@@ -105,8 +109,8 @@ function createReadProjection() {
         const key = JSON.stringify([prefix, options]);
         const answer = held.scans.get(key);
         if (answer) {
-          const keys = JSON.parse(answer.json);
-          if (keys.every(rowKey => heldRow(rowKey).found)) return keys.map(rowKey => heldRow(rowKey).value);
+          const entries = JSON.parse(answer.json).map(rowKey => held.rows.get(JSON.stringify(rowKey)));
+          if (entries.every(Boolean)) return entries.map(parsed);
         }
         const rows = await tx.scan(table, prefix, options);
         rows.forEach(row => keep(held.rows, JSON.stringify(row.key), row));
