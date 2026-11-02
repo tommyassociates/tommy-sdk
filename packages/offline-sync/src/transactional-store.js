@@ -143,6 +143,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     if (noticeKeys.size > NOTICE_KEYS) noticeKeys = null;
   }
   async function commit(snapshot, changes, extra) {
+    writes += 1;
     const result = await backend.commit(snapshot, changes, extra);
     track(snapshot, changes, result);
     noted(changes, result);
@@ -212,7 +213,38 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       }
     }
   }
-  async function wholeRows({ aged = false } = {}) {
+  // Concurrent whole reads share one read: a caller joins the read in flight
+  // for the same `aged` when no commit of this store began since it started
+  // (a read that may predate a write is never handed to a later caller), and
+  // only for WHOLE_SHARE_MS after it started, so a stalled read never holds
+  // later callers.
+  // Fresh held copies are copied again for each caller after the first; other
+  // rows are shared, and their consumers copy or only read them.
+  const WHOLE_SHARE_MS = 30000;
+  let writes = 0;
+  let wholeFlight = null;
+  function wholeRows({ aged = false } = {}) {
+    if (!wholeFlight || wholeFlight.aged !== aged || wholeFlight.writes !== writes || Date.now() - wholeFlight.at >= WHOLE_SHARE_MS) {
+      const flight = { aged, writes, at: Date.now(), waiters: [] };
+      wholeFlight = flight;
+      const done = (answer) => {
+        if (wholeFlight === flight) wholeFlight = null;
+        flight.waiters.forEach((waiter, at) => answer(waiter, at));
+      };
+      readWholeRows({ aged }).then(
+        (rows) => done(({ resolve }, at) => {
+          if (at === 0 || !freshRows.has(rows)) { resolve(rows); return; }
+          const fresh = JSON.parse(JSON.stringify(rows));
+          freshRows.add(fresh);
+          resolve(fresh);
+        }),
+        (error) => done(({ reject }) => reject(error))
+      );
+    }
+    const flight = wholeFlight;
+    return new Promise((resolve, reject) => { flight.waiters.push({ resolve, reject }); });
+  }
+  async function readWholeRows({ aged = false } = {}) {
     if (held && typeof backend.page === 'function') {
       const head = await backend.page({ afterKey: null, limit: 1, aged: true, metadataOnly: true });
       live();
@@ -375,6 +407,8 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       }
       return null;
     },
+    // A whole read pages the host port's rows by key, so getAll answers in key order.
+    keyOrdered: true,
     async get(key) { live(); const row = await backend.get(keyString(key)); live(); return paintable(row) ? copy(row) : undefined; },
     async getRaw(key) { live(); const row = await backend.get(keyString(key), { aged: true }); live(); return copy(row); },
     async getAll() { live(); const rows = await wholeRows(); live(); return owned(freshRows.has(rows) ? rows.filter(paintable) : rows.filter(paintable).map(copy)); },
@@ -699,6 +733,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     dispose({ purge = false } = {}) {
       retired = true;
       held = null;
+      wholeFlight = null;
       subscribers.clear();
       queries.clear();
       changeListeners.clear();
