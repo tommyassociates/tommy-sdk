@@ -2058,7 +2058,15 @@ export function createDataService({
       }
       // Not joined: a flight as another account form, or a changes read by a `full` ask.
       const form = formOf(context);
-      if (state.flight && state.flightForm === form && (!full || state.flightFull) && !fromNow) return settle(state.attempts.answer(state.flight, { nextAttempt }));
+      if (state.flight && state.flightForm === form && (!full || state.flightFull) && !fromNow) {
+        // An ask that joins a read still queued (a boot warm-up) raises it to
+        // its own visibility and priority, so a screen waiting on it is not
+        // held at the warm-up's rank.
+        if (state.flightJobKey && inForeground(name) && typeof scheduler.raise === 'function') {
+          try { scheduler.raise(state.flightJobKey, { visible: mode === 'visible', priority: PRIORITIES[priority] ?? PRIORITIES.normal }); } catch (_) { /* the read keeps its rank */ }
+        }
+        return settle(state.attempts.answer(state.flight, { nextAttempt }));
+      }
       if (state.flight) {
         // Read after it; while it waits to retry a failure, answer with that failure.
         const { attempts } = state;
@@ -2161,8 +2169,9 @@ export function createDataService({
         try { landed(outcome); } catch (_) { /* what it stored stands; its status says so */ }
         emitStatus();
       };
+      state.flightJobKey = lanedKey('data', `${label}:${key}`);
       state.flight = scheduler.request({
-        key: lanedKey('data', `${label}:${key}`), target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
+        key: state.flightJobKey, target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
         ...(inForeground(name)
           ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
           : { priority: PRIORITIES.background, visible: false }),
@@ -2190,7 +2199,7 @@ export function createDataService({
       }).finally(() => {
         attempts.settled();
         if (state.attempts === attempts) state.attempts = null;
-        state.flight = null; state.flightForm = null; state.flightFull = false; state.flightWhole = false; emitStatus();
+        state.flight = null; state.flightJobKey = null; state.flightForm = null; state.flightFull = false; state.flightWhole = false; emitStatus();
       });
       return settle(attempts.answer(state.flight));
     } catch (error) {
