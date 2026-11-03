@@ -2012,15 +2012,17 @@ export function createDataService({
   /** A refresh of `target` as the principal in `context` (taken when it was asked). */
   function refreshAs(target, {
     mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false, fromNow = false, sinceWrite = false, nextAttempt = false,
-    storedChecked = false, retry = false,
+    storedChecked = false, retry = false, stillWanted = null,
   } = {}, context) {
     live();
     const wanted = targetOf(target);
+    if (stillWanted !== null && typeof stillWanted !== 'function') return Promise.reject(serviceError('stillWanted must be a function', 'DATA_INVALID'));
     if (typeof nextAttempt !== 'boolean') return Promise.reject(serviceError('nextAttempt must be true or false', 'DATA_INVALID'));
     if (nextAttempt && (wanted.method !== undefined || wanted.query !== undefined || wanted.window !== undefined)) {
       return Promise.reject(serviceError('nextAttempt needs a collection or exact key read', 'DATA_UNSUPPORTED'));
     }
     if (wanted.method !== undefined) {
+      if (stillWanted !== null) return Promise.reject(serviceError('stillWanted needs a collection read', 'DATA_UNSUPPORTED'));
       return refreshMethodAs(wanted, {
         mode, priority, maxAge, reason, fromNow, sinceWrite, retry,
       }, context);
@@ -2052,7 +2054,7 @@ export function createDataService({
         }
         const check = state.storedCheck;
         const asked = {
-          mode, priority, maxAge, reason, full, fromNow, sinceWrite, nextAttempt, storedChecked: true,
+          mode, priority, maxAge, reason, full, fromNow, sinceWrite, nextAttempt, storedChecked: true, stillWanted,
         };
         return settle(check.done.then(() => {
           if (check.at !== null && now() - check.at < age && state.syncedAt === null && !state.flight && state.state !== 'error') {
@@ -2077,15 +2079,23 @@ export function createDataService({
         if (state.flightJobKey && inForeground(name) && typeof scheduler.raise === 'function') {
           try { scheduler.raise(state.flightJobKey, { visible: mode === 'visible', priority: PRIORITIES[priority] ?? PRIORITIES.normal }); } catch (_) { /* the read keeps its rank */ }
         }
+        if (state.flightAskers) {
+          if (stillWanted) state.flightAskers.wanted.add(stillWanted);
+          else state.flightAskers.always = true;
+        }
         return settle(state.attempts.answer(state.flight, { nextAttempt }));
       }
       if (state.flight) {
         // Read after it; while it waits to retry a failure, answer with that failure.
         const { attempts } = state;
         const after = () => refreshAs(target, {
-          mode: 'visible', priority, maxAge: 0, reason, full,
+          mode: 'visible', priority, maxAge: 0, reason, full, stillWanted,
         }, context);
         return settle(attempts.answer(state.flight, { nextAttempt }).then(after, (error) => (nextAttempt || attempts.failing() ? Promise.reject(error) : after())));
+      }
+      // An asker that no longer waits starts no read.
+      if (stillWanted && !stillWanted()) {
+        return settle(Promise.reject(Object.assign(serviceError(`'${wanted.collection}' is no longer wanted`, 'REFRESH_DROPPED'), { retryable: false })));
       }
       state.state = 'refreshing';
       emitStatus();
@@ -2182,6 +2192,11 @@ export function createDataService({
         emitStatus();
       };
       state.flightJobKey = lanedKey('data', `${label}:${key}`);
+      // Whether anyone still waits for this read: an asker without
+      // `stillWanted` always does; otherwise any asker's own answer.
+      const askers = { always: !stillWanted, wanted: new Set(stillWanted ? [stillWanted] : []) };
+      const stillAsked = () => askers.always || [...askers.wanted].some((asker) => { try { return !!asker(); } catch (_) { return false; } });
+      state.flightAskers = askers;
       state.flight = scheduler.request({
         key: state.flightJobKey, target: laned(label), budgetKey: spec.budgetKey || budgetKey, reason,
         ...(inForeground(name)
@@ -2191,9 +2206,12 @@ export function createDataService({
         whole: true,
         // A read other runs wait on from inside their own starts past the visible cap.
         ...(spec.gate === true ? { gate: true } : {}),
-        // Never run, or run again, once this service is disposed or its reads paused.
-        valid: () => !disposed && cadenceFactor(name) !== Infinity,
+        // Never run, or run again, once this service is disposed, its reads
+        // paused, or no asker still waits for it.
+        valid: () => !disposed && cadenceFactor(name) !== Infinity && stillAsked(),
         run: attempts.run(async (isCurrent, helpers) => {
+          // Once begun, the read is finished and stored for whoever asks next.
+          askers.always = true;
           let stopped = false;
           const value = await run(() => {
             const wantedNow = isCurrent();
@@ -2205,13 +2223,18 @@ export function createDataService({
           return outcome;
         }),
       }).then(landed, (error) => {
+        // A read dropped because nobody still waited for it says nothing about the source.
+        if (error?.code === 'REFRESH_DROPPED' && !stillAsked()) {
+          if (state.state === 'refreshing') state.state = 'stale';
+          throw error;
+        }
         state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
         if (error?.code === 'REFRESH_TIMEOUT' && error?.retryable === true) answeredLate = true;
         throw error;
       }).finally(() => {
         attempts.settled();
         if (state.attempts === attempts) state.attempts = null;
-        state.flight = null; state.flightJobKey = null; state.flightForm = null; state.flightFull = false; state.flightWhole = false; emitStatus();
+        state.flight = null; state.flightJobKey = null; state.flightAskers = null; state.flightForm = null; state.flightFull = false; state.flightWhole = false; emitStatus();
       });
       return settle(attempts.answer(state.flight));
     } catch (error) {
