@@ -93,6 +93,28 @@ describe('a read the scheduler tries again', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it('says a failed read is retrying while the scheduler still tries it, and not once its attempts are used up', async () => {
+    const scheduler = retryingScheduler({ attempts: 2 });
+    const { data } = service(scheduler);
+    const fetch = vi.fn().mockRejectedValue(offline());
+    data.source('members', { fetch });
+    await outcome(data.refresh('members', { mode: 'visible' }));
+    expect(data.status('members')).toMatchObject({ state: 'error', retrying: true });
+    scheduler.retry();
+    await vi.waitFor(() => expect(data.status('members').retrying).toBeUndefined());
+    expect(data.status('members').state).toBe('error');
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('says a read that answered is not retrying', async () => {
+    const scheduler = retryingScheduler();
+    const { data } = service(scheduler);
+    data.source('members', { fetch: vi.fn().mockResolvedValue([{ id: '1' }]) });
+    await data.refresh('members', { mode: 'visible' });
+    expect(data.status('members').state).toBe('fresh');
+    expect(data.status('members')).not.toHaveProperty('retrying');
+  });
+
   it('answers a caller asking during the backoff at once, with no second fetch, and a silent one with the failed status', async () => {
     const scheduler = retryingScheduler();
     const { data } = service(scheduler);

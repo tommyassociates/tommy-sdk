@@ -766,7 +766,10 @@ export function createDataService({
     let value = state.state;
     if (value !== 'refreshing' && !isOnline()) value = 'offline';
     else if (value === 'fresh' && (state.syncedAt === null || now() - state.syncedAt > staleAfterMs)) value = 'stale';
-    return { state: value, syncedAt: state.syncedAt, error: state.error };
+    const status = { state: value, syncedAt: state.syncedAt, error: state.error };
+    // A failed attempt of a read the scheduler is still trying again.
+    if (value === 'error' && state.flight) status.retrying = true;
+    return status;
   }
   const emitStatus = () => { [...listeners].forEach((listener) => { try { listener(); } catch (_) { /* listener isolation */ } }); };
 
