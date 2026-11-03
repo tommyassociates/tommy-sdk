@@ -846,9 +846,15 @@ export function createBroker({
     let timer;
     let deadlinePassed = false;
     // The handler's `signal` aborts when the caller is answered with a
-    // Timeout. A handler whose late value only warms the cache may ignore it;
-    // one that is not cacheable can stop reading for nobody.
+    // Timeout, or when the caller's own `signal` (the asking surface's shown
+    // signal) aborts. A handler whose late value only warms the cache may
+    // ignore it; one that is not cacheable can stop reading for nobody.
     const deadline = new AbortController();
+    const callerSignal = envelope.signal && typeof envelope.signal.addEventListener === 'function'
+      && typeof envelope.signal.aborted === 'boolean' ? envelope.signal : null;
+    const callerGone = () => deadline.abort();
+    if (callerSignal?.aborted) deadline.abort();
+    else callerSignal?.addEventListener('abort', callerGone, { once: true });
     const timeout = new Promise((_, reject) => {
       timer = setTimeout(() => {
         deadlinePassed = true;
@@ -907,6 +913,7 @@ export function createBroker({
       throw wrapped;
     } finally {
       clearTimeout(timer);
+      callerSignal?.removeEventListener('abort', callerGone);
     }
   }
 

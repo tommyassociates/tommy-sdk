@@ -267,7 +267,7 @@ export interface ActionsApi {
   emit(trigger: string, payload: unknown): Promise<EmitReceipt>;
 
   /** Evaluate another MP's condition. Rejects Timeout / UnknownCondition / ConditionError. */
-  query<R = unknown>(condition: string, args: unknown): Promise<R>;
+  query<R = unknown>(condition: string, args: unknown, options?: { signal?: AbortSignal }): Promise<R>;
 
   /**
    * Invoke another MP's activity. Idempotency key formed per the target manifest.

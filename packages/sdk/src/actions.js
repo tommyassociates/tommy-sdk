@@ -27,12 +27,16 @@ export function createActionsApi({ adapter, mpId }) {
       return adapter.rpc({ kind: 'emit', trigger, payload });
     },
 
-    /** Evaluate another MP's condition. Never queued offline (reads fail fast). */
-    async query(condition, args) {
+    /**
+     * Evaluate another MP's condition. Never queued offline (reads fail fast).
+     * `signal` (the asking surface's shown signal) is handed to the condition
+     * handler's own signal, so a read still waiting when it aborts can stop.
+     */
+    async query(condition, args, { signal } = {}) {
       if (typeof condition !== 'string' || !condition) {
         throw new TommyError({ code: 'InvalidPayload', message: 'query: condition name required', retryable: false });
       }
-      return adapter.rpc({ kind: 'query', condition, args });
+      return adapter.rpc({ kind: 'query', condition, args, ...(signal ? { signal } : {}) });
     },
 
     /** Invoke another MP's activity; resolves InvokeResult. */
