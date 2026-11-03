@@ -156,6 +156,13 @@ export function createBroker({
    */
   registrationTimeoutMs = 8000,
   /**
+   * How long a condition handler's `signal` still follows the caller's own
+   * `signal` after the caller is answered. A handler that answers from what it
+   * holds may leave a host read queued to warm the next answer; that read
+   * goes unsent once the asking surface leaves the screen within this time.
+   */
+  callerLinkAfterAnswerMs = 60000,
+  /**
    * How long an invoke joining an in-flight run with the same idempotency key
    * waits before a non-retryable `Timeout`. With `rpcDeadlineAt` it gives up just
    * before that deadline, so the caller gets this error, not the adapter's. It
@@ -847,8 +854,10 @@ export function createBroker({
     let deadlinePassed = false;
     // The handler's `signal` aborts when the caller is answered with a
     // Timeout, or when the caller's own `signal` (the asking surface's shown
-    // signal) aborts. A handler whose late value only warms the cache may
-    // ignore it; one that is not cacheable can stop reading for nobody.
+    // signal) aborts, before the answer or up to `callerLinkAfterAnswerMs`
+    // after it (work the handler left running, such as a queued host read
+    // that warms the next answer). A handler whose late value only warms the
+    // cache may ignore it; one that is not cacheable can stop reading for nobody.
     const deadline = new AbortController();
     const callerSignal = envelope.signal && typeof envelope.signal.addEventListener === 'function'
       && typeof envelope.signal.aborted === 'boolean' ? envelope.signal : null;
@@ -913,8 +922,27 @@ export function createBroker({
       throw wrapped;
     } finally {
       clearTimeout(timer);
-      callerSignal?.removeEventListener('abort', callerGone);
+      unlinkCallerLater(callerSignal, callerGone, deadline.signal);
     }
+  }
+
+  // Keeps a settled query's handler signal following its caller's signal for
+  // `callerLinkAfterAnswerMs`, then lets go; an abort either way ends it.
+  function unlinkCallerLater(callerSignal, callerGone, handlerSignal) {
+    if (!callerSignal) return;
+    if (callerSignal.aborted || handlerSignal.aborted || !(callerLinkAfterAnswerMs > 0)) {
+      callerSignal.removeEventListener('abort', callerGone);
+      return;
+    }
+    const unlink = () => {
+      clearTimeout(linkTimer);
+      callerSignal.removeEventListener('abort', callerGone);
+      handlerSignal.removeEventListener('abort', unlink);
+    };
+    const linkTimer = setTimeout(unlink, callerLinkAfterAnswerMs);
+    // Never hold a process open on a link nobody is watching (node/tests).
+    if (typeof linkTimer?.unref === 'function') linkTimer.unref();
+    handlerSignal.addEventListener('abort', unlink, { once: true });
   }
 
   function idempotencyKeyFor(activityDef, envelope, epoch = 0) {

@@ -8,9 +8,9 @@ import { createBroker, createFakeIssuer } from '../src/index.js';
 
 const TENANT = 'team-3';
 
-async function world(handler) {
+async function world(handler, options = {}) {
   const issuer = createFakeIssuer();
-  const broker = createBroker({ capabilityService: issuer });
+  const broker = createBroker({ capabilityService: issuer, ...options });
   broker.registerMp({
     id: 'demo',
     version: '1.0.0',
@@ -64,9 +64,31 @@ describe('the caller signal on a query', () => {
     expect(abortedAtStart).toBe(true);
   });
 
-  it('stops listening once the query settles', async () => {
+  it('still aborts the handler signal when the caller leaves soon after an early answer', async () => {
+    // A handler that answers from what it holds and leaves a read queued
+    // behind (the Scheduling window read answered from its cache).
     let seen;
     const query = await world((args, ctx) => { seen = ctx.signal; return {}; });
+    const caller = new AbortController();
+    await query(caller.signal);
+    expect(seen.aborted).toBe(false);
+    caller.abort();
+    expect(seen.aborted).toBe(true);
+  });
+
+  it('stops listening once the link after the answer has run out', async () => {
+    let seen;
+    const query = await world((args, ctx) => { seen = ctx.signal; return {}; }, { callerLinkAfterAnswerMs: 10 });
+    const caller = new AbortController();
+    await query(caller.signal);
+    await tick(30);
+    caller.abort();
+    expect(seen.aborted).toBe(false);
+  });
+
+  it('stops listening at once when the link after the answer is off', async () => {
+    let seen;
+    const query = await world((args, ctx) => { seen = ctx.signal; return {}; }, { callerLinkAfterAnswerMs: 0 });
     const caller = new AbortController();
     await query(caller.signal);
     caller.abort();
