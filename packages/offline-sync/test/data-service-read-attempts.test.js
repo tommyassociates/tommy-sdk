@@ -47,6 +47,12 @@ function retryingScheduler({ attempts = 5 } = {}) {
       return new Promise((resolve, reject) => { entry.waiters.push({ resolve, reject }); });
     },
     retry() { due.splice(0).forEach(start); },
+    retryNow: vi.fn((key) => {
+      const at = due.findIndex((entry) => entry.job.key === key);
+      if (at < 0) return false;
+      start(due.splice(at, 1)[0]);
+      return true;
+    }),
     revalidate: vi.fn(),
     get waiting() { return due.length; },
   };
@@ -107,6 +113,48 @@ describe('a read the scheduler tries again', () => {
     await Promise.resolve();
     await expect(data.refresh('members', { mode: 'visible' })).resolves.toBeUndefined();
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('runs a read waiting out its backoff now for a person\'s retry, and answers the retry with that attempt', async () => {
+    const scheduler = retryingScheduler();
+    const { data } = service(scheduler);
+    const fetch = vi.fn().mockRejectedValueOnce(offline()).mockRejectedValueOnce(offline()).mockResolvedValue([{ id: '1', name: 'Ada' }]);
+    data.source('members', { fetch });
+    await outcome(data.refresh('members', { mode: 'visible' }));
+    expect(scheduler.waiting).toBe(1);
+    // A retry whose attempt fails again is answered by that failure.
+    const failedAgain = await outcome(data.refresh('members', { mode: 'visible', fromNow: true, retry: true }));
+    expect(failedAgain?.[0]).toBe('rejected');
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(scheduler.waiting).toBe(1);
+    // The next retry reads at once and lands the rows, with no extra read after it.
+    await expect(data.refresh('members', { mode: 'visible', fromNow: true, retry: true })).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(data.status('members')).toMatchObject({ state: 'fresh', error: null });
+    expect((await data.read('members')).map((row) => row.name)).toEqual(['Ada']);
+    // A retry that would join the read on its way (no fromNow) runs it now too.
+    fetch.mockRejectedValueOnce(offline());
+    await outcome(data.refresh('members', { mode: 'visible', fromNow: true }));
+    await expect(data.refresh('members', { mode: 'visible', retry: true })).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(5);
+    // An ask that is not a retry is still answered by the failure at once.
+    fetch.mockRejectedValueOnce(offline());
+    await outcome(data.refresh('members', { mode: 'visible', fromNow: true }));
+    const plain = await outcome(data.refresh('members', { mode: 'visible', fromNow: true }));
+    expect(plain?.[0]).toBe('rejected');
+    expect(fetch).toHaveBeenCalledTimes(6);
+  });
+
+  it('answers a retry with the failure at once when the scheduler cannot run its read now', async () => {
+    const scheduler = retryingScheduler();
+    delete scheduler.retryNow;
+    const { data } = service(scheduler);
+    const fetch = vi.fn().mockRejectedValueOnce(offline()).mockResolvedValue([{ id: '1' }]);
+    data.source('members', { fetch });
+    await outcome(data.refresh('members', { mode: 'visible' }));
+    const retried = await outcome(data.refresh('members', { mode: 'visible', fromNow: true, retry: true }));
+    expect(retried?.[0]).toBe('rejected');
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it('answers a refresh method\'s callers at its first failed attempt, and joins an id asked again during the backoff', async () => {

@@ -2084,6 +2084,24 @@ export function createDataService({
       }
       // Not joined: a flight as another account form, or a changes read by a `full` ask.
       const form = formOf(context);
+      // A person's retry of a read waiting out its backoff runs that read's
+      // next attempt now and is answered by it: that attempt begins after
+      // the ask.
+      if (retry === true && state.flight && state.flightForm === form && (!full || state.flightFull) && state.attempts?.failing()
+        && state.flightJobKey && typeof scheduler.retryNow === 'function') {
+        let woken = false;
+        try { woken = scheduler.retryNow(state.flightJobKey) === true; } catch (_) { woken = false; }
+        if (woken) {
+          if (inForeground(name) && typeof scheduler.raise === 'function') {
+            try { scheduler.raise(state.flightJobKey, { visible: mode === 'visible', priority: PRIORITIES[priority] ?? PRIORITIES.normal }); } catch (_) { /* the read keeps its rank */ }
+          }
+          if (state.flightAskers) {
+            if (stillWanted) state.flightAskers.wanted.add(stillWanted);
+            else state.flightAskers.always = true;
+          }
+          return settle(state.attempts.answer(state.flight, { nextAttempt: true }));
+        }
+      }
       if (state.flight && state.flightForm === form && (!full || state.flightFull) && !fromNow) {
         // An ask that joins a read still queued (a boot warm-up) raises it to
         // its own visibility and priority, so a screen waiting on it is not
@@ -2563,7 +2581,9 @@ export function createDataService({
      * rejects. `maxAge` skips a fetch while the last sync is younger. `full`
      * reads a declared read whole. `fromNow` never joins a read in flight.
      * `nextAttempt` (host-internal, collection or exact key only) waits for a
-     * failed read's next attempt instead of its previous error.
+     * failed read's next attempt instead of its previous error. `retry` (a
+     * person asked) runs a read waiting out its backoff now, where the
+     * scheduler can, and answers with that attempt.
      *
      * `{ collection, method, params }` runs a refresh method: never more often
      * than its `cadenceMs`, whatever `maxAge` asks; invalid params reject even
