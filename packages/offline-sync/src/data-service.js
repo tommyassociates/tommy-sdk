@@ -1634,6 +1634,7 @@ export function createDataService({
   /** A refresh method's run as the principal in `context`; `retry` ends a refusal hold. */
   function refreshMethodAs(wanted, {
     mode = 'silent', priority = 'normal', maxAge = 0, reason = null, fromNow = false, sinceWrite = false, retry = false,
+    stillWanted = null,
   } = {}, context) {
     live();
     const {
@@ -1653,6 +1654,7 @@ export function createDataService({
     try { available = typeof method.available !== 'function' || method.available(params) !== false; } catch (_) { available = false; }
     const form = formOf(context);
     const batchParam = method.batch || null;
+    if (stillWanted !== null && batchParam) return Promise.reject(serviceError('stillWanted needs an unbatched method', 'DATA_UNSUPPORTED'));
     const shared = batchParam ? Object.fromEntries(Object.entries(params).filter(([param]) => param !== batchParam)) : params;
     const groupKey = JSON.stringify([form, name, wanted.method, shared]);
     let group = methodGroup(groupKey, name);
@@ -1874,6 +1876,8 @@ export function createDataService({
         // a screen joins a read the screen before it asked and the scheduler
         // lowered on leaving.
         const join = (flying) => {
+          if (stillWanted) flying.askers.wanted.add(stillWanted);
+          else flying.askers.always = true;
           if (!flying.begun && inForeground(name) && typeof scheduler.raise === 'function') {
             try {
               if (scheduler.raise(lanedKey('data', `${label}:${wanted.method}:${flying.seq}`), standing)) flying.rank = Math.min(flying.rank, askRank);
@@ -1900,6 +1904,8 @@ export function createDataService({
           && (!flying.begun || (flying.writeMark !== null && flying.writeMark === writeMarkNow()))) {
           return join(flying);
         }
+        // An asker that no longer waits starts no read.
+        if (stillWanted && !(() => { try { return !!stillWanted(); } catch (_) { return false; } })()) return Promise.reject(dropped());
         methodBatches += 1;
         // Only the newest flight stores and answers; `flightSeq` is numbered
         // across the service, so a group cleared and remade never matches it.
@@ -1915,7 +1921,11 @@ export function createDataService({
           rank: askRank,
           voidAtAsk,
           writeMark: null,
+          // Whether anyone still waits for this read: an asker without
+          // `stillWanted` always does; otherwise any asker's own answer.
+          askers: { always: !stillWanted, wanted: new Set(stillWanted ? [stillWanted] : []) },
         };
+        const stillAsked = () => flight.askers.always || [...flight.askers.wanted].some((asker) => { try { return !!asker(); } catch (_) { return false; } });
         group.state.flightSeq = flight.seq;
         group.state.flight = flight;
         // Only a retryable timeout lets the read continue past its caller's deadline.
@@ -1936,6 +1946,8 @@ export function createDataService({
             // Taken once: a retry reads after the same writes.
             if (!flight.begun) flight.writeMark = writeMarkNow();
             flight.begun = true;
+            // Once begun, the read is finished and stored for whoever asks next.
+            flight.askers.always = true;
             return run(params, null, () => isCurrent() && current(), afterDeadline, helpers?.storing).then((value) => {
               if (group.state.flight === flight && group.state.state === 'fresh') {
                 group.state.answered = {
@@ -1944,7 +1956,8 @@ export function createDataService({
               }
               return value;
             });
-          }, flight.attempts, current);
+          // Queued, it never runs once no asker still waits for it.
+          }, flight.attempts, () => current() && stillAsked());
         } catch (error) {
           flight.attempts.settled();
           scheduled = Promise.reject(failed(error, current));
@@ -2022,9 +2035,8 @@ export function createDataService({
       return Promise.reject(serviceError('nextAttempt needs a collection or exact key read', 'DATA_UNSUPPORTED'));
     }
     if (wanted.method !== undefined) {
-      if (stillWanted !== null) return Promise.reject(serviceError('stillWanted needs a collection read', 'DATA_UNSUPPORTED'));
       return refreshMethodAs(wanted, {
-        mode, priority, maxAge, reason, fromNow, sinceWrite, retry,
+        mode, priority, maxAge, reason, fromNow, sinceWrite, retry, stillWanted,
       }, context);
     }
     const { name, label, store, decl } = local(wanted.collection);
