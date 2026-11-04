@@ -12,7 +12,7 @@ fi
 repository="$1"
 destination="$2"
 requested_branch="${CIRCLE_BRANCH:-}"
-fallback_branch="${CI_SIBLING_FALLBACK_BRANCH:-mp-platform-rc7}"
+fallback_branch="${CI_SIBLING_FALLBACK_BRANCH:-mp-platform-rc8}"
 
 # A fresh CircleCI executor may check out over HTTPS and have no SSH host keys.
 # Pin GitHub's published key and fail promptly instead of waiting for a prompt.

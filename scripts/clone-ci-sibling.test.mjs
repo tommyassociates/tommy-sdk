@@ -1,7 +1,7 @@
 /**
  * CI's sibling checkout (scripts/clone-ci-sibling.sh) against a fake `git`:
  * the same-named sibling branch when it exists, the release branch
- * (mp-platform-rc7, or CI_SIBLING_FALLBACK_BRANCH) only once the branch is
+ * (mp-platform-rc8, or CI_SIBLING_FALLBACK_BRANCH) only once the branch is
  * proven missing, and no checkout at all on an auth or transport failure.
  */
 import { after, test } from 'node:test';
@@ -50,19 +50,19 @@ test('checks out the same-named sibling branch when it exists', () => {
 });
 
 test('falls back to the release branch only once the branch is proven missing', () => {
-  const result = checkout({ exists: { 'mp-platform-rc7': 0 } });
+  const result = checkout({ exists: { 'mp-platform-rc8': 0 } });
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.branch, 'mp-platform-rc7');
+  assert.equal(result.branch, 'mp-platform-rc8');
 });
 
 test('honours CI_SIBLING_FALLBACK_BRANCH', () => {
-  const result = checkout({ exists: { 'mp-platform-rc7': 0 }, fallback: 'mp-platform-rc7' });
-  assert.equal(result.branch, 'mp-platform-rc7');
+  const result = checkout({ exists: { 'mp-platform-rc8': 0 }, fallback: 'mp-platform-rc8' });
+  assert.equal(result.branch, 'mp-platform-rc8');
 });
 
 for (const code of [1, 128]) {
   test(`stops on an auth or transport failure (git exit ${code}) without a checkout`, () => {
-    const result = checkout({ exists: { 'feature/repair': code, 'mp-platform-rc7': 0 } });
+    const result = checkout({ exists: { 'feature/repair': code, 'mp-platform-rc8': 0 } });
     assert.notEqual(result.status, 0);
     assert.equal(result.branch, null);
   });
