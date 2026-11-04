@@ -1979,8 +1979,10 @@ export function createDataService({
               && !flight.deadlineRetry && group.state.state === 'refreshing') {
               group.state.state = 'stale';
             }
-            // A failed read's `retrying` ends with its flight; its waiters hear it.
-            if (!disposed && (ended === 'error' || group.state.state !== ended)) emitStatus();
+            // A failed read's `retrying` ends with its flight; its waiters hear
+            // it. A read that ends otherwise (dropped, purged) changes nothing
+            // its listeners are told about.
+            if (!disposed && ended === 'error') emitStatus();
           })
           .then(resolveFlight, rejectFlight)
           .catch(rejectFlight);
