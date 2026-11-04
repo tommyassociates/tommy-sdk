@@ -1974,10 +1974,13 @@ export function createDataService({
             flight.settled = true;
             if (group.state.flight !== flight) return;
             group.state.flight = null;
+            const ended = group.state.state;
             if (!disposed && methodGroups.get(groupKey) === group && group.state.flightSeq === flight.seq
               && !flight.deadlineRetry && group.state.state === 'refreshing') {
               group.state.state = 'stale';
             }
+            // A failed read's `retrying` ends with its flight; its waiters hear it.
+            if (!disposed && (ended === 'error' || group.state.state !== ended)) emitStatus();
           })
           .then(resolveFlight, rejectFlight)
           .catch(rejectFlight);

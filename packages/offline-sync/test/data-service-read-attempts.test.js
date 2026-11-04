@@ -106,6 +106,25 @@ describe('a read the scheduler tries again', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it('tells its status listeners when a method read stops retrying, so a caller waiting through the retries hears the end', async () => {
+    const scheduler = retryingScheduler({ attempts: 2 });
+    const { data } = service(scheduler);
+    const search = vi.fn().mockRejectedValue(offline());
+    data.source('members', {
+      fetch: async () => [],
+      methods: { search: { params: { q: { type: 'string' } }, fetch: search } },
+    });
+    const target = { collection: 'members', method: 'search', params: { q: 'a' } };
+    await outcome(data.refresh(target, { mode: 'visible' }));
+    expect(data.status(target)).toMatchObject({ state: 'error', retrying: true });
+    const heard = [];
+    data.onStatusChange(() => heard.push(data.status(target).retrying === true));
+    scheduler.retry();
+    await vi.waitFor(() => expect(data.status(target).retrying).toBeUndefined());
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(heard.at(-1)).toBe(false);
+  });
+
   it('says a read that answered is not retrying', async () => {
     const scheduler = retryingScheduler();
     const { data } = service(scheduler);
