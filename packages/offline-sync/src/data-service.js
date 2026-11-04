@@ -1907,7 +1907,7 @@ export function createDataService({
           && (!flying.begun || (flying.writeMark !== null && flying.writeMark === writeMarkNow()))) {
           return join(flying);
         }
-        // An asker that no longer waits starts no read.
+        // An asker that has stopped waiting starts no read.
         if (stillWanted && !(() => { try { return !!stillWanted(); } catch (_) { return false; } })()) return Promise.reject(dropped());
         methodBatches += 1;
         // Only the newest flight stores and answers; `flightSeq` is numbered
@@ -2126,7 +2126,7 @@ export function createDataService({
         }, context);
         return settle(attempts.answer(state.flight, { nextAttempt }).then(after, (error) => (nextAttempt || attempts.failing() ? Promise.reject(error) : after())));
       }
-      // An asker that no longer waits starts no read.
+      // An asker that has stopped waiting starts no read.
       if (stillWanted && !stillWanted()) {
         return settle(Promise.reject(Object.assign(serviceError(`'${wanted.collection}' is no longer wanted`, 'REFRESH_DROPPED'), { retryable: false })));
       }
