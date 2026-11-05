@@ -183,6 +183,21 @@ describe('refresh methods', () => {
     expect(await ids(data)).toEqual(['1']);
   });
 
+  it('reports the ask fresh when the whole read it joined answered it', async () => {
+    const { data } = service();
+    let release;
+    const held = new Promise((resolve) => { release = resolve; });
+    const api = server([member(1)]);
+    data.source('members', { fetch: async () => { await held; return { rows: [member(1)] }; }, read: {}, methods: methods(api) });
+    const reading = data.refresh('members', { mode: 'visible' });
+    const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'silent' });
+    release();
+    const [, answer] = await Promise.all([reading, asking]);
+    expect(api.byUserIds).not.toHaveBeenCalled();
+    expect(answer.state).toBe('fresh');
+    expect(answer.syncedAt).toEqual(data.status('members').syncedAt);
+  });
+
   it('never shares a fetch between two principals', async () => {
     let principal = { id: 'p1' };
     const { data } = service({ principal: () => principal });
