@@ -1713,6 +1713,7 @@ export function createDataService({
           if (answered) {
             group.state.state = 'fresh';
             group.state.error = null;
+            group.state.syncedAt = stateFor(targetKey({ collection: name })).syncedAt;
             return undefined;
           }
           // Re-checked as a new ask: idle groups may have been cleared while it waited.
