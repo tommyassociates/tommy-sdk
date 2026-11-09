@@ -46,13 +46,9 @@ export function createMemoryBackend() {
 }
 
 /** Fields a persisted record NEVER carries — see createWebStorageBackend. */
-// `lateResult` carries a FULL handler return value, exactly like `result` — it
-// is the salvaged value of a condition whose caller had already timed out. It was
-// added (round-1 F5) without being added here, so condition results were written
-// to localStorage and never released from the in-memory window: a payload-bearing
-// field outside both projections, which is the one shape these lists exist to
-// prevent (round-2 finding R2-F4).
-const REDACTED_FIELDS = ['args', 'result', 'payload', 'lateResult'];
+// `lateResult` is a full handler return value, like `result`. `capabilityTokenId`
+// holds the signed credential itself, not an opaque identifier.
+const REDACTED_FIELDS = ['args', 'result', 'payload', 'lateResult', 'capabilityTokenId'];
 
 /**
  * What the in-memory FULL-FIDELITY WINDOW releases — `result`/`payload` only.
@@ -115,6 +111,12 @@ export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
   const store = () => (storage === undefined ? webStorage() : storage);
   const rows = new Map(); // runId -> record AS GIVEN (this session only)
 
+  // Each backend uses one lazy snapshot; other tabs are observed on reload.
+  let persisted;
+  let timer;
+  let eventWindow;
+  let eventDocument;
+
   function loadPersisted() {
     const s = store();
     if (!s) return new Map();
@@ -124,6 +126,39 @@ export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
       return new Map(parsed.filter((r) => r && r.runId).map((r) => [r.runId, r]));
     } catch (_) {
       return new Map(); // corrupt — behave as empty rather than poisoning the path
+    }
+  }
+
+  function persistedRows() {
+    if (!persisted) persisted = loadPersisted();
+    return persisted;
+  }
+
+  function flush() {
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    timer = undefined;
+    eventWindow?.removeEventListener('pagehide', flush);
+    eventDocument?.removeEventListener('visibilitychange', onVisibilityChange);
+    eventWindow = undefined;
+    eventDocument = undefined;
+    const all = [...persistedRows().values()].sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
+    persisted = new Map(all.slice(-max).map((record) => [record.runId, redact(record)]));
+    savePersisted(persisted);
+  }
+
+  function onVisibilityChange() {
+    if (eventDocument?.visibilityState === 'hidden') flush();
+  }
+
+  function scheduleFlush() {
+    if (timer !== undefined) return;
+    timer = setTimeout(flush, 1000);
+    if (typeof window !== 'undefined') {
+      eventWindow = window;
+      eventDocument = typeof document !== 'undefined' ? document : undefined;
+      eventWindow.addEventListener('pagehide', flush);
+      eventDocument?.addEventListener('visibilitychange', onVisibilityChange);
     }
   }
 
@@ -140,7 +175,7 @@ export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
 
   /** Persisted rows merged UNDER the session's full ones (memory wins). */
   function merged() {
-    const out = new Map(loadPersisted());
+    const out = new Map(persistedRows());
     for (const [id, record] of rows) out.set(id, record);
     return out;
   }
@@ -148,9 +183,8 @@ export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
   return {
     async put(record) {
       rows.set(record.runId, record);
-      const persisted = loadPersisted();
-      persisted.set(record.runId, redact(record));
-      savePersisted(persisted);
+      persistedRows().set(record.runId, redact(record));
+      scheduleFlush();
     },
     async get(runId) {
       return merged().get(runId);
@@ -163,9 +197,8 @@ export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
     },
     async delete(runId) {
       rows.delete(runId);
-      const persisted = loadPersisted();
-      persisted.delete(runId);
-      savePersisted(persisted);
+      persistedRows().delete(runId);
+      scheduleFlush();
     },
   };
 }
