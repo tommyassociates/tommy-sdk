@@ -233,6 +233,8 @@ export const PanelTile = defineComponent({
     def: { type: Object, required: true },      // PanelDefinition
     ctx: { type: Object, required: true },      // PanelContext
     loadTimeoutMs: { type: Number, default: LOAD_TIMEOUT_MS },
+    onClose: { type: Function, default: null },
+    closeLabel: { type: String, default: 'Close' },
     onEvent: { type: Function, default: null }, // budget hooks: (event) => void
   },
   setup(props, { expose }) {
@@ -343,6 +345,10 @@ export const PanelTile = defineComponent({
 
     const panelComponent = guardPanelData(props.def.component, (err) => { if (alive) fail(err); });
 
+    const closeButton = () => props.onClose
+      ? h('button', { class: 'mp-panel-tile__close', 'data-cy': 'mp-panel-error-close', onClick: props.onClose }, props.closeLabel)
+      : null;
+
     return () => h('div', { class: ['mp-panel-tile', `mp-panel-tile--${status.value}`], 'data-panel-id': props.def.id }, [
       // Component path: the registered Vue/F7 component mounts as a light-DOM
       // child once ready (only then — so a re-throw can't reopen after fail()).
@@ -359,10 +365,11 @@ export const PanelTile = defineComponent({
         ? h('div', { class: 'mp-panel-tile__error' }, [
           h('p', "This panel couldn't load."),
           h('button', { class: 'mp-panel-tile__retry', onClick: retry }, 'Retry'),
+          closeButton(),
         ])
         : null,
       status.value === 'reload_addon'
-        ? h('div', { class: 'mp-panel-tile__reload' }, [h('p', 'Reload add-on')])
+        ? h('div', { class: 'mp-panel-tile__reload' }, [h('p', 'Reload add-on'), closeButton()])
         : null,
     ]);
   },

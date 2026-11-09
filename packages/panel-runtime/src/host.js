@@ -185,7 +185,7 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
      * list, re-flowed by the serializer on save), which is exactly what this
      * mode honours.
      */
-    mountSurface(el, { surface, viewerRoles = [], ctxFor, mpId, panelId, layout, pack = null, onDispose, onPanelElement }) {
+    mountSurface(el, { surface, viewerRoles = [], ctxFor, mpId, panelId, layout, pack = null, onDispose, onPanelElement, onClose, closeLabel }) {
       // Idempotent per element: re-mounting into the same element replaces its
       // app (never touches another element hosting the same surface name).
       this.unmountSurface(el);
@@ -267,6 +267,8 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
                 ? (entry ? ctxFor(mpId, def, entry) : ctxFor(mpId, def))
                 : { panelId: def.id, surface, surfaceContext: { surface }, config: (entry && entry.instance.config) || {}, online: true },
               onEvent,
+              onClose,
+              closeLabel,
             });
           })),
       });
