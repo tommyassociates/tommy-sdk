@@ -9,7 +9,7 @@
  * flipped the failed run record to `succeeded`, erasing the error a later triage
  * would look for.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   createBroker, createFakeIssuer, createRecordStore, createWebStorageBackend,
 } from '../src/index.js';
@@ -182,6 +182,7 @@ describe('R2-F4 — the salvaged value is payload-bearing and must be redacted',
         _dump: () => [...map.values()].join(''),
       };
     })();
+    vi.useFakeTimers();
     const store = createRecordStore({ backend: createWebStorageBackend({ storage }) });
     const rec = await store.open({ kind: 'query', tenantId: TENANT, targetMpId: 'demo' });
     await store.update(rec.runId, {
@@ -190,6 +191,8 @@ describe('R2-F4 — the salvaged value is payload-bearing and must be redacted',
       note: 'resolved after latency budget; the caller had already timed out',
     });
 
+    vi.advanceTimersByTime(1000);
+    vi.useRealTimers();
     const onDisk = storage._dump();
     expect(onDisk).toContain('resolved after latency budget');
     expect(onDisk).not.toContain('SENSITIVE-PAYLOAD');
