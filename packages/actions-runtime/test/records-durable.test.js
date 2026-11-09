@@ -6,7 +6,7 @@
  * are (a) the default picks itself when storage exists, and (b) what it writes
  * carries no tenant payload.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createRecordStore, createWebStorageBackend, createMemoryBackend } from '../src/index.js';
 
 function fakeStorage() {
@@ -25,13 +25,80 @@ describe('D.43 — durable, redacted run records', () => {
   let storage;
   const makeStore = () => createRecordStore({ backend: createWebStorageBackend({ storage }) });
 
-  beforeEach(() => { storage = fakeStorage(); });
+  beforeEach(() => { vi.useFakeTimers(); storage = fakeStorage(); });
+  afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+  it('loads lazily once and coalesces a burst while reads see pending puts and deletes', async () => {
+    storage.setItem('mp-action-records', JSON.stringify([{ runId: 'old', startedAt: 0 }]));
+    const get = vi.spyOn(storage, 'getItem');
+    const set = vi.spyOn(storage, 'setItem');
+    const backend = createWebStorageBackend({ storage });
+    expect(get).not.toHaveBeenCalled();
+    for (let i = 0; i < 20; i += 1) await backend.put({ runId: `r${i}`, startedAt: i + 1 });
+    await backend.delete('old');
+    await backend.delete('r0');
+    expect(await backend.get('old')).toBeUndefined();
+    expect(await backend.get('r0')).toBeUndefined();
+    expect(await backend.get('r1')).toEqual({ runId: 'r1', startedAt: 2 });
+    expect(await backend.count()).toBe(19);
+    expect(await backend.all()).toHaveLength(19);
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(set).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
+    expect(set).toHaveBeenCalledTimes(1);
+    const reloaded = createWebStorageBackend({ storage });
+    expect(await reloaded.count()).toBe(19);
+    expect(await reloaded.get('old')).toBeUndefined();
+    expect(await reloaded.get('r0')).toBeUndefined();
+  });
+
+  it.each(['pagehide', 'visibilitychange'])('flushes synchronously on %s and cancels the timer', async (event) => {
+    const window = new EventTarget();
+    const document = new EventTarget();
+    document.visibilityState = 'visible';
+    vi.stubGlobal('window', window);
+    vi.stubGlobal('document', document);
+    const set = vi.spyOn(storage, 'setItem');
+    const backend = createWebStorageBackend({ storage });
+    await backend.put({ runId: 'r' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(set).not.toHaveBeenCalled();
+    document.visibilityState = 'hidden';
+    (event === 'pagehide' ? window : document).dispatchEvent(new Event(event));
+    expect(set).toHaveBeenCalledTimes(1);
+    expect(persisted(storage)).toEqual([{ runId: 'r' }]);
+    vi.advanceTimersByTime(1000);
+    expect(set).toHaveBeenCalledTimes(1);
+    await backend.delete('r');
+    window.dispatchEvent(new Event('pagehide'));
+    expect(persisted(storage)).toEqual([]);
+  });
+
+  it('redacts credentials in older rows when rewriting the persisted history', async () => {
+    storage.setItem('mp-action-records', JSON.stringify([{ runId: 'old', capabilityTokenId: 'old-secret' }]));
+    const backend = createWebStorageBackend({ storage });
+    await backend.put({ runId: 'new' });
+    vi.advanceTimersByTime(1000);
+    expect(storage.getItem('mp-action-records')).not.toContain('old-secret');
+    expect(persisted(storage)).toHaveLength(2);
+  });
+
+  it('keeps capability credentials in session only', async () => {
+    const backend = createWebStorageBackend({ storage });
+    const record = { runId: 'r', capabilityTokenId: 'signed-secret' };
+    await backend.put(record);
+    expect(await backend.get('r')).toEqual(record);
+    vi.advanceTimersByTime(1000);
+    expect(persisted(storage)).toEqual([{ runId: 'r' }]);
+    expect(await createWebStorageBackend({ storage }).get('r')).toEqual({ runId: 'r' });
+  });
 
   it('SURVIVES A RELOAD — a second store over the same storage still has the run', async () => {
     const first = makeStore();
     const opened = await first.open({ kind: 'invoke', activityName: 'submit', sourceMpId: 'timesheets', args: { week: 'w1' } });
     await first.update(opened.runId, { status: 'succeeded' });
 
+    vi.advanceTimersByTime(1000);
     const second = makeStore();               // the reload
     const found = await second.get(opened.runId);
     expect(found).toBeDefined();
@@ -44,6 +111,7 @@ describe('D.43 — durable, redacted run records', () => {
     const opened = await store.open({ kind: 'invoke', activityName: 'verify_kiosk_pin', sourceMpId: 'time-clock', args: { pin: '4321' } });
     await store.update(opened.runId, { status: 'succeeded', result: { token: 'secret' } });
 
+    vi.advanceTimersByTime(1000);
     const raw = storage.getItem('mp-action-records');
     expect(raw).not.toContain('4321');        // the PIN never reaches disk
     expect(raw).not.toContain('secret');
@@ -69,6 +137,7 @@ describe('D.43 — durable, redacted run records', () => {
       // eslint-disable-next-line no-await-in-loop
       await store.open({ kind: 'invoke', activityName: `a${i}`, sourceMpId: 'timesheets' });
     }
+    vi.advanceTimersByTime(1000);
     expect(persisted(storage)).toHaveLength(3);
     expect(persisted(storage).map((r) => r.activityName)).toEqual(['a3', 'a4', 'a5']);
   });
@@ -85,6 +154,7 @@ describe('D.43 — durable, redacted run records', () => {
     const full = { getItem: () => null, setItem: () => { throw new Error('QuotaExceeded'); } };
     const quota = createRecordStore({ backend: createWebStorageBackend({ storage: full }) });
     const q = await quota.open({ kind: 'invoke', activityName: 'b', sourceMpId: 'm' });
+    expect(() => vi.advanceTimersByTime(1000)).not.toThrow();
     expect((await quota.get(q.runId)).activityName).toBe('b'); // still in the memory tier
   });
 
