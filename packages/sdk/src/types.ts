@@ -1861,7 +1861,26 @@ export interface OpenResult<R = unknown> {
   readonly result?: R;
 }
 
+export interface NavigationBackOptions {
+  /** Forwarded to Framework7's router.back(). */
+  readonly [key: string]: unknown;
+}
+
+export interface NavigationBackResult {
+  readonly back: boolean;
+  readonly deferred?: boolean;
+}
+
 export interface NavigationApi {
+  /** Open a host route using Framework7 navigate options. */
+  open(path: string, opts?: Readonly<Record<string, unknown>>): { opened: boolean; deferred?: boolean };
+  /**
+   * Pop the visible MP view's history with backward animation. A fallback that
+   * differs from the previous URL (or has no history) uses forced router.back.
+   * Without history or a fallback, returns { back: false }. Page changes defer
+   * the operation until navigation is allowed; opts forwards router options.
+   */
+  back(fallbackPath?: string, opts?: NavigationBackOptions): NavigationBackResult;
   /** Open another MP's contributed surface; resolves when that flow closes. */
   open<R = unknown>(target: OpenTarget): Promise<OpenResult<R>>;
   /** Called by the launched MP to finish the flow and return a result. */
