@@ -2,7 +2,7 @@
  * @tommy/actions-runtime — the host broker (in-process entry points; the
  * same broker is meant to serve the postMessage transport).
  */
-export { createBroker } from './broker.js';
+export { createBroker, SCOPED_INVOKE_HOST_API } from './broker.js';
 export { createRecordStore, createMemoryBackend, createWebStorageBackend } from './records.js';
 export { createIdempotencyLedger, createInvalidationEpochs } from './idempotency-ledger.js';
 export { createDurableQueue } from './durable-queue.js';
