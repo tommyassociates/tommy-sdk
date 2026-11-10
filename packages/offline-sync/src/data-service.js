@@ -2071,6 +2071,8 @@ export function createDataService({
       return release ? answer.finally(release) : answer;
     };
     try {
+      // An invalidation makes the next ask wait for a read begun after it.
+      if (state.flight && state.flightSeq <= voidOf(name)) fromNow = true;
       if (!spec) return settle(Promise.reject(serviceError(`'${wanted.collection}' has no source`, 'DATA_NO_SOURCE')));
       const factor = cadenceFactor(name);
       if (factor === Infinity) return settle(Promise.resolve());
