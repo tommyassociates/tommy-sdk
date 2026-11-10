@@ -56,6 +56,33 @@ function transactionalBackend(port, opened, options) {
 }
 
 describe('data service on memory stores', () => {
+  it.each([false, true])('shares an in-flight read only without invalidation (%s)', async (invalidated) => {
+    const data = memoryService();
+    const releases = [];
+    const fetch = vi.fn(() => new Promise((resolve) => { releases.push(resolve); }));
+    data.source('chats.messages', { fetch });
+    const first = data.refresh('chats.messages', { mode: 'visible', maxAge: 0 }).catch((error) => error);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    // The host's invalidateCollection binding purges the collection.
+    if (invalidated) await data.purge('chats.messages', {});
+    let answered = false;
+    const second = data.refresh('chats.messages', { mode: 'visible', maxAge: 0 });
+    const answer = second.then(() => { answered = true; }, (error) => { answered = true; return error; });
+    releases[0]([{ id: 'a', text: 'before' }]);
+    await first;
+    if (invalidated) {
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+      expect(answered).toBe(false);
+      releases[1]([{ id: 'a', text: 'after' }]);
+    }
+    await expect(second).resolves.toBeUndefined();
+    await answer;
+    expect(fetch).toHaveBeenCalledTimes(invalidated ? 2 : 1);
+    expect(await data.read('chats.messages')).toMatchObject([{ id: 'a', text: invalidated ? 'after' : 'before' }]);
+    expect(data.status('chats.messages').state).toBe('fresh');
+    data.dispose();
+  });
+
   it('sends each change and read as the principal it was asked under, and never joins a read asked as another form', async () => {
     let form = { accountType: 'Team', accountId: '44' };
     const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend() });
