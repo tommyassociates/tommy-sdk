@@ -463,6 +463,7 @@ export function createDataStore({
     const discarded = persisted?.discarded || [];
     const gone = byteEvicted.length + discarded.length;
     if (!gone) return [];
+    notifyEviction([...byteEvicted, ...discarded]);
     if (residentCount !== null) residentCount -= gone;
     capSaturated = false;
     // The eviction report says the write succeeded; a refused write's
@@ -528,9 +529,10 @@ export function createDataStore({
    * `delete()`; the row just stays. With `expectedRevision`, a row written
    * since it was read is kept. Resolves whether the row left memory.
    */
-  async function evict(key, expectedRevision) {
+  async function evict(key, expectedRevision, coverageLoss = false) {
     try {
       await api.delete(key, { silent: true, ...(expectedRevision !== undefined ? { expectedRevision } : {}) });
+      if (coverageLoss) notifyEviction([key]);
       return true;
     } catch (e) {
       if (e?.name !== 'PersistError') throw e;
@@ -564,7 +566,7 @@ export function createDataStore({
     for (const row of doomed) {
       const key = keyOf(row);
       // eslint-disable-next-line no-await-in-loop
-      if (!(await evict(key, row._rev))) continue;
+      if (!(await evict(key, row._rev, true))) continue;
       if (changed) changed.add(key);
       evicted.push(key);
     }
@@ -629,7 +631,7 @@ export function createDataStore({
       if (!row || row._window == null || !drop.has(row._window) || row._dirty) continue;
       const key = keyOf(row);
       // eslint-disable-next-line no-await-in-loop
-      if (await evict(key, row._rev) && changed) changed.add(key);
+      if (await evict(key, row._rev, true) && changed) changed.add(key);
     }
     return doomed;
   }
@@ -643,6 +645,11 @@ export function createDataStore({
     };
   }
 
+  function notifyEviction(keys) {
+    for (const listener of changeListeners) {
+      try { listener({ keys: keys.map(String), evicted: true }); } catch (_) { /* listener errors are theirs */ }
+    }
+  }
   /**
    * Fan a change out to subscribers. `changed` is one key or an iterable, so
    * a batch wakes each subscriber once.
@@ -1127,6 +1134,7 @@ export function createDataStore({
     /**
      * Called after every change, before subscribers read the store, with
      * `{ keys }` (the keys changed) or null when any row may have changed.
+     * A bounds eviction also announces `{ keys, evicted: true }` as rows leave.
      */
     onChange(listener) {
       changeListeners.add(listener);
