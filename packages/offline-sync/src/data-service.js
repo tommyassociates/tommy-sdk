@@ -669,10 +669,10 @@ export function createDataService({
    * the set it left (count and key digest), else null: stands in for a read
    * after a restart when a refresh asks within a `maxAge`.
    */
-  async function storedFreshAt(name, store, keyPath) {
+  async function storedFreshAt(name, store, keyPath, context) {
     try {
       const [meta, rows] = await Promise.all([metaOf(name), rawRows(store)]);
-      if (!meta || !Number.isFinite(meta.fullAt) || meta.fullAt > now() || typeof meta.digest !== 'string') return null;
+      if (!meta || meta.form !== formOf(context) || !Number.isFinite(meta.fullAt) || meta.fullAt > now() || typeof meta.digest !== 'string') return null;
       const keys = rows.map((row) => String(row[keyPath]));
       return meta.count === keys.length && meta.digest === keysDigest(keys) ? meta.fullAt : null;
     } catch (_) { return null; }
@@ -691,7 +691,13 @@ export function createDataService({
     if (watchedStores.has(name)) return true;
     if (typeof store.onChange !== 'function') return false;
     try {
-      const off = store.onChange(() => bump(name));
+      const off = store.onChange((notice) => {
+        bump(name);
+        if (notice?.evicted) {
+          loseCoverage(name);
+          emitStatus();
+        }
+      });
       if (typeof off !== 'function') return false;
       watchedStores.set(name, off);
       return true;
@@ -762,6 +768,10 @@ export function createDataService({
   const queryKey = (query) => (query && typeof query.where === 'function' ? { ...query, where: predicateId(query.where) } : query ?? null);
   const targetKey = (target) => JSON.stringify([target.collection, target.key ?? null, target.window ?? null, queryKey(target.query)]);
   const stateFor = (key, options) => targetStates.get(key, options);
+  function principalState(state) {
+    return state.freshForm === undefined || state.freshForm === formOf(jobContextNow())
+      ? state : { state: 'stale', syncedAt: null, error: null };
+  }
   function describeState(state) {
     let value = state.state;
     if (value !== 'refreshing' && !isOnline()) value = 'offline';
@@ -1104,6 +1114,7 @@ export function createDataService({
     // Whole-set ingests are stamped only after retained coverage is checked.
     if (replace && scoped && complete !== true) {
       const state = stateFor(targetKey({ collection: name }));
+      state.freshForm = formOf(jobContextNow());
       state.state = 'fresh'; state.syncedAt = now(); state.error = null;
       emitStatus();
     }
@@ -1238,7 +1249,7 @@ export function createDataService({
         const [meta, rows] = await Promise.all([metaOf(name), rawRows(store)]);
         read = observed ? { rows, generation } : null;
         const keys = rows.map((row) => String(row[keyPath]));
-        const whole = !!meta && typeof meta.digest === 'string' && meta.count === keys.length && meta.digest === keysDigest(keys);
+        const whole = !!meta && meta.form === formOf(context) && typeof meta.digest === 'string' && meta.count === keys.length && meta.digest === keysDigest(keys);
         // A whole read must run before the store's age limit hides rows the cursor vouches for.
         const wholeWithin = Math.min(fullEveryMs, confirmAfterMs(store));
         if (whole && typeof meta.cursor === 'string' && meta.cursor && Number.isFinite(meta.fullAt) && now() - meta.fullAt < wholeWithin) since = meta.cursor;
@@ -1260,7 +1271,7 @@ export function createDataService({
     }, async ({ answer, since, read }, _touched, startedAt, turn) => {
       if (snapshotRows(answer) === null) return NO_SNAPSHOT;
       const stored = await commitDeclared(target, spec, answer, {
-        startedAt, since, isCurrent, read, turn,
+        startedAt, since, isCurrent, read, turn, context,
       });
       return stored === 'read_again' ? READ_AGAIN : undefined;
     }, { isCurrent, storing });
@@ -1275,7 +1286,7 @@ export function createDataService({
    * old cursor and no digest, so the refused change is asked for again.
    */
   async function commitDeclared({ name, label, store, keyPath }, spec, answer, {
-    startedAt, since, isCurrent, read = null, turn,
+    startedAt, since, isCurrent, read = null, turn, context,
   }) {
     // Raw store: this is the read the others' recorded changes are kept from.
     const { raw } = turn;
@@ -1412,6 +1423,7 @@ export function createDataService({
     else nextCursor = changesOnly ? cursor ?? before?.cursor ?? null : cursor;
     await sourceMeta.set(name, {
       cursor: nextCursor,
+      form: formOf(context),
       fullAt: changesOnly ? (before?.fullAt ?? null) : now(),
       count: whole ? left.size : null,
       digest: whole ? keysDigest(left) : null,
@@ -1698,7 +1710,7 @@ export function createDataService({
     // `fromNow`: only a read begun after this ask (one after a write) answers it.
     if (batchParam && !fromNow) {
       const covered = (wholeCovers.get(coverKey(form, name)) || 0) > voidOf(name);
-      if (covered && age > 0 && whole.syncedAt !== null && askedAt - whole.syncedAt < age && whole.state !== 'error') {
+      if (covered && whole.freshForm === form && age > 0 && whole.syncedAt !== null && askedAt - whole.syncedAt < age && whole.state !== 'error') {
         group.state.state = 'fresh';
         group.state.error = null;
         group.state.syncedAt = whole.syncedAt;
@@ -2049,6 +2061,7 @@ export function createDataService({
       }, context);
     }
     const { name, label, store, decl } = local(wanted.collection);
+    watchChanges(name, store);
     if (wanted.query) checkQuery(wanted.query);
     const spec = sources.get(name) || decl?.source;
     const key = targetKey({ ...wanted, collection: name });
@@ -2058,10 +2071,19 @@ export function createDataService({
       return release ? answer.finally(release) : answer;
     };
     try {
+      // An invalidation makes the next ask wait for a read begun after it.
+      if (state.flight && state.flightSeq <= voidOf(name)) fromNow = true;
       if (!spec) return settle(Promise.reject(serviceError(`'${wanted.collection}' has no source`, 'DATA_NO_SOURCE')));
       const factor = cadenceFactor(name);
       if (factor === Infinity) return settle(Promise.resolve());
       const age = maxAge > 0 ? maxAge * factor : 0;
+      const form = formOf(context);
+      if (state.freshForm !== form) {
+        state.syncedAt = null;
+        state.storedCheck = null;
+        if (state.state === 'fresh') state.state = 'stale';
+      }
+      state.freshForm = form;
       if (!fromNow && age > 0 && state.syncedAt !== null && now() - state.syncedAt < age && state.state !== 'error') return settle(Promise.resolve());
       // The source meta's last whole read stands in for one this service has
       // not run; checked once per target state, concurrent asks share it.
@@ -2069,8 +2091,8 @@ export function createDataService({
         && spec?.read && !wanted.query && !wanted.window && (wanted.key === undefined || wanted.key === null) && typeof spec.scope !== 'function'
         && (!state.storedCheck || state.storedCheck.pending)) {
         if (!state.storedCheck) {
-          const check = { pending: true, at: null };
-          check.done = storedFreshAt(name, store, decl?.keyPath || 'id').then((at) => { check.at = at; check.pending = false; });
+          const check = { pending: true, at: null, loss: lossOf(name), form };
+          check.done = storedFreshAt(name, store, decl?.keyPath || 'id', context).then((at) => { check.at = at; check.pending = false; });
           state.storedCheck = check;
         }
         const check = state.storedCheck;
@@ -2078,7 +2100,8 @@ export function createDataService({
           mode, priority, maxAge, reason, full, fromNow, sinceWrite, nextAttempt, storedChecked: true, stillWanted,
         };
         return settle(check.done.then(() => {
-          if (check.at !== null && now() - check.at < age && state.syncedAt === null && !state.flight && state.state !== 'error') {
+          if (check.loss === lossOf(name) && check.form === formOf(jobContextNow()) && check.at !== null && now() - check.at < age && state.syncedAt === null && !state.flight && state.state !== 'error') {
+            state.freshForm = form;
             state.state = 'fresh'; state.syncedAt = check.at; state.error = null;
             emitStatus();
             return undefined;
@@ -2092,7 +2115,6 @@ export function createDataService({
         return settle(Promise.reject(serviceError('Offline', 'DATA_OFFLINE')));
       }
       // Not joined: a flight as another account form, or a changes read by a `full` ask.
-      const form = formOf(context);
       // A person's retry of a read waiting out its backoff runs that read's
       // next attempt now and is answered by it: that attempt begins after
       // the ask.
@@ -2219,6 +2241,7 @@ export function createDataService({
           state.error = { code: error.code, status: null, message: error.message };
           throw error;
         }
+        state.freshForm = form;
         state.state = 'fresh'; state.syncedAt = now(); state.error = null;
         if (wholeRead) wholeCovers.set(coverKey(form, name), Math.max(wholeCovers.get(coverKey(form, name)) || 0, flightSeq));
       };
@@ -2289,7 +2312,7 @@ export function createDataService({
   // were copied for this caller alone.
   const wholeReads = new Map();
   async function readWhole(name, store, raw) {
-    const id = `${raw ? 'raw' : 'paint'}:${name}`;
+    const id = JSON.stringify([raw, name, formOf(jobContextNow())]);
     const direct = () => (raw ? store.getAllRaw() : store.getAll());
     const reuseMs = typeof wholeReadReuseMs === 'function' ? wholeReadReuseMs(name) : wholeReadReuseMs;
     if (!(reuseMs > 0) || !feed || !watchChanges(name, store)) {
@@ -2617,6 +2640,7 @@ export function createDataService({
       const { name, store, decl } = local(collection);
       const keyPath = decl?.keyPath || 'id';
       const ingestForm = formOf(jobContextNow());
+      watchChanges(name, store);
       return inTurn(name, async (turn) => {
         // A replacement voids a cursor's meta; a few rows keep it in step.
         const tracksMeta = !!(sources.get(name) || decl?.source)?.read?.cursor;
@@ -2637,6 +2661,7 @@ export function createDataService({
             coverageSeq += 1;
             wholeCovers.set(coverKey(ingestForm, name), coverageSeq);
             const state = stateFor(targetKey({ collection: name }));
+            state.freshForm = ingestForm;
             state.state = 'fresh'; state.syncedAt = now(); state.error = null;
           } else loseCoverage(name);
           if (!disposed) emitStatus();
@@ -2900,7 +2925,8 @@ export function createDataService({
             ...(receipt ? { revision: observed ? generationOf(name) : null } : {}) };
         }
       }
-      const status = describeState(stateFor(targetKey({ ...wanted, collection: name }), { allocate: false }));
+      const currentState = stateFor(targetKey({ ...wanted, collection: name }), { allocate: false });
+      const status = describeState(principalState(currentState));
       if (!receipt) return status;
       const state = stateFor(targetKey({ ...wanted, collection: name }), { allocate: false });
       const whole = wanted.key == null && !wanted.query && !wanted.window;
@@ -2915,7 +2941,7 @@ export function createDataService({
     statuses() {
       return [...states.entries()].map(([key, state]) => {
         const [collection, rowKey, window] = JSON.parse(key);
-        return { collection, label: labelOf(collection), key: rowKey, window, ...describeState(state) };
+        return { collection, label: labelOf(collection), key: rowKey, window, ...describeState(principalState(state)) };
       });
     },
     /** Status of every non-batched refresh method read asked as the current account form. */
