@@ -5,7 +5,7 @@
  * the SDK validates for DX only. server_write goes through the injected
  * `serverInvoke` seam, never an endpoint literal.
  */
-import { TommyError, isTommyError, DEFAULT_RPC_TIMEOUT_MS } from '@tommy/sdk';
+import { TommyError, isTommyError, buildSdk, DEFAULT_RPC_TIMEOUT_MS } from '@tommy/sdk';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import {
@@ -20,6 +20,9 @@ import { validateToken } from './capability.js';
 import { evaluatePredicate as evaluateDeclaredPredicate } from './predicate.js';
 
 const err = (code, message, extra = {}) => new TommyError({ code, message, ...extra });
+
+export const SCOPED_INVOKE_HOST_API = 17;
+const PARENT_RUN = Symbol('parentRun');
 
 const dayKey = (ts) => new Date(ts).toISOString().slice(0, 10);
 
@@ -213,6 +216,7 @@ export function createBroker({
   // never more than a fifth of the time the caller has left.
   const JOIN_DEADLINE_MARGIN_MS = 250;
   const executingChains = new Map();  // sourceMpId -> depth of handler execution ON that chain (F6)
+  const activeRuns = new Set();
   const txnSteps = new Map();         // txnId -> [{activity, args, idempotencyKey}]
   const chainBudget = new Map();      // rootRunId -> total run count
   const buckets = new Map();          // `${mpId}:${kind}` -> {tokens, updatedAt}
@@ -1010,15 +1014,44 @@ export function createBroker({
       });
     }
     if (!handler) throw err('UnknownActivity', `activity '${envelope.activity}' has no registered handler`, { retryable: false });
-    const result = await handler(envelope.args, { tenantId: record.tenantId, txnId: envelope.txnId });
+    const parent = {
+      ownerMpId,
+      keys: new Set(envelope[PARENT_RUN]?.keys || []),
+    };
+    if (record.idempotencyKey) parent.keys.add(`${record.tenantId}:${envelope.activity}:${record.idempotencyKey}`);
+    activeRuns.add(parent);
+    const invoke = buildSdk({
+      init: { mpId: ownerMpId },
+      adapter: { rpc: async (call) => {
+        if (!activeRuns.has(parent)) throw err('ActivityFailed', 'Handler invoke scope has ended', { retryable: false });
+        const context = ownerEntry.invokeContext
+          ? await ownerEntry.invokeContext()
+          : (ownerMpId === envelope.sourceMpId ? envelope : null);
+        if (!context) throw err('PermissionDenied', 'Handler invoke requires its own MP identity', { retryable: false });
+        return dispatchInvoke({
+          ...context, ...call, sourceMpId: ownerMpId, tenantId: record.tenantId,
+          txnId: envelope.txnId,
+          chain: {
+            rootRunId: record.rootRunId || record.runId,
+            depth: (record.depth || 0) + 1,
+            chainPath: [...(record.chainPath || []), `${ownerMpId}:invoke(${envelope.activity})`],
+          },
+          [PARENT_RUN]: parent,
+        });
+      } },
+    }).actions.invoke;
+    let result;
+    try {
+      result = await handler(envelope.args, { tenantId: record.tenantId, txnId: envelope.txnId, invoke });
+    } finally {
+      activeRuns.delete(parent);
+    }
     return { rpcId: record.runId, status: 'succeeded', result };
   }
 
   /**
-   * Re-entrancy: while one of `mpId`'s dispatches is inside a handler, its new
-   * invokes run inline, since queueing a nested invoke behind its own ancestor
-   * would deadlock. An unrelated invoke in that window also runs inline; one
-   * repeating the running key joins it (`joinInflightInvoke`).
+   * Bundles below host API 17 rely on ambient handler re-entrancy. At 17 and
+   * above only a live handler's scoped invoke bypasses its source MP's FIFO.
    */
   function enterExecution(mpId) { executingChains.set(mpId, (executingChains.get(mpId) || 0) + 1); }
   function exitExecution(mpId) {
@@ -1030,8 +1063,16 @@ export function createBroker({
 
   async function dispatchInvokeInnerTracked(envelope) {
     const sourceMpId = envelope.sourceMpId;
-    // Re-entrant (nested) dispatch: run inline, never behind our own ancestor.
-    if (executingChains.has(sourceMpId)) return dispatchInvokeInner(envelope);
+    const parent = envelope[PARENT_RUN];
+    if (parent) {
+      if (!activeRuns.has(parent) || parent.ownerMpId !== sourceMpId) {
+        throw err('PermissionDenied', 'Invalid handler invoke scope', { retryable: false });
+      }
+      return dispatchInvokeInner(envelope);
+    }
+    // Bundles below the scoped-invoke contract retain ambient re-entrancy.
+    if ((mps.get(sourceMpId)?.minHostApi || 0) < SCOPED_INVOKE_HOST_API
+      && executingChains.has(sourceMpId)) return dispatchInvokeInner(envelope);
     // FIFO per source MP.
     const tail = invokeChains.get(sourceMpId) || Promise.resolve();
     const run = tail.catch(() => {}).then(() => dispatchInvokeInner(envelope));
@@ -1066,6 +1107,11 @@ export function createBroker({
     // Tenant-scoped: `derived_from_input` keys hash the args alone, so the same
     // write in two tenants would otherwise replay the other's result.
     const processedKey = idempotencyKey && `${tenantId}:${envelope.activity}:${idempotencyKey}`;
+    if (processedKey && envelope[PARENT_RUN]?.keys.has(processedKey)) {
+      throw err('LoopDetected', 'Handler invoked an ancestor activity with its running idempotency key', {
+        rule: 'idempotency.cycle', retryable: false,
+      });
+    }
     if (processedKey && processedKeys.has(processedKey)) {
       // A repeat key replays the stored result, not re-applied.
       return { ...processedKeys.get(processedKey), idempotentReplay: true };
@@ -1509,10 +1555,15 @@ export function createBroker({
   // --- public surface ---------------------------------------------------------
 
   return {
-    /** Register a manifest already validated by @tommy/manifest. */
-    registerMp(manifest, { handlers, firstParty } = {}) {
+    /**
+     * Register a validated manifest and its release entry's minHostApi.
+     * invokeContext supplies the handler MP's current authenticated envelope.
+     */
+    registerMp(manifest, { handlers, firstParty, minHostApi = 0, invokeContext } = {}) {
       mps.set(manifest.id, {
         manifest,
+        minHostApi,
+        invokeContext,
         handlers: handlers || {},
         firstParty: firstParty !== undefined ? firstParty : manifest.publisher?.type === 'first_party',
       });
