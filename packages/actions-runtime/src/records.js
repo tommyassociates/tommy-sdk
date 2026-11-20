@@ -111,8 +111,9 @@ export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
   const store = () => (storage === undefined ? webStorage() : storage);
   const rows = new Map(); // runId -> record AS GIVEN (this session only)
 
-  // Each backend uses one lazy snapshot; other tabs are observed on reload.
+  // Reads use a lazy snapshot. Flushes apply only this tab's pending changes.
   let persisted;
+  const pending = new Map();
   let timer;
   let eventWindow;
   let eventDocument;
@@ -142,7 +143,13 @@ export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
     eventDocument?.removeEventListener('visibilitychange', onVisibilityChange);
     eventWindow = undefined;
     eventDocument = undefined;
-    const all = [...persistedRows().values()].sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
+    const latest = loadPersisted();
+    for (const [id, record] of pending) {
+      if (record === null) latest.delete(id);
+      else latest.set(id, record);
+    }
+    pending.clear();
+    const all = [...latest.values()].sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
     persisted = new Map(all.slice(-max).map((record) => [record.runId, redact(record)]));
     savePersisted(persisted);
   }
@@ -183,7 +190,9 @@ export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
   return {
     async put(record) {
       rows.set(record.runId, record);
-      persistedRows().set(record.runId, redact(record));
+      const redacted = redact(record);
+      persistedRows().set(record.runId, redacted);
+      pending.set(record.runId, redacted);
       scheduleFlush();
     },
     async get(runId) {
@@ -198,6 +207,7 @@ export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
     async delete(runId) {
       rows.delete(runId);
       persistedRows().delete(runId);
+      pending.set(runId, null);
       scheduleFlush();
     },
   };

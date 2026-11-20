@@ -83,6 +83,19 @@ describe('D.43 — durable, redacted run records', () => {
     expect(persisted(storage)).toHaveLength(2);
   });
 
+  it('preserves another tab’s writes and deletions when flushing older snapshots', async () => {
+    storage.setItem('mp-action-records', JSON.stringify([{ runId: 'old', startedAt: 1 }]));
+    const first = createWebStorageBackend({ storage });
+    const second = createWebStorageBackend({ storage });
+    await first.put({ runId: 'first', startedAt: 2 });
+    await second.delete('old');
+    vi.advanceTimersByTime(1000);
+    await first.put({ runId: 'later', startedAt: 3 });
+    await second.put({ runId: 'second', startedAt: 4 });
+    vi.advanceTimersByTime(1000);
+    expect(persisted(storage).map((row) => row.runId)).toEqual(['first', 'later', 'second']);
+  });
+
   it('keeps capability credentials in session only', async () => {
     const backend = createWebStorageBackend({ storage });
     const record = { runId: 'r', capabilityTokenId: 'signed-secret' };
