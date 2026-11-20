@@ -96,6 +96,28 @@ describe('D.43 — durable, redacted run records', () => {
     expect(persisted(storage).map((row) => row.runId)).toEqual(['first', 'later', 'second']);
   });
 
+  it.each(['getItem', 'setItem'])('retains pending changes after a failed storage %s', async (method) => {
+    storage.setItem('mp-action-records', JSON.stringify([{ runId: 'old', startedAt: 1 }]));
+    const first = createWebStorageBackend({ storage });
+    await first.put({ runId: 'first', startedAt: 2 });
+    await first.delete('old');
+    const operation = vi.spyOn(storage, method).mockImplementationOnce(() => {
+      throw new Error('Storage temporarily unavailable');
+    });
+    vi.advanceTimersByTime(1000);
+    operation.mockRestore();
+    expect(persisted(storage).map((row) => row.runId)).toEqual(['old']);
+    expect(await first.get('old')).toBeUndefined();
+
+    const otherTab = createWebStorageBackend({ storage });
+    await otherTab.put({ runId: 'other-tab', startedAt: 3 });
+    vi.advanceTimersByTime(1000);
+    await first.put({ runId: 'later', startedAt: 4 });
+    vi.advanceTimersByTime(1000);
+
+    expect(persisted(storage).map((row) => row.runId)).toEqual(['first', 'other-tab', 'later']);
+  });
+
   it('keeps capability credentials in session only', async () => {
     const backend = createWebStorageBackend({ storage });
     const record = { runId: 'r', capabilityTokenId: 'signed-secret' };

@@ -118,11 +118,10 @@ export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
   let eventWindow;
   let eventDocument;
 
-  function loadPersisted() {
-    const s = store();
-    if (!s) return new Map();
+  function loadPersisted(storage) {
+    const raw = storage?.getItem(STORAGE_KEY);
     try {
-      const parsed = JSON.parse(s.getItem(STORAGE_KEY) || 'null');
+      const parsed = JSON.parse(raw || 'null');
       if (!Array.isArray(parsed)) return new Map();
       return new Map(parsed.filter((r) => r && r.runId).map((r) => [r.runId, r]));
     } catch (_) {
@@ -131,7 +130,13 @@ export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
   }
 
   function persistedRows() {
-    if (!persisted) persisted = loadPersisted();
+    if (!persisted) {
+      try {
+        persisted = loadPersisted(store());
+      } catch (_) {
+        persisted = new Map();
+      }
+    }
     return persisted;
   }
 
@@ -143,15 +148,22 @@ export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
     eventDocument?.removeEventListener('visibilitychange', onVisibilityChange);
     eventWindow = undefined;
     eventDocument = undefined;
-    const latest = loadPersisted();
-    for (const [id, record] of pending) {
-      if (record === null) latest.delete(id);
-      else latest.set(id, record);
+    const storage = store();
+    if (!storage) return;
+    try {
+      const latest = loadPersisted(storage);
+      for (const [id, record] of pending) {
+        if (record === null) latest.delete(id);
+        else latest.set(id, record);
+      }
+      const all = [...latest.values()].sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
+      const snapshot = all.slice(-max).map((record) => redact(record));
+      storage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+      persisted = new Map(snapshot.map((record) => [record.runId, record]));
+      pending.clear();
+    } catch (_) {
+      // Keep the pending changes for the next flush if storage is briefly unavailable.
     }
-    pending.clear();
-    const all = [...latest.values()].sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
-    persisted = new Map(all.slice(-max).map((record) => [record.runId, redact(record)]));
-    savePersisted(persisted);
   }
 
   function onVisibilityChange() {
@@ -166,17 +178,6 @@ export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
       eventDocument = typeof document !== 'undefined' ? document : undefined;
       eventWindow.addEventListener('pagehide', flush);
       eventDocument?.addEventListener('visibilitychange', onVisibilityChange);
-    }
-  }
-
-  function savePersisted(map) {
-    const s = store();
-    if (!s) return;
-    try {
-      const all = [...map.values()].sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
-      s.setItem(STORAGE_KEY, JSON.stringify(all.slice(-max)));
-    } catch (_) {
-      /* quota / disabled — degrade to memory-until-reload */
     }
   }
 
