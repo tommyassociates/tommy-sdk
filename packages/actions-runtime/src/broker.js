@@ -878,7 +878,15 @@ export function createBroker({
     // Captured BEFORE the handler runs, so any invalidation during the read is
     // visible to the detached salvage below.
     const epochAtDispatch = conditionCacheEpoch;
-    const deadlineAwareResult = Promise.resolve(handler(envelope.args, { tenantId, signal: deadline.signal })).then(
+    // A handler that throws before returning a promise is a rejection like
+    // any other, so it is answered, recorded and cleaned up below.
+    let handled;
+    try {
+      handled = Promise.resolve(handler(envelope.args, { tenantId, signal: deadline.signal }));
+    } catch (cause) {
+      handled = Promise.reject(cause);
+    }
+    const deadlineAwareResult = handled.then(
       (late) => {
         if (!deadlinePassed) return late;
         Promise.resolve()
