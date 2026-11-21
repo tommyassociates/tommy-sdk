@@ -98,3 +98,76 @@ describe('an ask joining a queued method read', () => {
     data.dispose();
   });
 });
+
+describe('an ask joining a queued batched method read', () => {
+  const batchedService = ({ foreground = () => true, fetch = vi.fn(async ({ ids }) => ({ rows: ids.map((id) => ({ id })) })) } = {}) => {
+    const scheduler = heldScheduler();
+    const store = createDataStore({ name: 'plans', backend: createMemoryStoreBackend(), indexes: { id: 'id' } });
+    const data = createDataService({
+      resolve: () => ({ store, decl: { keyPath: 'id', indexes: { id: 'id' } } }), principal: { id: 'p1' }, foreground, scheduler,
+    });
+    data.source('plans', { fetch: async () => [], methods: { byIds: { params: { ids: { type: 'ids' } }, batch: 'ids', field: 'id', fetch } } });
+    return { data, scheduler, fetch };
+  };
+  // A batched ask checks its stored rows before it reaches the scheduler.
+  const settled = () => new Promise((resolve) => { setTimeout(resolve, 0); });
+  const byIds = (ids) => ({ collection: 'plans', method: 'byIds', params: { ids } });
+
+  it('raises the queued batch when the ask waits on ids already in it, and still reads once', async () => {
+    const { data, scheduler, fetch } = batchedService();
+    const left = data.refresh(byIds(['1', '2']), { mode: 'visible', priority: 'normal' });
+    await settled();
+    expect(scheduler.raises).toEqual([]);
+    const shown = data.refresh(byIds(['1', '2']), { mode: 'visible', priority: 'high' });
+    await settled();
+    expect(scheduler.held).toHaveLength(1);
+    expect(scheduler.raises).toEqual([{ key: scheduler.held[0].job.key, visible: true, priority: 1 }]);
+    await scheduler.run();
+    await Promise.all([left, shown]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    data.dispose();
+  });
+
+  it('raises the queued batch once when the ask adds ids to it', async () => {
+    const { data, scheduler, fetch } = batchedService();
+    const left = data.refresh(byIds(['1']), { mode: 'visible', priority: 'normal' });
+    await settled();
+    const shown = data.refresh(byIds(['1', '2', '3']), { mode: 'visible', priority: 'high' });
+    await settled();
+    expect(scheduler.held).toHaveLength(1);
+    expect(scheduler.raises).toEqual([{ key: scheduler.held[0].job.key, visible: true, priority: 1 }]);
+    await scheduler.run();
+    await Promise.all([left, shown]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls[0][0].ids).toEqual(['1', '2', '3']);
+    data.dispose();
+  });
+
+  it('raises nothing for an account not in the foreground, nor for a batch already reading', async () => {
+    const hidden = batchedService({ foreground: () => false });
+    const first = hidden.data.refresh(byIds(['1']), { mode: 'visible' });
+    await settled();
+    const second = hidden.data.refresh(byIds(['1']), { mode: 'visible', priority: 'high' });
+    await settled();
+    expect(hidden.scheduler.raises).toEqual([]);
+    await hidden.scheduler.run();
+    await Promise.all([first, second]);
+    hidden.data.dispose();
+
+    let answer;
+    const slow = vi.fn(() => new Promise((resolve) => { answer = () => resolve({ rows: [{ id: '1' }] }); }));
+    const shown = batchedService({ fetch: slow });
+    const reading = shown.data.refresh(byIds(['1']), { mode: 'visible' });
+    await settled();
+    const ran = shown.scheduler.run();
+    await vi.waitFor(() => expect(slow).toHaveBeenCalledTimes(1));
+    const joined = shown.data.refresh(byIds(['1']), { mode: 'visible', priority: 'high' });
+    await settled();
+    expect(shown.scheduler.raises).toEqual([]);
+    answer();
+    await ran;
+    await Promise.all([reading, joined]);
+    expect(slow).toHaveBeenCalledTimes(1);
+    shown.data.dispose();
+  });
+});

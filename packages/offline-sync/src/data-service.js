@@ -2015,7 +2015,7 @@ export function createDataService({
         if (!group.open || group.open.ids.size >= max || at - group.open.at >= METHOD_SHARE_MS) {
           methodBatches += 1;
           const batch = {
-            ids: new Set(), at, key: String(methodBatches), promise: null, settle: null, attempts: readAttempts(),
+            ids: new Set(), at, key: String(methodBatches), promise: null, settle: null, attempts: readAttempts(), begun: false,
           };
           batch.promise = new Promise((resolve, reject) => { batch.settle = { resolve, reject }; })
             .finally(() => {
@@ -2031,8 +2031,17 @@ export function createDataService({
       });
       if (!waits.size) return Promise.resolve(ANSWERED_FRESH);
       const answers = [...waits].map((batch) => batch.attempts.answer(batch.promise));
+      // An ask that waits on a batch an earlier ask queued raises it to the
+      // ask's rank when that is higher, as a joined unbatched flight is.
+      if (inForeground(name) && typeof scheduler.raise === 'function') {
+        waits.forEach((batch) => {
+          if (batch.begun || started.includes(batch)) return;
+          try { scheduler.raise(lanedKey('data', `${label}:${wanted.method}:${batch.key}`), standing); } catch (_) { /* the batch keeps its rank */ }
+        });
+      }
       started.forEach((batch) => {
         job(batch.key, (isCurrent, helpers) => {
+          batch.begun = true;
           // A batch takes no more ids once it runs.
           if (group.open === batch) group.open = null;
           const ids = [...batch.ids].sort(idOrder);
