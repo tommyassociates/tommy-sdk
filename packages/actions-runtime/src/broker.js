@@ -221,8 +221,10 @@ export function createBroker({
   const chainBudget = new Map();      // rootRunId -> total run count
   const buckets = new Map();          // `${mpId}:${kind}` -> {tokens, updatedAt}
   // Offline queue rows {sourceMpId, envelope, bytes, seq, queuedAt}. The store
-  // owns the array and persists it (D.43); `null` opts out of persistence, and
-  // gets a storage-less instance rather than a second code path.
+  // owns the array and persists it; `null` opts out of persistence, and gets a
+  // storage-less instance rather than a second code path. A store may offer
+  // `settle(seq, { envelope, outcome })`: the drain hands it a write refused
+  // for good instead of calling `remove(seq)`, before `onOfflineOutcome`.
   const queueStore = offlineQueue || createDurableQueue({ now, storage: null });
   // Ids of the queued rows a drain of this broker is sending now: their
   // receipts read `sending`, and they cannot be discarded meanwhile.
@@ -1549,7 +1551,14 @@ export function createBroker({
           await queueStore.noteAttempt?.(row.seq);
           break;
         }
-        await queueStore.remove(row.seq);
+        // A write refused for good goes to the queue's `settle` when it has
+        // one, so the queue can keep the refusal in the same commit that
+        // removes the row: a page that dies before the observer runs still
+        // has it. Emits and accepted writes are removed.
+        // eslint-disable-next-line no-await-in-loop
+        await (!outcome.ok && !envelope.trigger && typeof queueStore.settle === 'function'
+          ? queueStore.settle(row.seq, { envelope, outcome })
+          : queueStore.remove(row.seq));
         if (typeof onOfflineOutcome === 'function') {
           try {
             Promise.resolve(onOfflineOutcome(envelope, outcome)).catch(() => {});

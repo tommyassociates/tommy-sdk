@@ -59,7 +59,9 @@ export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, 
         seq = Math.max(seq, ...rows.map((row) => row.seq), 0);
         action.afterCommit?.();
         if (action.changes.length) {
-          changes.committed(action.changes.map((change) => change.value || before.rows.find((row) => row.id === change.key)).filter(Boolean));
+          // A settled receipt is not a queued row: queue listeners hear only rows.
+          changes.committed(action.changes.filter((made) => !action.quiet?.has(made.key))
+            .map((made) => made.value || before.rows.find((row) => row.id === made.key)).filter(Boolean));
         }
         return action.result;
       } catch (error) {
@@ -120,6 +122,32 @@ export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, 
       return serial(async () => {
         const removed = await change((found) => ({ rows: found.filter((row) => row.id !== id),
           changes: id && found.some((row) => row.id === id) ? [{ op: 'delete', key: id }] : [], result: !!id && found.some((row) => row.id === id) }));
+        release(rowSeq);
+        return removed;
+      });
+    },
+    /**
+     * Settle a queued write the server refused for good: its row is removed
+     * and, when `receipt` ({ key, value }, a row without `seq`) is given, the
+     * receipt is written in the same commit, so the store never holds neither.
+     * The receipt is written even when the row has already gone. Resolves true
+     * when the row is removed by this call.
+     */
+    settle(rowSeq, { receipt } = {}) {
+      const id = rows.find((row) => row.seq === rowSeq)?.id;
+      const kept = receipt && typeof receipt.key === 'string' && receipt.key && receipt.value && receipt.value.seq === undefined
+        && !valid(receipt.value) ? receipt : null;
+      if (receipt && !kept) return Promise.reject(Object.assign(new Error('a settled receipt needs a key and a row without seq'), { name: 'TypeError' }));
+      return serial(async () => {
+        const removed = await change((found) => {
+          const present = !!id && found.some((row) => row.id === id);
+          return {
+            rows: found.filter((row) => row.id !== id),
+            changes: [...(present ? [{ op: 'delete', key: id }] : []), ...(kept ? [{ op: 'put', key: kept.key, value: copy(kept.value) }] : [])],
+            quiet: kept ? new Set([kept.key]) : null,
+            result: present,
+          };
+        });
         release(rowSeq);
         return removed;
       });
