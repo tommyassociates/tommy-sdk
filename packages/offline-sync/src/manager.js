@@ -230,42 +230,15 @@ export function createDataManager({
       'get', 'getRaw', 'getAll', 'getAllRaw', 'readWhere', 'selectFrom',
       'query', 'validateRecord', 'subscribe', 'subscribeQuery', 'onChange',
     ]);
-    // A Mini Program's put may be conditional, declaratively: `ifAbsent`
-    // (written only while no row has the key) or `expectedRevision` (only
-    // while the row is still that revision). Either resolves undefined when
-    // the row is left as it was. Only a store that judges the condition
-    // inside its revision-checked commit takes one; on any other store the
-    // put rejects (CONDITIONAL_WRITE_UNSUPPORTED) and writes nothing.
-    // Host-only options never pass.
-    const conditional = stores.get(name)?.conditionalWrites === true;
-    const unsupported = () => Object.assign(
-      new Error(`store '${name}': conditional writes are not supported on this store`),
-      { code: 'CONDITIONAL_WRITE_UNSUPPORTED', name: 'PersistError', retained: false }
-    );
     const publicArgs = (property, args) => {
       if (property !== 'put' && property !== 'delete') return args;
-      const {
-        when: _when, receipt: _receipt, guardKey: _guardKey, ifAbsent, ...options
-      } = args[1] || {};
-      if (property === 'put') {
-        const { expectedRevision, ...rest } = options;
-        if ((ifAbsent === true || Number.isSafeInteger(expectedRevision)) && !conditional) throw unsupported();
-        if (ifAbsent === true) return [args[0], { ...rest, when: (previous) => previous === undefined || previous === null }, ...args.slice(2)];
-        if (Number.isSafeInteger(expectedRevision)) {
-          return [args[0], { ...rest, when: (previous) => previous?._rev === expectedRevision }, ...args.slice(2)]; // eslint-disable-line no-underscore-dangle
-        }
-        return [args[0], rest, ...args.slice(2)];
-      }
+      const { when: _when, receipt: _receipt, guardKey: _guardKey, ...options } = args[1] || {};
       return [args[0], options, ...args.slice(2)];
     };
     Reflect.ownKeys(writer).filter((property) => property !== 'replaceSynced').forEach((property) => {
       const value = writer[property];
       if (typeof value === 'function') {
-        target[property] = (...args) => {
-          let mapped;
-          try { mapped = publicArgs(property, args); } catch (error) { return Promise.reject(error); }
-          return Reflect.apply(value, writer, mapped);
-        };
+        target[property] = (...args) => Reflect.apply(value, writer, publicArgs(property, args));
       } else target[property] = value;
     });
     let handle;

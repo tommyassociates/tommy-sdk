@@ -620,9 +620,8 @@ export function createDataService({
       return result;
     };
     const writers = {
-      // A put that resolved without writing (a declined condition) touched nothing.
       put: (record, ...rest) => (barred(record) ? Promise.resolve(undefined)
-        : recorded(() => store.put(record, ...rest), (written) => (written === undefined ? [] : [keyOf(record)]), () => [keyOf(record)])),
+        : recorded(() => store.put(record, ...rest), () => [keyOf(record)], () => [keyOf(record)])),
       delete: (key, ...rest) => recorded(() => store.delete(key, ...rest), () => [key], () => [key]),
       deleteMany: (keys, ...rest) => recorded(() => store.deleteMany(keys, ...rest),
         (removed) => (Array.isArray(removed) ? removed : (keys || [])), () => keys || []),
