@@ -384,6 +384,8 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
   }
   const api = {
     name,
+    // A conditional put is judged inside the revision-checked commit.
+    conditionalWrites: true,
     validateRecord,
     /** How long a row stays visible without being written again (null: always). */
     ageLimitMs: () => ageLimit(),
