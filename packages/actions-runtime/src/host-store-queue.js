@@ -11,6 +11,9 @@ const failure = (result) => Object.assign(new Error(result.reason), { reason: re
 // commit too large for the store.
 export const SETTLE_RECEIPT_MAX_BYTES = 64 * 1024;
 const utf8Bytes = (value) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+// The store's refusals that mean a write does not fit (a row, a payload, the
+// quota); any other refusal (busy, unavailable, write failed) is passing.
+export const DOES_NOT_FIT = Object.freeze(['row-capacity', 'payload-capacity', 'quota']);
 const receiptShape = (receipt) => !!receipt && typeof receipt.key === 'string' && !!receipt.key && !!receipt.value
   && typeof receipt.value === 'object' && receipt.value.seq === undefined;
 const valid = (row) => row && typeof row.id === 'string' && row.envelope && Number.isFinite(row.queuedAt) && Number.isSafeInteger(row.seq);
@@ -141,9 +144,11 @@ export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, 
      * The receipt is written even when the row has already gone. With
      * `keepExisting`, a receipt already stored under that key is kept as it
      * is, judged in the same revision-checked commit. A receipt larger than
-     * SETTLE_RECEIPT_MAX_BYTES, or one the store refuses, is replaced by
-     * `fallback` and then by none, so a refusal never stops the queue; a key
-     * that names a queued write is never written. Resolves
+     * SETTLE_RECEIPT_MAX_BYTES, or one the store refuses as not fitting
+     * (DOES_NOT_FIT), is replaced by `fallback` and then by none; any other
+     * store failure rejects with the row still queued, so a passing failure
+     * never drops a refusal. A key that names a queued write is never
+     * written. Resolves
      * `{ removed, receipt: 'written' | 'kept' | 'none' }`.
      */
     settle(rowSeq, { receipt, fallback, keepExisting = false } = {}) {
@@ -167,12 +172,12 @@ export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, 
           result: { removed: present, receipt: written },
         };
       });
-      // A store refusal of a receipt (size, quota) falls to the next, smaller
-      // one; a refusal of the removal alone is the caller's to handle.
+      // Only a receipt that does not fit falls to the next, smaller one; a
+      // refusal of the removal alone is the caller's to handle.
       const tryFrom = (index) => {
         const kept = index < candidates.length ? candidates[index] : null;
         return attempt(kept).catch((error) => {
-          if (!kept || error?.reason === 'conflict') throw error;
+          if (!kept || !DOES_NOT_FIT.includes(error?.reason)) throw error;
           return tryFrom(index + 1);
         });
       };

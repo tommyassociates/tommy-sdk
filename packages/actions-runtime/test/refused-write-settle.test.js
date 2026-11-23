@@ -196,7 +196,7 @@ describe('createHostStoreQueue settle', () => {
     const seq = await queue.push(entry(1));
     const commit = d.backend.commit;
     vi.spyOn(d.backend, 'commit').mockImplementation(async (snapshot, changes) => (changes.some((change) => change.value?.full)
-      ? { ok: false, reason: 'too_large' } : commit(snapshot, changes)));
+      ? { ok: false, reason: 'row-capacity' } : commit(snapshot, changes)));
     await expect(queue.settle(seq, {
       receipt: { key: 'refused:k-1', value: { id: 'refused:k-1', full: true } },
       fallback: { key: 'refused:k-1', value: { id: 'refused:k-1' } },
@@ -240,5 +240,26 @@ describe('createHostStoreQueue settle', () => {
     await expect(queue.settle(seq2, { receipt: { key: 'refused:k-2', value: { id: 'refused:k-2' } }, keepExisting: true }))
       .resolves.toEqual({ removed: true, receipt: 'written' });
     expect(d.rows.get('refused:k-2')).toEqual({ id: 'refused:k-2' });
+  });
+
+  it('a passing store failure on the receipt keeps the row queued and drops nothing', async () => {
+    const d = device();
+    const queue = createHostStoreQueue({ backend: d.backend });
+    const seq = await queue.push(entry(1));
+    const commit = d.backend.commit;
+    let unavailable = 1;
+    vi.spyOn(d.backend, 'commit').mockImplementation(async (snapshot, changes) => {
+      if (unavailable > 0 && changes.some((change) => change.op === 'put')) { unavailable -= 1; return { ok: false, reason: 'unavailable' }; }
+      return commit(snapshot, changes);
+    });
+    await expect(queue.settle(seq, {
+      receipt: { key: 'refused:k-1', value: { id: 'refused:k-1', full: true } },
+      fallback: { key: 'refused:k-1', value: { id: 'refused:k-1' } },
+    })).rejects.toMatchObject({ reason: 'unavailable' });
+    expect(queue.all()).toHaveLength(1);
+    expect(d.rows.has('refused:k-1')).toBe(false);
+    // Asked again once the store is back, the receipt is kept with the removal.
+    await expect(queue.settle(seq, { receipt: { key: 'refused:k-1', value: { id: 'refused:k-1', full: true } } }))
+      .resolves.toEqual({ removed: true, receipt: 'written' });
   });
 });
