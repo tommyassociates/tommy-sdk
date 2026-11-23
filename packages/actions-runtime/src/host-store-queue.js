@@ -101,16 +101,23 @@ export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, 
       const assigned = await change((found) => {
         const existing = found.find((row) => row.id === id);
         if (existing) return { rows: found, changes: [], result: existing.seq };
+        // A claim for a subject another row of the same activity holds takes nothing.
+        if (typeof input.subject === 'string' && found.some((row) => row.subject === input.subject
+          && row.sourceMpId === input.sourceMpId && row.envelope?.activity === input.envelope?.activity)) {
+          return { rows: found, changes: [], result: null };
+        }
         const partition = found.filter((row) => row.sourceMpId === input.sourceMpId);
         if (partition.length >= QUEUE_MAX_ENTRIES || partition.reduce((sum, row) => sum + (row.bytes || 0), 0) + input.bytes > QUEUE_MAX_BYTES) throw notKept();
         const next = Math.max(seq, ...found.map((row) => row.seq), 0) + 1;
         const row = { id, seq: next, sourceMpId: input.sourceMpId, envelope: envelopeOf(input.envelope), bytes: input.bytes,
           queuedAt: imported ? input.queuedAt : now(), ...(input.owner ? { owner: copy(input.owner) } : {}),
-          ...(imported && input.attempts ? { attempts: input.attempts } : {}) };
+          ...(imported && input.attempts ? { attempts: input.attempts } : {}),
+          ...(typeof input.subject === 'string' ? { subject: input.subject } : {}),
+          ...(imported && input.unsettled ? { unsettled: copy(input.unsettled) } : {}) };
         return { rows: [...found, row], changes: [{ op: 'put', key: id, value: row }], result: next,
           afterCommit: () => { if (input.held) { held.add(id); heldHere.set(next, id); } } };
       });
-      if (input.held) { held.add(id); heldHere.set(assigned, id); }
+      if (input.held && assigned !== null) { held.add(id); heldHere.set(assigned, id); }
       return assigned;
     } catch (cause) { throw cause.name === 'QueueNotKept' ? cause : notKept(cause); }
   }
@@ -127,6 +134,33 @@ export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, 
     ready: () => serial(restore),
     all: () => rows,
     push: (input) => serial(() => admit(input)),
+    /**
+     * Push a row for `subject` only while no row of the same Mini Program and
+     * activity holds that subject, judged in the same revision-checked
+     * commit. Resolves its seq, or null when the subject is taken.
+     */
+    claim: (input) => serial(() => admit({ ...input, subject: String(input.subject) })),
+    /**
+     * Mark a row as unsettled (`{ reason, at }`): the server's answer did not
+     * say whether its write went. It stays queued and no drain sends it.
+     */
+    markUnsettled(rowSeq, unsettled) {
+      const id = rows.find((row) => row.seq === rowSeq)?.id;
+      return serial(() => change((found) => {
+        const row = found.find((candidate) => candidate.id === id);
+        const next = row && { ...row, unsettled: copy(unsettled) };
+        return { rows: found.map((candidate) => (candidate.id === id ? next : candidate)),
+          changes: next ? [{ op: 'put', key: id, value: next }] : [], result: !!next };
+      }));
+    },
+    /** Hold a queued row for a write running in this page; false when it is held already or gone. */
+    hold(rowSeq) {
+      const id = rows.find((row) => row.seq === rowSeq)?.id;
+      if (!id || held.has(id)) return false;
+      held.add(id);
+      heldHere.set(rowSeq, id);
+      return true;
+    },
     importRow: (row) => serial(() => admit(row, true)),
     remove(rowSeq) {
       const id = rows.find((row) => row.seq === rowSeq)?.id;

@@ -45,6 +45,13 @@ function describeSemantic(err) {
     // naturalKeyField guard. Naming them apart matters — reporting a
     // naturalKeyField misuse as an offline-replay error would send the author
     // to edit the wrong field.
+    if (/\/activities\/additionalProperties\/allOf\/4\//.test(err.schemaPath)) {
+      return {
+        path,
+        rule: 'hold-unsettled-requires-client-key',
+        message: `activity '${name}' declares holdUnsettled but is not a server_write with idempotency 'client_key' and offlineReplayable false — a held write is sent again only under its own key, by a check again.`,
+      };
+    }
     if (/\/activities\/additionalProperties\/allOf\/1\//.test(err.schemaPath)) {
       return {
         path,

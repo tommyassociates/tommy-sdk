@@ -50,6 +50,8 @@ export type TommyErrorCode =
   | 'ConditionError'
   | 'ActivityFailed'
   | 'Offline_QueueFull'
+  /** A write of an activity that declares holdUnsettled for a subject whose write is held (or already being checked). */
+  | 'WriteHeld'
   | 'RateLimited'
   | 'CapabilityTokenInvalid'
   | 'LoopDetected'
@@ -1237,9 +1239,31 @@ export interface HostFormSubmissionWindowRestoration {
   readonly atomic: false;
   readonly queryComplete: false;
 }
+/** A held write of an activity that declares holdUnsettled. */
+export interface HeldWrite {
+  readonly id: string;
+  readonly input: Readonly<Record<string, unknown>>;
+  readonly reason: string;
+  readonly heldAt: number;
+}
 export interface HostApi {
   /** Payload-free invalidation of this MP's committed queue in its account. */
   onQueuedWritesChange(callback: () => void): () => void;
+  /**
+   * The held write of one subject for this MP's activity that declares
+   * `holdUnsettled` (name without the MP prefix), or null. `reason` is the
+   * refusal code the answer was held for, `unconfirmed` when no answer
+   * settled it, or `sending` while it runs. `input` is the MP's own request.
+   */
+  heldWrite(activity: string, keyFields: Readonly<Record<string, string | number>>): HeldWrite | null;
+  /** Calls back with the subject's held write (or null) whenever this MP's queue changes. */
+  onHeldWriteChange(activity: string, keyFields: Readonly<Record<string, string | number>>, callback: (held: HeldWrite | null) => void): () => void;
+  /**
+   * Ask again for a held write: its request goes again under its own key
+   * through the normal dispatch; the answer settles or keeps it. Rejects as
+   * the invoke does, or `WriteHeld` when it is gone or already being checked.
+   */
+  checkHeldWrite(id: string): Promise<unknown>;
   restoreFormSubmissionWindow(options: {
     readonly window: string;
     readonly throughPage?: number;

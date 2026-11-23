@@ -18,8 +18,10 @@ import { createIdempotencyLedger, createInvalidationEpochs } from './idempotency
 import { createDurableQueue } from './durable-queue.js';
 import { validateToken } from './capability.js';
 import { evaluatePredicate as evaluateDeclaredPredicate } from './predicate.js';
+import { holdSubject, unsettledReason } from './held-writes.js';
 
 const err = (code, message, extra = {}) => new TommyError({ code, message, ...extra });
+
 
 export const SCOPED_INVOKE_HOST_API = 17;
 const PARENT_RUN = Symbol('parentRun');
@@ -1255,10 +1257,12 @@ export function createBroker({
     // would lose it. The row is held (no drain here sends it, a restart replays
     // it with its key); an answered write removes it. If it cannot be kept the
     // write still runs. A drained replay is its own row already.
-    const heldSeq = activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable
-      && !envelope.restoreDrain && typeof queueStore.isHeld === 'function'
-      ? await holdInQueue(envelope.sourceMpId, { ...envelope, identity, idempotencyKey })
-      : null;
+    const heldSeq = activityDef.holdUnsettled
+      ? await claimSubject(envelope.sourceMpId, activityDef.holdUnsettled, { ...envelope, identity, idempotencyKey })
+      : (activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable
+        && !envelope.restoreDrain && typeof queueStore.isHeld === 'function'
+        ? await holdInQueue(envelope.sourceMpId, { ...envelope, identity, idempotencyKey })
+        : null);
     try {
       const record = await records.open({
         kind: 'invoke',
@@ -1300,6 +1304,49 @@ export function createBroker({
     } catch (_) {
       return null;
     }
+  }
+
+  /**
+   * The queue row a `holdUnsettled` write runs under, claimed before its
+   * request goes: one row per Mini Program, activity and subject, judged in
+   * the queue's own commit. A dispatch with the key of the row that holds the
+   * subject is that row's check again and runs under it. Any other dispatch
+   * for a held subject is refused (WriteHeld), and so is a write whose row
+   * cannot be kept: such a write never goes without its row.
+   */
+  async function claimSubject(sourceMpId, hold, envelope) {
+    const subject = holdSubject(hold, envelope.args);
+    if (subject === null) {
+      throw err('InvalidPayload', `activity '${envelope.activity}' needs its hold key fields (${hold.key.join(', ')})`, { retryable: false });
+    }
+    const refuse = (why) => err('WriteHeld', why, { retryable: false });
+    await queueStore.ready?.();
+    const holding = ownQueuedRows().find((row) => row.sourceMpId === sourceMpId
+      && row.envelope?.activity === envelope.activity && row.subject === subject);
+    if (holding) {
+      if (holding.envelope?.idempotencyKey !== envelope.idempotencyKey) throw refuse(`a write of '${envelope.activity}' for this subject is held until it is checked`);
+      if (!queueStore.hold?.(holding.seq)) throw refuse(`the held write of '${envelope.activity}' is already being checked`);
+      return holding.seq;
+    }
+    const bytes = utf16Units(JSON.stringify(envelope.args || {}));
+    const holder = currentQueueOwner();
+    const partition = ownQueuedRows().filter((row) => row.sourceMpId === sourceMpId);
+    if (partition.length >= QUEUE_MAX_ENTRIES || partition.reduce((sum, row) => sum + row.bytes, 0) + bytes > QUEUE_MAX_BYTES) {
+      throw err('Offline_QueueFull', `the queue for mp '${sourceMpId}' is full; '${envelope.activity}' was not sent`, { retryable: false });
+    }
+    const owner = holder
+      ? Object.fromEntries(['tenantId', ...OWNER_FIELDS].filter((key) => known(holder[key])).map((key) => [key, holder[key]]))
+      : undefined;
+    let seqClaimed;
+    try {
+      seqClaimed = await queueStore.claim({
+        sourceMpId, envelope, bytes, owner, subject, held: true,
+      });
+    } catch (cause) {
+      throw err('Offline_QueueFull', `the queue for mp '${sourceMpId}' could not keep '${envelope.activity}'; it was not sent`, { retryable: false, cause });
+    }
+    if (seqClaimed === null || seqClaimed === undefined) throw refuse(`a write of '${envelope.activity}' for this subject is held until it is checked`);
+    return seqClaimed;
   }
 
   async function attemptAdmittedInvoke({
@@ -1385,6 +1432,20 @@ export function createBroker({
       }
     }
 
+    // A `holdUnsettled` write whose outcome is not known keeps its row,
+    // marked unsettled with why and when; no drain sends it, only a check
+    // again does. A final answer removes it below.
+    const unsettledWhy = activityDef.holdUnsettled && heldSeq !== null ? unsettledReason(lastError, activityDef.holdUnsettled) : null;
+    if (unsettledWhy) {
+      try { await queueStore.markUnsettled(heldSeq, { reason: unsettledWhy, at: now() }); } catch (_) { /* unmarked rows read as unconfirmed */ }
+      await records.update(record.runId, {
+        status: 'dead_letter', error: { code: lastError.code, message: lastError.message }, attempts: attempt,
+      });
+      throw Object.assign(err('ActivityFailed', `activity '${envelope.activity}' is held: ${lastError.message}`, {
+        retryable: false, runId: record.runId, cause: lastError,
+      }), { unsettled: { reason: unsettledWhy } });
+    }
+
     // A replayable server write whose request never reached the server waits
     // in the offline queue, as it would had the device reported itself
     // offline. A drained replay is still in the queue, so it just fails here
@@ -1458,6 +1519,19 @@ export function createBroker({
     const tenant = known(stamp.tenantId) ? stamp.tenantId : row.envelope?.identity?.tenantId;
     if (String(tenant) !== String(holder.tenantId)) return false;
     return OWNER_FIELDS.every((key) => !known(stamp[key]) || (known(holder[key]) && String(stamp[key]) === String(holder[key])));
+  }
+
+  // A held row as its Mini Program reads it.
+  function heldEntry(row) {
+    const running = queueStore.isHeld?.(row);
+    return {
+      id: row.id,
+      activity: row.envelope.activity,
+      input: JSON.parse(JSON.stringify(row.envelope.args ?? {})),
+      key: row.envelope.idempotencyKey,
+      reason: running ? 'sending' : (row.unsettled?.reason || 'unconfirmed'),
+      heldAt: Number.isFinite(row.unsettled?.at) ? row.unsettled.at : row.queuedAt,
+    };
   }
 
   function ownQueuedRows() {
@@ -1545,6 +1619,9 @@ export function createBroker({
     for (const [, rows] of bySource) {
       rows.sort((a, b) => a.seq - b.seq); // FIFO per source MP
       for (const row of rows) {
+        // A held write (one subject's, outcome not known) is sent again only
+        // by a check again; it holds back none of its Mini Program's rows.
+        if (typeof row.subject === 'string') continue;
         // A write still running in this page holds its row: it is not sent a
         // second time alongside itself, and its Mini Program's later rows wait.
         if (queueStore.isHeld?.(row)) break;
@@ -1849,7 +1926,7 @@ export function createBroker({
      */
     queuedWrites(sourceMpId) {
       return ownQueuedRows()
-        .filter((row) => row.sourceMpId === sourceMpId && row.envelope?.activity && row.id)
+        .filter((row) => row.sourceMpId === sourceMpId && row.envelope?.activity && row.id && typeof row.subject !== 'string')
         .sort((a, b) => a.seq - b.seq)
         .map((row) => {
           const attempts = Number(row.attempts) || 0;
@@ -1878,9 +1955,41 @@ export function createBroker({
         await queueStore.ready?.();
         if (typeof id !== 'string' || !id || retired) return false;
         const row = ownQueuedRows().find((queued) => queued.id === id && queued.sourceMpId === sourceMpId);
-        if (!row || !row.envelope?.activity || queueStore.isHeld?.(row) || drainingRows.has(row.id)) return false;
+        if (!row || !row.envelope?.activity || typeof row.subject === 'string' || queueStore.isHeld?.(row) || drainingRows.has(row.id)) return false;
         return (await queueStore.remove(row.seq)) === true;
       } catch (_) { return false; }
+    },
+
+    /**
+     * The held write of one subject: the row of this Mini Program's
+     * `holdUnsettled` activity (qualified name) whose key fields equal
+     * `keyFields`, as `{ id, activity, input, key, reason, heldAt }`, or null.
+     * `reason` is the code or `unconfirmed` the answer was held for,
+     * `sending` while a dispatch or check again runs in this page, and
+     * `unconfirmed` for a row whose dispatch never finished (the page
+     * closed). Only rows of this broker's person and account; `input` is a copy.
+     */
+    heldWrite(sourceMpId, activity, keyFields) {
+      const [ownerMpId, activityName] = splitQualified(activity);
+      const hold = mps.get(ownerMpId)?.manifest.activities?.[activityName]?.holdUnsettled;
+      if (!hold) return null;
+      const subject = holdSubject(hold, keyFields);
+      if (subject === null) return null;
+      const row = ownQueuedRows().find((queued) => queued.sourceMpId === sourceMpId
+        && queued.envelope?.activity === activity && queued.subject === subject);
+      return row ? heldEntry(row) : null;
+    },
+
+    /** Every held write of this Mini Program (or of every one when no id is given), as heldWrite answers them, with `sourceMpId` and `subject` (its key values). */
+    heldWrites(sourceMpId = null) {
+      return ownQueuedRows()
+        .filter((row) => typeof row.subject === 'string' && (sourceMpId === null || row.sourceMpId === sourceMpId))
+        .sort((a, b) => a.seq - b.seq)
+        .map((row) => {
+          let subject = [];
+          try { subject = JSON.parse(row.subject); } catch (_) { subject = []; }
+          return { ...heldEntry(row), sourceMpId: row.sourceMpId, subject };
+        });
     },
 
     /** Diagnostics: idempotent runs in flight, and the joins waiting on them. */
