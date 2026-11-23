@@ -9,6 +9,11 @@ import { createBroker, createFakeIssuer } from '../src/index.js';
 
 const TENANT = 'team-1';
 
+// A test clock for the queued-resend spacing (F8): `later()` moves past any wait.
+const clock = { t: 1000000 };
+const later = () => { clock.t += 10 * 60 * 1000; };
+const timing = { now: () => clock.t, setTimer: () => null, clearTimer: () => {} };
+
 const activity = (extra = {}) => ({
   description: 'a',
   inputSchema: { type: 'object' },
@@ -24,7 +29,7 @@ const networkDown = () => Object.assign(new Error('Network request failed'), { n
 
 async function world(activities, serverInvoke) {
   const issuer = createFakeIssuer();
-  const broker = createBroker({ capabilityService: issuer, serverInvoke, sleep: async () => {} });
+  const broker = createBroker({ capabilityService: issuer, serverInvoke, sleep: async () => {}, ...timing });
   broker.registerMp({
     id: 'timeclock', version: '1.0.0', publisher: { type: 'first_party' },
     triggers: {}, conditions: {}, activities, actions: {},
@@ -50,11 +55,13 @@ describe('a write that cannot reach the server while the device reports online',
     expect(outcome.status).toBe('queued_offline');
     expect(w.broker.queueStats().total).toBe(1);
 
+    later();
     const still = await w.broker.drainOfflineQueue();
     expect(still[0].ok).toBe(false);
     expect(w.broker.queueStats().total).toBe(1);
 
     up = true;
+    later();
     const drained = await w.broker.drainOfflineQueue();
     expect(drained).toHaveLength(1);
     expect(drained[0].ok).toBe(true);
@@ -92,6 +99,7 @@ describe('a write that cannot reach the server while the device reports online',
     expect((await w.invoke('punch', { at: 'out' }, { idempotencyKey: 'k-out' })).status).toBe('queued_offline');
     expect(w.broker.queueStats().total).toBe(2);
     up = true;
+    later();
     await w.broker.drainOfflineQueue();
     expect(sent).toEqual([{ at: 'in', key: 'k-in' }, { at: 'out', key: 'k-out' }]);
     await w.broker.drainOfflineQueue();

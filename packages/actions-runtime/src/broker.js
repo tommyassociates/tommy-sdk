@@ -11,6 +11,7 @@ import addFormats from 'ajv-formats';
 import {
   DEFAULT_THROTTLE_PROFILE, QUERY_RATE_WAIT_MAX_MS, QUEUE_MAX_ENTRIES, QUEUE_MAX_BYTES, SYNC_EMIT_TIMEOUT_MS, DEFAULT_RETRY,
   retryDelayMs,
+  queueResendDelayMs,
   SENSITIVE_CONDITIONS, domainScopeForMp,
 } from './constants.js';
 import { createRecordStore } from './records.js';
@@ -174,6 +175,9 @@ export function createBroker({
   inflightJoinTimeoutMs = DEFAULT_RPC_TIMEOUT_MS,
   /** Injectable so a test asserts the retry schedule instead of waiting it out. */
   sleep = (ms) => (ms > 0 ? new Promise((resolve) => { setTimeout(resolve, ms); }) : Promise.resolve()),
+  /** Injectable timer for the queued-resend wake-up (F8); unref'd so node can exit. */
+  setTimer = (fn, ms) => { const timer = setTimeout(fn, ms); timer?.unref?.(); return timer; },
+  clearTimer = (timer) => clearTimeout(timer),
 } = {}) {
   if (!capabilityService || typeof capabilityService.validate !== 'function') {
     throw new Error('createBroker: capabilityService with validate() required');
@@ -1303,6 +1307,7 @@ export function createBroker({
         if (result.status && result.status === 'failed') throw err('ActivityFailed', result.error?.message || 'executor reported failure', { retryable: false });
         validateAgainst(activityDef.resultSchema, result.result, 'ActivityFailed', `activity '${envelope.activity}' result`);
         const final = { rpcId: record.runId, status: 'succeeded', result: result.result };
+        resendFailures.delete(idempotencyKey);
         await records.update(record.runId, { status: 'succeeded', result: result.result });
         if (processedKey) {
           processedKeys.set(processedKey, final);
@@ -1358,6 +1363,10 @@ export function createBroker({
       } catch (cause) {
         lastError = isTommyError(cause) ? cause : err('ActivityFailed', String(cause && cause.message), { retryable: false, cause });
         if (!lastError.retryable) break;
+        // The request never reached the server: sending it again at once on the
+        // same link sends the whole body again (a clock photo) for nothing. The
+        // offline queue sends it later, spaced (F8).
+        if (activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable && neverReachedServer(lastError)) break;
       }
     }
 
@@ -1369,6 +1378,7 @@ export function createBroker({
       && !envelope.restoreDrain && neverReachedServer(lastError)) {
       // Its held row is already queued; the caller releases it.
       if (heldSeq === null) await enqueueOffline(envelope.sourceMpId, { ...envelope, identity, idempotencyKey });
+      noteResendFailure(idempotencyKey);
       await records.update(record.runId, { status: 'queued_offline', attempts: attempt });
       return { rpcId: record.runId, status: 'queued_offline' };
     }
@@ -1466,6 +1476,31 @@ export function createBroker({
   // is never sent twice by two drains.
   let drainInFlight = null;
 
+  // Queued writes whose last send never reached the server, by idempotency
+  // key: how many sends failed and when the next may go (F8). A drain asked
+  // for sooner leaves the row (and its Mini Program's later rows) queued and
+  // wakes itself when it is due, so a row never waits for a trigger that
+  // does not come.
+  const resendFailures = new Map();
+  let resendTimer = null;
+
+  // Counts the failure and wakes a drain when the row is due.
+  function noteResendFailure(key) {
+    if (key === undefined || key === null) return;
+    const failures = (resendFailures.get(key)?.failures || 0) + 1;
+    const waitMs = queueResendDelayMs(failures);
+    resendFailures.set(key, { failures, dueAt: now() + waitMs });
+    wakeDrainIn(waitMs);
+  }
+
+  function wakeDrainIn(ms) {
+    if (resendTimer !== null) clearTimer(resendTimer);
+    resendTimer = setTimer(() => {
+      resendTimer = null;
+      if (isOnline) Promise.resolve(drainOfflineQueue()).catch(() => {});
+    }, Math.max(0, ms));
+  }
+
   function drainOfflineQueue(...args) {
     if (drainInFlight) return drainInFlight;
     drainInFlight = trackWork(() => drainOfflineQueueInnerTracked(...args))
@@ -1527,6 +1562,12 @@ export function createBroker({
         // Its write was answered while this drain sent the rows before it.
         if (!queueStore.all().some((queued) => queued.seq === row.seq)) continue;
         const envelope = row.envelope;
+        // Its last send did not reach the server and its wait is not over (F8).
+        const waitMs = (resendFailures.get(envelope?.idempotencyKey)?.dueAt || 0) - now();
+        if (waitMs > 0) {
+          wakeDrainIn(waitMs);
+          break;
+        }
         if (row.id) drainingRows.add(row.id);
         // eslint-disable-next-line no-await-in-loop
         const outcome = await Promise.resolve().then(() => replayEnvelope(envelope)).then((restored) => (restored.trigger
@@ -1547,8 +1588,10 @@ export function createBroker({
         // receipt reads as tried and not sent.
         if (!outcome.ok && !refusedForGood(outcome.error)) {
           await queueStore.noteAttempt?.(row.seq);
+          if (neverReachedServer(outcome.error)) noteResendFailure(envelope?.idempotencyKey);
           break;
         }
+        resendFailures.delete(envelope?.idempotencyKey);
         await queueStore.remove(row.seq);
         if (typeof onOfflineOutcome === 'function') {
           try {
@@ -1742,7 +1785,11 @@ export function createBroker({
       return out;
     },
 
-    setOnline(value) { isOnline = !!value; },
+    setOnline(value) {
+      // Back from offline: the link changed, so a queued write goes at once (F8).
+      if (!isOnline && value) resendFailures.forEach((entry) => { entry.dueAt = 0; });
+      isOnline = !!value;
+    },
     isOnline: () => isOnline,
     drainOfflineQueue,
     /** Committed changes to this MP's queue in this account; callback has no payload. */

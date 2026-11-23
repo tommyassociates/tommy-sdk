@@ -73,6 +73,22 @@ export const RETRY_BASE_DELAY_MS = 100;
 export const RETRY_MAX_DELAY_MS = 400;
 
 /**
+ * Spacing between resends of a QUEUED write whose request never reached the
+ * server (F8). The drain runs on every server answer, foreground and
+ * reconnect, so on a weak link an unspaced row was resent back to back, its
+ * whole body (a clock photo) each time. The first resend waits the base, each
+ * further one doubles it, up to the ceiling. In memory: a reload resends at once.
+ */
+export const QUEUE_RESEND_BASE_MS = 5000;
+export const QUEUE_RESEND_MAX_MS = 120000;
+
+/** The wait after the `failures`-th unanswered send of a queued write. */
+export function queueResendDelayMs(failures) {
+  if (!(failures > 0)) return 0;
+  return Math.min(QUEUE_RESEND_BASE_MS * (2 ** (failures - 1)), QUEUE_RESEND_MAX_MS);
+}
+
+/**
  * Delay BEFORE `attempt` (1-based). The first attempt is never delayed.
  * `none` keeps immediate retries for an activity that wants them, and is the
  * honest way to ask for immediate retries now that the default spaces them.

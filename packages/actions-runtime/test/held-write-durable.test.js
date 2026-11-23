@@ -54,12 +54,17 @@ const settle = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 
 let storage;
 
+// A test clock for the queued-resend spacing (F8): `later()` moves past any wait.
+const clock = { t: 1000000 };
+const later = () => { clock.t += 10 * 60 * 1000; };
+const timing = { now: () => clock.t, setTimer: () => null, clearTimer: () => {} };
+
 /** One page: a broker over the device's storage, with this page's own held set. */
 async function page(serverInvoke, { activities = { punch: activity() }, held = new Set(), online = true } = {}) {
   const issuer = createFakeIssuer();
   const queue = createDurableQueue({ storage, held });
   const broker = createBroker({
-    capabilityService: issuer, serverInvoke, online, offlineQueue: queue, sleep: async () => {},
+    capabilityService: issuer, serverInvoke, online, offlineQueue: queue, sleep: async () => {}, ...timing,
   });
   broker.registerMp({
     id: 'timeclock', version: '1.0.0', publisher: { type: 'first_party' },
@@ -177,6 +182,7 @@ describe('a replayable write in flight is kept on the device', () => {
     expect(storedRows()).toHaveLength(1);
 
     up = true;
+    later();
     const drained = await w.broker.drainOfflineQueue();
     expect(drained).toHaveLength(1);
     expect(sent).toHaveLength(1);
