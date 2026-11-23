@@ -242,12 +242,13 @@ describe('createHostStoreQueue settle', () => {
     expect(d.rows.get('refused:k-2')).toEqual({ id: 'refused:k-2' });
   });
 
-  it('a passing store failure on the receipt keeps the row queued and drops nothing', async () => {
+  it('a passing store failure is asked again (same settlement, nothing resent), and the full receipt is kept', async () => {
     const d = device();
-    const queue = createHostStoreQueue({ backend: d.backend });
+    const waits = [];
+    const queue = createHostStoreQueue({ backend: d.backend, wait: async (ms) => { waits.push(ms); } });
     const seq = await queue.push(entry(1));
     const commit = d.backend.commit;
-    let unavailable = 1;
+    let unavailable = 2;
     vi.spyOn(d.backend, 'commit').mockImplementation(async (snapshot, changes) => {
       if (unavailable > 0 && changes.some((change) => change.op === 'put')) { unavailable -= 1; return { ok: false, reason: 'unavailable' }; }
       return commit(snapshot, changes);
@@ -255,11 +256,58 @@ describe('createHostStoreQueue settle', () => {
     await expect(queue.settle(seq, {
       receipt: { key: 'refused:k-1', value: { id: 'refused:k-1', full: true } },
       fallback: { key: 'refused:k-1', value: { id: 'refused:k-1' } },
-    })).rejects.toMatchObject({ reason: 'unavailable' });
+    })).resolves.toEqual({ removed: true, receipt: 'written' });
+    expect(d.rows.get('refused:k-1')).toEqual({ id: 'refused:k-1', full: true });
+    expect(waits).toEqual([50, 250]);
+  });
+
+  it('a store that stays down: the retries are bounded, the row stays queued, and a closed queue stops asking', async () => {
+    const d = device();
+    const waits = [];
+    const queue = createHostStoreQueue({ backend: d.backend, wait: async (ms) => { waits.push(ms); } });
+    const seq = await queue.push(entry(1));
+    const commit = d.backend.commit;
+    vi.spyOn(d.backend, 'commit').mockImplementation(async (snapshot, changes) => (changes.some((change) => change.op === 'put')
+      ? { ok: false, reason: 'unavailable' } : commit(snapshot, changes)));
+    await expect(queue.settle(seq, { receipt: { key: 'refused:k-1', value: { id: 'refused:k-1' } } })).rejects.toMatchObject({ reason: 'unavailable' });
+    expect(waits).toEqual([50, 250, 1000]);
     expect(queue.all()).toHaveLength(1);
     expect(d.rows.has('refused:k-1')).toBe(false);
-    // Asked again once the store is back, the receipt is kept with the removal.
-    await expect(queue.settle(seq, { receipt: { key: 'refused:k-1', value: { id: 'refused:k-1', full: true } } }))
-      .resolves.toEqual({ removed: true, receipt: 'written' });
+
+    const torn = createHostStoreQueue({ backend: d.backend, wait: async () => { torn.close(); } });
+    await torn.ready();
+    await expect(torn.settle(torn.all()[0].seq, { receipt: { key: 'refused:k-1', value: { id: 'refused:k-1' } } })).rejects.toMatchObject({ reason: 'unavailable' });
+  });
+
+  it('a settlement the store cannot take holds only its own Mini Program: the others\' rows still go', async () => {
+    const d = device();
+    const queue = createHostStoreQueue({ backend: d.backend, wait: async () => {} });
+    const issuer = createFakeIssuer();
+    const sent = [];
+    const broker = createBroker({
+      capabilityService: issuer, offlineQueue: queue, online: false, idempotencyLedger: null,
+      serverInvoke: async (envelope) => {
+        const mp = String(envelope.activity).split('.')[0];
+        sent.push(mp);
+        if (mp === 'forms') throw Object.assign(new Error('refused'), { status: 409 });
+        return { status: 'succeeded', result: {} };
+      },
+      replayEnvelope: async (envelope) => ({ ...envelope, instanceId: 'live', capabilityToken: tokens[envelope.sourceMpId] }),
+    });
+    const tokens = {};
+    for (const id of ['forms', 'notes']) {
+      broker.registerMp({ id, version: '1.0.0', publisher: { type: 'first_party' }, activities: { save: ACTIVITY } });
+      // eslint-disable-next-line no-await-in-loop
+      tokens[id] = await issuer.issue(id, '1.0.0', 'team-3', [], 'live');
+      // eslint-disable-next-line no-await-in-loop
+      await broker.invoke({ sourceMpId: id, activity: `${id}.save`, args: {}, idempotencyKey: `k-${id}`, instanceId: 'live', capabilityToken: tokens[id] });
+    }
+    const commit = d.backend.commit;
+    vi.spyOn(d.backend, 'commit').mockImplementation(async (snapshot, changes) => (changes.some((change) => change.op === 'delete' && queue.all().find((row) => row.id === change.key)?.sourceMpId === 'forms')
+      ? { ok: false, reason: 'unavailable' } : commit(snapshot, changes)));
+    broker.setOnline(true);
+    await broker.drainOfflineQueue();
+    expect(sent.sort()).toEqual(['forms', 'notes']);
+    expect(queue.all().map((row) => row.sourceMpId)).toEqual(['forms']);
   });
 });

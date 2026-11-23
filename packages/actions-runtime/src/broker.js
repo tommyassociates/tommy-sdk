@@ -1555,10 +1555,20 @@ export function createBroker({
         // one, so the queue can keep the refusal in the same commit that
         // removes the row: a page that dies before the observer runs still
         // has it. Emits and accepted writes are removed.
-        // eslint-disable-next-line no-await-in-loop
-        await (!outcome.ok && !envelope.trigger && typeof queueStore.settle === 'function'
-          ? queueStore.settle(row.seq, { envelope, outcome })
-          : queueStore.remove(row.seq));
+        // A settlement the store could not take keeps its row queued, and so
+        // do the rows its Mini Program queued after it; other Mini Programs'
+        // rows still go.
+        if (!outcome.ok && !envelope.trigger && typeof queueStore.settle === 'function') {
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            await queueStore.settle(row.seq, { envelope, outcome });
+          } catch (_) {
+            break;
+          }
+        } else {
+          // eslint-disable-next-line no-await-in-loop
+          await queueStore.remove(row.seq);
+        }
         if (typeof onOfflineOutcome === 'function') {
           try {
             Promise.resolve(onOfflineOutcome(envelope, outcome)).catch(() => {});
