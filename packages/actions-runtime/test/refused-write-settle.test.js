@@ -242,48 +242,27 @@ describe('createHostStoreQueue settle', () => {
     expect(d.rows.get('refused:k-2')).toEqual({ id: 'refused:k-2' });
   });
 
-  it('a passing store failure is asked again (same settlement, nothing resent), and the full receipt is kept', async () => {
+  it('a passing store failure rejects at once with the row still queued, holding no turn', async () => {
     const d = device();
-    const waits = [];
-    const queue = createHostStoreQueue({ backend: d.backend, wait: async (ms) => { waits.push(ms); } });
+    const queue = createHostStoreQueue({ backend: d.backend });
     const seq = await queue.push(entry(1));
     const commit = d.backend.commit;
-    let unavailable = 2;
+    let unavailable = 1;
     vi.spyOn(d.backend, 'commit').mockImplementation(async (snapshot, changes) => {
       if (unavailable > 0 && changes.some((change) => change.op === 'put')) { unavailable -= 1; return { ok: false, reason: 'unavailable' }; }
       return commit(snapshot, changes);
     });
-    await expect(queue.settle(seq, {
-      receipt: { key: 'refused:k-1', value: { id: 'refused:k-1', full: true } },
-      fallback: { key: 'refused:k-1', value: { id: 'refused:k-1' } },
-    })).resolves.toEqual({ removed: true, receipt: 'written' });
-    expect(d.rows.get('refused:k-1')).toEqual({ id: 'refused:k-1', full: true });
-    expect(waits).toEqual([50, 250]);
-  });
-
-  it('a store that stays down: the retries are bounded, the row stays queued, and a closed queue stops asking', async () => {
-    const d = device();
-    const waits = [];
-    const queue = createHostStoreQueue({ backend: d.backend, wait: async (ms) => { waits.push(ms); } });
-    const seq = await queue.push(entry(1));
-    const commit = d.backend.commit;
-    vi.spyOn(d.backend, 'commit').mockImplementation(async (snapshot, changes) => (changes.some((change) => change.op === 'put')
-      ? { ok: false, reason: 'unavailable' } : commit(snapshot, changes)));
-    await expect(queue.settle(seq, { receipt: { key: 'refused:k-1', value: { id: 'refused:k-1' } } })).rejects.toMatchObject({ reason: 'unavailable' });
-    expect(waits).toEqual([50, 250, 1000]);
+    await expect(queue.settle(seq, { receipt: { key: 'refused:k-1', value: { id: 'refused:k-1', full: true } } })).rejects.toMatchObject({ reason: 'unavailable' });
     expect(queue.all()).toHaveLength(1);
-    expect(d.rows.has('refused:k-1')).toBe(false);
-
-    const torn = createHostStoreQueue({ backend: d.backend, wait: async () => { torn.close(); } });
-    await torn.ready();
-    await expect(torn.settle(torn.all()[0].seq, { receipt: { key: 'refused:k-1', value: { id: 'refused:k-1' } } })).rejects.toMatchObject({ reason: 'unavailable' });
+    // The queue's turn is free at once: another write goes in.
+    await queue.push(entry(2));
+    await expect(queue.settle(seq, { receipt: { key: 'refused:k-1', value: { id: 'refused:k-1', full: true } } })).resolves.toEqual({ removed: true, receipt: 'written' });
   });
 
-  it('a settlement the store cannot take holds only its own Mini Program: the others\' rows still go', async () => {
-    const d = device();
-    const queue = createHostStoreQueue({ backend: d.backend, wait: async () => {} });
+  function twoMpWorld(queue) {
     const issuer = createFakeIssuer();
     const sent = [];
+    const tokens = {};
     const broker = createBroker({
       capabilityService: issuer, offlineQueue: queue, online: false, idempotencyLedger: null,
       serverInvoke: async (envelope) => {
@@ -294,20 +273,66 @@ describe('createHostStoreQueue settle', () => {
       },
       replayEnvelope: async (envelope) => ({ ...envelope, instanceId: 'live', capabilityToken: tokens[envelope.sourceMpId] }),
     });
-    const tokens = {};
-    for (const id of ['forms', 'notes']) {
-      broker.registerMp({ id, version: '1.0.0', publisher: { type: 'first_party' }, activities: { save: ACTIVITY } });
-      // eslint-disable-next-line no-await-in-loop
-      tokens[id] = await issuer.issue(id, '1.0.0', 'team-3', [], 'live');
-      // eslint-disable-next-line no-await-in-loop
-      await broker.invoke({ sourceMpId: id, activity: `${id}.save`, args: {}, idempotencyKey: `k-${id}`, instanceId: 'live', capabilityToken: tokens[id] });
+    const queueBoth = async () => {
+      for (const id of ['forms', 'notes']) {
+        if (!tokens[id]) {
+          broker.registerMp({ id, version: '1.0.0', publisher: { type: 'first_party' }, activities: { save: ACTIVITY } });
+          // eslint-disable-next-line no-await-in-loop
+          tokens[id] = await issuer.issue(id, '1.0.0', 'team-3', [], 'live');
+        }
+        // eslint-disable-next-line no-await-in-loop
+        await broker.invoke({ sourceMpId: id, activity: `${id}.save`, args: {}, idempotencyKey: `k-${id}`, instanceId: 'live', capabilityToken: tokens[id] });
+      }
+    };
+    return { broker, sent, queueBoth };
+  }
+
+  it('a settlement the store cannot take holds only its Mini Program; the next drain settles it without sending it again', async () => {
+    vi.useFakeTimers();
+    try {
+      const d = device();
+      const queue = createHostStoreQueue({ backend: d.backend });
+      const { broker, sent, queueBoth } = twoMpWorld(queue);
+      await queueBoth();
+      const commit = d.backend.commit;
+      let failing = true;
+      vi.spyOn(d.backend, 'commit').mockImplementation(async (snapshot, changes) => (failing && changes.some((change) => change.op === 'delete' && queue.all().find((row) => row.id === change.key)?.sourceMpId === 'forms')
+        ? { ok: false, reason: 'unavailable' } : commit(snapshot, changes)));
+      broker.setOnline(true);
+      await broker.drainOfflineQueue();
+      expect(sent.sort()).toEqual(['forms', 'notes']);
+      expect(queue.all().map((row) => row.sourceMpId)).toEqual(['forms']);
+      // The store recovers; the scheduled drain settles the refusal and sends nothing again.
+      failing = false;
+      await vi.advanceTimersByTimeAsync(2000);
+      await vi.waitFor(() => expect(queue.all()).toEqual([]));
+      expect(sent.filter((mp) => mp === 'forms')).toHaveLength(1);
+      // A drain on reconnect sends nothing either.
+      await broker.drainOfflineQueue();
+      expect(sent.filter((mp) => mp === 'forms')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
     }
-    const commit = d.backend.commit;
-    vi.spyOn(d.backend, 'commit').mockImplementation(async (snapshot, changes) => (changes.some((change) => change.op === 'delete' && queue.all().find((row) => row.id === change.key)?.sourceMpId === 'forms')
-      ? { ok: false, reason: 'unavailable' } : commit(snapshot, changes)));
-    broker.setOnline(true);
-    await broker.drainOfflineQueue();
-    expect(sent.sort()).toEqual(['forms', 'notes']);
-    expect(queue.all().map((row) => row.sourceMpId)).toEqual(['forms']);
+  });
+
+  it('teardown cancels the scheduled drain: no commit after it', async () => {
+    vi.useFakeTimers();
+    try {
+      const d = device();
+      const queue = createHostStoreQueue({ backend: d.backend });
+      const { broker, queueBoth } = twoMpWorld(queue);
+      await queueBoth();
+      const commit = d.backend.commit;
+      const spy = vi.spyOn(d.backend, 'commit').mockImplementation(async (snapshot, changes) => (changes.some((change) => change.op === 'delete' && queue.all().find((row) => row.id === change.key)?.sourceMpId === 'forms')
+        ? { ok: false, reason: 'unavailable' } : commit(snapshot, changes)));
+      broker.setOnline(true);
+      await broker.drainOfflineQueue();
+      await broker.teardown();
+      const before = spy.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(10000);
+      expect(spy.mock.calls.length).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

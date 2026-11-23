@@ -14,9 +14,6 @@ const utf8Bytes = (value) => new TextEncoder().encode(JSON.stringify(value)).byt
 // The store's refusals that mean a write does not fit (a row, a payload, the
 // quota); any other refusal (busy, unavailable, write failed) is passing.
 export const DOES_NOT_FIT = Object.freeze(['row-capacity', 'payload-capacity', 'quota']);
-// A passing store failure during a settlement is asked again after these
-// waits (the same revision-checked settlement; nothing is sent again).
-export const SETTLE_RETRY_WAITS_MS = Object.freeze([50, 250, 1000]);
 const receiptShape = (receipt) => !!receipt && typeof receipt.key === 'string' && !!receipt.key && !!receipt.value
   && typeof receipt.value === 'object' && receipt.value.seq === undefined;
 const valid = (row) => row && typeof row.id === 'string' && row.envelope && Number.isFinite(row.queuedAt) && Number.isSafeInteger(row.seq);
@@ -31,15 +28,12 @@ const envelopeOf = (envelope) => copy(Object.fromEntries([
  * ready() restores its synchronous receipt view; every mutation reads the
  * current revision and resolves only after the port confirms its commit.
  */
-export function createHostStoreQueue({
-  backend, now = Date.now, ttlMs = TTL_MS, held = HELD, wait = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); }),
-} = {}) {
+export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, held = HELD } = {}) {
   const changes = createQueueChanges();
   let rows = [];
   let seq = 0;
   let expired = 0;
   let loaded = false;
-  let closed = false;
   let tail = Promise.resolve();
   const heldHere = new Map();
   const serial = (work) => {
@@ -152,10 +146,10 @@ export function createHostStoreQueue({
      * is, judged in the same revision-checked commit. A receipt larger than
      * SETTLE_RECEIPT_MAX_BYTES, or one the store refuses as not fitting
      * (DOES_NOT_FIT), is replaced by `fallback` and then by none. Any other
-     * store failure is passing: the same settlement is asked again after
-     * SETTLE_RETRY_WAITS_MS while the queue is open, then rejects with the
-     * row still queued, so a passing failure never drops a refusal. A key that
-     * names a queued write is never written. Resolves
+     * store failure rejects at once with the row still queued (the caller
+     * asks again later), so a passing failure never drops a refusal and never
+     * holds the queue's turn. A key that names a queued write is never
+     * written. Resolves
      * `{ removed, receipt: 'written' | 'kept' | 'none' }`.
      */
     settle(rowSeq, { receipt, fallback, keepExisting = false } = {}) {
@@ -188,14 +182,8 @@ export function createHostStoreQueue({
           return tryFrom(index + 1);
         });
       };
-      const settleWithRetries = (round) => tryFrom(0).catch(async (error) => {
-        if (closed || round >= SETTLE_RETRY_WAITS_MS.length || DOES_NOT_FIT.includes(error?.reason)) throw error;
-        await wait(SETTLE_RETRY_WAITS_MS[round]);
-        if (closed) throw error;
-        return settleWithRetries(round + 1);
-      });
       return serial(async () => {
-        const settled = await settleWithRetries(0);
+        const settled = await tryFrom(0);
         release(rowSeq);
         return settled;
       });
@@ -212,6 +200,6 @@ export function createHostStoreQueue({
     release,
     isHeld: (row) => !!row?.id && held.has(row.id),
     expiredOnLoad: () => expired,
-    close() { closed = true; changes.clear(); return backend.close?.(); },
+    close() { changes.clear(); return backend.close?.(); },
   };
 }

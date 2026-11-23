@@ -43,6 +43,11 @@ const APPLIED_KEYS_OVERFLOW_MAX = 10000;
  *  is refused (`RateLimited`) rather than admitted, so every running key stays
  *  joinable and a stuck MP cannot pile up work without limit. */
 const INFLIGHT_RUNS_MAX = 500;
+// A refused queued write whose settlement the store could not take is
+// settled again by a drain this long after, at most this many times in a
+// row; later drains (reconnect, a new write) try again as well.
+const SETTLE_RETRY_AFTER_MS = 2000;
+const SETTLE_RETRY_DRAINS = 3;
 
 // Server-write activities whose host adapter gets replay provenance (see
 // executeInvoke). `team.update_member` always gets it: the member-restore gate
@@ -226,6 +231,23 @@ export function createBroker({
   // `settle(seq, { envelope, outcome })`: the drain hands it a write refused
   // for good instead of calling `remove(seq)`, before `onOfflineOutcome`.
   const queueStore = offlineQueue || createDurableQueue({ now, storage: null });
+  // Queued rows the server refused for good whose settlement the queue's
+  // store could not take yet, by row id, with their outcome: the next drain
+  // settles them again without sending them. One bounded re-drain is
+  // scheduled for them, cancelled at teardown.
+  const unsettled = new Map();
+  let settleRetryTimer = null;
+  let settleRetries = 0;
+  function scheduleSettleRetry() {
+    // eslint-disable-next-line no-use-before-define
+    if (retired || settleRetryTimer || settleRetries >= SETTLE_RETRY_DRAINS) return;
+    settleRetries += 1;
+    settleRetryTimer = setTimeout(() => {
+      settleRetryTimer = null;
+      // eslint-disable-next-line no-use-before-define
+      if (!retired) Promise.resolve().then(() => drainOfflineQueue()).catch(() => {});
+    }, SETTLE_RETRY_AFTER_MS);
+  }
   // Ids of the queued rows a drain of this broker is sending now: their
   // receipts read `sending`, and they cannot be discarded meanwhile.
   const drainingRows = new Set();
@@ -1527,23 +1549,30 @@ export function createBroker({
         // second time alongside itself, and its Mini Program's later rows wait.
         if (queueStore.isHeld?.(row)) break;
         // Its write was answered while this drain sent the rows before it.
-        if (!queueStore.all().some((queued) => queued.seq === row.seq)) continue;
+        if (!queueStore.all().some((queued) => queued.seq === row.seq)) { unsettled.delete(row.id); continue; }
         const envelope = row.envelope;
-        if (row.id) drainingRows.add(row.id);
-        // eslint-disable-next-line no-await-in-loop
-        const outcome = await Promise.resolve().then(() => replayEnvelope(envelope)).then((restored) => (restored.trigger
-          ? dispatchEmit(restored)
-          // ORIGINAL key. `restoreQueuedAt` is the moment the row entered the
-          // durable queue (recorded by durable-queue.js on push) — the one fact a
-          // replayed write can carry about how long it waited, and the runtime
-          // sets it here so no MP can forge it.
-          : dispatchInvoke({
-            ...restored, rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
-          })))
-          .then((result) => ({ ok: true, result }))
-          .catch((error) => ({ ok: false, error }))
-          .finally(() => { if (row.id) drainingRows.delete(row.id); });
-        results.push(outcome);
+        // A row whose refusal is known is settled again, never sent again.
+        const refusedBefore = row.id ? unsettled.get(row.id) : undefined;
+        let outcome;
+        if (refusedBefore) {
+          outcome = refusedBefore;
+        } else {
+          if (row.id) drainingRows.add(row.id);
+          // eslint-disable-next-line no-await-in-loop
+          outcome = await Promise.resolve().then(() => replayEnvelope(envelope)).then((restored) => (restored.trigger
+            ? dispatchEmit(restored)
+            // ORIGINAL key. `restoreQueuedAt` is the moment the row entered the
+            // durable queue (recorded by durable-queue.js on push) — the one fact a
+            // replayed write can carry about how long it waited, and the runtime
+            // sets it here so no MP can forge it.
+            : dispatchInvoke({
+              ...restored, rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
+            })))
+            .then((result) => ({ ok: true, result }))
+            .catch((error) => ({ ok: false, error }))
+            .finally(() => { if (row.id) drainingRows.delete(row.id); });
+          results.push(outcome);
+        }
         // A row not settled stays queued, and so do the rows its Mini Program
         // queued after it (a clock-out never goes before its clock-in). Its
         // receipt reads as tried and not sent.
@@ -1554,15 +1583,18 @@ export function createBroker({
         // A write refused for good goes to the queue's `settle` when it has
         // one, so the queue can keep the refusal in the same commit that
         // removes the row: a page that dies before the observer runs still
-        // has it. Emits and accepted writes are removed.
-        // A settlement the store could not take keeps its row queued, and so
-        // do the rows its Mini Program queued after it; other Mini Programs'
-        // rows still go.
+        // has it. One the store cannot take yet stays queued with its outcome
+        // known; its Mini Program's later rows wait, every other Mini
+        // Program's rows still go. Emits and accepted writes are removed.
         if (!outcome.ok && !envelope.trigger && typeof queueStore.settle === 'function') {
           try {
             // eslint-disable-next-line no-await-in-loop
             await queueStore.settle(row.seq, { envelope, outcome });
+            if (row.id) unsettled.delete(row.id);
+            if (!unsettled.size) settleRetries = 0;
           } catch (_) {
+            if (row.id) unsettled.set(row.id, outcome);
+            scheduleSettleRetry();
             break;
           }
         } else {
@@ -1863,6 +1895,9 @@ export function createBroker({
     async teardown(instanceId) {
       if (instanceId != null) return;
       retired = true;
+      clearTimeout(settleRetryTimer);
+      settleRetryTimer = null;
+      unsettled.clear();
       [...queueSubscriptions].forEach((off) => off());
       await queueStore.close?.();
       for (const entry of debouncePending.values()) clearTimeout(entry.timer);
