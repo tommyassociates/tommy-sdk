@@ -1068,12 +1068,23 @@ export function createDataService({
     live();
     const { name, decl } = local(collection);
     if (!Array.isArray(incomingRows)) throw serviceError('ingest: rows must be an array', 'DATA_INVALID');
-    const rows = incomingRows.map((row) => {
+    const given = incomingRows.map((row) => {
       if (!row || typeof row !== 'object' || !Object.hasOwn(row, '_writeReceipt')) return row;
       const { _writeReceipt: _receipt, ...domain } = row;
       return domain;
     });
     const keyPath = decl?.keyPath || 'id';
+    // A source's `ingestRecord(dto, prev)` merges each row stored from outside
+    // its declared read with the stored row of the same key, read in this
+    // turn, so nothing written between the read and the write is undone.
+    const spec = sources.get(name) || decl?.source;
+    let rows = given;
+    if (typeof spec?.ingestRecord === 'function') {
+      const keyed = given.filter((row) => row && typeof row === 'object' && row[keyPath] !== undefined && row[keyPath] !== null);
+      const previous = previousByKey((await Promise.all([...new Set(keyed.map((row) => String(row[keyPath])))]
+        .map((key) => store.getRaw(key)))).filter(Boolean), keyPath);
+      rows = given.map((row) => (keyed.includes(row) ? spec.ingestRecord(row, previous.get(String(row[keyPath]))) : row));
+    }
     const inScope = typeof scope === 'function' ? scope : () => true;
     // A refused row never keeps an older stored version alive through a replacement.
     const isAccepted = (row) => row && typeof row === 'object'
@@ -2579,7 +2590,9 @@ export function createDataService({
     },
     /**
      * Registers how a collection syncs: `fetch(target)`, optional `budgetKey`,
-     * `gate`, `toRecord(dto, prev)`, `keyOf(dto)`, `scope(target)` (rows in
+     * `gate`, `toRecord(dto, prev)`, `ingestRecord(dto, prev)` (how a row
+     * stored from outside the declared read, `ingest`, merges with the
+     * stored row of its key), `keyOf(dto)`, `scope(target)` (rows in
      * scope missing from the answer are pruned, dirty ones never), `read`,
      * `methods` and `push(command, record)`.
      */
