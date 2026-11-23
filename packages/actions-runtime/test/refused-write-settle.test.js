@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { createBroker, createFakeIssuer, createHostStoreQueue } from '../src/index.js';
+import { SETTLE_RECEIPT_MAX_BYTES } from '../src/host-store-queue.js';
 
 const copy = (v) => JSON.parse(JSON.stringify(v));
 function device() {
@@ -58,17 +59,29 @@ async function world(queue, { serverInvoke, onOfflineOutcome } = {}) {
 }
 
 describe('a queued write refused for good', () => {
-  it('is settled by the queue before the outcome observer runs, and never removed on its own', async () => {
+  it('commits the settlement before the outcome observer runs, and never removes the row on its own', async () => {
     const d = device();
     const queue = keepingQueue(d.backend);
-    const order = [];
-    queue.settle.mockImplementation(((settle) => (...args) => { order.push('settle'); return settle(...args); })(queue.settle.getMockImplementation()));
-    const onOfflineOutcome = vi.fn(() => { order.push('observer'); });
+    const onOfflineOutcome = vi.fn();
     const w = await world(queue, { serverInvoke: async () => { throw Object.assign(new Error('stale'), { status: 409 }); }, onOfflineOutcome });
     await w.invoke(1);
+    // Hold the settling commit (the one that writes the receipt) open.
+    let release;
+    const commit = d.backend.commit;
+    vi.spyOn(d.backend, 'commit').mockImplementation(async (snapshot, changes) => {
+      if (changes.some((change) => change.key === 'refused:k-1')) await new Promise((done) => { release = done; });
+      return commit(snapshot, changes);
+    });
     w.broker.setOnline(true);
-    await w.broker.drainOfflineQueue();
-    expect(order).toEqual(['settle', 'observer']);
+    const drain = w.broker.drainOfflineQueue();
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+    await new Promise((done) => { setTimeout(done, 20); });
+    expect(onOfflineOutcome).not.toHaveBeenCalled();
+    expect(d.rows.has('refused:k-1')).toBe(false);
+    release();
+    await drain;
+    expect(onOfflineOutcome).toHaveBeenCalledTimes(1);
+    expect(d.rows.has('refused:k-1')).toBe(true);
     expect(queue.remove).not.toHaveBeenCalled();
     expect(queue.settle).toHaveBeenCalledWith(expect.any(Number), expect.objectContaining({
       envelope: expect.objectContaining({ activity: 'forms.save', idempotencyKey: 'k-1' }),
@@ -135,7 +148,7 @@ describe('createHostStoreQueue settle', () => {
     const commit = vi.spyOn(d.backend, 'commit');
     const heard = vi.fn();
     queue.onChange(heard);
-    await expect(queue.settle(seq, { receipt: { key: 'refused:k-1', value: { id: 'refused:k-1', kind: 'refused' } } })).resolves.toBe(true);
+    await expect(queue.settle(seq, { receipt: { key: 'refused:k-1', value: { id: 'refused:k-1', kind: 'refused' } } })).resolves.toEqual({ removed: true, receipt: 'written' });
     expect(commit).toHaveBeenCalledTimes(1);
     expect(commit.mock.calls[0][1].map((change) => [change.op, change.key])).toEqual([['delete', expect.any(String)], ['put', 'refused:k-1']]);
     expect([...d.rows.values()]).toEqual([{ id: 'refused:k-1', kind: 'refused' }]);
@@ -149,7 +162,7 @@ describe('createHostStoreQueue settle', () => {
     const queue = createHostStoreQueue({ backend: d.backend });
     const seq = await queue.push(entry(1));
     await queue.remove(seq);
-    await expect(queue.settle(seq, { receipt: { key: 'refused:k-1', value: { id: 'refused:k-1' } } })).resolves.toBe(false);
+    await expect(queue.settle(seq, { receipt: { key: 'refused:k-1', value: { id: 'refused:k-1' } } })).resolves.toEqual({ removed: false, receipt: 'written' });
     expect([...d.rows.keys()]).toEqual(['refused:k-1']);
     await expect(queue.settle(seq, { receipt: { key: 'x', value: { id: 'x', seq: 4 } } })).rejects.toThrow(/without seq/);
     await expect(queue.settle(seq, { receipt: { key: '', value: { id: 'y' } } })).rejects.toThrow(/needs a key/);
@@ -159,8 +172,73 @@ describe('createHostStoreQueue settle', () => {
     const d = device();
     const queue = createHostStoreQueue({ backend: d.backend });
     const seq = await queue.push({ ...entry(1), held: true });
-    await expect(queue.settle(seq)).resolves.toBe(true);
+    await expect(queue.settle(seq)).resolves.toEqual({ removed: true, receipt: 'none' });
     expect(d.rows.size).toBe(0);
     expect(queue.all()).toEqual([]);
+  });
+
+  it('a receipt too large for the bound gives way to the smaller fallback, then to none, so the queue moves on', async () => {
+    const d = device();
+    const queue = createHostStoreQueue({ backend: d.backend });
+    const big = { key: 'refused:k-1', value: { id: 'refused:k-1', args: 'x'.repeat(SETTLE_RECEIPT_MAX_BYTES) } };
+    const small = { key: 'refused:k-1', value: { id: 'refused:k-1', argsOmitted: true } };
+    const first = await queue.push(entry(1));
+    await expect(queue.settle(first, { receipt: big, fallback: small })).resolves.toEqual({ removed: true, receipt: 'written' });
+    expect(d.rows.get('refused:k-1')).toEqual(small.value);
+    const second = await queue.push(entry(2));
+    await expect(queue.settle(second, { receipt: { ...big, key: 'refused:k-2' } })).resolves.toEqual({ removed: true, receipt: 'none' });
+    expect(queue.all()).toEqual([]);
+  });
+
+  it('a receipt the store refuses (too large for a row) is retried smaller in a new commit, and the row still goes', async () => {
+    const d = device();
+    const queue = createHostStoreQueue({ backend: d.backend });
+    const seq = await queue.push(entry(1));
+    const commit = d.backend.commit;
+    vi.spyOn(d.backend, 'commit').mockImplementation(async (snapshot, changes) => (changes.some((change) => change.value?.full)
+      ? { ok: false, reason: 'too_large' } : commit(snapshot, changes)));
+    await expect(queue.settle(seq, {
+      receipt: { key: 'refused:k-1', value: { id: 'refused:k-1', full: true } },
+      fallback: { key: 'refused:k-1', value: { id: 'refused:k-1' } },
+    })).resolves.toEqual({ removed: true, receipt: 'written' });
+    expect([...d.rows.values()]).toEqual([{ id: 'refused:k-1' }]);
+  });
+
+  it('never writes a receipt over a queued write', async () => {
+    const d = device();
+    const queue = createHostStoreQueue({ backend: d.backend });
+    const one = await queue.push(entry(1));
+    await queue.push(entry(2));
+    const other = queue.all().find((row) => row.seq !== one);
+    await expect(queue.settle(one, { receipt: { key: other.id, value: { id: other.id, kind: 'refused' } } })).resolves.toEqual({ removed: true, receipt: 'none' });
+    const reopened = createHostStoreQueue({ backend: d.backend });
+    await reopened.ready();
+    expect(reopened.all().map((row) => row.envelope.args.n)).toEqual([2]);
+  });
+
+  it('keeps an existing receipt, judged in the same commit as the removal', async () => {
+    const d = device();
+    const queue = createHostStoreQueue({ backend: d.backend });
+    const seq = await queue.push(entry(1));
+    d.rows.set('refused:k-1', { id: 'refused:k-1', first: true });
+    await expect(queue.settle(seq, { receipt: { key: 'refused:k-1', value: { id: 'refused:k-1' } }, keepExisting: true }))
+      .resolves.toEqual({ removed: true, receipt: 'kept' });
+    expect(d.rows.get('refused:k-1')).toEqual({ id: 'refused:k-1', first: true });
+    // Another handle removes the receipt between the read and the commit: the
+    // revision fence makes the settlement read again and write it.
+    const seq2 = await queue.push(entry(2));
+    d.rows.set('refused:k-2', { id: 'refused:k-2', first: true });
+    const commit = d.backend.commit;
+    let raced = false;
+    vi.spyOn(d.backend, 'commit').mockImplementation(async (snapshot, changes) => {
+      if (!raced && changes.some((change) => change.key !== undefined)) {
+        raced = true;
+        await commit({ storeRevision: snapshot.storeRevision }, [{ op: 'delete', key: 'refused:k-2' }]);
+      }
+      return commit(snapshot, changes);
+    });
+    await expect(queue.settle(seq2, { receipt: { key: 'refused:k-2', value: { id: 'refused:k-2' } }, keepExisting: true }))
+      .resolves.toEqual({ removed: true, receipt: 'written' });
+    expect(d.rows.get('refused:k-2')).toEqual({ id: 'refused:k-2' });
   });
 });

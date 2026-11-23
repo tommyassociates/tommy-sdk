@@ -7,6 +7,12 @@ let ids = 0;
 const copy = (value) => JSON.parse(JSON.stringify(value));
 const notKept = (cause) => Object.assign(new Error('the offline queue could not be kept on this device'), { name: 'QueueNotKept', cause });
 const failure = (result) => Object.assign(new Error(result.reason), { reason: result.reason });
+// A settled receipt is small and bounded, so it never makes the settling
+// commit too large for the store.
+export const SETTLE_RECEIPT_MAX_BYTES = 64 * 1024;
+const utf8Bytes = (value) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+const receiptShape = (receipt) => !!receipt && typeof receipt.key === 'string' && !!receipt.key && !!receipt.value
+  && typeof receipt.value === 'object' && receipt.value.seq === undefined;
 const valid = (row) => row && typeof row.id === 'string' && row.envelope && Number.isFinite(row.queuedAt) && Number.isSafeInteger(row.seq);
 // The request's data and stable key survive; authority and deadlines belong to
 // the live world that sends it, never to device storage.
@@ -35,6 +41,7 @@ export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, 
   async function snapshot() {
     const found = [];
     let afterKey = null;
+    const keys = new Set();
     let fence;
     do {
       const page = await backend.page({ afterKey, limit: 100, aged: true });
@@ -42,15 +49,16 @@ export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, 
       if (fence && (fence.epoch !== page.epoch || fence.storeRevision !== page.storeRevision)) throw failure({ reason: 'conflict' });
       fence = page;
       found.push(...page.rows.map((row) => row.value));
+      page.rows.forEach((row) => keys.add(row.key));
       afterKey = page.nextKey;
     } while (afterKey !== null);
-    return { ...fence, rows: found.filter(valid) };
+    return { ...fence, rows: found.filter(valid), keys };
   }
   async function change(plan) {
     for (let attempt = 0; ; attempt += 1) {
       try {
         const before = await snapshot();
-        const action = plan(before.rows);
+        const action = plan(before.rows, before);
         if (action.changes.length) {
           const result = await backend.commit(before, action.changes);
           if (result.ok === false) throw failure(result);
@@ -130,26 +138,48 @@ export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, 
      * Settle a queued write the server refused for good: its row is removed
      * and, when `receipt` ({ key, value }, a row without `seq`) is given, the
      * receipt is written in the same commit, so the store never holds neither.
-     * The receipt is written even when the row has already gone. Resolves true
-     * when the row is removed by this call.
+     * The receipt is written even when the row has already gone. With
+     * `keepExisting`, a receipt already stored under that key is kept as it
+     * is, judged in the same revision-checked commit. A receipt larger than
+     * SETTLE_RECEIPT_MAX_BYTES, or one the store refuses, is replaced by
+     * `fallback` and then by none, so a refusal never stops the queue; a key
+     * that names a queued write is never written. Resolves
+     * `{ removed, receipt: 'written' | 'kept' | 'none' }`.
      */
-    settle(rowSeq, { receipt } = {}) {
+    settle(rowSeq, { receipt, fallback, keepExisting = false } = {}) {
       const id = rows.find((row) => row.seq === rowSeq)?.id;
-      const kept = receipt && typeof receipt.key === 'string' && receipt.key && receipt.value && receipt.value.seq === undefined
-        && !valid(receipt.value) ? receipt : null;
-      if (receipt && !kept) return Promise.reject(Object.assign(new Error('a settled receipt needs a key and a row without seq'), { name: 'TypeError' }));
-      return serial(async () => {
-        const removed = await change((found) => {
-          const present = !!id && found.some((row) => row.id === id);
-          return {
-            rows: found.filter((row) => row.id !== id),
-            changes: [...(present ? [{ op: 'delete', key: id }] : []), ...(kept ? [{ op: 'put', key: kept.key, value: copy(kept.value) }] : [])],
-            quiet: kept ? new Set([kept.key]) : null,
-            result: present,
-          };
+      if ((receipt && !receiptShape(receipt)) || (fallback && !receiptShape(fallback))) {
+        return Promise.reject(Object.assign(new Error('a settled receipt needs a key and a row without seq'), { name: 'TypeError' }));
+      }
+      const candidates = [receipt, fallback].filter((one) => one && utf8Bytes(one.value) <= SETTLE_RECEIPT_MAX_BYTES);
+      const attempt = (kept) => change((found, before) => {
+        const present = !!id && found.some((row) => row.id === id);
+        const usable = kept && kept.key !== id && !found.some((row) => row.id === kept.key) ? kept : null;
+        const existing = !!usable && keepExisting && before.keys.has(usable.key);
+        const writes = usable && !existing ? [{ op: 'put', key: usable.key, value: copy(usable.value) }] : [];
+        let written = 'none';
+        if (existing) written = 'kept';
+        else if (writes.length) written = 'written';
+        return {
+          rows: found.filter((row) => row.id !== id),
+          changes: [...(present ? [{ op: 'delete', key: id }] : []), ...writes],
+          quiet: usable ? new Set([usable.key]) : null,
+          result: { removed: present, receipt: written },
+        };
+      });
+      // A store refusal of a receipt (size, quota) falls to the next, smaller
+      // one; a refusal of the removal alone is the caller's to handle.
+      const tryFrom = (index) => {
+        const kept = index < candidates.length ? candidates[index] : null;
+        return attempt(kept).catch((error) => {
+          if (!kept || error?.reason === 'conflict') throw error;
+          return tryFrom(index + 1);
         });
+      };
+      return serial(async () => {
+        const settled = await tryFrom(0);
         release(rowSeq);
-        return removed;
+        return settled;
       });
     },
     noteAttempt(rowSeq) {
