@@ -230,9 +230,23 @@ export function createDataManager({
       'get', 'getRaw', 'getAll', 'getAllRaw', 'readWhere', 'selectFrom',
       'query', 'validateRecord', 'subscribe', 'subscribeQuery', 'onChange',
     ]);
+    // A Mini Program's put may be conditional, declaratively: `ifAbsent`
+    // (written only while no row has the key) or `expectedRevision` (only
+    // while the row is still that revision). Either resolves undefined when
+    // the row is left as it was. Host-only options never pass.
     const publicArgs = (property, args) => {
       if (property !== 'put' && property !== 'delete') return args;
-      const { when: _when, receipt: _receipt, guardKey: _guardKey, ...options } = args[1] || {};
+      const {
+        when: _when, receipt: _receipt, guardKey: _guardKey, ifAbsent, ...options
+      } = args[1] || {};
+      if (property === 'put') {
+        const { expectedRevision, ...rest } = options;
+        if (ifAbsent === true) return [args[0], { ...rest, when: (previous) => previous === undefined || previous === null }, ...args.slice(2)];
+        if (Number.isSafeInteger(expectedRevision)) {
+          return [args[0], { ...rest, when: (previous) => previous?._rev === expectedRevision }, ...args.slice(2)]; // eslint-disable-line no-underscore-dangle
+        }
+        return [args[0], rest, ...args.slice(2)];
+      }
       return [args[0], options, ...args.slice(2)];
     };
     Reflect.ownKeys(writer).filter((property) => property !== 'replaceSynced').forEach((property) => {
