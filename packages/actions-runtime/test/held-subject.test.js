@@ -167,4 +167,29 @@ describe('a held write in the host queue', () => {
     expect(await queue.markUnsettled(claims.find((claimed) => claimed !== null), { reason: 'unconfirmed', at: 5 })).toBe(true);
     expect([...rows.values()][0].unsettled).toEqual({ reason: 'unconfirmed', at: 5 });
   });
+
+  it('a success whose row removal failed is cleared by the next check again under that key', async () => {
+    const queue = createDurableQueue({ storage, held: new Set() });
+    const realRemove = queue.remove.bind(queue);
+    let failRemove = true;
+    queue.remove = async (seq) => { if (failRemove) { failRemove = false; throw new Error('storage busy'); } return realRemove(seq); };
+    const { invoke, held } = await page(async () => ({ status: 'succeeded', result: { sendId: '1' } }), { queue });
+    await invoke(body(), 'k-1');
+    expect(held()).not.toBe(null);
+    const again = await invoke(body(), 'k-1');
+    expect(again.idempotentReplay).toBe(true);
+    expect(held()).toBe(null);
+    // A new send for that document is no longer refused as held.
+    await expect(invoke(body(), 'k-2')).resolves.toMatchObject({ status: 'succeeded' });
+  });
+
+  it('a check again under the held key with another body is refused and sends nothing', async () => {
+    const calls = [];
+    const { invoke, held } = await page(async (input) => { calls.push(input); throw noAnswer(); });
+    await expect(invoke(body(), 'k-1')).rejects.toMatchObject({ unsettled: { reason: 'unconfirmed' } });
+    const sent = calls.length;
+    await expect(invoke(body({ to: ['other@b.test'] }), 'k-1')).rejects.toMatchObject({ code: 'WriteHeld' });
+    expect(calls.length).toBe(sent);
+    expect(held().input.to).toEqual(['a@b.test']);
+  });
 });

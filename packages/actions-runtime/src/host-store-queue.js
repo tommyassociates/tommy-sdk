@@ -186,8 +186,10 @@ export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, 
      * written. Resolves
      * `{ removed, receipt: 'written' | 'kept' | 'none' }`.
      */
-    settle(rowSeq, { receipt, fallback, keepExisting = false } = {}) {
-      const id = rows.find((row) => row.seq === rowSeq)?.id;
+    settle(rowSeq, { receipt, fallback, keepExisting = false, rowId = null } = {}) {
+      // `rowId` names the row the drain sent: a seq alone may name another
+      // tab's newer row once that one was removed.
+      const id = typeof rowId === 'string' && rowId ? rowId : rows.find((row) => row.seq === rowSeq)?.id;
       if ((receipt && !receiptShape(receipt)) || (fallback && !receiptShape(fallback))) {
         return Promise.reject(Object.assign(new Error('a settled receipt needs a key and a row without seq'), { name: 'TypeError' }));
       }

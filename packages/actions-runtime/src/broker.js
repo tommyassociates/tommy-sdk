@@ -1148,11 +1148,13 @@ export function createBroker({
     }
     if (processedKey && processedKeys.has(processedKey)) {
       // A repeat key replays the stored result, not re-applied.
+      await releaseSettledHold(activityDef, envelope);
       return { ...processedKeys.get(processedKey), idempotentReplay: true };
     }
     if (processedKey && appliedKeysOverflow.has(processedKey)) {
       // Applied this session but its result was released by the cap: still
       // suppressed, in the durable-ledger hit's shape.
+      await releaseSettledHold(activityDef, envelope);
       return { status: 'succeeded', idempotentReplay: true, resultRetained: false };
     }
 
@@ -1161,6 +1163,7 @@ export function createBroker({
     // with `resultRetained: false`. Only `client_key`: other keys derive from
     // the args and would put tenant data on disk.
     if (processedKey && activityDef.idempotency === 'client_key' && idempotencyLedger?.has(processedKey)) {
+      await releaseSettledHold(activityDef, envelope);
       return { status: 'succeeded', idempotentReplay: true, resultRetained: false };
     }
 
@@ -1314,6 +1317,22 @@ export function createBroker({
    * for a held subject is refused (WriteHeld), and so is a write whose row
    * cannot be kept: such a write never goes without its row.
    */
+  // A held write whose key is already applied (its row outlived the success
+  // that should have removed it) leaves the queue when that key is asked again.
+  async function releaseSettledHold(activityDef, envelope) {
+    const hold = activityDef?.holdUnsettled;
+    if (!hold) return;
+    const subject = holdSubject(hold, envelope.args);
+    if (subject === null) return;
+    try {
+      await queueStore.ready?.();
+      const row = ownQueuedRows().find((candidate) => candidate.sourceMpId === envelope.sourceMpId
+        && candidate.envelope?.activity === envelope.activity && candidate.subject === subject
+        && candidate.envelope?.idempotencyKey === envelope.idempotencyKey && !queueStore.isHeld?.(candidate));
+      if (row) await queueStore.remove(row.seq);
+    } catch (_) { /* asked again later */ }
+  }
+
   async function claimSubject(sourceMpId, hold, envelope) {
     const subject = holdSubject(hold, envelope.args);
     if (subject === null) {
@@ -1325,6 +1344,10 @@ export function createBroker({
       && row.envelope?.activity === envelope.activity && row.subject === subject);
     if (holding) {
       if (holding.envelope?.idempotencyKey !== envelope.idempotencyKey) throw refuse(`a write of '${envelope.activity}' for this subject is held until it is checked`);
+      // A check again sends the held request itself: the same key with another body is refused.
+      if (JSON.stringify(holding.envelope?.args ?? {}) !== JSON.stringify(envelope.args ?? {})) {
+        throw refuse(`the held write of '${envelope.activity}' is checked with its own request`);
+      }
       if (!queueStore.hold?.(holding.seq)) throw refuse(`the held write of '${envelope.activity}' is already being checked`);
       return holding.seq;
     }
@@ -1412,7 +1435,11 @@ export function createBroker({
         if (processedKey && activityDef.idempotency === 'client_key') idempotencyLedger?.add(processedKey);
         // Applied: its held row goes (after the ledger has the key, so a restart
         // in between suppresses the replay rather than sending it again).
-        if (heldSeq !== null) await queueStore.remove(heldSeq);
+        // A removal that fails leaves the row; the next check again under
+        // the same key finds the key applied and removes it then.
+        if (heldSeq !== null) {
+          try { await queueStore.remove(heldSeq); } catch (_) { /* released by the next check again */ }
+        }
         if (envelope.txnId) {
           const steps = txnSteps.get(envelope.txnId) || [];
           steps.push({ activity: envelope.activity, args: envelope.args, idempotencyKey });
@@ -1666,7 +1693,8 @@ export function createBroker({
         if (!outcome.ok && !envelope.trigger && typeof queueStore.settle === 'function') {
           try {
             // eslint-disable-next-line no-await-in-loop
-            await queueStore.settle(row.seq, { envelope, outcome });
+            // The row by its stable id: another tab may have reused its seq.
+            await queueStore.settle(row.seq, { envelope, outcome, rowId: row.id });
             if (row.id) unsettled.delete(row.id);
             if (!unsettled.size) settleRetries = 0;
           } catch (_) {

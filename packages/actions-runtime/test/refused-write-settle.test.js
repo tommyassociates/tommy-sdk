@@ -336,3 +336,27 @@ describe('createHostStoreQueue settle', () => {
     }
   });
 });
+
+describe('settling by the row the drain sent', () => {
+  it('never removes another tab\'s newer row that took the same seq', async () => {
+    const { backend } = device();
+    const a = createHostStoreQueue({ backend });
+    const envelope = (key) => ({ sourceMpId: 'forms', activity: 'forms.save', args: { key }, idempotencyKey: key });
+    await a.push({ sourceMpId: 'forms', envelope: envelope('first'), bytes: 10 });
+    const [first] = a.all();
+    // Tab B removes the first row; a newly opened tab C queues another, which takes seq 1 again.
+    const b = createHostStoreQueue({ backend });
+    await b.ready();
+    await b.remove(b.all()[0].seq);
+    const c = createHostStoreQueue({ backend });
+    await c.push({ sourceMpId: 'forms', envelope: envelope('second'), bytes: 10 });
+    const [second] = c.all();
+    expect(second.seq).toBe(first.seq);
+    // Tab A sees the store again, then settles the refusal it sent for the first row.
+    await a.noteAttempt(-1);
+    await a.settle(first.seq, { rowId: first.id, receipt: { key: 'refused:first', value: { id: 'refused:first', kind: 'refused' } } });
+    const after = createHostStoreQueue({ backend });
+    await after.ready();
+    expect(after.all().map((row) => row.envelope.idempotencyKey)).toEqual(['second']);
+  });
+});
