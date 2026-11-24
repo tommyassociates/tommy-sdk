@@ -246,8 +246,12 @@ export function createBroker({
     settleRetries += 1;
     settleRetryTimer = setTimeout(() => {
       settleRetryTimer = null;
+      // A drain still open has already passed the refused row: the retry
+      // waits for it to finish, then drains again for the rows left unsettled.
       // eslint-disable-next-line no-use-before-define
-      if (!retired) Promise.resolve().then(() => drainOfflineQueue()).catch(() => {});
+      const open = drainInFlight;
+      // eslint-disable-next-line no-use-before-define
+      if (!retired) Promise.resolve(open).catch(() => {}).then(() => (retired || !unsettled.size ? null : drainOfflineQueue())).catch(() => {});
     }, SETTLE_RETRY_AFTER_MS);
   }
   // Ids of the queued rows a drain of this broker is sending now: their

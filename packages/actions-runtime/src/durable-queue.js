@@ -85,6 +85,10 @@ function webStorage() {
  *   page; shared by the page's queues by default (tests pass a fresh set to
  *   stand for a restart)
  */
+// Whether two rows' owner stamps name the same account (a row without one is anyone's).
+const OWNER_KEYS = ['tenantId', 'person', 'accountType', 'accountId'];
+const sameOwner = (a, b) => !a || !b || OWNER_KEYS.every((key) => String(a[key] ?? '') === String(b[key] ?? ''));
+
 export function createDurableQueue({
   ttlMs = DEFAULT_TTL_MS, now = () => Date.now(), storage, held = HELD_IN_THIS_PAGE,
 } = {}) {
@@ -190,9 +194,11 @@ export function createDurableQueue({
      */
     push({ sourceMpId, envelope, bytes, owner, held: holding = false, subject }) {
       refresh();
-      // A claim for a subject another row of the same activity holds takes nothing.
+      // A claim for a subject another row of the same activity holds takes
+      // nothing, judged within the claiming account: the device-wide queue
+      // holds other accounts' rows, which never block this one.
       if (typeof subject === 'string' && rows.some((row) => row.subject === subject
-        && row.sourceMpId === sourceMpId && row.envelope?.activity === envelope?.activity)) return null;
+        && row.sourceMpId === sourceMpId && row.envelope?.activity === envelope?.activity && sameOwner(row.owner, owner))) return null;
       seq += 1;
       const id = newRowId();
       rows.push({

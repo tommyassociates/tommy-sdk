@@ -192,4 +192,15 @@ describe('a held write in the host queue', () => {
     expect(calls.length).toBe(sent);
     expect(held().input.to).toEqual(['a@b.test']);
   });
+
+  it('another account on the same device is not blocked by a held write it cannot see', async () => {
+    const calls = [];
+    let answerNext = noAnswer;
+    const { invoke, held, become } = await page(async (input) => { calls.push(input); const next = answerNext; return next ? Promise.reject(next()) : { status: 'succeeded', result: {} }; });
+    await expect(invoke(body(), 'k-a')).rejects.toMatchObject({ unsettled: { reason: 'unconfirmed' } });
+    become({ tenantId: TENANT, person: '8', accountType: 'TeamMember', accountId: '6' });
+    expect(held()).toBe(null);
+    answerNext = null;
+    await expect(invoke(body(), 'k-b')).resolves.toMatchObject({ status: 'succeeded' });
+  });
 });
