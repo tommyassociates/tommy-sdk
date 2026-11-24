@@ -28,6 +28,17 @@ describe('D.43 — durable, redacted run records', () => {
   beforeEach(() => { vi.useFakeTimers(); storage = fakeStorage(); });
   afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
+  it('a flush after the page\'s window went away still writes, and throws nothing', async () => {
+    const page = { addEventListener: vi.fn(), removeEventListener: vi.fn() };
+    vi.stubGlobal('window', page);
+    const backend = createWebStorageBackend({ storage });
+    await backend.put({ runId: 'late', startedAt: 1 });
+    delete page.addEventListener;
+    delete page.removeEventListener;
+    expect(() => vi.advanceTimersByTime(1000)).not.toThrow();
+    expect(persisted(storage).map((record) => record.runId)).toEqual(['late']);
+  });
+
   it('loads lazily once and coalesces a burst while reads see pending puts and deletes', async () => {
     storage.setItem('mp-action-records', JSON.stringify([{ runId: 'old', startedAt: 0 }]));
     const get = vi.spyOn(storage, 'getItem');
