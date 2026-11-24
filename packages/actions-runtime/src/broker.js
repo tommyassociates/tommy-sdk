@@ -19,8 +19,10 @@ import { createIdempotencyLedger, createInvalidationEpochs } from './idempotency
 import { createDurableQueue } from './durable-queue.js';
 import { validateToken } from './capability.js';
 import { evaluatePredicate as evaluateDeclaredPredicate } from './predicate.js';
+import { holdSubject, unsettledReason } from './held-writes.js';
 
 const err = (code, message, extra = {}) => new TommyError({ code, message, ...extra });
+
 
 export const SCOPED_INVOKE_HOST_API = 17;
 const PARENT_RUN = Symbol('parentRun');
@@ -44,6 +46,11 @@ const APPLIED_KEYS_OVERFLOW_MAX = 10000;
  *  is refused (`RateLimited`) rather than admitted, so every running key stays
  *  joinable and a stuck MP cannot pile up work without limit. */
 const INFLIGHT_RUNS_MAX = 500;
+// A refused queued write whose settlement the store could not take is
+// settled again by a drain this long after, at most this many times in a
+// row; later drains (reconnect, a new write) try again as well.
+const SETTLE_RETRY_AFTER_MS = 2000;
+const SETTLE_RETRY_DRAINS = 3;
 
 // Server-write activities whose host adapter gets replay provenance (see
 // executeInvoke). `team.update_member` always gets it: the member-restore gate
@@ -101,6 +108,16 @@ function stableHash(value) {
 
 // A text's size in UTF-16 code units, as Web Storage quotas charge it.
 const utf16Units = (text) => String(text).length;
+
+// A value as JSON with every object's keys in order, arrays as they are: two
+// bodies with the same fields in another order read the same.
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().filter((key) => value[key] !== undefined).map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
 
 export function createBroker({
   capabilityService,
@@ -225,9 +242,54 @@ export function createBroker({
   const chainBudget = new Map();      // rootRunId -> total run count
   const buckets = new Map();          // `${mpId}:${kind}` -> {tokens, updatedAt}
   // Offline queue rows {sourceMpId, envelope, bytes, seq, queuedAt}. The store
-  // owns the array and persists it (D.43); `null` opts out of persistence, and
-  // gets a storage-less instance rather than a second code path.
+  // owns the array and persists it; `null` opts out of persistence, and gets a
+  // storage-less instance rather than a second code path. A store may offer
+  // `settle(seq, { envelope, outcome })`: the drain hands it a write refused
+  // for good instead of calling `remove(seq)`, before `onOfflineOutcome`.
   const queueStore = offlineQueue || createDurableQueue({ now, storage: null });
+  // Queued rows the server refused for good whose settlement the queue's
+  // store could not take yet, by row id, with their outcome: the next drain
+  // settles them again without sending them. One bounded re-drain is
+  // scheduled for them, cancelled at teardown.
+  const unsettled = new Map();
+  let settleRetryTimer = null;
+  let settleRetries = 0;
+  function scheduleSettleRetry() {
+    // eslint-disable-next-line no-use-before-define
+    if (retired || settleRetryTimer || settleRetries >= SETTLE_RETRY_DRAINS) return;
+    settleRetries += 1;
+    settleRetryTimer = setTimeout(() => {
+      settleRetryTimer = null;
+      // A drain still open has already passed the refused row: the retry
+      // waits for it to finish, then drains again for the rows left unsettled.
+      // eslint-disable-next-line no-use-before-define
+      const open = drainInFlight;
+      // eslint-disable-next-line no-use-before-define
+      // Offline, the rows wait for the reconnect drain: a drain now would
+      // queue unsent writes again instead of sending them.
+      if (!retired) Promise.resolve(open).catch(() => {}).then(() => (retired || !unsettled.size || !isOnline ? null : drainOfflineQueue())).catch(() => {});
+    }, SETTLE_RETRY_AFTER_MS);
+  }
+  // Held rows whose write was applied but whose removal the store refused:
+  // never shown as held again in this page, and removed again later (the
+  // write itself is never sent again).
+  const appliedHolds = new Set();
+  let holdCleanupTimer = null;
+  let holdCleanupTries = 0;
+  function scheduleHoldCleanup() {
+    if (retired || holdCleanupTimer || !appliedHolds.size || holdCleanupTries >= SETTLE_RETRY_DRAINS) return;
+    holdCleanupTries += 1;
+    holdCleanupTimer = setTimeout(async () => {
+      holdCleanupTimer = null;
+      for (const id of [...appliedHolds]) {
+        const row = queueStore.all().find((candidate) => candidate.id === id);
+        if (!row) { appliedHolds.delete(id); continue; }
+        // eslint-disable-next-line no-await-in-loop
+        try { await queueStore.remove(row.seq); appliedHolds.delete(id); } catch (_) { /* tried again */ }
+      }
+      if (appliedHolds.size) scheduleHoldCleanup(); else holdCleanupTries = 0;
+    }, SETTLE_RETRY_AFTER_MS);
+  }
   // Ids of the queued rows a drain of this broker is sending now: their
   // receipts read `sending`, and they cannot be discarded meanwhile.
   const drainingRows = new Set();
@@ -1125,12 +1187,16 @@ export function createBroker({
       });
     }
     if (processedKey && processedKeys.has(processedKey)) {
-      // A repeat key replays the stored result, not re-applied.
-      return { ...processedKeys.get(processedKey), idempotentReplay: true };
+      // A repeat key replays the stored result, not re-applied (taken before
+      // the hold's cleanup awaits, which another write could evict it in).
+      const stored = processedKeys.get(processedKey);
+      await releaseSettledHold(activityDef, envelope);
+      return { ...stored, idempotentReplay: true };
     }
     if (processedKey && appliedKeysOverflow.has(processedKey)) {
       // Applied this session but its result was released by the cap: still
       // suppressed, in the durable-ledger hit's shape.
+      await releaseSettledHold(activityDef, envelope);
       return { status: 'succeeded', idempotentReplay: true, resultRetained: false };
     }
 
@@ -1139,11 +1205,15 @@ export function createBroker({
     // with `resultRetained: false`. Only `client_key`: other keys derive from
     // the args and would put tenant data on disk.
     if (processedKey && activityDef.idempotency === 'client_key' && idempotencyLedger?.has(processedKey)) {
+      await releaseSettledHold(activityDef, envelope);
       return { status: 'succeeded', idempotentReplay: true, resultRetained: false };
     }
 
     // Offline: a replayable write queues; anything else is a typed Offline reject.
+    // A queued row being drained is already in the queue: it stays there for
+    // the reconnect, never queued again beside itself.
     if (!isOnline && activityDef.sideEffect !== 'local_write') {
+      if (envelope.restoreDrain === true) throw err('Offline', `'${envelope.activity}' waits in the queue for a connection`, { retryable: true });
       if (activityDef.offlineReplayable) {
         await enqueueOffline(envelope.sourceMpId, { ...envelope, identity, idempotencyKey });
         const queuedRecord = await records.open({
@@ -1235,10 +1305,12 @@ export function createBroker({
     // would lose it. The row is held (no drain here sends it, a restart replays
     // it with its key); an answered write removes it. If it cannot be kept the
     // write still runs. A drained replay is its own row already.
-    const heldSeq = activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable
-      && !envelope.restoreDrain && typeof queueStore.isHeld === 'function'
-      ? await holdInQueue(envelope.sourceMpId, { ...envelope, identity, idempotencyKey })
-      : null;
+    const heldSeq = activityDef.holdUnsettled
+      ? await claimSubject(envelope.sourceMpId, activityDef.holdUnsettled, { ...envelope, identity, idempotencyKey })
+      : (activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable
+        && !envelope.restoreDrain && typeof queueStore.isHeld === 'function'
+        ? await holdInQueue(envelope.sourceMpId, { ...envelope, identity, idempotencyKey })
+        : null);
     try {
       const record = await records.open({
         kind: 'invoke',
@@ -1280,6 +1352,75 @@ export function createBroker({
     } catch (_) {
       return null;
     }
+  }
+
+  /**
+   * The queue row a `holdUnsettled` write runs under, claimed before its
+   * request goes: one row per Mini Program, activity and subject, judged in
+   * the queue's own commit. A dispatch with the key of the row that holds the
+   * subject is that row's check again and runs under it. Any other dispatch
+   * for a held subject is refused (WriteHeld), and so is a write whose row
+   * cannot be kept: such a write never goes without its row.
+   */
+  // A held write whose key is already applied (its row outlived the success
+  // that should have removed it) leaves the queue when that key is asked again.
+  async function releaseSettledHold(activityDef, envelope) {
+    const hold = activityDef?.holdUnsettled;
+    if (!hold) return;
+    const subject = holdSubject(hold, envelope.args);
+    if (subject === null) return;
+    try {
+      await queueStore.ready?.();
+      const row = ownQueuedRows().find((candidate) => candidate.sourceMpId === envelope.sourceMpId
+        && candidate.envelope?.activity === envelope.activity && candidate.subject === subject
+        && candidate.envelope?.idempotencyKey === envelope.idempotencyKey && !queueStore.isHeld?.(candidate));
+      if (row) await queueStore.remove(row.seq);
+    } catch (_) { /* asked again later */ }
+  }
+
+  async function claimSubject(sourceMpId, hold, envelope) {
+    const subject = holdSubject(hold, envelope.args);
+    if (subject === null) {
+      throw err('InvalidPayload', `activity '${envelope.activity}' needs its hold key fields (${hold.key.join(', ')})`, { retryable: false });
+    }
+    const refuse = (why) => err('WriteHeld', why, { retryable: false });
+    await queueStore.ready?.();
+    let holding = ownQueuedRows().find((row) => row.sourceMpId === sourceMpId
+      && row.envelope?.activity === envelope.activity && row.subject === subject);
+    // An applied write's row whose removal failed goes now, before the new claim.
+    if (holding && appliedHolds.has(holding.id)) {
+      try { await queueStore.remove(holding.seq); appliedHolds.delete(holding.id); holding = null; } catch (_) {
+        throw refuse(`the last write of '${envelope.activity}' for this subject is still being cleared`);
+      }
+    }
+    if (holding) {
+      if (holding.envelope?.idempotencyKey !== envelope.idempotencyKey) throw refuse(`a write of '${envelope.activity}' for this subject is held until it is checked`);
+      // A check again sends the held request itself: the same key with another body is refused.
+      if (canonicalJson(holding.envelope?.args ?? {}) !== canonicalJson(envelope.args ?? {})) {
+        throw refuse(`the held write of '${envelope.activity}' is checked with its own request`);
+      }
+      if (!queueStore.hold?.(holding.seq)) throw refuse(`the held write of '${envelope.activity}' is already being checked`);
+      return holding.seq;
+    }
+    const bytes = utf16Units(JSON.stringify(envelope.args || {}));
+    const holder = currentQueueOwner();
+    const partition = ownQueuedRows().filter((row) => row.sourceMpId === sourceMpId);
+    if (partition.length >= QUEUE_MAX_ENTRIES || partition.reduce((sum, row) => sum + row.bytes, 0) + bytes > QUEUE_MAX_BYTES) {
+      throw err('Offline_QueueFull', `the queue for mp '${sourceMpId}' is full; '${envelope.activity}' was not sent`, { retryable: false });
+    }
+    const owner = holder
+      ? Object.fromEntries(['tenantId', ...OWNER_FIELDS].filter((key) => known(holder[key])).map((key) => [key, holder[key]]))
+      : undefined;
+    let seqClaimed;
+    try {
+      seqClaimed = await queueStore.claim({
+        sourceMpId, envelope, bytes, owner, subject, held: true,
+      });
+    } catch (cause) {
+      throw err('Offline_QueueFull', `the queue for mp '${sourceMpId}' could not keep '${envelope.activity}'; it was not sent`, { retryable: false, cause });
+    }
+    if (seqClaimed === null || seqClaimed === undefined) throw refuse(`a write of '${envelope.activity}' for this subject is held until it is checked`);
+    return seqClaimed;
   }
 
   async function attemptAdmittedInvoke({
@@ -1346,7 +1487,15 @@ export function createBroker({
         if (processedKey && activityDef.idempotency === 'client_key') idempotencyLedger?.add(processedKey);
         // Applied: its held row goes (after the ledger has the key, so a restart
         // in between suppresses the replay rather than sending it again).
-        if (heldSeq !== null) await queueStore.remove(heldSeq);
+        // A removal that fails leaves the row; the next check again under
+        // the same key finds the key applied and removes it then.
+        if (heldSeq !== null) {
+          const heldId = queueStore.all().find((candidate) => candidate.seq === heldSeq)?.id;
+          try { await queueStore.remove(heldSeq); } catch (_) {
+            // Applied: the row is not shown as held, and its removal is tried again.
+            if (heldId) { appliedHolds.add(heldId); scheduleHoldCleanup(); }
+          }
+        }
         if (envelope.txnId) {
           const steps = txnSteps.get(envelope.txnId) || [];
           steps.push({ activity: envelope.activity, args: envelope.args, idempotencyKey });
@@ -1368,6 +1517,20 @@ export function createBroker({
         // offline queue sends it later, spaced (F8).
         if (activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable && neverReachedServer(lastError)) break;
       }
+    }
+
+    // A `holdUnsettled` write whose outcome is not known keeps its row,
+    // marked unsettled with why and when; no drain sends it, only a check
+    // again does. A final answer removes it below.
+    const unsettledWhy = activityDef.holdUnsettled && heldSeq !== null ? unsettledReason(lastError, activityDef.holdUnsettled) : null;
+    if (unsettledWhy) {
+      try { await queueStore.markUnsettled(heldSeq, { reason: unsettledWhy, at: now() }); } catch (_) { /* unmarked rows read as unconfirmed */ }
+      await records.update(record.runId, {
+        status: 'dead_letter', error: { code: lastError.code, message: lastError.message }, attempts: attempt,
+      });
+      throw Object.assign(err('ActivityFailed', `activity '${envelope.activity}' is held: ${lastError.message}`, {
+        retryable: false, runId: record.runId, cause: lastError,
+      }), { unsettled: { reason: unsettledWhy } });
     }
 
     // A replayable server write whose request never reached the server waits
@@ -1444,6 +1607,19 @@ export function createBroker({
     const tenant = known(stamp.tenantId) ? stamp.tenantId : row.envelope?.identity?.tenantId;
     if (String(tenant) !== String(holder.tenantId)) return false;
     return OWNER_FIELDS.every((key) => !known(stamp[key]) || (known(holder[key]) && String(stamp[key]) === String(holder[key])));
+  }
+
+  // A held row as its Mini Program reads it.
+  function heldEntry(row) {
+    const running = queueStore.isHeld?.(row);
+    return {
+      id: row.id,
+      activity: row.envelope.activity,
+      input: JSON.parse(JSON.stringify(row.envelope.args ?? {})),
+      key: row.envelope.idempotencyKey,
+      reason: running ? 'sending' : (row.unsettled?.reason || 'unconfirmed'),
+      heldAt: Number.isFinite(row.unsettled?.at) ? row.unsettled.at : row.queuedAt,
+    };
   }
 
   function ownQueuedRows() {
@@ -1556,33 +1732,43 @@ export function createBroker({
     for (const [, rows] of bySource) {
       rows.sort((a, b) => a.seq - b.seq); // FIFO per source MP
       for (const row of rows) {
+        // A held write (one subject's, outcome not known) is sent again only
+        // by a check again; it holds back none of its Mini Program's rows.
+        if (typeof row.subject === 'string') continue;
         // A write still running in this page holds its row: it is not sent a
         // second time alongside itself, and its Mini Program's later rows wait.
         if (queueStore.isHeld?.(row)) break;
         // Its write was answered while this drain sent the rows before it.
-        if (!queueStore.all().some((queued) => queued.seq === row.seq)) continue;
+        if (!queueStore.all().some((queued) => queued.seq === row.seq)) { unsettled.delete(row.id); continue; }
         const envelope = row.envelope;
-        // Its last send did not reach the server and its wait is not over (F8).
-        const waitMs = (resendFailures.get(envelope?.idempotencyKey)?.dueAt || 0) - now();
-        if (waitMs > 0) {
-          wakeDrainIn(waitMs);
-          break;
+        // A row whose refusal is known is settled again, never sent again.
+        const refusedBefore = row.id ? unsettled.get(row.id) : undefined;
+        let outcome;
+        if (refusedBefore) {
+          outcome = refusedBefore;
+        } else {
+          // Its last send did not reach the server and its wait is not over (F8).
+          const waitMs = (resendFailures.get(envelope?.idempotencyKey)?.dueAt || 0) - now();
+          if (waitMs > 0) {
+            wakeDrainIn(waitMs);
+            break;
+          }
+          if (row.id) drainingRows.add(row.id);
+          // eslint-disable-next-line no-await-in-loop
+          outcome = await Promise.resolve().then(() => replayEnvelope(envelope)).then((restored) => (restored.trigger
+            ? dispatchEmit(restored)
+            // ORIGINAL key. `restoreQueuedAt` is the moment the row entered the
+            // durable queue (recorded by durable-queue.js on push) — the one fact a
+            // replayed write can carry about how long it waited, and the runtime
+            // sets it here so no MP can forge it.
+            : dispatchInvoke({
+              ...restored, rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
+            })))
+            .then((result) => ({ ok: true, result }))
+            .catch((error) => ({ ok: false, error }))
+            .finally(() => { if (row.id) drainingRows.delete(row.id); });
+          results.push(outcome);
         }
-        if (row.id) drainingRows.add(row.id);
-        // eslint-disable-next-line no-await-in-loop
-        const outcome = await Promise.resolve().then(() => replayEnvelope(envelope)).then((restored) => (restored.trigger
-          ? dispatchEmit(restored)
-          // ORIGINAL key. `restoreQueuedAt` is the moment the row entered the
-          // durable queue (recorded by durable-queue.js on push) — the one fact a
-          // replayed write can carry about how long it waited, and the runtime
-          // sets it here so no MP can forge it.
-          : dispatchInvoke({
-            ...restored, rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
-          })))
-          .then((result) => ({ ok: true, result }))
-          .catch((error) => ({ ok: false, error }))
-          .finally(() => { if (row.id) drainingRows.delete(row.id); });
-        results.push(outcome);
         // A row not settled stays queued, and so do the rows its Mini Program
         // queued after it (a clock-out never goes before its clock-in). Its
         // receipt reads as tried and not sent.
@@ -1591,8 +1777,30 @@ export function createBroker({
           if (neverReachedServer(outcome.error)) noteResendFailure(envelope?.idempotencyKey);
           break;
         }
+        // Its outcome is known, so its resend wait (F8) is over.
         resendFailures.delete(envelope?.idempotencyKey);
-        await queueStore.remove(row.seq);
+        // A write refused for good goes to the queue's `settle` when it has
+        // one, so the queue can keep the refusal in the same commit that
+        // removes the row: a page that dies before the observer runs still
+        // has it. One the store cannot take yet stays queued with its outcome
+        // known; its Mini Program's later rows wait, every other Mini
+        // Program's rows still go. Emits and accepted writes are removed.
+        if (!outcome.ok && !envelope.trigger && typeof queueStore.settle === 'function') {
+          try {
+            // eslint-disable-next-line no-await-in-loop
+            // The row by its stable id: another tab may have reused its seq.
+            await queueStore.settle(row.seq, { envelope, outcome, rowId: row.id });
+            if (row.id) unsettled.delete(row.id);
+            if (!unsettled.size) settleRetries = 0;
+          } catch (_) {
+            if (row.id) unsettled.set(row.id, outcome);
+            scheduleSettleRetry();
+            break;
+          }
+        } else {
+          // eslint-disable-next-line no-await-in-loop
+          await queueStore.remove(row.seq);
+        }
         if (typeof onOfflineOutcome === 'function') {
           try {
             Promise.resolve(onOfflineOutcome(envelope, outcome)).catch(() => {});
@@ -1845,7 +2053,7 @@ export function createBroker({
      */
     queuedWrites(sourceMpId) {
       return ownQueuedRows()
-        .filter((row) => row.sourceMpId === sourceMpId && row.envelope?.activity && row.id)
+        .filter((row) => row.sourceMpId === sourceMpId && row.envelope?.activity && row.id && typeof row.subject !== 'string')
         .sort((a, b) => a.seq - b.seq)
         .map((row) => {
           const attempts = Number(row.attempts) || 0;
@@ -1874,9 +2082,41 @@ export function createBroker({
         await queueStore.ready?.();
         if (typeof id !== 'string' || !id || retired) return false;
         const row = ownQueuedRows().find((queued) => queued.id === id && queued.sourceMpId === sourceMpId);
-        if (!row || !row.envelope?.activity || queueStore.isHeld?.(row) || drainingRows.has(row.id)) return false;
+        if (!row || !row.envelope?.activity || typeof row.subject === 'string' || queueStore.isHeld?.(row) || drainingRows.has(row.id)) return false;
         return (await queueStore.remove(row.seq)) === true;
       } catch (_) { return false; }
+    },
+
+    /**
+     * The held write of one subject: the row of this Mini Program's
+     * `holdUnsettled` activity (qualified name) whose key fields equal
+     * `keyFields`, as `{ id, activity, input, key, reason, heldAt }`, or null.
+     * `reason` is the code or `unconfirmed` the answer was held for,
+     * `sending` while a dispatch or check again runs in this page, and
+     * `unconfirmed` for a row whose dispatch never finished (the page
+     * closed). Only rows of this broker's person and account; `input` is a copy.
+     */
+    heldWrite(sourceMpId, activity, keyFields) {
+      const [ownerMpId, activityName] = splitQualified(activity);
+      const hold = mps.get(ownerMpId)?.manifest.activities?.[activityName]?.holdUnsettled;
+      if (!hold) return null;
+      const subject = holdSubject(hold, keyFields);
+      if (subject === null) return null;
+      const row = ownQueuedRows().find((queued) => queued.sourceMpId === sourceMpId
+        && queued.envelope?.activity === activity && queued.subject === subject && !appliedHolds.has(queued.id));
+      return row ? heldEntry(row) : null;
+    },
+
+    /** Every held write of this Mini Program (or of every one when no id is given), as heldWrite answers them, with `sourceMpId` and `subject` (its key values). */
+    heldWrites(sourceMpId = null) {
+      return ownQueuedRows()
+        .filter((row) => typeof row.subject === 'string' && !appliedHolds.has(row.id) && (sourceMpId === null || row.sourceMpId === sourceMpId))
+        .sort((a, b) => a.seq - b.seq)
+        .map((row) => {
+          let subject = [];
+          try { subject = JSON.parse(row.subject); } catch (_) { subject = []; }
+          return { ...heldEntry(row), sourceMpId: row.sourceMpId, subject };
+        });
     },
 
     /** Diagnostics: idempotent runs in flight, and the joins waiting on them. */
@@ -1891,6 +2131,10 @@ export function createBroker({
     async teardown(instanceId) {
       if (instanceId != null) return;
       retired = true;
+      clearTimeout(settleRetryTimer);
+      clearTimeout(holdCleanupTimer);
+      settleRetryTimer = null;
+      unsettled.clear();
       [...queueSubscriptions].forEach((off) => off());
       await queueStore.close?.();
       for (const entry of debouncePending.values()) clearTimeout(entry.timer);

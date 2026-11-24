@@ -469,6 +469,28 @@ resultSchema?: JsonSchema1
  */
 sideEffect: ("local_write" | "server_write" | "external_call")
 /**
+ * A server write whose outcome can be unknown (no answer, a timeout, an answer that says it is still in progress). The host queue keeps the write's input and idempotency key from before it is sent until an answer settles it: one write per Mini Program, activity and subject (the values of `key`), claimed atomically. An answer that does not settle it leaves the row held, never sent again by itself; the Mini Program reads it (`heldWrite`) and asks again under the same key (`checkHeldWrite`). `holdCodes`: refusal codes meaning the outcome is still unknown. `keepCodes`: refusal codes answered before the server looked the key up, which say nothing about an earlier attempt. `settleCodes`: codes a 5xx answer carries when it is final. Requires `idempotency: client_key`, `offlineReplayable: false` and `sideEffect: server_write`.
+ */
+holdUnsettled?: {
+/**
+ * @minItems 1
+ * @maxItems 5
+ */
+key: [string]|[string, string]|[string, string, string]|[string, string, string, string]|[string, string, string, string, string]
+/**
+ * @maxItems 50
+ */
+holdCodes?: string[]
+/**
+ * @maxItems 50
+ */
+keepCodes?: string[]
+/**
+ * @maxItems 50
+ */
+settleCodes?: string[]
+}
+/**
  * Activity names in THIS MP whose recorded idempotency results this activity's success makes stale. A `derived_from_input` key is a hash of the args, so it replays forever for identical args — correct while the state it describes still holds, wrong the moment a sibling activity clears that state. `lock_window_for_shift` records `{locked: true}`; `unlock_window_for_shift` genuinely clears the flags under a DIFFERENT activity name, so a re-assign with identical args used to hit the recorded key and return `{locked: true}` with no read and no write — a succeeded run reporting a lock that never happened. Naming the dependency is deliberate rather than deriving it: the broker cannot know which pairs of activities are inverses, and a blanket "any write clears every key" rule would delete the duplicate-suppression that the fan-out depends on. Entries are bare activity names (no `mpId.` prefix) and are invalidated tenant-scoped, on success only. Invalidation clears this DEVICE's in-memory results and stamps its subsequent derived keys with a durable per-device epoch so the server's own ledger also misses; that ledger is keyed by team, so a second device that has not seen the invalidation still presents the unstamped key and can still be replayed.
  */
 invalidatesIdempotency?: string[]

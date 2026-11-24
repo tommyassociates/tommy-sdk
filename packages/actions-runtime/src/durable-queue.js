@@ -85,6 +85,10 @@ function webStorage() {
  *   page; shared by the page's queues by default (tests pass a fresh set to
  *   stand for a restart)
  */
+// Whether two rows' owner stamps name the same account (a row without one is anyone's).
+const OWNER_KEYS = ['tenantId', 'person', 'accountType', 'accountId'];
+const sameOwner = (a, b) => !a || !b || OWNER_KEYS.every((key) => String(a[key] ?? '') === String(b[key] ?? ''));
+
 export function createDurableQueue({
   ttlMs = DEFAULT_TTL_MS, now = () => Date.now(), storage, held = HELD_IN_THIS_PAGE,
 } = {}) {
@@ -188,11 +192,18 @@ export function createDurableQueue({
      * `held`: the row belongs to a write still running in this page, which
      * no drain sends until it is released (or the page restarts).
      */
-    push({ sourceMpId, envelope, bytes, owner, held: holding = false }) {
+    push({ sourceMpId, envelope, bytes, owner, held: holding = false, subject }) {
       refresh();
+      // A claim for a subject another row of the same activity holds takes
+      // nothing, judged within the claiming account: the device-wide queue
+      // holds other accounts' rows, which never block this one.
+      if (typeof subject === 'string' && rows.some((row) => row.subject === subject
+        && row.sourceMpId === sourceMpId && row.envelope?.activity === envelope?.activity && sameOwner(row.owner, owner))) return null;
       seq += 1;
       const id = newRowId();
-      rows.push({ sourceMpId, envelope, bytes, seq, id, queuedAt: now(), ...(owner ? { owner } : {}) });
+      rows.push({
+        sourceMpId, envelope, bytes, seq, id, queuedAt: now(), ...(owner ? { owner } : {}), ...(typeof subject === 'string' ? { subject } : {}),
+      });
       if (!persist()) {
         rows.pop();
         seq -= 1;
@@ -204,6 +215,36 @@ export function createDurableQueue({
       }
       changes.committed([rows[rows.length - 1]]);
       return seq;
+    },
+
+    /**
+     * Push a row for `subject` only while no row of the same Mini Program and
+     * activity holds it. Returns its seq, or null when the subject is taken.
+     */
+    claim(input) {
+      return this.push({ ...input, subject: String(input.subject) });
+    },
+
+    /** Mark a row as unsettled (`{ reason, at }`): it stays queued and no drain sends it. */
+    markUnsettled(rowSeq, unsettled) {
+      refresh();
+      const row = rows[rowAt(rowSeq)];
+      if (!row) return false;
+      const before = row.unsettled;
+      row.unsettled = { ...unsettled };
+      if (!persist()) { if (before === undefined) delete row.unsettled; else row.unsettled = before; return false; }
+      changes.committed([row]);
+      return true;
+    },
+
+    /** Hold a queued row for a write running in this page; false when held already or gone. */
+    hold(rowSeq) {
+      refresh();
+      const id = rows[rowAt(rowSeq)]?.id;
+      if (!id || held.has(id)) return false;
+      held.add(id);
+      heldHere.set(rowSeq, id);
+      return true;
     },
 
     /**

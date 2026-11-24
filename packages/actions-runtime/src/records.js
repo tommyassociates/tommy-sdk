@@ -117,6 +117,9 @@ export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
   let timer;
   let eventWindow;
   let eventDocument;
+  // The listener removals, bound when added: a page torn down before the
+  // timer fires (a closed test world, an unloading frame) still lets go.
+  const stopListening = [];
 
   function loadPersisted(storage) {
     const raw = storage?.getItem(STORAGE_KEY);
@@ -144,8 +147,7 @@ export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
     if (timer === undefined) return;
     clearTimeout(timer);
     timer = undefined;
-    eventWindow?.removeEventListener('pagehide', flush);
-    eventDocument?.removeEventListener('visibilitychange', onVisibilityChange);
+    stopListening.splice(0).forEach((stop) => { try { stop(); } catch (_) { /* the page is gone */ } });
     eventWindow = undefined;
     eventDocument = undefined;
     const storage = store();
@@ -173,11 +175,17 @@ export function createWebStorageBackend({ storage, max = PERSIST_MAX } = {}) {
   function scheduleFlush() {
     if (timer !== undefined) return;
     timer = setTimeout(flush, 1000);
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
       eventWindow = window;
       eventDocument = typeof document !== 'undefined' ? document : undefined;
-      eventWindow.addEventListener('pagehide', flush);
-      eventDocument?.addEventListener('visibilitychange', onVisibilityChange);
+      const page = eventWindow;
+      const doc = eventDocument;
+      page.addEventListener('pagehide', flush);
+      stopListening.push(page.removeEventListener.bind(page, 'pagehide', flush));
+      if (typeof doc?.addEventListener === 'function') {
+        doc.addEventListener('visibilitychange', onVisibilityChange);
+        stopListening.push(doc.removeEventListener.bind(doc, 'visibilitychange', onVisibilityChange));
+      }
     }
   }
 

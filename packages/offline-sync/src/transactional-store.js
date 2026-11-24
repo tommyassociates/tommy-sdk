@@ -418,19 +418,26 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     selectFrom(rows, predicate = () => true) { return (rows || []).filter(paintable).filter(predicate).map(strip); },
     scan: (options) => scan(options, false),
     scanRaw: (options) => scan(options, true),
-    async put(record, { dedupeKey, silent = false } = {}) {
+    // `when(previous)` is judged on the row read for this commit, and the
+    // commit is checked against the store revision, so a condition holds
+    // against writers in other tabs too; a write it refuses resolves undefined.
+    async put(record, { dedupeKey, silent = false, when = null } = {}) {
       requiredRecord(record);
       const submitted = copy(record);
       const key = keyString(record[keyPath]);
       return exclusive(async () => {
+        let refused = false;
         await mutation([key], (rows, storeRevision) => {
           const previous = rows.get(key);
+          refused = typeof when === 'function' && when(previous) !== true;
+          if (refused) return [];
           // A local write keeps the row's window, what a push acknowledged,
           // and a refusal for access: the row stays refused until a retry.
           const refusal = previous?._pushRefused != null ? { _pushRefused: previous._pushRefused } : {};
           const stamped = { ...holdRowFields(submitted, previous, heldFields), ...(previous?._window != null ? { _window: previous._window } : {}), ...acknowledged(previous), ...refusal, _rev: rowRevision(previous, storeRevision), _dirty: true, _updatedAt: new Date(now()).toISOString(), ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}) };
           return [{ op: 'put', key, value: stamped }];
         }, { retry: true });
+        if (refused) return undefined;
         if (!silent) await notify();
         return record[keyPath];
       });
