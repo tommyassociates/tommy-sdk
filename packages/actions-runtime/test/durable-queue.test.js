@@ -98,7 +98,7 @@ describe('D.43 — the offline queue survives a reload', () => {
   });
 
   it('DROPS a row past its TTL rather than replaying it — and reports the drop', async () => {
-    let clock = 1_000_000;
+    let clock = 1000000;
     const first = await makeBroker({ queue: createDurableQueue({ storage, now: () => clock }) });
     await first.call('w1', 'k-1');
 
@@ -114,7 +114,7 @@ describe('D.43 — the offline queue survives a reload', () => {
   });
 
   it('a row INSIDE the TTL still replays — the drop is bounded by time, not by reload', async () => {
-    let clock = 1_000_000;
+    let clock = 1000000;
     const first = await makeBroker({ queue: createDurableQueue({ storage, now: () => clock }) });
     await first.call('w1', 'k-1');
 
@@ -197,6 +197,11 @@ describe('D.43 — the offline queue survives a reload', () => {
   });
 });
 
+// A test clock for the queued-resend spacing (F8): `later()` moves past any wait.
+const clock = { t: 1000000 };
+const later = () => { clock.t += 10 * 60 * 1000; };
+const timing = { now: () => clock.t, setTimer: () => null, clearTimer: () => {} };
+
 describe('a queued row leaves the queue only once the server has answered it', () => {
   let storage;
   let applied;
@@ -210,6 +215,7 @@ describe('a queued row leaves the queue only once the server has answered it', (
       onOfflineOutcome,
       serverInvoke: async (envelope) => answer(envelope),
       offlineQueue: createDurableQueue({ storage }),
+      ...timing,
     });
     broker.registerMp(MANIFEST, { handlers: { activities: {} } });
     const token = await issuer.issue('timesheets', '1.0.0', 'team-A', [], 'i-a');
@@ -235,6 +241,7 @@ describe('a queued row leaves the queue only once the server has answered it', (
     expect(stored()).toEqual(['w1']);
     expect(broker.queueStats().total).toBe(1);
     sends();
+    later();
     await broker.drainOfflineQueue();
     expect(applied).toEqual(['w1']);
     expect(stored()).toEqual([]);
@@ -309,6 +316,7 @@ describe('a queued row leaves the queue only once the server has answered it', (
     expect(applied).toEqual([]);
     expect(stored()).toEqual(['w1', 'w2']);
 
+    later();
     await broker.drainOfflineQueue();
     expect(applied).toEqual(['w1', 'w2']);
   });
