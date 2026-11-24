@@ -1206,7 +1206,10 @@ export function createBroker({
     }
 
     // Offline: a replayable write queues; anything else is a typed Offline reject.
+    // A queued row being drained is already in the queue: it stays there for
+    // the reconnect, never queued again beside itself.
     if (!isOnline && activityDef.sideEffect !== 'local_write') {
+      if (envelope.restoreDrain === true) throw err('Offline', `'${envelope.activity}' waits in the queue for a connection`, { retryable: true });
       if (activityDef.offlineReplayable) {
         await enqueueOffline(envelope.sourceMpId, { ...envelope, identity, idempotencyKey });
         const queuedRecord = await records.open({
