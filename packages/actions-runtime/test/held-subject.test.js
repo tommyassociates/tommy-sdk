@@ -175,12 +175,15 @@ describe('a held write in the host queue', () => {
     queue.remove = async (seq) => { if (failRemove) { failRemove = false; throw new Error('storage busy'); } return realRemove(seq); };
     const { invoke, held } = await page(async () => ({ status: 'succeeded', result: { sendId: '1' } }), { queue });
     await invoke(body(), 'k-1');
-    expect(held()).not.toBe(null);
+    // Applied: not shown as held, though its row is still kept.
+    expect(held()).toBe(null);
+    expect(queue.all()).toHaveLength(1);
     const again = await invoke(body(), 'k-1');
     expect(again.idempotentReplay).toBe(true);
-    expect(held()).toBe(null);
-    // A new send for that document is no longer refused as held.
+    expect(again.status).toBe('succeeded');
+    // A new send for that document is not refused as held, and the old row is gone.
     await expect(invoke(body(), 'k-2')).resolves.toMatchObject({ status: 'succeeded' });
+    expect(queue.all()).toHaveLength(0);
   });
 
   it('a check again under the held key with another body is refused and sends nothing', async () => {
@@ -203,4 +206,15 @@ describe('a held write in the host queue', () => {
     answerNext = null;
     await expect(invoke(body(), 'k-b')).resolves.toMatchObject({ status: 'succeeded' });
   });
+
+  it('a check again with the same body in another field order is the held request', async () => {
+    let answer = noAnswer;
+    const { invoke, held } = await page(async () => { if (answer) throw answer(); return { status: 'succeeded', result: { sendId: '1' } }; });
+    await expect(invoke(body(), 'k-1')).rejects.toMatchObject({ unsettled: { reason: 'unconfirmed' } });
+    answer = null;
+    const reordered = Object.fromEntries(Object.entries(body()).reverse());
+    await expect(invoke(reordered, 'k-1')).resolves.toMatchObject({ status: 'succeeded' });
+    expect(held()).toBe(null);
+  });
 });
+

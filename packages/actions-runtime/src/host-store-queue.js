@@ -121,9 +121,10 @@ export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, 
       return assigned;
     } catch (cause) { throw cause.name === 'QueueNotKept' ? cause : notKept(cause); }
   }
-  function release(rowSeq) {
-    const id = heldHere.get(rowSeq) ?? rows.find((row) => row.seq === rowSeq)?.id;
-    heldHere.delete(rowSeq);
+  function release(rowSeq, rowId = null) {
+    const id = rowId || (heldHere.get(rowSeq) ?? rows.find((row) => row.seq === rowSeq)?.id);
+    // Only this row's mark: a seq another tab reused names a different row.
+    if (!rowId || heldHere.get(rowSeq) === rowId) heldHere.delete(rowSeq);
     if (id && held.delete(id)) {
       const row = rows.find((candidate) => candidate.id === id);
       if (row) changes.committed([row]);
@@ -220,7 +221,7 @@ export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, 
       };
       return serial(async () => {
         const settled = await tryFrom(0);
-        release(rowSeq);
+        release(rowSeq, id);
         return settled;
       });
     },

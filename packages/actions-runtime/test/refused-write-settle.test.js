@@ -360,6 +360,56 @@ describe('createHostStoreQueue settle', () => {
     }
   });
 
+  it('a retry whose open drain ends while offline leaves the rows for the reconnect drain', async () => {
+    vi.useFakeTimers();
+    try {
+      const d = device();
+      const queue = createHostStoreQueue({ backend: d.backend });
+      const issuer = createFakeIssuer();
+      const tokens = {};
+      let release;
+      const notesHeld = new Promise((resolve) => { release = resolve; });
+      const sent = [];
+      const broker = createBroker({
+        capabilityService: issuer, offlineQueue: queue, online: false, idempotencyLedger: null,
+        serverInvoke: async (envelope) => {
+          const mp = String(envelope.activity).split('.')[0];
+          sent.push(mp);
+          if (mp === 'forms') throw Object.assign(new Error('refused'), { status: 409 });
+          await notesHeld;
+          return { status: 'succeeded', result: {} };
+        },
+        replayEnvelope: async (envelope) => ({ ...envelope, instanceId: 'live', capabilityToken: tokens[envelope.sourceMpId] }),
+      });
+      for (const id of ['forms', 'notes']) {
+        broker.registerMp({ id, version: '1.0.0', publisher: { type: 'first_party' }, activities: { save: ACTIVITY } });
+        tokens[id] = await issuer.issue(id, '1.0.0', 'team-3', [], 'live'); // eslint-disable-line no-await-in-loop
+        await broker.invoke({ sourceMpId: id, activity: `${id}.save`, args: {}, idempotencyKey: `k-${id}`, instanceId: 'live', capabilityToken: tokens[id] }); // eslint-disable-line no-await-in-loop
+      }
+      const commit = d.backend.commit;
+      let failing = true;
+      vi.spyOn(d.backend, 'commit').mockImplementation(async (snapshot, changes) => (failing && changes.some((change) => change.op === 'delete' && queue.all().find((row) => row.id === change.key)?.sourceMpId === 'forms')
+        ? { ok: false, reason: 'unavailable' } : commit(snapshot, changes)));
+      broker.setOnline(true);
+      const draining = broker.drainOfflineQueue();
+      await vi.waitFor(() => expect(sent).toContain('notes'));
+      await vi.advanceTimersByTimeAsync(2000);
+      failing = false;
+      broker.setOnline(false);
+      release();
+      await draining;
+      await vi.advanceTimersByTimeAsync(10);
+      // Offline: no drain started for the retry; the refused row waits for the reconnect.
+      expect(queue.all().map((row) => row.sourceMpId)).toEqual(['forms']);
+      broker.setOnline(true);
+      await broker.drainOfflineQueue();
+      await vi.waitFor(() => expect(queue.all()).toEqual([]));
+      expect(sent.filter((mp) => mp === 'forms')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('teardown cancels the scheduled drain: no commit after it', async () => {
     vi.useFakeTimers();
     try {
@@ -404,4 +454,16 @@ describe('settling by the row the drain sent', () => {
     await after.ready();
     expect(after.all().map((row) => row.envelope.idempotencyKey)).toEqual(['second']);
   });
+
+  it('settling another row by its id leaves the running row under that seq marked as running', async () => {
+    const { backend } = device();
+    const queue = createHostStoreQueue({ backend });
+    const seq = await queue.push({ sourceMpId: 'forms', envelope: { sourceMpId: 'forms', activity: 'forms.save', args: {}, idempotencyKey: 'live' }, bytes: 10, held: true });
+    const [live] = queue.all();
+    expect(queue.isHeld(live)).toBe(true);
+    await queue.settle(seq, { rowId: 'gone-row', receipt: { key: 'refused:gone', value: { id: 'refused:gone', kind: 'refused' } } });
+    expect(queue.isHeld(queue.all()[0])).toBe(true);
+    expect(queue.all().map((row) => row.id)).toEqual([live.id]);
+  });
 });
+

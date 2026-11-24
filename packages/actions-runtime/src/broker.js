@@ -108,6 +108,16 @@ function stableHash(value) {
 // A text's size in UTF-16 code units, as Web Storage quotas charge it.
 const utf16Units = (text) => String(text).length;
 
+// A value as JSON with every object's keys in order, arrays as they are: two
+// bodies with the same fields in another order read the same.
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().filter((key) => value[key] !== undefined).map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
 export function createBroker({
   capabilityService,
   recordBackend,
@@ -251,7 +261,29 @@ export function createBroker({
       // eslint-disable-next-line no-use-before-define
       const open = drainInFlight;
       // eslint-disable-next-line no-use-before-define
-      if (!retired) Promise.resolve(open).catch(() => {}).then(() => (retired || !unsettled.size ? null : drainOfflineQueue())).catch(() => {});
+      // Offline, the rows wait for the reconnect drain: a drain now would
+      // queue unsent writes again instead of sending them.
+      if (!retired) Promise.resolve(open).catch(() => {}).then(() => (retired || !unsettled.size || !isOnline ? null : drainOfflineQueue())).catch(() => {});
+    }, SETTLE_RETRY_AFTER_MS);
+  }
+  // Held rows whose write was applied but whose removal the store refused:
+  // never shown as held again in this page, and removed again later (the
+  // write itself is never sent again).
+  const appliedHolds = new Set();
+  let holdCleanupTimer = null;
+  let holdCleanupTries = 0;
+  function scheduleHoldCleanup() {
+    if (retired || holdCleanupTimer || !appliedHolds.size || holdCleanupTries >= SETTLE_RETRY_DRAINS) return;
+    holdCleanupTries += 1;
+    holdCleanupTimer = setTimeout(async () => {
+      holdCleanupTimer = null;
+      for (const id of [...appliedHolds]) {
+        const row = queueStore.all().find((candidate) => candidate.id === id);
+        if (!row) { appliedHolds.delete(id); continue; }
+        // eslint-disable-next-line no-await-in-loop
+        try { await queueStore.remove(row.seq); appliedHolds.delete(id); } catch (_) { /* tried again */ }
+      }
+      if (appliedHolds.size) scheduleHoldCleanup(); else holdCleanupTries = 0;
     }, SETTLE_RETRY_AFTER_MS);
   }
   // Ids of the queued rows a drain of this broker is sending now: their
@@ -1151,9 +1183,11 @@ export function createBroker({
       });
     }
     if (processedKey && processedKeys.has(processedKey)) {
-      // A repeat key replays the stored result, not re-applied.
+      // A repeat key replays the stored result, not re-applied (taken before
+      // the hold's cleanup awaits, which another write could evict it in).
+      const stored = processedKeys.get(processedKey);
       await releaseSettledHold(activityDef, envelope);
-      return { ...processedKeys.get(processedKey), idempotentReplay: true };
+      return { ...stored, idempotentReplay: true };
     }
     if (processedKey && appliedKeysOverflow.has(processedKey)) {
       // Applied this session but its result was released by the cap: still
@@ -1344,12 +1378,18 @@ export function createBroker({
     }
     const refuse = (why) => err('WriteHeld', why, { retryable: false });
     await queueStore.ready?.();
-    const holding = ownQueuedRows().find((row) => row.sourceMpId === sourceMpId
+    let holding = ownQueuedRows().find((row) => row.sourceMpId === sourceMpId
       && row.envelope?.activity === envelope.activity && row.subject === subject);
+    // An applied write's row whose removal failed goes now, before the new claim.
+    if (holding && appliedHolds.has(holding.id)) {
+      try { await queueStore.remove(holding.seq); appliedHolds.delete(holding.id); holding = null; } catch (_) {
+        throw refuse(`the last write of '${envelope.activity}' for this subject is still being cleared`);
+      }
+    }
     if (holding) {
       if (holding.envelope?.idempotencyKey !== envelope.idempotencyKey) throw refuse(`a write of '${envelope.activity}' for this subject is held until it is checked`);
       // A check again sends the held request itself: the same key with another body is refused.
-      if (JSON.stringify(holding.envelope?.args ?? {}) !== JSON.stringify(envelope.args ?? {})) {
+      if (canonicalJson(holding.envelope?.args ?? {}) !== canonicalJson(envelope.args ?? {})) {
         throw refuse(`the held write of '${envelope.activity}' is checked with its own request`);
       }
       if (!queueStore.hold?.(holding.seq)) throw refuse(`the held write of '${envelope.activity}' is already being checked`);
@@ -1442,7 +1482,11 @@ export function createBroker({
         // A removal that fails leaves the row; the next check again under
         // the same key finds the key applied and removes it then.
         if (heldSeq !== null) {
-          try { await queueStore.remove(heldSeq); } catch (_) { /* released by the next check again */ }
+          const heldId = queueStore.all().find((candidate) => candidate.seq === heldSeq)?.id;
+          try { await queueStore.remove(heldSeq); } catch (_) {
+            // Applied: the row is not shown as held, and its removal is tried again.
+            if (heldId) { appliedHolds.add(heldId); scheduleHoldCleanup(); }
+          }
         }
         if (envelope.txnId) {
           const steps = txnSteps.get(envelope.txnId) || [];
@@ -2008,14 +2052,14 @@ export function createBroker({
       const subject = holdSubject(hold, keyFields);
       if (subject === null) return null;
       const row = ownQueuedRows().find((queued) => queued.sourceMpId === sourceMpId
-        && queued.envelope?.activity === activity && queued.subject === subject);
+        && queued.envelope?.activity === activity && queued.subject === subject && !appliedHolds.has(queued.id));
       return row ? heldEntry(row) : null;
     },
 
     /** Every held write of this Mini Program (or of every one when no id is given), as heldWrite answers them, with `sourceMpId` and `subject` (its key values). */
     heldWrites(sourceMpId = null) {
       return ownQueuedRows()
-        .filter((row) => typeof row.subject === 'string' && (sourceMpId === null || row.sourceMpId === sourceMpId))
+        .filter((row) => typeof row.subject === 'string' && !appliedHolds.has(row.id) && (sourceMpId === null || row.sourceMpId === sourceMpId))
         .sort((a, b) => a.seq - b.seq)
         .map((row) => {
           let subject = [];
@@ -2037,6 +2081,7 @@ export function createBroker({
       if (instanceId != null) return;
       retired = true;
       clearTimeout(settleRetryTimer);
+      clearTimeout(holdCleanupTimer);
       settleRetryTimer = null;
       unsettled.clear();
       [...queueSubscriptions].forEach((off) => off());
