@@ -8,7 +8,7 @@
  * persists those arrays into the `dashboard_layout` team setting) — the host
  * renders a PARALLEL, flag-gated grid section of its own.
  */
-import { createApp, h } from 'vue';
+import { createApp, h, shallowReactive } from 'vue';
 import { PanelTile } from './panel-tile.js';
 import { isStaleWorldRefusal } from './stale-world.js';
 import { layoutFor, normalizePanels } from './layout.js';
@@ -16,6 +16,16 @@ import { layoutFor, normalizePanels } from './layout.js';
 /** Advisory surface budget (a tunable default). */
 export const SURFACE_PANEL_BUDGET = 24;
 export const SURFACE_MP_BUDGET = 12;
+
+// A tile's key carries its definition's generation: a re-registered panel
+// (a new definition object) mounts fresh; the same definition is patched.
+const defGenerations = new WeakMap();
+let defGeneration = 0;
+function generationOf(def) {
+  if (!def || typeof def !== 'object') return 0;
+  if (!defGenerations.has(def)) defGenerations.set(def, (defGeneration += 1));
+  return defGenerations.get(def);
+}
 
 /**
  * Takes a stale-world refusal that Vue attributes to a panel tile itself
@@ -58,7 +68,7 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
   // both the master page (`/calendar/`) and the detail page (`/calendar/overview/`)
   // simultaneously. Keying by surface would tear the first down when the second
   // mounts (blanking the master pane).
-  const mounted = new Map();       // el -> { app, el, surface }
+  const mounted = new Map();       // el -> { app, el, surface, view, onDispose }
 
   return {
     /**
@@ -186,9 +196,11 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
      * mode honours.
      */
     mountSurface(el, { surface, viewerRoles = [], ctxFor, mpId, panelId, layout, pack = null, onDispose, onPanelElement, onClose, closeLabel }) {
-      // Idempotent per element: re-mounting into the same element replaces its
-      // app (never touches another element hosting the same surface name).
-      this.unmountSurface(el);
+      // Per element (never another element hosting the same surface name). A
+      // re-mount into an element this host already serves keeps its app and
+      // patches its tiles by key: an unchanged tile keeps its component
+      // instance, and a changed context arrives as a prop update. A world
+      // (account) change is another host, which mounts fresh.
       let tiles;
       if (Array.isArray(layout)) {
         // A resolved entry with no decl (MP uninstalled) or no live
@@ -224,10 +236,31 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
         if (onEvent) onEvent({ type: 'surface-budget-exceeded', surface, count: tiles.length, at: Date.now() });
         tiles.length = SURFACE_PANEL_BUDGET;
       }
+      const next = {
+        surface, tiles, pack, ctxFor, onPanelElement, onClose, closeLabel,
+      };
+      const current = mounted.get(el);
+      if (current?.view) {
+        const replacedDispose = current.onDispose;
+        Object.assign(current.view, next);
+        current.surface = surface;
+        current.onDispose = onDispose;
+        // The previous mount's host resources (its contexts' panes) go once
+        // the tiles were handed the new ones.
+        if (replacedDispose && replacedDispose !== onDispose) {
+          try { replacedDispose(); } catch (_) { /* host cleanup isolation */ }
+        }
+        return { panelCount: tiles.length, patched: true };
+      }
+      this.unmountSurface(el);
+      const view = shallowReactive(next);
       const app = createApp({
         name: 'MpPanelSurface',
-        render: () => h('div', { class: 'mp-panel-grid', 'data-mp-surface': surface },
-          tiles.map(({ mpId, def, entry }) => {
+        render: () => h('div', { class: 'mp-panel-grid', 'data-mp-surface': view.surface },
+          view.tiles.map(({ mpId, def, entry }) => {
+            const {
+              surface: shownSurface, pack: shownPack, ctxFor: contextFor, onPanelElement: onElement, onClose: close, closeLabel: closeText,
+            } = view;
             // Composed placement is an INLINE style on the tile root (Vue
             // fallthrough onto PanelTile's single root div): explicit start
             // lines, because `span` alone would let the grid autoplace and
@@ -235,7 +268,7 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
             const cell = entry && entry.cell;
             let style;
             if (cell) {
-              style = pack === 'flow'
+              style = shownPack === 'flow'
                 ? { gridColumn: `span ${cell.w}` }
                 : { gridColumn: `${cell.x + 1} / span ${cell.w}`, gridRow: `${cell.y + 1} / span ${cell.h}` };
             }
@@ -249,10 +282,10 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
               });
             }
             return h(PanelTile, {
-              ref: (instance) => onPanelElement?.(mpId, def, entry, instance?.$el || null),
+              ref: (instance) => onElement?.(mpId, def, entry, instance?.$el || null),
               // Composed keys are the INSTANCE uuid — the same panel may be
               // placed twice on one tab.
-              key: entry ? entry.instance.id : `${mpId}:${def.id}`,
+              key: `${entry ? entry.instance.id : `${mpId}:${def.id}`}#${generationOf(def)}`,
               style,
               // The instance id on the tile ELEMENT (attrs fall through to
               // the root) — hosts overlay per-tile chrome (edit-mode
@@ -263,12 +296,12 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
               // Composed mode hands ctxFor the full resolver entry as a third
               // argument (params/config/cell live there); declaration-mode
               // calls stay two-arg so arity-sniffing hosts see no change.
-              ctx: ctxFor
-                ? (entry ? ctxFor(mpId, def, entry) : ctxFor(mpId, def))
-                : { panelId: def.id, surface, surfaceContext: { surface }, config: (entry && entry.instance.config) || {}, online: true },
+              ctx: contextFor
+                ? (entry ? contextFor(mpId, def, entry) : contextFor(mpId, def))
+                : { panelId: def.id, surface: shownSurface, surfaceContext: { surface: shownSurface }, config: (entry && entry.instance.config) || {}, online: true },
               onEvent,
-              onClose,
-              closeLabel,
+              onClose: close,
+              closeLabel: closeText,
             });
           })),
       });
@@ -283,8 +316,10 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
         try { onDispose?.(); } finally { app.unmount(); }
         throw error;
       }
-      mounted.set(el, { app, el, surface, onDispose });
-      return { panelCount: tiles.length };
+      mounted.set(el, {
+        app, el, surface, view, onDispose,
+      });
+      return { panelCount: tiles.length, patched: false };
     },
 
     /**

@@ -1,0 +1,47 @@
+{
+  "source": "designed",
+  "journey": "J9",
+  "surface": "S11",
+  "hostApi": 20,
+  "decisions": [
+    "D23"
+  ],
+  "given": {
+    "surface": "dashboard tile of a Mini Program panel that already rendered",
+    "trigger": "location filter change → re-attach",
+    "def.load": {
+      "delayMs": 7000
+    }
+  },
+  "call": {
+    "api": "sdk panel-runtime mountSurface / panel-tile boot"
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "patch",
+      "payload": "tile kept (same instance id); ctx updated as a prop; no unmount"
+    },
+    {
+      "t": 5000,
+      "event": "status",
+      "payload": {
+        "content": "previous render kept",
+        "mark": "stale",
+        "retry": true
+      }
+    },
+    {
+      "t": 7000,
+      "event": "status",
+      "payload": {
+        "content": "new render",
+        "mark": null
+      }
+    }
+  ],
+  "assert": [
+    "No 'This panel couldn't load' at 5 s on a slow network.",
+    "A real load failure still shows the error card; 3 in a row still escalate to reload."
+  ]
+}
