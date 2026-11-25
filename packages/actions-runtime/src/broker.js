@@ -40,15 +40,42 @@ const CONFIRM_WITHIN_MS = 24 * 60 * 60 * 1000;
 // A write that takes a secret input is never kept for a confirm.
 const SECRET_INPUT_NAMES = new Set(['pin', 'passcode', 'password', 'secret', 'token', 'otp']);
 
-function hasSecretInput(schema, depth = 0) {
-  if (!schema || typeof schema !== 'object' || depth > 8) return false;
+const SCHEMA_DEPTH_MAX = 8;
+const SUBSCHEMA_KEYS = ['items', 'additionalProperties', 'additionalItems', 'contains', 'not', 'if', 'then', 'else',
+  'propertyNames', 'unevaluatedProperties', 'unevaluatedItems'];
+const SUBSCHEMA_LIST_KEYS = ['allOf', 'anyOf', 'oneOf', 'prefixItems'];
+const SUBSCHEMA_MAP_KEYS = ['patternProperties', 'dependentSchemas'];
+
+function localRef(root, ref) {
+  if (typeof ref !== 'string' || !ref.startsWith('#')) return undefined;
+  if (ref === '#') return root;
+  if (!ref.startsWith('#/')) return undefined;
+  return ref.slice(2).split('/').map((part) => decodeURIComponent(part).replace(/~1/g, '/').replace(/~0/g, '~'))
+    .reduce((node, part) => (node && typeof node === 'object' ? node[part] : undefined), root);
+}
+
+// Anything it cannot inspect (too deep, a remote or unresolvable $ref) counts as secret, so the request is never kept.
+function hasSecretInput(schema, depth = 0, root = schema, seen = new Set()) {
+  if (schema === undefined || schema === null || typeof schema === 'boolean') return false;
+  if (typeof schema !== 'object' || depth > SCHEMA_DEPTH_MAX) return true;
   if (schema.writeOnly === true) return true;
+  if (schema.$ref !== undefined) {
+    const target = localRef(root, schema.$ref);
+    if (target === undefined) return true;
+    if (!seen.has(schema.$ref) && hasSecretInput(target, depth + 1, root, new Set([...seen, schema.$ref]))) return true;
+  }
   for (const [name, property] of Object.entries(schema.properties || {})) {
     if (SECRET_INPUT_NAMES.has(String(name).toLowerCase())) return true;
-    if (hasSecretInput(property, depth + 1)) return true;
+    if (hasSecretInput(property, depth + 1, root, seen)) return true;
   }
-  if (schema.items && hasSecretInput(schema.items, depth + 1)) return true;
-  return ['allOf', 'anyOf', 'oneOf'].some((key) => Array.isArray(schema[key]) && schema[key].some((part) => hasSecretInput(part, depth + 1)));
+  for (const key of SUBSCHEMA_MAP_KEYS) {
+    if (Object.values(schema[key] || {}).some((part) => hasSecretInput(part, depth + 1, root, seen))) return true;
+  }
+  for (const key of SUBSCHEMA_KEYS) {
+    const part = schema[key];
+    if (Array.isArray(part) ? part.some((one) => hasSecretInput(one, depth + 1, root, seen)) : hasSecretInput(part, depth + 1, root, seen)) return true;
+  }
+  return SUBSCHEMA_LIST_KEYS.some((key) => Array.isArray(schema[key]) && schema[key].some((part) => hasSecretInput(part, depth + 1, root, seen)));
 }
 
 const confirmEligible = (activityDef) => activityDef?.idempotency === 'client_key'
