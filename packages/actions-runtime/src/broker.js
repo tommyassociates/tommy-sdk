@@ -2046,10 +2046,12 @@ export function createBroker({
     /**
      * One Mini Program's waiting writes, as receipts its own surface can show
      * after a reload (the queue's own receipts, never a second draft
-     * list): `[{ id, activity, args, queuedAt, attempts, state }]` in the
-     * order they will be sent. `state` is `sending` (on its way now),
-     * `failed` (sent and not settled; it is sent again) or `queued`. Only
-     * rows of this broker's person and account; `args` are a copy.
+     * list): `[{ id, activity, args, queuedAt, attempts, state,
+     * idempotencyKey }]` in the order they will be sent. `state` is `sending`
+     * (on its way now), `failed` (sent and not settled; it is sent again) or
+     * `queued`; `idempotencyKey` is the key the write was queued under (null
+     * only for a row queued without one). Only rows of this broker's person
+     * and account; `args` are a copy.
      */
     queuedWrites(sourceMpId) {
       return ownQueuedRows()
@@ -2066,6 +2068,7 @@ export function createBroker({
             queuedAt: row.queuedAt,
             attempts,
             state,
+            idempotencyKey: typeof row.envelope.idempotencyKey === 'string' ? row.envelope.idempotencyKey : null,
           };
         });
     },
