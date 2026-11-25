@@ -1,17 +1,8 @@
-/**
- * Time alone is never a panel error. Past the load timeout, a tile that
- * already rendered keeps its content with a stale mark and Retry; a first boot
- * keeps its skeleton with a "taking longer" note; a late answer replaces
- * either; a real failure still shows the error card, and three in a row still
- * escalate. A changed context loads the tile again, keeping its content
- * meanwhile. Contract fixture J9-panel-slow-keeps-content.
- */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createPanelHost, LOAD_TIMEOUT_MS } from '../src/index.js';
 
-// Under jsdom, fileURLToPath rejects the URL objects it is given, so the path is read off import.meta.url.
 const FIXTURE = JSON.parse(readFileSync(join(dirname(decodeURIComponent(new globalThis.URL(import.meta.url).pathname)), 'fixtures/hds-contract/J9-panel-slow-keeps-content.json'), 'utf8'));
 const panels = { reports: { surfaces: ['dashboard'] } };
 const entry = (config) => ({ instance: { id: 'i-1', mpId: 'reports', panelId: 'reports', config }, decl: panels.reports, cell: { x: 0, y: 0, w: 4, h: 3 } });
@@ -29,7 +20,6 @@ describe('no time-only panel error (J9-panel-slow-keeps-content)', () => {
   });
   afterEach(() => { vi.useRealTimers(); el.remove(); });
 
-  /** A plain-DOM panel whose load for a location answers when the test says so. */
   function slowPanel() {
     const pending = new Map();
     const def = {
@@ -50,7 +40,6 @@ describe('no time-only panel error (J9-panel-slow-keeps-content)', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(tile().className).toContain('mp-panel-tile--ready');
 
-    // The location filter changes: re-attach with a new context (patch, not remount).
     const result = host.mountSurface(el, { surface: 'dashboard', layout: [entry({ location: 'pier' })] });
     expect(result.patched).toBe(patch.event === 'patch');
     await vi.advanceTimersByTimeAsync(LOAD_TIMEOUT_MS + 10);

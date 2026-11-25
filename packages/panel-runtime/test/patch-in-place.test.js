@@ -1,11 +1,3 @@
-/**
- * A surface re-mounted into the element it already fills keeps its app and
- * patches its tiles by key: an unchanged tile keeps its component instance
- * (it is never unmounted), a changed context arrives as a prop update, a
- * removed tile goes and an added one mounts. A world (account) change is
- * another host, which mounts fresh. Contract fixture J9-panel-slow-keeps-content
- * (the patch half).
- */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -13,7 +5,6 @@ import { h } from 'vue';
 import { createPanelHost } from '../src/index.js';
 
 const flush = () => new Promise((resolve) => { setTimeout(resolve, 0); });
-// Under jsdom, fileURLToPath rejects the URL objects it is given, so the path is read off import.meta.url.
 const FIXTURE = JSON.parse(readFileSync(join(dirname(decodeURIComponent(new globalThis.URL(import.meta.url).pathname)), 'fixtures/hds-contract/J9-panel-slow-keeps-content.json'), 'utf8'));
 
 const lifecycle = { mounted: [], unmounted: [], instances: new Map() };
@@ -70,7 +61,6 @@ describe('panel surface patch in place', () => {
     expect(lifecycle.unmounted).toEqual([]);
     expect(lifecycle.mounted).toEqual(['a', 'b']);
     expect(el.firstElementChild).toBe(appRoot);
-    // The changed context reached the kept instance as a prop update.
     expect(b.ctx.config.week).toBe(2);
     expect(el.querySelector('[data-instance-id="i-2"] .tile-body').getAttribute('data-week')).toBe('2');
   });

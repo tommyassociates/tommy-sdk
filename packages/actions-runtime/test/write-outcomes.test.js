@@ -1,13 +1,3 @@
-/**
- * Write outcomes by key: what happened to a Mini Program's own client_key
- * write survives a restart (`writeOutcome`), its follow-up emit is marked once
- * (`markOutcomeEmitted`), and a write that got no settling answer is sent once
- * more under the same key with its recorded arguments byte for byte
- * (`confirmWriteOutcome`), within the bounds: eligible activities only, a
- * recorded request, once per key, within 24 hours. No result is ever kept.
- * Replays the contract fixtures J4-outcome-hit-succeeded, J4-outcome-miss,
- * J6-outcome-unconfirmed-confirm-replayed and J6-confirm-outcome-bounds-refused.
- */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -38,7 +28,6 @@ const verifyKioskPin = {
 };
 const saveLeave = { ...recordAttendance, description: 'a leave save' };
 
-/** A device store for `account.mp_outcomes`: rows survive a "restart" (a new broker over the same rows). */
 function deviceStore(seed = []) {
   const rows = new Map(seed.map((row) => [row.id, JSON.parse(JSON.stringify(row))]));
   return {
@@ -49,7 +38,6 @@ function deviceStore(seed = []) {
   };
 }
 
-/** A stored record as the broker writes it, for the given activity, key and fields. */
 function seedRecord(activity, key, fields) {
   const ledger = createOutcomeLedger({ now: () => fields.at });
   const made = ledger.record('*', activity, key, { state: fields.state, rpcId: fields.rpcId ?? null, request: fields.request });
@@ -67,7 +55,6 @@ async function page({ store, now, online = true, serverInvoke = vi.fn(async () =
     now: () => clock.now,
     outcomeStore: store,
     sleep: async () => {},
-    // As the host does: a confirm's request gets this page's identity and token.
     replayEnvelope: async (envelope) => ({ ...envelope, ...identities[envelope.sourceMpId] }),
   });
   broker.registerMp({
@@ -143,12 +130,10 @@ describe('a clock-out whose answer was lost (J6-outcome-unconfirmed-confirm-repl
     const [, request, resolved, , marked] = f.timeline;
     const store = deviceStore();
 
-    // Sent online; the server committed it, but the answer never arrived.
     const first = await page({ store, now: given.at, serverInvoke: vi.fn(async () => { throw lostAnswer(); }) });
     await expect(first.invoke(given.activity, request.payload.args, given.key)).rejects.toMatchObject({ code: 'ActivityFailed' });
     await first.broker.outcomesReady();
 
-    // The app restarted.
     const serverInvoke = vi.fn(async () => ({ result: resolved.payload.result, replayed: true }));
     const second = await page({ store, now: given.at + 10 * 60000, serverInvoke });
     await second.broker.outcomesReady();
@@ -159,17 +144,14 @@ describe('a clock-out whose answer was lost (J6-outcome-unconfirmed-confirm-repl
     const [sent] = serverInvoke.mock.calls[0];
     expect(sent.idempotencyKey).toBe(request.payload.idempotencyKey);
     expect(sent.activity).toBe(given.activity);
-    // Byte for byte: the recorded body, the original client time inside it.
     expect(JSON.stringify(sent.args)).toBe(JSON.stringify(request.payload.args));
     expect(answer).toEqual({ ...resolved.payload, rpcId: expect.any(String) });
 
     expect(await second.broker.markOutcomeEmitted('time-clock', 'record_attendance', given.key)).toBe(marked.payload);
     expect(second.broker.writeOutcome('time-clock', 'record_attendance', given.key)).toMatchObject({ state: 'succeeded', emitted: true, confirmable: false });
-    // Once per key: a second confirm sends nothing.
     await expect(second.broker.confirmWriteOutcome('time-clock', 'record_attendance', given.key))
       .rejects.toMatchObject({ code: 'WriteNotConfirmable', details: { reason: 'no_request' } });
 
-    // A second restart finds it emitted: Time Clock does not emit again.
     const third = await page({ store, now: given.at + 20 * 60000 });
     await third.broker.outcomesReady();
     expect(third.broker.writeOutcome('time-clock', 'record_attendance', given.key)).toMatchObject({ state: 'succeeded', emitted: true });

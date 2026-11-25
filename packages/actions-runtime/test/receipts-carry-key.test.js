@@ -1,8 +1,3 @@
-/**
- * Every receipt of a waiting write carries the key it was queued under, so a
- * Mini Program matches its own pending work by key, not by its arguments.
- * Replays the contract fixture J4-receipts-with-key.
- */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

@@ -1,24 +1,3 @@
-/**
- * provider-readiness.test.js — the MP REGISTRATION RACE, made waitable.
- *
- * An MP registers only once its bundle has been fetched and evaluated, and the
- * host mounts each MP's surfaces AS SOON AS THAT MP registers rather than
- * blocking the route on the whole fan-out (the instant-boot optimisation in
- * app/src/services/mp-loader/index.js, `mountReadySurfacesFor`). So a panel can
- * be live and dispatching while a DIFFERENT MP it consumes is still mid-fetch.
- *
- * Before this, the broker had one answer for both cases: UnknownCondition. That
- * is indistinguishable from "the MP is not installed", and consumers wrap these
- * reads in a safeQuery default — so the failure was silent. MEASURED on the
- * `availability/main` parity pair, 2026-08-21: all four `leave.*` reads failed
- * with `condition 'leave.leave_requests' is not registered` while the SAME boot
- * summary reported `mps: 2, mounted: 2`. Leave was installed, loading, and had
- * simply not got there yet; the Next-Time-Off card rendered empty.
- *
- * `expectMps()` lets the host declare the loading set, so the broker can tell
- * "not YET" from "not installed" — and wait for the first without ever delaying
- * the second.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 
@@ -62,27 +41,12 @@ const registerProvider = (broker) => broker.registerMp(provider, {
   },
 });
 
-/**
- * Register on a TIMER, not synchronously after the dispatch call.
- *
- * ⚠ THIS DETAIL IS LOAD-BEARING AND WAS FOUND BY MUTATION TESTING. `invoke()`
- * awaits several steps (idempotency ledger, offline-queue check) before it
- * looks the MP up, so a SYNCHRONOUS `registerProvider()` on the next line lands
- * during those awaits — the entry is present by the time the lookup runs, and
- * the test passes whether or not the wait exists. Written that way, the write
- * half of this suite proved nothing: stubbing the fix left it green. A timer
- * puts registration after a real turn of the event loop, which is the race the
- * host actually produces (a bundle fetch), and reds correctly when the wait is
- * removed.
- */
 const registerProviderLate = (broker, ms = 15) => setTimeout(() => registerProvider(broker), ms);
 
 async function world({ registrationTimeoutMs = 8000 } = {}) {
   const issuer = createFakeIssuer();
   const broker = createBroker({ capabilityService: issuer, registrationTimeoutMs });
   broker.registerMp(consumer, { handlers: {} });
-  // The cross-MP write grant — this suite is about the RACE, not authorisation,
-  // so the caller is granted what authz-invoke.test.js exists to police.
   const token = await issuer.issue('availability', '1.0.0', TENANT, ['invoke:leave.request_leave'], 'i-av');
   return {
     broker,
@@ -100,7 +64,6 @@ describe('provider readiness — an ANNOUNCED MP is waited for', () => {
     const w = await world();
     w.broker.expectMps(['leave']);
 
-    // Dispatch FIRST, register after — the boot ordering the panel actually hit.
     const pending = w.query();
     registerProviderLate(w.broker);
 
@@ -130,11 +93,8 @@ describe('provider readiness — an ANNOUNCED MP is waited for', () => {
   it('an already-registered provider does NOT wait — announcing it is a no-op', async () => {
     const w = await world({ registrationTimeoutMs: 30_000 });
     registerProvider(w.broker);
-    w.broker.expectMps(['leave']); // late, and must not re-arm a wait
+    w.broker.expectMps(['leave']);
 
-    // A wait would last the 30 s registration timeout, past the test's own
-    // timeout; resolving within a second proves there was none, even on a
-    // loaded machine.
     const started = Date.now();
     expect(await w.query()).toBe('requests');
     expect(Date.now() - started).toBeLessThan(1_000);
@@ -143,7 +103,7 @@ describe('provider readiness — an ANNOUNCED MP is waited for', () => {
 
 describe('provider readiness — an UNANNOUNCED MP still fails fast', () => {
   it('a read for an MP the host never announced raises UnknownCondition immediately', async () => {
-    const w = await world({ registrationTimeoutMs: 60_000 }); // a wait would hang the test
+    const w = await world({ registrationTimeoutMs: 60_000 });
     const rejection = await w.query().catch((e) => e);
 
     expect(rejection.code).toBe('UnknownCondition');
@@ -157,9 +117,6 @@ describe('provider readiness — an UNANNOUNCED MP still fails fast', () => {
     expect(rejection.code).toBe('UnknownActivity');
   });
 
-  // ⚠ THE DISTINCTION THE WAIT IS GATED ON. A REGISTERED MP missing the named
-  // condition is a manifest error, not a race. Waiting on it would turn an
-  // instant, accurate failure into a timeout that lies about the cause.
   it('a REGISTERED provider missing the condition fails immediately, announced or not', async () => {
     const w = await world({ registrationTimeoutMs: 60_000 });
     w.broker.expectMps(['leave']);
@@ -187,8 +144,6 @@ describe('provider readiness — an announcement is a promise the host must keep
   });
 
   it('stopExpecting releases waiters AT ONCE rather than making each burn the timeout', async () => {
-    // The bundle-fetch-failed path: the host knows the MP is not coming, so
-    // callers must not keep paying for the announcement.
     const w = await world({ registrationTimeoutMs: 60_000 });
     w.broker.expectMps(['leave']);
 

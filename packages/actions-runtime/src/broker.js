@@ -1,10 +1,4 @@
-/**
- * The host broker: the trusted mediator every cross-MP message passes through.
- * Enforcement (capability tokens, default-deny authz, throttles, loop/cascade
- * caps, schema validation, action-run records) lives here, never in SDK code;
- * the SDK validates for DX only. server_write goes through the injected
- * `serverInvoke` seam, never an endpoint literal.
- */
+// Enforcement lives here, never in SDK code; the SDK validates for developer experience only.
 import { TommyError, isTommyError, buildSdk, DEFAULT_RPC_TIMEOUT_MS } from '@tommy/sdk';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
@@ -32,36 +26,20 @@ const PARENT_RUN = Symbol('parentRun');
 
 const dayKey = (ts) => new Date(ts).toISOString().slice(0, 10);
 
-/** inputMap sources the broker executes (plus the default). */
 const M1_SOURCES = new Set(['trigger', 'condition', 'option']);
 
-/**
- * Broker-lifetime maps are caches, not ledgers, so each has a hard cap;
- * eviction costs a recompute or re-apply, never correctness.
- */
+// Broker-lifetime maps are caches, not ledgers: each is capped, and eviction costs a recompute, never correctness.
 const CONDITION_CACHE_MAX = 500;
-/** Insertion order is eviction order (FIFO). */
 const PROCESSED_KEYS_MAX = 1000;
-/** Keys whose RESULT was released but whose already-applied fact must survive
- *  — far cheaper per entry, so it holds an order of magnitude more. */
 const APPLIED_KEYS_OVERFLOW_MAX = 10000;
-/** Idempotent runs that may be in flight at once. Past it a new keyed invoke
- *  is refused (`RateLimited`) rather than admitted, so every running key stays
- *  joinable and a stuck MP cannot pile up work without limit. */
+// Past this a keyed invoke is refused, so every running key stays joinable and a stuck MP cannot pile up work.
 const INFLIGHT_RUNS_MAX = 500;
-// A refused queued write whose settlement the store could not take is
-// settled again by a drain this long after, at most this many times in a
-// row; later drains (reconnect, a new write) try again as well.
 const SETTLE_RETRY_AFTER_MS = 2000;
 const SETTLE_RETRY_DRAINS = 3;
-// A write's outcome may be confirmed (sent once more under its key) only this
-// long after it was recorded.
 const CONFIRM_WITHIN_MS = 24 * 60 * 60 * 1000;
-// Input names that mark an argument as a secret: a write that takes one is
-// never kept for a confirm.
+// A write that takes a secret input is never kept for a confirm.
 const SECRET_INPUT_NAMES = new Set(['pin', 'passcode', 'password', 'secret', 'token', 'otp']);
 
-/** Whether a JSON schema names (or marks writeOnly) a secret input anywhere in its properties. */
 function hasSecretInput(schema, depth = 0) {
   if (!schema || typeof schema !== 'object' || depth > 8) return false;
   if (schema.writeOnly === true) return true;
@@ -73,27 +51,16 @@ function hasSecretInput(schema, depth = 0) {
   return ['allOf', 'anyOf', 'oneOf'].some((key) => Array.isArray(schema[key]) && schema[key].some((part) => hasSecretInput(part, depth + 1)));
 }
 
-/** A client_key, offline-replayable activity with no secret input: its request may be kept and confirmed. */
 const confirmEligible = (activityDef) => activityDef?.idempotency === 'client_key'
   && activityDef.offlineReplayable === true && !hasSecretInput(activityDef.inputSchema);
 
-// Server-write activities whose host adapter gets replay provenance (see
-// executeInvoke). `team.update_member` always gets it: the member-restore gate
-// reads deadlineAt on live calls too.
 const RESTORE_CONTEXT_ALWAYS = new Set(['team.update_member']);
-// These get it only on a durable-queue drain (`restoreDrain`), so the server can
-// read "restoreContext present" as "this write waited in the queue" and honour
-// its captured time. An inspector replay sets `restoreReplay` but never waited.
+// Only on a durable-queue drain: the server reads restoreContext as 'this write waited' and honours its captured time.
 const RESTORE_CONTEXT_ON_DRAIN = new Set(['time-clock.record_attendance', 'time-clock.record_booking_clock']);
 const wantsRestoreContext = (envelope) => RESTORE_CONTEXT_ALWAYS.has(envelope.activity)
   || (RESTORE_CONTEXT_ON_DRAIN.has(envelope.activity) && envelope.restoreDrain === true);
-// `queuedAt` is part of the drain-only context; the member-restore wire shape is unchanged.
 const wantsQueuedAt = (envelope) => RESTORE_CONTEXT_ON_DRAIN.has(envelope.activity) && envelope.restoreDrain === true;
 
-/**
- * Platform triggers on every registered MP's namespace, undeclared; a closed,
- * in-binary set. `settings.changed` fires only when a setting actually moves.
- */
 const SYSTEM_TRIGGERS = Object.freeze({
   'settings.changed': Object.freeze({
     emission: 'async',
@@ -109,18 +76,13 @@ function dottedGet(obj, path) {
   return String(path).split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), obj);
 }
 
-/** Key-order-independent stringify (deterministic Action idempotency keys). */
 function stableStringify(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
   return `{${Object.keys(value).sort().filter((k) => value[k] !== undefined).map((k) => `${JSON.stringify(k)}:${stableStringify(value[k])}`).join(',')}}`;
 }
 
-/**
- * FNV-1a 32-bit over the stable form, so a derived Action key fits the
- * envelope's idempotencyKey maxLength (128). The server's upsert is the real
- * duplicate guard; the key is the exactly-once ledger handle.
- */
+// FNV-1a so a derived key fits idempotencyKey maxLength (128); the server's upsert is the real duplicate guard.
 function stableHash(value) {
   const text = stableStringify(value);
   let hash = 0x811c9dc5;
@@ -131,11 +93,8 @@ function stableHash(value) {
   return (hash >>> 0).toString(36);
 }
 
-// A text's size in UTF-16 code units, as Web Storage quotas charge it.
 const utf16Units = (text) => String(text).length;
 
-// A value as JSON with every object's keys in order, arrays as they are: two
-// bodies with the same fields in another order read the same.
 function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -148,96 +107,31 @@ export function createBroker({
   capabilityService,
   recordBackend,
   serverInvoke,
-  // Host-only outcome observation; the broker remains the sole replay owner.
   onOfflineOutcome,
   now = () => Date.now(),
   online = true,
   throttleOverrides = {},
-  // Trusted host aliases for in-memory configuration only; wire and durable
-  // identities retain the tenant identifier supplied by the authenticated call.
   tenantStateKey = (tenantId) => tenantId,
-  // Enforcement flags, default off: turning one on needs the matching manifest
-  // declarations (grants / read: scopes) to exist first.
-  /**
-   * Treat `authorizedCallers: []` as deny-all-cross-MP, not "unset".
-   * `callerPolicy: owner_only` says the same thing and is not gated on this.
-   */
   strictEmptyCallers = false,
-  /** Cross-MP condition reads require a `read:<owner>.<condition>` scope. */
   enforceConditionScopes = false,
-  /** Emit must own the trigger namespace; subscribe must be granted. */
   strictEmitOwnership = false,
-  /**
-   * `(mpId, tenantId) => string[]`: the scopes that MP's install holds in that
-   * tenant (its token's `effectiveScopes`), for the paths that carry no token:
-   * `subscribe()` and its deliveries, Action trigger bindings and Action
-   * dispatches. No array means no scopes; omitted, the manifest's declared
-   * `permissions.scopes` are used.
-   */
   grantedScopes,
-  /** `{ mpId: 'domain' }` overrides for read-scope derivation. */
   domainScopeOverrides = {},
-  /** Conditions the primitives derivation must not grant. */
   sensitiveConditions = SENSITIVE_CONDITIONS,
-  /**
-   * The durable half of the idempotency ledger. It detects storage itself, so
-   * node/tests stay memory-only; `null` disables persistence.
-   */
   idempotencyLedger = createIdempotencyLedger(),
   invalidationEpochs = createInvalidationEpochs(),
-  /** The offline queue's durable half; same seam as the ledger above. */
   offlineQueue = createDurableQueue({ now }),
-  /**
-   * `() => ({ person, accountType, accountId, tenantId })`: who this broker
-   * queues and sends offline writes for. The queue is one store per device, so
-   * only a broker of the same owner sends a row (see `ownsQueuedRow`); an
-   * unstamped row goes to a broker of its tenant. Without it every row is ours.
-   */
+  // The queue is one store per device, so only a broker of the same owner sends a row.
   queueOwner = null,
   replayEnvelope = (envelope) => envelope,
-  /**
-   * The durable half of the write outcome records (`writeOutcome`,
-   * `confirmWriteOutcome`): `{ load(), put(record), remove(id) }`. Without
-   * one (a kiosk device, tests) records live in memory only.
-   */
   outcomeStore = null,
-  /**
-   * The durable half of held condition answers (`account.mp_condition_answers`):
-   * `{ load(), put(entry), remove(id) }`. Without one (a kiosk device, tests)
-   * they live in memory only.
-   */
   conditionAnswerStore = null,
-  /**
-   * `() => string`: the viewer's role fingerprint (role, Team Admin or Team
-   * Member mode, location-tag set). A held condition answer is served only
-   * under the fingerprint it was kept under.
-   */
   viewerFingerprint = () => '',
-  /** `(code, status)`: a read failed with a code the refusal lists do not name. */
   reportReadCode = null,
-  /**
-   * How long a dispatch waits for an MP announced through `expectMps()` but not
-   * yet registered before raising Unknown{Condition,Activity}. Larger than a
-   * condition's `latencyBudgetMs`: it covers bundle fetch + eval on a cold radio.
-   */
   registrationTimeoutMs = 8000,
-  /**
-   * How long a condition handler's `signal` still follows the caller's own
-   * `signal` after the caller is answered. A handler that answers from what it
-   * holds may leave a host read queued to warm the next answer; that read
-   * goes unsent once the asking surface leaves the screen within this time.
-   */
   callerLinkAfterAnswerMs = 60000,
-  /**
-   * How long an invoke joining an in-flight run with the same idempotency key
-   * waits before a non-retryable `Timeout`. With `rpcDeadlineAt` it gives up just
-   * before that deadline, so the caller gets this error, not the adapter's. It
-   * also ends a handler invoking its own activity with its own key.
-   */
   inflightJoinTimeoutMs = DEFAULT_RPC_TIMEOUT_MS,
-  /** Injectable so a test asserts the retry schedule instead of waiting it out. */
   sleep = (ms) => (ms > 0 ? new Promise((resolve) => { setTimeout(resolve, ms); }) : Promise.resolve()),
-  /** Injectable timer for the queued-resend wake-up (F8); unref'd so node can exit. */
   setTimer = (fn, ms) => { const timer = setTimeout(fn, ms); timer?.unref?.(); return timer; },
   clearTimer = (timer) => clearTimeout(timer),
 } = {}) {
@@ -256,53 +150,35 @@ export function createBroker({
 
   const records = createRecordStore({ backend: recordBackend, now });
   const outcomes = createOutcomeLedger({ store: outcomeStore, now });
-  // Read what the store holds now, so `writeOutcome` (synchronous) can answer it.
   outcomes.ready();
   const conditionAnswers = createConditionAnswers({ store: conditionAnswerStore });
   conditionAnswers.ready();
-  // Orders the reads that may keep a held condition answer.
   let conditionReadSeq = 0;
 
-  // --- registries -----------------------------------------------------------
-  const mps = new Map();              // mpId -> { manifest, handlers, firstParty }
-  // The host mounts each MP's surfaces as soon as that MP registers, so a panel
-  // can query an MP that is still loading and get `UnknownCondition`, which looks
-  // like "not installed". `expectMps()` declares the set about to register so
-  // the broker awaits "not yet"; an MP never announced still fails fast.
-  const expectedMps = new Set();      // announced by the host, not yet registered
-  const registrationWaiters = new Map(); // mpId -> Set<resolve>
-  const subscribers = new Map();      // trigger -> Set<{mpId, handler}>
-  const actionState = new Map();      // tenant / MP / Action / optional location -> {enabled, options}
-  const settingState = new Map();     // `${tenantId}:${mpId}` -> { key: value } (manifest-driven settings projection)
-  const processedKeys = new Map();    // `${tenantId}:${activity}:${idempotencyKey}` -> stored result (FIFO cap PROCESSED_KEYS_MAX)
+  const mps = new Map();
+  // Panels can query an MP still loading; announced MPs are awaited instead of failing as UnknownCondition.
+  const expectedMps = new Set();
+  const registrationWaiters = new Map();
+  const subscribers = new Map();
+  const actionState = new Map();
+  const settingState = new Map();
+  const processedKeys = new Map();
 
-  const appliedKeysOverflow = new Set(); // keys evicted from processedKeys — the fact survives, the result does not
-  const conditionCache = new Map();   // `${tenantId}:${condition}:${argsJson}` -> {value, expiresAt} (cap CONDITION_CACHE_MAX)
-  // Bumped by every condition-cache invalidation, so the detached late-value
-  // salvage can tell the cache moved after its dispatch returned.
+  const appliedKeysOverflow = new Set();
+  const conditionCache = new Map();
+  // Bumped on every condition-cache invalidation so the late-value salvage can tell the cache moved.
   let conditionCacheEpoch = 0;
-  const suppressionTally = new Map(); // `${tenantId}:${trigger}:${day}` -> count
-  const debouncePending = new Map();  // `${trigger}:${emitterMpId}` -> {timer, resolvers}
-  const invokeChains = new Map();     // sourceMpId -> tail promise (FIFO per source MP)
-  const inflightInvokes = new Map();  // processedKey -> { deadlineAt, waiters } of the run applying it
-  // A join rejects this long before the caller's `rpcDeadlineAt` at most, and
-  // never more than a fifth of the time the caller has left.
+  const suppressionTally = new Map();
+  const debouncePending = new Map();
+  const invokeChains = new Map();
+  const inflightInvokes = new Map();
   const JOIN_DEADLINE_MARGIN_MS = 250;
-  const executingChains = new Map();  // sourceMpId -> depth of handler execution ON that chain (F6)
+  const executingChains = new Map();
   const activeRuns = new Set();
-  const txnSteps = new Map();         // txnId -> [{activity, args, idempotencyKey}]
-  const chainBudget = new Map();      // rootRunId -> total run count
-  const buckets = new Map();          // `${mpId}:${kind}` -> {tokens, updatedAt}
-  // Offline queue rows {sourceMpId, envelope, bytes, seq, queuedAt}. The store
-  // owns the array and persists it; `null` opts out of persistence, and gets a
-  // storage-less instance rather than a second code path. A store may offer
-  // `settle(seq, { envelope, outcome })`: the drain hands it a write refused
-  // for good instead of calling `remove(seq)`, before `onOfflineOutcome`.
+  const txnSteps = new Map();
+  const chainBudget = new Map();
+  const buckets = new Map();
   const queueStore = offlineQueue || createDurableQueue({ now, storage: null });
-  // Queued rows the server refused for good whose settlement the queue's
-  // store could not take yet, by row id, with their outcome: the next drain
-  // settles them again without sending them. One bounded re-drain is
-  // scheduled for them, cancelled at teardown.
   const unsettled = new Map();
   let settleRetryTimer = null;
   let settleRetries = 0;
@@ -312,19 +188,15 @@ export function createBroker({
     settleRetries += 1;
     settleRetryTimer = setTimeout(() => {
       settleRetryTimer = null;
-      // A drain still open has already passed the refused row: the retry
-      // waits for it to finish, then drains again for the rows left unsettled.
+      // An open drain has already passed the refused row: wait for it, then drain the unsettled rows again.
       // eslint-disable-next-line no-use-before-define
       const open = drainInFlight;
       // eslint-disable-next-line no-use-before-define
-      // Offline, the rows wait for the reconnect drain: a drain now would
-      // queue unsent writes again instead of sending them.
+      // Offline, rows wait for the reconnect drain; draining now would re-queue unsent writes.
       if (!retired) Promise.resolve(open).catch(() => {}).then(() => (retired || !unsettled.size || !isOnline ? null : drainOfflineQueue())).catch(() => {});
     }, SETTLE_RETRY_AFTER_MS);
   }
-  // Held rows whose write was applied but whose removal the store refused:
-  // never shown as held again in this page, and removed again later (the
-  // write itself is never sent again).
+  // Applied writes whose removal the store refused: never shown held again, and never sent again.
   const appliedHolds = new Set();
   let holdCleanupTimer = null;
   let holdCleanupTries = 0;
@@ -342,8 +214,7 @@ export function createBroker({
       if (appliedHolds.size) scheduleHoldCleanup(); else holdCleanupTries = 0;
     }, SETTLE_RETRY_AFTER_MS);
   }
-  // Ids of the queued rows a drain of this broker is sending now: their
-  // receipts read `sending`, and they cannot be discarded meanwhile.
+  // Rows being sent by a drain read as sending and cannot be discarded meanwhile.
   const drainingRows = new Set();
   let isOnline = online;
   let pendingWork = 0;
@@ -362,24 +233,16 @@ export function createBroker({
     return [qualified.slice(0, idx), qualified.slice(idx + 1)];
   };
 
-  // --- enforcement helpers --------------------------------------------------
-
   function authenticate(envelope) {
     const issued = envelope.capabilityToken;
     const identity = capabilityService.validate(issued, { mpId: envelope.sourceMpId, instanceId: envelope.instanceId });
-    return identity; // { mpId, tenantId, scopes, tokenId }
+    return identity;
   }
 
   function throttleProfileFor(mpId) {
     return { ...DEFAULT_THROTTLE_PROFILE, ...(throttleOverrides[mpId] || {}) };
   }
 
-  /**
-   * Take one of `mpId`'s `kind` tokens; returns how long to wait before running.
-   * A future token is reserved by taking the bucket below zero, so the next
-   * caller queues behind this one. Past `maxWaitMs` nothing is reserved and the
-   * call is refused with `retryAfterMs`.
-   */
   function reserveToken(mpId, kind, maxWaitMs = 0) {
     const profile = throttleProfileFor(mpId);
     const perMin = { emit: profile.emitsPerMin, query: profile.queriesPerMin, invoke: profile.invokesPerMin }[kind];
@@ -409,7 +272,6 @@ export function createBroker({
     reserveToken(mpId, kind, 0);
   }
 
-  /** A query's token: waits for the next one up to QUERY_RATE_WAIT_MAX_MS. */
   async function awaitQueryToken(mpId) {
     const waitMs = reserveToken(mpId, 'query', QUERY_RATE_WAIT_MAX_MS);
     if (waitMs <= 0) return;
@@ -449,11 +311,7 @@ export function createBroker({
     const policy = activityDef.callerPolicy;
     const callerIsTarget = callerMpId === targetMpId;
     const callerFirstParty = mps.get(callerMpId)?.firstParty === true;
-    // A declared `callerPolicy` is authoritative. Without one, the shape of
-    // `authorizedCallers` decides: a non-empty list is `listed`, an explicit []
-    // is `owner_only` under `strictEmptyCallers`, and an absent field is
-    // `first_party` (not default-deny). `callerPolicy` stays optional in v1, so
-    // a manifest omitting it must keep that default rather than become uninvokable.
+    // callerPolicy is optional in v1, so an omitted one keeps the first_party default instead of becoming uninvokable.
     const explicitEmpty = Array.isArray(callers) && callers.length === 0;
     const effectivePolicy = policy
       || (Array.isArray(callers) && callers.length ? 'listed' : null)
@@ -464,7 +322,6 @@ export function createBroker({
       listed: () => callerIsTarget || (Array.isArray(callers) && callers.includes(callerMpId)),
     }[effectivePolicy]();
     if (!allowed) {
-      // Cite the field the author wrote, not a `callerPolicy` it never declared.
       const rule = policy
         ? `activities.${activityName}.callerPolicy`
         : `activities.${activityName}.authorizedCallers`;
@@ -477,8 +334,7 @@ export function createBroker({
       });
     }
     const scope = `invoke:${qualify(targetMpId, activityName)}`;
-    // '*' is the HOST authority marker (inspector replay, txn compensation) —
-    // never issuable through a capability token (tokens carry catalogue scopes).
+    // '*' is the host authority marker, never issuable through a capability token.
     if (!scopes.includes(scope) && !scopes.includes('*') && !callerIsTarget) {
       throw err('PermissionDenied', `caller lacks scope '${scope}'`, { rule: 'permissions', retryable: false });
     }
@@ -488,12 +344,7 @@ export function createBroker({
     ? sensitiveConditions.has(qualified)
     : (sensitiveConditions || []).includes(qualified));
 
-  /**
-   * Read grant for a condition or trigger `{owner}.{primitive}`: the explicit
-   * `read:{owner}.{primitive}`, the owner's catalogue domain scope
-   * (`read:shifts`, …), or the host's '*'. Sensitive conditions accept only the
-   * explicit scope: `read:attendance` must not hand out `time-clock.kiosk_pin`.
-   */
+  // Sensitive conditions accept only the explicit scope: read:attendance must not hand out time-clock.kiosk_pin.
   function readGrant(ownerMpId, primitiveName) {
     const qualified = qualify(ownerMpId, primitiveName);
     const explicit = `read:${qualified}`;
@@ -504,7 +355,6 @@ export function createBroker({
       explicit,
       domain,
       sensitive,
-      // The scopes that would grant this read, most specific first.
       accepts: sensitive ? [explicit] : [explicit, domain],
       denialMessage: sensitive
         ? `caller lacks scope '${explicit}' ('${qualified}' is sensitive — the '${domain}' domain scope does not grant it)`
@@ -514,28 +364,21 @@ export function createBroker({
 
   const holdsReadGrant = (held, grant) => grant.accepts.some((s) => held.includes(s)) || held.includes('*');
 
-  /** The scopes a tokenless path judges `mpId` by in `tenantId` — see `grantedScopes`. */
   function tokenlessScopes(mpId, tenantId) {
     if (typeof grantedScopes !== 'function') return mps.get(mpId)?.manifest.permissions?.scopes || [];
     const held = grantedScopes(mpId, tenantId);
     return Array.isArray(held) ? held : [];
   }
 
-  /** Cross-MP condition reads need a `readGrant`; gated on `enforceConditionScopes`. */
   function authorizeQuery(callerMpId, ownerMpId, conditionName, scopes) {
     if (!enforceConditionScopes) return;
-    if (callerMpId === ownerMpId) return; // an MP always reads its own conditions
+    if (callerMpId === ownerMpId) return;
     const grant = readGrant(ownerMpId, conditionName);
     if (!holdsReadGrant(scopes || [], grant)) {
       throw err('PermissionDenied', grant.denialMessage, { rule: 'permissions', retryable: false });
     }
   }
 
-  /**
-   * Registration check for `subscribe()`. It carries no capability token, so
-   * the grant comes from `tokenlessScopes`. Every delivery re-tests it
-   * (`subscriberHears`), so a grant that narrows later stops the payloads.
-   */
   function authorizeSubscribe(subscriberMpId, triggerQualified, tenantId) {
     if (triggerGranted(subscriberMpId, triggerQualified, tenantId)) return;
     const [ownerMpId, triggerName] = splitQualified(triggerQualified);
@@ -544,8 +387,6 @@ export function createBroker({
       rule: 'permissions', retryable: false,
     });
   }
-
-  // --- Active Trigger Index ---------------------------------------------------
 
   function actionKey(tenantId, mpId, actionId, locationId = null) {
     return `${tenantStateKey(tenantId)}:${mpId}:${actionId}${locationId == null ? '' : `:location:${locationId}`}`;
@@ -562,7 +403,6 @@ export function createBroker({
     return value == null || value === '' ? null : String(value);
   }
 
-  /** Drop this tenant's memoised condition results (a settings write may change them). */
   function invalidateConditionCache(tenantId) {
     const prefix = `${tenantStateKey(tenantId)}:`;
     conditionCacheEpoch += 1;
@@ -571,12 +411,7 @@ export function createBroker({
     }
   }
 
-  /**
-   * Whether `mpId` may hear `triggerQualified` in `tenantId`, for `subscribe()`
-   * and Action trigger bindings alike. An ungranted binding is dropped, not
-   * thrown: the emit belongs to an unrelated MP, and one MP's manifest must not
-   * break another's writes.
-   */
+  // An ungranted binding is dropped, not thrown: one MP's manifest must not break another's writes.
   function triggerGranted(mpId, triggerQualified, tenantId) {
     if (!strictEmitOwnership) return true;
     const [ownerMpId, triggerName] = splitQualified(triggerQualified);
@@ -604,11 +439,6 @@ export function createBroker({
     return wired;
   }
 
-  /**
-   * Whether a stored subscription receives an emit in `tenantId`: one
-   * registered for a tenant hears only that tenant, and the subscriber must
-   * still hold the grant there.
-   */
   function subscriberHears(sub, triggerQualified, tenantId) {
     if (sub.tenantKey !== undefined && sub.tenantKey !== tenantStateKey(tenantId)) return false;
     return triggerGranted(sub.mpId, triggerQualified, tenantId);
@@ -619,14 +449,6 @@ export function createBroker({
       || actionsForTrigger(tenantId, triggerQualified, payload).length > 0;
   }
 
-  // --- dispatch internals ----------------------------------------------------
-
-  /**
-   * An Action's dispatches run as the MP that owns the Action, not the emitter,
-   * so its condition gates are judged by the owner's grants. No RPC carries a
-   * token here, so scopes are the owner's `tokenlessScopes`; the emitter's token
-   * id stays as `causedByTokenId` for tracing.
-   */
   function identityForAction(executingMpId, emitterIdentity) {
     return {
       mpId: executingMpId,
@@ -641,9 +463,6 @@ export function createBroker({
     const { mpId, actionId, action, options } = wiredAction;
     const identity = identityForAction(mpId, emitterIdentity);
 
-    // inputMap source resolver: trigger/option/const/condition plus default;
-    // transforms and templates are rejected. `conditionValues` grows gate by
-    // gate, so a later gate's input may read an earlier gate's return.
     const conditionValues = {};
     const resolveSource = (source) => {
       if (source.transform) throw err('InvalidPayload', `Action '${actionId}': transform chains (E2) not implemented at M1`, { rule: 'not-implemented:2.22-E2', retryable: false });
@@ -662,8 +481,6 @@ export function createBroker({
       return value;
     };
 
-    // Every condition gate must pass. A gate parameterises its condition via
-    // `input` (resolved sources) or literal `args`.
     for (const gate of action.conditions || []) {
       const ref = gate.ref || gate.name;
       const owner = gate.mp || mpId;
@@ -699,10 +516,7 @@ export function createBroker({
     if (!binding.inputMap) args = triggerPayload;
 
     const targetMp = binding.mp || mpId;
-    // A client_key activity dispatched by an Action has no caller to supply the
-    // key, so derive it from (action, trigger payload, args): a replay of the
-    // same event carries the same key. The payload is in it because args alone
-    // can repeat across distinct events.
+    // No caller supplies the key, so derive it from action, payload and args; args alone repeat across events.
     const targetDef = mps.get(targetMp)?.manifest.activities?.[binding.name];
     const derivedKey = targetDef?.idempotency === 'client_key'
       ? `act-${mpId}-${actionId}-${stableHash({ trigger: triggerPayload ?? null, args })}`.slice(0, 128)
@@ -794,15 +608,10 @@ export function createBroker({
     const triggerQualified = qualify(ownerMpId, triggerName);
     const ownerEntry = mps.get(ownerMpId);
     const triggerDef = ownerEntry?.manifest.triggers?.[triggerName]
-      // System triggers exist on every registered MP undeclared; an unknown
-      // owner is still UnknownTrigger.
       || (ownerEntry && SYSTEM_TRIGGERS[triggerName]);
     if (!triggerDef) throw err('UnknownTrigger', `trigger '${triggerQualified}' is not declared by any registered MP`, { retryable: false });
 
-    // Only the owner may emit its trigger, or one MP could drive another's
-    // Actions. Host-originated emits (a host `identity`, no token) act for the
-    // owner and are exempt. Checked before the offline enqueue, so a drain
-    // (which replays with `identity`) is not re-judged.
+    // Only the owner may emit its trigger; checked before the offline enqueue so a drain is not re-judged.
     const hostOriginated = !envelope.capabilityToken && !!envelope.identity;
     if (strictEmitOwnership && ownerMpId !== emitterMp && !hostOriginated) {
       throw err('PermissionDenied', `mp '${emitterMp}' may not emit '${triggerQualified}' — the trigger is owned by '${ownerMpId}'`, {
@@ -811,7 +620,6 @@ export function createBroker({
     }
     validateAgainst(triggerDef.payloadSchema, envelope.payload, 'InvalidPayload', `trigger '${triggerQualified}' payload`);
 
-    // No enabled consumer: suppress, tally only.
     if (!triggerIsActive(tenantId, triggerQualified, envelope.payload)) {
       const key = `${tenantId}:${triggerQualified}:${dayKey(now())}`;
       suppressionTally.set(key, (suppressionTally.get(key) || 0) + 1);
@@ -850,7 +658,6 @@ export function createBroker({
     const receipt = { emitId: record.runId, deliveredTo: deliveries.length, queuedFor: 0 };
 
     if (emission === 'sync') {
-      // Resolve after FIRST-PARTY subscribers acknowledge, capped at 3s.
       const cap = new Promise((resolve) => { setTimeout(resolve, SYNC_EMIT_TIMEOUT_MS); });
       await Promise.race([Promise.allSettled(deliveries), cap]);
     }
@@ -879,11 +686,6 @@ export function createBroker({
     return { emitId: record.runId, deliveredTo: 0, queuedFor: 0, coalescing: true };
   }
 
-  /**
-   * An MP's entry, waiting for registration if the host announced it; undefined
-   * if absent, unannounced or late. Only a wholly unregistered MP waits: a
-   * registered one missing the named primitive is a manifest error, failed at once.
-   */
   async function resolveMpEntry(mpId) {
     const entry = mps.get(mpId);
     if (entry) return entry;
@@ -895,7 +697,7 @@ export function createBroker({
     await new Promise((resolve) => {
       const done = () => { clearTimeout(timer); waiters.delete(done); resolve(); };
       const timer = setTimeout(done, registrationTimeoutMs);
-      // Never hold a process open on a wait nobody is watching (node/tests).
+      // Never hold a process open on a wait nobody is watching.
       if (typeof timer?.unref === 'function') timer.unref();
       waiters.add(done);
     });
@@ -903,23 +705,17 @@ export function createBroker({
     return mps.get(mpId);
   }
 
-  /**
-   * An `unresolved` answer reports on the read, not the world. Caching it would
-   * pin the failure for the whole TTL, so neither cache write in `query` does.
-   */
   function isKnownUnknown(value) {
     return !!(value && typeof value === 'object' && value.unresolved);
   }
 
-  /** Over CONDITION_CACHE_MAX: drop expired entries, then the oldest inserted. */
   function pruneConditionCache(justSetKey = null) {
     if (conditionCache.size <= CONDITION_CACHE_MAX) return;
     const t = now();
     for (const [key, entry] of conditionCache) {
       if (entry.expiresAt <= t) conditionCache.delete(key);
     }
-    // Never the entry just stored, or a short-TTL condition evicts itself on
-    // every read.
+    // Never the entry just stored, or a short-TTL condition evicts itself on every read.
     for (const key of conditionCache.keys()) {
       if (conditionCache.size <= CONDITION_CACHE_MAX) break;
       if (key === justSetKey) continue;
@@ -937,7 +733,6 @@ export function createBroker({
     return runQuery(envelope, prepared);
   }
 
-  /** Authenticate, resolve, authorize and validate a query; throws as a query does. */
   async function prepareQuery(envelope) {
     const identity = envelope.identity || authenticate(envelope);
     const tenantId = envelope.tenantId || identity.tenantId;
@@ -954,25 +749,19 @@ export function createBroker({
     return { identity, tenantId, ownerMpId, conditionName, ownerEntry, conditionDef, cacheKey };
   }
 
-  /** A `cacheable` condition's unexpired cached answer, as `{ value }`, or null. */
   function cachedConditionAnswer({ conditionDef, cacheKey }) {
     if (!conditionDef.cacheable) return null;
     const hit = conditionCache.get(cacheKey);
     if (hit && hit.expiresAt > now()) return { value: hit.value };
-    // Reclaim an expired entry rather than skip it.
     if (hit) conditionCache.delete(cacheKey);
     return null;
   }
 
-  /** Run a prepared query's handler: rate token, run record, deadline, return validation, cache. */
   async function runQuery(envelope, {
     identity, tenantId, ownerMpId, conditionName, ownerEntry, conditionDef, cacheKey,
   }) {
     const heldKey = heldConditionKey(envelope, conditionDef);
     const heldSeq = heldKey ? (conditionReadSeq += 1) : 0;
-    // The rate token is taken here, after the cache: an answer the broker
-    // already holds runs nothing, so it is not throttled. A read that runs
-    // the handler waits briefly for a token rather than failing at once.
     await awaitQueryToken(envelope.sourceMpId);
 
     const handler = ownerEntry.handlers?.conditions?.[conditionName];
@@ -995,12 +784,6 @@ export function createBroker({
     const budget = conditionDef.latencyBudgetMs || 5000;
     let timer;
     let deadlinePassed = false;
-    // The handler's `signal` aborts when the caller is answered with a
-    // Timeout, or when the caller's own `signal` (the asking surface's shown
-    // signal) aborts, before the answer or up to `callerLinkAfterAnswerMs`
-    // after it (work the handler left running, such as a queued host read
-    // that warms the next answer). A handler whose late value only warms the
-    // cache may ignore it; one that is not cacheable can stop reading for nobody.
     const deadline = new AbortController();
     const callerSignal = envelope.signal && typeof envelope.signal.addEventListener === 'function'
       && typeof envelope.signal.aborted === 'boolean' ? envelope.signal : null;
@@ -1014,11 +797,7 @@ export function createBroker({
         reject(err('Timeout', `condition '${envelope.condition}' exceeded latencyBudgetMs ${budget}`, { retryable: false, runId: record.runId }));
       }, budget);
     });
-    // Captured BEFORE the handler runs, so any invalidation during the read is
-    // visible to the detached salvage below.
     const epochAtDispatch = conditionCacheEpoch;
-    // A handler that throws before returning a promise is a rejection like
-    // any other, so it is answered, recorded and cleaned up below.
     let handled;
     try {
       handled = Promise.resolve(handler(envelope.args, { tenantId, signal: deadline.signal }));
@@ -1030,17 +809,13 @@ export function createBroker({
         if (!deadlinePassed) return late;
         Promise.resolve()
           .then(async () => {
-            // A cache hit is served unvalidated, so a late value must pass
-            // returnSchema before it may warm the cache.
+            // A cache hit is served unvalidated, so a late value must pass returnSchema before warming the cache.
             validateAgainst(conditionDef.returnSchema, late, 'ConditionError', `condition '${envelope.condition}' late return`);
-            // The run stays `failed` (the caller saw a Timeout); the salvage
-            // rides its own fields so status filters still find the run.
             await records.update(record.runId, {
               lateResult: late,
               note: 'resolved after latency budget; the caller had already timed out',
             });
-            // A moved epoch means an invalidation (say a delete) landed during
-            // the read, so this value is stale and must not refill the cache.
+            // A moved epoch means an invalidation landed during the read, so this value must not refill the cache.
             if (conditionCacheEpoch !== epochAtDispatch) return;
             if (conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !isKnownUnknown(late)) {
               conditionCache.set(cacheKey, { value: late, expiresAt: now() + conditionDef.cacheTtlMs });
@@ -1059,13 +834,11 @@ export function createBroker({
       const value = await Promise.race([deadlineAwareResult, timeout]);
       validateAgainst(conditionDef.returnSchema, value, 'ConditionError', `condition '${envelope.condition}' return`);
       await records.update(record.runId, { status: 'succeeded', result: value });
-      // A zero TTL entry could never be served, and a known-unknown must not be
-      // cached. An invalidation during the read or record write also skips it.
+      // A zero-TTL entry could never be served, and a known-unknown must not be cached.
       if (conditionCacheEpoch === epochAtDispatch && conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !isKnownUnknown(value)) {
         conditionCache.set(cacheKey, { value, expiresAt: now() + conditionDef.cacheTtlMs });
         pruneConditionCache(cacheKey);
       }
-      // A heldFirst condition keeps its answer (validated above) for the next asker.
       if (heldKey && !isKnownUnknown(value) && heldKey.current()) {
         conditionAnswers.keep({ ...heldKey.entry, answer: value, at: now(), seq: heldSeq });
       }
@@ -1073,7 +846,6 @@ export function createBroker({
     } catch (cause) {
       const wrapped = isTommyError(cause) ? cause
         : err('ConditionError', `condition '${envelope.condition}' threw: ${String(cause && cause.message)}`, { retryable: false, cause });
-      // A refusal purges what this viewer held of the condition's answer.
       if (heldKey && heldKey.current() && classifyReadOutcome(wrapped).state === 'refused') conditionAnswers.remove(heldKey.id);
       await records.update(record.runId, { status: 'failed', error: { code: wrapped.code, message: wrapped.message } });
       throw wrapped;
@@ -1083,13 +855,6 @@ export function createBroker({
     }
   }
 
-  // --- held-first conditions --------------------------------------------------
-
-  /**
-   * Where a `heldFirst` condition's answer to these arguments is kept for the
-   * current queue owner and viewer role fingerprint, with `current()` saying
-   * whether both are still the ones it was taken for. Null for any other condition.
-   */
   function heldConditionKey(envelope, conditionDef) {
     if (conditionDef?.heldFirst !== true) return null;
     const owner = outcomeOwner();
@@ -1104,28 +869,17 @@ export function createBroker({
     return { id, owner, fingerprint, current, entry: { id, owner, fingerprint, condition: envelope.condition } };
   }
 
-  /** Whether a held answer read at `at` is older than the condition's declared showAgeMs. */
   function agedAt(conditionDef, at) {
     const showAgeMs = conditionDef?.freshness?.showAgeMs;
     return Number.isFinite(showAgeMs) && Number.isFinite(at) && now() - at > showAgeMs;
   }
 
-  /** The declared retry steps, ascending, at most 3; the host default otherwise. */
   function retryStepsOf(conditionDef) {
     const steps = conditionDef?.freshness?.retryAfterMs;
     if (Array.isArray(steps) && steps.length && steps.length <= 3 && steps.every((step, i) => Number.isFinite(step) && step > 0 && (i === 0 || step > steps[i - 1]))) return steps;
     return [4000, 12000];
   }
 
-  /**
-   * A query with `onRead`. A `cacheable` hit answers fresh. A condition that
-   * does not declare `heldFirst` answers fresh once its handler answers, with
-   * no notice. A `heldFirst` condition with an answer held for this owner,
-   * fingerprint and arguments resolves it at once (`state: 'held'`) and reads
-   * again in the background, telling the asker through `onRead`; with nothing
-   * held it waits for the handler as a query does. A refusal rejects; it
-   * never resolves.
-   */
   async function heldFirstQuery(envelope, prepared) {
     const { conditionDef } = prepared;
     const cached = cachedConditionAnswer(prepared);
@@ -1145,17 +899,6 @@ export function createBroker({
     };
   }
 
-  /**
-   * Read a held condition answer again in the background and tell the asker:
-   * `checking` as each attempt starts (`stale` instead while a landed write
-   * marked the answer stale), then one terminal notice — `fresh` with the
-   * answer (kept), `refused` (the held answer purged first), or `stale` with
-   * `retrying: false` once the retry steps are used up. A failed attempt with
-   * steps left says `stale` with `retrying: true` and when it reads again.
-   * Notices go after the held answer was delivered, never inside the call,
-   * never after the owner or fingerprint changed, and a throw in `onRead`
-   * touches nothing else.
-   */
   function revalidateHeld(envelope, prepared, key, held) {
     const { conditionDef } = prepared;
     const { onRead } = envelope;
@@ -1164,7 +907,7 @@ export function createBroker({
     let shownAt = held.at;
     let ended = false;
     let markedStale = held.stale === true;
-    // The first notice waits for a turn of the event loop, so the asker has its held answer first.
+    // Wait a turn so the asker has its held answer before the first notice.
     let chain = new Promise((resolve) => { setTimeout(resolve, 0); });
     const deliver = (notice, terminal = false) => {
       chain = chain.then(() => {
@@ -1191,7 +934,6 @@ export function createBroker({
         failure = Object.assign(new Error(`condition '${envelope.condition}' answered unresolved`), { code: 'DATA_NOT_READ' });
       }
       if (!failure) {
-        // runQuery kept the answer; the notice carries when it was read.
         const at = conditionAnswers.get(key.id)?.at ?? now();
         shownAt = at;
         markedStale = false;
@@ -1199,7 +941,6 @@ export function createBroker({
         return;
       }
       const outcome = classifyReadOutcome(failure, { report: reportReadCode });
-      // No notice: no caller waits, the account is not shown, or the viewer signed out.
       if (outcome.state === 'silent' || outcome.state === 'held' || outcome.state === 'signed_out') { ended = true; return; }
       if (outcome.state === 'refused') {
         if (key.current()) conditionAnswers.remove(key.id);
@@ -1220,11 +961,6 @@ export function createBroker({
     attempt(0).catch(() => {});
   }
 
-  /**
-   * A handler's refusal reaches an `onRead` asker as a refusal, not as the
-   * ConditionError that wraps it: `PermissionDenied` with the refusal as its
-   * cause. Any other error is unchanged.
-   */
   function asRefusal(error) {
     if (!isTommyError(error) || error.code !== 'ConditionError') return error;
     const outcome = classifyReadOutcome(error);
@@ -1232,14 +968,8 @@ export function createBroker({
     return err('PermissionDenied', error.message, { retryable: false, cause: error.cause || error });
   }
 
-  /** Drop every held condition answer (a permission, role, location or team change, sign-out, account switch). */
   function purgeConditionAnswers() { conditionAnswers.purge(); }
 
-  /**
-   * A landed write touched these host collections: held answers of every
-   * condition whose `freshness.sources` names one of them are marked stale
-   * (still answered first, always read again, `stale` until a fresh answer).
-   */
   function markConditionAnswersStale(collectionIds) {
     const touched = new Set((Array.isArray(collectionIds) ? collectionIds : [collectionIds]).filter((id) => typeof id === 'string'));
     if (!touched.size) return;
@@ -1250,8 +980,6 @@ export function createBroker({
     });
   }
 
-  // Keeps a settled query's handler signal following its caller's signal for
-  // `callerLinkAfterAnswerMs`, then lets go; an abort either way ends it.
   function unlinkCallerLater(callerSignal, callerGone, handlerSignal) {
     if (!callerSignal) return;
     if (callerSignal.aborted || handlerSignal.aborted || !(callerLinkAfterAnswerMs > 0)) {
@@ -1264,16 +992,13 @@ export function createBroker({
       handlerSignal.removeEventListener('abort', unlink);
     };
     const linkTimer = setTimeout(unlink, callerLinkAfterAnswerMs);
-    // Never hold a process open on a link nobody is watching (node/tests).
+    // Never hold a process open on a link nobody is watching.
     if (typeof linkTimer?.unref === 'function') linkTimer.unref();
     handlerSignal.addEventListener('abort', unlink, { once: true });
   }
 
   function idempotencyKeyFor(activityDef, envelope, epoch = 0) {
-    // The invalidation epoch is folded into every broker-derived key, never a
-    // `client_key`: the caller owns that one and the server's ledger is keyed on
-    // it. At epoch 0 keys carry no stamp, so an install that never invalidated
-    // keeps its keys.
+    // The epoch stamps broker-derived keys only, never client_key (the server ledger keys on it); epoch 0 adds none.
     const stamp = epoch > 0 ? `e${epoch}.` : '';
     switch (activityDef.idempotency) {
       case 'client_key': {
@@ -1285,28 +1010,21 @@ export function createBroker({
       case 'natural_key': {
         const field = activityDef.naturalKeyField || 'id';
         const value = dottedGet(envelope.args, field);
-        // Without the field every call would collide on 'n-undefined' and a
-        // distinct write would replay the first's result, so fall back to the
-        // whole args.
         return value !== undefined ? `${stamp}n-${value}` : `${stamp}n-${JSON.stringify(envelope.args)}`;
       }
-      // Declared by the host's scheduled-write system activities
-      // (`tommy.clock.schedule_follow_up` / `cancel_follow_up`), which are
-      // offline-replayable, so a replayed drain must carry the same key.
+      // These scheduled-write activities are offline-replayable, so a replayed drain must carry the same key.
       case 'correlationKey': {
         const value = envelope.args?.correlationKey;
         if (value === undefined || value === null || value === '') {
           throw err('InvalidPayload', 'idempotency=correlationKey requires args.correlationKey', { retryable: false });
         }
-        // The key includes the rest of the args: on the correlation key alone,
-        // rescheduling a follow-up to a new time would replay the first result.
         const rest = { ...envelope.args };
         delete rest.correlationKey;
         const tail = Object.keys(rest).length ? `-${JSON.stringify(rest)}` : '';
         return `${stamp}c-${value}${tail}`;
       }
       default:
-        return undefined; // 'none' — forbidden with offlineReplayable (validator-enforced)
+        return undefined;
     }
   }
 
@@ -1319,8 +1037,7 @@ export function createBroker({
         kind: 'invoke',
         activity: envelope.activity,
         args: envelope.args,
-        // Replay provenance, set by the runtime and never by MP args: the server
-        // honours a queued punch's captured time only with this marker.
+        // Set by the runtime, never MP args: the server honours a queued punch's captured time only with this marker.
         ...(wantsRestoreContext(envelope) ? {
           restoreContext: {
             mpId: record.sourceMpId, instanceId: envelope.instanceId, tenantId: record.tenantId,
@@ -1369,10 +1086,6 @@ export function createBroker({
     return { rpcId: record.runId, status: 'succeeded', result };
   }
 
-  /**
-   * Bundles below host API 17 rely on ambient handler re-entrancy. At 17 and
-   * above only a live handler's scoped invoke bypasses its source MP's FIFO.
-   */
   function enterExecution(mpId) { executingChains.set(mpId, (executingChains.get(mpId) || 0) + 1); }
   function exitExecution(mpId) {
     const depth = (executingChains.get(mpId) || 0) - 1;
@@ -1390,10 +1103,8 @@ export function createBroker({
       }
       return dispatchInvokeInner(envelope);
     }
-    // Bundles below the scoped-invoke contract retain ambient re-entrancy.
     if ((mps.get(sourceMpId)?.minHostApi || 0) < SCOPED_INVOKE_HOST_API
       && executingChains.has(sourceMpId)) return dispatchInvokeInner(envelope);
-    // FIFO per source MP.
     const tail = invokeChains.get(sourceMpId) || Promise.resolve();
     const run = tail.catch(() => {}).then(() => dispatchInvokeInner(envelope));
     invokeChains.set(sourceMpId, run);
@@ -1408,7 +1119,6 @@ export function createBroker({
     takeToken(envelope.sourceMpId, 'invoke');
 
     const [ownerMpId, activityName] = splitQualified(envelope.activity);
-    // Writes wait for an announced MP's registration too.
     const ownerEntry = await resolveMpEntry(ownerMpId);
     const activityDef = ownerEntry?.manifest.activities?.[activityName];
     if (!activityDef) throw err('UnknownActivity', `activity '${envelope.activity}' is not registered`, { retryable: false });
@@ -1417,15 +1127,12 @@ export function createBroker({
     validateAgainst(activityDef.inputSchema, envelope.args, 'InvalidPayload', `activity '${envelope.activity}' args`);
 
     const chain = envelope.chain || { rootRunId: undefined, depth: 0, chainPath: [] };
-    // A fresh caller-invoke is its own chain root; loop/fan-out caps bound the
-    // causal tree, so they apply to chained dispatches only.
     if (chain.rootRunId) checkChain(envelope.sourceMpId, `invoke(${envelope.activity})`, chain);
 
     const idempotencyKey = idempotencyKeyFor(
       activityDef, envelope, invalidationEpochs.get(`${tenantId}:${envelope.activity}`),
     );
-    // Tenant-scoped: `derived_from_input` keys hash the args alone, so the same
-    // write in two tenants would otherwise replay the other's result.
+    // Tenant-scoped: derived keys hash args alone, so two tenants would otherwise replay each other's result.
     const processedKey = idempotencyKey && `${tenantId}:${envelope.activity}:${idempotencyKey}`;
     if (processedKey && envelope[PARENT_RUN]?.keys.has(processedKey)) {
       throw err('LoopDetected', 'Handler invoked an ancestor activity with its running idempotency key', {
@@ -1433,34 +1140,25 @@ export function createBroker({
       });
     }
     if (processedKey && processedKeys.has(processedKey)) {
-      // A repeat key replays the stored result, not re-applied (taken before
-      // the hold's cleanup awaits, which another write could evict it in).
       const stored = processedKeys.get(processedKey);
       await releaseSettledHold(activityDef, envelope);
       noteReplayedSuccess(activityDef, envelope, idempotencyKey);
       return { ...stored, idempotentReplay: true };
     }
     if (processedKey && appliedKeysOverflow.has(processedKey)) {
-      // Applied this session but its result was released by the cap: still
-      // suppressed, in the durable-ledger hit's shape.
       await releaseSettledHold(activityDef, envelope);
       noteReplayedSuccess(activityDef, envelope, idempotencyKey);
       return { status: 'succeeded', idempotentReplay: true, resultRetained: false };
     }
 
-    // The durable ledger catches a `client_key` processed in an earlier session.
-    // Results are never persisted (one may be a live PIN), so a hit suppresses
-    // with `resultRetained: false`. Only `client_key`: other keys derive from
-    // the args and would put tenant data on disk.
+    // Results are never persisted (one may be a live PIN); client_key only, as derived keys would put tenant data on disk.
     if (processedKey && activityDef.idempotency === 'client_key' && idempotencyLedger?.has(processedKey)) {
       await releaseSettledHold(activityDef, envelope);
       noteReplayedSuccess(activityDef, envelope, idempotencyKey);
       return { status: 'succeeded', idempotentReplay: true, resultRetained: false };
     }
 
-    // Offline: a replayable write queues; anything else is a typed Offline reject.
-    // A queued row being drained is already in the queue: it stays there for
-    // the reconnect, never queued again beside itself.
+    // A row being drained is already queued; never queue it again beside itself.
     if (!isOnline && activityDef.sideEffect !== 'local_write') {
       if (envelope.restoreDrain === true) throw err('Offline', `'${envelope.activity}' waits in the queue for a connection`, { retryable: true });
       if (activityDef.offlineReplayable) {
@@ -1490,8 +1188,6 @@ export function createBroker({
       envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, chain, idempotencyKey, processedKey,
     };
     if (!processedKey) return runAdmittedInvoke(admitted);
-    // Same key still running (possible via inline re-entrant invokes): join it
-    // rather than apply the write twice.
     const running = inflightInvokes.get(processedKey);
     if (running) return joinInflightInvoke(running, envelope);
     if (inflightInvokes.size >= INFLIGHT_RUNS_MAX) {
@@ -1500,8 +1196,6 @@ export function createBroker({
       });
     }
     const run = runAdmittedInvoke(admitted);
-    // Joins wait on the entry, not on `run`: one reaction on the run settles
-    // them all, and a join that times out removes itself.
     const entry = { deadlineAt: envelope.rpcDeadlineAt, waiters: new Set() };
     inflightInvokes.set(processedKey, entry);
     const settle = (outcome) => {
@@ -1513,11 +1207,6 @@ export function createBroker({
     return run;
   }
 
-  /**
-   * How long a join may wait: until just before the earlier of its own and the
-   * running call's deadline (the latter bounds a handler joining itself).
-   * `rpcDeadlineAt` is wall-clock time, so this reads Date.now(), not `now`.
-   */
   function joinWaitMs(envelope, running) {
     const deadlines = [envelope.rpcDeadlineAt, running.deadlineAt].filter(Number.isFinite);
     if (!deadlines.length) return inflightJoinTimeoutMs;
@@ -1526,7 +1215,6 @@ export function createBroker({
     return Math.max(0, Math.min(inflightJoinTimeoutMs, remaining - margin));
   }
 
-  /** Wait for the run in flight with this key: its result (as a replay) or its error, within the join bound. */
   function joinInflightInvoke(running, envelope) {
     const waitMs = joinWaitMs(envelope, running);
     return new Promise((resolve, reject) => {
@@ -1546,15 +1234,10 @@ export function createBroker({
     });
   }
 
-  /** Record, execute (with retries) and settle one admitted invoke. */
   async function runAdmittedInvoke({
     envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, chain, idempotencyKey, processedKey,
   }) {
-    // A replayable server write is queued on the device before its request
-    // goes, since a hung request neither answers nor fails and closing the app
-    // would lose it. The row is held (no drain here sends it, a restart replays
-    // it with its key); an answered write removes it. If it cannot be kept the
-    // write still runs. A drained replay is its own row already.
+    // Queued before the request goes: a hung request neither answers nor fails, and closing the app would lose it.
     const heldSeq = activityDef.holdUnsettled
       ? await claimSubject(envelope.sourceMpId, activityDef.holdUnsettled, { ...envelope, identity, idempotencyKey })
       : (activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable
@@ -1578,22 +1261,15 @@ export function createBroker({
         chainPath: chain.chainPath,
         online: isOnline,
       });
-      // Until an answer settles it, the write is waiting: a restart finds it queued.
       noteOutcome(activityDef, envelope, idempotencyKey, 'queued', { rpcId: record.runId });
       return await attemptAdmittedInvoke({
         envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, idempotencyKey, processedKey, record, heldSeq,
       });
     } finally {
-      // Whatever ended the run, its row (if it is still queued) is a waiting write now.
       if (heldSeq !== null) await queueStore.release(heldSeq);
     }
   }
 
-  /**
-   * Keep a running write's row in the durable queue; null when it cannot be
-   * kept, or when a row of this write (same activity and key) is queued
-   * already, which a restart replays in its place.
-   */
   async function holdInQueue(sourceMpId, envelope) {
     try {
       await queueStore.ready?.();
@@ -1606,16 +1282,6 @@ export function createBroker({
     }
   }
 
-  /**
-   * The queue row a `holdUnsettled` write runs under, claimed before its
-   * request goes: one row per Mini Program, activity and subject, judged in
-   * the queue's own commit. A dispatch with the key of the row that holds the
-   * subject is that row's check again and runs under it. Any other dispatch
-   * for a held subject is refused (WriteHeld), and so is a write whose row
-   * cannot be kept: such a write never goes without its row.
-   */
-  // A held write whose key is already applied (its row outlived the success
-  // that should have removed it) leaves the queue when that key is asked again.
   async function releaseSettledHold(activityDef, envelope) {
     const hold = activityDef?.holdUnsettled;
     if (!hold) return;
@@ -1639,7 +1305,6 @@ export function createBroker({
     await queueStore.ready?.();
     let holding = ownQueuedRows().find((row) => row.sourceMpId === sourceMpId
       && row.envelope?.activity === envelope.activity && row.subject === subject);
-    // An applied write's row whose removal failed goes now, before the new claim.
     if (holding && appliedHolds.has(holding.id)) {
       try { await queueStore.remove(holding.seq); appliedHolds.delete(holding.id); holding = null; } catch (_) {
         throw refuse(`the last write of '${envelope.activity}' for this subject is still being cleared`);
@@ -1647,7 +1312,6 @@ export function createBroker({
     }
     if (holding) {
       if (holding.envelope?.idempotencyKey !== envelope.idempotencyKey) throw refuse(`a write of '${envelope.activity}' for this subject is held until it is checked`);
-      // A check again sends the held request itself: the same key with another body is refused.
       if (canonicalJson(holding.envelope?.args ?? {}) !== canonicalJson(envelope.args ?? {})) {
         throw refuse(`the held write of '${envelope.activity}' is checked with its own request`);
       }
@@ -1683,13 +1347,10 @@ export function createBroker({
     let lastError;
     while (attempt < Math.max(1, retry.maxAttempts)) {
       attempt += 1;
-      // The declared backoff, capped in constants.js so a dead-letter still
-      // lands well inside a second.
       // eslint-disable-next-line no-await-in-loop
       if (attempt > 1) await sleep(retryDelayMs(retry.backoff, attempt));
       await records.update(record.runId, { status: 'running', attempts: attempt });
       try {
-        // The handler window is the re-entrancy window.
         enterExecution(envelope.sourceMpId);
         let result;
         try {
@@ -1699,17 +1360,13 @@ export function createBroker({
         }
         if (result.status && result.status === 'failed') throw err('ActivityFailed', result.error?.message || 'executor reported failure', { retryable: false });
         validateAgainst(activityDef.resultSchema, result.result, 'ActivityFailed', `activity '${envelope.activity}' result`);
-        // `replayed`: the server answered a key it had already applied.
         const final = { rpcId: record.runId, status: 'succeeded', result: result.result, ...(result.replayed === true ? { replayed: true } : {}) };
         resendFailures.delete(idempotencyKey);
         noteOutcome(activityDef, envelope, idempotencyKey, 'succeeded', { rpcId: record.runId });
         await records.update(record.runId, { status: 'succeeded', result: result.result });
         if (processedKey) {
           processedKeys.set(processedKey, final);
-          // A recorded result outlives the state it describes once a sibling
-          // activity undoes it (lock vs unlock). The MP names those siblings in
-          // `invalidatesIdempotency`; the broker cannot know inverses, and
-          // clearing every key on any write would break fan-out de-duplication.
+          // The broker cannot know inverse activities, so the MP names those whose recorded results this write invalidates.
           for (const staleActivity of activityDef.invalidatesIdempotency || []) {
             const qualified = `${ownerMpId}.${staleActivity}`;
             const prefix = `${tenantId}:${qualified}:`;
@@ -1722,9 +1379,6 @@ export function createBroker({
             // Move the epoch so the server's ledger misses too.
             invalidationEpochs.bump(`${tenantId}:${qualified}`);
           }
-          // FIFO cap: release the result but keep the key in the overflow set,
-          // or a natural_key/derived_from_input write (no durable ledger) would
-          // re-apply.
           while (processedKeys.size > PROCESSED_KEYS_MAX) {
             const oldest = processedKeys.keys().next();
             if (oldest.done) break;
@@ -1737,16 +1391,11 @@ export function createBroker({
             }
           }
         }
-        // Record the key durably, never the result; client_key only.
+        // Record the key durably, never the result.
         if (processedKey && activityDef.idempotency === 'client_key') idempotencyLedger?.add(processedKey);
-        // Applied: its held row goes (after the ledger has the key, so a restart
-        // in between suppresses the replay rather than sending it again).
-        // A removal that fails leaves the row; the next check again under
-        // the same key finds the key applied and removes it then.
         if (heldSeq !== null) {
           const heldId = queueStore.all().find((candidate) => candidate.seq === heldSeq)?.id;
           try { await queueStore.remove(heldSeq); } catch (_) {
-            // Applied: the row is not shown as held, and its removal is tried again.
             if (heldId) { appliedHolds.add(heldId); scheduleHoldCleanup(); }
           }
         }
@@ -1755,7 +1404,6 @@ export function createBroker({
           steps.push({ activity: envelope.activity, args: envelope.args, idempotencyKey });
           txnSteps.set(envelope.txnId, steps);
         }
-        // The owner's server_write invalidates its condition cache.
         if (activityDef.sideEffect === 'server_write') {
           conditionCacheEpoch += 1;
           for (const key of conditionCache.keys()) {
@@ -1766,16 +1414,11 @@ export function createBroker({
       } catch (cause) {
         lastError = isTommyError(cause) ? cause : err('ActivityFailed', String(cause && cause.message), { retryable: false, cause });
         if (!lastError.retryable) break;
-        // The request never reached the server: sending it again at once on the
-        // same link sends the whole body again (a clock photo) for nothing. The
-        // offline queue sends it later, spaced (F8).
+        // Never reached the server: resending now resends the whole body for nothing; the queue spaces it.
         if (activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable && neverReachedServer(lastError)) break;
       }
     }
 
-    // A `holdUnsettled` write whose outcome is not known keeps its row,
-    // marked unsettled with why and when; no drain sends it, only a check
-    // again does. A final answer removes it below.
     const unsettledWhy = activityDef.holdUnsettled && heldSeq !== null ? unsettledReason(lastError, activityDef.holdUnsettled) : null;
     if (unsettledWhy) {
       noteOutcome(activityDef, envelope, idempotencyKey, 'unconfirmed', { rpcId: record.runId });
@@ -1788,13 +1431,8 @@ export function createBroker({
       }), { unsettled: { reason: unsettledWhy } });
     }
 
-    // A replayable server write whose request never reached the server waits
-    // in the offline queue, as it would had the device reported itself
-    // offline. A drained replay is still in the queue, so it just fails here
-    // and stays there.
     if (activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable
       && !envelope.restoreDrain && neverReachedServer(lastError)) {
-      // Its held row is already queued; the caller releases it.
       if (heldSeq === null) await enqueueOffline(envelope.sourceMpId, { ...envelope, identity, idempotencyKey });
       noteResendFailure(idempotencyKey);
       await records.update(record.runId, { status: 'queued_offline', attempts: attempt });
@@ -1802,15 +1440,11 @@ export function createBroker({
       return { rpcId: record.runId, status: 'queued_offline' };
     }
 
-    // A refusal settles the write; a drained row whose send never left the
-    // device still waits in the queue; anything else got no settling answer.
     if (refusedForGood(lastError)) {
       noteOutcome(activityDef, envelope, idempotencyKey, 'refused', { rpcId: record.runId, refusal: refusalOf(lastError) });
     } else {
       noteOutcome(activityDef, envelope, idempotencyKey, envelope.restoreDrain && neverReachedServer(lastError) ? 'queued' : 'unconfirmed', { rpcId: record.runId });
     }
-    // Budget exhausted or non-retryable: dead-letter. The server
-    // answered (or the write failed for good), so its held row goes.
     if (heldSeq !== null) await queueStore.remove(heldSeq);
     await records.update(record.runId, {
       status: 'dead_letter',
@@ -1828,12 +1462,10 @@ export function createBroker({
     const identity = envelope.identity || authenticate(envelope);
     const steps = txnSteps.get(envelope.txnId) || [];
     txnSteps.delete(envelope.txnId);
-    // Reverse-order compensation via `undo_*`, run with the owning MP's
-    // authority: undoing a step is the owner's activity, not a caller privilege.
     for (const step of steps.reverse()) {
       const [ownerMpId, name] = splitQualified(step.activity);
       const undoName = `undo_${name}`;
-      if (!mps.get(ownerMpId)?.manifest.activities?.[undoName]) continue; // best-effort-no-rollback
+      if (!mps.get(ownerMpId)?.manifest.activities?.[undoName]) continue;
       // eslint-disable-next-line no-await-in-loop
       await dispatchInvoke({
         kind: 'invoke',
@@ -1848,8 +1480,6 @@ export function createBroker({
     return { rolledBack: steps.length };
   }
 
-  // --- offline queue (broker-owned store; FIFO per source MP) ----------------
-
   function currentQueueOwner() {
     try { return typeof queueOwner === 'function' ? queueOwner() || null : null; } catch (_) { return null; }
   }
@@ -1857,12 +1487,6 @@ export function createBroker({
   const OWNER_FIELDS = ['person', 'accountType', 'accountId'];
   const known = (value) => value !== undefined && value !== null && value !== '';
 
-  /**
-   * Whether this broker may send a queued row (see `queueOwner`): the row's
-   * tenant is this broker's, and every person or account field the row was
-   * stamped with is this broker's too. A broker that does not know one of
-   * them sends no row stamped with it.
-   */
   function ownsQueuedRow(row, holder) {
     if (typeof queueOwner !== 'function') return true;
     if (!holder || !known(holder.tenantId)) return false;
@@ -1872,7 +1496,6 @@ export function createBroker({
     return OWNER_FIELDS.every((key) => !known(stamp[key]) || (known(holder[key]) && String(stamp[key]) === String(holder[key])));
   }
 
-  // A held row as its Mini Program reads it.
   function heldEntry(row) {
     const running = queueStore.isHeld?.(row);
     return {
@@ -1890,19 +1513,13 @@ export function createBroker({
     return queueStore.all().filter((row) => ownsQueuedRow(row, holder));
   }
 
-  // --- write outcomes ---------------------------------------------------------
-
-  /** Whose outcome records these are: the queue owner (person and account); every record is ours without one. */
   function outcomeOwner() {
     const holder = currentQueueOwner();
     if (!holder) return '*';
     return JSON.stringify(['tenantId', ...OWNER_FIELDS].map((key) => (known(holder[key]) ? String(holder[key]) : null)));
   }
 
-  /** The refusal of an answered write, as `{ code, status, message }`. */
   function refusalOf(error) {
-    // The answer itself (the cause with an HTTP status), else the innermost
-    // error that is more than the broker's own ActivityFailed wrapping.
     let answered = null;
     let inner = error;
     let cause = error;
@@ -1921,14 +1538,8 @@ export function createBroker({
     };
   }
 
-  /**
-   * Record what happened to a `client_key` write. Its request is kept (for a
-   * confirm) only for an eligible activity while it waits or is unconfirmed;
-   * the result is never kept.
-   */
   function noteOutcome(activityDef, envelope, idempotencyKey, state, { rpcId, refusal } = {}) {
     if (activityDef?.idempotency !== 'client_key' || !idempotencyKey) return;
-    // An rpc id is recorded only once an answer settled the write.
     const settled = state === 'succeeded' || state === 'refused';
     const open = state === 'queued' || state === 'unconfirmed';
     const request = open && confirmEligible(activityDef) ? {
@@ -1939,13 +1550,11 @@ export function createBroker({
     } catch (_) { /* a record that cannot be kept never fails the write */ }
   }
 
-  /** A replayed success settles a record still waiting or unconfirmed. */
   function noteReplayedSuccess(activityDef, envelope, idempotencyKey) {
     const before = idempotencyKey ? outcomes.get(outcomeOwner(), envelope.activity, idempotencyKey) : null;
     if (before && (before.state === 'queued' || before.state === 'unconfirmed')) noteOutcome(activityDef, envelope, idempotencyKey, 'succeeded');
   }
 
-  /** This MP's own activity (name without its prefix), or null for another MP's or an unknown one. */
   function ownActivity(sourceMpId, activity) {
     if (typeof activity !== 'string' || !activity || activity.includes('.')) return null;
     const activityDef = mps.get(sourceMpId)?.manifest?.activities?.[activity];
@@ -1961,7 +1570,6 @@ export function createBroker({
   );
 
   async function enqueueOffline(sourceMpId, envelope, { held = false } = {}) {
-    // Keep the existing payload budgets in UTF-16 code units on every backend.
     const bytes = utf16Units(JSON.stringify(envelope.args || envelope.payload || {}));
     const holder = currentQueueOwner();
     await queueStore.ready?.();
@@ -1981,19 +1589,12 @@ export function createBroker({
     }
   }
 
-  // One drain at a time: a drain asked for while one runs joins it, so a row
-  // is never sent twice by two drains.
+  // One drain at a time, so a row is never sent twice.
   let drainInFlight = null;
 
-  // Queued writes whose last send never reached the server, by idempotency
-  // key: how many sends failed and when the next may go (F8). A drain asked
-  // for sooner leaves the row (and its Mini Program's later rows) queued and
-  // wakes itself when it is due, so a row never waits for a trigger that
-  // does not come.
   const resendFailures = new Map();
   let resendTimer = null;
 
-  // Counts the failure and wakes a drain when the row is due.
   function noteResendFailure(key) {
     if (key === undefined || key === null) return;
     const failures = (resendFailures.get(key)?.failures || 0) + 1;
@@ -2017,14 +1618,11 @@ export function createBroker({
     return drainInFlight;
   }
 
-  // Codes that mean "not yet", never "no": the row is sent again later.
   const UNSETTLED_CODES = new Set([
     'ActivityFailed', 'Timeout', 'Offline', 'RateLimited', 'UnknownActivity', 'UnknownTrigger',
     'ACCOUNT_NOT_DISPLAYED', 'ACCOUNT_PERMISSIONS_UNKNOWN',
   ]);
 
-  // No answer came back at all: status 0, or the fetch itself threw. Any HTTP
-  // status means the server answered.
   function neverReachedServer(error) {
     let cause = error;
     for (let depth = 0; cause && depth < 8; depth += 1) {
@@ -2037,11 +1635,6 @@ export function createBroker({
     return false;
   }
 
-  /**
-   * A queued row is settled when the server answered a 4xx other than 401, 408
-   * and 429, or, with no HTTP answer, the activity's own error is final (not
-   * retryable and not in UNSETTLED_CODES). Anything else is sent again.
-   */
   function refusedForGood(error) {
     let cause = error;
     for (let depth = 0; cause && depth < 8; depth += 1) {
@@ -2063,24 +1656,17 @@ export function createBroker({
     }
     const results = [];
     for (const [, rows] of bySource) {
-      rows.sort((a, b) => a.seq - b.seq); // FIFO per source MP
+      rows.sort((a, b) => a.seq - b.seq);
       for (const row of rows) {
-        // A held write (one subject's, outcome not known) is sent again only
-        // by a check again; it holds back none of its Mini Program's rows.
         if (typeof row.subject === 'string') continue;
-        // A write still running in this page holds its row: it is not sent a
-        // second time alongside itself, and its Mini Program's later rows wait.
         if (queueStore.isHeld?.(row)) break;
-        // Its write was answered while this drain sent the rows before it.
         if (!queueStore.all().some((queued) => queued.seq === row.seq)) { unsettled.delete(row.id); continue; }
         const envelope = row.envelope;
-        // A row whose refusal is known is settled again, never sent again.
         const refusedBefore = row.id ? unsettled.get(row.id) : undefined;
         let outcome;
         if (refusedBefore) {
           outcome = refusedBefore;
         } else {
-          // Its last send did not reach the server and its wait is not over (F8).
           const waitMs = (resendFailures.get(envelope?.idempotencyKey)?.dueAt || 0) - now();
           if (waitMs > 0) {
             wakeDrainIn(waitMs);
@@ -2090,10 +1676,6 @@ export function createBroker({
           // eslint-disable-next-line no-await-in-loop
           outcome = await Promise.resolve().then(() => replayEnvelope(envelope)).then((restored) => (restored.trigger
             ? dispatchEmit(restored)
-            // ORIGINAL key. `restoreQueuedAt` is the moment the row entered the
-            // durable queue (recorded by durable-queue.js on push) — the one fact a
-            // replayed write can carry about how long it waited, and the runtime
-            // sets it here so no MP can forge it.
             : dispatchInvoke({
               ...restored, rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
             })))
@@ -2102,26 +1684,17 @@ export function createBroker({
             .finally(() => { if (row.id) drainingRows.delete(row.id); });
           results.push(outcome);
         }
-        // A row not settled stays queued, and so do the rows its Mini Program
-        // queued after it (a clock-out never goes before its clock-in). Its
-        // receipt reads as tried and not sent.
+        // Later rows of the same MP stay queued too: a clock-out never goes before its clock-in.
         if (!outcome.ok && !refusedForGood(outcome.error)) {
           await queueStore.noteAttempt?.(row.seq);
           if (neverReachedServer(outcome.error)) noteResendFailure(envelope?.idempotencyKey);
           break;
         }
-        // Its outcome is known, so its resend wait (F8) is over.
         resendFailures.delete(envelope?.idempotencyKey);
-        // A write refused for good goes to the queue's `settle` when it has
-        // one, so the queue can keep the refusal in the same commit that
-        // removes the row: a page that dies before the observer runs still
-        // has it. One the store cannot take yet stays queued with its outcome
-        // known; its Mini Program's later rows wait, every other Mini
-        // Program's rows still go. Emits and accepted writes are removed.
+        // Settled in the same commit as the removal, so a page that dies before the observer runs keeps the refusal.
         if (!outcome.ok && !envelope.trigger && typeof queueStore.settle === 'function') {
           try {
             // eslint-disable-next-line no-await-in-loop
-            // The row by its stable id: another tab may have reused its seq.
             await queueStore.settle(row.seq, { envelope, outcome, rowId: row.id });
             if (row.id) unsettled.delete(row.id);
             if (!unsettled.size) settleRetries = 0;
@@ -2144,16 +1717,8 @@ export function createBroker({
     return results;
   }
 
-  // --- public surface ---------------------------------------------------------
-
   return {
-    /**
-     * Register a validated manifest and its release entry's minHostApi.
-     * invokeContext supplies the handler MP's current authenticated envelope.
-     */
     registerMp(manifest, { handlers, firstParty, minHostApi = 0, invokeContext } = {}) {
-      // A new version of an MP, or a change to its conditions' schemas, makes
-      // every held condition answer suspect.
       const before = mps.get(manifest.id)?.manifest;
       const conditionShapes = (m) => canonicalJson(Object.fromEntries(Object.entries(m?.conditions || {})
         .map(([name, def]) => [name, { inputSchema: def.inputSchema ?? null, returnSchema: def.returnSchema ?? null }])));
@@ -2165,7 +1730,6 @@ export function createBroker({
         handlers: handlers || {},
         firstParty: firstParty !== undefined ? firstParty : manifest.publisher?.type === 'first_party',
       });
-      // Release anything waiting on this MP to arrive (see `expectedMps`).
       expectedMps.delete(manifest.id);
       const waiters = registrationWaiters.get(manifest.id);
       if (waiters) {
@@ -2174,17 +1738,10 @@ export function createBroker({
       }
     },
 
-    /**
-     * Announce the MPs the host is about to register; a dispatch to one waits
-     * for it instead of failing as unknown. An MP announced and never registered
-     * costs every caller `registrationTimeoutMs`, so call `stopExpecting()` for
-     * any that drops out.
-     */
     expectMps(mpIds = []) {
       for (const mpId of mpIds) if (mpId && !mps.has(mpId)) expectedMps.add(mpId);
     },
 
-    /** Withdraw an announcement, releasing its waiters to fail now as not registered. */
     stopExpecting(mpId) {
       expectedMps.delete(mpId);
       const waiters = registrationWaiters.get(mpId);
@@ -2196,7 +1753,6 @@ export function createBroker({
 
     unregisterMp(mpId) { mps.delete(mpId); },
 
-    /** Per-tenant Action state (server is system of record; this is the device projection). */
     setActionState(tenantId, mpId, actionId, { enabled, options, scopeLocationId, inherited = false, revision }) {
       const entry = mps.get(mpId);
       const action = entry?.manifest.actions?.[actionId];
@@ -2214,8 +1770,7 @@ export function createBroker({
       }
       if (revision !== undefined && prev.revision !== undefined && revision < prev.revision) return;
       if (scoped && inherited === true) {
-        // Keep the revision tombstone: an older concurrent list response must
-        // not resurrect the override after a reset has committed.
+        // Keep the revision tombstone: an older concurrent list response must not resurrect the override.
         actionState.set(key, { inherited: true, revision });
         return;
       }
@@ -2226,26 +1781,16 @@ export function createBroker({
         options: options !== undefined ? options : prev.options, revision, inherited: false });
     },
 
-    // --- manifest-driven settings ---------------------------------------------
-    // The device-side per-tenant settings read model shared by the renderer,
-    // `tommy.settings.get()` and `{ from: setting }` predicates; the system of
-    // record is each field's declared `store`.
     setSettingState(tenantId, mpId, values = {}) {
       const key = `${tenantStateKey(tenantId)}:${mpId}`;
       settingState.set(key, { ...(settingState.get(key) || {}), ...values });
-      // A condition may read a setting.
       invalidateConditionCache(tenantId);
     },
 
-    /**
-     * A copy of this MP's own settings. Another MP's settings are read only
-     * through a declared `{ from: setting, mp }` source.
-     */
     settingsFor(tenantId, mpId) {
       return { ...(settingState.get(`${tenantStateKey(tenantId)}:${mpId}`) || {}) };
     },
 
-    /** Declared settings pages: the display side the projection omits. */
     settingsCatalog() {
       const out = [];
       for (const [mpId, entry] of mps) {
@@ -2256,16 +1801,8 @@ export function createBroker({
       return out;
     },
 
-    /**
-     * The one predicate evaluator every platform gate uses. Callers pass
-     * resolved source values; they never compare.
-     */
     evaluatePredicate: evaluateDeclaredPredicate,
 
-    /**
-     * `tenantId`: the subscribing instance's tenant. The subscription then
-     * hears only that tenant's emits; without it, every tenant's.
-     */
     subscribe(mpId, trigger, handler, { tenantId } = {}) {
       const qualified = trigger.includes('.') ? trigger : qualify(mpId, trigger);
       authorizeSubscribe(mpId, qualified, tenantId);
@@ -2281,16 +1818,11 @@ export function createBroker({
     invoke: dispatchInvoke,
     rollbackTransaction,
 
-    /** Inspector surface: query + replay. */
     records: {
       query: (filter) => records.query(filter),
       get: (runId) => records.get(runId),
     },
 
-    /**
-     * Re-dispatch a failed invoke with its original args (same key or a new
-     * one), with host authority, attributed to the original source MP.
-     */
     async replay(runId, { newIdempotencyKey } = {}) {
       const record = await records.get(runId);
       if (!record || record.kind !== 'invoke') throw err('UnknownActivity', `run '${runId}' is not a replayable invoke`, { retryable: false });
@@ -2310,10 +1842,6 @@ export function createBroker({
       return [...suppressionTally.entries()].map(([key, count]) => ({ key, count }));
     },
 
-    /**
-     * Manifest-side display metadata for each registered Action, which the
-     * server's per-tenant state payload omits. Read-only.
-     */
     actionCatalog() {
       const out = [];
       for (const [mpId, entry] of mps) {
@@ -2333,13 +1861,11 @@ export function createBroker({
     },
 
     setOnline(value) {
-      // Back from offline: the link changed, so a queued write goes at once (F8).
       if (!isOnline && value) resendFailures.forEach((entry) => { entry.dueAt = 0; });
       isOnline = !!value;
     },
     isOnline: () => isOnline,
     drainOfflineQueue,
-    /** Committed changes to this MP's queue in this account; callback has no payload. */
     onQueuedWritesChange(sourceMpId, callback) {
       if (retired || typeof callback !== 'function') return () => {};
       const captured = { ...currentQueueOwner() };
@@ -2370,8 +1896,6 @@ export function createBroker({
         bySource[row.sourceMpId] = (bySource[row.sourceMpId] || 0) + 1;
         bytesBySource[row.sourceMpId] = (bytesBySource[row.sourceMpId] || 0) + (row.bytes || 0);
       }
-      // `expiredOnLoad` is the one path that discards an accepted write, so it
-      // is reported for the host to surface.
       return {
         total: rows.length,
         bySource,
@@ -2382,16 +1906,6 @@ export function createBroker({
       };
     },
 
-    /**
-     * One Mini Program's waiting writes, as receipts its own surface can show
-     * after a reload (the queue's own receipts, never a second draft
-     * list): `[{ id, activity, args, queuedAt, attempts, state,
-     * idempotencyKey }]` in the order they will be sent. `state` is `sending`
-     * (on its way now), `failed` (sent and not settled; it is sent again) or
-     * `queued`; `idempotencyKey` is the key the write was queued under (null
-     * only for a row queued without one). Only rows of this broker's person
-     * and account; `args` are a copy.
-     */
     queuedWrites(sourceMpId) {
       return ownQueuedRows()
         .filter((row) => row.sourceMpId === sourceMpId && row.envelope?.activity && row.id && typeof row.subject !== 'string')
@@ -2412,13 +1926,6 @@ export function createBroker({
         });
     },
 
-    /**
-     * The recorded outcome of one of this Mini Program's own `client_key`
-     * writes (`activity` without its prefix) by its idempotency key:
-     * `{ state, at, rpcId, refusal?, emitted, confirmable }`, or null when
-     * none is recorded (never written, evicted, expired, or another MP's
-     * activity). Synchronous; never sends. No result is kept.
-     */
     writeOutcome(sourceMpId, activity, idempotencyKey) {
       const own = ownActivity(sourceMpId, activity);
       if (!own || typeof idempotencyKey !== 'string' || !idempotencyKey) return null;
@@ -2434,12 +1941,6 @@ export function createBroker({
       };
     },
 
-    /**
-     * Marks the follow-up a Mini Program emitted for one of its succeeded
-     * writes as done. True when it marked a `succeeded` record; false when
-     * there is none. Rejects `WriteNotFound` for an activity this MP does not
-     * own.
-     */
     async markOutcomeEmitted(sourceMpId, activity, idempotencyKey) {
       const own = ownActivity(sourceMpId, activity);
       if (!own) throw err('WriteNotFound', `'${activity}' is not an activity of mp '${sourceMpId}'`, { retryable: false });
@@ -2451,17 +1952,6 @@ export function createBroker({
       return true;
     },
 
-    /**
-     * Sends one of this Mini Program's writes once more under its own key,
-     * with the recorded arguments byte for byte, when its outcome is not
-     * known. Refused with `WriteNotConfirmable` (`details.reason`) unless, in
-     * this order: the activity is eligible (client_key, offline-replayable,
-     * no secret input) — `not_eligible`; a request is recorded as queued or
-     * unconfirmed — `no_request`; no confirm has left the device for this key
-     * — `already_confirmed`; it was recorded within 24 hours — `expired`.
-     * `WriteNotFound` for an activity this MP does not own. Offline it sends
-     * nothing and answers `unconfirmed` (that does not count as the confirm).
-     */
     async confirmWriteOutcome(sourceMpId, activity, idempotencyKey) {
       const own = ownActivity(sourceMpId, activity);
       if (!own) throw err('WriteNotFound', `'${activity}' is not an activity of mp '${sourceMpId}'`, { retryable: false });
@@ -2478,7 +1968,6 @@ export function createBroker({
       if (now() - record.at > CONFIRM_WITHIN_MS) throw notConfirmable('expired', `'${own.qualified}' was recorded more than 24 hours ago`);
       const offline = (message) => ({ state: 'unconfirmed', error: { code: 'DATA_OFFLINE', status: 0, message } });
       if (!isOnline) return offline(`'${own.qualified}' was not confirmed: the device is offline`);
-      // Claimed in this turn, before any await, so a second confirm is refused.
       outcomes.patch(owner, own.qualified, idempotencyKey, { confirmSent: true });
       const release = () => outcomes.patch(owner, own.qualified, idempotencyKey, { confirmSent: false });
       const request = JSON.parse(JSON.stringify(record.request));
@@ -2509,26 +1998,14 @@ export function createBroker({
       return { state: 'unconfirmed', error: { code: null, status: null, message: `'${own.qualified}' answered ${answer?.status || 'nothing'}` } };
     },
 
-    /** Drops every write outcome record (sign-out). */
     purgeOutcomes() { outcomes.clear(); },
 
-    /** Drops every held condition answer. */
     purgeConditionAnswers,
-    /** Marks stale the held answers of conditions that read any of these host collections. */
     markConditionAnswersStale,
-    /** Resolves once the held condition answers the store held are read, and every one kept so far is stored. */
     conditionAnswersReady() { return conditionAnswers.ready().then(() => conditionAnswers.flush()); },
 
-    /** Resolves once the outcome records the store held are read, and every record written so far is stored. */
     outcomesReady() { return outcomes.ready().then(() => outcomes.flush()); },
 
-    /**
-     * Discard one of this Mini Program's waiting writes by its receipt id, so
-     * it is never sent. False, and nothing changes, for a row on its way
-     * (held by its running write, or being sent by a drain), another Mini
-     * Program's, another person's or account's, or one that has left the queue.
-     * Resolves true only after the queue confirms its removal.
-     */
     async discardQueuedWrite(sourceMpId, id) {
       try {
         await queueStore.ready?.();
@@ -2539,15 +2016,6 @@ export function createBroker({
       } catch (_) { return false; }
     },
 
-    /**
-     * The held write of one subject: the row of this Mini Program's
-     * `holdUnsettled` activity (qualified name) whose key fields equal
-     * `keyFields`, as `{ id, activity, input, key, reason, heldAt }`, or null.
-     * `reason` is the code or `unconfirmed` the answer was held for,
-     * `sending` while a dispatch or check again runs in this page, and
-     * `unconfirmed` for a row whose dispatch never finished (the page
-     * closed). Only rows of this broker's person and account; `input` is a copy.
-     */
     heldWrite(sourceMpId, activity, keyFields) {
       const [ownerMpId, activityName] = splitQualified(activity);
       const hold = mps.get(ownerMpId)?.manifest.activities?.[activityName]?.holdUnsettled;
@@ -2559,7 +2027,6 @@ export function createBroker({
       return row ? heldEntry(row) : null;
     },
 
-    /** Every held write of this Mini Program (or of every one when no id is given), as heldWrite answers them, with `sourceMpId` and `subject` (its key values). */
     heldWrites(sourceMpId = null) {
       return ownQueuedRows()
         .filter((row) => typeof row.subject === 'string' && !appliedHolds.has(row.id) && (sourceMpId === null || row.sourceMpId === sourceMpId))
@@ -2571,14 +2038,13 @@ export function createBroker({
         });
     },
 
-    /** Diagnostics: idempotent runs in flight, and the joins waiting on them. */
     inflightStats() {
       let waiting = 0;
       for (const entry of inflightInvokes.values()) waiting += entry.waiters.size;
       return { runs: inflightInvokes.size, waiting };
     },
 
-    /** Host retention must not retire a running action or delayed delivery. */
+    // Host retention must not retire a running action or delayed delivery.
     hasPendingWork: () => pendingWork > 0 || debouncePending.size > 0,
     async teardown(instanceId) {
       if (instanceId != null) return;

@@ -1,7 +1,3 @@
-/**
- * @tommy/actions-runtime — the host broker (in-process entry points; the
- * same broker is meant to serve the postMessage transport).
- */
 export { createBroker, SCOPED_INVOKE_HOST_API } from './broker.js';
 export { createRecordStore, createMemoryBackend, createWebStorageBackend } from './records.js';
 export { createIdempotencyLedger, createInvalidationEpochs } from './idempotency-ledger.js';
@@ -12,13 +8,8 @@ export { createDurableQueue } from './durable-queue.js';
 export { createHostStoreQueue } from './host-store-queue.js';
 export { holdSubject, unsettledReason } from './held-writes.js';
 export { validateToken, createFakeIssuer } from './capability.js';
-// THE predicate evaluator (there is exactly one — R4). Anything that gates on
-// a declared predicate imports it from here and supplies a context bag; no
-// caller re-implements a comparison.
 export { evaluatePredicate, resolveSource, PredicateError, PREDICATE_OPERATORS } from './predicate.js';
 export {
   DEFAULT_THROTTLE_PROFILE, QUERY_RATE_WAIT_MAX_MS, QUEUE_MAX_ENTRIES, QUEUE_MAX_BYTES, SYNC_EMIT_TIMEOUT_MS,
-  // Read-scope derivation — exported so review tooling
-  // and tests read the same lists the broker enforces.
   DOMAIN_SCOPE_BY_MP, SENSITIVE_CONDITIONS, domainScopeForMp,
 } from './constants.js';

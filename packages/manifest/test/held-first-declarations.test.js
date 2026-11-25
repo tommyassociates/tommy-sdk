@@ -1,8 +1,3 @@
-// Level-20 declarations: an activity may keep its refused queued writes
-// (keepRefused, only when offline-replayable); a condition may be held first
-// (heldFirst) and describe how its held answer ages and is retried (freshness,
-// only with heldFirst). Replays the contract fixture's cases, each grafted onto
-// the compact valid manifest.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +15,6 @@ const yamlLines = (obj, indent) => Object.entries(obj).map(([key, value]) => {
   return `${indent}${key}: ${JSON.stringify(value)}\n`;
 }).join('');
 
-/** The base manifest with the fixture's abbreviated activity and condition keys laid over its own. */
 function manifestFor(payload) {
   let yaml = BASE;
   const [activity] = Object.values(payload.activities ?? {});

@@ -1,27 +1,5 @@
-/**
- * condition-answers.js — the last answered value of each `heldFirst`
- * condition, per (queue owner, viewer role fingerprint, condition, canonical
- * arguments), so an asker that passes `onRead` gets it at once while the
- * handler runs again in the background.
- *
- * One entry: { id, owner, fingerprint, condition, answer, at, seq, stale }.
- * `at` is when the answer was read; `seq` orders the reads that produced
- * entries (a read that started before the one an entry came from never
- * replaces it); `stale` is set when a landed write touched a collection the
- * condition reads, and cleared by the next answer.
- *
- * Only answers that validated against the condition's `returnSchema` and do
- * not carry `unresolved: true` are kept (the broker decides). Bounded: at most
- * `maxRows` entries, the least recently written evicted first; no TTL — an old
- * answer is still shown, marked aged. Storage is injected (`{ load(),
- * put(entry), remove(id) }`, sync or async); without one (a kiosk, tests)
- * entries live in memory only. Reads are synchronous from memory after
- * `ready()`; store writes never throw into a read.
- */
-
 const DEFAULT_MAX = 500;
 
-/** FNV-1a 32-bit, hex: the entry id, so a stored entry names no arguments. */
 function digest(value) {
   let h = 0x811c9dc5;
   const text = String(value);
@@ -40,7 +18,6 @@ function wellFormed(entry) {
 }
 
 export function createConditionAnswers({ store = null, maxRows = DEFAULT_MAX } = {}) {
-  /** id -> entry; insertion order is eviction order. */
   const entries = new Map();
   let loading = null;
   let tail = Promise.resolve();
@@ -77,7 +54,6 @@ export function createConditionAnswers({ store = null, maxRows = DEFAULT_MAX } =
   return {
     idFor: (owner, fingerprint, condition, argsJson) => digest(`${owner}\u0000${fingerprint}\u0000${condition}\u0000${argsJson}`),
 
-    /** Merge what the store holds; an entry already written in memory wins when it is newer. */
     ready() {
       if (!store?.load) return Promise.resolve();
       if (!loading) {
@@ -96,7 +72,6 @@ export function createConditionAnswers({ store = null, maxRows = DEFAULT_MAX } =
 
     get(id) { return entries.get(id) || null; },
 
-    /** Keep an answer unless an entry from a later-started read is already there. True when kept. */
     keep({ id, owner, fingerprint, condition, answer, at, seq }) {
       const before = entries.get(id);
       if (before && (before.seq ?? 0) > seq) return false;
@@ -106,7 +81,6 @@ export function createConditionAnswers({ store = null, maxRows = DEFAULT_MAX } =
 
     remove,
 
-    /** Mark stale every entry whose condition `touched(condition)` says a landed write affected. */
     markStale(touched) {
       for (const entry of [...entries.values()]) {
         if (entry.stale || !touched(entry.condition)) continue;
@@ -114,7 +88,6 @@ export function createConditionAnswers({ store = null, maxRows = DEFAULT_MAX } =
       }
     },
 
-    /** Drop every entry, or those `which(entry)` selects. */
     purge(which = null) {
       for (const entry of [...entries.values()]) if (!which || which(entry)) remove(entry.id);
     },

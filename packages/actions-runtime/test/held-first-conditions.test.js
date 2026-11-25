@@ -1,13 +1,3 @@
-/**
- * Held-first conditions: a query with `onRead` of a condition that declares
- * `heldFirst` resolves the answer the device holds at once and reads again in
- * the background, telling the asker through `onRead`. A refusal purges the
- * held answer; a failure keeps it; an answer is never served under another
- * viewer role fingerprint; a landed write on a collection the condition reads
- * marks it stale. Replays J9-condition-held-then-fresh,
- * J9-condition-client-refused-clears, J9-condition-client-failed-keeps,
- * J9-condition-purged-on-role-change and J6-condition-attendances-in-range-held.
- */
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -36,7 +26,6 @@ const conditionDef = (extra = {}) => ({
   ...extra,
 });
 
-/** A broker with one owner MP whose condition answers through `handler`, and a clock and timer the test drives. */
 async function world({
   mp = 'scheduling', condition = 'c', def = conditionDef({ heldFirst: true }), handler, store = null, fingerprint = { value: 'rf-1' }, start = 1764057600000,
 } = {}) {
@@ -70,7 +59,6 @@ async function world({
   return { broker, ask, notices, clock, timers, runTimers, report, fingerprint };
 }
 
-/** A stored entry as the broker keeps it, for an owner-less broker (every record is its own). */
 function heldEntry({ fingerprint, condition, args, answer, at }) {
   const answers = createConditionAnswers();
   const id = answers.idFor('*', fingerprint, condition, JSON.stringify(args, Object.keys(args).sort()));
@@ -102,10 +90,8 @@ describe('held-first conditions (contract fixtures)', () => {
     answer(f.given.server['handler answer'].returns);
     await settle();
     expect(w.notices).toEqual([checking.payload, fresh.payload]);
-    // The fresh value replaced the held entry.
     await w.broker.conditionAnswersReady();
     expect([...store.rows.values()][0]).toMatchObject({ answer: fresh.payload.answer, at: fresh.payload.asOf });
-    // The next asker gets it held.
     w.notices.length = 0;
     expect(await w.ask(held.args)).toMatchObject({ state: 'held', answer: fresh.payload.answer, asOf: fresh.payload.asOf });
   });
@@ -119,7 +105,6 @@ describe('held-first conditions (contract fixtures)', () => {
     await w.broker.conditionAnswersReady();
     let askedAtNotice = null;
     const got = await w.ask(held.args, {
-      // Asked again from inside the refused notice: nothing is held any more, so it waits and is refused.
       onRead: (notice) => { w.notices.push(notice); if (notice.state === 'refused') { askedAtNotice = w.ask(held.args, { onRead: () => {} }); askedAtNotice.catch(() => {}); } },
     });
     expect(got).toEqual(resolved.payload);
@@ -128,7 +113,6 @@ describe('held-first conditions (contract fixtures)', () => {
     await expect(askedAtNotice).rejects.toMatchObject({ code: 'PermissionDenied' });
     await w.broker.conditionAnswersReady();
     expect(store.rows.size).toBe(0);
-    // Nothing held now: a second ask waits for the handler, and its refusal rejects.
     await expect(w.ask(held.args)).rejects.toMatchObject({ code: 'PermissionDenied' });
   });
 
@@ -144,7 +128,6 @@ describe('held-first conditions (contract fixtures)', () => {
     const stale = w.notices.filter((n) => n.state !== 'checking');
     expect(stale).toEqual([{ ...staleNotice.payload, error: { ...staleNotice.payload.error, message: expect.any(String) } }]);
     expect(stale[0].error.code).toBe('Timeout');
-    // Retries 4 s then 12 s, then a final stale without a retry; the answer stays held.
     await w.runTimers();
     await w.runTimers();
     const terminal = w.notices.filter((n) => n.state === 'stale').at(-1);
@@ -173,7 +156,6 @@ describe('held-first conditions (contract fixtures)', () => {
     const handler = vi.fn(async () => { throw refused(); });
     const w = await world({ condition: 'shift_requests_for_location', store, fingerprint: { value: held.roleFingerprint }, handler });
     await w.broker.conditionAnswersReady();
-    // Priya removes Lena's Pier tag: the fingerprint moves, and the host purges.
     w.fingerprint.value = 'rf-lm-harbour';
     w.broker.purgeConditionAnswers('role_or_location_change');
     await expect(w.ask(held.args)).rejects.toMatchObject({ code: 'PermissionDenied' });
@@ -236,14 +218,14 @@ describe('ordering and declarations', () => {
     const answers = [];
     const w = await world({ store, handler: () => new Promise((resolve) => { answers.push(resolve); }) });
     await w.broker.conditionAnswersReady();
-    await w.ask({ a: 1 }); // read 1 starts
+    await w.ask({ a: 1 });
     await settle();
     w.clock.now += 10;
-    await w.ask({ a: 1 }); // read 2 starts later
+    await w.ask({ a: 1 });
     await settle();
-    answers[1]({ n: 2 }); // the later read lands first
+    answers[1]({ n: 2 });
     await settle();
-    answers[0]({ n: 1 }); // the earlier read lands after it
+    answers[0]({ n: 1 });
     await settle();
     expect(await w.ask({ a: 1 }, { onRead: () => {} })).toMatchObject({ state: 'held', answer: { n: 2 } });
   });
@@ -370,7 +352,6 @@ describe('the read-outcome classifier', () => {
     expect(READ_OUTCOME_CODES.access).toEqual(['PermissionDenied', 'DATA_FORBIDDEN', 'DATA_ACCESS_CHANGED', 'FORBIDDEN', 'NotAuthorized', 'SCOPE_DENIED', 'DeniedScope', 'Unauthorized', 'Forbidden']);
     expect(READ_OUTCOME_CODES.unavailable).toEqual(['UnknownCondition', 'DATA_UNDECLARED', 'DATA_TRUNCATED', 'DATA_NOT_APPLICABLE', 'NDIS_DISABLED']);
     expect(report).not.toHaveBeenCalled();
-    // The default for a code no list names, by status.
     expect(classifyReadOutcome({ code: 'SOMETHING_NEW', status: 403 }, { report })).toEqual({ state: 'refused', reason: 'access' });
     expect(classifyReadOutcome({ code: 'SOMETHING_NEW', status: 404 }, { report })).toEqual({ state: 'refused', reason: 'unavailable' });
     expect(classifyReadOutcome({ code: 'SOMETHING_NEW', status: 410 }, { report })).toEqual({ state: 'refused', reason: 'unavailable' });

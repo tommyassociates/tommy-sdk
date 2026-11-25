@@ -1,39 +1,18 @@
-/**
- * panel-tile.js — one host-owned grid tile (panel-runtime.md §2).
- *
- * The host paints the skeleton INSTANTLY; the MP's panel definition fills a
- * Shadow-DOM root when its `load()` resolves (progressive reveal). Time alone
- * is never an error: past `LOAD_TIMEOUT_MS` a first boot keeps its skeleton
- * with a "taking longer" note, and a tile that already rendered keeps its
- * content with a stale mark and Retry, until the load answers or fails. A
- * real failure shows the error card, Retry re-runs load, and 3 consecutive
- * failures escalate to a "Reload add-on" state. A changed context (anything
- * but the live objects it carries) loads and renders the tile again, keeping
- * what it shows meanwhile. (§8's 30 KB/200 ms/5 MB are review/harness checks,
- * NOT runtime-enforced.)
- *
- * Containment: load/render failures are caught here (the boundary pattern
- * — a broken panel is a fallback tile, siblings keep running) and reported
- * through the budget-hook event stream.
- */
 import { defineComponent, h, ref, watch, onMounted, onBeforeUnmount, onErrorCaptured } from 'vue';
 import { isStaleWorldRefusal } from './stale-world.js';
 
 export const LOAD_TIMEOUT_MS = 5000;
 export const MAX_CONSECUTIVE_FAILURES = 3;
 
-/** The host-drawn words of a tile, in English unless the host passes its own. */
 export const DEFAULT_TILE_LABELS = Object.freeze({
   stale: "Couldn't refresh — showing the last view",
   retry: 'Try again',
   slow: 'Taking longer than usual…',
 });
 
-// Context fields that are live objects (the MP's SDK, chat panes), not what
-// the panel shows: a new one alone never loads the tile again.
+// Live objects, not displayed data: a new one alone never reloads the tile.
 const LIVE_CONTEXT_FIELDS = new Set(['tommy', 'chatPane', 'chatThreadPane', 'chatList']);
 
-/** A context as the panel shows it: its plain fields, without functions or live objects. */
 function contextSignature(ctx) {
   try {
     return JSON.stringify(ctx ?? null, (key, value) => {
@@ -46,18 +25,7 @@ function contextSignature(ctx) {
   }
 }
 
-/**
- * Base stylesheet adopted into every panel shadow root.
- *
- * MP panels render plain DOM (h3/ul/li/p/button) into their (closed) shadow
- * root — a boundary host stylesheets do NOT cross. Without a sheet the content
- * falls back to UA defaults (raw bullets, unstyled buttons). CSS custom
- * properties (the `--tommy-*` design tokens declared on :root) DO pierce the
- * boundary, so this token-based sheet gives every MP a consistent, card-like
- * look that sits next to the first-party dashboard cards. Adopted via
- * `adoptedStyleSheets` because the MPs' `render()` calls `replaceChildren()`,
- * which would wipe an injected <style> node but leaves adopted sheets intact.
- */
+// Host stylesheets cannot cross the closed shadow root but tokens do, so this sheet styles MP panel DOM.
 const PANEL_BASE_CSS = `
 :host {
   display: block;
@@ -198,11 +166,10 @@ function baseSheet() {
       return sheet;
     }
   } catch (_) { /* adoptedStyleSheets unsupported — fall through */ }
-  sharedBaseSheet = false; // memoise the unsupported case
+  sharedBaseSheet = false;
   return false;
 }
 
-/** Give a shadow root the base panel look (adopted sheet, or a <style> fallback). */
 export function applyPanelBaseStyles(shadowRoot) {
   const sheet = baseSheet();
   if (sheet) {
@@ -213,24 +180,13 @@ export function applyPanelBaseStyles(shadowRoot) {
       return;
     } catch (_) { /* fall through to <style> */ }
   }
-  // Fallback: constructable sheets unavailable. A <style> node is wiped by the
-  // MP's replaceChildren(); it is re-applied after each render (see boot()).
   const style = document.createElement('style');
   style.setAttribute('data-mp-panel-base', '');
   style.textContent = PANEL_BASE_CSS.replace(/:host/g, ':host, :root');
   shadowRoot.append(style);
 }
 
-/**
- * The panel's component with its Options-API `data()` guarded. Vue runs
- * `data()` outside its error wrapping, so a throw there escapes as the tile's
- * own update error, which the tile's `onErrorCaptured` never sees, and leaves
- * a half-mounted child the tile's next patch cannot remove. The guard catches
- * an ordinary error, answers empty data, renders the child as nothing and
- * hands the error to `onDataError`, so the child mounts whole and the tile
- * shows its error card. A stale-world refusal is rethrown: the surface app's
- * error handler takes it quietly (host.js `quietStaleTileErrors`).
- */
+// Vue runs data() outside its error wrapping, where onErrorCaptured cannot see the throw, so guard it here.
 function guardPanelData(component, onDataError) {
   if (!component || typeof component !== 'object' || typeof component.data !== 'function') return component;
   const failed = new WeakSet();
@@ -259,26 +215,23 @@ function guardPanelData(component, onDataError) {
 export const PanelTile = defineComponent({
   name: 'MpPanelTile',
   props: {
-    def: { type: Object, required: true },      // PanelDefinition
-    ctx: { type: Object, required: true },      // PanelContext
+    def: { type: Object, required: true },
+    ctx: { type: Object, required: true },
     loadTimeoutMs: { type: Number, default: LOAD_TIMEOUT_MS },
     onClose: { type: Function, default: null },
     closeLabel: { type: String, default: 'Close' },
-    labels: { type: Object, default: null },    // { stale, retry, slow }: host words for the marks
-    onEvent: { type: Function, default: null }, // budget hooks: (event) => void
+    labels: { type: Object, default: null },
+    onEvent: { type: Function, default: null },
   },
   setup(props, { expose }) {
-    const status = ref('loading'); // loading | ready | error | reload_addon
+    const status = ref('loading');
     const failures = ref(0);
     const mountEl = ref(null);
-    // Rendered at least once: a later load keeps the content shown meanwhile.
     const rendered = ref(false);
-    // Past the load timeout: `stale` over rendered content, `slow` under a first-boot skeleton.
     const stale = ref(false);
     const slow = ref(false);
     let shadowRoot = null;
     let alive = true;
-    // Only the latest load may settle the tile.
     let bootSeq = 0;
     const label = (key) => (props.labels && typeof props.labels[key] === 'string' && props.labels[key]) || DEFAULT_TILE_LABELS[key];
 
@@ -313,17 +266,12 @@ export const PanelTile = defineComponent({
         emitEvent(keep ? 'panel-stale' : 'panel-slow', { afterMs: props.loadTimeoutMs });
       }, props.loadTimeoutMs);
       try {
-        // Optional prefetch — both paths may declare load(). The component path
-        // usually fetches inside the component's setup() via `tommy` instead.
         if (props.def.load) {
           await Promise.resolve(props.def.load(props.ctx));
         }
         if (!current()) return;
         if (props.def.component) {
-          // Component path: mount a Vue/F7 component declaratively into the
-          // LIGHT-DOM content node (the render fn renders it once ready). No
-          // shadow root (F7's global CSS can't cross a closed shadow boundary),
-          // no def.render. Render errors are contained by onErrorCaptured below.
+          // No shadow root on the component path: F7's global CSS cannot cross a closed shadow boundary.
           status.value = 'ready';
           rendered.value = true;
           stale.value = false;
@@ -334,18 +282,12 @@ export const PanelTile = defineComponent({
         }
         if (!shadowRoot) {
           shadowRoot = mountEl.value.attachShadow({ mode: 'closed' });
-          // DEV-ONLY escape hatch: closed shadow roots are unreachable from
-          // Playwright/devtools — expose the root on the mount element in dev
-          // builds so e2e can drive panel content. Absent in production.
           try {
             if (import.meta.env && import.meta.env.DEV) mountEl.value.__mpShadowRoot = shadowRoot;
           } catch (_) { /* no import.meta.env outside vite */ }
         }
         shadowRoot.replaceChildren();
         await props.def.render(shadowRoot, props.ctx);
-        // Base look for the MP's plain DOM. Applied AFTER render: the MP's
-        // render() typically calls replaceChildren() on the root, which wipes a
-        // <style> fallback node — the adopted-sheet path is idempotent.
         applyPanelBaseStyles(shadowRoot);
         if (!current()) return;
         status.value = 'ready';
@@ -365,7 +307,6 @@ export const PanelTile = defineComponent({
       }
     }
 
-    // A changed context loads the tile again; what it shows stays meanwhile.
     watch(() => contextSignature(props.ctx), (next, previous) => {
       if (next === previous || !alive) return;
       if (status.value === 'ready' || status.value === 'loading') boot();
@@ -381,22 +322,7 @@ export const PanelTile = defineComponent({
       alive = false;
       try { if (props.def.unmount) props.def.unmount(); } catch (_) { /* contained */ }
     });
-    // The tile IS the error boundary: a component-path child (or a Vue-in-shadow
-    // render-path MP) that throws during render/setup/lifecycle is contained
-    // here — the tile enters its error/retry state, siblings keep running.
-    //
-    // Except a stale-world refusal (stale-world.js): the store displays another
-    // account while this tile's world is still mounted, so the panel's time
-    // display and host reads refuse. That is not a fault of the panel, so the
-    // tile neither shows the error card, nor emits `panel-error`, nor lets the
-    // error reach the app's error handler. It changes nothing either: the child
-    // stays mounted with its state, and the throw that failed its render left
-    // it empty (Vue renders a failed render as nothing) while a throwing watcher
-    // leaves its last frame. Changing nothing is what keeps this quiet — no tile
-    // re-render, so nothing re-runs the child but the store changes it already
-    // reads — and what brings it back: when the same world is displayed again
-    // those store changes re-render the child, which answers normally. When the
-    // world is left for good, the loader unmounts the surface.
+    // The tile is the error boundary, except a stale-world refusal, which is not the panel's fault and changes nothing.
     onErrorCaptured((err) => {
       if (isStaleWorldRefusal(err)) return false;
       if (alive) fail(err);
@@ -412,10 +338,6 @@ export const PanelTile = defineComponent({
       : null;
 
     return () => h('div', { class: ['mp-panel-tile', `mp-panel-tile--${status.value}`], 'data-panel-id': props.def.id }, [
-      // Component path: the registered Vue/F7 component mounts as a light-DOM
-      // child once ready (only then — so a re-throw can't reopen after fail()).
-      // Plain-DOM path: the shadow-root mount point is ALWAYS present (render
-      // targets it); skeleton/fallback overlays it while not ready.
       props.def.component
         ? h('div', { class: 'mp-panel-tile__content', style: status.value === 'ready' ? undefined : { display: 'none' } },
           status.value === 'ready' ? [h(panelComponent, { tommy: props.ctx && props.ctx.tommy, ctx: props.ctx })] : [])

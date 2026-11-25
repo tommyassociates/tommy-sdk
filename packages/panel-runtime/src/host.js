@@ -1,24 +1,11 @@
-/**
- * host.js — the host grid: collects MP panel registrations (the PanelsApi the
- * loader injects into each MP's SDK) and mounts them into host-owned surface
- * elements with skeleton + per-panel containment (panel-runtime.md §2).
- *
- * MP panels NEVER enter the shell's `panelDefs` / `panels.top|left|right`
- * arrays (the core filter strips unknown names and edit-mode
- * persists those arrays into the `dashboard_layout` team setting) — the host
- * renders a PARALLEL, flag-gated grid section of its own.
- */
 import { createApp, h, shallowReactive } from 'vue';
 import { PanelTile } from './panel-tile.js';
 import { isStaleWorldRefusal } from './stale-world.js';
 import { layoutFor, normalizePanels } from './layout.js';
 
-/** Advisory surface budget (a tunable default). */
 export const SURFACE_PANEL_BUDGET = 24;
 export const SURFACE_MP_BUDGET = 12;
 
-// A tile's key carries its definition's generation: a re-registered panel
-// (a new definition object) mounts fresh; the same definition is patched.
 const defGenerations = new WeakMap();
 let defGeneration = 0;
 function generationOf(def) {
@@ -27,15 +14,7 @@ function generationOf(def) {
   return defGenerations.get(def);
 }
 
-/**
- * Takes a stale-world refusal that Vue attributes to a panel tile itself
- * quietly, as the tile's `onErrorCaptured` takes a child's (panel-tile.js).
- * Vue runs an Options-API `data()` outside its error wrapping, so a panel
- * whose `data()` reads its world's time display while the tile mounts it
- * during an account switch throws as the tile's own "component update"
- * error, which the tile's boundary never sees. Every other error goes to the
- * host's own handler when it installed one, or to the console.
- */
+// Vue runs Options-API data() outside its error wrapping, so a stale-world throw surfaces as the tile's own error.
 function quietStaleTileErrors(app) {
   const hostHandler = app.config.errorHandler;
   app.config.errorHandler = (err, instance, info) => {
@@ -50,31 +29,12 @@ function quietStaleTileErrors(app) {
   };
 }
 
-/**
- * @param {object} [opts]
- * @param {function} [opts.onEvent] budget/telemetry hook
- * @param {function} [opts.installComponentRuntime] host-supplied installer run
- *   on every surface `createApp` — installs Framework7Vue + registerComponents
- *   + provides `$f7`/store so a component-path tile's `f7-*` globals resolve.
- *   panel-runtime stays framework7-agnostic (layering): the app/core supplies
- *   this; without it, only the plain-DOM `render` path works.
- */
 export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
-  const registrations = new Map(); // mpId -> Map<panelId, def>
-  const declarations = new Map();  // mpId -> manifest.panels declaration
-  // Keyed by the host ELEMENT, not the surface name: one MP surface (e.g.
-  // `full_page`) can be mounted into MORE THAN ONE element at once — the
-  // canonical master-detail routes mount the same MP's `full_page` panel into
-  // both the master page (`/calendar/`) and the detail page (`/calendar/overview/`)
-  // simultaneously. Keying by surface would tear the first down when the second
-  // mounts (blanking the master pane).
-  const mounted = new Map();       // el -> { app, el, surface, view, onDispose }
+  const registrations = new Map();
+  const declarations = new Map();
+  const mounted = new Map();
 
   return {
-    /**
-     * The PanelsApi for one MP instance — injected as `tommy.panels`.
-     * register() only accepts ids the manifest DECLARES (contract-first).
-     */
     panelsApiFor(mpId, manifestPanelsRaw = {}, { firstParty = false, onEmbed } = {}) {
       const manifestPanels = Object.fromEntries(normalizePanels(manifestPanelsRaw));
       declarations.set(mpId, manifestPanels);
@@ -86,18 +46,11 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
           if (!manifestPanels[def.id]) {
             throw new Error(`tommy.panels.register: panel '${def.id}' is not declared in the manifest`);
           }
-          // component XOR render — a panel is authored EITHER as a Vue/F7
-          // component (light DOM, shared runtime) OR as a plain-DOM render(root)
-          // (shadow-isolated). Exactly one; never both, never neither.
           const hasComponent = Boolean(def.component);
           const hasRender = typeof def.render === 'function';
           if (hasComponent === hasRender) {
             throw new Error(`tommy.panels.register: panel '${def.id}' must provide exactly one of 'component' or 'render'`);
           }
-          // The `component` path mounts in LIGHT DOM sharing the host runtime
-          // (drops shadow isolation), so it is FIRST-PARTY ONLY until the
-          // untrusted-review pipeline exists. Untrusted MPs stay on the
-          // shadow-isolated `render` path.
           if (hasComponent && !firstParty) {
             throw new Error(`tommy.panels.register: panel '${def.id}' — the 'component' path is first-party only (untrusted MPs must use 'render')`);
           }
@@ -106,26 +59,6 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
         async requestNavigation() {
           throw new Error('tommy.panels.requestNavigation: host navigation lands with the shell integration (M1 loader)');
         },
-        /**
-         * A.6 — EMBED ANOTHER MP'S PANEL into an element of this one's surface.
-         *
-         * The park this closes recorded that `team_member_details` was already
-         * a real manifest surface that `layoutFor` resolves and that
-         * `mps/documents` already declared a panel for — and that there was
-         * still no way to ASK for one, because `attachSurface` is host-only and
-         * unreachable from MP source. This is that ask. The MP supplies
-         * `{ mpId, panelId, el, surfaceContext }`; the host resolves consent,
-         * mounts the OWNING MP's own component with the OWNING MP's own sdk,
-         * and returns a disposer.
-         *
-         * The embedded panel is NOT this MP's code and never becomes it: it
-         * renders in its owner's context, reads its owner's conditions and is
-         * torn down through the returned handle. Nothing about the embedded
-         * MP's data crosses into the embedder.
-         *
-         * Every check lives host-side (`onEmbed`), because a caller-supplied
-         * assertion is not a permission.
-         */
         async embed(opts = {}) {
           if (typeof onEmbed !== 'function') {
             throw new Error('tommy.panels.embed: the host has no embed integration');
@@ -138,15 +71,6 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
       };
     },
 
-    /**
-     * Panels visible on a surface for the current viewer, grouped by MP.
-     * `opts.mpId` scopes the result to a single MP (a per-MP surface host,
-     * e.g. the Time Clock full-page page); omit it to render every MP.
-     * `opts.panelId` scopes further to a SINGLE panel (a per-panel canonical
-     * route, e.g. the Partner MP's `/dashboard/partner/` mounting only
-     * `partner-dashboard`); omit it to render every panel of the surface. Both
-     * are purely additive — absent → the prior "render all" behaviour.
-     */
     layoutFor(surface, viewerRoles, { mpId, panelId } = {}) {
       const out = [];
       for (const [id, manifestPanels] of declarations) {
@@ -161,56 +85,10 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
       return out;
     },
 
-    /**
-     * Mount every visible panel for `surface` into the host element.
-     * The skeleton paints with the grid; each tile reveals progressively.
-     * `mpId` scopes the mount to a single MP (filtered BEFORE the panel
-     * budget, so a scoped surface is never truncated by another MP).
-     *
-     * `layout` switches the mount to COMPOSED mode: the array is
-     * `resolveComposedLayout`'s output and IS the tile list — order, geometry
-     * and visibility were decided upstream; the host neither re-filters nor
-     * re-sorts. Absent `layout`, declaration mode below runs exactly as
-     * before — that dormancy is load-bearing (every pre-01c surface mounts
-     * through it).
-     *
-     * `pack: 'flow'` changes only HOW the composed
-     * cells are placed in CSS: tiles keep their stored ORDER (sorted by y then
-     * x, the reading order the composition was flow-placed in) but are handed
-     * to the grid with `grid-column: span w` and no explicit start line, so the
-     * browser auto-flows them left-to-right with no holes.
-     *
-     * Why it exists: explicit `x`/`y` start lines reproduce every gap the
-     * stored geometry contains. On a 12-column grid a mixed-width composition
-     * ALWAYS contains gaps — a w6 tile after two w4s does not fit in the
-     * remaining 4 columns, so it starts a new row and leaves a 4-column hole —
-     * and per-tile vertical compaction can then lift a row's left-hand
-     * neighbours away, leaving a tile stranded at the right edge of an
-     * otherwise empty row. Both were reported on the main dashboard.
-     *
-     * NOT the default, and never for a surface whose tiles are placed by hand:
-     * `tommy.host.mountDashboardTab` drag & drop SWAPS x/y between two tiles
-     * without touching array order, so ignoring x/y there would make dragging
-     * do nothing. The main dashboard reorders the ARRAY instead (its draggable
-     * list, re-flowed by the serializer on save), which is exactly what this
-     * mode honours.
-     */
     mountSurface(el, { surface, viewerRoles = [], ctxFor, mpId, panelId, layout, pack = null, onDispose, onPanelElement, onClose, closeLabel, labels = null }) {
-      // Per element (never another element hosting the same surface name). A
-      // re-mount into an element this host already serves keeps its app and
-      // patches its tiles by key: an unchanged tile keeps its component
-      // instance, and a changed context arrives as a prop update. A world
-      // (account) change is another host, which mounts fresh.
       let tiles;
       if (Array.isArray(layout)) {
-        // A resolved entry with no decl (MP uninstalled) or no live
-        // registration (MP failed to boot) still OWNS its cell: it becomes an
-        // "unavailable" tile, never a PanelTile — no load attempt, no
-        // retry/circuit-breaker state for code that isn't there.
         const entries = layout.filter((entry) => entry && entry.instance);
-        // Flow mode reads the stored geometry as an ORDER, not as coordinates:
-        // the tiles are sorted into reading order here and placed by the grid
-        // below. Stable — equal cells keep their array order.
         if (pack === 'flow') {
           entries
             .map((entry, index) => ({ entry, index }))
@@ -232,7 +110,6 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
         tiles = groups.flatMap(({ mpId, defs }) => defs.map((def) => ({ mpId, def })));
       }
       if (tiles.length > SURFACE_PANEL_BUDGET) {
-        // Advisory budget: log through the hook, render the budgeted slice.
         if (onEvent) onEvent({ type: 'surface-budget-exceeded', surface, count: tiles.length, at: Date.now() });
         tiles.length = SURFACE_PANEL_BUDGET;
       }
@@ -245,8 +122,6 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
         Object.assign(current.view, next);
         current.surface = surface;
         current.onDispose = onDispose;
-        // The previous mount's host resources (its contexts' panes) go once
-        // the tiles were handed the new ones.
         if (replacedDispose && replacedDispose !== onDispose) {
           try { replacedDispose(); } catch (_) { /* host cleanup isolation */ }
         }
@@ -261,10 +136,7 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
             const {
               surface: shownSurface, pack: shownPack, ctxFor: contextFor, onPanelElement: onElement, onClose: close, closeLabel: closeText, labels: tileLabels,
             } = view;
-            // Composed placement is an INLINE style on the tile root (Vue
-            // fallthrough onto PanelTile's single root div): explicit start
-            // lines, because `span` alone would let the grid autoplace and
-            // lose the composed x/y. Declaration mode has no cell — no style.
+            // Explicit start lines: `span` alone would let the grid autoplace and lose the composed x/y.
             const cell = entry && entry.cell;
             let style;
             if (cell) {
@@ -283,19 +155,10 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
             }
             return h(PanelTile, {
               ref: (instance) => onElement?.(mpId, def, entry, instance?.$el || null),
-              // Composed keys are the INSTANCE uuid — the same panel may be
-              // placed twice on one tab.
               key: `${entry ? entry.instance.id : `${mpId}:${def.id}`}#${generationOf(def)}`,
               style,
-              // The instance id on the tile ELEMENT (attrs fall through to
-              // the root) — hosts overlay per-tile chrome (edit-mode
-              // controls) and need to address tiles unambiguously; the def
-              // id alone is ambiguous when one panel is placed twice.
               'data-instance-id': entry ? entry.instance.id : undefined,
               def,
-              // Composed mode hands ctxFor the full resolver entry as a third
-              // argument (params/config/cell live there); declaration-mode
-              // calls stay two-arg so arity-sniffing hosts see no change.
               ctx: contextFor
                 ? (entry ? contextFor(mpId, def, entry) : contextFor(mpId, def))
                 : { panelId: def.id, surface: shownSurface, surfaceContext: { surface: shownSurface }, config: (entry && entry.instance.config) || {}, online: true },
@@ -306,8 +169,6 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
             });
           })),
       });
-      // Install the host F7 runtime (Framework7Vue + registerComponents + $f7)
-      // onto the surface app so component-path tiles resolve `f7-*` globals.
       // Contained: a broken installer must not take down the whole surface.
       if (installComponentRuntime) {
         try { installComponentRuntime(app); } catch (e) { if (onEvent) onEvent({ type: 'surface-runtime-install-failed', surface, message: String(e && e.message), at: Date.now() }); }
@@ -323,22 +184,14 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
       return { panelCount: tiles.length, patched: false };
     },
 
-    /**
-     * A.6 — one MP's DECLARED panel entry (the manifest copy, not the
-     * registration), so the loader can resolve embed consent against the
-     * contract rather than against whatever the MP happened to register.
-     */
     panelDeclaration(mpId, panelId) {
       return (declarations.get(mpId) || {})[panelId] || null;
     },
 
-    /** Whether THIS host already has an app mounted into `el` (the loader uses
-     *  this to skip re-mounting a surface it painted incrementally during boot). */
     isSurfaceMounted(el) {
       return mounted.has(el);
     },
 
-    /** Unmount the app hosted in `el` (the host element the surface mounted into). */
     unmountSurface(el) {
       const entry = mounted.get(el);
       if (!entry) return;
@@ -347,9 +200,7 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
       try {
         entry.app.unmount();
       } catch (error) {
-        // A tree left broken by an update that threw part-way cannot unmount.
-        // Clear what the app left on the element so the next surface mounted
-        // here starts fresh instead of patching against the broken tree.
+        // A tree left broken by a throwing update cannot unmount; clear it so the next mount starts fresh.
         el._vnode = null;
         delete el.__vue_app__;
         el.replaceChildren();
@@ -357,7 +208,6 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
       }
     },
 
-    /** Full teardown (a team switch is teardown-and-cold-boot). */
     teardownMp(mpId) {
       registrations.delete(mpId);
       declarations.delete(mpId);

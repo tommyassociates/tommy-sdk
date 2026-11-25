@@ -1,30 +1,3 @@
-/**
- * 2.4 — Inter-MP Bus & SDK surface — TypeScript types.
- *
- * The public type surface of `@tommy/sdk`, the runtime loaded by every Mini
- * Program — inside its own iframe in sandboxed mode, or in the shell's realm
- * via the direct adapter in in-process mode (`execution-modes.md`). The
- * surface is identical in both modes; an MP cannot detect its mode through
- * this API. This file is the contract; no `any` in the public
- * surface. Per-MP trigger/condition/activity types are *generated* from the
- * manifest (Phase 5.2) and intersected with these generics so an author gets
- * autocomplete on their own contracts.
- *
- * Status: specification artefact (Phase 2). Not wired to an implementation yet.
- */
-/*
- * VENDORED from plans/refactor-plan/02-architecture/sdk-types.ts (D22 seed,
- * authoritative). ONE extension flagged per sdk-broker harden round-1:
- * TommyErrorCode adds 'Offline' (offline-sync.md §7 — a non-replayable
- * activity invoked offline rejects with a typed Offline error; the code was
- * required by behaviour but absent from every catalogue) and 'UnknownMethod'
- * (the Phase 5.3 unknown-method guard). Everything else is verbatim.
- */
-
-// ============================================================================
-// Primitives
-// ============================================================================
-
 export type MpId = string;
 export type Surface =
   | 'dashboard'
@@ -33,12 +6,7 @@ export type Surface =
   | 'full_page';
 export type Iso8601 = string;
 
-/** Opaque, short-lived, signed. Issued in the handshake; attached to every RPC. */
 export type CapabilityToken = string & { readonly __brand: 'CapabilityToken' };
-
-// ============================================================================
-// Errors — typed, named codes
-// ============================================================================
 
 export type TommyErrorCode =
   | 'UnknownTrigger'
@@ -50,11 +18,8 @@ export type TommyErrorCode =
   | 'ConditionError'
   | 'ActivityFailed'
   | 'Offline_QueueFull'
-  /** A write of an activity that declares holdUnsettled for a subject whose write is held (or already being checked). */
   | 'WriteHeld'
-  /** Host API level 20: `markOutcomeEmitted` / `confirmWriteOutcome` named an activity this MP does not own. */
   | 'WriteNotFound'
-  /** Host API level 20: `confirmWriteOutcome` refused; `details.reason` is `already_confirmed`, `expired`, `not_eligible` or `no_request`. */
   | 'WriteNotConfirmable'
   | 'RateLimited'
   | 'CapabilityTokenInvalid'
@@ -66,41 +31,21 @@ export type TommyErrorCode =
   | 'Offline'
   | 'UnknownMethod';
 
-/**
- * Every rejection from the SDK is a TommyError. `code` is machine-checkable;
- * `rule` names the exact contract clause that was violated (schema-first errors).
- */
 export interface TommyError {
   readonly name: 'TommyError';
   readonly code: TommyErrorCode;
-  /** Human-readable, names the broken rule. e.g. "activity 'x' not in authorizedCallers". */
   readonly message: string;
-  /** The manifest/schema path that failed, when applicable. */
   readonly rule?: string;
-  /** Whether the broker considers this retryable (Timeout / network / 503). */
   readonly retryable: boolean;
-  /** Correlates with the ActionRun record for debugging. */
   readonly runId?: string;
   readonly cause?: unknown;
-  /**
-   * On a `RateLimited` refusal from the broker's rate limit: milliseconds until
-   * a token is free for the caller. Absent when unknown (older hosts, and a
-   * refusal for another reason, such as too many writes in flight).
-   */
   readonly retryAfterMs?: number;
-  /** On a `WriteNotConfirmable` refusal: `{ reason }`. */
   readonly details?: Readonly<Record<string, unknown>>;
 }
 
-// ============================================================================
-// Actions bus
-// ============================================================================
-
 export interface EmitReceipt {
   readonly emitId: string;
-  /** Subscribers the broker delivered to immediately. */
   readonly deliveredTo: number;
-  /** Subscribers offline at emit time; will receive on replay. */
   readonly queuedFor: number;
 }
 
@@ -109,7 +54,6 @@ export type InvokeStatus = 'succeeded' | 'failed' | 'dead_letter' | 'queued_offl
 export interface InvokeResult<R = unknown> {
   readonly rpcId: string;
   readonly status: InvokeStatus;
-  /** Present when status === 'succeeded'; validated against the activity resultSchema. */
   readonly result?: R;
   readonly error?: TommyError;
 }
@@ -120,13 +64,11 @@ export interface TriggerMeta {
   readonly emitId: string;
   readonly emitterMpId: MpId;
   readonly ts: Iso8601;
-  /** False when delivered from the offline replay queue. */
   readonly live: boolean;
 }
 
 export type Unsubscribe = () => void;
 
-/** One queued call inside `batch()`. Each resolves/rejects independently. */
 export type BatchCall =
   | { kind: 'emit'; trigger: string; payload: unknown }
   | { kind: 'query'; condition: string; args: unknown }
@@ -137,31 +79,18 @@ export interface TransactionContext {
   invoke<R = unknown>(activity: string, args: unknown): Promise<InvokeResult<R>>;
 }
 
-/**
- * Declarative, non-Turing-complete arg assembly for an Action's activity binding.
- * The original four shapes (actions-runtime.md §9.7) plus the 2.22 additions:
- * serviceRead (E6), item (E5 forEach element), template (E3). Every non-template
- * shape may carry a closed-operator transform chain (E2, max 8 steps).
- */
 export type InputMapSource =
   | { from: 'trigger'; path: string; default?: unknown; transform?: TransformChain }
-  | { from: 'condition'; ref: string; path: string; default?: unknown; transform?: TransformChain }   // ref = a conditions[] entry (its `ref` alias, defaulting to name)
-  | { from: 'serviceRead'; ref: string; path: string; default?: unknown; transform?: TransformChain } // 2.22 E6 — a serviceReads[] entry
+  | { from: 'condition'; ref: string; path: string; default?: unknown; transform?: TransformChain }
+  | { from: 'serviceRead'; ref: string; path: string; default?: unknown; transform?: TransformChain }
   | { from: 'option'; path: string; default?: unknown; transform?: TransformChain }
-  | { from: 'item'; path: string; default?: unknown; transform?: TransformChain }                     // 2.22 E5 — the current forEach element
+  | { from: 'item'; path: string; default?: unknown; transform?: TransformChain }
   | { const: unknown; default?: unknown }
-  | { template: string; default?: unknown };                                                          // 2.22 E3 — plain text; {{source.path | op(args)}} placeholders; rendered as data, never HTML
+  | { template: string; default?: unknown };                                                          // Placeholders render as data, never HTML.
 
-/** Map of activity-input field -> single source. Produces exactly one args object; broker validates against the activity inputSchema. */
 export type InputMap = Record<string, InputMapSource>;
 
-/**
- * 2.22 E2 — the closed, total, in-binary transform operator set (one interpreter
- * family with remote-configurability.md §6 L6: operators live in the binary,
- * config supplies operands, nothing composes into arbitrary computation).
- * Signatures: actions-configurability.md §2.2. Extending this union is a
- * PLATFORM release, never config.
- */
+// Closed operator set: extending this union is a platform release, never config.
 export type TransformOp =
   | 'concat' | 'upper' | 'lower' | 'trim' | 'slice' | 'replace'
   | 'add' | 'subtract' | 'multiply' | 'divide' | 'round' | 'clamp'
@@ -171,36 +100,25 @@ export type TransformOp =
   | 'first' | 'last' | 'count' | 'sum' | 'pluck' | 'join' | 'find' | 'filter';
 
 export interface TransformStep { op: TransformOp; args?: Record<string, unknown> }
-/** Max 8 steps (schema-enforced); each step type-checked against the source/target schemas at manifest validation. */
 export type TransformChain = TransformStep[];
 
-/** 2.22 E4/E7 — a closed L6-comparator predicate over declared sources (activity.select `when`; interactions `visibleWhen`). One composition level. */
 export type Predicate =
   | { source: InputMapSource; op: 'exists' | 'not_exists' | 'equals' | 'not_equals' | 'one_of' | 'range'; operand?: unknown; operands?: unknown[] }
   | { allOf: Predicate[] }
   | { anyOf: Predicate[] };
 
-/** 2.22 E4 — one branch of activity.select. Ordered, first-match-wins; the terminal branch MUST be `else` (validator-enforced) and may `skip`. */
 export type SelectBranch =
   | { when: Predicate; mp?: string; name: string; inputMap?: InputMap }
   | { else: true; mp?: string; name: string; inputMap?: InputMap }
   | { else: true; skip: true };
 
-/** 2.22 E5 — bounded fan-out over a condition/serviceRead-returned collection. ONE metered execution; each element dispatch is a child run. */
 export interface ForEachDecl { from: InputMapSource; maxItems: number }
 
-/** 2.22 E6 — a host service-read declared as a wiring source (leased under the installer tenant's existing grants; joins the §9.6 dependency surface). */
 export interface ServiceReadDecl { ref: string; name: `tommy.${string}`; input?: InputMap }
 
-/** 2.22 §2.7 — the declarative pre-dispatch confirm guard. Decline = a typed skip recorded on the action-run. */
 export interface ConfirmGuard { title: string; message: string; confirmLabel?: string; destructive?: boolean }
 
-/**
- * 2.22 E7 (D20) — a declared interaction point (contributions.interactions[]):
- * SDK-rendered affordance emitting the MP-owned trigger `<mpId>.ui.<id>` with
- * zero MP code. Payload binds ONLY from the declared view context. visibleWhen
- * gates visibility, never authority (L3). hideWhenUnwired default true (D21).
- */
+// visibleWhen gates visibility, never authority.
 export interface InteractionDeclaration {
   id: string;
   kind: 'button' | 'menu_item' | 'list_row_action' | 'fab' | 'link';
@@ -209,53 +127,38 @@ export interface InteractionDeclaration {
   icon?: string;
   payload: Record<string, { from: 'route'; param: string } | { from: 'context'; path: string } | { const: unknown }>;
   visibleWhen?: Predicate;
-  hideWhenUnwired?: boolean; // default true
+  hideWhenUnwired?: boolean;
 }
 
-/**
- * 2.22 §4 (D19) — a Computed Action function declaration (manifest `functions:`).
- * Packaged inside the reviewed MP artifact (functions/ dir); executes SERVER-SIDE
- * in the Action Function Runtime (pure compute, no I/O; inputs assembled by the
- * platform through the leased/audited path); returns the intent envelope. Each
- * entry is a PrimitiveContract row (2.21) and a computed consumer (2.21 §3.1).
- */
 export interface FunctionDeclaration {
   entry: `functions/${string}`;
   runtime: 'afr-js@1';
   description: string;
   inputSchema?: object;
   resultSchema: object;
-  timeoutMs: number; // <= 5000
-  memoryMb: number;  // <= 128
+  timeoutMs: number;
+  memoryMb: number;
   reads: { conditions?: string[]; serviceReads?: `tommy.${string}`[] };
   targets: { activities: string[] };
   contractVersion?: string;
   deprecated?: { replacement?: string; removeAfter?: string };
 }
 
-/** The standard envelope an AFR function receives (2.22 §4.3). `now`/`random` are injected — runs are deterministic and inspector-replayable. */
 export interface FunctionInput<TriggerPayload = unknown, Options = unknown> {
   trigger: TriggerPayload;
-  conditions: Record<string, unknown>;   // keyed by declared reads.conditions refs
-  serviceReads: Record<string, unknown>; // keyed by declared reads.serviceReads refs
+  conditions: Record<string, unknown>;
+  serviceReads: Record<string, unknown>;
   options: Options;
-  now: string;        // ISO instant, injected
-  randomSeed: string; // seeded randomness, injected
+  now: string;
+  randomSeed: string;
 }
 
-/**
- * FINALIZED 2026-07-02 (D19 — actions-configurability.md 2.22 §4; supersedes the
- * old "DEFERRED" marker here). A Computed Action returns the invoke INTENT —
- * a single envelope, a capped array (fan-out), or a typed skip; the server-side
- * executor validates args against the target inputSchema, enforces
- * authorizedCallers + tenant grants, and dispatches. The function NEVER invokes.
- */
+// The function never invokes: it returns the intent and the server executor validates and dispatches.
 export type ComputedActionResult =
   | { activity: { mp: string; name: string }; args: unknown; idempotencyKey?: string }
   | { activity: { mp: string; name: string }; args: unknown; idempotencyKey?: string }[]
   | { skip: true };
 
-/** 2.22 §5 — the Solution schema: the declarative bundle the AI composer emits and an admin approves. Compose-never-widen: no code, no grants. */
 export interface SolutionSchema {
   id: string;
   version: number;
@@ -263,62 +166,34 @@ export interface SolutionSchema {
   mps: { mpId: string }[];
   actions: { actionId: string; enabled: boolean; options?: Record<string, unknown> }[];
   rules?: { key: string; op: 'compare' | 'range' | 'one_of' | 'required' | 'default'; operands: unknown[] }[];
-  config?: Record<string, unknown>; // 2.20 namespaces subset, schema-validated per namespace
+  config?: Record<string, unknown>;
 }
 
-/**
- * The Actions bus. `T` is the manifest-generated map of this MP's own
- * triggers/conditions/activities; left generic here.
- */
 export interface ActionsApi {
-  /** Emit a trigger. Async fan-out by default. Rejects InvalidPayload before reaching the broker. */
   emit(trigger: string, payload: unknown): Promise<EmitReceipt>;
 
-  /** Evaluate another MP's condition. Rejects Timeout / UnknownCondition / ConditionError. */
   query<R = unknown>(condition: string, args: unknown, options?: { signal?: AbortSignal }): Promise<R>;
-  /**
-   * Host API level 20. With `onRead` the promise resolves to the held-first
-   * envelope: a condition that declares `heldFirst` answers its held value at
-   * once (`state: 'held'`) and the handler's answer arrives as one terminal
-   * notice; any other condition resolves `state: 'fresh'` once the handler
-   * answers, with no notice. A refusal rejects; it never resolves.
-   */
+  // A refusal rejects; it never resolves.
   query<R = unknown>(condition: string, args: unknown, options: { signal?: AbortSignal; onRead: (notice: ReadNotice<R>) => void }): Promise<HeldFirstAnswer<R>>;
 
-  /**
-   * Invoke another MP's activity. Idempotency key formed per the target manifest.
-   * Signature unchanged for inputMap-driven Actions: the broker assembles `args`
-   * from the Action's InputMap (see InputMapSource), so `args` is broker-supplied
-   * rather than caller-supplied in that path.
-   */
   invoke<R = unknown>(activity: string, args: unknown, options?: { idempotencyKey?: string }): Promise<InvokeResult<R>>;
 
-  /** Subscribe to a trigger. Returns an unsubscribe fn; also auto-removed on MP teardown. */
   subscribe<P = unknown>(trigger: string, handler: Handler<P>): Unsubscribe;
 
-  /** Transport batching — fewer RPC round-trips (sandboxed mode); pass-through in-process. Not an atomicity guarantee. */
   batch(calls: readonly BatchCall[]): Promise<ReadonlyArray<PromiseSettledResult<unknown>>>;
 
-  /** Best-effort saga: shared txnId, FIFO order, compensating activities on failure. */
   transaction<R>(fn: (tx: TransactionContext) => Promise<R>): Promise<R>;
 }
-
-// ============================================================================
-// Handshake & context (host -> MP, see isolation-model.md §6)
-// ============================================================================
 
 export interface TenantContext {
   readonly tenantId: string;
   readonly displayName: string;
-  /** Coarse role tags only — NOT the full account/user graph (audit 1.8 fix). */
   readonly roles: readonly string[];
 }
 
 export interface SurfaceContext {
   readonly surface: Surface;
-  /** Present on team_member_details; the only host data that crosses. */
   readonly teamMemberId?: string;
-  /** Present on client_details; the only host data that crosses. */
   readonly clientId?: string;
 }
 
@@ -326,71 +201,38 @@ export interface MpInit {
   readonly instanceId: string;
   readonly tenant: TenantContext;
   readonly locale: string;
-  /** Resolved theme — tokens + mode. The SDK applies it before first paint. */
   readonly theme: ThemeContext;
   readonly capabilityToken: CapabilityToken;
-  /** Intersection of manifest-declared and tenant-granted scopes. Advisory for UI. */
   readonly grantedScopes: readonly string[];
   readonly surfaceContext: SurfaceContext;
-  /**
-   * This MP's per-tenant config, validated against panels[].configSchema.
-   * Delivery channel of the one remote-config service (remote-configurability.md 2.20):
-   * server-resolved + version-pinned for this (user, tenant); published already-resolved, not a fetch channel.
-   */
   readonly mpConfig: Readonly<Record<string, unknown>>;
-  /** Exact shared-dependency versions the host expects (kills version drift, audit 1.7). */
   readonly sharedDeps: Readonly<Record<string, string>>;
-  /**
-   * The host's MP API level (core `HOST_API_LEVEL`, the level it sends as `X-Host-Api`).
-   * Feature-detect host capabilities with it, e.g. `init.hostApi >= 5` for `tommy.prefs`.
-   * Hosts that predate it leave it out; treat a missing value as below every level a
-   * capability needs.
-   */
   readonly hostApi?: number;
 }
 
-// ============================================================================
-// Theming (see theming.md)
-// ============================================================================
-
-/** Resolved theme mode — 'system' is resolved to one of these host-side. */
 export type ThemeMode = 'light' | 'dark';
 
-/** Design-system tokens — the ~328 --tommy-* CSS custom properties. */
 export type ThemeTokens = Readonly<Record<`--tommy-${string}`, string>>;
 
 export interface ThemeContext {
-  /** Resolved mode for the current Day/Night/System setting. */
   readonly mode: ThemeMode;
-  /** Value for the MP document's CSS `color-scheme` (sandboxed mode; in-process MPs inherit the shell's). */
   readonly colorScheme: ThemeMode;
-  /** Full --tommy-* token set for `mode`. The SDK applies these to :root. */
   readonly tokens: ThemeTokens;
 }
 
-/**
- * Theme access. The SDK applies tokens to the MP document automatically — CSS
- * `var(--tommy-*)` re-themes with no MP code. This API is for the rare MP that
- * must react in JS (redraw a canvas, swap a raster asset).
- */
 export interface ThemeApi {
   readonly current: ThemeContext;
   onChange(handler: (theme: ThemeContext) => void): Unsubscribe;
 }
 
-// ============================================================================
-// Panel runtime (see panel-runtime.md)
-// ============================================================================
-
 export type PanelStatus =
   | 'discovered'
   | 'loading'
   | 'ready'
-  | 'stale'        // rendered from cache, revalidating
+  | 'stale'
   | 'needs_connection'
   | 'error';
 
-/** Host-assigned geometry for one panel (host grid cells in-process; cell coordinates inside the MP's surface iframe in sandboxed mode). */
 export interface PanelCell {
   readonly panelId: string;
   readonly x: number;
@@ -399,35 +241,19 @@ export interface PanelCell {
   readonly h: number;
 }
 
-/**
- * One panel PLACED on a composed dashboard tab — a `panels[]` entry of the
- * `dashboards` team Setting document (scope 01c). The composition references
- * panels by (mpId, panelId); the manifest declaration stays the authority on
- * eligibility, rbac and size bounds at resolve time. `mpId` is `"core"` for
- * legacy first-party panels.
- */
 export interface ComposedPanelInstance {
-  /** Placement uuid — the tile key; the same panel may be placed twice on one tab. */
   readonly id: string;
   readonly mpId: MpId;
   readonly panelId: string;
-  /** Grid units on the host's 12-column grid (w 1–12; clamped to the declaration's size envelope at resolve time). */
   readonly x: number;
   readonly y: number;
   readonly w: number;
   readonly h: number;
-  /** Per-placement parameter bindings: fed from surface context, pinned statically by the admin, or left to the declaration default. */
   readonly params?: Readonly<Record<string,
     | { readonly source: 'context' }
     | { readonly source: 'static'; readonly value: unknown }
     | { readonly source: 'default' }>>;
-  /** Per-tenant panel config validated against the manifest configSchema. */
   readonly config?: Readonly<Record<string, unknown>>;
-  /**
-   * Placement-level audience targeting. Entries are tag ids (`members` may
-   * also hold a userId). AND across present non-empty contexts, OR within a
-   * list; absent/empty = everyone.
-   */
   readonly visibility?: {
     readonly audience?: {
       readonly roles?: readonly string[];
@@ -439,38 +265,16 @@ export interface ComposedPanelInstance {
   };
 }
 
-/**
- * One declared panel parameter — a manifest `panels[].params[]` entry (01c
- * FR-11). The declaration is what lets the host's per-panel settings UI
- * render a panel's inputs WITHOUT executing MP code, and what the FR-12
- * resolution order runs against: surface context → admin static value →
- * declaration default → needs-configuration.
- */
 export interface PanelParamSpec {
-  /** Binding key — the exact key a `ComposedPanelInstance.params` entry names. */
   readonly name: string;
-  /** `'id'` marks an entity id (e.g. actor_id, client_id) so the settings UI offers a picker, not a text field. */
   readonly type: 'string' | 'integer' | 'boolean' | 'id';
-  /** If true and nothing resolves a value, the host renders needs-configuration instead of mounting. Default false. */
   readonly required?: boolean;
-  /** Legal provenance: 'context' = surface-supplied only (never admin-editable); 'static' = admin-set only; 'any' = context first, then static. Default 'any'. */
   readonly source?: 'context' | 'static' | 'any';
-  /** Settings-UI display label; falls back to the name. */
   readonly label?: string;
-  /** Settings-UI help text (schema-capped at 200 chars). */
   readonly description?: string;
 }
 
-/**
- * One resolved tile of a composed tab: the placement joined to its manifest
- * declaration and the grid cell it occupies. `decl` is null when the placing
- * MP is uninstalled or no longer declares the panel — the entry is KEPT and
- * the host renders an unavailable tile in its cell (a stored composition
- * never silently loses a placement). The declaration's shape is owned by the
- * manifest schema, not this contract — opaque here EXCEPT `params`, the one
- * slice the host must read (settings UI + FR-12 resolution), which the
- * resolver passes through untouched.
- */
+// decl is null when the panel is gone; the entry is kept so a stored composition never loses a placement.
 export interface ResolvedPanelEntry {
   readonly instance: ComposedPanelInstance;
   readonly decl: (Readonly<Record<string, unknown>> & { readonly params?: readonly PanelParamSpec[] }) | null;
@@ -481,46 +285,24 @@ export interface PanelContext {
   readonly panelId: string;
   readonly surface: Surface;
   readonly surfaceContext: SurfaceContext;
-  /** Per-tenant panel config validated against the manifest configSchema. */
   readonly config: Readonly<Record<string, unknown>>;
   readonly online: boolean;
 }
 
-/** What an MP implements per panel. Mounted inside a closed Shadow DOM root. */
 export interface PanelDefinition {
   readonly id: string;
-  /** Load data needed before first paint. Honour the per-panel timeout. */
   load(ctx: PanelContext): Promise<void>;
-  /** Render into the provided shadow root. */
   render(root: ShadowRoot, ctx: PanelContext): void | Promise<void>;
-  /** Optional: respond to a refresh tick / trigger. */
   refresh?(ctx: PanelContext): void | Promise<void>;
   unmount?(): void;
 }
 
 export interface PanelsApi {
-  /** Register a panel implementation for an id declared in the manifest. */
   register(def: PanelDefinition): void;
-  /** Request the host to navigate (panels cannot navigate the shell directly). */
   requestNavigation(target: { route: string; params?: Record<string, string> }): Promise<void>;
-  /** Tell the host this panel's content size changed (host re-flows the grid). */
   reportSize(panelId: string, size: { w: number; h: number }): void;
 }
 
-// ============================================================================
-// Local data (per-MP IndexedDB — see offline-sync.md)
-// ============================================================================
-
-/**
- * A memoised derived view over a store's normalized entities. `subscribeQuery`
- * recomputes a Selector ONLY when an entity it read changes, and fires the
- * handler with the new derived value — not the whole store. This is the typed
- * surface behind data-fabric.md §4.2/§9 (per-selector reactive fan-out); the
- * fabric memoises each Selector so a single entity change recomputes only the
- * affected selectors. `Query<Rec>` is the read-only accessor the selector reads
- * through (get-by-id / getAll / index range) — the fabric tracks which entities
- * a selector touched to decide what to recompute.
- */
 export interface Query<Rec = unknown> {
   get(key: IDBValidKey): Rec | undefined;
   getAll(query?: { index?: string; range?: IDBKeyRange }): readonly Rec[];
@@ -530,185 +312,64 @@ export type Selector<Rec, V> = (q: Query<Rec>) => V;
 export interface DataStore<Rec = unknown> {
   get(key: IDBValidKey): Promise<Rec | undefined>;
   getRaw(key: IDBValidKey): Promise<Rec | undefined>;
-  /** Complete compatibility reads reject when the bounded set cannot fit. */
   getAll(query?: { index?: string; range?: IDBKeyRange }): Promise<Rec[]>;
   getAllRaw(): Promise<Rec[]>;
-  /** Available on transactional hosts. Each page has at most 100 rows/8 MiB. */
   scan?(options: { cursor: string | null; limit: number }): Promise<{ rows: Rec[]; nextCursor: string | null; complete: boolean }>;
   scanRaw?(options: { cursor: string | null; limit: number }): Promise<{ rows: Rec[]; nextCursor: string | null; complete: boolean }>;
   put(record: Rec): Promise<IDBValidKey>;
   delete(key: IDBValidKey, options?: { expectedRevision?: number }): Promise<void>;
-  /**
-   * Whole-store reactive callback (UNCHANGED, back-compat). Fires on local
-   * writes and sync-applied remote changes with the full record set; the
-   * subscriber derives its own views. Re-runs on ANY change to the store.
-   */
   subscribe(handler: (records: Rec[]) => void): Unsubscribe;
-  /**
-   * ADDITIVE selector subscription (data-fabric.md §4.2). The fabric memoises
-   * `selector` and fires `handler` with its new value ONLY when an entity the
-   * selector read changes — so a change recomputes only the affected selectors,
-   * not every subscriber. Fires on local write, sync-applied remote change, and
-   * real-time push. Does NOT replace the whole-store overload above.
-   */
   subscribeQuery<V>(selector: Selector<Rec, V>, handler: (value: V) => void): Unsubscribe;
 }
 
-/**
- * A read-only view of a host collection (host API level 5), through a named
- * profile: the MP world's own account's rows, projected (and joined with the
- * account's other collections) by the host. Readable only when the host
- * exposes the collection and profile and the MP declares and holds every
- * scope the profile names (`DATA_FORBIDDEN` otherwise, checked at every call,
- * when an answer settles and before every delivery); `DATA_UNDECLARED` for a
- * collection or profile the host does not expose. Without a profile named,
- * the MP gets the smallest its scopes allow. Rows are frozen: repeated reads
- * with no change answer the same rows while retained in the host's bounded
- * memo. Evicted keyed rows are projected again; whole-list identity stays
- * until a change. While the world's account is not
- * displayed, reads refuse with `ACCOUNT_NOT_DISPLAYED` (retryable) and a
- * subscription holds its latest rows until the account is displayed again.
- */
 export interface HostCollection<Rec = unknown> {
-  /**
-   * Every row, one by key, or several by keys (null where none). Keys the
-   * device does not hold are asked of the host (the source's `byIds`
-   * method, when it has one), waited for a bounded time.
-   */
   read(key?: string | readonly string[] | null): Promise<readonly Rec[] | Rec | readonly (Rec | null)[] | null>;
-  /** Several rows by key, in the order asked (null where none); misses as `read`. */
   getMany(keys: readonly string[]): Promise<readonly (Rec | null)[]>;
-  /**
-   * Rows by one of the view's lookups (`by_user`, `by_tag` for members;
-   * `by_context` for tags) with `equals` or `anyOf`, in the order asked, each
-   * row once; or every row in key order, paged by `cursor`. Values the device
-   * holds no row of are asked of the host through the method that reads by
-   * that lookup (`byUserIds` for `by_user`), waited for a bounded time.
-   */
   query(spec?: { index?: string; equals?: readonly string[]; anyOf?: readonly string[]; limit?: number; cursor?: string | null }):
     Promise<{ rows: readonly Rec[]; nextCursor: string | null; complete: boolean }>;
-  /**
-   * Only the selected keys, copied at subscription time (at most 100), in
-   * order with null for a missing row. Revalidates through the source's
-   * covering method, preserving its cadence and compatibility fallback.
-   */
   subscribe(callback: (rows: readonly (Rec | null)[]) => void, options: { keys: readonly string[]; onError?: (error: unknown) => void }): () => void;
-  /**
-   * The rows one of the source's methods covers for `params` (its own match,
-   * e.g. `workforce.shifts` `byRange` with `{ from, to }`): the rows held at
-   * once, then whenever they change; revalidated through that method's read.
-   * Host API level 11.
-   */
   subscribe(callback: (rows: readonly Rec[]) => void, options: {
     method: string;
     params: Record<string, unknown>;
-    /**
-     * Read status of the method's revalidation (host API level 11; `state`,
-     * `asOf`, `aged`, `nextAttemptAt`, `error`, `reason` and the `checking` and
-     * `refused` notices since level 20). With it, `callback` is called only
-     * when the rows changed.
-     */
     onRead?: (notice: ReadNotice) => void;
     onError?: (error: unknown) => void;
   }): () => void;
-  /** The rows now, then whenever their rows or read status changes, while the account is displayed. */
   subscribe(callback: (rows: readonly Rec[]) => void, options?: { onError?: (error: unknown) => void }): () => void;
-  /** The collection's status; `complete` only when every collection the profile reads has completed a read. */
   status(): DataStatus & { complete: boolean };
-  /**
-   * Asks the host to read again; the host alone fetches, dedupes and keeps
-   * the cadence. With no `method`, every collection the profile reads, at
-   * the host's cadence for MP asks (`maxAge` may only ask for less often;
-   * `fresh` for an action that must not act on stale rows). With `method`
-   * and `params`, one of the source's refresh methods (`byIds({ ids })`,
-   * `byUserIds({ user_ids })`, `search({ q, page? })`); an unknown method or
-   * param, or a param of the wrong shape, is refused (`DATA_INVALID`). A
-   * method's answer is merged, never the whole list. `waitMs` (at most
-   * 60000) answers `{ state: 'refreshing', waited: true }` once it passed,
-   * while the read goes on. A search answers the keys of its page and
-   * whether there are more.
-   */
   refresh(options?: {
     method?: string;
     params?: Readonly<Record<string, unknown>>;
     maxAge?: number;
     fresh?: boolean;
     waitMs?: number;
-    /** Deliberate retry: reset these sources' circuits and begin a read after this ask, bypassing freshness. */
     retry?: boolean;
   }): Promise<DataStatus & { waited?: true; keys?: readonly string[] | null; more?: boolean | null }>;
 }
 
 export interface DataApi {
-  /** Open one of the object stores declared in manifest.localData. */
   store<Rec = unknown>(name: string): DataStore<Rec>;
-  /** Host API level 5: a host collection the host exposes to MPs, through a profile (e.g. `workforce.members`, `ref` or `team`). */
   host?<Rec = unknown>(collection: string, options?: { profile?: string }): HostCollection<Rec>;
-  /** Sync status for a store, for stale-while-revalidate UX + the brownout contract. */
   syncState(storeName: string): {
     lastSyncedAt: Iso8601 | null;
     pending: number;
     online: boolean;
-    /** Per-namespace circuit-breaker state — the fault signal for the brownout contract (data-fabric.md §7). */
     breaker?: 'closed' | 'open' | 'half_open';
-    /** True when the namespace is serving stale cache because revalidation is failing/slow (distinct from offline). */
     stale?: boolean;
   };
-  /**
-   * The host data service surface, confined to this MP's stores. Collection
-   * names are the declared store names (or `mp.<mpId>.<store>`); any other
-   * namespace is refused.
-   */
-  /**
-   * Rows as copies without storage metadata (`_rev`, `_dirty`, …). `raw: true`
-   * reads as writers see the collection: rows too old to paint and unsent
-   * tombstones included, with their metadata.
-   */
   read?<Rec = unknown>(collection: string, key?: string | readonly string[] | null, options?: { raw?: boolean }): Promise<Rec | Rec[] | null>;
   query?<Rec = unknown>(collection: string, spec?: DataQuerySpec<Rec>): Promise<{ rows: Rec[]; nextCursor: string | null; complete: boolean }>;
   subscribe?<Value = unknown>(target: DataTarget, callback: (value: Value) => void, options?: { onError?: (error: unknown) => void }): () => void;
-  /**
-   * @experimental No MP uses a source yet. Rows with unsent changes keep them
-   * through a refresh; see `mutate` for how changes are sent.
-   */
   source?<Dto = unknown, Rec = unknown>(collection: string, spec: DataSource<Dto, Rec>): () => void;
-  /**
-   * @experimental Runs a collection's `source`. A row with an unsent local
-   * change keeps it; a query target prunes only the rows of its query.
-   */
   refresh?(target: DataTarget, options?: DataRefreshOptions): Promise<DataStatus>;
-  /**
-   * @experimental An optimistic write pushed through a source's `push`. An
-   * unsent change stays on the row (a delete as a hidden tombstone) and is
-   * sent again after a reload; a change refused for access (403) waits,
-   * marked on the row, until `retry`, and later changes to that row wait with
-   * it (with `wait`, they reject `DATA_ACCESS_CHANGED`); a retry sends the row
-   * once, as it is then. Failed ones go again on reconnect.
-   */
   mutate?<Rec = unknown>(collection: string, command: DataMutation<Rec>, options?: { wait?: boolean }): Promise<{ key: string; pushed: boolean }>;
-  /**
-   * Server rows the MP received, stored synced; `replace` makes them the
-   * complete set for `scope`. Only a replacing ingest, or one marked
-   * `complete` (rows a complete read delivered), stamps the collection synced.
-   * `written` counts the rows stored; `unsaved` names rows the store could
-   * keep only in memory (the device's storage refused them).
-   */
   ingest?<Rec = unknown>(collection: string, rows: readonly Rec[], options?: { replace?: boolean; complete?: boolean; scope?: (row: Rec) => boolean }): Promise<{ written: number; unsaved?: string[] }>;
-  /**
-   * All cached rows, or only `keys`, or every row of an index range; dirty
-   * rows only with `force`. Any other option, or one of another shape, is
-   * refused with `DATA_INVALID`.
-   */
   purge?(collection: string, options?: { force?: boolean; keys?: readonly string[]; query?: DataIndexRange }): Promise<{ removed: string[] }>;
-  /** Keeps the newest `keep` rows of an index range; dirty rows are never removed. */
   trim?(collection: string, options: DataIndexRange & { keep: number }): Promise<{ removed: string[] }>;
   status?(target: DataTarget): DataStatus;
-  /** Sends every change that failed again (never one refused for access). */
   retryFailed?(): Promise<unknown>;
 }
 
 export type DataTarget = string | { collection: string; key?: string; window?: Record<string, unknown>; query?: DataQuerySpec };
-/** A whole index range: no paging or filter fields. */
 export interface DataIndexRange {
   readonly index: string;
   readonly equals?: readonly unknown[];
@@ -722,61 +383,29 @@ export interface DataQuerySpec<Rec = unknown> {
   readonly prefix?: readonly unknown[];
   readonly lower?: unknown;
   readonly upper?: unknown;
-  /** Rows to return, 1 to 5000 (default 50); anything else is refused with `DATA_INVALID`. */
   readonly limit?: number;
-  /** An index read's cursor, or without an index the last key a page returned. */
   readonly cursor?: string | null;
-  /** Filters a read without an index; refused with an index (`DATA_INVALID`). */
   readonly where?: (row: Rec) => boolean;
-  /** Answer as writers see the collection: rows too old to paint included. */
   readonly raw?: boolean;
 }
 export interface DataSource<Dto = unknown, Rec = unknown> {
-  /**
-   * With `read` declared, a whole-collection fetch is given `context.since`
-   * (the stored cursor, or null for a whole read) and may answer
-   * `{ rows, cursor, since }` (`since`: it read only what changed).
-   */
   fetch(target: { collection: string; key?: string; window?: Record<string, unknown> }, context?: { since?: string | null; principal?: unknown; background?: boolean }): Promise<Dto[] | Dto | { rows: Dto[]; cursor?: string | null; since?: boolean } | null>;
-  /**
-   * @experimental A declared read: the service keeps its cursor (`cursor`) in
-   * the collection's source meta, never among its rows, and asks only for
-   * what changed while the stored rows are still the whole set the last read
-   * left; it reads whole at least every `fullEveryMs`, removes rows whose
-   * `removedField` is set, and purges the collection when the server refuses
-   * the read (`forbidden: 'purge'`, the default). A row the store cannot keep
-   * leaves the cursor where it was. Any other field is refused (`DATA_INVALID`).
-   */
   read?: { cursor?: boolean; removedField?: string; fullEveryMs?: number; forbidden?: 'purge' | 'keep' };
-  /** The scheduler budget and circuit this source's refreshes run in (the service's own when absent). */
   budgetKey?: string;
-  /** A record from an answered row; `prev` is the stored row it replaces (found by `keyOf`), without sync metadata. */
   toRecord?(dto: Dto, prev?: Rec): Rec;
-  /** The stored key of an answered row (for `prev`); a declared read defaults to the row's key field. */
   keyOf?(dto: Dto): string;
   scope?(target: { collection: string; window?: Record<string, unknown> }): (row: Rec) => boolean;
-  /**
-   * @experimental Sends one local change; changes to a row arrive in order. A
-   * change left unsent by an earlier page or reload arrives as a `put` of the
-   * stored row, and a change may arrive again after a failure, so a push must
-   * be idempotent. A change restored after a reload is sent as the row is
-   * when it goes out, or not at all once it was sent elsewhere.
-   */
+  // A change may arrive again after a failure or reload, so a push must be idempotent.
   push?(command: DataMutation<Rec>, record: Rec | null): Promise<unknown>;
 }
 export interface DataRefreshOptions {
-  /** `silent` never rejects; `visible` rejects so a surface with nothing to show can say why. */
   readonly mode?: 'silent' | 'visible';
   readonly priority?: 'visible' | 'high' | 'normal' | 'background';
-  /** Skip the fetch while the last successful sync is younger than this (ms). */
   readonly maxAge?: number;
   readonly reason?: string;
-  /** A declared read reads the whole collection, whatever its cursor. */
   readonly full?: boolean;
 }
-/** @internal Options for the host's canonical collection or exact-key reader, outside hosted MP refresh profiles. */
 export interface HostOwnedDataRefreshOptions extends DataRefreshOptions {
-  /** Join the next attempt of a failed read, with the same principal, backoff and deadlines; ordinary refresh remains fail-fast. */
   readonly nextAttempt?: boolean;
 }
 export type DataMutation<Rec = unknown> =
@@ -787,58 +416,35 @@ export interface DataStatus {
   readonly state: 'fresh' | 'stale' | 'refreshing' | 'offline' | 'error';
   readonly syncedAt: number | null;
   readonly error: { code: string | null; status: number | null; message: string } | null;
-  /** Host API level 20: `syncedAt` is older than the source's declared `showAgeMs`. Never hides anything. */
   readonly aged?: boolean;
 }
 
-// ============================================================================
-// Held-first reads (host API level 20)
-// ============================================================================
-
-/** What a view is showing. */
 export type ReadState =
-  /** What the device holds, before any completed server read of it in this ask or follow. */
   | 'held'
-  /** Held data shown while a server read is in flight. */
   | 'checking'
-  /** The answer of a completed server read. */
   | 'fresh'
-  /** The last read failed (offline, timeout, 5xx, busy); held data stays. */
   | 'stale'
-  /** The server refused this viewer; clear what is held. */
   | 'refused'
-  /** Nothing held and no completed read (a promise rejects `DATA_NOT_READ`; a follow delivers []). */
   | 'not_read';
 
 export interface ReadError { code: string | null; status: number | null; message: string }
 
-/** Delivered through `onRead` on a method subscription, a contract-read bridge and a condition query. */
 export interface ReadNotice<T = unknown> {
   state: 'checking' | 'fresh' | 'stale' | 'refused';
-  /** True only with state 'fresh'. */
   answered: boolean;
-  /** ms since epoch of the answer the caller should now show; null when unknown. */
   asOf: number | null;
-  /** asOf is older than the declared showAgeMs. Never hides anything. */
   aged: boolean;
-  /** state 'stale' only: the host will read again by itself. */
   retrying?: boolean;
-  /** state 'stale' only: when the next attempt is due, or null. */
   nextAttemptAt?: number | null;
-  /** 'stale' and 'refused'. */
   error?: ReadError | null;
-  /** 'refused' only: 'access' (this viewer may not read it) or 'unavailable' (nothing serves it). */
   reason?: 'access' | 'unavailable';
-  /** Bridges and conditions, state 'fresh' only: the completed answer. A subscription delivers rows through its callback instead. */
   answer?: T;
-  /** 'last_known' when held rows were delivered under the last confirmed permissions. */
   permissions?: 'confirmed' | 'last_known';
 }
 
-/** What a contract-read bridge or a condition query resolves to when `onRead` is passed. */
 export interface HeldFirstAnswer<T> {
   answer: T;
-  /** Never 'refused': a refusal rejects the promise (nothing held) or arrives as the terminal notice. */
+  // Never 'refused': a refusal rejects the promise or arrives as the terminal notice.
   state: 'held' | 'fresh';
   asOf: number | null;
   aged: boolean;
@@ -846,17 +452,12 @@ export interface HeldFirstAnswer<T> {
 
 export type WriteOutcomeState = 'succeeded' | 'refused' | 'unconfirmed' | 'queued';
 
-/** The recorded outcome of one of this MP's `idempotency: client_key` writes, by its key. No result payload is kept. */
 export interface WriteOutcome {
   state: WriteOutcomeState;
-  /** ms epoch the state was recorded. */
   at: number;
   rpcId: string | null;
-  /** state 'refused'. */
   refusal?: ReadError;
-  /** The caller marked a follow-up emit as done (`markOutcomeEmitted`). */
   emitted: boolean;
-  /** `confirmWriteOutcome` would be accepted now. */
   confirmable: boolean;
 }
 
@@ -865,7 +466,6 @@ export type ConfirmWriteOutcomeAnswer =
   | { state: 'refused'; refusal: ReadError }
   | { state: 'unconfirmed'; error: ReadError };
 
-/** One of this MP's writes waiting in (or refused from) the host queue. */
 export interface QueuedWriteReceipt {
   readonly id: string;
   readonly activity: string;
@@ -873,9 +473,7 @@ export interface QueuedWriteReceipt {
   readonly queuedAt: number;
   readonly attempts: number;
   readonly state: 'queued' | 'sending' | 'failed' | 'refused';
-  /** Host API level 20: the key the write was queued under; null only for a row queued without one. */
   readonly idempotencyKey: string | null;
-  /** state 'refused'. */
   readonly refusal?: { code: string | null; message: string; status: number | null };
   readonly refusedAt?: number;
 }
@@ -886,11 +484,9 @@ export interface OfflineQueueAnswer {
   readonly bytesCap: number | null;
   readonly entriesCap: number | null;
   readonly expiredOnLoad: number;
-  /** With `{ receipts: true }`. */
   readonly receipts?: readonly QueuedWriteReceipt[];
 }
 
-/** A queued punch of this account, by its key. */
 export interface PendingAttendance {
   idempotencyKey: string;
   status: 'start' | 'stop' | 'pause' | 'resume';
@@ -898,119 +494,70 @@ export interface PendingAttendance {
   teamMemberId: string;
 }
 
-/** The attendance bridges' answer (`attendancesSnapshot`, `followAttendances`). */
 export interface AttendanceSnapshot<A = Readonly<Record<string, unknown>>> {
   attendances: A[];
   unresolved: boolean;
-  /** Host API level 20; null when `unresolved` is false. */
   why: 'not_fresh' | 'access_unknown' | null;
-  /** Host API level 20: the rows are vouched from the device, not a fresh proof. */
   held: boolean;
-  /** Host API level 20. */
   asOf: number | null;
-  /** Host API level 20: this account's queued punches, by key (possibly empty). */
   pending: PendingAttendance[];
 }
 
-// ============================================================================
-// Host UI & Directory services (see host-services.md)
-// ============================================================================
-
-/** roles / tags / skills / locations are tag-family entities in Tommy; team
- *  members and clients are separate. `client` is a platform service exposed
- *  here as a directory kind (loop-review X4–X5). */
 export type DirectoryKind =
   | 'team_member' | 'location' | 'role' | 'skill' | 'tag' | 'client';
 
-/** Minimal reference to a directory entity. Never a full record. */
+// Never a full record.
 export interface EntityRef {
   readonly kind: DirectoryKind;
-  /** The ENTITY's id: team-member ROW id, location id, or (role/skill/tag) the tag id. */
   readonly id: string;
   readonly displayName: string;
-  /** team_member only: the member's USER id (what assignee_id / user_id fields store). */
   readonly userId?: string;
-  /** Picker / resolveMany results: the tag the entity is known by in tag-family filters. */
   readonly tagId?: string;
 }
 
-/** Cancelled arrays contain only resolvable initial refs; retain the original IDs. */
 export interface PickerResult extends Array<EntityRef> {
   readonly cancelled?: boolean;
 }
 
 export interface PickerOptions {
   readonly purpose?:
-    /** Restrict member candidates to current authoritative internal-booking assignees. */
     | 'booking_assignee'
-    /** Restrict member candidates to current authoritative assignees for task creation. */
     | 'task_create_assignee'
-    /** Restrict member candidates to current authoritative assignees for task updates. */
     | 'task_update_assignee'
-    /** Restrict member candidates to current authoritative journey assignees. */
     | 'journey_assignee';
-  /** Entity ids (EntityRef.id space) pre-selected when the picker opens. */
   readonly preselected?: readonly string[];
-  /** team_member: pre-select by USER id instead — for fields that store one. */
   readonly preselectedUserIds?: readonly string[];
-  /** Tag-family filters may preselect the entity’s backing tag instead of its entity id. */
   readonly preselectedTagIds?: readonly string[];
-  /** Optional modal title. */
   readonly title?: string;
 }
 
 export interface PickOptions extends PickerOptions {
-  /**
-   * One or more entity kinds the picker may select. A single picker call MAY
-   * mix kinds (e.g. ['team_member','role']) — mirrors tag.vue's `context`
-   * array. The MP must hold the `read:` scope for every kind listed.
-   */
   readonly kinds: readonly DirectoryKind[];
-  /** Allow multi-select. Default false. */
   readonly multiple?: boolean;
 }
 
-/**
- * Host-rendered selection UI. The host opens the app's own picker (in the host
- * realm, permission-scoped to the current user) and returns only the choice.
- * THIS is how an MP chooses team members / locations / roles / skills / tags:
- * never load `directory.list()` to fill a <select> (a 10,000-member team stalls
- * the page). Backing out of a picker returns the selection it opened with.
- * Requires the matching `read:` scope(s); results are double-filtered
- * (MP scope ∩ user visibility) — see host-services.md.
- */
+// Never load directory.list() to fill a select: a 10,000-member team stalls the page.
 export interface UiApi {
-  /** Temporarily colour the web/native top edge for this MP instance. Calls take precedence. */
   setTopEdge(options: { color: string; content?: 'auto' | 'light' | 'dark' }): Promise<void>;
-  /** Restore the previous owner or current app theme; also automatic on instance disposal. */
   resetTopEdge(): Promise<void>;
-  /** Captures into the originating registered host pane. Files and URLs never leave the host. */
+  // Files and URLs never leave the host.
   captureChatAttachment(opts: { el: HTMLElement; kind: 'files' | 'photo' | 'audio' }): Promise<{
     id: string; state: string; count: number; requiresReattachment: boolean;
     files: readonly { filename: string; contentType: string; byteSize: number }[];
   } | null>;
-  /** Host-owned canonical blocks. The connected anchor must be registered by the originating pane. */
   showChatMessageBlocks(opts: {
     conversationId: string; messageId: string; accessEpisode: string | null; contextVersion: string; el: HTMLElement;
   }): Promise<{ close(): void }>;
-  /** Host-owned scoped attachments. No URL, bytes or private descriptors are returned. */
   showChatMessageMedia(opts: {
     conversationId: string; messageId: string; accessEpisode: string | null; contextVersion: string; el: HTMLElement;
   }): Promise<{ close(): void }>;
-  /**
-   * Team MP member-edit preflight. Host-owned paid-seat confirmation precedes
-   * both member and regular-hours writes. Decline, expiry or detached popup
-   * resolves approved:false. A confirmation is single-use, instance/account/payload-bound;
-   * offline replay cannot reuse it. No billing data crosses this UI boundary.
-   */
+  // The confirmation is single-use and payload-bound; no billing data crosses this boundary.
   confirmTeamMemberUpdate(opts: {
     memberId: string;
     data: Record<string, unknown>;
     el: HTMLElement;
   }): Promise<{ approved: boolean; restoreConfirmation?: string }>;
-  /** Canonical picker — supports mixed kinds and multi-select. */
   pick(opts: PickOptions): Promise<PickerResult>;
-  // convenience wrappers — common single-kind cases, thin calls to pick():
   pickTeamMember(opts?: PickerOptions): Promise<EntityRef | null>;
   pickTeamMembers(opts?: PickerOptions): Promise<PickerResult>;
   pickLocation(opts?: PickerOptions): Promise<EntityRef | null>;
@@ -1020,28 +567,14 @@ export interface UiApi {
   pickSkills(opts?: PickerOptions): Promise<PickerResult>;
   pickTag(opts?: PickerOptions): Promise<EntityRef | null>;
   pickTags(opts?: PickerOptions): Promise<PickerResult>;
-  /**
-   * Show the host-rendered mini-profile quick-look card for a team member or
-   * client. Responsive (desktop dropdown / mobile bottom sheet), permission-
-   * scoped. Resolves when the card is dismissed. Replaces `onMiniProfileClick`.
-   */
   showMiniProfile(ref: { kind: 'team_member' | 'client'; id: string }): Promise<void>;
-  /**
-   * Transient host-rendered snackbar. Grant-free (exposes no data, cannot reveal
-   * anything the user may not see) — no catalogue scope. Resolves once the toast
-   * is dismissed/auto-hidden; `actionInvoked` is true when the user tapped the
-   * optional action. Replaces every MP's bespoke toast.
-   */
+  // Grant-free: it exposes no data, so it needs no catalogue scope.
   toast(opts: {
     message: string;
     variant?: 'info' | 'success' | 'warning' | 'error';
     durationMs?: number;
     action?: { label: string };
   }): Promise<{ actionInvoked: boolean }>;
-  /**
-   * Host-rendered modal confirm. Grant-free (no catalogue scope). Resolves true
-   * when confirmed, false when cancelled/dismissed. Use before destructive actions.
-   */
   confirm(opts: {
     title: string;
     message?: string;
@@ -1051,24 +584,14 @@ export interface UiApi {
   }): Promise<boolean>;
 }
 
-/** Permission-scoped reference data. Every result is double-filtered by the host. */
 export interface DirectoryApi {
-  /** id -> EntityRef, or null if the user may not see it. */
   resolve(kind: DirectoryKind, id: string): Promise<EntityRef | null>;
-  /** Batch resolve; only permitted entities are returned. `idSpace: 'user'` reads team_member ids as USER ids. */
   resolveMany(kind: DirectoryKind, ids: readonly string[], opts?: { idSpace?: 'id' | 'user' | 'tag' }): Promise<ReadonlyArray<EntityRef>>;
-  /** The entities the user+MP may see. Prefer UiApi pickers — list exposes more data. */
   list(
     kind: DirectoryKind,
     query?: { search?: string; limit?: number; cursor?: string },
   ): Promise<{ items: readonly EntityRef[]; nextCursor?: string }>;
 }
-
-// ============================================================================
-// Device & native capabilities (see host-services.md — host-mediated, never
-// called natively by MP code in either mode). Every method passes the triple
-// gate: MP scope ∩ device-capability-present ∩ OS permission.
-// ============================================================================
 
 export interface PhotoResult {
   readonly dataUrl: string;
@@ -1081,12 +604,12 @@ export interface AudioResult {
 }
 export interface ScanResult {
   readonly value: string;
-  readonly format: string;        // e.g. 'qr', 'ean13'
+  readonly format: string;
 }
 export interface Position {
   readonly latitude: number;
   readonly longitude: number;
-  readonly accuracy: number;      // metres
+  readonly accuracy: number;
   readonly timestamp: number;
 }
 export interface NetworkStatus {
@@ -1100,40 +623,19 @@ export interface DeviceInfo {
 }
 
 export interface DeviceApi {
-  /** Host-mediated photo capture. Returns the artifact, not a MediaStream. */
   capturePhoto(opts?: { camera?: 'front' | 'back' }): Promise<PhotoResult>;
-  /** QR / barcode scan via the host scanner UI. */
   scanCode(opts?: { formats?: readonly string[] }): Promise<ScanResult>;
-  /** Host-mediated audio recording. */
   recordAudio(opts?: { maxMs?: number }): Promise<AudioResult>;
-  /** One-time GPS fix. */
   getLocation(opts?: { highAccuracy?: boolean }): Promise<Position>;
-  /** Ongoing GPS. Host shows a persistent indicator; auto-stops on teardown. */
   watchLocation(handler: (p: Position) => void, opts?: { highAccuracy?: boolean }): Unsubscribe;
-  /** Current network status. */
   network(): Promise<NetworkStatus>;
   onNetworkChange(handler: (s: NetworkStatus) => void): Unsubscribe;
-  /** Native share sheet. */
   share(payload: { title?: string; text?: string; url?: string }): Promise<void>;
-  /** Save an image to the device gallery. */
   saveImage(image: Blob): Promise<void>;
-  /** Post a local notification. */
   notify(opts: { title: string; body: string }): Promise<void>;
-  /** Coarse device info. */
   info(): Promise<DeviceInfo>;
-  /**
-   * Host-mediated Capacitor kiosk / guided-access lock. Canonicalises the
-   * previously-unnamed Time-Clock host call (the old `lock_device` activity was
-   * removed). Scope `invoke:device_kiosk`.
-   */
   requestKioskMode(opts: { enabled: boolean }): Promise<void>;
 }
-
-// ============================================================================
-// Platform services — `tommy.host` (see host-services.md; loop-review X4,X5,X8)
-// Reference/identity/infrastructure that is NOT a Mini Program: always present,
-// versioned, cannot be uninstalled. Exposed as plain reads.
-// ============================================================================
 
 export interface ForecastingGate {
   readonly experimental: boolean;
@@ -1149,7 +651,6 @@ export interface ForecastingSettings {
   readonly minGeneratedShiftHours: number;
 }
 
-/** HTTP failures resolve as flat results; local permission gates reject. */
 export interface ForecastingErrorResult {
   readonly error: 'upgrade_required' | 'billing_locked' | 'hidden' | 'forbidden'
     | 'unauthenticated' | 'not_found' | 'conflict' | 'validation' | 'rate_limited'
@@ -1192,7 +693,6 @@ export type CalendarRuleParams = DemandRuleTiming & { readonly headcount: number
   | { readonly trigger: 'day_of_year' | 'public_holiday'; readonly value: ReadonlyArray<string> }
 );
 
-/** Returned rows retain the server's snake_case serializer fields. */
 export type DemandRule = {
   readonly id: number;
   readonly location_id: number | null;
@@ -1246,7 +746,6 @@ export interface ForecastingRuleWrite {
   params?: SalesBandRuleParams | CalendarRuleParams;
 }
 
-/** CamelCase command arguments; successful results are unwrapped wire DTOs. */
 export interface ForecastingHostApi {
   settings(): Promise<ForecastingSettings>;
   weeks(args: { locationId: string | number; isoWeeks: string | ReadonlyArray<string>; kinds?: string | ReadonlyArray<'total' | 'count'> }): Promise<ForecastingResult<{ readonly pages: ReadonlyArray<SalesMetricsWeekPage> }>>;
@@ -1273,7 +772,6 @@ export interface HostHoliday {
 export interface HostTimesheetQuery {
   readonly timesheetId?: string;
   readonly shiftId?: string;
-  /** At most 200 identifiers, exclusive of shiftId; an empty set selects no rows. */
   readonly shiftIds?: ReadonlyArray<string>;
   readonly startAt?: Iso8601;
   readonly endAt?: Iso8601;
@@ -1284,7 +782,6 @@ export interface HostTimesheetQuery {
   readonly dashboard?: true;
 }
 
-/** Mapped fields retain omissions from the permission-scoped server answer. */
 export interface HostTimesheet {
   readonly id: string;
   readonly teamMemberId: string;
@@ -1306,7 +803,6 @@ export interface HostTimesheet {
   readonly expenses: ReadonlyArray<Readonly<Record<string, unknown>>>;
 }
 
-/** Filters from the generated Tasks contract. Paging and clocks remain host-owned. */
 export interface HostTaskBoardFilters {
   readonly from?: Iso8601;
   readonly to?: Iso8601;
@@ -1335,7 +831,6 @@ export interface HostTaskSavedView {
 export interface HostTaskQueryOptions {
   readonly windowKey?: string;
   readonly params?: HostTaskBoardFilters;
-  /** Optional caller view lifetime; the host also applies its own display ticket. */
   readonly isCurrent?: () => boolean;
 }
 export interface HostTaskBoardSnapshot {
@@ -1352,7 +847,6 @@ export interface HostTaskQueryFailure {
   readonly code?: string;
   readonly status?: number;
 }
-/** Metadata of one canonical exact Forms read; response values are not cached by MPs. */
 export interface HostFormEntryProof {
   readonly epoch: number; readonly grants: number; readonly receipt: number;
   readonly revision: number; readonly keys: readonly string[];
@@ -1364,7 +858,6 @@ export interface HostFormEntry {
   readonly user_id: string | number | null; readonly team_id: string | number;
   readonly [field: string]: unknown;
 }
-/** Current raw resident rows of an actual canonical source read. */
 export interface HostFormSubmissionReadRow {
   readonly id: string;
   readonly name: string;
@@ -1374,7 +867,6 @@ export interface HostFormSubmissionReadRow {
   readonly fields: Readonly<Record<string, unknown>>;
   readonly [field: string]: unknown;
 }
-/** Scalar result of rebuilding a followed window under its current canonical grant. */
 export interface HostFormSubmissionWindowRestoration {
   readonly window: string;
   readonly requestedThrough: number;
@@ -1387,7 +879,6 @@ export interface HostFormSubmissionWindowRestoration {
   readonly atomic: false;
   readonly queryComplete: false;
 }
-/** A held write of an activity that declares holdUnsettled. */
 export interface HeldWrite {
   readonly id: string;
   readonly input: Readonly<Record<string, unknown>>;
@@ -1395,53 +886,23 @@ export interface HeldWrite {
   readonly heldAt: number;
 }
 export interface HostApi {
-  /** Payload-free invalidation of this MP's committed queue in its account. */
   onQueuedWritesChange(callback: () => void): () => void;
-  /** This MP's share of the host queue; with `receipts: true`, its waiting (and refused) writes. */
   offlineQueue(options?: { receipts?: boolean }): OfflineQueueAnswer;
-  /**
-   * Host API level 20. The recorded outcome of this MP's own `client_key`
-   * activity (name without the MP prefix) by its key, or null (never
-   * recorded, evicted, or another MP's activity). Synchronous; never sends.
-   */
   writeOutcome(activity: string, idempotencyKey: string): WriteOutcome | null;
-  /** Host API level 20. Marks a `succeeded` record's follow-up emit as done; false when there is no such record. */
   markOutcomeEmitted(activity: string, idempotencyKey: string): Promise<boolean>;
-  /**
-   * Host API level 20. Sends the recorded request again under the same key,
-   * byte for byte, once per key and within 24 hours, for an eligible activity
-   * whose record is `unconfirmed` or `queued`. Rejects `WriteNotFound`, or
-   * `WriteNotConfirmable` with `details.reason` `already_confirmed`,
-   * `expired`, `not_eligible` or `no_request`. Offline it resolves
-   * `unconfirmed` and sends nothing.
-   */
   confirmWriteOutcome(activity: string, idempotencyKey: string): Promise<ConfirmWriteOutcomeAnswer>;
-  /**
-   * The held write of one subject for this MP's activity that declares
-   * `holdUnsettled` (name without the MP prefix), or null. `reason` is the
-   * refusal code the answer was held for, `unconfirmed` when no answer
-   * settled it, or `sending` while it runs. `input` is the MP's own request.
-   */
   heldWrite(activity: string, keyFields: Readonly<Record<string, string | number>>): HeldWrite | null;
-  /** Calls back with the subject's held write (or null) whenever this MP's queue changes. */
   onHeldWriteChange(activity: string, keyFields: Readonly<Record<string, string | number>>, callback: (held: HeldWrite | null) => void): () => void;
-  /**
-   * Ask again for a held write: its request goes again under its own key
-   * through the normal dispatch; the answer settles or keeps it. Rejects as
-   * the invoke does, or `WriteHeld` when it is gone or already being checked.
-   */
   checkHeldWrite(id: string): Promise<unknown>;
   restoreFormSubmissionWindow(options: {
     readonly window: string;
     readonly throughPage?: number;
     readonly onRead?: (rows: ReadonlyArray<HostFormSubmissionReadRow>) => undefined;
   }): Promise<HostFormSubmissionWindowRestoration>;
-  /** Existing scoped exact GET. A 404 is absence only for this identifier. API9. */
   fetchFormSubmission(options: { readonly formId: string | number; readonly withReceipt: true }): Promise<{
     readonly record: HostFormEntry | null; readonly proof: HostFormEntryProof;
   }>;
   fetchFormSubmission(options: { readonly formId: string | number; readonly withReceipt?: false }): Promise<HostFormEntry | null>;
-  /** Synchronous metadata admission; never starts transport or retains another response. API9. */
   formSubmissionCurrent(options: { readonly formId: string | number; readonly proof: HostFormEntryProof }): boolean;
   fetchDocumentsCatalogue(options?: {
     readonly allTeam?: boolean; readonly targetUserId?: string; readonly force?: boolean;
@@ -1460,16 +921,13 @@ export interface HostApi {
     readonly manager?: boolean; readonly onChange?: () => void;
     readonly onError?: (error: unknown) => void;
   }): Promise<() => void>;
-  /** Complete bounded logical Tasks reads through the canonical host response owner. */
   tasksBoardQuery(options?: HostTaskQueryOptions & {
     readonly incremental?: boolean;
     readonly onPage?: (cards: ReadonlyArray<HostTaskCard>) => void;
   }): Promise<HostTaskBoardSnapshot & HostTaskQueryFailure & { readonly serverTime?: string }>;
-  /** No transport; complete means retained query membership and authority still hold. */
   tasksBoardSnapshot(options?: HostTaskQueryOptions): Promise<HostTaskBoardSnapshot>;
   tasksViews(options?: { readonly isCurrent?: () => boolean }): Promise<HostTaskViewsSnapshot & HostTaskQueryFailure>;
   tasksViewsSnapshot(options?: { readonly isCurrent?: () => boolean }): Promise<HostTaskViewsSnapshot>;
-  /** Invalidation drops query proofs; it never deletes authored intent or starts a read. */
   tasksInvalidateBoardQuery(options?: { readonly windowKey?: string }): boolean;
   followTasksBoard(options: HostTaskQueryOptions & {
     readonly onChange?: (snapshot: HostTaskBoardSnapshot) => void;
@@ -1481,34 +939,23 @@ export interface HostApi {
     readonly onError?: (error: unknown) => void;
   }): () => void;
 
-  /** Read-only managed template preview. Does not create a team journey. */
   journeysTemplatePreview?(params: {product_key: string}): Promise<Record<string, unknown>>;
-  /** Version-checked soft archive; retains existing records and activity. */
   journeysDeleteFamily?(params: {id: string; base_version: number}): Promise<Record<string, unknown>>;
-  /** Bounded directory-scoped journey progress. Host rejects stale actor context. */
   journeysMemberSummaries?(params: {member_ids: ReadonlyArray<string | number>}): Promise<{
     members: ReadonlyArray<{metric: 'member_next'; member_id: string | number; open_step_count: number; next: ReadonlyArray<Record<string, unknown>>; stuck: boolean; server_time: string}>;
     server_time: string;
   }>;
-  /** Mount the permission-scoped next-step panel on a team-member profile. */
   mountJourneyMemberPanel?(element: HTMLElement, options: {memberId: string | number}): Promise<{close(): void} | null>;
 
-  /** Is a platform feature flag enabled for this tenant? (loop-review X8) */
   feature(name: string): Promise<boolean>;
-  /** Does the current user hold a permission? Host applies the real RBAC. (X8) */
   permission(name: string): Promise<boolean>;
-  /** Public holidays in a range (platform service — not an MP). */
   holidays(range: { startAt: Iso8601; endAt: Iso8601; force?: boolean }): Promise<ReadonlyArray<HostHoliday>>;
-  /** Rendering hints only; forecasting calls retain the host/API permission gates. */
   forecastingGate(): Promise<ForecastingGate>;
   readonly forecasting: ForecastingHostApi;
-  /** Pay-rate templates (platform service). Shape is the payroll contract. */
   payTemplates(query?: { teamMemberId?: string; force?: boolean }): Promise<ReadonlyArray<unknown>>;
-  /** Minimal employment context, aligned to the unique selected user IDs. Unknown reads reject. */
   readSchedulingPayContexts(query: { userIds: readonly string[]; force?: boolean }): Promise<
     ReadonlyArray<Readonly<{ userId: string; employeeExists: boolean; payTemplateId: string | null }>>
   >;
-  /** One bounded canonical template/selection read with synchronous current display admission. */
   openSchedulingPayData(options: {
     userIds: readonly string[];
     onSnapshot(snapshot: Readonly<{
@@ -1518,39 +965,22 @@ export interface HostApi {
     onInvalidated?(): void;
     onError?(error: unknown): void;
   }): Readonly<{ load(options?: { force?: boolean }): Promise<void>; stop(): void }>;
-  /** Canonical invalidation notices contain no payroll rows. Unsubscribe when the popup closes. */
   followSchedulingPayData(options: { userIds?: readonly string[]; onChange(): void; onError?(error: unknown): void }): () => void;
-  /** Complete bounded canonical query; unavailable or partial reads reject. */
   fetchTimesheets(query?: HostTimesheetQuery): Promise<ReadonlyArray<HostTimesheet>>;
-  /** Null denotes an answered exact absence, rather than a missing retained key. */
   fetchTimesheet(id: string): Promise<HostTimesheet | null>;
-  /** Reads only an answered query whose authority and retained keys still hold. */
   timesheetsSnapshot(query?: HostTimesheetQuery): Promise<{
     readonly timesheets: ReadonlyArray<HostTimesheet>;
     readonly unresolved: boolean;
   }>;
-  /** Invalidation notices carry no rows and never start a refresh. */
   followTimesheets(query: HostTimesheetQuery, onInvalidate: () => void): () => void;
-  /** Videos platform service (interim until/unless a Training MP exists):
-   *  clock-in videos a team member must watch. First consumer: Time Clock. */
   requiredClockInVideos(teamMemberId: string): Promise<
     ReadonlyArray<{ videoId: string; title: string; watched: boolean }>
   >;
-  /** Record that the current user viewed a video (Videos platform service). */
   recordVideoView(args: { videoId: string }): Promise<void>;
-  /**
-   * Curated-key org config (read-only; settings owned by the host/admin UI).
-   * The readable key set is Tommy-curated and versioned — no free-form keys
-   * (timezone, week_start, currency, business_hours, rounding, default_location,
-   * locale, branding). `tommy.clock.timezone` exposes the timezone slice.
-   */
   tenantSetting(
     key: string,
   ): Promise<string | number | boolean | null>;
-  /**
-   * Integration connection state only (never secrets) for a provider category.
-   * Closes the registry §6 unowned edge (timesheets W-EDGE-15 payroll branch).
-   */
+  // Connection state only, never secrets.
   integrationSettings(
     category: 'payroll' | 'accounting' | 'payments',
   ): Promise<{
@@ -1558,10 +988,7 @@ export interface HostApi {
     readonly connected: boolean;
     readonly capabilities?: readonly string[];
   }>;
-  /**
-   * Per-provider connection state + opaque ref only; never secrets. Closes the
-   * registry §6 unowned edge (invoicing W-EDGE-06 Stripe affordance gate).
-   */
+  // Connection state and an opaque ref only, never secrets.
   integration(
     provider: string,
   ): Promise<{
@@ -1571,59 +998,20 @@ export interface HostApi {
   } | null>;
 }
 
-/**
- * `tommy.host.payTemplatesChanged` (TRIGGER) — the change event for the
- * pull-only `payTemplates()` read; closes the registry §6 reactivity gap so
- * scheduling cost estimates (W-EDGE-20) and timesheet hours/cost (W-EDGE-14)
- * do not serve stale rates. Emitted by tommy-api via the inbound platform-emit
- * channel (actions-runtime.md §1). Mirrors `tommy.user.role_changed` /
- * `tommy.billing.plan_changed` / the `tommy.directory.*` entity-event triggers.
- */
 export interface PayTemplatesChangedTrigger {
   readonly at: Iso8601;
   readonly teamMemberId?: string;
 }
 
-// ============================================================================
-// Messaging — `tommy.messaging` (see host-services.md; the Chats platform
-// service, backed by tommy-chat-server — a host service, never an MP).
-// ============================================================================
-
 export interface MessagingApi {
-  /** Reset the current user's chat session (Chats platform service — tommy-chat-server). */
   resetSession(): Promise<void>;
-  // NOTE — messaging CONTENT is NOT a platform primitive. Per the 2026-06-14
-  // decision (D5 stands), `send_message` and the inbound message triggers
-  // (message_received / mention_received / message_read / conversation_created,
-  // plus unread_count / conversation_exists) stay owned by the future
-  // Team Comms MP (`team-comms.*`), deferred to M5 and dormant per
-  // actions-runtime.md §9.6. `resetSession` is the ONLY platform/host messaging
-  // primitive. Do not add content methods/triggers here.
+  // Messaging content is not a platform primitive: resetSession is the only host messaging method.
 }
 
-/**
- * X7 — "act on behalf of". Conditions and Activities that operate on a team
- * member accept an optional `targetTeamMemberId` in their args. When absent,
- * the operation targets the current user. The host enforces the actor
- * permission at the boundary (same double-filter as host-services).
- */
 export type WithActor<T> = T & { targetTeamMemberId?: string };
 
-// ============================================================================
-// Clock / Scheduler — `tommy.clock` (see platform-primitives.md §2/§3)
-// The headline new platform primitive. Formalises the bespoke tommy-api
-// scheduled-job server-emit pattern into a first-class, timezone-aware,
-// per-tenant scheduled TRIGGER plus authoritative time CONDITIONS.
-// ============================================================================
-
-/** IANA timezone identifier, e.g. 'Australia/Sydney'. */
 export type IanaTz = string;
 
-/**
- * The Action setting carried in `optionsSchema` for a `tommy.clock.scheduled`
- * trigger — the schedule is the setting (not a fixed payload). Two Actions on
- * one MP may hold different schedules.
- */
 export interface ClockScheduleOptions {
   readonly schedule:
     | { kind: 'cron'; cron: string; timezone: IanaTz }
@@ -1636,7 +1024,6 @@ export interface ClockScheduleOptions {
   readonly catchUpPolicy?: 'skip' | 'fire_once';
 }
 
-/** Emitted by `tommy.clock.scheduled`. `occurrenceKey` is stable per fire and doubles as the idempotency seed. */
 export interface ClockScheduledTrigger {
   readonly firedAt: Iso8601;
   readonly scheduledFor: Iso8601;
@@ -1644,11 +1031,6 @@ export interface ClockScheduledTrigger {
   readonly occurrenceKey: string;
 }
 
-/**
- * Emitted by `tommy.clock.relative` (low-priority) — fire N before/after a
- * STATIC self-anchored timestamp. Reactive entity-relative timers stay
- * owner-side (e.g. scheduling's own `set_shift_reminders`).
- */
 export interface ClockRelativeTrigger {
   readonly firedAt: Iso8601;
   readonly anchor: Iso8601;
@@ -1656,7 +1038,6 @@ export interface ClockRelativeTrigger {
   readonly occurrenceKey: string;
 }
 
-/** `now()` condition return — the authoritative SERVER clock, not the device clock. */
 export interface ClockNow {
   readonly instant: Iso8601;
   readonly tenantLocal: Iso8601;
@@ -1664,7 +1045,6 @@ export interface ClockNow {
   readonly epochMs: number;
 }
 
-/** `timezone()` condition return — the resolved tenant timezone. */
 export interface ClockTimezone {
   readonly timezone: IanaTz;
   readonly utcOffsetMinutes: number;
@@ -1672,48 +1052,34 @@ export interface ClockTimezone {
 }
 
 export interface ClockApi {
-  /** Authoritative server clock (uncacheable / ~1s TTL). Non-metered. */
   now(): Promise<ClockNow>;
-  /** Resolved tenant timezone (cacheable; invalidated on tenant-settings change). Non-metered. */
   timezone(): Promise<ClockTimezone>;
 }
 
-// ============================================================================
-// Lifecycle — `tommy.lifecycle` (see platform-primitives.md §2)
-// App & connectivity lifecycle triggers. network_online/offline are the
-// BUS-trigger form of the same signal as the in-MP `device.onNetworkChange`.
-// ============================================================================
-
-/** `tommy.lifecycle.app_resumed` — debounced; supersedes the interim `host.resume`. */
 export interface LifecycleAppResumedTrigger {
   readonly resumedAt: Iso8601;
   readonly awayMs?: number;
   readonly coldStart: boolean;
 }
 
-/** `tommy.lifecycle.app_backgrounded` — debounced. */
 export interface LifecycleAppBackgroundedTrigger {
   readonly backgroundedAt: Iso8601;
 }
 
-/** `tommy.lifecycle.network_online` — bus-trigger form of the existing online signal. */
 export interface LifecycleNetworkOnlineTrigger {
   readonly at: Iso8601;
   readonly type: NetworkStatus['type'];
 }
 
-/** `tommy.lifecycle.network_offline` — bus-trigger form of the existing offline signal. */
 export interface LifecycleNetworkOfflineTrigger {
   readonly at: Iso8601;
 }
 
-/** Opaque display admission. Original accepted commands keep their own authority and outcome. */
 export interface DisplayEpisodeTicket {
   current(): boolean;
   stop(): void;
 }
 
-/** Host admission combined with a consumer's local semantic lifetime. */
 export interface DisplayOwner extends DisplayEpisodeTicket {
   assertCurrent(): void;
 }
@@ -1722,23 +1088,10 @@ export declare function createDisplayOwner(
   options?: { current?: () => boolean; onRetire?: () => void },
 ): Readonly<DisplayOwner>;
 
-/**
- * Platform lifecycle BUS triggers above remain available through Actions subscriptions.
- * DEFERRED — reserved, not implemented: cross-MP mp_opened/mp_closed events;
- * privacy-sensitive read:lifecycle_mp_events remains default-deny. Do not wire.
- */
 export interface LifecycleApi {
-  /** Capture once per displayed view lifetime. Stop on close, replacement or unmount. */
   captureDisplayEpisode(): DisplayEpisodeTicket;
 }
 
-// ============================================================================
-// Cross-user notifications — `tommy.notifications` (see platform-primitives.md
-// §2/§4). Targets OTHER users via tommy-api `UserPushNotifier` — distinct from
-// the LOCAL-only `tommy.device.notify` (self-device toast).
-// ============================================================================
-
-/** `tommy.notifications.notification_opened` trigger; scope `read:notifications_events`. */
 export interface NotificationOpenedTrigger {
   readonly notificationId: string;
   readonly channel: 'push' | 'inapp';
@@ -1749,10 +1102,6 @@ export interface NotificationOpenedTrigger {
 }
 
 export interface NotificationsApi {
-  /**
-   * Push notification to OTHER users (tommy-api `server_write`, `UserPushNotifier`).
-   * Scope `invoke:notifications_push`.
-   */
   send_push(args: {
     to: string | readonly string[];
     title: string;
@@ -1761,10 +1110,6 @@ export interface NotificationsApi {
     badge?: number;
     deepLink?: string;
   }): Promise<{ notificationId: string; deliveredDeviceCount: number }>;
-  /**
-   * Persistent in-app bell/inbox notification to OTHER users (tommy-api notifier).
-   * Scope `invoke:notifications_inapp`.
-   */
   send_inapp_notification(args: {
     to: string | readonly string[];
     title: string;
@@ -1774,21 +1119,8 @@ export interface NotificationsApi {
     level?: 'info' | 'success' | 'warning' | 'error';
   }): Promise<{ notificationId: string }>;
 
-  // DEFERRED — reserved behind a flag, NOT wired (no current MP demand):
-  //   send_email({ to, subject, body, templateId?, templateData? })
-  //     -> { messageId }; scope `invoke:notifications_email`.
-  //   send_sms({ to, body }) -> { messageId, segmentCount };
-  //     scope `invoke:notifications_sms`; DUAL-METERED (Actions unit + :sms meter).
-  // SMS's one concrete demand (scheduling.send_booking_confirmation) is already
-  // Scheduling-owned; do not ship a general send_sms in the first cut.
 }
 
-// ============================================================================
-// Identity, auth & RBAC — `tommy.session` / `tommy.user`
-// (see platform-primitives.md §2). who-am-I reads + identity/role events.
-// ============================================================================
-
-/** Minimal session identity — NOT the full user graph (audit 1.8). */
 export interface SessionUser {
   readonly userId: string;
   readonly teamMemberId?: string;
@@ -1797,7 +1129,6 @@ export interface SessionUser {
   readonly isKioskActor: boolean;
 }
 
-/** `tommy.session.user_logged_in` trigger payload. */
 export interface SessionUserLoggedInTrigger {
   readonly userId: string;
   readonly teamMemberId?: string;
@@ -1806,7 +1137,6 @@ export interface SessionUserLoggedInTrigger {
   readonly isKioskActor: boolean;
 }
 
-/** `tommy.session.user_logged_out` trigger payload. */
 export interface SessionUserLoggedOutTrigger {
   readonly userId: string;
   readonly teamMemberId?: string;
@@ -1814,7 +1144,6 @@ export interface SessionUserLoggedOutTrigger {
   readonly reason: string;
 }
 
-/** `tommy.session.active_user_changed` — kiosk PIN actor switch (no full logout). */
 export interface SessionActiveUserChangedTrigger {
   readonly previousTeamMemberId?: string;
   readonly activeTeamMemberId: string;
@@ -1822,7 +1151,6 @@ export interface SessionActiveUserChangedTrigger {
   readonly via: string;
 }
 
-/** `tommy.user.role_changed` — doubles as the cache-invalidation signal for cached role/permission reads. */
 export interface UserRoleChangedTrigger {
   readonly teamMemberId: string;
   readonly addedRoles: readonly string[];
@@ -1831,67 +1159,45 @@ export interface UserRoleChangedTrigger {
   readonly changedBy?: string;
 }
 
-/** who-am-I reads. The login/logout/actor-switch/role-change events ride the bus (types above). */
 export interface SessionApi {
-  /** Minimal current session identity, or null when unauthenticated. */
   current_user(): Promise<SessionUser | null>;
-  /** Current user's roles + primary role. */
   current_role(): Promise<{ roles: readonly string[]; primaryRole?: string }>;
-  /** Is there an authenticated session? Gate user-scoped reads pre-login. */
   is_authenticated(): Promise<boolean>;
 }
 
-/**
- * `tommy.user.*` — RBAC events namespace. `role_changed` is a platform-emitted
- * BUS trigger (payload `UserRoleChangedTrigger`), not a read; no methods.
- */
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface UserApi {}
 
-// ============================================================================
-// Directory entity-event triggers — `tommy.directory.*`
-// (see platform-primitives.md §2). REF-ONLY: payloads carry ids (+ changedFields),
-// NEVER records; per-subscriber double-filtered; subscriber re-resolves via
-// `tommy.directory.resolve`. Preserves the audit-1.8 guarantee.
-// ============================================================================
+// Payloads carry ids, never records; subscribers re-resolve via tommy.directory.resolve.
 
-/** `tommy.directory.team_member_added`. */
 export interface DirectoryTeamMemberAddedTrigger {
   readonly teamMemberId: string;
   readonly at: Iso8601;
 }
 
-/** `tommy.directory.team_member_updated` — debounce candidate. */
 export interface DirectoryTeamMemberUpdatedTrigger {
   readonly teamMemberId: string;
   readonly changedFields: readonly string[];
   readonly at: Iso8601;
 }
 
-/** `tommy.directory.team_member_deactivated`. */
 export interface DirectoryTeamMemberDeactivatedTrigger {
   readonly teamMemberId: string;
   readonly at: Iso8601;
   readonly effectiveAt?: Iso8601;
 }
 
-/** `tommy.directory.client_added` — ref-only. */
 export interface DirectoryClientAddedTrigger {
   readonly clientId: string;
   readonly at: Iso8601;
 }
 
-/** `tommy.directory.client_updated` — debounce candidate. */
 export interface DirectoryClientUpdatedTrigger {
   readonly clientId: string;
   readonly changedFields: readonly string[];
   readonly at: Iso8601;
 }
 
-/**
- * `tommy.directory.entity_changed` — ONE consolidated trigger for the
- * low-cardinality tag-family kinds (location/role/tag), to avoid primitive sprawl.
- */
 export interface DirectoryEntityChangedTrigger {
   readonly kind: 'location' | 'role' | 'tag';
   readonly entityId: string;
@@ -1899,12 +1205,6 @@ export interface DirectoryEntityChangedTrigger {
   readonly at: Iso8601;
 }
 
-// ============================================================================
-// Billing — `tommy.billing` (see platform-primitives.md §2)
-// Actions usage READ + allowance / over-allowance / plan-change triggers.
-// ============================================================================
-
-/** `tommy.billing.actions_usage` condition return. */
 export interface BillingActionsUsage {
   readonly allowance: number;
   readonly used: number;
@@ -1917,7 +1217,6 @@ export interface BillingActionsUsage {
   readonly topupCreditsAvailable?: number;
 }
 
-/** `tommy.billing.actions_allowance_warning` — 80%/90% cross. Self-reference metering-exempt. */
 export interface BillingAllowanceWarningTrigger {
   readonly tenantId: string;
   readonly periodStart: Iso8601;
@@ -1929,7 +1228,6 @@ export interface BillingAllowanceWarningTrigger {
   readonly projectedOverageAt?: Iso8601;
 }
 
-/** `tommy.billing.actions_over_allowance` — first crossing. Self-reference metering-exempt. */
 export interface BillingOverAllowanceTrigger {
   readonly tenantId: string;
   readonly periodStart: Iso8601;
@@ -1939,7 +1237,6 @@ export interface BillingOverAllowanceTrigger {
   readonly coverage: string;
 }
 
-/** `tommy.billing.plan_changed`. */
 export interface BillingPlanChangedTrigger {
   readonly tenantId: string;
   readonly previousPlanId: string;
@@ -1950,23 +1247,11 @@ export interface BillingPlanChangedTrigger {
   readonly reason: string;
 }
 
-/** Actions-usage read. Allowance/over-allowance/plan-change events ride the bus (types above). */
 export interface BillingApi {
-  /** Current-period Actions usage for this tenant. Non-metered read. */
   actions_usage(args?: { tenantId?: string }): Promise<BillingActionsUsage>;
 
-  // DEFERRED — reserved, NOT wired (weakest demand; plan_changed covers every
-  // demonstrated need): `tommy.billing.subscription_status_changed`
-  //   -> { tenantId, previousStatus, newStatus, effectiveAt, gracePeriodEndsAt? }.
 }
 
-// ============================================================================
-// Actions-meta triggers — `tommy.actions.*` (see platform-primitives.md §2)
-// Read from the existing action-run record; meta-triggers carry a re-entrancy
-// guard + debounce/coalesce.
-// ============================================================================
-
-/** `tommy.actions.action_dead_lettered` — high-value, low-frequency alerting. */
 export interface ActionDeadLetteredTrigger {
   readonly tenantId: string;
   readonly runId: string;
@@ -1981,17 +1266,6 @@ export interface ActionDeadLetteredTrigger {
   readonly deadLetteredAt: Iso8601;
 }
 
-// DEFERRED — reserved, NOT wired (noisy; needs mandatory-debounce + default-disabled
-// and a concrete consumer): `tommy.actions.action_failed`
-//   -> { ...errorCode, retryable, attempts, willRetry, failedAt }.
-
-// ============================================================================
-// Offline-sync triggers — `tommy.sync.*` (see platform-primitives.md §2;
-// offline-sync.md §3/§5). sync_completed = queue drained; conflict_detected =
-// a specific conflict, OBSERVE-ONLY (these report outcomes; they do not resolve).
-// ============================================================================
-
-/** `tommy.sync.sync_completed` — broker finished draining the offline trigger queue. */
 export interface SyncCompletedTrigger {
   readonly completedAt: Iso8601;
   readonly drainedCount: number;
@@ -2000,7 +1274,6 @@ export interface SyncCompletedTrigger {
   readonly mpId?: MpId;
 }
 
-/** `tommy.sync.conflict_detected` — OBSERVE-ONLY; the merge stays the MP's customResolverActivity. */
 export interface SyncConflictDetectedTrigger {
   readonly mpId: MpId;
   readonly storeName: string;
@@ -2012,48 +1285,19 @@ export interface SyncConflictDetectedTrigger {
   readonly detectedAt: Iso8601;
 }
 
-// ============================================================================
-// DEFERRED platform primitives — reserved names only, NOT wired into any live
-// API surface (see platform-primitives.md §5 residuals). Build when a concrete
-// consumer appears.
-// ============================================================================
-
-/**
- * DEFERRED — `tommy.location.*` geofence triggers. A full audit found ZERO
- * current demand and outsized cost (stateful host geofence engine, per-tenant
- * fence config, battery/privacy). `tommy.device.getLocation` covers today's
- * real demand. Reserved; do NOT build until a concrete auto-clock-in MP lands.
- *
- * Reserved payload shape (both `geofence_entered` / `geofence_exited`):
- *   { teamMemberId, locationId, fenceId, at, position }
- *   scope `read:location_geofence` (default-deny).
- */
-// (Type intentionally not declared on the live surface — name reserved in prose.)
-
-// ============================================================================
-// Cross-MP launch — `tommy.navigation` (see host-services.md)
-// Opening another MP's UI (a form, a page). Host-mediated — the caller never
-// touches the target MP's realm. Not an Activity (Activities are headless).
-// ============================================================================
-
 export interface OpenTarget {
   readonly mpId: MpId;
-  /** A route the target MP declares in its manifest `contributions` (public only). */
   readonly route: string;
   readonly params?: Readonly<Record<string, string>>;
-  /** Present as a full page or a modal layer. Default 'page'. */
   readonly mode?: 'page' | 'modal';
 }
 
 export interface OpenResult<R = unknown> {
-  /** True if the launched flow finished; false if the user cancelled/dismissed. */
   readonly completed: boolean;
-  /** Whatever the launched MP returned via `complete()` — e.g. a new record id. */
   readonly result?: R;
 }
 
 export interface NavigationBackOptions {
-  /** Forwarded to Framework7's router.back(). */
   readonly [key: string]: unknown;
 }
 
@@ -2063,57 +1307,19 @@ export interface NavigationBackResult {
 }
 
 export interface NavigationApi {
-  /** Open a host route using Framework7 navigate options. */
   open(path: string, opts?: Readonly<Record<string, unknown>>): { opened: boolean; deferred?: boolean };
-  /**
-   * Pop the visible MP view's history with backward animation. A fallback that
-   * differs from the previous URL (or has no history) uses forced router.back.
-   * Without history or a fallback, returns { back: false }. Page changes defer
-   * the operation until navigation is allowed; opts forwards router options.
-   */
   back(fallbackPath?: string, opts?: NavigationBackOptions): NavigationBackResult;
-  /** Open another MP's contributed surface; resolves when that flow closes. */
   open<R = unknown>(target: OpenTarget): Promise<OpenResult<R>>;
-  /** Called by the launched MP to finish the flow and return a result. */
   complete(result?: unknown): void;
-  /** Is a target MP installed + enabled for this tenant? Gate the affordance on it. */
   canOpen(mpId: MpId): Promise<boolean>;
 }
 
-// ============================================================================
-// Root SDK object — `tommy`
-// ============================================================================
-
-/**
- * This MP's own small UI choices (a layout, a filter, a toggle), kept per
- * account on the device by the host, never sent anywhere. Hosts from API
- * level 5 (`init.hostApi >= 5`); older hosts have no such namespace.
- */
+// Kept per account on the device, never sent anywhere.
 export interface PrefsApi {
-  /**
-   * Resolves once the stored preferences are loaded. The store opens on the
-   * MP's first use; read choices again when this resolves.
-   */
   ready(): Promise<void>;
-  /** The stored value (a copy), or null when none is stored or none has loaded yet. */
   get<T = unknown>(key: string): T | null;
-  /**
-   * The stored value (a copy), or `fallback` when none is stored or none has
-   * loaded yet. An `undefined` fallback is no fallback: the read is null.
-   */
   get<T>(key: string, fallback: T): T | (undefined extends T ? null : never);
-  /**
-   * Stores a JSON value; the next `get` returns it at once. Rejects with
-   * `DATA_NOT_SAVED` when the device could not keep it (its storage full or
-   * gone, or no room for it): it would be lost on reload. A saved choice is
-   * never dropped to make room for another.
-   */
   set(key: string, value: unknown): Promise<void>;
-  /**
-   * Removes a stored value; the next `get` answers the fallback at once.
-   * Rejects with `DATA_NOT_SAVED` when the device could not record the
-   * removal: the value would return on reload.
-   */
   remove(key: string): Promise<void>;
 }
 
@@ -2139,26 +1345,15 @@ export interface TimeDisplayOptions {
   readonly locale?: string;
   readonly kind?: 'datetime' | 'date' | 'time';
   readonly includeZone?: 'auto' | 'always';
-  /**
-   * The zone label names the business city alone, with no difference from
-   * the viewer: for output other people read (exports, PDFs, shared files).
-   */
   readonly absoluteZone?: boolean;
 }
 
 export interface ZonedTimeText {
   readonly text: string;
   readonly timezone: string;
-  /** The UTC offset at that instant ("UTC+11:00"). */
   readonly offset: string;
-  /** The zone's city in the display language ("Sydney"). */
   readonly city: string;
-  /** Hours this clock is ahead of the viewer's (negative behind); 0 with `absoluteZone`. */
   readonly diffHours: number;
-  /**
-   * "Sydney (+1 hour)"; the city alone when the clocks agree or with
-   * `absoluteZone`; the UTC offset for viewers whose preference is offset labels.
-   */
   readonly zoneLabel: string;
 }
 
@@ -2176,18 +1371,12 @@ export interface TimeRangeDisplay extends TimeDisplay {
   readonly end: TimeDisplay;
 }
 
-/** A business zone against the viewer's clock: what one "Times are in Sydney time — 1 hour ahead of you" notice says. */
 export interface ZoneSummary {
   readonly timezone: string;
-  /** The zone's city in the display language. */
   readonly city: string;
-  /** Whether the zone is not the viewer's. */
   readonly mismatch: boolean;
-  /** Hours the zone's clock is ahead of the viewer's; negative behind. */
   readonly diffHours: number;
-  /** The signed difference in the display language ("+1 hour", "-4.5 hours"). */
   readonly diffText: string;
-  /** The unsigned difference ("1 hour"). */
   readonly distanceText: string;
   readonly ahead: boolean;
 }
@@ -2203,7 +1392,6 @@ export interface CalendarDayBounds {
   readonly date: string;
   readonly timezone: string;
   readonly start: Iso8601;
-  /** Exclusive: the first instant after this business date, including a following skipped date. */
   readonly end: Iso8601;
   readonly startOffset: string;
   readonly endOffset: string;
@@ -2238,16 +1426,11 @@ export interface TimeDisplayError extends RangeError {
   readonly segments?: ReadonlyArray<Readonly<{ start: Iso8601; end: Iso8601 }>>;
 }
 
-/** Synchronous host-owned display; private preferences never enter an MP store. */
+// Private preferences never enter an MP store.
 export interface TimeApi {
   formatInstant(value: Iso8601, options: TimeDisplayOptions): TimeDisplay;
   formatRange(start: Iso8601, end: Iso8601, options: TimeDisplayOptions): TimeRangeDisplay;
   formatDateOnly(value: string, options?: { readonly locale?: string }): string;
-  /**
-   * The zone (the team's when omitted) against the viewer's clock now, or at
-   * `at`. An unknown zone throws TIMEZONE_INVALID. The `<zone-notice>`
-   * surface component shows it.
-   */
   zoneSummary(timezone?: string | null, options?: { readonly locale?: string; readonly at?: Iso8601 }): ZoneSummary;
   viewer(): ViewerTimezone;
   context(): Readonly<{ teamTimezone: string | null; enabled: boolean }>;
@@ -2255,9 +1438,7 @@ export interface TimeApi {
   calendarParts(value: Iso8601, options: { readonly timezone: string }): Readonly<{
     date: string; time: string; weekday: number;
   }>;
-  /** Read-only civil-day bounds; user-authored wall times still use strict resolveWallTime. */
   dayBounds(date: string, options: { readonly timezone: string }): CalendarDayBounds;
-  /** Gaps reject; an overlap without disambiguation rejects with chronological choices. */
   resolveWallTime(options: {
     readonly date: string;
     readonly time: string;
@@ -2266,75 +1447,42 @@ export interface TimeApi {
   }): ResolvedWallTime;
 }
 
-/** What an MP bundle's optional `migrate` export is told about a store rebuild. */
 export interface StoreMigrationContext {
-  /** The store's `schemaVersion` its rows were written under. */
   fromSchema: number;
-  /** The `schemaVersion` the published manifest declares now. */
   toSchema: number;
-  /** The declared store name. */
   store: string;
 }
 
-/**
- * An MP bundle's optional `migrate` export: a pure function carrying one
- * authored or unsent row into the store's new declared schema. Return the
- * row in its new shape (keyed by the store's `keyPath`), or `null` to set it
- * aside unsent (Settings → App Data → Pending sync). A row that does not fit
- * the new `recordSchema`, or whose key another kept row already has, is set
- * aside too.
- */
 export type StoreMigrate = (row: Record<string, unknown>, context: StoreMigrationContext) => Record<string, unknown> | null;
 
 export interface TommySdk {
   readonly init: MpInit;
-  /** Per-account UI preferences kept by the host (API level 5). */
   readonly prefs: PrefsApi;
   readonly time: TimeApi;
   readonly actions: ActionsApi;
   readonly panels: PanelsApi;
   readonly data: DataApi;
-  /** Host-rendered pickers (team member, location, role, skill, tag). */
   readonly ui: UiApi;
-  /** Permission-scoped reference data. */
   readonly directory: DirectoryApi;
-  /** Host-mediated device & native capabilities (camera, GPS, scan, …). */
   readonly device: DeviceApi;
-  /** Current theme + change subscription (Day/Night/System). */
   readonly theme: ThemeApi;
-  /** Platform services — feature/permission gates + reference data. */
   readonly host: HostApi;
-  /** Cross-MP launch — open another MP's UI and optionally await a result. */
   readonly navigation: NavigationApi;
-  /** Chats platform service (tommy-chat-server) — host-mediated session reset only (D5). */
   readonly messaging: MessagingApi;
-  /** Clock / Scheduler — authoritative server time reads (the scheduled trigger is wired in Actions). */
   readonly clock: ClockApi;
-  /** App & connectivity lifecycle — bus triggers (payload types) wired via `actions.subscribe`. */
   readonly lifecycle: LifecycleApi;
-  /** Cross-user notifications (push / in-app) to OTHER users — distinct from local `device.notify`. */
   readonly notifications: NotificationsApi;
-  /** who-am-I reads (current_user / current_role / is_authenticated). */
   readonly session: SessionApi;
-  /** RBAC events namespace (`role_changed` rides the bus). */
   readonly user: UserApi;
-  /** Actions usage read; allowance/over-allowance/plan-change events ride the bus. */
   readonly billing: BillingApi;
   readonly log: (level: 'debug' | 'info' | 'warn' | 'error', msg: string, extra?: unknown) => void;
-  /** i18n bound to this MP's bundled locales (not the shared window.i18n). */
   readonly t: (key: string, fallback: string, vars?: Record<string, unknown>) => string;
-  /**
-   * Unknown-method guard. Accessing a non-existent SDK method throws a
-   * TommySDKError with a "did you mean" suggestion (Phase 5.3) rather than
-   * returning undefined — critical for AI authors.
-   */
 }
 
 declare global {
   // eslint-disable-next-line no-var
   var tommy: TommySdk;
 }
-/** Local viewport selection only; observations still require a scoped host write. */
 export declare function visibleChatMessageIds(
   elements: Iterable<{ dataset?: { chatMessageId?: string }; isConnected?: boolean; getBoundingClientRect?: () => { top: number; left: number; bottom: number; right: number } }>,
   options: { active?: boolean; viewport: { top: number; left: number; bottom: number; right: number }; windowBounds: { top: number; left: number; bottom: number; right: number } },
@@ -2345,7 +1493,6 @@ export declare function visibleChatConversationIds(
   options: { active?: boolean; viewport: { top: number; left: number; bottom: number; right: number }; windowBounds: { top: number; left: number; bottom: number; right: number } },
 ): string[];
 
-/** Device-local advisory deadlines; does not read receipts or send messages. */
 export declare const CHAT_SEND_NOTICE_MS: 30000;
 export declare function createChatSendFeedback(options: {
   read: () => Iterable<{ key: string; startedAt: number; pending: boolean }>;

@@ -1,17 +1,3 @@
-// The 5-layer manifest validator (README §Validation layers).
-// Layers run in order; the FIRST failing layer stops the pipeline. Every error
-// carries { line, path, rule, message, suggestion? } — the named-rule contract
-// that lets an AI author correct and resubmit autonomously.
-//
-//   1. YAML         — well-formed, readable YAML.
-//   2. Schema       — Ajv 2020-12 vs manifest-schema.json (shape errors).
-//   3. Catalogue    — every permissions.scopes entry is a catalogue member.
-//   4. Cross-ref    — actions' trigger/conditions/activity + panels'
-//                     dataRequirements resolve to declared primitives.
-//   5. Semantic     — the schema's allOf if/then rules (offline-replay ⇒
-//                     idempotency, debounced ⇒ debounceMs, custom sync ⇒
-//                     resolver), plus --strict-ai rules.
-
 import { parseManifest, locateLine, pointerToPath, pathToDisplay } from './parse.js';
 import { compileValidator } from './schema.js';
 import { loadCatalogue, suggestScope } from './catalogue.js';
@@ -21,8 +7,6 @@ function validator() {
   if (!cachedValidator) cachedValidator = compileValidator();
   return cachedValidator;
 }
-
-// --- Ajv error → named-rule descriptor ------------------------------------
 
 const SEMANTIC_RE = /\/(triggers|activities|localData|conditions)\/additionalProperties\/allOf\//;
 
@@ -41,10 +25,7 @@ function describeSemantic(err) {
     };
   }
   if (err.schemaPath.includes('/activities/')) {
-    // The activities block has TWO allOf branches; index 1 is the L22
-    // naturalKeyField guard. Naming them apart matters — reporting a
-    // naturalKeyField misuse as an offline-replay error would send the author
-    // to edit the wrong field.
+    // Name the two allOf branches apart, or a naturalKeyField misuse sends the author to the wrong field.
     if (/\/activities\/additionalProperties\/allOf\/5\//.test(err.schemaPath)) {
       return {
         path,
@@ -79,11 +60,6 @@ function describeSemantic(err) {
       message: `condition '${name}' declares freshness without heldFirst: true — freshness describes a held answer, and without heldFirst nothing is held.`,
     };
   }
-  // The localData block now has TWO allOf branches, and naming them apart
-  // matters for the same reason it does for activities above: a store that
-  // persists without a cap is not a sync-resolver problem, and reporting it as
-  // one sends the author to add `customResolverActivity` to a
-  // server_authoritative store, which is meaningless.
   if (/\/localData\/additionalProperties\/allOf\/1\//.test(err.schemaPath)) {
     return {
       path,
@@ -157,8 +133,6 @@ function describeShape(err) {
   }
 }
 
-/** Collapse identical errors — Ajv emits both the `if` and `then` error for a
- *  failing if/then branch, which describeSemantic maps to one rule. */
 function dedupe(errors) {
   const seen = new Set();
   return errors.filter((e) => {
@@ -181,11 +155,7 @@ function finalize(doc, lineCounter, d, layer, suggestion) {
   };
 }
 
-// --- Shape the schema cannot express --------------------------------------
-
-// A condition's `freshness.retryAfterMs` steps must ascend: each retry waits
-// longer than the one before. JSON Schema cannot compare items, so this runs
-// beside the schema layer.
+// JSON Schema cannot compare items, so ascending retry steps are checked here.
 function retryStepErrors(doc, lineCounter, data) {
   const errors = [];
   for (const [name, cond] of Object.entries(data?.conditions ?? {})) {
@@ -201,8 +171,6 @@ function retryStepErrors(doc, lineCounter, data) {
   }
   return errors;
 }
-
-// --- Cross-reference layer -------------------------------------------------
 
 function crossRefErrors(doc, lineCounter, data) {
   const errors = [];
@@ -224,14 +192,10 @@ function crossRefErrors(doc, lineCounter, data) {
   const interactionTriggers = new Set(
     (data.contributions?.interactions ?? []).map((i) => `ui.${i.id}`),
   );
-  // dataRequirements resolves to a declared condition/activity/trigger OR a
-  // declared permission scope (the schema documents "conditions/scopes").
   const dataResolvable = new Set([...conditions, ...activities, ...triggers, ...scopes]);
 
-  // Resolve one activity target ({name} local, {mp,name} external, {computed})
-  // against the declared primitives, pushing the right named error if it dangles.
   const resolveTarget = (actionName, target, path) => {
-    if (!target || target.mp || target.skip) return; // external or a skip branch
+    if (!target || target.mp || target.skip) return;
     if (target.computed != null) {
       if (!functions.has(target.computed)) {
         errors.push(
@@ -255,36 +219,7 @@ function crossRefErrors(doc, lineCounter, data) {
     }
   };
 
-  // --- naturalKeyField must name a SCALAR property of the inputSchema -------
-  //
-  // The broker builds the key as `n-${value}` (broker.js idempotencyKeyFor), a
-  // template literal. So a field pointing at an OBJECT stringifies to
-  // `n-[object Object]` and an ARRAY to `n-a,b` — every invocation collides,
-  // and the second distinct write replays the first's stored result instead of
-  // applying. That is the M3 `set_mileage_status` approve→reject failure
-  // exactly, and it is SILENT: no error, a plausible key, the wrong answer.
-  //
-  // The schema can say `naturalKeyField` is a string; it cannot say the string
-  // must name a scalar property of a sibling object, which is why this lives in
-  // the cross-reference layer. Naming a property that does not exist at all is
-  // also caught here — the broker would fall back to whole-args derivation, so
-  // the declaration would be decoration rather than the contract it looks like.
-  //
-  // Dotted paths are ACCEPTED without inspection: `a.b` addresses a nested
-  // property whose type the inputSchema often does not spell out, and refusing
-  // what cannot be checked would be worse than allowing it.
-  // D.38 ruling (a), 2026-08-15 — `natural_key` WITHOUT `naturalKeyField` is
-  // refused, because it was never a natural key. The broker's natural_key branch
-  // falls back to `n-${JSON.stringify(args)}` when the field is missing, which is
-  // byte-for-byte the behaviour of `derived_from_input` under a different prefix.
-  // 74 of the estate's 114 natural_key activities were spelled that way; all 74
-  // were re-declared as `derived_from_input` in the same commit, so the estate
-  // enters this rule already clean and it can be an ERROR rather than a warning.
-  //
-  // The point is that the declaration should state what happens. A strategy that
-  // silently degrades into a different strategy makes `natural_key` unreadable —
-  // you cannot tell the 40 real identity keys from the 74 whole-args hashes
-  // without opening the broker. Refusing the empty spelling keeps the two apart.
+  // The broker builds the key as `n-${value}`, so a non-scalar field makes every invocation collide silently.
   for (const [name, act] of Object.entries(data.activities ?? {})) {
     if (act.idempotency === 'natural_key' && act.naturalKeyField === undefined) {
       errors.push(
@@ -300,9 +235,7 @@ function crossRefErrors(doc, lineCounter, data) {
   for (const [name, act] of Object.entries(data.activities ?? {})) {
     const field = act.naturalKeyField;
     if (typeof field !== 'string' || field.includes('.')) continue;
-    // Beside another strategy the field is already refused by name
-    // (natural-key-field-requires-natural-key). Adding a second complaint about
-    // a field the broker will never read would send the author to the wrong fix.
+    // Beside another strategy the field is already refused by name; a second complaint would mislead.
     if (act.idempotency !== 'natural_key') continue;
     const props = act.inputSchema?.properties;
     if (!props || typeof props !== 'object') continue;
@@ -353,7 +286,6 @@ function crossRefErrors(doc, lineCounter, data) {
         );
       }
     });
-    // Activity: single target, E4 select-branch list, or E2.2 §4 computed ref.
     const act = action.activity;
     if (act) {
       if (Array.isArray(act.select)) {
@@ -383,8 +315,6 @@ function crossRefErrors(doc, lineCounter, data) {
   return errors;
 }
 
-// --- --strict-ai layer -----------------------------------------------------
-
 function aiStrictErrors(doc, lineCounter, data) {
   const errors = [];
   for (const [name, act] of Object.entries(data.activities ?? {})) {
@@ -401,16 +331,9 @@ function aiStrictErrors(doc, lineCounter, data) {
   return errors;
 }
 
-/**
- * Validate a manifest source string.
- * @param {string} source
- * @param {{ catalogueOverride?: object, strictAi?: boolean }} [opts]
- * @returns {{ ok: boolean, manifestId: string|null, errors: Array }}
- */
 export function validateManifest(source, opts = {}) {
   const { doc, data, lineCounter, yamlErrors } = parseManifest(source);
 
-  // Layer 1 — YAML
   if (yamlErrors.length > 0) {
     return {
       ok: false,
@@ -434,28 +357,10 @@ export function validateManifest(source, opts = {}) {
     ajvErrors.filter((e) => !isSemantic(e)).map((e) => finalize(doc, lineCounter, describeShape(e), 2)),
   );
 
-  // Layer 2 — Schema shape (plus what JSON Schema cannot say about a shape)
   shape.push(...retryStepErrors(doc, lineCounter, data));
   if (shape.length > 0) return { ok: false, manifestId, errors: shape };
 
-  // Layer 3 — Catalogue
-  //
-  // The QUALIFIED per-primitive form (`verb:<mpId>.<primitive>`, e.g.
-  // invoke:team-comms.send_message) is exempt: it is addressed by the OWNING
-  // MP's manifest, not by the fixed catalogue, so catalogue membership is not
-  // the right question to ask of it. Layer 2's pattern already constrains its
-  // shape, and layer 4 (cross-reference) is where a qualified scope naming a
-  // primitive nobody publishes should be caught.
-  //
-  // This exemption is not new policy — it is the grammar catching up with what
-  // is already enforced at runtime. A cross-MP invoke has no domain derivation:
-  // the broker's authorizeInvoke and the server's InvokeExecutor both require
-  // exactly `invoke:<owner>.<activity>`, so that string is the ONLY way a
-  // manifest can declare the authority it needs. tommy-api's own checker
-  // (Mp::ManifestCheck M08/M02) has always skipped catalogue membership for
-  // this form; the schema and this layer were the last two places still
-  // rejecting it, which is why the seven live cross-MP wirings had to be
-  // granted out of band by seed data instead of declared.
+  // Qualified per-primitive scopes are addressed by the owning MP's manifest, not the catalogue.
   const catalogue = loadCatalogue(opts.catalogueOverride ?? opts.cataloguePath);
   const isQualified = (scope) => /^(read|write|invoke):[a-z][a-z0-9-]*\.[a-z][a-z0-9_]*$/.test(scope);
   const cat = [];
@@ -479,11 +384,9 @@ export function validateManifest(source, opts = {}) {
   });
   if (cat.length > 0) return { ok: false, manifestId, errors: cat };
 
-  // Layer 4 — Cross-reference
   const xref = crossRefErrors(doc, lineCounter, data);
   if (xref.length > 0) return { ok: false, manifestId, errors: xref };
 
-  // Layer 5 — Semantic (schema allOf) + strict-ai
   const semantic = ajvErrors
     .filter(isSemantic)
     .map((e) => finalize(doc, lineCounter, describeSemantic(e), 5));
