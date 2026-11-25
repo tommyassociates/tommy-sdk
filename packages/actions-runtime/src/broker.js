@@ -15,7 +15,7 @@ import { validateToken } from './capability.js';
 import { evaluatePredicate as evaluateDeclaredPredicate } from './predicate.js';
 import { holdSubject, unsettledReason } from './held-writes.js';
 import { createOutcomeLedger } from './outcome-ledger.js';
-import { createConditionAnswers } from './condition-answers.js';
+import { createConditionAnswers, conditionSignature } from './condition-answers.js';
 import { classifyReadOutcome, readErrorOf } from './read-outcome.js';
 
 const err = (code, message, extra = {}) => new TommyError({ code, message, ...extra });
@@ -37,6 +37,8 @@ const INFLIGHT_RUNS_MAX = 500;
 const SETTLE_RETRY_AFTER_MS = 2000;
 const SETTLE_RETRY_DRAINS = 3;
 const CONFIRM_WITHIN_MS = 24 * 60 * 60 * 1000;
+// A revalidation whose condition was purged or marked stale mid-read reads again, at most this many times.
+const FENCE_RESTARTS_MAX = 2;
 // A write that takes a secret input is never kept for a confirm.
 const SECRET_INPUT_NAMES = new Set(['pin', 'passcode', 'password', 'secret', 'token', 'otp']);
 
@@ -178,6 +180,7 @@ export function createBroker({
   const records = createRecordStore({ backend: recordBackend, now });
   const outcomes = createOutcomeLedger({ store: outcomeStore, now });
   outcomes.ready();
+  let outcomeGeneration = 0;
   const conditionAnswers = createConditionAnswers({ store: conditionAnswerStore });
   conditionAnswers.ready();
   let conditionReadSeq = 0;
@@ -772,8 +775,14 @@ export function createBroker({
     authorizeQuery(envelope.sourceMpId, ownerMpId, conditionName, identity.scopes);
     validateAgainst(conditionDef.inputSchema, envelope.args, 'InvalidPayload', `condition '${envelope.condition}' args`);
 
-    const cacheKey = `${tenantStateKey(tenantId)}:${envelope.condition}:${JSON.stringify(envelope.args)}`;
+    // A held-first condition's cached answer belongs to the viewer it was read for.
+    const viewer = conditionDef.heldFirst === true ? `:${JSON.stringify(currentFingerprint())}` : '';
+    const cacheKey = `${tenantStateKey(tenantId)}:${envelope.condition}:${JSON.stringify(envelope.args)}${viewer}`;
     return { identity, tenantId, ownerMpId, conditionName, ownerEntry, conditionDef, cacheKey };
+  }
+
+  function currentFingerprint() {
+    try { return String(viewerFingerprint?.() ?? ''); } catch (_) { return ''; }
   }
 
   function cachedConditionAnswer({ conditionDef, cacheKey }) {
@@ -784,11 +793,14 @@ export function createBroker({
     return null;
   }
 
-  async function runQuery(envelope, {
-    identity, tenantId, ownerMpId, conditionName, ownerEntry, conditionDef, cacheKey,
-  }) {
-    const heldKey = heldConditionKey(envelope, conditionDef);
+  async function runQuery(envelope, prepared) {
+    const {
+      identity, tenantId, ownerMpId, conditionName, ownerEntry, conditionDef, cacheKey,
+    } = prepared;
+    const heldKey = heldConditionKey(envelope, prepared);
     const heldSeq = heldKey ? (conditionReadSeq += 1) : 0;
+    const heldFence = heldKey ? conditionAnswers.epoch(envelope.condition) : null;
+    const epochAtDispatch = conditionCacheEpoch;
     await awaitQueryToken(envelope.sourceMpId);
 
     const handler = ownerEntry.handlers?.conditions?.[conditionName];
@@ -824,7 +836,6 @@ export function createBroker({
         reject(err('Timeout', `condition '${envelope.condition}' exceeded latencyBudgetMs ${budget}`, { retryable: false, runId: record.runId }));
       }, budget);
     });
-    const epochAtDispatch = conditionCacheEpoch;
     let handled;
     try {
       handled = Promise.resolve(handler(envelope.args, { tenantId, signal: deadline.signal }));
@@ -845,7 +856,7 @@ export function createBroker({
             // A moved epoch means an invalidation landed during the read, so this value must not refill the cache.
             if (conditionCacheEpoch !== epochAtDispatch) return;
             if (conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !isKnownUnknown(late)) {
-              conditionCache.set(cacheKey, { value: late, expiresAt: now() + conditionDef.cacheTtlMs });
+              conditionCache.set(cacheKey, { value: late, expiresAt: now() + conditionDef.cacheTtlMs, condition: envelope.condition });
               pruneConditionCache(cacheKey);
             }
           })
@@ -863,10 +874,10 @@ export function createBroker({
       await records.update(record.runId, { status: 'succeeded', result: value });
       // A zero-TTL entry could never be served, and a known-unknown must not be cached.
       if (conditionCacheEpoch === epochAtDispatch && conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !isKnownUnknown(value)) {
-        conditionCache.set(cacheKey, { value, expiresAt: now() + conditionDef.cacheTtlMs });
+        conditionCache.set(cacheKey, { value, expiresAt: now() + conditionDef.cacheTtlMs, condition: envelope.condition });
         pruneConditionCache(cacheKey);
       }
-      if (heldKey && !isKnownUnknown(value) && heldKey.current()) {
+      if (heldKey && !isKnownUnknown(value) && heldKey.current() && conditionAnswers.epoch(envelope.condition) === heldFence) {
         conditionAnswers.keep({ ...heldKey.entry, answer: value, at: now(), seq: heldSeq });
       }
       return value;
@@ -882,18 +893,20 @@ export function createBroker({
     }
   }
 
-  function heldConditionKey(envelope, conditionDef) {
+  function heldConditionKey(envelope, { conditionDef, ownerEntry, tenantId }) {
     if (conditionDef?.heldFirst !== true) return null;
-    const owner = outcomeOwner();
-    let fingerprint = '';
-    try { fingerprint = String(viewerFingerprint?.() ?? ''); } catch (_) { fingerprint = ''; }
+    const owner = recordOwner(tenantId);
+    if (!owner) return null;
+    const fingerprint = currentFingerprint();
+    const sig = conditionSignature(ownerEntry?.manifest?.version, conditionDef);
     const id = conditionAnswers.idFor(owner, fingerprint, envelope.condition, canonicalJson(envelope.args ?? null));
-    const current = () => {
-      let fingerprintNow = '';
-      try { fingerprintNow = String(viewerFingerprint?.() ?? ''); } catch (_) { fingerprintNow = ''; }
-      return !retired && outcomeOwner() === owner && fingerprintNow === fingerprint;
+    const current = () => !retired && recordOwner(tenantId) === owner && currentFingerprint() === fingerprint;
+    const entry = {
+      id, owner, fingerprint, condition: envelope.condition, sig,
     };
-    return { id, owner, fingerprint, current, entry: { id, owner, fingerprint, condition: envelope.condition } };
+    return {
+      id, owner, fingerprint, current, entry, expected: { owner, fingerprint, condition: envelope.condition, sig },
+    };
   }
 
   function agedAt(conditionDef, at) {
@@ -911,9 +924,11 @@ export function createBroker({
     const { conditionDef } = prepared;
     const cached = cachedConditionAnswer(prepared);
     if (cached) return { answer: cached.value, state: 'fresh', asOf: now(), aged: false };
-    const key = heldConditionKey(envelope, conditionDef);
+    const key = heldConditionKey(envelope, prepared);
     if (key) await conditionAnswers.ready();
-    const held = key ? conditionAnswers.get(key.id) : null;
+    const found = key && key.current() ? conditionAnswers.get(key.id) : null;
+    const held = found ? conditionAnswers.get(key.id, key.expected) : null;
+    if (found && !held) conditionAnswers.remove(key.id);
     if (!held) {
       const value = await runQuery(envelope, prepared).catch((error) => { throw asRefusal(error); });
       return { answer: value, state: 'fresh', asOf: now(), aged: false };
@@ -939,7 +954,7 @@ export function createBroker({
     const deliver = (notice, terminal = false) => {
       chain = chain.then(() => {
         if (ended) return;
-        if (!key.current()) { ended = true; return; }
+        if (callerSignal?.aborted || !key.current()) { ended = true; return; }
         if (terminal) ended = true;
         try { onRead(notice); } catch (_) { /* the asker's own error */ }
       });
@@ -952,10 +967,21 @@ export function createBroker({
         : { state: 'checking', ...base() });
       let value;
       let failure = null;
-      try {
-        value = await runQuery({ ...envelope, onRead: undefined }, prepared);
-      } catch (error) {
-        failure = error;
+      for (let restarts = 0; ; restarts += 1) {
+        const fence = conditionAnswers.epoch(envelope.condition);
+        failure = null;
+        try {
+          value = await runQuery({ ...envelope, onRead: undefined }, prepared);
+        } catch (error) {
+          failure = error;
+        }
+        if (failure && classifyReadOutcome(failure).state === 'refused') break;
+        if (conditionAnswers.epoch(envelope.condition) === fence) break;
+        if (ended || retired || callerSignal?.aborted || !key.current()) { ended = true; return; }
+        if (restarts >= FENCE_RESTARTS_MAX) {
+          failure = Object.assign(new Error(`condition '${envelope.condition}' changed while it was read`), { code: 'REFRESH_BUSY' });
+          break;
+        }
       }
       if (!failure && isKnownUnknown(value)) {
         failure = Object.assign(new Error(`condition '${envelope.condition}' answered unresolved`), { code: 'DATA_NOT_READ' });
@@ -995,16 +1021,30 @@ export function createBroker({
     return err('PermissionDenied', error.message, { retryable: false, cause: error.cause || error });
   }
 
-  function purgeConditionAnswers() { conditionAnswers.purge(); }
+  function purgeConditionAnswers() {
+    conditionAnswers.purge();
+    conditionCacheEpoch += 1;
+    conditionCache.clear();
+  }
 
   function markConditionAnswersStale(collectionIds) {
     const touched = new Set((Array.isArray(collectionIds) ? collectionIds : [collectionIds]).filter((id) => typeof id === 'string'));
     if (!touched.size) return;
-    conditionAnswers.markStale((condition) => {
+    const reads = (condition) => {
       const [ownerMpId, conditionName] = splitQualified(condition);
       const sources = mps.get(ownerMpId)?.manifest?.conditions?.[conditionName]?.freshness?.sources;
       return Array.isArray(sources) && sources.some((source) => touched.has(source));
-    });
+    };
+    conditionAnswers.markStale(reads);
+    let moved = false;
+    for (const [mpId, entry] of mps) {
+      for (const name of Object.keys(entry.manifest?.conditions || {})) {
+        const qualified = qualify(mpId, name);
+        if (reads(qualified)) { conditionAnswers.touch(qualified); moved = true; }
+      }
+    }
+    for (const [cacheKey, hit] of [...conditionCache]) if (hit.condition && reads(hit.condition)) conditionCache.delete(cacheKey);
+    if (moved) conditionCacheEpoch += 1;
   }
 
   function unlinkCallerLater(callerSignal, callerGone, handlerSignal) {
@@ -1143,6 +1183,7 @@ export function createBroker({
   async function dispatchInvokeInner(envelope) {
     const identity = envelope.identity || authenticate(envelope);
     const tenantId = envelope.tenantId || identity.tenantId;
+    const outcomeScope = outcomeScopeFor(tenantId);
     takeToken(envelope.sourceMpId, 'invoke');
 
     const [ownerMpId, activityName] = splitQualified(envelope.activity);
@@ -1169,19 +1210,19 @@ export function createBroker({
     if (processedKey && processedKeys.has(processedKey)) {
       const stored = processedKeys.get(processedKey);
       await releaseSettledHold(activityDef, envelope);
-      noteReplayedSuccess(activityDef, envelope, idempotencyKey);
+      noteReplayedSuccess(activityDef, envelope, idempotencyKey, outcomeScope);
       return { ...stored, idempotentReplay: true };
     }
     if (processedKey && appliedKeysOverflow.has(processedKey)) {
       await releaseSettledHold(activityDef, envelope);
-      noteReplayedSuccess(activityDef, envelope, idempotencyKey);
+      noteReplayedSuccess(activityDef, envelope, idempotencyKey, outcomeScope);
       return { status: 'succeeded', idempotentReplay: true, resultRetained: false };
     }
 
     // Results are never persisted (one may be a live PIN); client_key only, as derived keys would put tenant data on disk.
     if (processedKey && activityDef.idempotency === 'client_key' && idempotencyLedger?.has(processedKey)) {
       await releaseSettledHold(activityDef, envelope);
-      noteReplayedSuccess(activityDef, envelope, idempotencyKey);
+      noteReplayedSuccess(activityDef, envelope, idempotencyKey, outcomeScope);
       return { status: 'succeeded', idempotentReplay: true, resultRetained: false };
     }
 
@@ -1205,14 +1246,14 @@ export function createBroker({
           online: false,
         });
         await records.update(queuedRecord.runId, { status: 'queued_offline' });
-        noteOutcome(activityDef, envelope, idempotencyKey, 'queued', { rpcId: queuedRecord.runId });
+        noteOutcome(activityDef, envelope, idempotencyKey, 'queued', { rpcId: queuedRecord.runId }, outcomeScope);
         return { rpcId: queuedRecord.runId, status: 'queued_offline' };
       }
       throw err('Offline', `activity '${envelope.activity}' is not offlineReplayable and the device is offline`, { retryable: false });
     }
 
     const admitted = {
-      envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, chain, idempotencyKey, processedKey,
+      envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, chain, idempotencyKey, processedKey, outcomeScope,
     };
     if (!processedKey) return runAdmittedInvoke(admitted);
     const running = inflightInvokes.get(processedKey);
@@ -1262,7 +1303,7 @@ export function createBroker({
   }
 
   async function runAdmittedInvoke({
-    envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, chain, idempotencyKey, processedKey,
+    envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, chain, idempotencyKey, processedKey, outcomeScope,
   }) {
     // Queued before the request goes: a hung request neither answers nor fails, and closing the app would lose it.
     const heldSeq = activityDef.holdUnsettled
@@ -1288,9 +1329,9 @@ export function createBroker({
         chainPath: chain.chainPath,
         online: isOnline,
       });
-      noteOutcome(activityDef, envelope, idempotencyKey, 'queued', { rpcId: record.runId });
+      noteOutcome(activityDef, envelope, idempotencyKey, 'queued', { rpcId: record.runId }, outcomeScope);
       return await attemptAdmittedInvoke({
-        envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, idempotencyKey, processedKey, record, heldSeq,
+        envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, idempotencyKey, processedKey, record, heldSeq, outcomeScope,
       });
     } finally {
       if (heldSeq !== null) await queueStore.release(heldSeq);
@@ -1367,7 +1408,7 @@ export function createBroker({
   }
 
   async function attemptAdmittedInvoke({
-    envelope, identity, tenantId, ownerMpId, ownerEntry, activityName, activityDef, idempotencyKey, processedKey, record, heldSeq,
+    envelope, identity, tenantId, ownerMpId, ownerEntry, activityName, activityDef, idempotencyKey, processedKey, record, heldSeq, outcomeScope,
   }) {
     const retry = { ...DEFAULT_RETRY, ...(activityDef.retry || {}) };
     let attempt = 0;
@@ -1389,7 +1430,7 @@ export function createBroker({
         validateAgainst(activityDef.resultSchema, result.result, 'ActivityFailed', `activity '${envelope.activity}' result`);
         const final = { rpcId: record.runId, status: 'succeeded', result: result.result, ...(result.replayed === true ? { replayed: true } : {}) };
         resendFailures.delete(idempotencyKey);
-        noteOutcome(activityDef, envelope, idempotencyKey, 'succeeded', { rpcId: record.runId });
+        noteOutcome(activityDef, envelope, idempotencyKey, 'succeeded', { rpcId: record.runId }, outcomeScope);
         await records.update(record.runId, { status: 'succeeded', result: result.result });
         if (processedKey) {
           processedKeys.set(processedKey, final);
@@ -1448,7 +1489,7 @@ export function createBroker({
 
     const unsettledWhy = activityDef.holdUnsettled && heldSeq !== null ? unsettledReason(lastError, activityDef.holdUnsettled) : null;
     if (unsettledWhy) {
-      noteOutcome(activityDef, envelope, idempotencyKey, 'unconfirmed', { rpcId: record.runId });
+      noteOutcome(activityDef, envelope, idempotencyKey, 'unconfirmed', { rpcId: record.runId }, outcomeScope);
       try { await queueStore.markUnsettled(heldSeq, { reason: unsettledWhy, at: now() }); } catch (_) { /* unmarked rows read as unconfirmed */ }
       await records.update(record.runId, {
         status: 'dead_letter', error: { code: lastError.code, message: lastError.message }, attempts: attempt,
@@ -1463,14 +1504,14 @@ export function createBroker({
       if (heldSeq === null) await enqueueOffline(envelope.sourceMpId, { ...envelope, identity, idempotencyKey });
       noteResendFailure(idempotencyKey);
       await records.update(record.runId, { status: 'queued_offline', attempts: attempt });
-      noteOutcome(activityDef, envelope, idempotencyKey, 'queued', { rpcId: record.runId });
+      noteOutcome(activityDef, envelope, idempotencyKey, 'queued', { rpcId: record.runId }, outcomeScope);
       return { rpcId: record.runId, status: 'queued_offline' };
     }
 
     if (refusedForGood(lastError)) {
-      noteOutcome(activityDef, envelope, idempotencyKey, 'refused', { rpcId: record.runId, refusal: refusalOf(lastError) });
+      noteOutcome(activityDef, envelope, idempotencyKey, 'refused', { rpcId: record.runId, refusal: refusalOf(lastError) }, outcomeScope);
     } else {
-      noteOutcome(activityDef, envelope, idempotencyKey, envelope.restoreDrain && neverReachedServer(lastError) ? 'queued' : 'unconfirmed', { rpcId: record.runId });
+      noteOutcome(activityDef, envelope, idempotencyKey, envelope.restoreDrain && neverReachedServer(lastError) ? 'queued' : 'unconfirmed', { rpcId: record.runId }, outcomeScope);
     }
     if (heldSeq !== null) await queueStore.remove(heldSeq);
     await records.update(record.runId, {
@@ -1540,10 +1581,17 @@ export function createBroker({
     return queueStore.all().filter((row) => ownsQueuedRow(row, holder));
   }
 
-  function outcomeOwner() {
-    const holder = currentQueueOwner();
-    if (!holder) return '*';
-    return JSON.stringify(['tenantId', ...OWNER_FIELDS].map((key) => (known(holder[key]) ? String(holder[key]) : null)));
+  // Whose held answers and outcomes these are: the queue owner, else the authenticated tenant; null keeps and serves nothing.
+  function recordOwner(tenantId) {
+    if (typeof queueOwner === 'function') {
+      const holder = currentQueueOwner();
+      if (!holder || !known(holder.tenantId)) return null;
+      return JSON.stringify(['tenantId', ...OWNER_FIELDS].map((key) => (known(holder[key]) ? String(holder[key]) : null)));
+    }
+    if (!known(tenantId)) return null;
+    let tenantKey;
+    try { tenantKey = tenantStateKey(tenantId); } catch (_) { return null; }
+    return known(tenantKey) ? JSON.stringify(['tenant', String(tenantKey)]) : null;
   }
 
   function refusalOf(error) {
@@ -1565,21 +1613,29 @@ export function createBroker({
     };
   }
 
-  function noteOutcome(activityDef, envelope, idempotencyKey, state, { rpcId, refusal } = {}) {
-    if (activityDef?.idempotency !== 'client_key' || !idempotencyKey) return;
+  // Taken when a write is admitted, so its outcome lands with the account that sent it, and never after a purge.
+  function outcomeScopeFor(tenantId) {
+    return { owner: recordOwner(tenantId), generation: outcomeGeneration };
+  }
+
+  const outcomeScopeLive = (scope) => !!scope?.owner && !retired && scope.generation === outcomeGeneration;
+
+  function noteOutcome(activityDef, envelope, idempotencyKey, state, { rpcId, refusal } = {}, scope = null) {
+    if (activityDef?.idempotency !== 'client_key' || !idempotencyKey || !outcomeScopeLive(scope)) return;
     const settled = state === 'succeeded' || state === 'refused';
     const open = state === 'queued' || state === 'unconfirmed';
     const request = open && confirmEligible(activityDef) ? {
       sourceMpId: envelope.sourceMpId, activity: envelope.activity, args: envelope.args ?? {}, idempotencyKey,
     } : undefined;
     try {
-      outcomes.record(outcomeOwner(), envelope.activity, idempotencyKey, { state, rpcId: settled ? rpcId ?? null : null, refusal, request });
+      outcomes.record(scope.owner, envelope.activity, idempotencyKey, { state, rpcId: settled ? rpcId ?? null : null, refusal, request });
     } catch (_) { /* a record that cannot be kept never fails the write */ }
   }
 
-  function noteReplayedSuccess(activityDef, envelope, idempotencyKey) {
-    const before = idempotencyKey ? outcomes.get(outcomeOwner(), envelope.activity, idempotencyKey) : null;
-    if (before && (before.state === 'queued' || before.state === 'unconfirmed')) noteOutcome(activityDef, envelope, idempotencyKey, 'succeeded');
+  function noteReplayedSuccess(activityDef, envelope, idempotencyKey, scope) {
+    if (!outcomeScopeLive(scope)) return;
+    const before = idempotencyKey ? outcomes.get(scope.owner, envelope.activity, idempotencyKey) : null;
+    if (before && (before.state === 'queued' || before.state === 'unconfirmed')) noteOutcome(activityDef, envelope, idempotencyKey, 'succeeded', {}, scope);
   }
 
   function ownActivity(sourceMpId, activity) {
@@ -1953,10 +2009,12 @@ export function createBroker({
         });
     },
 
-    writeOutcome(sourceMpId, activity, idempotencyKey) {
+    writeOutcome(sourceMpId, activity, idempotencyKey, { tenantId } = {}) {
       const own = ownActivity(sourceMpId, activity);
       if (!own || typeof idempotencyKey !== 'string' || !idempotencyKey) return null;
-      const record = outcomes.get(outcomeOwner(), own.qualified, idempotencyKey);
+      const owner = recordOwner(tenantId);
+      if (!owner) return null;
+      const record = outcomes.get(owner, own.qualified, idempotencyKey);
       if (!record) return null;
       return {
         state: record.state,
@@ -1968,26 +2026,27 @@ export function createBroker({
       };
     },
 
-    async markOutcomeEmitted(sourceMpId, activity, idempotencyKey) {
+    async markOutcomeEmitted(sourceMpId, activity, idempotencyKey, { tenantId } = {}) {
       const own = ownActivity(sourceMpId, activity);
       if (!own) throw err('WriteNotFound', `'${activity}' is not an activity of mp '${sourceMpId}'`, { retryable: false });
       await outcomes.ready();
-      const owner = outcomeOwner();
+      const owner = recordOwner(tenantId);
+      if (!owner) return false;
       const record = outcomes.get(owner, own.qualified, idempotencyKey);
       if (!record || record.state !== 'succeeded') return false;
       if (record.emitted !== true) outcomes.patch(owner, own.qualified, idempotencyKey, { emitted: true });
       return true;
     },
 
-    async confirmWriteOutcome(sourceMpId, activity, idempotencyKey) {
+    async confirmWriteOutcome(sourceMpId, activity, idempotencyKey, { tenantId } = {}) {
       const own = ownActivity(sourceMpId, activity);
       if (!own) throw err('WriteNotFound', `'${activity}' is not an activity of mp '${sourceMpId}'`, { retryable: false });
       if (!confirmEligible(own.activityDef)) {
         throw notConfirmable('not_eligible', `'${own.qualified}' cannot be confirmed: only a client_key, offline-replayable write with no secret input can`);
       }
       await outcomes.ready();
-      const owner = outcomeOwner();
-      const record = outcomes.get(owner, own.qualified, idempotencyKey);
+      const owner = recordOwner(tenantId);
+      const record = owner ? outcomes.get(owner, own.qualified, idempotencyKey) : null;
       if (!confirmOpen(record) || !record.request) {
         throw notConfirmable('no_request', `no waiting or unconfirmed request of '${own.qualified}' is recorded for this key`);
       }
@@ -2025,7 +2084,10 @@ export function createBroker({
       return { state: 'unconfirmed', error: { code: null, status: null, message: `'${own.qualified}' answered ${answer?.status || 'nothing'}` } };
     },
 
-    purgeOutcomes() { outcomes.clear(); },
+    purgeOutcomes() {
+      outcomeGeneration += 1;
+      outcomes.clear();
+    },
 
     purgeConditionAnswers,
     markConditionAnswersStale,

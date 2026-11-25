@@ -5,6 +5,7 @@ import { TommyError } from '@tommy/sdk';
 import { createBroker, createFakeIssuer, createOutcomeLedger } from '../src/index.js';
 
 const TENANT = 'team-1';
+const OWNER = JSON.stringify([TENANT, null, null, null]);
 const fixture = (name) => JSON.parse(readFileSync(fileURLToPath(new URL(`./fixtures/hds-contract/${name}.json`, import.meta.url)), 'utf8'));
 
 const recordAttendance = {
@@ -40,7 +41,7 @@ function deviceStore(seed = []) {
 
 function seedRecord(activity, key, fields) {
   const ledger = createOutcomeLedger({ now: () => fields.at });
-  const made = ledger.record('*', activity, key, { state: fields.state, rpcId: fields.rpcId ?? null, request: fields.request });
+  const made = ledger.record(OWNER, activity, key, { state: fields.state, rpcId: fields.rpcId ?? null, request: fields.request });
   return { ...made, emitted: fields.emitted === true, confirmSent: fields.confirmSent === true };
 }
 
@@ -54,6 +55,7 @@ async function page({ store, now, online = true, serverInvoke = vi.fn(async () =
     online,
     now: () => clock.now,
     outcomeStore: store,
+    queueOwner: () => ({ tenantId: TENANT }),
     sleep: async () => {},
     replayEnvelope: async (envelope) => ({ ...envelope, ...identities[envelope.sourceMpId] }),
   });

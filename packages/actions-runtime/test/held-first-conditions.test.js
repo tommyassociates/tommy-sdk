@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createBroker, createFakeIssuer, createConditionAnswers, classifyReadOutcome, READ_OUTCOME_CODES } from '../src/index.js';
+import { conditionSignature } from '../src/condition-answers.js';
 
 const TENANT = 'team-1';
 const fixture = (name) => JSON.parse(readFileSync(fileURLToPath(new URL(`./fixtures/hds-contract/${name}.json`, import.meta.url)), 'utf8'));
@@ -59,10 +60,14 @@ async function world({
   return { broker, ask, notices, clock, timers, runTimers, report, fingerprint };
 }
 
+// Kept for the tenant of the asking token, by version 1.0.0 of the default condition shape.
+const OWNER = JSON.stringify(['tenant', TENANT]);
 function heldEntry({ fingerprint, condition, args, answer, at }) {
   const answers = createConditionAnswers();
-  const id = answers.idFor('*', fingerprint, condition, JSON.stringify(args, Object.keys(args).sort()));
-  return { id, owner: '*', fingerprint, condition, answer, at, seq: 0, stale: false };
+  const id = answers.idFor(OWNER, fingerprint, condition, JSON.stringify(args, Object.keys(args).sort()));
+  return {
+    id, owner: OWNER, fingerprint, condition, sig: conditionSignature('1.0.0', conditionDef()), answer, at, seq: 0, stale: false,
+  };
 }
 
 const refused = () => Object.assign(new Error('Permission denied'), { code: 'PermissionDenied', status: 403 });
