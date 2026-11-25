@@ -23,6 +23,8 @@ const err = (code, message, extra = {}) => new TommyError({ code, message, ...ex
 
 export const SCOPED_INVOKE_HOST_API = 17;
 const PARENT_RUN = Symbol('parentRun');
+// A confirm's dispatch: told when its request is sent, and given one attempt.
+const CONFIRM_SEND = Symbol('confirmSend');
 
 const dayKey = (ts) => new Date(ts).toISOString().slice(0, 10);
 
@@ -1099,6 +1101,7 @@ export function createBroker({
     const handler = ownerEntry.handlers?.activities?.[activityName];
     if (activityDef.sideEffect === 'server_write') {
       if (!serverInvoke) throw err('ActivityFailed', `server_write activity '${envelope.activity}' has no server executor wired`, { retryable: true });
+      if (envelope[CONFIRM_SEND]) envelope[CONFIRM_SEND].started = true;
       return serverInvoke({
         rpcId: record.runId,
         kind: 'invoke',
@@ -1118,6 +1121,7 @@ export function createBroker({
       });
     }
     if (!handler) throw err('UnknownActivity', `activity '${envelope.activity}' has no registered handler`, { retryable: false });
+    if (envelope[CONFIRM_SEND]) envelope[CONFIRM_SEND].started = true;
     const parent = {
       ownerMpId,
       keys: new Set(envelope[PARENT_RUN]?.keys || []),
@@ -1410,7 +1414,7 @@ export function createBroker({
   async function attemptAdmittedInvoke({
     envelope, identity, tenantId, ownerMpId, ownerEntry, activityName, activityDef, idempotencyKey, processedKey, record, heldSeq, outcomeScope,
   }) {
-    const retry = { ...DEFAULT_RETRY, ...(activityDef.retry || {}) };
+    const retry = { ...DEFAULT_RETRY, ...(activityDef.retry || {}), ...(envelope[CONFIRM_SEND] ? { maxAttempts: 1 } : {}) };
     let attempt = 0;
     let lastError;
     while (attempt < Math.max(1, retry.maxAttempts)) {
@@ -1651,6 +1655,35 @@ export function createBroker({
   const notConfirmable = (reason, message) => Object.assign(
     err('WriteNotConfirmable', message, { retryable: false }), { details: { reason } },
   );
+
+  // A discarded write is never sent, so nothing may confirm it or report it as waiting.
+  function forgetDiscardedOutcome(row, owner) {
+    const key = row.envelope?.idempotencyKey;
+    if (!owner || typeof key !== 'string' || !key) return;
+    try {
+      if (confirmOpen(outcomes.get(owner, row.envelope.activity, key))) outcomes.remove(owner, row.envelope.activity, key);
+    } catch (_) { /* the record ages out */ }
+  }
+
+  // A confirm answered from the idempotency ledger ran nothing new; its own run record names it.
+  async function confirmRunId(own, request, restored) {
+    const [targetMpId] = splitQualified(own.qualified);
+    const run = await records.open({
+      kind: 'invoke',
+      activityName: own.qualified,
+      sourceMpId: request.sourceMpId,
+      targetMpId,
+      tenantId: restored?.identity?.tenantId ?? restored?.tenantId,
+      args: request.args,
+      idempotencyKey: request.idempotencyKey,
+      rootRunId: undefined,
+      depth: 0,
+      chainPath: [],
+      online: isOnline,
+    });
+    await records.update(run.runId, { status: 'succeeded', note: 'confirmed by an idempotent replay' });
+    return run.runId;
+  }
 
   async function enqueueOffline(sourceMpId, envelope, { held = false } = {}) {
     const bytes = utf16Units(JSON.stringify(envelope.args || envelope.payload || {}));
@@ -2057,18 +2090,23 @@ export function createBroker({
       outcomes.patch(owner, own.qualified, idempotencyKey, { confirmSent: true });
       const release = () => outcomes.patch(owner, own.qualified, idempotencyKey, { confirmSent: false });
       const request = JSON.parse(JSON.stringify(record.request));
+      const send = { started: false };
+      let restored;
       let answer;
       try {
-        const restored = await replayEnvelope(request);
+        restored = await replayEnvelope(request);
         answer = await dispatchInvoke({
           ...restored, args: request.args, activity: request.activity, sourceMpId,
           rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: undefined, idempotencyKey: request.idempotencyKey,
+          [CONFIRM_SEND]: send,
         });
       } catch (error) {
         if (neverReachedServer(error) || error?.code === 'Offline') {
           release();
           return offline(String(error?.message || 'the request did not leave the device'));
         }
+        // Nothing reached the network, so the one confirm is still to come.
+        if (!send.started) release();
         if (refusedForGood(error)) return { state: 'refused', refusal: refusalOf(error) };
         return { state: 'unconfirmed', error: refusalOf(error) };
       }
@@ -2077,8 +2115,9 @@ export function createBroker({
         return offline(`'${own.qualified}' did not leave the device; it waits in the queue`);
       }
       if (answer?.status === 'succeeded') {
+        const rpcId = answer.rpcId ?? record.rpcId ?? await confirmRunId(own, request, restored);
         return {
-          state: 'succeeded', result: answer.result, replayed: answer.idempotentReplay === true || answer.replayed === true, rpcId: answer.rpcId ?? record.rpcId ?? null,
+          state: 'succeeded', result: answer.result, replayed: answer.idempotentReplay === true || answer.replayed === true, rpcId,
         };
       }
       return { state: 'unconfirmed', error: { code: null, status: null, message: `'${own.qualified}' answered ${answer?.status || 'nothing'}` } };
@@ -2101,7 +2140,11 @@ export function createBroker({
         if (typeof id !== 'string' || !id || retired) return false;
         const row = ownQueuedRows().find((queued) => queued.id === id && queued.sourceMpId === sourceMpId);
         if (!row || !row.envelope?.activity || typeof row.subject === 'string' || queueStore.isHeld?.(row) || drainingRows.has(row.id)) return false;
-        return (await queueStore.remove(row.seq)) === true;
+        const owner = recordOwner(row.envelope?.identity?.tenantId ?? row.owner?.tenantId);
+        await outcomes.ready();
+        const removed = (await queueStore.remove(row.seq)) === true;
+        if (removed) forgetDiscardedOutcome(row, owner);
+        return removed;
       } catch (_) { return false; }
     },
 
