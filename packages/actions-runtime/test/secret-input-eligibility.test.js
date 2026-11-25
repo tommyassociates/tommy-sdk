@@ -27,6 +27,9 @@ const SCHEMAS = {
   'a PIN under additionalProperties': { type: 'object', additionalProperties: { type: 'object', properties: { pin: { type: 'string' } } } },
   'a token under patternProperties': { type: 'object', patternProperties: { '^x-': { type: 'object', properties: { token: { type: 'string' } } } } },
   'a secret in prefixItems': { type: 'array', prefixItems: [{ type: 'object', properties: { secret: { type: 'string' } } }] },
+  'a writeOnly field under a draft-07 schema dependency': {
+    type: 'object', properties: { note: { type: 'string' } }, dependencies: { note: { properties: { credential: { type: 'string', writeOnly: true } } } },
+  },
 };
 
 async function brokerWith(inputSchema) {

@@ -48,7 +48,7 @@ const SCHEMA_DEPTH_MAX = 8;
 const SUBSCHEMA_KEYS = ['items', 'additionalProperties', 'additionalItems', 'contains', 'not', 'if', 'then', 'else',
   'propertyNames', 'unevaluatedProperties', 'unevaluatedItems'];
 const SUBSCHEMA_LIST_KEYS = ['allOf', 'anyOf', 'oneOf', 'prefixItems'];
-const SUBSCHEMA_MAP_KEYS = ['patternProperties', 'dependentSchemas'];
+const SUBSCHEMA_MAP_KEYS = ['patternProperties', 'dependentSchemas', 'dependencies'];
 
 function localRef(root, ref) {
   if (typeof ref !== 'string' || !ref.startsWith('#')) return undefined;
@@ -73,7 +73,10 @@ function hasSecretInput(schema, depth = 0, root = schema, seen = new Set()) {
     if (hasSecretInput(property, depth + 1, root, seen)) return true;
   }
   for (const key of SUBSCHEMA_MAP_KEYS) {
-    if (Object.values(schema[key] || {}).some((part) => hasSecretInput(part, depth + 1, root, seen))) return true;
+    // A draft-07 `dependencies` value is either a schema or a list of property names.
+    if (Object.values(schema[key] || {}).some((part) => (Array.isArray(part)
+      ? part.some((name) => SECRET_INPUT_NAMES.has(String(name).toLowerCase()))
+      : hasSecretInput(part, depth + 1, root, seen)))) return true;
   }
   for (const key of SUBSCHEMA_KEYS) {
     const part = schema[key];
