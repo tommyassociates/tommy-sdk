@@ -1,19 +1,3 @@
-/**
- * idempotency-invalidation.test.js — spec mp-declared-bounds-that-dont-bind
- * Phase 2 (B2).
- *
- * `derived_from_input` hashes the args, so the broker replays a recorded result
- * for identical args forever. That is right while the state the result describes
- * still holds, and wrong the moment a sibling activity clears it: lock records
- * `{locked: true}`, unlock runs under a DIFFERENT activity name and genuinely
- * clears the flags, and a re-lock with identical args then replayed the recorded
- * success with no read and no write — a succeeded run reporting a lock that did
- * not happen.
- *
- * The MP names the dependency because the broker cannot know which activities
- * are inverses, and a blanket "any write clears every key" rule would delete the
- * duplicate suppression the fan-out depends on.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer, createInvalidationEpochs } from '../src/index.js';
 
@@ -81,7 +65,7 @@ describe('declared idempotency invalidation', () => {
     const second = await w.call('lock_window');
 
     expect(second.idempotentReplay).toBe(true);
-    expect(w.calls.lock_window).toBe(1); // suppressed — this is the guarantee
+    expect(w.calls.lock_window).toBe(1);
   });
 
   it('re-executes a lock after an unlock cleared what the recorded result described', async () => {
@@ -90,8 +74,6 @@ describe('declared idempotency invalidation', () => {
     await w.call('unlock_window');
     const relock = await w.call('lock_window');
 
-    // THE DEFECT: this used to come back `{ok: true, seq: 1, idempotentReplay: true}`
-    // — a lock that never ran, reported as a success.
     expect(relock.idempotentReplay).toBeUndefined();
     expect(w.calls.lock_window).toBe(2);
   });
@@ -102,8 +84,6 @@ describe('declared idempotency invalidation', () => {
     await w.call('unlock_window');
     const repeat = await w.call('unrelated_write');
 
-    // Invalidation is NAMED, not "any write clears everything" — the blanket
-    // rule would delete the duplicate suppression the fan-out depends on.
     expect(repeat.idempotentReplay).toBe(true);
     expect(w.calls.unrelated_write).toBe(1);
   });
@@ -114,7 +94,6 @@ describe('declared idempotency invalidation', () => {
 
     await w.call('lock_window');
     await w.call('lock_window', { shiftId: 's-1' }, otherToken, 'i-2');
-    // Clear tenant-9's lock record; tenant-42's must survive.
     await w.call('unlock_window');
 
     const otherRepeat = await w.call('lock_window', { shiftId: 's-1' }, otherToken, 'i-2');
@@ -122,19 +101,7 @@ describe('declared idempotency invalidation', () => {
   });
 });
 
-/**
- * PHASE 1 (mp-bounds-the-scanner-cannot-see) — the invalidation reaches the
- * SERVER's ledger too, not only the client's memory.
- *
- * `invalidatesIdempotency` cleared `processedKeys` and `appliedKeysOverflow` and
- * was documented as though that were the whole story. It is not: the server
- * keeps its own ledger of succeeded invocations, looked up by (team, activity,
- * idempotency_key) and replayed verbatim (invoke_executor.rb find_succeeded).
- * So the runtime cleared one ledger and claimed both, and a repeat invoke after
- * an invalidation still got the stale result back over the wire.
- */
 describe('the invalidation epoch reaches the server ledger', () => {
-  /** Same world, but recording the key the SERVER is asked about. */
   async function keyRecordingWorld() {
     const keys = [];
     const issuer = createFakeIssuer();
@@ -164,8 +131,6 @@ describe('the invalidation epoch reaches the server ledger', () => {
     await w.call('lock_window');
     const after = w.lastKeyFor('lock_window');
 
-    // Same activity, same args — but the key the SERVER is asked about differs,
-    // so find_succeeded misses and the write genuinely runs again.
     expect(after).not.toBe(first);
     expect(after.startsWith('e1.')).toBe(true);
   });
@@ -177,28 +142,16 @@ describe('the invalidation epoch reaches the server ledger', () => {
     await w.call('unlock_window');
     await w.call('unrelated_write', { x: 1 });
 
-    // The epoch is PER ACTIVITY. A shared epoch would churn every unrelated
-    // write's key on any invalidation, writing a new server row each time.
     expect(w.lastKeyFor('unrelated_write')).toBe(before);
   });
 
   it('is byte-identical to the old key until something invalidates', async () => {
     const w = await keyRecordingWorld();
     await w.call('lock_window', { shiftId: 's-9' });
-    // Epoch 0 carries no stamp, so an install that has never invalidated writes
-    // exactly the keys it always did — no new Mp::Invocation rows, no churn.
     expect(w.lastKeyFor('lock_window')).toBe(`d-${JSON.stringify({ shiftId: 's-9' })}`);
   });
 });
 
-/**
- * BSC-1 — the epoch must survive a reload, or it undoes itself.
- *
- * Held in a closure Map, the epoch worked until the shell reloaded: the counter
- * reset to 0, the next invoke re-presented the ORIGINAL derived key, and the
- * server replayed the stale result. That is the exact defect the epoch exists to
- * stop, one refresh away.
- */
 describe('the invalidation epoch survives a reload', () => {
   const fakeStorage = () => {
     const map = new Map();
@@ -230,12 +183,11 @@ describe('the invalidation epoch survives a reload', () => {
   }
 
   it('still stamps the key after the shell reloads', async () => {
-    const storage = fakeStorage();               // survives the "reload"
+    const storage = fakeStorage();
     const first = await brokerOver(storage);
     await first.call('lock_window');
-    await first.call('unlock_window');           // invalidates
+    await first.call('unlock_window');
 
-    // A SECOND broker over the same storage — a shell reload.
     const second = await brokerOver(storage);
     await second.call('lock_window');
 
@@ -243,9 +195,6 @@ describe('the invalidation epoch survives a reload', () => {
   });
 
   it('degrades to session-scoped rather than throwing without storage', async () => {
-    // A runtime with no Web Storage must still invalidate WITHIN the session —
-    // the first cut wrote the epoch nowhere and read back 0, which broke the
-    // in-session guarantee too.
     const w = await brokerOver(null);
     await w.call('lock_window');
     await w.call('unlock_window');
@@ -254,15 +203,6 @@ describe('the invalidation epoch survives a reload', () => {
   });
 });
 
-/**
- * BSC-R2-3 — storage that EXISTS but cannot be written to.
- *
- * The in-memory fallback was reachable only when Web Storage was absent. On a
- * device where it exists and the write fails — quota full, private-mode quirk —
- * `save` kept the epoch in memory and `load` ignored it, reading the stale disk
- * value back. The invalidation was lost in-session on exactly the devices under
- * storage pressure.
- */
 describe('the epoch survives storage that will not accept writes', () => {
   it('keeps invalidating in-session when setItem throws', async () => {
     const map = new Map();
@@ -274,8 +214,6 @@ describe('the epoch survives storage that will not accept writes', () => {
     const epochs = createInvalidationEpochs({ storage: readOnly });
     expect(epochs.get('team-9:availability.lock_window')).toBe(0);
     epochs.bump('team-9:availability.lock_window');
-    // Nothing reached disk — but the invalidation must still hold for this
-    // session, which is what the fallback is FOR.
     expect(epochs.get('team-9:availability.lock_window')).toBe(1);
   });
 });

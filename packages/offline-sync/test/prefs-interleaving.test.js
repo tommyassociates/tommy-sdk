@@ -1,10 +1,4 @@
 // @vitest-environment node
-/**
- * `tommy.prefs` against storage whose every read and write lands when the test
- * lets it, in any order: loads, sets, removals, refusals and reloads
- * overlapping each other. `get()` answers the last value the device saved, or
- * the value of a change still on its way; a reload answers what storage holds.
- */
 import { describe, it, expect } from 'vitest';
 import { createDataManager } from '../src/index.js';
 
@@ -22,12 +16,6 @@ function prng(seed) {
   };
 }
 
-/**
- * The device's storage for the prefs store. Every call waits in `queue` until
- * `release` runs it: reads answer what storage holds then, writes land or are
- * refused then. A whole read asked after the test called the prefs API, before
- * it released anything, is a load, and only a load may fail.
- */
 function heldStorage() {
   const durable = new Map();
   const queue = [];
@@ -83,7 +71,6 @@ describe('tommy.prefs under overlapping loads and writes', () => {
     await flush();
     const refused = storage.api(() => data.prefs.set('layout', 'list')).catch((error) => error);
     await flush();
-    // The set's row read and write land first, and the device refuses the write.
     while (storage.queue.some((op) => !op.load)) {
       storage.release(storage.queue.findIndex((op) => !op.load), false);
       // eslint-disable-next-line no-await-in-loop
@@ -104,9 +91,7 @@ describe('tommy.prefs under overlapping loads and writes', () => {
       const storage = heldStorage();
       let instance = 0;
       let data = open(storage, `team-${seed}`);
-      // Per key, the changes asked of this instance and not settled yet, in order.
       let pending = new Map(KEYS.map((key) => [key, []]));
-      // Keys whose stored value this instance knows: all, once a load answered.
       let known = new Set();
       let loaded = false;
       const settled = new Set();
@@ -160,7 +145,6 @@ describe('tommy.prefs under overlapping loads and writes', () => {
         } else {
           await drain();
           await data.dispose();
-          // A reload answers exactly what storage holds.
           const reloaded = open(storage, `team-${seed}`);
           storage.api(() => reloaded.prefs.ready());
           await flush();
@@ -171,7 +155,6 @@ describe('tommy.prefs under overlapping loads and writes', () => {
           }
           for (const key of KEYS) expect(reloaded.prefs.get(key, FALLBACK)).toBe(stored(storage, key));
           await reloaded.dispose();
-          // The next instance starts with nothing loaded: its first load overlaps what comes next.
           instance += 1;
           data = open(storage, `team-${seed}`);
           pending = new Map(KEYS.map((key) => [key, []]));

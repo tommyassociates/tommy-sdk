@@ -1,20 +1,3 @@
-// 01c FR-11 — `panels[].params`: the panel's DECLARED parameter vocabulary.
-//
-// Before this field the vocabulary lived nowhere: PanelInstance.params (the
-// `dashboards` team Setting) could bind any name to any source and the host's
-// per-panel settings UI had nothing to render from — it would have had to
-// execute MP code to learn what a panel needs, which the review pipeline
-// forbids. The declaration closes that: name + type + source is enough for
-// the UI to draw the right input (picker for 'id', toggle for 'boolean') and
-// for the FR-12 resolver to know the legal order — surface context, then the
-// admin's static value, then the declaration default, else needs-configuration.
-//
-// The field is OPTIONAL and purely additive: every manifest that validated
-// before this schema minor still validates (the last case pins that), so no
-// re-vendor of published MPs is forced. `source` constrains provenance, not
-// presence — 'context' params never show as editable in settings, which is
-// why the enum lives here and not in the host.
-
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -24,9 +7,8 @@ import { loadSchema } from '../src/schema.js';
 const BASE = readFileSync(fileURLToPath(new URL('./fixtures/valid-minimal.yml', import.meta.url)), 'utf8');
 const ANCHOR = '    size: { defaultW: 4, defaultH: 3 }\n';
 
-/** valid-minimal with a params block appended to its one panel. */
 function withParams(block) {
-  expect(BASE).toContain(ANCHOR); // the anchor must still exist in the fixture
+  expect(BASE).toContain(ANCHOR);
   return BASE.replace(ANCHOR, ANCHOR + block);
 }
 
@@ -82,8 +64,6 @@ describe('FR-11 — panels[].params declared vocabulary', () => {
   it('accepts the minimal spec — name + type; required/source defaults are informational (host-applied), never injected', () => {
     const yaml = withParams('    params:\n      - name: actor_id\n        type: id\n');
     expect(errorsOf(yaml)).toEqual([]);
-    // The validator must not mutate the document: absent stays absent, the
-    // host reads the schema defaults (required:false, source:'any') itself.
     expect(paramsOf(yaml)).toEqual([{ name: 'actor_id', type: 'id' }]);
   });
 
@@ -101,10 +81,10 @@ describe('FR-11 — panels[].params declared vocabulary', () => {
 
   it('REJECTS a param missing name or type, and values outside the enums', () => {
     const bad = [
-      '    params:\n      - type: string\n',                       // no name
-      '    params:\n      - name: client_id\n',                    // no type
-      '    params:\n      - name: client_id\n        type: uuid\n', // not a declared type
-      '    params:\n      - name: client_id\n        type: id\n        source: server\n', // not a declared source
+      '    params:\n      - type: string\n',
+      '    params:\n      - name: client_id\n',
+      '    params:\n      - name: client_id\n        type: uuid\n',
+      '    params:\n      - name: client_id\n        type: id\n        source: server\n',
     ];
     for (const block of bad) {
       expect(errorsOf(withParams(block)).length, JSON.stringify(block)).toBeGreaterThanOrEqual(1);

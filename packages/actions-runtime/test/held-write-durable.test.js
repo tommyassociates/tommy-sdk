@@ -1,18 +1,3 @@
-/**
- * HDF 6b — a replayable server write is kept on the device WHILE it is in
- * flight, not only once its request has failed.
- *
- * On a hung connection (requests never answer, the device still reports itself
- * online) the request neither succeeds nor fails, so a write that entered the
- * durable queue only on a network error was held in memory alone: closing the
- * app lost it. Now its row is in the durable queue before the request goes:
- *   - a restart replays it once, with its ORIGINAL idempotency key;
- *   - while it is still running in this page, a drain leaves it (and the rows
- *     its Mini Program queued after it) alone, so it is never sent twice at once;
- *   - an answered write (applied, or refused) takes its row out again;
- *   - a write whose request never reached the server keeps its row, which the
- *     next drain sends once.
- */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createBroker, createFakeIssuer, createDurableQueue } from '../src/index.js';
 
@@ -41,7 +26,6 @@ const activity = (extra = {}) => ({
 const networkDown = () => Object.assign(new Error('Network request failed'), { name: 'MpApiError', status: 0 });
 const refused = () => Object.assign(new Error('invalid'), { name: 'MpApiError', status: 422 });
 
-/** A request that answers only when the test says so. */
 function hungServer() {
   const calls = [];
   const serverInvoke = (envelope) => new Promise((resolve, reject) => {
@@ -54,12 +38,10 @@ const settle = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 
 let storage;
 
-// A test clock for the queued-resend spacing (F8): `later()` moves past any wait.
 const clock = { t: 1000000 };
 const later = () => { clock.t += 10 * 60 * 1000; };
 const timing = { now: () => clock.t, setTimer: () => null, clearTimer: () => {} };
 
-/** One page: a broker over the device's storage, with this page's own held set. */
 async function page(serverInvoke, { activities = { punch: activity() }, held = new Set(), online = true } = {}) {
   const issuer = createFakeIssuer();
   const queue = createDurableQueue({ storage, held });
@@ -91,7 +73,6 @@ describe('a replayable write in flight is kept on the device', () => {
     expect(storedRows()).toHaveLength(1);
     expect(storedRows()[0].envelope.idempotencyKey).toBe('k-1');
 
-    // The app is closed mid-hang: a new page over the same storage.
     const sent = [];
     const after = await page(async (envelope) => {
       sent.push(envelope);
@@ -148,7 +129,6 @@ describe('a replayable write in flight is kept on the device', () => {
     const w = await page(hung.serverInvoke, { held });
     w.invoke('punch', { at: 'in' }, { idempotencyKey: 'k-in' }).catch(() => {});
     await settle();
-    // A clock-out queued by another page's broker, after the clock-in.
     const offline = await page(async () => ({ status: 'succeeded', result: {} }), { held, online: false });
     await offline.invoke('punch', { at: 'out' }, { idempotencyKey: 'k-out' });
     expect(storedRows().map((row) => row.envelope.args.at)).toEqual(['in', 'out']);

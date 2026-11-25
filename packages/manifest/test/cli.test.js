@@ -1,6 +1,3 @@
-// CLI contract — exit codes (0 ok · 1 checkable failure · 2 usage/IO) and the
-// typegen subcommand emitting typed contracts for the MP's own primitives.
-
 import { describe, it, expect } from 'vitest';
 import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -56,12 +53,11 @@ describe('cli exit codes', () => {
     const code = await runCli(['manifest', 'validate', dir, '--json'], c.io);
     expect(code).toBe(2);
     expect(JSON.parse(c.out[0]).errors[0].rule).toBe('io-error');
-    expect(c.err).toEqual([]); // no stack trace on stderr
+    expect(c.err).toEqual([]);
   });
 
   it('a value flag that swallows a following flag → 2', async () => {
     const c = capture();
-    // `-o --json`: --json must not be consumed as the output dir.
     expect(await runCli(['manifest', 'typegen', REF, '-o', '--json'], c.io)).toBe(2);
   });
 

@@ -1,9 +1,3 @@
-/**
- * A write queued offline is only reported as queued once the device holds it.
- * A row the device's storage could not take (its quota is spent, e.g. by the
- * photos of a form) is refused as Offline_QueueFull, so the MP keeps its draft
- * and says so, instead of a queued write that is gone at the next reload.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer, createDurableQueue } from '../src/index.js';
 
@@ -56,7 +50,6 @@ describe('offline queue: only what the device holds is queued', () => {
       .rejects.toMatchObject({ code: 'Offline_QueueFull' });
     expect(queue.all()).toHaveLength(1);
     expect(JSON.parse(storage.data.get('mp-offline-queue')).rows).toHaveLength(1);
-    // The next small write is still taken.
     await expect(submit({ schemaName: 'incident', fields: { b: 2 } }, 'k3')).resolves.toMatchObject({ status: 'queued_offline' });
     expect(JSON.parse(storage.data.get('mp-offline-queue')).rows).toHaveLength(2);
   });

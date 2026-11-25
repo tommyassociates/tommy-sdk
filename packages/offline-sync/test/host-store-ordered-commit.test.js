@@ -1,17 +1,8 @@
 // @vitest-environment node
-/**
- * A commit on a database that runs a transaction's requests in the order they
- * were asked (IndexedDB) asks its row writes together instead of waiting on
- * each: a large team's page of 600 shifts was thousands of round trips in a
- * row. A database that does not say so (SQLite) still has each request
- * waited for before the next is asked.
- */
 import { describe, it, expect } from 'vitest';
 import { createHostStorePort } from '../src/host-store/index.js';
 import { createMemoryIndexedDb, identity } from './helpers/host-databases.js';
 
-// Each request answers on its own later macrotask; `turns` counts how many
-// the commit waited through, `peak` the most requests outstanding at once.
 function counted({ ordered }) {
   const stats = { turns: 0, outstanding: 0, peak: 0 };
   const turn = (value) => {
@@ -40,7 +31,6 @@ async function writeTwice(database, stats) {
     handle: opened.handle, expectedEpoch: opened.epoch, expectedStoreRevision: revision,
     changes: values.map((value) => ({ op: 'put', key: String(value.id), value })),
   });
-  // A commit holds at most 100 changes (MAX_ROWS), as the data layer sends them.
   let revision = opened.storeRevision;
   const all = rows(300);
   let first;
@@ -71,8 +61,6 @@ describe('host store commit on an ordered database', () => {
     const { first, second, commitPeak } = await writeTwice(database, stats);
     expect(first.ok).toBe(true);
     expect(second.ok).toBe(true);
-    // Rewriting 100 rows (meta read, index deletes and puts, meta, body)
-    // once asked one request at a time.
     expect(commitPeak).toBeGreaterThan(100);
   });
 

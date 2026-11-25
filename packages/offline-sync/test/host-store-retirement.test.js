@@ -1,8 +1,3 @@
-/**
- * A retirement's selector: the viewer at an origin (all of it), one
- * session's chat fragments, or one subject's namespace, never both of the
- * last two; anything else is refused.
- */
 import { describe, it, expect } from 'vitest';
 import { retirementMatcher, HOST_STORE_FEATURES } from '../src/host-store/protocol.js';
 

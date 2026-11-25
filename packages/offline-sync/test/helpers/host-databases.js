@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createSqliteDatabase } from '../../src/host-store/index.js';
 
-// IndexedDB key order: numbers < strings < arrays; arrays compare element-wise.
 function compare(a, b) {
   const type = (value) => (Array.isArray(value) ? 3 : typeof value === 'string' ? 2 : 1);
   if (type(a) !== type(b)) return type(a) - type(b);
@@ -19,11 +18,6 @@ function compare(a, b) {
 }
 const copy = (value) => (value === undefined ? undefined : JSON.parse(JSON.stringify(value)));
 
-/**
- * The host-store transaction API with IndexedDB semantics (array keys, key
- * ranges bounded by `[...prefix, []]`, all-or-nothing transactions), for
- * exercising the port as the web adapter drives it.
- */
 export function createMemoryIndexedDb({ turn = null } = {}) {
   let tables = { owners: new Map(), stores: new Map(), rows: new Map() };
   let tail = Promise.resolve();
@@ -34,8 +28,6 @@ export function createMemoryIndexedDb({ turn = null } = {}) {
     const lowerOk = after === null ? compare(key, lower) >= 0 : compare(key, lower) > 0;
     return lowerOk && compare(key, [...prefix, []]) < 0;
   };
-  // With `turn`, each request answers on a later turn of the event loop, as
-  // a browser's does; its effect still lands in the order it was asked.
   const answer = (value) => (turn ? turn(value) : value);
   const api = {
     get: async (table, key) => answer(copy(tables[table].get(encode(key)))),
@@ -66,7 +58,6 @@ export function createMemoryIndexedDb({ turn = null } = {}) {
   };
 }
 
-/** The host-store SQLite engine on node:sqlite (WAL needs a file), as the desktop and native adapters drive it. */
 export function createNodeSqliteDatabase() {
   const directory = mkdtempSync(join(tmpdir(), 'host-store-'));
   const connection = new DatabaseSync(join(directory, 'store.sqlite'));
@@ -85,7 +76,6 @@ export function identity({ viewerId = '7', accountType = 'User', accountId = '7'
   return { version: 2, authorityOrigin: origin, viewerId, accountType, accountId, tenantId, mpId, subjectKey: null };
 }
 
-/** A fake BroadcastChannel bus: every channel on the bus sees the others' posts. */
 export function createChannelBus() {
   const members = new Set();
   return class FakeBroadcastChannel {

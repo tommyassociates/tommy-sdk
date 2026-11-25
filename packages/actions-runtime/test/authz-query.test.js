@@ -1,18 +1,3 @@
-/**
- * authz-query.test.js (F2) — cross-MP condition reads need a read grant.
- *
- * Gap register Class F/F2: `dispatchQuery` had no `authorizeInvoke` equivalent,
- * so any MP could read `time-clock.kiosk_pin`, `clients.client`, etc.
- *
- * Council C1 resolved the grant vocabulary to Option B — DERIVED scopes:
- *   - the owner's catalogue DOMAIN scope (`read:attendance` for time-clock,
- *     `read:shifts` for scheduling) grants that owner's conditions;
- *   - the explicit per-primitive `read:{owner}.{condition}` still works
- *     (a strict superset, mirroring `invoke:{owner}.{activity}`);
- *   - SENSITIVE_CONDITIONS are excluded from derivation — the domain scope
- *     does NOT grant them, only the explicit per-primitive scope does.
- * Gated on `enforceConditionScopes` (default OFF).
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer, SENSITIVE_CONDITIONS, DOMAIN_SCOPE_BY_MP, domainScopeForMp } from '../src/index.js';
 
@@ -22,8 +7,6 @@ const condition = () => ({
   description: 'c', inputSchema: { type: 'object' }, returnSchema: { type: 'string' }, latencyBudgetMs: 100,
 });
 
-// time-clock's catalogue domain is `attendance`, NOT its own id — the case the
-// derivation map exists for.
 const owner = {
   id: 'time-clock',
   version: '1.0.0',
@@ -78,7 +61,7 @@ describe('dispatchQuery — condition read scopes (F2)', () => {
     const rejection = await w.query('time-clock.attendance_history').catch((e) => e);
     expect(rejection.code).toBe('PermissionDenied');
     expect(rejection.message).toContain("'read:time-clock.attendance_history'");
-    expect(rejection.message).toContain("'read:attendance'"); // names the derived route too
+    expect(rejection.message).toContain("'read:attendance'");
     expect(rejection.rule).toBe('permissions');
     expect(rejection.retryable).toBe(false);
   });
@@ -131,7 +114,6 @@ describe('SENSITIVE_CONDITIONS — derivation does not reach them (C1 part 2)', 
     expect(rejection.code).toBe('PermissionDenied');
     expect(rejection.message).toContain('is sensitive');
     expect(rejection.message).toContain("'read:time-clock.kiosk_pin'");
-    // ...while the same scope still grants the non-sensitive sibling.
     expect(await w.query('time-clock.attendance_history')).toBe('hours');
   });
 
@@ -155,9 +137,9 @@ describe('SENSITIVE_CONDITIONS — derivation does not reach them (C1 part 2)', 
       scopes: ['read:attendance'],
       sensitiveConditions: new Set(['time-clock.attendance_history']),
     });
-    expect(await w.query('time-clock.kiosk_pin')).toBe('1234');   // no longer sensitive
+    expect(await w.query('time-clock.kiosk_pin')).toBe('1234');
     const rejection = await w.query('time-clock.attendance_history').catch((e) => e);
-    expect(rejection.code).toBe('PermissionDenied');              // now sensitive
+    expect(rejection.code).toBe('PermissionDenied');
   });
 });
 

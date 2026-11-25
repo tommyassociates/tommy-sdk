@@ -1,5 +1,3 @@
-// Route contribution shape — the master-detail + :param additions
-// (mp-canonical-routes-addon-relocation, Phase 1).
 import { describe, it, expect } from 'vitest';
 import { validateManifest } from '../src/index.js';
 

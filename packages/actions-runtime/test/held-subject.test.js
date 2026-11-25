@@ -1,14 +1,3 @@
-/**
- * An activity that declares `holdUnsettled` has its write kept in the host
- * queue from before its request goes until an answer settles it: one row per
- * Mini Program, activity and subject (the values of its key fields), claimed
- * atomically. A final answer (applied, or a coded refusal it does not hold
- * for) removes the row. An unknown outcome (no answer, a timeout, a 5xx, an
- * uncoded refusal, a hold or keep code) keeps it, marked with why and when,
- * and no drain sends it again. A check again is a dispatch under the row's
- * own key. Rows carry the account captured when they were claimed, and only
- * that account reads or checks them.
- */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createBroker, createFakeIssuer, createDurableQueue, createHostStoreQueue } from '../src/index.js';
 
@@ -114,7 +103,6 @@ describe('a held write in the host queue', () => {
     const p = await page(async (envelope) => { sent.push(envelope); if (next) throw next; return { status: 'succeeded', result: { sendId: '1' } }; });
     await p.invoke(body(), 'k-1').catch(() => {});
     expect(p.held().reason).toBe('unconfirmed');
-    // Another key for the same subject is refused while the row is held.
     await expect(p.invoke(body(), 'k-2')).rejects.toMatchObject({ code: 'WriteHeld' });
     next = answer(409, 'SEND_IN_PROGRESS');
     await p.invoke(p.held().input, p.held().key).catch(() => {});
@@ -175,13 +163,11 @@ describe('a held write in the host queue', () => {
     queue.remove = async (seq) => { if (failRemove) { failRemove = false; throw new Error('storage busy'); } return realRemove(seq); };
     const { invoke, held } = await page(async () => ({ status: 'succeeded', result: { sendId: '1' } }), { queue });
     await invoke(body(), 'k-1');
-    // Applied: not shown as held, though its row is still kept.
     expect(held()).toBe(null);
     expect(queue.all()).toHaveLength(1);
     const again = await invoke(body(), 'k-1');
     expect(again.idempotentReplay).toBe(true);
     expect(again.status).toBe('succeeded');
-    // A new send for that document is not refused as held, and the old row is gone.
     await expect(invoke(body(), 'k-2')).resolves.toMatchObject({ status: 'succeeded' });
     expect(queue.all()).toHaveLength(0);
   });

@@ -1,16 +1,7 @@
 // @vitest-environment node
-/**
- * A collection refresh may pass `stillWanted`, answering whether its asker
- * still waits. The queued scheduler job stays valid while any asker of the
- * read still wants it, and always when one asked without `stillWanted`; once
- * none does, the job is dropped before it runs and reads nothing. An
- * unbatched refresh method takes it the same way, per flight.
- */
 import { describe, it, expect, vi } from 'vitest';
 import { createDataService, createDataStore, createMemoryStoreBackend } from '../src/index.js';
 
-// A scheduler that holds jobs until `run()`; like the host's, a job whose
-// `valid()` is false when its turn comes is dropped without running.
 function heldScheduler() {
   const held = [];
   return {

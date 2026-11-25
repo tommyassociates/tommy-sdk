@@ -1,11 +1,4 @@
 // @vitest-environment node
-/**
- * A visible read that passed its deadline answers its caller with the
- * scheduler's REFRESH_TIMEOUT, named for its collection and carrying the
- * stack of where the caller asked: the scheduler's own error comes from its
- * timer and names no caller, so one left unhandled could not be traced.
- * Every other failure, and every other mode, answers as before.
- */
 import { describe, it, expect, vi } from 'vitest';
 import {
   createDataService, createDataStore, createMemoryStoreBackend,
@@ -13,8 +6,6 @@ import {
 import { timedOutFor } from '../src/data-service.js';
 
 const timeout = () => Object.assign(new Error('Refresh took too long'), { code: 'REFRESH_TIMEOUT', retryable: true });
-// A scheduler that answers every request with `answer()`, as the host's does
-// for a visible read past its deadline.
 const answering = (answer) => ({ request: () => Promise.reject(answer()), revalidate: vi.fn() });
 function service(scheduler) {
   const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });

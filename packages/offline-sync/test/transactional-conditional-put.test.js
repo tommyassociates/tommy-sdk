@@ -1,11 +1,4 @@
 // @vitest-environment node
-/**
- * A conditional put on a host-store collection (`when(previous)`) is judged
- * on the row read for its commit, and the commit is checked against the store
- * revision, so two handles on the same collection (two tabs) claiming one key
- * at once end with exactly one claim; the other resolves undefined and leaves
- * the row as the winner wrote it.
- */
 import { afterEach, describe, expect, it } from 'vitest';
 import { createDataStore } from '../src/index.js';
 import { createHostStorePort } from '../src/host-store/index.js';

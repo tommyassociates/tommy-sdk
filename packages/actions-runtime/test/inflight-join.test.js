@@ -1,14 +1,3 @@
-/**
- * inflight-join.test.js — an invoke whose idempotency key matches a run still
- * in flight (same activity, same tenant) joins that run and receives its result
- * or error; the activity is applied once.
- *
- * A second invoke from an MP whose chain is executing a handler runs inline
- * (re-entrancy, F6), so without the join it would pass the stored-result check
- * before the first run stored its result and apply the write again. A join
- * waits at most `inflightJoinTimeoutMs`, so a handler that invokes its own
- * activity with its own key is rejected instead of waiting on itself.
- */
 import { describe, it, expect } from 'vitest';
 import { createDirectAdapter } from '@tommy/sdk';
 import { createBroker, createFakeIssuer } from '../src/index.js';
@@ -364,7 +353,6 @@ describe('an invoke joins a run in flight with the same key', () => {
     const INFLIGHT_RUNS_MAX = 500;
     w.invoke('save', { id: 0 }).catch(() => {});
     await started.promise;
-    // Issued while a handler of the same MP is executing, so each runs inline.
     const refusals = [];
     for (let i = 1; i < INFLIGHT_RUNS_MAX + 20; i += 1) w.invoke('save', { id: i }).catch((e) => refusals.push(e));
     await tick(50);

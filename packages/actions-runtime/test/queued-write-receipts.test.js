@@ -1,13 +1,3 @@
-/**
- * D1 (ruled 30 Oct) — pending work after a reload is shown from the action
- * queue's OWN receipts, never a second draft list.
- *
- * A Mini Program's surface reads its own waiting writes (`queuedWrites`) from
- * the durable queue: what is waiting, in order, and whether it is waiting,
- * being sent now, or was tried and not sent. It can discard one that is not on
- * its way (`discardQueuedWrite`). Another Mini Program's rows, and rows of
- * another person or account, are never listed or discarded.
- */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createBroker, createFakeIssuer, createDurableQueue } from '../src/index.js';
 
@@ -36,7 +26,6 @@ const settle = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 
 let storage;
 
-/** One page: a broker over the device's storage, as `person`. */
 async function page(serverInvoke, { online = false, person = '5', held = new Set() } = {}) {
   const issuer = createFakeIssuer();
   const broker = createBroker({
@@ -108,7 +97,6 @@ describe('queued write receipts survive a reload and belong to their Mini Progra
     await first.invoke('timesheets', { timesheetId: '12' }, 'k-2');
     first.broker.setOnline(true);
     await first.broker.drainOfflineQueue();
-    // The first was tried; the one behind it waits its turn.
     expect(first.broker.queuedWrites('timesheets').map((row) => [row.state, row.attempts]))
       .toEqual([['failed', 1], ['queued', 0]]);
 

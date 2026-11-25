@@ -1,12 +1,4 @@
 // @vitest-environment node
-/**
- * The paint ceiling per store: every cache holds its rows to PAINT_CEILING_MS
- * unless it was created with `paintCeiling: false`, which paints them at any
- * age while the row cap, window retention and the backend's age limit still
- * apply. Client-owned (`last_write_wins`) stores never age out of a read, and
- * the raw reads see every row in every case. Driven on the memory store and
- * on the host store (both engines) the app opens.
- */
 import { describe, it, expect } from 'vitest';
 import { createDataStore, createMemoryStoreBackend, PAINT_CEILING_MS } from '../src/data-store.js';
 import { createHostStorePort } from '../src/host-store/index.js';
@@ -15,7 +7,6 @@ import { DATABASES, identity } from './helpers/host-databases.js';
 const DAY = 24 * 60 * 60 * 1000;
 const MAX_AGE_MS = 30 * DAY;
 
-/** A host-store-backed collection the way the app opens one. */
 function transactionalBackend(port, options) {
   let handle;
   const ready = () => (handle ||= port.open(options));
@@ -43,7 +34,6 @@ function transactionalBackend(port, options) {
   };
 }
 
-// One store on a clock the test moves, on the memory backend or a host store.
 function world(create, storeOptions = {}) {
   let clock = Date.parse('2026-09-01T00:00:00.000Z');
   const now = () => clock;
@@ -61,7 +51,6 @@ function world(create, storeOptions = {}) {
   return { store, database, age: (ms) => { clock += ms; } };
 }
 
-// What each read a surface paints through answers for row `id`.
 async function painted(store, id) {
   return {
     get: (await store.get(id))?.id ?? null,
@@ -126,7 +115,7 @@ describe.each(STORES)('the paint ceiling per store (%s)', (_name, create) => {
       await store.put({ id: '1' });
       // eslint-disable-next-line no-await-in-loop
       await store.markSynced('1');
-      age(20 * DAY); // past the ceiling, within the host store age limit
+      age(20 * DAY);
       // eslint-disable-next-line no-await-in-loop
       expect(await painted(store, '1')).toEqual(shows('1'));
       // eslint-disable-next-line no-await-in-loop

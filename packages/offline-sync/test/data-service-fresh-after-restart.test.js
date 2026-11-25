@@ -1,12 +1,4 @@
 // @vitest-environment node
-/**
- * A declared read's freshness outlives the page: a whole read records when it
- * ran and the key digest of what it left in the collection's source meta
- * (cursor or none), and a later service over the same rows and meta (the app
- * opened again) takes an unforced refresh within `maxAge` of that read as
- * fresh, while the stored rows are still the whole set it left. Past
- * `maxAge`, with a row gone or added since, or asked afresh, it reads.
- */
 import { describe, it, expect } from 'vitest';
 import {
   createDataService, createDataStore, createMemoryStoreBackend, createMemorySourceMeta,

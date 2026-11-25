@@ -1,11 +1,3 @@
-/**
- * invalidation-contract.test.js — mp-durable-instant-surfaces review F1.
- *
- * The spec declared a four-item invalidation contract and said all four were
- * "required together". Items 1 (the account/tenant key) and 4 (always
- * revalidate) shipped; items 2 and 3 did not, which left a durable cache
- * surviving a PERMISSION CHANGE with no bound on its age. These pin both.
- */
 import { describe, it, expect, vi } from 'vitest';
 import { createDataStore, createMemoryStoreBackend } from '../src/data-store.js';
 import { createDataManager } from '../src/manager.js';
@@ -81,7 +73,6 @@ describe('the paint ceiling (contract item 3, the platform half)', () => {
     now,
   });
 
-  /** Put a row stamped `ageDays` ago, then read through liveQuery at "now". */
   const withRowAged = async (ageDays) => {
     const t0 = Date.parse('2026-09-04T00:00:00.000Z');
     let clock = t0 - (ageDays * DAY);
@@ -89,7 +80,7 @@ describe('the paint ceiling (contract item 3, the platform half)', () => {
     const lq = mgr.liveQuery('rows', { scope: () => true, fetch: () => [] });
     await lq.store.put({ id: '1' });
     await lq.store.markSynced('1');
-    clock = t0;                       // travel forward to the read
+    clock = t0;
     return lq;
   };
 
@@ -101,9 +92,6 @@ describe('the paint ceiling (contract item 3, the platform half)', () => {
   it('does NOT paint a row stamped 8 days ago', async () => {
     const lq = await withRowAged(8);
     expect(await lq.read()).toEqual([]);
-    // Still STORED — the ceiling governs the paint; the store's TTL evicts.
-    // `getAllRaw` is the unfiltered view: `getAll` carries the ceiling now
-    // (review PAINT-CEILING-GETALL-READERS), because MPs paint through it too.
     expect((await lq.store.getAllRaw()).length).toBe(1);
   });
 
@@ -121,15 +109,12 @@ describe('the paint ceiling (contract item 3, the platform half)', () => {
     let clock = t0 - (30 * DAY);
     const mgr = manager(() => clock);
     const lq = mgr.liveQuery('rows', { scope: () => true, fetch: () => [] });
-    await lq.store.put({ id: 'local' });    // never markSynced -> dirty
+    await lq.store.put({ id: 'local' });
     clock = t0;
     expect((await lq.read()).map((r) => r.id)).toEqual(['local']);
   });
 
   it('applies to windowCache.read too, not just liveQuery (review R2-F2)', async () => {
-    // The ceiling is a platform promise about what may be SHOWN. Living inside
-    // liveQuery, it left windowCache — the path timesheets_cache and
-    // invoicing_cache are read through — painting up to the 30-day store TTL.
     const t0 = Date.parse('2026-09-04T00:00:00.000Z');
     let clock = t0 - (8 * DAY);
     const mgr = manager(() => clock);
@@ -139,7 +124,7 @@ describe('the paint ceiling (contract item 3, the platform half)', () => {
     await store.markSynced('1');
     clock = t0;
     expect(await wc.read({ from: 1, to: 2 })).toEqual([]);
-    expect((await store.getAllRaw()).length).toBe(1);   // stored, just not painted
+    expect((await store.getAllRaw()).length).toBe(1);
   });
 
   it('windowCache.sync returns the painted set, not the raw reconcile read', async () => {
@@ -165,22 +150,10 @@ describe('the paint ceiling (contract item 3, the platform half)', () => {
     await lq.store.put({ id: 'old' });
     await lq.store.markSynced('old');
     clock = t0;
-    // A failed fetch keeps the cache (the SWR contract) — but the stale rows
-    // must not come back through the read the revalidate returns.
     expect(await lq.revalidate()).toEqual([]);
   });
 });
 
-/**
- * pruneScope — review CAL-FILTERED-PRUNE.
- *
- * `scope` answers "what should this surface show". `reconcile` reused it to
- * answer "what may this read DELETE", and those diverge the moment a read is
- * FILTERED: the rows the filter never covered are absent from the answer and
- * were deleted as though the server had dropped them. Scheduling hit this twice
- * and hand-rolled a separate predicate in both writers; this is that predicate
- * as a primitive.
- */
 describe('pruneScope separates what a read may show from what it may delete', () => {
   const manager = () => createDataManager({
     capabilityToken: { tenantId: 'team-3', mpId: 'filtered-mp' }, mpId: 'filtered-mp',
@@ -202,14 +175,13 @@ describe('pruneScope separates what a read may show from what it may delete', ()
     const lq = mgr.liveQuery('rows', {
       scope: () => true,
       pruneScope: () => false,
-      fetch: () => [{ id: 'a', member: 'a' }],     // only member a's rows came back
+      fetch: () => [{ id: 'a', member: 'a' }],
     });
     await lq.revalidate();
     expect((await store.getAll()).map((r) => r.id).sort()).toEqual(['a', 'b']);
   });
 
   it('WITHOUT pruneScope the same read deletes the rows it never covered', async () => {
-    // The defect, pinned so the primitive cannot be quietly removed.
     const mgr = manager();
     const store = mgr.store('rows');
     await seed(store, ['a', 'b']);
@@ -227,14 +199,6 @@ describe('pruneScope separates what a read may show from what it may delete', ()
   });
 });
 
-/**
- * PAINT-CEILING-DIRECT-READS — the ceiling at the read itself.
- *
- * It was written into `liveQuery`, then widened to `windowCache`, and both were
- * the wrong altitude: MPs read their stores DIRECTLY too, so the scheduling grid
- * could paint rows up to the store's 30-day TTL off disk. `readWhere` is where
- * every reader passes.
- */
 describe('the paint ceiling applies to a direct store read', () => {
   const storeAt = (nowFn) => createDataStore({
     name: 'rows', keyPath: 'id', backend: createMemoryStoreBackend(), now: nowFn,
@@ -259,13 +223,6 @@ describe('the paint ceiling applies to a direct store read', () => {
   });
 
   it('getAll carries the ceiling too — MPs paint through it, so it cannot be the raw view', async () => {
-    // ⚠ THIS ASSERTION USED TO SAY THE OPPOSITE, and it was wrong. Round 6 put
-    // the ceiling on `readWhere` only and reasoned that `getAll` was "the
-    // writers' view". It is not: twenty-odd MP call sites read `getAll()` to
-    // PAINT — time-clock derives clock-in state from it off a persisted cache.
-    // Leaving it unfiltered left the ceiling bypassed for all of them (review
-    // PAINT-CEILING-GETALL-READERS). The safe behaviour is now the default and
-    // the raw view is the one you ask for by name.
     const store = await seeded();
     expect((await store.getAll()).map((r) => r.id)).toEqual(['fresh']);
   });
@@ -276,9 +233,6 @@ describe('the paint ceiling applies to a direct store read', () => {
   });
 
   it('a client-owned (last_write_wins) store never ages out — it is the only copy', async () => {
-    // A member's saved settings or half-typed draft is not stale server data
-    // going off. Ageing it out of a read would be data loss dressed as a
-    // freshness guarantee — which the first version of this fix did.
     const t0 = Date.parse('2026-09-04T00:00:00.000Z');
     let clock = t0 - (60 * DAY);
     const store = createDataStore({
@@ -293,9 +247,6 @@ describe('the paint ceiling applies to a direct store read', () => {
   });
 
   it('get(key) carries the ceiling — an edit form must not prefill from a stale row', async () => {
-    // The third read API, uncovered until review PAINT-CEILING-GET-KEY. A form
-    // prefilled from a fortnight-old row is worse than an empty one: the
-    // operator saves it back as current.
     const store = await seeded();
     expect(await store.get('old')).toBeUndefined();
     expect((await store.get('fresh'))?.id).toBe('fresh');
@@ -310,25 +261,12 @@ describe('the paint ceiling applies to a direct store read', () => {
     const t0 = Date.parse('2026-09-04T00:00:00.000Z');
     let clock = t0 - (40 * DAY);
     const store = storeAt(() => clock);
-    await store.put({ id: 'mine' });             // never markSynced
+    await store.put({ id: 'mine' });
     clock = t0;
     expect((await store.readWhere(() => true)).map((r) => r.id)).toEqual(['mine']);
   });
 });
 
-/**
- * The ceiling has ONE owner (spec mp-bounds-the-scanner-cannot-see phase 4).
- *
- * The manager kept its own copy of the paint ceiling. It was the less informed
- * of the two: `DataStore.paintable` knows the store's `syncStrategy` and exempts
- * client-owned (`last_write_wins`) rows — ageing out a member's own saved
- * settings or half-typed draft is data loss dressed as a freshness guarantee —
- * while the manager's copy knew nothing about strategy and filtered them anyway.
- *
- * Not reachable in the shipped estate when it was found: no MP reads a
- * `last_write_wins` store through `liveQuery` or `windowCache`. Fixed because
- * the primitive was wrong, and pinned here so it cannot come back.
- */
 describe('the paint ceiling has one owner', () => {
   const agedManager = (localData, clock) => createDataManager({
     capabilityToken: { tenantId: 'team-3', mpId: 'ceiling-mp' },
@@ -377,7 +315,6 @@ describe('a revalidate reads the store once', () => {
     reads.mockClear();
     expect((await wc.sync({ from: 'a' })).map((row) => row.id)).toEqual(['3']);
     expect(reads).toHaveBeenCalledTimes(1);
-    // A read that may not prune still paints by its own scope.
     const filtered = mgr.liveQuery('rows', { scope: (row) => row.id !== '2', pruneScope: () => false, fetch: () => [{ id: '4' }] });
     expect((await filtered.revalidate()).map((row) => row.id).sort()).toEqual(['1', '3', '4']);
   });
@@ -399,7 +336,6 @@ describe('liveQuery subscribers', () => {
     await lq.store.put({ id: 'n1', kind: 'note' });
     await vi.waitFor(() => expect(seen.map((list) => list.at(-1))).toEqual([['s1'], ['s1']]));
     expect(reads).not.toHaveBeenCalled();
-    // What they paint is what a read would give: scoped, without store fields.
     expect(await lq.read()).toEqual([{ id: 's1', kind: 'shift' }]);
     offs.forEach((off) => off());
   });

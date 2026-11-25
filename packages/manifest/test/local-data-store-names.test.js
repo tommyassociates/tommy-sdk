@@ -1,9 +1,3 @@
-// A store's declared schema is the manifest's `localData` entry, and the host
-// owns two kinds of store beside the declared ones: `prefs` (tommy.prefs) and
-// `<name>__unfit` (rows a schema change set aside). A manifest can declare a
-// store's `schemaVersion`, never one of those names, and never a name too
-// long for its `__unfit` sibling to keep within 64 characters.
-
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -11,7 +5,6 @@ import { validateManifest } from '../src/index.js';
 
 const BASE = readFileSync(fileURLToPath(new URL('./fixtures/valid-minimal.yml', import.meta.url)), 'utf8');
 
-/** valid-minimal with one declared store. */
 function withStore(name, extra = '') {
   return `${BASE.trimEnd()}\nlocalData:\n  ${name}:\n    keyPath: id\n    syncStrategy: last_write_wins\n${extra}    recordSchema:\n      type: object\n      properties:\n        id: { type: string }\n`;
 }

@@ -7,9 +7,6 @@ import {
 
 const disposers = [];
 afterEach(() => disposers.splice(0).reverse().forEach((dispose) => dispose()));
-// This sequential memory boundary exercises the service's batch-call context.
-// Each row uses the real DataStore predicate and CAS deletion; no physical
-// atomic batch or SQLite transaction is exercised by this fixture.
 function attachMemoryBatchBoundary(store) {
   store.deleteMany = async (keys, options = {}) => {
     const wanted = [...new Set(keys.map(String))];

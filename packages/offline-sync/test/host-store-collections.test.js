@@ -1,10 +1,4 @@
 // @vitest-environment node
-/**
- * The host store's collection layer on both physical engines: namespaced
- * collections on the existing owner keys, secondary indexes, migrations,
- * per-collection and per-domain eviction that never touches dirty or authored
- * rows, inspection and cache clearing for Settings → Data, and the change feed.
- */
 import { describe, it, expect } from 'vitest';
 import {
   createHostStorePort, retireHostStorePrincipal, createHostStoreChangeFeed, observeHostStorePort,
@@ -129,14 +123,11 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     await v1.put([{ id: 1, text: 'one', _dirty: true }, { id: 2, text: 'two', _dirty: true }]);
     const v2 = await open({ storeName: 'outbox', policy: 'authored', schemaVersion: 2, indexes: { byBody: 'body' } });
     expect(v2.migration).toEqual({ from: 1, to: 2 });
-    // Reads see the old generation; writes wait for the migration.
     expect((await v2.all()).map((row) => row.text)).toEqual(['one', 'two']);
     await expect(v2.put([{ id: 3, body: 'x' }])).resolves.toMatchObject({ ok: false, reason: 'unavailable' });
     const step = (phase, extra = {}) => port.migration({ handle: v2.handle, expectedEpoch: v2.epoch, phase, ...extra });
     await step('begin');
     await step('write', { changes: [{ op: 'put', key: '1', value: { id: 1, body: 'one', _dirty: true } }] });
-    // An interrupted migration leaves version 1 authoritative; once its lease
-    // runs out the next opener restarts from the top.
     const again = await open({ storeName: 'outbox', policy: 'authored', schemaVersion: 2, indexes: { byBody: 'body' } });
     const restart = (phase, extra = {}) => port.migration({ handle: again.handle, expectedEpoch: again.epoch, phase, ...extra });
     expect((await again.all()).map((row) => row.text)).toEqual(['one', 'two']);
@@ -149,7 +140,6 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     expect((await again.query({ index: 'byBody', equals: ['two'] })).rows.map((row) => row.key)).toEqual(['2']);
     const listed = (await port.inspect({ op: 'stores', selector: SELECTOR })).stores.find((row) => row.label === 'mp.platform-data.outbox' || row.label === 'outbox');
     expect(listed).toMatchObject({ schemaVersion: 2, rowCount: 2, dirtyCount: 2, migrating: false });
-    // The superseded handle is retired rather than writing the old shape.
     await expect(v2.put([{ id: 9, body: 'late' }])).resolves.toMatchObject({ ok: false });
   });
 
@@ -163,7 +153,6 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
       if (changes.length) await step('write', { changes });
       return step('complete');
     };
-    // Authored: a new fingerprint, or a new index, migrates instead of refusing.
     const drafts = await open({ storeName: 'drafts', policy: 'authored', schemaFingerprint: 'schema-a' });
     await drafts.put([{ id: 1, title: 'Kept', _dirty: true }]);
     const reshaped = await open({ storeName: 'drafts', policy: 'authored', schemaFingerprint: 'schema-b', indexes: { byTitle: 'title' } });
@@ -172,7 +161,6 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     const settled = await open({ storeName: 'drafts', policy: 'authored', schemaFingerprint: 'schema-b', indexes: { byTitle: 'title' } });
     expect(settled.migration).toBeFalsy();
     expect((await settled.query({ index: 'byTitle', equals: ['Kept'] })).rows.map((row) => row.key)).toEqual(['1']);
-    // A cache with nothing unsent starts empty; one with an unsent row migrates it.
     const clean = await open({ storeName: 'shifts', schemaFingerprint: 'schema-a' });
     await clean.put([{ id: 1 }]);
     const cleanNext = await open({ storeName: 'shifts', schemaFingerprint: 'schema-b' });
@@ -203,7 +191,6 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     let clock = 1000;
     const database = create();
     const kind = database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb';
-    // Two tabs (or windows): two ports over one database.
     const tabA = createHostStorePort({ database, backend: kind, now: () => clock });
     const tabB = createHostStorePort({ database, backend: kind, now: () => clock });
     const input = (schemaFingerprint) => openInput({ storeName: 'drafts', policy: 'authored', schemaFingerprint });
@@ -223,13 +210,11 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     const stepB = (phase, extra = {}) => tabB.migration({ handle: b.handle, expectedEpoch: b.epoch, phase, ...extra });
     const pageOf = async (port, handle, afterKey) => port.read({ handle: handle.handle, expectedEpoch: handle.epoch, afterKey, limit: 100 });
     await expect(stepA('begin')).resolves.toMatchObject({ ok: true });
-    // B finds A's live lease and does not take the store over.
     await expect(stepB('begin')).resolves.toMatchObject({ ok: false, reason: 'busy' });
     let afterKey = null;
     do {
       // eslint-disable-next-line no-await-in-loop
       const page = await pageOf(tabA, a, afterKey);
-      // B keeps trying between A's pages; A's writes renew the lease.
       // eslint-disable-next-line no-await-in-loop
       await expect(stepB('begin')).resolves.toMatchObject({ ok: false, reason: 'busy' });
       // eslint-disable-next-line no-await-in-loop
@@ -241,7 +226,6 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     } while (afterKey !== null);
     await expect(stepB('complete')).resolves.toMatchObject({ ok: false, reason: 'conflict' });
     await expect(stepA('complete')).resolves.toMatchObject({ ok: true });
-    // B reopens after A: the store is rebuilt, every draft is there.
     const reopened = await tabB.open(input('schema-b'));
     expect(reopened.migration).toBeFalsy();
     const kept = [];
@@ -275,7 +259,6 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     await expect(stepB('begin')).resolves.toMatchObject({ ok: true });
     const page = await tabB.read({ handle: b.handle, expectedEpoch: b.epoch, afterKey: null, limit: 100 });
     await stepB('write', { changes: page.rows.map((row) => ({ op: 'put', key: row.key, value: row.value })) });
-    // A wakes up late: none of its steps land in B's generation.
     await expect(stepA('write', { changes: [{ op: 'put', key: '9', value: { id: 9 } }] })).resolves.toMatchObject({ ok: false, reason: 'conflict' });
     await expect(stepA('complete')).resolves.toMatchObject({ ok: false, reason: 'conflict' });
     await expect(stepA('abort')).resolves.toMatchObject({ ok: false, reason: 'conflict' });
@@ -300,17 +283,14 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
       return step('complete');
     };
     await seed(cacheInput('grant-a', 'schema-a'));
-    // The grant alone changed.
     const grant = await port.open(cacheInput('grant-b', 'schema-a'));
     expect(grant.migration).toEqual({ from: 1, to: 1, fromFingerprint: 'schema-a', cacheFingerprintChanged: true, fromCacheFingerprint: 'grant-a' });
     await finish(grant);
     await seed(cacheInput('grant-b', 'schema-a'));
-    // The schema alone changed: no grant signal.
     const schema = await port.open(cacheInput('grant-b', 'schema-b'));
     expect(schema.migration).toEqual({ from: 1, to: 1, fromFingerprint: 'schema-a' });
     await finish(schema);
     await seed(cacheInput('grant-b', 'schema-b'));
-    // Both changed: the grant signal is there.
     const both = await port.open(cacheInput('grant-c', 'schema-c'));
     expect(both.migration).toMatchObject({ cacheFingerprintChanged: true, fromCacheFingerprint: 'grant-b', fromFingerprint: 'schema-b' });
   });
@@ -326,7 +306,6 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     await drafts.put([{ id: 1, _dirty: true }]);
     const rolledBack = await open({ storeName: 'drafts', policy: 'authored', schemaVersion: 1, schemaFingerprint: 'v1' });
     expect(rolledBack.migration).toEqual({ from: 2, to: 1, fromFingerprint: 'v2' });
-    // An opener that does not fingerprint its schema is still refused.
     await expect(port.open(openInput({ storeName: 'drafts', policy: 'authored', schemaVersion: 1 }))).rejects.toMatchObject({ reason: 'unavailable' });
   });
 
@@ -341,7 +320,6 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     expect(result.ok).toBe(true);
     expect(result.evicted.map((row) => row.key).sort()).toEqual(['1', '3']);
     expect((await rows.all()).map((row) => row.id)).toEqual([2, 4, 5]);
-    // Only dirty rows left to give: the write is refused instead.
     const dirty = await open({ storeName: 'chats.drafts', limits: { maxRows: 1, evict: 'lru' } });
     await dirty.put([{ id: 1, _dirty: true }]);
     await expect(dirty.put([{ id: 2 }])).resolves.toMatchObject({ ok: false, reason: 'row-capacity' });
@@ -414,7 +392,6 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     await expect(port.open({ ...openInput({ storeName: 'drafts', policy: 'authored', indexes: { byCode: 'code' } }), unique: ['byCode'] }))
       .rejects.toMatchObject({ reason: 'unserializable' });
     const codes = await open({ storeName: 'drafts', policy: 'authored', indexes: { byCode: 'code' } });
-    // Two rows may hold the same indexed value: uniqueness is the server's to enforce.
     await expect(codes.put([{ id: 'a', code: 'X1', _dirty: true }, { id: 'b', code: 'X1', _dirty: true }])).resolves.toMatchObject({ ok: true });
     const listed = (await stores()).find((row) => row.label === 'drafts');
     expect(listed.indexes).toEqual(['byCode']);
@@ -466,12 +443,9 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     const messagesStep = await rebuild('chats.messages');
     const grown = (id) => ({ changes: [{ op: 'put', key: id, value: { id, body: 'x'.repeat(180), _dirty: true } }] });
     await expect(threadsStep('write', grown('t1'))).resolves.toMatchObject({ ok: true });
-    // The threads rebuild now holds more than its old rows: the messages
-    // rebuild counts it at that size, whichever of the two completes.
     await expect(messagesStep('write', grown('m1'))).resolves.toMatchObject({ ok: false, reason: 'quota' });
     await expect(threadsStep('complete')).resolves.toMatchObject({ ok: true });
     await expect(messagesStep('abort')).resolves.toMatchObject({ ok: true });
-    // A commit beside a rebuild counts it too.
     const plain = await open({ storeName: 'chats.rows', limits });
     const rebuilding = await rebuild('chats.messages');
     await expect(rebuilding('write', grown('m1'))).resolves.toMatchObject({ ok: false, reason: 'quota' });
@@ -483,7 +457,6 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     const { port, open } = await setup(create);
     const limits = { evict: 'lru', domainMaxBytes: 400 };
     const threads = await open({ storeName: 'chats.threads', limits });
-    // A sibling that declares a larger budget for itself grows past this one's.
     const messages = await open({ storeName: 'chats.messages', limits: { ...limits, domainMaxBytes: 1000 } });
     await threads.put([{ id: 't1', body: 'x'.repeat(50), _dirty: true }]);
     await messages.put([{ id: 'm1', body: 'x'.repeat(200) }]);
@@ -509,7 +482,6 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
       await port.retire({ handle: opened.handle, mode: 'close' });
     }
     expect(port.openHandles()).toBe(0);
-    // A handle another opener's rebuild retired is forgotten on its next use.
     const stale = await port.open(openInput({ storeName: 'drafts', policy: 'authored', schemaFingerprint: 'schema-a' }));
     const rebuilding = await port.open(openInput({ storeName: 'drafts', policy: 'authored', schemaFingerprint: 'schema-b' }));
     const step = (phase) => port.migration({ handle: rebuilding.handle, expectedEpoch: rebuilding.epoch, phase });
@@ -526,14 +498,12 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     const listed = (await stores()).find((row) => row.label === 'drafts');
     await expect(port.purge({ selector: SELECTOR, store: listed.id, force: true })).resolves.toMatchObject({ ok: true, removed: ['d1', 'd2'] });
     expect(await drafts.all()).toEqual([]);
-    // The handle's snapshot is stale: its write conflicts, then succeeds on the new revision.
     await expect(drafts.put([{ id: 'd3', _dirty: true }])).resolves.toMatchObject({ ok: false, reason: 'conflict' });
     const fresh = await port.read({ handle: drafts.handle, expectedEpoch: drafts.epoch, afterKey: null, limit: 10 });
     drafts.refresh(fresh);
     await expect(drafts.put([{ id: 'd3', _dirty: true }])).resolves.toMatchObject({ ok: true });
     expect(await drafts.all()).toEqual([{ id: 'd3', _dirty: true }]);
 
-    // A rebuild under way when the clear lands: its opener's next step conflicts.
     const rebuilding = await port.open(openInput({ storeName: 'drafts', policy: 'authored', schemaVersion: 2 }));
     const step = (phase, extra = {}) => port.migration({ handle: rebuilding.handle, expectedEpoch: rebuilding.epoch, phase, ...extra });
     await expect(step('begin')).resolves.toMatchObject({ ok: true });
@@ -574,7 +544,6 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     expect(local.map((event) => [event.type, event.label || null, event.keys])).toEqual([
       ['commit', 'chats.rows', ['1']], ['commit', 'chats.rows', ['2']], ['evict', null, ['1']], ['purge', 'chats.rows', ['2']],
     ]);
-    // A cleared store is named with its account, so no other account's reads hear it.
     expect(local[2].keysByLabel).toEqual({ 'chats.rows': ['1'] });
     expect(remote[2].keysByLabel).toEqual({ 'chats.rows': ['1'] });
     const [commit, , , purge] = local;
@@ -603,7 +572,6 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     await observed.commit({ handle: opened.handle, expectedEpoch: opened.epoch, expectedStoreRevision: listed.revision ?? 1, changes: many.slice(100) });
     const cache = (await observed.inspect({ op: 'stores', selector: SELECTOR })).stores[0];
     await observed.purge({ selector: SELECTOR, store: cache.id });
-    // A principal's purge names no store and no keys.
     feed.publish({ type: 'purge', principal: 'p' });
     await new Promise((resolve) => { setTimeout(resolve, 0); });
     const shape = (event) => [event.type, event.keys === undefined ? 'every row' : event.keys.length, event.truncated === true];

@@ -1,11 +1,4 @@
 // @vitest-environment node
-/**
- * A read the scheduler tries again after a failure: its callers are
- * answered by the first failed attempt (the device's rows stand), while the
- * retries go on in the background and settle the read and its status. A
- * caller asking during the backoff is answered at once, with no second
- * flight. Once the service retires, none of its jobs runs or runs again.
- */
 import {
   describe, it, expect, vi,
 } from 'vitest';
@@ -13,11 +6,6 @@ import {
   createDataService, createDataStore, createMemoryStoreBackend,
 } from '../src/index.js';
 
-/**
- * A scheduler that keeps a job's requests through every attempt, as the
- * host's does: a failed attempt waits until `retry()` (its backoff), up to
- * `attempts`. It checks `valid()` before each attempt.
- */
 function retryingScheduler({ attempts = 5 } = {}) {
   const jobs = new Map();
   const due = [];
@@ -66,7 +54,6 @@ function service(scheduler) {
   });
   return { data, store };
 }
-// Whether a promise has settled, after the microtasks queued so far.
 async function outcome(promise) {
   let settled = null;
   promise.then((value) => { settled = ['resolved', value]; }, (error) => { settled = ['rejected', error]; });
@@ -84,7 +71,6 @@ describe('a read the scheduler tries again', () => {
     expect(settled?.[0]).toBe('rejected');
     expect(settled[1]).toMatchObject({ status: 0 });
     expect(data.status('members')).toMatchObject({ state: 'error', error: { status: 0 } });
-    // The read is still the service's: not idle until its retries settle.
     expect(scheduler.waiting).toBe(1);
     expect(data.idle()).toBe(false);
     scheduler.retry();
@@ -144,12 +130,10 @@ describe('a read the scheduler tries again', () => {
     expect(joined?.[0]).toBe('rejected');
     const silent = await outcome(data.refresh('members'));
     expect(silent).toEqual(['resolved', expect.objectContaining({ state: 'error' })]);
-    // A full read asked behind it is answered with the failure too, not held.
     const full = await outcome(data.refresh('members', { mode: 'visible', full: true }));
     expect(full?.[0]).toBe('rejected');
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(scheduler.waiting).toBe(1);
-    // An ask while the retry runs waits for that attempt.
     scheduler.retry();
     await Promise.resolve();
     await expect(data.refresh('members', { mode: 'visible' })).resolves.toBeUndefined();
@@ -163,22 +147,18 @@ describe('a read the scheduler tries again', () => {
     data.source('members', { fetch });
     await outcome(data.refresh('members', { mode: 'visible' }));
     expect(scheduler.waiting).toBe(1);
-    // A retry whose attempt fails again is answered by that failure.
     const failedAgain = await outcome(data.refresh('members', { mode: 'visible', fromNow: true, retry: true }));
     expect(failedAgain?.[0]).toBe('rejected');
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(scheduler.waiting).toBe(1);
-    // The next retry reads at once and lands the rows, with no extra read after it.
     await expect(data.refresh('members', { mode: 'visible', fromNow: true, retry: true })).resolves.toBeUndefined();
     expect(fetch).toHaveBeenCalledTimes(3);
     expect(data.status('members')).toMatchObject({ state: 'fresh', error: null });
     expect((await data.read('members')).map((row) => row.name)).toEqual(['Ada']);
-    // A retry that would join the read on its way (no fromNow) runs it now too.
     fetch.mockRejectedValueOnce(offline());
     await outcome(data.refresh('members', { mode: 'visible', fromNow: true }));
     await expect(data.refresh('members', { mode: 'visible', retry: true })).resolves.toBeUndefined();
     expect(fetch).toHaveBeenCalledTimes(5);
-    // An ask that is not a retry is still answered by the failure at once.
     fetch.mockRejectedValueOnce(offline());
     await outcome(data.refresh('members', { mode: 'visible', fromNow: true }));
     const plain = await outcome(data.refresh('members', { mode: 'visible', fromNow: true }));
@@ -216,7 +196,6 @@ describe('a read the scheduler tries again', () => {
     scheduler.retry();
     await vi.waitFor(async () => expect((await data.read('members')).map((row) => row.id).sort()).toEqual(['1', '2']));
     expect(byIds).toHaveBeenCalledTimes(2);
-    // A search (not batched) is answered the same way.
     const search = vi.fn().mockRejectedValueOnce(offline()).mockResolvedValue([{ id: '9' }]);
     data.source('members', {
       fetch: async () => [],
@@ -244,7 +223,6 @@ describe('a read the scheduler tries again', () => {
   });
 
   it('shows no failure of an attempt that ends after its read settled, over the read that came next', async () => {
-    // A scheduler that can end its jobs while an attempt is still running.
     const ended = [];
     const scheduler = {
       request(job) {
@@ -268,7 +246,6 @@ describe('a read the scheduler tries again', () => {
     expect(await first).toMatchObject({ code: 'REFRESH_DROPPED' });
     await data.refresh('members', { mode: 'visible' });
     expect(data.status('members')).toMatchObject({ state: 'fresh', error: null });
-    // The first read's attempt fails only now.
     failFirst(offline());
     for (let turn = 0; turn < 20; turn += 1) await Promise.resolve(); // eslint-disable-line no-await-in-loop
     expect(data.status('members')).toMatchObject({ state: 'fresh', error: null });
@@ -286,7 +263,6 @@ describe('a read asked to begin after the ask', () => {
     const before = data.refresh('members', { mode: 'visible' });
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     const after = data.refresh('members', { mode: 'visible', maxAge: 60000, fromNow: true });
-    // Without it, an ask joins the read on its way.
     const joined = data.refresh('members', { mode: 'visible' });
     release();
     await Promise.all([before, joined, after]);

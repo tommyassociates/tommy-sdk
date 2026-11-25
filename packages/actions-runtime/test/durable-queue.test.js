@@ -1,20 +1,7 @@
-/**
- * D.43 — the durable offline queue.
- *
- * The test that matters is `SURVIVES A RELOAD`: it queues a write offline,
- * throws the broker away, builds a SECOND one over the SAME storage, and drains
- * it. That is what a reload actually is, and before this the row simply
- * evaporated while the MP's promise had already resolved as queued.
- *
- * The rest pin the ruled trade: rows carry tenant payloads, so the bound (they
- * are deleted as they drain) and the TTL (a stale row is DROPPED, not replayed)
- * are the price the ruling was given at, not incidental hygiene.
- */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TommyError } from '@tommy/sdk';
 import { createBroker, createFakeIssuer, createDurableQueue } from '../src/index.js';
 
-/** A localStorage stand-in that PERSISTS across broker instances, like the real one. */
 function fakeStorage() {
   const data = new Map();
   return {
@@ -54,9 +41,6 @@ describe('D.43 — the offline queue survives a reload', () => {
       capabilityService: issuer,
       online,
       onOfflineOutcome,
-      // `submit_timesheet` is a `server_write`, so the write lands HERE, not in a
-      // local handler — which is the whole point: the row being replayed is a
-      // pending call to the server, and losing it loses the user's submission.
       serverInvoke: async (envelope) => { applied.push(envelope.args.week); return { ok: true }; },
       offlineQueue: queue === undefined ? createDurableQueue({ storage }) : queue,
     });
@@ -75,15 +59,14 @@ describe('D.43 — the offline queue survives a reload', () => {
     const first = await makeBroker();
     const queued = await first.call('w1', 'k-1');
     expect(queued.status).toBe('queued_offline');
-    expect(applied).toEqual([]);                     // nothing applied yet — it is offline
+    expect(applied).toEqual([]);
 
-    // The reload: brand-new broker, brand-new in-memory array, SAME storage.
     const second = await makeBroker();
-    expect(second.broker.queueStats().total).toBe(1); // the row came back
+    expect(second.broker.queueStats().total).toBe(1);
 
     second.broker.setOnline(true);
     await second.broker.drainOfflineQueue();
-    expect(applied).toEqual(['w1']);                 // the write the MP was promised
+    expect(applied).toEqual(['w1']);
   });
 
   it('a drained row is GONE from storage — the resting set is pending writes, not history', async () => {
@@ -102,15 +85,15 @@ describe('D.43 — the offline queue survives a reload', () => {
     const first = await makeBroker({ queue: createDurableQueue({ storage, now: () => clock }) });
     await first.call('w1', 'k-1');
 
-    clock += 8 * 24 * 60 * 60 * 1000;                // eight days later
+    clock += 8 * 24 * 60 * 60 * 1000;
     const stale = createDurableQueue({ storage, now: () => clock });
     expect(stale.all()).toEqual([]);
-    expect(stale.expiredOnLoad()).toBe(1);           // surfaced, not silently swallowed
+    expect(stale.expiredOnLoad()).toBe(1);
 
     const second = await makeBroker({ queue: stale });
     second.broker.setOnline(true);
     await second.broker.drainOfflineQueue();
-    expect(applied).toEqual([]);                     // a three-week-old edit is NOT applied over later truth
+    expect(applied).toEqual([]);
   });
 
   it('a row INSIDE the TTL still replays — the drop is bounded by time, not by reload', async () => {
@@ -118,7 +101,7 @@ describe('D.43 — the offline queue survives a reload', () => {
     const first = await makeBroker({ queue: createDurableQueue({ storage, now: () => clock }) });
     await first.call('w1', 'k-1');
 
-    clock += 6 * 24 * 60 * 60 * 1000;                // six days — inside the 7-day bound
+    clock += 6 * 24 * 60 * 60 * 1000;
     const second = await makeBroker({ queue: createDurableQueue({ storage, now: () => clock }) });
     second.broker.setOnline(true);
     await second.broker.drainOfflineQueue();
@@ -161,13 +144,13 @@ describe('D.43 — the offline queue survives a reload', () => {
     const corrupt = fakeStorage();
     corrupt.setItem('mp-offline-queue', '{not json');
     const q = createDurableQueue({ storage: corrupt });
-    expect(q.all()).toEqual([]);                     // empty, not poisoned
+    expect(q.all()).toEqual([]);
 
     const full = { getItem: () => null, setItem: () => { throw new Error('QuotaExceeded'); } };
     const quota = createDurableQueue({ storage: full });
     expect(() => quota.push({ sourceMpId: 'timesheets', envelope: { a: 1 }, bytes: 2 }))
       .toThrow(expect.objectContaining({ name: 'QueueNotKept' }));
-    expect(quota.all()).toHaveLength(0);             // never reported as queued
+    expect(quota.all()).toHaveLength(0);
   });
 
   it('two queues over the same storage (two warm worlds) never drop or bring back each other\'s rows', () => {
@@ -182,8 +165,8 @@ describe('D.43 — the offline queue survives a reload', () => {
 
     a.remove(seqA);
     b.push({ sourceMpId: 'timesheets', envelope: { args: { week: 'c' } }, bytes: 2 });
-    expect(weeks()).toEqual(['b', 'c']);             // a's sent row is not brought back by b
-    storage.removeItem('mp-offline-queue');          // sign-out removes the queue
+    expect(weeks()).toEqual(['b', 'c']);
+    storage.removeItem('mp-offline-queue');
     expect(a.all()).toEqual([]);
   });
 
@@ -197,7 +180,6 @@ describe('D.43 — the offline queue survives a reload', () => {
   });
 });
 
-// A test clock for the queued-resend spacing (F8): `later()` moves past any wait.
 const clock = { t: 1000000 };
 const later = () => { clock.t += 10 * 60 * 1000; };
 const timing = { now: () => clock.t, setTimer: () => null, clearTimer: () => {} };

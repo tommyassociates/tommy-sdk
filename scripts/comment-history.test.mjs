@@ -1,12 +1,3 @@
-// Comments state what the code does now and why. Rollout history, plan tags,
-// dated rulings, review rounds and people's names belong in commits, PRs and
-// ledgers. This counts the comment lines that carry those markers in each
-// source file and fails when a file gains any beyond its baseline.
-//
-// Lowering the baseline after a cleanup:
-//   COMMENT_HISTORY_BASELINE=tighten node --test scripts/comment-history.test.mjs
-// rewrites the baseline with each count lowered to what the file has now. It
-// never raises a count and never adds a file.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -36,7 +27,6 @@ const PLAN = /PROVENANCE|LEGACY_REMOVAL_PLAN|BACKLOG|owner-reported/;
 
 const EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.vue', '.scss']);
 const SKIP_DIRS = new Set(['node_modules', 'locales', 'i18n', 'dist', 'test', 'tests', '__tests__']);
-// Generated modules and tests are not scanned.
 const GENERATED = new Set(['manifest.js', 'locales.js']);
 const isSkipped = (name) => GENERATED.has(name) || name.includes('.generated.') || name.includes('.embedded.')
   || name.includes('.test.');
@@ -57,17 +47,14 @@ function sources() {
   return out.sort();
 }
 
-// A file whose header says it is generated is rewritten by its generator, not by hand.
 const isGeneratedText = (text) => {
   const head = text.split('\n', 3).join('\n');
   return /\bGENERATED\b/.test(head) || /do not (hand-?)?edit/i.test(head);
 };
 
-// After one of these characters or keywords, `/` starts a regex literal rather than a division.
 const REGEX_AFTER = new Set([...'(,=:[!&|?{};+-*%~^<>']);
 const REGEX_KEYWORDS = new Set(['return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'new', 'delete',
   'void', 'throw', 'instanceof', 'yield', 'await']);
-// After the `)` that closes the head of one of these statements, `/` starts a regex literal too.
 const CONTROL_KEYWORDS = new Set(['if', 'while', 'for', 'with']);
 const WORD = /[\w$]/;
 
@@ -79,10 +66,6 @@ function regexAllowed(src, prev) {
   return REGEX_KEYWORDS.has(src.slice(from, prev + 1));
 }
 
-/**
- * Whether the `(` after src[prev] opens the head of a control statement;
- * `x.for(` is a method call.
- */
 function opensControlHead(src, prev) {
   if (prev < 0 || !WORD.test(src[prev])) return false;
   let from = prev;
@@ -93,7 +76,6 @@ function opensControlHead(src, prev) {
   return before < 0 || src[before] !== '.';
 }
 
-/** Index just past the string literal opening at src[start]; an unescaped newline ends it. */
 function skipQuoted(src, start, end) {
   const quote = src[start];
   let i = start + 1;
@@ -106,7 +88,6 @@ function skipQuoted(src, start, end) {
   return end;
 }
 
-/** Index just past the regex literal (and its flags) opening at src[start]. */
 function skipRegex(src, start, end) {
   let i = start + 1;
   let inClass = false;
@@ -122,11 +103,6 @@ function skipRegex(src, start, end) {
   return i;
 }
 
-/**
- * Calls `add(from, to)` for each `//` and `/* *\/` comment in src[start, end),
- * stepping over string, template and regex literals (or, in a stylesheet,
- * strings and unquoted `url()` values).
- */
 function codeComments(src, start, end, add, style) {
   const lineEnd = (from) => {
     const at = src.indexOf('\n', from);
@@ -175,9 +151,6 @@ function codeComments(src, start, end, add, style) {
       inTemplate = true;
       i += 1;
     } else if (!style && (c === '+' || c === '-') && next === c) {
-      // A postfix `++` / `--` leaves its operand as the previous token, so a
-      // `/` after it divides; a prefix one is an operator, so a `/` after it
-      // opens a regex.
       if (regexNext()) prev = i + 1;
       i += 2;
     } else if (!style && c === '/' && regexNext()) {
@@ -200,25 +173,16 @@ function codeComments(src, start, end, add, style) {
   }
 }
 
-// The rest of a tag after its name, through the closing `>`. A quoted
-// attribute value follows its `=` and may hold `<`, `>` or `<!--`.
 const TAG_REST = String.raw`(?=[\s/>])(?:[^<>"'=]|=\s*(?:"[^"]*"|'[^']*')?)*>`;
 const BLOCK_OPEN = new RegExp(`<!--|<(template|script|style)${TAG_REST}`, 'g');
-// A comment opening, or a whole tag with its attributes.
 const MARKUP = new RegExp(`<!--|<(/?)([A-Za-z][\\w:.-]*)${TAG_REST}`, 'g');
 const RAW_CLOSE = { script: /<\/script\s*>/g, style: /<\/style\s*>/g };
 
-/** Index just past the `<!-- -->` comment opening at src[start]. */
 function markupCommentEnd(src, start) {
   const close = src.indexOf('-->', start + 4);
   return close < 0 ? src.length : close + 3;
 }
 
-/**
- * Calls `add(from, to)` for each `<!-- -->` comment in the markup src[start, end).
- * Tags are stepped over whole, so a `<!--` inside a quoted attribute value is
- * not read as a comment.
- */
 function markupComments(src, start, end, add) {
   MARKUP.lastIndex = start;
   for (let m = MARKUP.exec(src); m && m.index < end; m = MARKUP.exec(src)) {
@@ -230,11 +194,6 @@ function markupComments(src, start, end, add) {
   }
 }
 
-/**
- * The match of the `</template>` that closes the template whose body starts at
- * `body`, or null. Nested templates are counted; comments and other tags are
- * stepped over.
- */
 function templateClose(src, body) {
   let depth = 1;
   MARKUP.lastIndex = body;
@@ -248,11 +207,6 @@ function templateClose(src, body) {
   return null;
 }
 
-/**
- * Calls `add(from, to)` for each comment in a Vue single-file component. A
- * block opens and closes wherever its tags sit on a line: a script or style
- * body runs to its first closing tag, a template body to its matching one.
- */
 function vueComments(src, add) {
   let cursor = 0;
   BLOCK_OPEN.lastIndex = 0;
@@ -280,10 +234,6 @@ function vueComments(src, add) {
   }
 }
 
-/**
- * The comment text of each line of `src` that has any: `//`, `/* *\/` and
- * `<!-- -->` comments, never the inside of a string, template or regex literal.
- */
 function commentLines(src, ext) {
   const lineStarts = [0];
   for (let at = src.indexOf('\n'); at >= 0; at = src.indexOf('\n', at + 1)) lineStarts.push(at + 1);
@@ -312,7 +262,6 @@ function commentLines(src, ext) {
   return [...byLine.keys()].sort((a, b) => a - b).map((line) => byLine.get(line));
 }
 
-/** How many comment lines of `text` carry a history marker. */
 function historyCount(text, ext) {
   return commentLines(text, ext)
     .filter((line) => HISTORY.test(line) || REFERENCE.test(line) || PLAN.test(line)).length;

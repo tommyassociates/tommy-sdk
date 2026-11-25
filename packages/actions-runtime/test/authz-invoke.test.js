@@ -1,23 +1,3 @@
-/**
- * authz-invoke.test.js (F1) — `authorizedCallers: []` means DENY ALL cross-MP,
- * not "unset". Gap register Class F/F1: the authz ternary collapsed the empty
- * array into the unset branch, so 52 activities that declare `[]` (all of
- * time-clock's, timesheets', scheduling's) were callable by any first-party MP.
- *
- * The strict reading lands behind `strictEmptyCallers` (default OFF) because
- * the live estate has cross-MP callers that must first be granted explicitly.
- * Both flag states are asserted here, plus the first-party default path the
- * register flags as untested.
- *
- * SECOND HALF (D.40, ruled 2026-08-12) — `callerPolicy`. The three cases above
- * are only two-thirds sayable with `authorizedCallers`: owner-only is spelled by
- * an EMPTY ARRAY and first-party by an ABSENT FIELD, so both are carried by the
- * shape of the value rather than by a value, and the empty case reads two ways
- * depending on `strictEmptyCallers`. `callerPolicy: owner_only | first_party |
- * listed` says it outright and is authoritative wherever present. The second
- * describe block below pins that it is NOT gated on the flag — that is the whole
- * point of it, and it is the property a future flag flip could silently undo.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 
@@ -43,11 +23,6 @@ const manifest = (id, publisherType, activities) => ({
   actions: {},
 });
 
-/**
- * time-clock owns three activities: one with an EXPLICIT empty caller list,
- * one with no list at all, one with a non-empty list. timesheets (first party)
- * and acme (third party) are the callers.
- */
 async function world({ strictEmptyCallers } = {}) {
   const issuer = createFakeIssuer();
   const broker = createBroker({ capabilityService: issuer, strictEmptyCallers });
@@ -55,10 +30,6 @@ async function world({ strictEmptyCallers } = {}) {
     delete_attendance: activity({ authorizedCallers: [] }),
     touch_attendance: activity(),
     record_view: activity({ authorizedCallers: ['timesheets'] }),
-    // D.40 — the same three cases said out loud. `sync_attendance` lists the
-    // THIRD-party MP deliberately: it proves `listed` overrides both defaults in
-    // both directions (a third party in, a first party out), which neither the
-    // empty nor the absent spelling can express.
     purge_attendance: activity({ callerPolicy: 'owner_only' }),
     open_attendance: activity({ callerPolicy: 'first_party' }),
     sync_attendance: activity({ callerPolicy: 'listed', authorizedCallers: ['acme-reporting'] }),
@@ -157,9 +128,6 @@ describe('authorizeInvoke — empty vs unset authorizedCallers (F1)', () => {
 
 describe('authorizeInvoke — callerPolicy says the case outright (D.40)', () => {
   it('owner_only denies a FIRST-PARTY caller under BOTH flag states', async () => {
-    // The property that matters: unlike `authorizedCallers: []`, this does not
-    // depend on strictEmptyCallers. Flipping that flag off must not silently
-    // re-open 58 owner-only activities to every first-party MP.
     for (const w of [await world(), await world({ strictEmptyCallers: true })]) {
       // eslint-disable-next-line no-await-in-loop
       const rejection = await w.asFirstParty('purge_attendance').catch((e) => e);
@@ -191,10 +159,6 @@ describe('authorizeInvoke — callerPolicy says the case outright (D.40)', () =>
   });
 
   it('callerPolicy is AUTHORITATIVE over a contradicting authorizedCallers', async () => {
-    // The schema rejects this pairing (owner_only/first_party forbid a companion
-    // list) precisely so one question has one answer. Pinned anyway: a manifest
-    // that reaches the broker unvalidated must resolve the tightest way, not
-    // fall through to the list.
     const issuer = createFakeIssuer();
     const broker = createBroker({ capabilityService: issuer });
     broker.registerMp(manifest('time-clock', 'first_party', {

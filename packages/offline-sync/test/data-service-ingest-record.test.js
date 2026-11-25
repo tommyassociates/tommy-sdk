@@ -1,11 +1,4 @@
 // @vitest-environment node
-/**
- * A source may declare `ingestRecord(dto, prev)`: rows stored from outside the
- * declared read (`ingest`) are merged with the stored row of the same key
- * inside the ingest's turn, so a lighter row from elsewhere keeps what only
- * the source's own read carries. The declared read itself stores its answer
- * as answered, and a source without it stores ingested rows as given.
- */
 import { describe, it, expect } from 'vitest';
 import {
   createDataService, createDataStore, createMemoryStoreBackend, createMemorySourceMeta,
@@ -30,7 +23,6 @@ describe('ingestRecord', () => {
     await data.refresh('account', { mode: 'visible' });
     await data.ingest('account', [{ key: 'one', name: 'Cafe Pty' }]);
     expect(await data.read('account')).toEqual([{ key: 'one', name: 'Cafe Pty', invoicing: { record: true } }]);
-    // The source's own read stores its answer as answered: an absent field is absent.
     answer = [{ key: 'one', name: 'Cafe Pty' }];
     await data.refresh('account', { mode: 'visible', force: true });
     expect(await data.read('account')).toEqual([{ key: 'one', name: 'Cafe Pty' }]);

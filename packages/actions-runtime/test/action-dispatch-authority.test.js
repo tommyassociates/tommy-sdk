@@ -1,31 +1,6 @@
-/**
- * action-dispatch-authority.test.js — the three parked broker debts (D.35,
- * D.36, D.37), all of which are about an Action running with an authority that
- * was never its own.
- *
- * D.35 — an Action's dispatches carried the EMITTER's identity. `sourceMpId`
- *   was already the action owner, but `identity.scopes` is what
- *   `authorizeQuery` judges, so an Action owned by A and fired by B's emit read
- *   A's cross-MP condition gates with B's grants. That is wrong in BOTH
- *   directions, and both are pinned here.
- *
- * D.36 — `subscribe()` is grant-tested (F4) and the DECLARATIVE binding was
- *   not, so an MP could consume another MP's trigger just by naming it in an
- *   Action. That is how leave's `create_leave_on_shift_absent` consumed
- *   `time-clock.shift_marked_absent` with no `read:attendance` declaration.
- *
- * D.37 — `correlationKey` fell through `idempotencyKeyFor`'s switch to
- *   `default: undefined`, i.e. it behaved exactly as `none`. The two host-owned
- *   `tommy.clock.*` scheduled writes declare it AND `offlineReplayable: true`,
- *   which is the combination the schema forbids — hidden in the one place the
- *   manifest checker cannot see, because system activities bypass it.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 
-// An async emission returns its receipt before the deliveries settle, so every
-// assertion about what an Action DID has to let them land first — the same
-// wait `action-run-records.test.js` uses.
 const settle = () => new Promise((resolve) => { setTimeout(resolve, 10); });
 
 const TENANT = 'team-1';
@@ -35,10 +10,6 @@ const condition = () => ({
   description: 'c', inputSchema: { type: 'object' }, returnSchema: { type: 'boolean' }, latencyBudgetMs: 100,
 });
 
-/* =============================================== D.35 — whose authority runs */
-
-// clients owns a gated read; time-clock owns the trigger; leave owns the Action
-// and is the MP whose grants must decide the gate.
 const clients = {
   id: 'clients',
   version: '1.0.0',
@@ -100,8 +71,6 @@ async function actionWorld({ leaveScopes = [], emitterScopes = [], enforceCondit
   broker.registerMp(leaveWith({ scopes: leaveScopes }), {
     handlers: { activities: { create_leave: (args) => { created.push(args); return { ok: true }; } } },
   });
-  // The EMITTER's token. Its scopes are deliberately different from the action
-  // owner's — that difference is the whole subject of D.35.
   const token = await issuer.issue('time-clock', '1.0.0', TENANT, emitterScopes, 'i-tc');
   return {
     broker,
@@ -124,9 +93,6 @@ describe('D.35 — an Action runs as the MP that owns it', () => {
   });
 
   it('the EMITTER\'s grant does NOT admit it — the borrowed authority is gone', async () => {
-    // Before the fix this passed on the emitter's scopes: `identity.scopes`
-    // reached authorizeQuery unchanged, so time-clock's grant opened leave's
-    // gate. Now the gate is judged on leave's own (empty) declaration.
     const w = await actionWorld({ leaveScopes: [], emitterScopes: ['read:clients'] });
     await w.emit();
     await settle();
@@ -141,16 +107,12 @@ describe('D.35 — an Action runs as the MP that owns it', () => {
     await settle();
     const [invokeRecord] = await w.broker.records.query({ kind: 'invoke' });
     expect(invokeRecord.sourceMpId).toBe('leave');
-    // The emit is still the cause and still recorded under the emitter.
     const [emitRecord] = await w.broker.records.query({ kind: 'emit' });
     expect(emitRecord.sourceMpId).toBe('time-clock');
     expect(emitRecord.capabilityTokenId).toBeTruthy();
-    // …but the Action's own dispatch carries no borrowed capability token.
     expect(invokeRecord.capabilityTokenId).toBeUndefined();
   });
 });
-
-/* ============================== D.36 — the declarative binding needs a grant */
 
 async function bindingWorld({ leaveScopes = [], strictEmitOwnership = true, bindOwnTrigger = false } = {}) {
   const issuer = createFakeIssuer();
@@ -183,9 +145,6 @@ describe('D.36 — declarative trigger binding is grant-tested like subscribe()'
     const receipt = await w.emitForeign();
     await settle();
     expect(w.created).toHaveLength(0);
-    // …and it is not a consumer at all, so the emit suppresses exactly as it
-    // would with no binding declared. An ungranted wiring must not keep a
-    // trigger "active".
     expect(receipt.suppressed).toBe(true);
   });
 
@@ -218,16 +177,10 @@ describe('D.36 — declarative trigger binding is grant-tested like subscribe()'
   });
 
   it('an ungranted binding does NOT break the emitting MP\'s own emit', async () => {
-    // The imperative path can reject, because a caller is waiting. Here the
-    // caller is an unrelated MP; failing its emit because a third party
-    // declared an ungranted Action would let one manifest break another's
-    // writes.
     const w = await bindingWorld({ leaveScopes: [] });
     await expect(w.emitForeign()).resolves.toBeTruthy();
   });
 });
-
-/* ================================================ D.37 — correlationKey keys */
 
 const clockOwner = (idempotency = 'correlationKey') => ({
   id: 'clock',
@@ -296,9 +249,6 @@ describe('D.37 — correlationKey is a real idempotency strategy', () => {
     expect(second.scheduled).toBe(first.scheduled);
   });
 
-  // The deliberate deviation from the parked note's "key on args.correlationKey":
-  // keying on the correlation key ALONE makes a follow-up un-rescheduable, and a
-  // swallowed reschedule is silent. This is the M3 set_mileage_status failure.
   it('does NOT swallow a re-scheduling of the same family to a new time', async () => {
     const w = await clockWorld();
     await w.invoke('schedule_follow_up', { correlationKey: 'follow-up-9', fireAt: '2026-04-01T09:00:00Z' });

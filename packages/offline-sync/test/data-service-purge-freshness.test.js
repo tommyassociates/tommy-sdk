@@ -1,11 +1,4 @@
 // @vitest-environment node
-/**
- * A whole purge (what a host invalidation does) leaves the collection's
- * reads not run: the next refresh reads the server whatever `maxAge` it asks
- * with, and a read begun before the purge never marks the collection fresh,
- * whether the purge overtook it before it stored or after. A purge of named
- * keys removes only those rows and leaves what the last whole read covered.
- */
 import { describe, it, expect } from 'vitest';
 import {
   createDataService, createDataStore, createMemoryStoreBackend, createMemorySourceMeta,
@@ -46,8 +39,6 @@ function world({
   };
 }
 
-// Runs each job at once, but answers its callers only when the test says:
-// what the read stored is in the store before its outcome lands.
 function heldScheduler() {
   const held = [];
   return {

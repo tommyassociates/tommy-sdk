@@ -1,22 +1,3 @@
-// Tours grammar — PARKED A.1 step 1.
-//
-// ⚠ THE GRAMMAR WAS DERIVED FROM THE CHECKER, NOT INVENTED. Four Ruby rules
-// already existed and already read `contributions.tours`,
-// `contributions.tourAnchors`, `tour.autoLaunch.when`, `tour.steps[].anchor`,
-// `step.host`, `tour.replayable` and `tour.fixtures[].teardown` through
-// `Mp::ManifestCheck::Walk` (the API manifest-check rules directory,
-// m19_tour_anchors_rendered.rb, m20_…, m21_…, m22_…). This schema is the shape
-// they were written against.
-//
-// ⚠ AND THAT IS WHY NONE OF THEM HAD EVER FIRED ON REAL DATA: `contributions` is
-// `additionalProperties: false`, so until this change a manifest declaring a tour
-// failed SCHEMA validation before a single tour rule could run. The rules were
-// dead code guarded by a gate that rejected their own input.
-//
-// SHAPE HERE, POLICY IN THE RULES. Teardown is deliberately not schema-required
-// even though M21 refuses a fixture without one: two authorities on one decision
-// is the anti-pattern M20's own rationale names, and the rule's message is far
-// better than a schema type error.
 import { describe, it, expect } from 'vitest';
 import { validateManifest } from '../src/index.js';
 
@@ -44,9 +25,6 @@ contributions:
   });
 
   it('REJECTS a dotted anchor name', () => {
-    // The rendered attribute is `data-tour-target="<mpId>.<name>"`, so a dot in
-    // the name makes the mpId prefix ambiguous — `a.b.c` could be either MP `a`
-    // anchor `b.c` or MP `a.b` anchor `c`.
     const r = validateManifest(withBody(`
 contributions:
   tourAnchors:
@@ -87,8 +65,6 @@ contributions:
   });
 
   it('accepts a HOST-chrome step, which declares no MP anchor', () => {
-    // M19 excuses `host: true` and `tommy.`-prefixed anchors from the
-    // declared-anchor requirement — host furniture is not the MP's DOM.
     const r = validateManifest(withBody(`
 contributions:
   tours:
@@ -149,10 +125,6 @@ contributions:
   });
 
   it('leaves a teardown-less fixture to the CHECKER, not the schema', () => {
-    // Deliberate: M21 refuses this with an explanation of the measured failure
-    // (a browser closed mid-tour leaves permanent sample records on a live
-    // surface with no sweeper). A schema `required` would pre-empt that with a
-    // worse message and put two authorities on one decision.
     const r = validateManifest(withBody(`
 contributions:
   tourAnchors:
@@ -179,12 +151,6 @@ contributions:
   });
 
   it('accepts the chain field and per-step requireInteraction', () => {
-    // ⚠ BOTH FIELDS WERE FOUND BY PORTING A REAL TOUR, not by review. The
-    // grammar was derived from the four checker rules and NEITHER field appears
-    // in any of them, so neither existed. Without `nextTour` the shipped
-    // four-tour chain (Scheduling → Time Clock → Timesheets → Team) silently
-    // shortens; without `requireInteraction` three steps of the timesheets tour
-    // lose their real-interaction requirement.
     const r = validateManifest(withBody(`
 contributions:
   tourAnchors:
@@ -201,18 +167,12 @@ contributions:
   });
 
   it('REJECTS a dotted tour id', () => {
-    // ⚠ The id is the WIRE KEY: `tours.seen[id]`. Keeping it to one flat token
-    // is what stops an id from drifting into a path-like shape that invites
-    // renaming — and renaming re-onboards the entire existing user base.
     expect(validateManifest(withBody('contributions:\n  tours:\n    - id: mp.timesheets\n      steps:\n        - anchor: a')).ok).toBe(false);
   });
 });
 
 describe('the gate that made the four tour rules unreachable', () => {
   it('a tour-declaring manifest no longer fails schema validation outright', () => {
-    // The regression this whole step exists to prevent: `contributions` is
-    // additionalProperties:false, so BEFORE this change the manifest below was
-    // rejected at the schema, and M19/M20/M21/M22 never saw a single tour.
     const r = validateManifest(withBody(`
 contributions:
   tourAnchors:

@@ -1,11 +1,3 @@
-/**
- * F8 (device run 23 Nov): on a weak link a queued clock punch was resent back
- * to back — the drain runs on every server answer — with its whole photo each
- * time. A replayable write whose request never reached the server is now sent
- * once per try, and a queued row's resends are spaced: 5s, then doubling to a
- * 2-minute ceiling. A drain asked for sooner leaves it queued and wakes itself
- * when it is due; going from offline to online sends it at once.
- */
 import { describe, it, expect } from 'vitest';
 import { TommyError } from '@tommy/sdk';
 import { createBroker, createFakeIssuer } from '../src/index.js';
@@ -23,7 +15,6 @@ const punch = {
   retry: { maxAttempts: 3 },
 };
 
-// A host transport that marks a dropped connection retryable (status 0).
 const cut = () => Object.assign(new TommyError({ code: 'Offline', message: 'Network request failed', retryable: true }), { status: 0 });
 
 async function world() {
@@ -65,7 +56,6 @@ describe('a queued write whose sends never reach the server (F8)', () => {
   it('waits before each resend, longer each time, and a drain asked for sooner sends nothing', async () => {
     const w = await world();
     await w.invoke('in', 'k-1');
-    // The drain every server answer starts: too soon.
     expect(await w.broker.drainOfflineQueue()).toEqual([]);
     expect(w.sent).toEqual(['in']);
 
@@ -73,7 +63,6 @@ describe('a queued write whose sends never reach the server (F8)', () => {
     await w.broker.drainOfflineQueue();
     expect(w.sent).toEqual(['in', 'in']);
 
-    // Second failure: the wait doubles.
     w.clock.t += queueResendDelayMs(1);
     expect(await w.broker.drainOfflineQueue()).toEqual([]);
     w.clock.t += queueResendDelayMs(2) - queueResendDelayMs(1);
@@ -94,7 +83,7 @@ describe('a queued write whose sends never reach the server (F8)', () => {
     w.link.up = true;
     w.clock.t += w.timers[0].ms;
     w.timers.shift().fn();
-    await w.broker.drainOfflineQueue(); // joins the woken drain
+    await w.broker.drainOfflineQueue();
     expect(w.sent).toEqual(['in', 'in']);
     expect(w.broker.queueStats().total).toBe(0);
   });

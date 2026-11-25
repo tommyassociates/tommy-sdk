@@ -1,12 +1,4 @@
 // @vitest-environment node
-/**
- * Every write to a collection goes in its turn and is recorded as a change
- * of its rows: a query or window refresh too, so an older declared read never
- * undoes it. A queued refresh re-checks that it is still wanted inside the
- * turn, immediately before it commits. Every asynchronous call is tracked
- * from its start to its end, so `idle()` never reports a call still on its
- * way. Outside a turn the collection's store takes no writes at all.
- */
 import {
   describe, it, expect, vi,
 } from 'vitest';
@@ -67,7 +59,6 @@ describe('writes in the collection\'s turn', () => {
   it('refuses a write through the collection\'s store outside its turn', async () => {
     const { data } = service();
     data.source('members', { fetch: async () => [] });
-    // The only handles the service gives out: a writer (writes in turn) and reads.
     const writer = data.writer('members');
     await writer.put({ id: 'w' });
     expect((await data.read('members', 'w')).id).toBe('w');
@@ -149,7 +140,6 @@ describe('scoped writes', () => {
     await data.ingest('members', [{ id: 'gone', group: 'a' }, { id: 'kept', group: 'b' }]);
     const declared = data.refresh('members', { mode: 'visible' });
     await vi.waitFor(() => expect(release).toBeTypeOf('function'));
-    // A window read of group a finds 'gone' removed on the server.
     await data.reconcileWindow('members', { fetch: async () => [], scope: (row) => row.group === 'a' });
     release();
     await declared;
@@ -219,13 +209,11 @@ describe('a queued refresh', () => {
     });
     const { data } = service({ scheduler, store: slow });
     data.source('members', { fetch: async () => ({ id: 'a', v: 9 }) });
-    // An ingest holds the collection's turn.
     let open;
     gate = new Promise((resolve) => { open = resolve; });
     const holding = data.ingest('members', [{ id: 'z' }]);
     const refresh = data.refresh({ collection: 'members', key: 'a' }, { mode: 'silent' });
     await new Promise((resolve) => { setTimeout(resolve, 5); });
-    // No longer wanted while it waits for the turn.
     wanted = false;
     gate = null;
     open();

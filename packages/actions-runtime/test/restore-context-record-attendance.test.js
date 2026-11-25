@@ -1,23 +1,3 @@
-/**
- * Scope 11 D23 — replay provenance for `time-clock.record_attendance`.
- *
- * An offline punch is scrutinised like a manual entry (owner ruling R6): the
- * server honours the CAPTURED time only when it can tell the write is a drained
- * replay, and it records when the punch was queued. Both facts must come from
- * the runtime, never from MP args — an MP that could set them could back-date
- * its own punches. So the drain stamps `restoreReplay` + `restoreQueuedAt`, and
- * `executeInvoke` forwards them as `restoreContext` for exactly the activities
- * in RESTORE_CONTEXT_ON_DRAIN, and only for a durable-queue DRAIN.
- *
- * Three things are pinned:
- *  1. a drained `record_attendance` carries { replayed: true, queuedAt };
- *  2. a LIVE `record_attendance` (online, never queued) carries NO restoreContext —
- *     the marker cannot be present on a write that did not wait;
- *  3. an activity outside the set gets exactly today's envelope (additive change);
- *  4. an INSPECTOR replay of a live failure (broker.replay) is not a drain — no
- *     restoreContext — and a drained `team.update_member` keeps its exact
- *     pre-existing restoreContext shape (no `queuedAt`).
- */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createBroker, createFakeIssuer, createDurableQueue } from '../src/index.js';
 
@@ -91,7 +71,7 @@ describe('D23 — record_attendance replay provenance', () => {
     expect(queued.status).toBe('queued_offline');
     expect(seen).toEqual([]);
 
-    clock = T0 + 90 * 60 * 1000; // reconnects ninety minutes later
+    clock = T0 + 90 * 60 * 1000;
     const online = await makeBroker();
     online.broker.setOnline(true);
     await online.broker.drainOfflineQueue();
@@ -100,9 +80,9 @@ describe('D23 — record_attendance replay provenance', () => {
     const env = seen[0];
     expect(env.activity).toBe('time-clock.record_attendance');
     expect(env.restoreContext).toMatchObject({ replayed: true, tenantId: 'team-A', mpId: 'time-clock' });
-    expect(env.restoreContext.queuedAt).toBe(T0);          // set by the drain from the row, not by args
-    expect(env.idempotencyKey).toBe('k-1');                // ORIGINAL key survives the replay
-    expect(env.args).toEqual({ status: 'start' });         // args are untouched — the marker is beside them
+    expect(env.restoreContext.queuedAt).toBe(T0);
+    expect(env.idempotencyKey).toBe('k-1');
+    expect(env.args).toEqual({ status: 'start' });
   });
 
   it('a LIVE punch carries no restoreContext at all', async () => {
@@ -134,9 +114,9 @@ describe('D23 — record_attendance replay provenance', () => {
 
     fail = false;
     seen = [];
-    await broker.replay(dead.runId); // a human pressed "replay" in the inspector
+    await broker.replay(dead.runId);
     expect(seen).toHaveLength(1);
-    expect(seen[0].restoreContext).toBeUndefined(); // never waited in the queue → not an offline punch
+    expect(seen[0].restoreContext).toBeUndefined();
   });
 
   it('a drained team.update_member keeps its pre-existing restoreContext shape — no queuedAt (Codex P2)', async () => {

@@ -1,7 +1,3 @@
-/**
- * enforcement.test.js (ac2) — unauthorized caller denied, throttle trips,
- * loop capped — all with NAMED errors (actions-runtime.md §6/§7/§8).
- */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createBroker, createFakeIssuer, DEFAULT_THROTTLE_PROFILE } from '../src/index.js';
 
@@ -87,9 +83,6 @@ describe('broker enforcement', () => {
     expect(rejection.code).toBe('PermissionDenied');
     expect(rejection.message).toContain("does not list 'acme-reporting' in authorizedCallers");
     expect(rejection.rule).toBe('activities.submit.authorizedCallers');
-    // The denial itself is a failed action-run record (§6.5)? Denials happen
-    // pre-record at M1 dispatch entry — asserted via records suite for the
-    // executed path; the named error is the contract here.
   });
 
   it('rejects an expired capability token with CapabilityTokenInvalid', async () => {
@@ -112,7 +105,6 @@ describe('broker enforcement', () => {
     const emit = () => tight.broker.emit({
       sourceMpId: 'acme-reporting', instanceId: 'i-1', capabilityToken: tight.token, trigger: 'acme-reporting.ping', payload: {},
     });
-    // Burst of 3 passes (suppressed — no consumer — but rate still charged).
     await emit(); await emit(); await emit();
     const rejection = await emit().catch((e) => e);
     expect(rejection.code).toBe('RateLimited');

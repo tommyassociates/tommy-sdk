@@ -1,14 +1,7 @@
 // @vitest-environment node
-/**
- * An ask that joins a whole read still queued in the scheduler (a silent
- * boot warm-up) raises that queued job to the ask's own visibility and
- * priority, so a screen waiting on it is not held at the warm-up's rank. An
- * account not in the foreground raises nothing.
- */
 import { describe, it, expect, vi } from 'vitest';
 import { createDataService, createDataStore, createMemoryStoreBackend } from '../src/index.js';
 
-// A scheduler that holds jobs until `run()` and records raises.
 function heldScheduler() {
   const held = [];
   const raises = [];
@@ -84,8 +77,6 @@ describe('an ask joining a queued method read', () => {
   };
   const target = { collection: 'plans', method: 'client', params: { client: '7' } };
 
-  // The screen left behind asked it; the scheduler lowered it on leaving; the
-  // next screen asks the same read and shares the queued flight.
   it('raises the queued flight to the joining ask, and still reads once', async () => {
     const { data, scheduler, fetch } = methodService();
     const left = data.refresh(target, { mode: 'visible', priority: 'normal' });
@@ -109,7 +100,6 @@ describe('an ask joining a queued batched method read', () => {
     data.source('plans', { fetch: async () => [], methods: { byIds: { params: { ids: { type: 'ids' } }, batch: 'ids', field: 'id', fetch } } });
     return { data, scheduler, fetch };
   };
-  // A batched ask checks its stored rows before it reaches the scheduler.
   const settled = () => new Promise((resolve) => { setTimeout(resolve, 0); });
   const byIds = (ids) => ({ collection: 'plans', method: 'byIds', params: { ids } });
 

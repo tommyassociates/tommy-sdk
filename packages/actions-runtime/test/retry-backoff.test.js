@@ -1,16 +1,3 @@
-/**
- * retry-backoff.test.js — spec mp-declared-bounds-that-dont-bind Phase 1 (B1).
- *
- * `retry.backoff` has been a manifest-schema enum since v1 and is declared by 26
- * activities across 14 MPs, and nothing implemented it: the three attempts fired
- * back to back. That matters most for `RateLimited`, the one retryable error the
- * runtime raises itself — three immediate retries against a token bucket fail in
- * the same millisecond and burn the whole budget.
- *
- * The schedule is asserted, not waited out. `sleep` is injected so these tests
- * record what the loop ASKED to wait; a suite that sits through real delays is a
- * suite that gets them shortened later.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 import { retryDelayMs, RETRY_BASE_DELAY_MS, RETRY_MAX_DELAY_MS } from '../src/constants.js';
@@ -49,9 +36,6 @@ async function runAndRecordDelays(retry) {
       conditions: {},
       activities: {
         always_fails: async () => {
-          // `name = 'TommyError'` is what makes the broker treat this as a
-          // typed error rather than wrapping it as non-retryable — the same
-          // shape sdk-private's own `retryable()` helper builds.
           const e = new Error('transient');
           e.name = 'TommyError';
           e.code = 'Timeout';
@@ -87,8 +71,6 @@ describe('retryDelayMs', () => {
     expect(retryDelayMs('linear', 3)).toBe(RETRY_BASE_DELAY_MS * 2);
     expect(retryDelayMs('exponential', 2)).toBe(RETRY_BASE_DELAY_MS);
     expect(retryDelayMs('exponential', 3)).toBe(RETRY_BASE_DELAY_MS * 2);
-    // The cap is the point: an uncapped exponential turns a millisecond
-    // dead-letter into a multi-second one, and every Action run inherits it.
     expect(retryDelayMs('exponential', 12)).toBe(RETRY_MAX_DELAY_MS);
     expect(retryDelayMs('linear', 99)).toBe(RETRY_MAX_DELAY_MS);
   });
@@ -102,7 +84,6 @@ describe('the broker applies the declared backoff', () => {
   it('spaces the default 3-attempt budget, and the whole budget stays under a second', async () => {
     const { waited, threw } = await runAndRecordDelays(undefined);
 
-    // 3 attempts => 2 gaps. The first attempt is never delayed.
     expect(waited).toEqual([RETRY_BASE_DELAY_MS, RETRY_BASE_DELAY_MS * 2]);
     expect(waited.reduce((a, b) => a + b, 0)).toBeLessThan(1000);
     expect(threw).toBeTruthy();

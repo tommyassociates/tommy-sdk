@@ -1,16 +1,9 @@
 // @vitest-environment node
-/**
- * A server row answered exactly as a store holds it is not a change:
- * reconcile leaves it unwritten (a commit is announced on the change feed)
- * and tells no one, so two strict reads over shared rows never void each
- * other's receipt.
- */
 import { describe, it, expect, vi } from 'vitest';
 import { createDataService, createDataStore, createMemoryStoreBackend } from '../src/index.js';
 import { createHostStorePort, createHostStoreChangeFeed, observeHostStorePort } from '../src/host-store/index.js';
 import { DATABASES, identity, createChannelBus } from './helpers/host-databases.js';
 
-/** A host-store-backed collection the way the app opens one. */
 function transactionalBackend(port, options) {
   let handle;
   const ready = () => (handle ||= port.open(options));
@@ -54,7 +47,6 @@ function open(create, feed = null, { maxAgeMs = 30 * 86400000, now, ...rowPolicy
 const mine = [{ id: '1', user_id: '5', status: 'approved', meta: { a: 1, b: 2 } }];
 const team = [...mine, { id: '2', user_id: '6', status: 'pending', meta: { a: 3 } }];
 
-// The host store (both engines) and the memory store a session collection uses.
 const STORES = [...DATABASES, ['memory', null]];
 
 describe.each(STORES)('reconcile of unchanged server rows (%s)', (_name, create) => {
@@ -71,7 +63,6 @@ describe.each(STORES)('reconcile of unchanged server rows (%s)', (_name, create)
     await store.markSynced('1');
     await store.replaceSynced('1', { id: '1', title: 'Bakery' }, { when: () => true });
     expect((await store.getRaw('1')).notification_count).toBe(2);
-    // Explicit values still replace what is held, including zero and null.
     for (const notification_count of [0, null]) {
       await store.reconcile([{ id: '1', title: 'Bakery', notification_count }], { keepDirty: true });
       expect((await store.getRaw('1')).notification_count).toBe(notification_count);
@@ -105,7 +96,6 @@ describe.each(STORES)('reconcile of unchanged server rows (%s)', (_name, create)
     const before = await store.getRaw('1');
     const heard = vi.fn();
     store.onChange(heard);
-    // The same rows, keys in another order.
     const answered = await store.reconcile(team.map((row) => ({ meta: { b: row.meta.b, a: row.meta.a }, status: row.status, user_id: row.user_id, id: row.id }))
       .map((row) => (row.meta.b === undefined ? { ...row, meta: { a: row.meta.a } } : row)), { prune: false, keepDirty: true, syncedAt: null });
     expect(answered.upserted).toBe(2);
@@ -164,10 +154,8 @@ describe.each(STORES)('reconcile of unchanged server rows (%s)', (_name, create)
   it('keeps a held stamp through a write of the same content, and drops it over changed content', async () => {
     const { database, store } = open(create);
     await store.reconcile([{ ...team[0], _readStamp: 'exact-1' }], { prune: false, keepDirty: true, syncedAt: null, windowKey: 'w1' });
-    // Another window's read: written (retagged), the content the stamp read unchanged.
     await store.reconcile([team[0]], { prune: false, keepDirty: true, syncedAt: null, windowKey: 'w2' });
     expect(await store.getRaw('1')).toMatchObject({ _readStamp: 'exact-1', _window: 'w2' });
-    // A newer version no stamped read saw.
     await store.reconcile([{ ...team[0], status: 'rejected' }], { prune: false, keepDirty: true, syncedAt: null });
     const after = await store.getRaw('1');
     expect(after.status).toBe('rejected');
@@ -232,7 +220,6 @@ describe.each(STORES)('reconcile of unchanged server rows (%s)', (_name, create)
     await data.refresh(own, { mode: 'visible' });
     const ownBefore = data.status(own, { receipt: true });
     expect(ownBefore.receiptRevision).toBe(ownBefore.revision);
-    // The team-wide read again, answering the rows it answered before.
     await data.refresh(all, { mode: 'visible', maxAge: 0, fromNow: true });
     const ownAfter = data.status(own, { receipt: true });
     expect(ownAfter.receiptRevision).toBe(ownAfter.revision);

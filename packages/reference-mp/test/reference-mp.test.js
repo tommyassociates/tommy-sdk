@@ -1,11 +1,3 @@
-/**
- * reference-mp.test.js — the reference MP boots against the REAL runtime
- * stack (broker + SDK + data + panel host) and exercises every primitive:
- * manifest validates clean (incl. vs the plans seed), the required Action's
- * trigger→activity loop runs through the bus, the condition answers
- * cross-MP queries, panels mount on all three surfaces, offline emits queue
- * and replay. This IS the M1 "runtime refined against it" fixture suite.
- */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
@@ -16,31 +8,6 @@ import { createDataManager } from '@tommy/offline-sync';
 import { createPanelHost } from '@tommy/panel-runtime';
 import referenceMp, { postCheckin } from '../src/index.js';
 
-// ⚠ ONE TENANT PER WORLD, NOT ONE FOR THE FILE — this is what made the suite
-// order-dependent, and the mechanism is worth stating because it is invisible
-// from the test body.
-//
-// `checkins` declares `syncStrategy: last_write_wins`, and this package's
-// vitest.config.js sets `environment: 'jsdom'`. So `hasWebStorage()` is TRUE
-// here (it is false under plain node), and offline-sync's defaultBackend picks
-// `createLocalStorageBackend(databaseName(token, mpId), …)` instead of memory.
-// `databaseName` includes both tenantId and mpId — so with a file-level constant
-// tenant, EVERY world built by bootWorld() resolved to the SAME localStorage
-// keys, and jsdom keeps localStorage alive across examples. A `beforeEach` that
-// boots a genuinely fresh broker/sdk/host therefore still inherited the previous
-// example's check-ins.
-//
-// Two examples read that as a product answer: the cross-MP condition saw
-// `checkedIn: true` where it had written nothing, and the offline replay found
-// one record before draining where it expects zero.
-//
-// A distinct tenant per world fixes it at the level the platform already models
-// — `names.js` exists precisely so two teams running the same MP never share a
-// store (the D-multi-team regression it names) — so this also EXERCISES that
-// partitioning rather than only working around the symptom. Clearing
-// localStorage in an afterEach would go green too, but would leave every world
-// on one store name, one deleted hook away from the same bug and proving
-// nothing about partitioning.
 let worldSeq = 0;
 const flush = () => new Promise((resolve) => { setTimeout(resolve, 5); });
 
@@ -80,13 +47,8 @@ describe('reference MP (team-checkin)', () => {
     const verdict = validateManifest(referenceMp.manifest);
     expect(verdict.errors || []).toEqual([]);
     expect(verdict.ok).toBe(true);
-    // The seed as this repository keeps it: the manifest package's fixture
-    // (the run's cwd is this package; vitest's transformed import.meta.url is
-    // not a file: URL here).
     const seed = readFileSync(path.resolve(process.cwd(), '../manifest/test/fixtures/reference-manifest.yml'), 'utf8');
     expect(referenceMp.manifest).toBe(seed);
-    // A workspace that holds the plans above this repository has the seed's
-    // original there too: the same bytes.
     let root = process.cwd();
     while (!existsSync(path.join(root, 'plans')) && root !== path.dirname(root)) root = path.dirname(root);
     const original = path.join(root, 'plans/refactor-plan/05-deliverables/05-reference-mp/reference-manifest.yml');
@@ -101,7 +63,6 @@ describe('reference MP (team-checkin)', () => {
     expect(records).toHaveLength(1);
     expect(records[0].status).toBe('great');
 
-    // Every hop is an action-run record.
     expect(await world.broker.records.query({ kind: 'emit' })).toHaveLength(1);
     const invokes = await world.broker.records.query({ kind: 'invoke' });
     expect(invokes).toHaveLength(1);
@@ -111,7 +72,6 @@ describe('reference MP (team-checkin)', () => {
 
   it('the condition answers cross-MP has_checked_in_today queries', async () => {
     const memberId = 'self';
-    // A first-party caller MP queries the reference MP's condition.
     const caller = { id: 'timesheets', version: '1.0.0', publisher: { type: 'first_party' }, triggers: {}, conditions: {}, activities: {}, actions: {} };
     world.broker.registerMp(caller, { handlers: {} });
     const callerToken = await world.issuer.issue('timesheets', '1.0.0', world.tenant, [], 'inst-ts');
@@ -124,9 +84,6 @@ describe('reference MP (team-checkin)', () => {
 
     await postCheckin(world.sdk, { status: 'ok' });
     await flush();
-    // cacheable 60s: bypass by different args? Same args — invalidation only
-    // fires on server_write; local_write keeps the cache. Assert the CACHED
-    // answer semantics explicitly (fresh broker world → fresh answer).
     const fresh = await bootWorld();
     await postCheckin(fresh.sdk, { status: 'ok' });
     await flush();
@@ -168,7 +125,6 @@ describe('reference MP (team-checkin)', () => {
   });
 
   it('the 2.22 teaching Actions register and surface in per-tenant state (dispatch deferred)', () => {
-    // enabledByDefault:false → never dispatched; required lock enforced.
     expect(() => world.broker.setActionState(world.tenant, 'team-checkin', 'record_on_checkin', { enabled: false }))
       .toThrow(/required/);
     world.broker.setActionState(world.tenant, 'team-checkin', 'notify_manager_when_struggling', { enabled: false, options: {} });

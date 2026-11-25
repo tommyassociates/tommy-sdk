@@ -84,7 +84,6 @@ describe.each(DATABASES)('hot port reads on %s', (_name, create) => {
       counts.rows = 0;
       first.rows[0].value.title = 'caller mutation';
       for (let n = 0; n < 8; n += 1) expect((await port.read(ask)).rows[0].value.title).toBe('One');
-      // Point reads share the same normalized rows the scan held.
       expect((await port.read({ handle: opened.handle, expectedEpoch: opened.epoch, keys: ['1'] })).rows[0].value.title).toBe('One');
       expect(counts.rows).toBe(0);
       await port.commit({ handle: opened.handle, expectedEpoch: opened.epoch, expectedStoreRevision: committed.storeRevision, changes: change('Two') });

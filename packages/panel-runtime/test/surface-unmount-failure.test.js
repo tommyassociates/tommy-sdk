@@ -1,12 +1,3 @@
-/**
- * surface-unmount-failure.test.js — an element whose surface app fails to
- * unmount can host a surface again.
- *
- * A panel left broken by an error mid-update makes Vue's unmount throw. The
- * host forgets the element and clears what the broken app left on it, so the
- * next world's surface (an account switch) mounts there instead of patching
- * against the broken tree and throwing again.
- */
 import { describe, it, expect, afterEach } from 'vitest';
 import { h, nextTick } from 'vue';
 import { createPanelHost } from '../src/index.js';
@@ -34,8 +25,6 @@ describe('a surface whose app fails to unmount', () => {
     const broken = createPanelHost();
     surfaceWith(broken, el, { render: () => h('p', 'old') });
     await flush();
-    // The state an update that threw part-way leaves: a null child in the
-    // mounted tree, which Vue's unmount cannot destructure.
     el._vnode.component.subTree.children.push(null);
     expect(() => el._vnode.component.subTree.children.forEach(({ type }) => type)).toThrow(TypeError);
 

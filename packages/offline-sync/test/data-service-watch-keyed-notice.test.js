@@ -1,19 +1,9 @@
 // @vitest-environment node
-/**
- * A watcher of a collection hears which rows changed: `watch` calls its
- * listener with `{ keys }` when every changed row's key is known (this tab's
- * writes and the rows their evictions removed, change-feed commits that list
- * their keys, and evictions that list each store's keys), and with null when
- * any row may have changed (another handle's change, a purge),
- * so a caller keeping rows derived from the collection can re-read only the
- * keys named.
- */
 import { afterEach, describe, expect, it } from 'vitest';
 import { createDataService, createDataStore, createMemoryStoreBackend } from '../src/index.js';
 import { createHostStorePort } from '../src/host-store/index.js';
 import { DATABASES, identity } from './helpers/host-databases.js';
 
-/** A host-store-backed collection the way the app opens one. */
 function transactionalBackend(port, options) {
   let handle;
   const ready = () => (handle ||= port.open(options));
@@ -134,7 +124,6 @@ describe.each([...DATABASES, ['memory', null]])('another owner\'s change (%s)', 
     const getAll = store.getAll.bind(store);
     const get = store.get.bind(store);
     store.getAll = (...args) => { reads += 1; return getAll(...args); };
-    // A whole subscription re-reads a change's named keys, not the collection.
     store.get = (...args) => { reads += 1; return get(...args); };
     const off = data.subscribe('shifts', () => {});
     await new Promise((resolve) => { setTimeout(resolve, 20); });

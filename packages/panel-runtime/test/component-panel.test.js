@@ -1,11 +1,3 @@
-/**
- * component-panel.test.js (ac2/ac3) — the `component` mount path.
- *
- * A panel may register a Vue/F7 `component` (instead of a plain-DOM
- * `render(root)`). The host mounts it in LIGHT DOM inside an F7-enabled surface
- * app so `f7-*` globals resolve; the plain-DOM path is untouched; a throwing
- * component is contained to its tile; unmounting the surface leaves no orphan.
- */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { h, resolveComponent } from 'vue';
 import { createPanelHost } from '../src/index.js';
@@ -17,14 +9,9 @@ const manifestPanels = {
   'dom-tile': { surfaces: ['dashboard'] },
 };
 
-// Stand-in for a Framework7-Vue global component, registered on the surface app
-// by the host-supplied installer (the real one runs Framework7Vue +
-// registerComponents). Its presence proves `f7-*` resolve inside a tile.
 const F7ListStub = { name: 'f7-list', render() { return h('div', { class: 'stub-f7-list' }, 'list'); } };
 const installComponentRuntime = (app) => { app.component('f7-list', F7ListStub); };
 
-// A component panel that renders a GLOBAL `f7-list` (only resolves if the
-// surface app installed the F7 runtime) and reads its injected `tommy`/`ctx`.
 function componentDef(id, { onMounted: onMountedSpy } = {}) {
   return {
     id,
@@ -32,8 +19,6 @@ function componentDef(id, { onMounted: onMountedSpy } = {}) {
       name: `Comp-${id}`,
       props: ['tommy', 'ctx'],
       mounted() { if (onMountedSpy) onMountedSpy(this.tommy, this.ctx); },
-      // resolveComponent mirrors what a compiled SFC template emits for a global
-      // `<f7-list>` — it looks up the surface app's registry (installComponentRuntime).
       render() { return h('div', { class: 'comp-body' }, [h(resolveComponent('f7-list')), h('span', { class: 'panel-id' }, this.ctx?.panelId)]); },
     },
   };
@@ -74,14 +59,11 @@ describe('component panel path', () => {
     await flush();
 
     const comp = el.querySelector('[data-panel-id="comp-tile"]');
-    // Light DOM: the component content is directly queryable (NOT behind a
-    // closed shadow root, which querySelector could not pierce).
     expect(comp.className).toContain('mp-panel-tile--ready');
     expect(comp.querySelector('.comp-body')).toBeTruthy();
-    expect(comp.querySelector('.stub-f7-list')?.textContent).toBe('list');   // f7-* resolved
-    expect(comp.querySelector('.panel-id')?.textContent).toBe('comp-tile');   // ctx flowed in
+    expect(comp.querySelector('.stub-f7-list')?.textContent).toBe('list');
+    expect(comp.querySelector('.panel-id')?.textContent).toBe('comp-tile');
 
-    // The plain-DOM path is unaffected (renders into its shadow root).
     const dom = el.querySelector('[data-panel-id="dom-tile"]');
     expect(dom.className).toContain('mp-panel-tile--ready');
   });
@@ -106,9 +88,6 @@ describe('component panel path', () => {
     });
     host.mountSurface(el, { surface: 'dashboard', ctxFor: (_mp, def) => ({ panelId: def.id, tommy }) });
     await flush();
-    // The surface app is a SEPARATE Vue app that installs only F7 + $f7 — the
-    // main app's $api / $store / Vuex plugin are never on it. Data must flow
-    // through the injected `tommy` (tommy.actions / tommy.data / tommy.host).
     expect(captured.$api).toBeUndefined();
     expect(captured.$store).toBeUndefined();
     expect(captured.optionsStore).toBeUndefined();
@@ -131,7 +110,6 @@ describe('component panel path', () => {
     const api = host.panelsApiFor('mp-x', manifestPanels, { firstParty: true });
     expect(() => api.register({ id: 'comp-tile' })).toThrow(/exactly one of 'component' or 'render'/);
     expect(() => api.register({ id: 'comp-tile', component: {}, render() {} })).toThrow(/exactly one/);
-    // exactly one is fine:
     expect(() => api.register({ id: 'comp-tile', component: { render() { return h('div'); } } })).not.toThrow();
     expect(() => api.register({ id: 'dom-tile', render() {} })).not.toThrow();
   });
@@ -140,7 +118,6 @@ describe('component panel path', () => {
     const untrusted = host.panelsApiFor('mp-untrusted', manifestPanels, { firstParty: false });
     expect(() => untrusted.register({ id: 'comp-tile', component: { render() { return h('div'); } } }))
       .toThrow(/first-party only/);
-    // …but the shadow-isolated render path stays open to untrusted MPs.
     expect(() => untrusted.register({ id: 'dom-tile', render() {} })).not.toThrow();
   });
 

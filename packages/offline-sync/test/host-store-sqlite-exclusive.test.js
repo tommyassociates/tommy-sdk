@@ -1,10 +1,4 @@
 // @vitest-environment node
-/**
- * An exclusive SQLite database (a phone's WebView, its only user): a read
- * sends no BEGIN or COMMIT of its own, and owner and store rows are answered
- * from memory once read — yet every write, rollback and purge is seen exactly
- * as the database holds it.
- */
 import { describe, it, expect } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -56,10 +50,8 @@ describe('exclusive SQLite database', () => {
       const first = await port.commit({ handle: handle.handle, expectedEpoch: handle.epoch, expectedStoreRevision: handle.storeRevision, changes: [put('d1', { title: 'One' })] });
       const second = await port.commit({ handle: handle.handle, expectedEpoch: handle.epoch, expectedStoreRevision: first.storeRevision, changes: [put('d1', { title: 'Two' })] });
       expect(second).toMatchObject({ ok: true });
-      // A stale revision is refused as the store row now held says.
       expect(await port.commit({ handle: handle.handle, expectedEpoch: handle.epoch, expectedStoreRevision: first.storeRevision, changes: [put('d1', { title: 'Stale' })] }))
         .toMatchObject({ ok: false, reason: 'conflict' });
-      // A write undone inside its transaction is not held.
       await expect(database.transaction('readwrite', async (tx) => {
         const store = (await tx.scan('stores', [JSON.parse(JSON.stringify((await tx.scan('owners', [], { limit: 1 }))[0].key))], { limit: 1 }))[0];
         await tx.put('stores', { ...store, revision: store.revision + 50 });

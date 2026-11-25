@@ -1,9 +1,3 @@
-/**
- * action-client-key.test.js — an Action-dispatched client_key activity gets a
- * key derived from the trigger payload as well as the assembled args: a replay
- * of the same emission is absorbed, while two distinct emissions whose args
- * happen to match (a constant prompt) are two writes.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 
@@ -36,8 +30,6 @@ const target = {
       description: 'ask a question',
       inputSchema: { type: 'object', required: ['prompt'], properties: { prompt: { type: 'string' } } },
       resultSchema: { type: 'object' },
-      // local, so the test needs no server executor; the key derivation is
-      // the same for every side effect.
       sideEffect: 'local_write',
       idempotency: 'client_key',
       offlineReplayable: false,

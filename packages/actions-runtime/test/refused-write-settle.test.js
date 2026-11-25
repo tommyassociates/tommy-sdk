@@ -1,9 +1,3 @@
-/**
- * A queued write the server refuses for good is handed to the queue's
- * `settle` before anything else hears of it, so a host can keep the refusal in
- * the same commit that removes the row. A page that dies straight after that
- * commit (before `onOfflineOutcome` runs) still has the refusal on the device.
- */
 import { describe, it, expect, vi } from 'vitest';
 import { createBroker, createFakeIssuer, createHostStoreQueue } from '../src/index.js';
 import { SETTLE_RECEIPT_MAX_BYTES } from '../src/host-store-queue.js';
@@ -29,7 +23,6 @@ const ACTIVITY = {
   idempotency: 'client_key', offlineReplayable: true, retry: { maxAttempts: 1 },
 };
 
-// A host queue that keeps a refusal as a receipt row in the settling commit.
 function keepingQueue(backend) {
   const queue = createHostStoreQueue({ backend });
   return {
@@ -65,7 +58,6 @@ describe('a queued write refused for good', () => {
     const onOfflineOutcome = vi.fn();
     const w = await world(queue, { serverInvoke: async () => { throw Object.assign(new Error('stale'), { status: 409 }); }, onOfflineOutcome });
     await w.invoke(1);
-    // Hold the settling commit (the one that writes the receipt) open.
     let release;
     const commit = d.backend.commit;
     vi.spyOn(d.backend, 'commit').mockImplementation(async (snapshot, changes) => {
@@ -93,7 +85,6 @@ describe('a queued write refused for good', () => {
   it('keeps its refusal on the device when the page dies straight after the queue settles it', async () => {
     const d = device();
     const queue = keepingQueue(d.backend);
-    // The page dies after the broker's queue step: the observer never runs.
     const w = await world(queue, {
       serverInvoke: async () => { throw Object.assign(new Error('locked'), { status: 409 }); },
       onOfflineOutcome: () => { throw new Error('page gone'); },
@@ -224,8 +215,6 @@ describe('createHostStoreQueue settle', () => {
     await expect(queue.settle(seq, { receipt: { key: 'refused:k-1', value: { id: 'refused:k-1' } }, keepExisting: true }))
       .resolves.toEqual({ removed: true, receipt: 'kept' });
     expect(d.rows.get('refused:k-1')).toEqual({ id: 'refused:k-1', first: true });
-    // Another handle removes the receipt between the read and the commit: the
-    // revision fence makes the settlement read again and write it.
     const seq2 = await queue.push(entry(2));
     d.rows.set('refused:k-2', { id: 'refused:k-2', first: true });
     const commit = d.backend.commit;
@@ -254,7 +243,6 @@ describe('createHostStoreQueue settle', () => {
     });
     await expect(queue.settle(seq, { receipt: { key: 'refused:k-1', value: { id: 'refused:k-1', full: true } } })).rejects.toMatchObject({ reason: 'unavailable' });
     expect(queue.all()).toHaveLength(1);
-    // The queue's turn is free at once: another write goes in.
     await queue.push(entry(2));
     await expect(queue.settle(seq, { receipt: { key: 'refused:k-1', value: { id: 'refused:k-1', full: true } } })).resolves.toEqual({ removed: true, receipt: 'written' });
   });
@@ -302,12 +290,10 @@ describe('createHostStoreQueue settle', () => {
       await broker.drainOfflineQueue();
       expect(sent.sort()).toEqual(['forms', 'notes']);
       expect(queue.all().map((row) => row.sourceMpId)).toEqual(['forms']);
-      // The store recovers; the scheduled drain settles the refusal and sends nothing again.
       failing = false;
       await vi.advanceTimersByTimeAsync(2000);
       await vi.waitFor(() => expect(queue.all()).toEqual([]));
       expect(sent.filter((mp) => mp === 'forms')).toHaveLength(1);
-      // A drain on reconnect sends nothing either.
       await broker.drainOfflineQueue();
       expect(sent.filter((mp) => mp === 'forms')).toHaveLength(1);
     } finally {
@@ -348,7 +334,6 @@ describe('createHostStoreQueue settle', () => {
       broker.setOnline(true);
       const draining = broker.drainOfflineQueue();
       await vi.waitFor(() => expect(sent).toContain('notes'));
-      // The retry's time comes while the notes write keeps the drain open.
       await vi.advanceTimersByTimeAsync(2000);
       failing = false;
       release();
@@ -399,7 +384,6 @@ describe('createHostStoreQueue settle', () => {
       release();
       await draining;
       await vi.advanceTimersByTimeAsync(10);
-      // Offline: no drain started for the retry; the refused row waits for the reconnect.
       expect(queue.all().map((row) => row.sourceMpId)).toEqual(['forms']);
       broker.setOnline(true);
       await broker.drainOfflineQueue();
@@ -439,7 +423,6 @@ describe('settling by the row the drain sent', () => {
     const envelope = (key) => ({ sourceMpId: 'forms', activity: 'forms.save', args: { key }, idempotencyKey: key });
     await a.push({ sourceMpId: 'forms', envelope: envelope('first'), bytes: 10 });
     const [first] = a.all();
-    // Tab B removes the first row; a newly opened tab C queues another, which takes seq 1 again.
     const b = createHostStoreQueue({ backend });
     await b.ready();
     await b.remove(b.all()[0].seq);
@@ -447,7 +430,6 @@ describe('settling by the row the drain sent', () => {
     await c.push({ sourceMpId: 'forms', envelope: envelope('second'), bytes: 10 });
     const [second] = c.all();
     expect(second.seq).toBe(first.seq);
-    // Tab A sees the store again, then settles the refusal it sent for the first row.
     await a.noteAttempt(-1);
     await a.settle(first.seq, { rowId: first.id, receipt: { key: 'refused:first', value: { id: 'refused:first', kind: 'refused' } } });
     const after = createHostStoreQueue({ backend });
