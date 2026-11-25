@@ -258,8 +258,9 @@ export function createBroker({
       if (appliedHolds.size) scheduleHoldCleanup(); else holdCleanupTries = 0;
     }, SETTLE_RETRY_AFTER_MS);
   }
-  // Rows being sent by a drain read as sending and cannot be discarded meanwhile.
+  // Rows being sent by a drain read as sending and cannot be discarded meanwhile; rows being discarded are never sent.
   const drainingRows = new Set();
+  const discardingRows = new Set();
   let isOnline = online;
   let pendingWork = 0;
   let retired = false;
@@ -1812,12 +1813,13 @@ export function createBroker({
   }
 
   // A queue that cannot settle keeps a refused write of a keepRefused activity as a refused receipt.
+  // 'kept', 'not_kept' (nothing asks to keep it) or 'failed' (asked, but storage could not mark it).
   async function keptAsRefused(row, outcome) {
     const activity = row.envelope?.activity;
-    if (outcome.ok || row.envelope?.trigger || typeof activity !== 'string' || typeof queueStore.markRefused !== 'function') return false;
+    if (outcome.ok || row.envelope?.trigger || typeof activity !== 'string' || typeof queueStore.markRefused !== 'function') return 'not_kept';
     const [ownerMpId, name] = splitQualified(activity);
-    if (ownerMpId !== row.sourceMpId || mps.get(ownerMpId)?.manifest?.activities?.[name]?.keepRefused !== true) return false;
-    try { return (await queueStore.markRefused(row.seq, { refusal: refusalOf(outcome.error), at: now() })) === true; } catch (_) { return false; }
+    if (ownerMpId !== row.sourceMpId || mps.get(ownerMpId)?.manifest?.activities?.[name]?.keepRefused !== true) return 'not_kept';
+    try { return (await queueStore.markRefused(row.seq, { refusal: refusalOf(outcome.error), at: now() })) === true ? 'kept' : 'failed'; } catch (_) { return 'failed'; }
   }
 
   async function drainOfflineQueueInnerTracked() {
@@ -1832,7 +1834,7 @@ export function createBroker({
     for (const [, rows] of bySource) {
       rows.sort((a, b) => a.seq - b.seq);
       for (const row of rows) {
-        if (typeof row.subject === 'string' || row.refused) continue;
+        if (typeof row.subject === 'string' || row.refused || discardingRows.has(row.id)) continue;
         if (queueStore.isHeld?.(row)) break;
         if (!queueStore.all().some((queued) => queued.seq === row.seq)) { unsettled.delete(row.id); continue; }
         const envelope = row.envelope;
@@ -1881,9 +1883,20 @@ export function createBroker({
             scheduleSettleRetry();
             break;
           }
-        } else if (!(await keptAsRefused(row, outcome))) { // eslint-disable-line no-await-in-loop
-          // eslint-disable-next-line no-await-in-loop
-          await queueStore.remove(row.seq);
+        } else {
+          const kept = await keptAsRefused(row, outcome); // eslint-disable-line no-await-in-loop
+          if (kept === 'failed') {
+            // Never sent again: the refusal is marked on a later drain.
+            if (row.id) unsettled.set(row.id, outcome);
+            scheduleSettleRetry();
+            break;
+          }
+          if (kept === 'kept') {
+            if (row.id) unsettled.delete(row.id);
+          } else {
+            // eslint-disable-next-line no-await-in-loop
+            await queueStore.remove(row.seq);
+          }
         }
         if (typeof onOfflineOutcome === 'function') {
           try {
@@ -2216,12 +2229,16 @@ export function createBroker({
     async discardQueuedWrite(sourceMpId, id) {
       try {
         await queueStore.ready?.();
+        await outcomes.ready();
         if (typeof id !== 'string' || !id || retired) return false;
         const row = ownQueuedRows().find((queued) => queued.id === id && queued.sourceMpId === sourceMpId);
-        if (!row || !row.envelope?.activity || typeof row.subject === 'string' || queueStore.isHeld?.(row) || drainingRows.has(row.id)) return false;
+        if (!row || !row.envelope?.activity || typeof row.subject === 'string' || queueStore.isHeld?.(row)
+          || drainingRows.has(row.id) || discardingRows.has(row.id)) return false;
         const owner = recordOwner(row.envelope?.identity?.tenantId ?? row.owner?.tenantId);
-        await outcomes.ready();
-        const removed = (await queueStore.remove(row.seq)) === true;
+        // Claimed in the same turn as the check, so a drain starting meanwhile skips it.
+        discardingRows.add(row.id);
+        let removed;
+        try { removed = (await queueStore.remove(row.seq)) === true; } finally { discardingRows.delete(row.id); }
         if (removed) forgetDiscardedOutcome(row, owner);
         return removed;
       } catch (_) { return false; }
