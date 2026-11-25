@@ -75,4 +75,32 @@ describe('async renders on an in-place update', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(shown()).toEqual(['location pier']);
   });
+
+  it('the root a panel drew into is the shown root: a click delegated to it and a later write to it both work', async () => {
+    const roots = [];
+    const clicks = vi.fn();
+    const def = {
+      id: 'reports',
+      load: vi.fn(async () => {}),
+      render: vi.fn(async (root, ctx) => {
+        roots.push(root);
+        const button = document.createElement('button');
+        button.textContent = `open ${ctx.config.location}`;
+        root.append(button);
+        root.addEventListener('click', (event) => clicks(event.target.textContent));
+      }),
+    };
+    host.panelsApiFor('reports', panels).register(def);
+    host.mountSurface(el, { surface: 'dashboard', layout: [entry({ location: 'first' })] });
+    await vi.advanceTimersByTimeAsync(0);
+    host.mountSurface(el, { surface: 'dashboard', layout: [entry({ location: 'pier' })] });
+    await vi.advanceTimersByTimeAsync(0);
+    const shownRoot = el.querySelector('[data-panel-id="reports"] .mp-panel-tile__content').__mpShadowRoot;
+    shownRoot.querySelector('button').click();
+    expect(clicks).toHaveBeenCalledWith('open pier');
+    const later = document.createElement('p');
+    later.textContent = 'updated later';
+    roots[roots.length - 1].append(later);
+    expect(shown()).toEqual(['updated later']);
+  });
 });

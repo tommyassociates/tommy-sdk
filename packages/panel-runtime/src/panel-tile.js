@@ -230,7 +230,6 @@ export const PanelTile = defineComponent({
     const rendered = ref(false);
     const stale = ref(false);
     const slow = ref(false);
-    let shadowRoot = null;
     let alive = true;
     let bootSeq = 0;
     const label = (key) => (props.labels && typeof props.labels[key] === 'string' && props.labels[key]) || DEFAULT_TILE_LABELS[key];
@@ -280,19 +279,25 @@ export const PanelTile = defineComponent({
           emitEvent('panel-ready', { durationMs: Date.now() - startedAt });
           return;
         }
-        if (!shadowRoot) {
-          shadowRoot = mountEl.value.attachShadow({ mode: 'closed' });
-          try {
-            if (import.meta.env && import.meta.env.DEV) mountEl.value.__mpShadowRoot = shadowRoot;
-          } catch (_) { /* no import.meta.env outside vite */ }
+        // Each render draws into its own hidden host; the current one replaces the shown host, keeping the root it drew into.
+        const surface = document.createElement('div');
+        surface.className = 'mp-panel-tile__surface';
+        surface.hidden = true;
+        const root = surface.attachShadow({ mode: 'closed' });
+        mountEl.value.append(surface);
+        try {
+          await props.def.render(root, props.ctx);
+          applyPanelBaseStyles(root);
+        } catch (cause) {
+          surface.remove();
+          throw cause;
         }
-        // Each render draws into its own detached root; only the current one replaces what is shown, once it is done.
-        const stage = document.createElement('div').attachShadow({ mode: 'closed' });
-        await props.def.render(stage, props.ctx);
-        applyPanelBaseStyles(stage);
-        if (!current()) return;
-        shadowRoot.replaceChildren(...stage.childNodes);
-        try { shadowRoot.adoptedStyleSheets = [...stage.adoptedStyleSheets]; } catch (_) { /* no constructed sheets here */ }
+        if (!current()) { surface.remove(); return; }
+        for (const child of [...mountEl.value.children]) if (child !== surface) child.remove();
+        surface.hidden = false;
+        try {
+          if (import.meta.env && import.meta.env.DEV) mountEl.value.__mpShadowRoot = root;
+        } catch (_) { /* no import.meta.env outside vite */ }
         status.value = 'ready';
         rendered.value = true;
         stale.value = false;
