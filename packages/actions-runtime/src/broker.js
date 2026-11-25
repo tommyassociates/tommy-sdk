@@ -777,9 +777,10 @@ export function createBroker({
     authorizeQuery(envelope.sourceMpId, ownerMpId, conditionName, identity.scopes);
     validateAgainst(conditionDef.inputSchema, envelope.args, 'InvalidPayload', `condition '${envelope.condition}' args`);
 
-    // A held-first condition's cached answer belongs to the viewer it was read for.
-    const viewer = conditionDef.heldFirst === true ? `:${JSON.stringify(currentFingerprint())}` : '';
-    const cacheKey = `${tenantStateKey(tenantId)}:${envelope.condition}:${JSON.stringify(envelope.args)}${viewer}`;
+    // A held-first condition's cached answer belongs to the owner and viewer it was read for; with no owner it is not cached.
+    const owner = conditionDef.heldFirst === true ? recordOwner(tenantId) : '';
+    const viewer = conditionDef.heldFirst === true ? `:${JSON.stringify([owner, currentFingerprint()])}` : '';
+    const cacheKey = owner === null ? null : `${tenantStateKey(tenantId)}:${envelope.condition}:${JSON.stringify(envelope.args)}${viewer}`;
     return { identity, tenantId, ownerMpId, conditionName, ownerEntry, conditionDef, cacheKey };
   }
 
@@ -788,7 +789,7 @@ export function createBroker({
   }
 
   function cachedConditionAnswer({ conditionDef, cacheKey }) {
-    if (!conditionDef.cacheable) return null;
+    if (!conditionDef.cacheable || !cacheKey) return null;
     const hit = conditionCache.get(cacheKey);
     if (hit && hit.expiresAt > now()) return { value: hit.value };
     if (hit) conditionCache.delete(cacheKey);
@@ -1587,15 +1588,19 @@ export function createBroker({
 
   // Whose held answers and outcomes these are: the queue owner, else the authenticated tenant; null keeps and serves nothing.
   function recordOwner(tenantId) {
+    const keyOf = (value) => {
+      try { const key = tenantStateKey(value); return known(key) ? String(key) : null; } catch (_) { return null; }
+    };
     if (typeof queueOwner === 'function') {
       const holder = currentQueueOwner();
       if (!holder || !known(holder.tenantId)) return null;
+      // A request authenticated for another tenant than the owner's is nobody's here.
+      if (known(tenantId) && keyOf(tenantId) !== keyOf(holder.tenantId)) return null;
       return JSON.stringify(['tenantId', ...OWNER_FIELDS].map((key) => (known(holder[key]) ? String(holder[key]) : null)));
     }
     if (!known(tenantId)) return null;
-    let tenantKey;
-    try { tenantKey = tenantStateKey(tenantId); } catch (_) { return null; }
-    return known(tenantKey) ? JSON.stringify(['tenant', String(tenantKey)]) : null;
+    const tenantKey = keyOf(tenantId);
+    return tenantKey ? JSON.stringify(['tenant', tenantKey]) : null;
   }
 
   function refusalOf(error) {
