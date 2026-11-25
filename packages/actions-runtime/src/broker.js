@@ -1178,7 +1178,7 @@ export function createBroker({
     const attempt = async (index) => {
       if (ended || retired || callerSignal?.aborted || !key.current()) { ended = true; return; }
       deliver(markedStale
-        ? { state: 'stale', ...base(), retrying: true, nextAttemptAt: null, error: null }
+        ? { state: 'stale', ...base(), retrying: true }
         : { state: 'checking', ...base() });
       let value;
       let failure = null;
@@ -1199,7 +1199,8 @@ export function createBroker({
         return;
       }
       const outcome = classifyReadOutcome(failure, { report: reportReadCode });
-      if (outcome.state === 'silent') { ended = true; return; }
+      // No notice: no caller waits, the account is not shown, or the viewer signed out.
+      if (outcome.state === 'silent' || outcome.state === 'held' || outcome.state === 'signed_out') { ended = true; return; }
       if (outcome.state === 'refused') {
         if (key.current()) conditionAnswers.remove(key.id);
         deliver({

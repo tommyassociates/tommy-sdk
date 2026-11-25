@@ -11,7 +11,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { createBroker, createFakeIssuer, createConditionAnswers, classifyReadOutcome } from '../src/index.js';
+import { createBroker, createFakeIssuer, createConditionAnswers, classifyReadOutcome, READ_OUTCOME_CODES } from '../src/index.js';
 
 const TENANT = 'team-1';
 const fixture = (name) => JSON.parse(readFileSync(fileURLToPath(new URL(`./fixtures/hds-contract/${name}.json`, import.meta.url)), 'utf8'));
@@ -277,6 +277,28 @@ describe('ordering and declarations', () => {
     expect(w.notices).toEqual([]);
   });
 
+  it('J9-condition-stale-on-write: after a landed write on a declared source, held first, stale, then fresh', async () => {
+    const f = fixture('J9-condition-stale-on-write');
+    const held = f.given.held['account.mp_condition_answers'];
+    const [resolved, staleNotice, fresh] = f.timeline;
+    const def = conditionDef({ heldFirst: true, freshness: f.given.manifest.freshness });
+    const store = deviceStore([heldEntry({ fingerprint: held.roleFingerprint, condition: 'scheduling.shift_requirements_for', args: held.args, answer: held.answer, at: held.asOf })]);
+    let answer;
+    const w = await world({
+      condition: 'shift_requirements_for', def, store, fingerprint: { value: held.roleFingerprint }, start: f.given.landedWrite.at,
+      handler: () => new Promise((resolve) => { answer = resolve; }),
+    });
+    await w.broker.conditionAnswersReady();
+    w.broker.markConditionAnswersStale(f.given.landedWrite.writes);
+    expect(await w.ask(held.args)).toEqual(resolved.payload);
+    await settle();
+    expect(w.notices).toEqual([staleNotice.payload]);
+    w.clock.now = fresh.payload.asOf;
+    answer(f.given.server['handler answer'].returns);
+    await settle();
+    expect(w.notices).toEqual([staleNotice.payload, fresh.payload]);
+  });
+
   it('stale on write: a landed write on a declared source always reads again and says stale until fresh', async () => {
     const def = conditionDef({ heldFirst: true, freshness: { refreshAfterMs: 3600000, sources: ['workforce.attendances'] } });
     const store = deviceStore([heldEntry({ fingerprint: 'rf-1', condition: 'scheduling.c', args: { a: 1 }, answer: { n: 1 }, at: 1000 })]);
@@ -334,7 +356,27 @@ describe('the read-outcome classifier', () => {
     expect(classifyReadOutcome(new Error('no status'))).toEqual({ state: 'stale', retrying: true });
     expect(classifyReadOutcome({ code: 'InvalidPayload' })).toEqual({ state: 'stale', retrying: false });
     expect(classifyReadOutcome({ code: 'DATA_RETIRED' })).toEqual({ state: 'silent' });
-    expect(classifyReadOutcome({ code: 'SCOPE_DENIED' }, { report })).toEqual({ state: 'stale', retrying: false });
-    expect(report).toHaveBeenCalledWith('SCOPE_DENIED', null);
+  });
+
+  it('covers every code the completed list names, and the three default branches', () => {
+    const report = vi.fn();
+    for (const code of READ_OUTCOME_CODES.access) expect(classifyReadOutcome({ code }, { report }), code).toEqual({ state: 'refused', reason: 'access' });
+    for (const code of READ_OUTCOME_CODES.unavailable) expect(classifyReadOutcome({ code }, { report }), code).toEqual({ state: 'refused', reason: 'unavailable' });
+    for (const code of READ_OUTCOME_CODES.retry) expect(classifyReadOutcome({ code }, { report }), code).toEqual({ state: 'stale', retrying: true });
+    for (const code of READ_OUTCOME_CODES.noRetry) expect(classifyReadOutcome({ code }, { report }), code).toEqual({ state: 'stale', retrying: false });
+    expect(classifyReadOutcome({ code: 'DATA_RETIRED' }, { report })).toEqual({ state: 'silent' });
+    for (const code of READ_OUTCOME_CODES.held) expect(classifyReadOutcome({ code }, { report }), code).toEqual({ state: 'held' });
+    expect(classifyReadOutcome({ code: 'DATA_SIGNED_OUT' }, { report })).toEqual({ state: 'signed_out' });
+    expect(READ_OUTCOME_CODES.access).toEqual(['PermissionDenied', 'DATA_FORBIDDEN', 'DATA_ACCESS_CHANGED', 'FORBIDDEN', 'NotAuthorized', 'SCOPE_DENIED', 'DeniedScope', 'Unauthorized', 'Forbidden']);
+    expect(READ_OUTCOME_CODES.unavailable).toEqual(['UnknownCondition', 'DATA_UNDECLARED', 'DATA_TRUNCATED', 'DATA_NOT_APPLICABLE', 'NDIS_DISABLED']);
+    expect(report).not.toHaveBeenCalled();
+    // The default for a code no list names, by status.
+    expect(classifyReadOutcome({ code: 'SOMETHING_NEW', status: 403 }, { report })).toEqual({ state: 'refused', reason: 'access' });
+    expect(classifyReadOutcome({ code: 'SOMETHING_NEW', status: 404 }, { report })).toEqual({ state: 'refused', reason: 'unavailable' });
+    expect(classifyReadOutcome({ code: 'SOMETHING_NEW', status: 410 }, { report })).toEqual({ state: 'refused', reason: 'unavailable' });
+    expect(classifyReadOutcome({ code: 'SOMETHING_NEW', status: 422 }, { report })).toEqual({ state: 'stale', retrying: false });
+    expect(classifyReadOutcome({ code: 'SOMETHING_NEW' }, { report })).toEqual({ state: 'stale', retrying: false });
+    expect(report).toHaveBeenCalledWith('SOMETHING_NEW', 422);
+    expect(report).toHaveBeenCalledWith('SOMETHING_NEW', null);
   });
 });

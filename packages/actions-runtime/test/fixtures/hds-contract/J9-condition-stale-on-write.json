@@ -1,0 +1,122 @@
+{
+  "source": "designed",
+  "journey": "J9",
+  "surface": "S5",
+  "hostApi": 20,
+  "decisions": [
+    "D16",
+    "D19",
+    "D22"
+  ],
+  "given": {
+    "manifest": {
+      "mp": "scheduling",
+      "condition": "shift_requirements_for",
+      "heldFirst": true,
+      "freshness": {
+        "sources": [
+          "workforce.shift_requirements"
+        ]
+      }
+    },
+    "held": {
+      "account.mp_condition_answers": {
+        "viewer": "u-55",
+        "roleFingerprint": "rf-member-loc7",
+        "args": {
+          "shiftId": "101"
+        },
+        "answer": {
+          "requirements": [
+            {
+              "id": "r-1",
+              "title": "Wear name badge",
+              "done": false
+            }
+          ]
+        },
+        "asOf": 1764041000000
+      }
+    },
+    "landedWrite": {
+      "activity": "scheduling.complete_requirement",
+      "writes": [
+        "workforce.shift_requirements"
+      ],
+      "at": 1764041100000
+    },
+    "server": {
+      "handler answer": {
+        "delayMs": 3000,
+        "returns": {
+          "requirements": [
+            {
+              "id": "r-1",
+              "title": "Wear name badge",
+              "done": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  "call": {
+    "api": "tommy.actions.query('scheduling.shift_requirements_for', { shiftId: '101' }, { onRead })",
+    "after": "the landed write above"
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "resolve",
+      "payload": {
+        "answer": {
+          "requirements": [
+            {
+              "id": "r-1",
+              "title": "Wear name badge",
+              "done": false
+            }
+          ]
+        },
+        "state": "held",
+        "asOf": 1764041000000,
+        "aged": false
+      }
+    },
+    {
+      "t": 5,
+      "event": "notice",
+      "payload": {
+        "state": "stale",
+        "answered": false,
+        "asOf": 1764041000000,
+        "aged": false,
+        "retrying": true
+      }
+    },
+    {
+      "t": 3000,
+      "event": "notice",
+      "payload": {
+        "state": "fresh",
+        "answered": true,
+        "asOf": 1764041103000,
+        "aged": false,
+        "answer": {
+          "requirements": [
+            {
+              "id": "r-1",
+              "title": "Wear name badge",
+              "done": true
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "assert": [
+    "A landed write whose writes: names a collection in the condition's freshness.sources marks its held answers stale.",
+    "The held answer is still answered first (O1), and a background read always runs.",
+    "Notices say stale until a fresh answer lands; fresh follows only a completed read (O2)."
+  ]
+}

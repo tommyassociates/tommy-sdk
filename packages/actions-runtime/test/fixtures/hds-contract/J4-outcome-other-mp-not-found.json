@@ -1,0 +1,58 @@
+{
+  "source": "designed",
+  "journey": "J4",
+  "surface": "S6",
+  "hostApi": 20,
+  "decisions": [
+    "D7"
+  ],
+  "given": {
+    "caller": "time-clock",
+    "record": {
+      "account.mp_outcomes": {
+        "activity": "scheduling.update_shift",
+        "key": "sc-9-edit",
+        "state": "succeeded",
+        "emitted": false
+      }
+    }
+  },
+  "call": {
+    "api": [
+      "tommy.host.writeOutcome('scheduling.update_shift', 'sc-9-edit')",
+      "tommy.host.markOutcomeEmitted('scheduling.update_shift', 'sc-9-edit')",
+      "tommy.host.confirmWriteOutcome('scheduling.update_shift', 'sc-9-edit')"
+    ]
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "return",
+      "payload": null
+    },
+    {
+      "t": 0,
+      "event": "reject",
+      "payload": {
+        "code": "WriteNotFound"
+      }
+    },
+    {
+      "t": 0,
+      "event": "reject",
+      "payload": {
+        "code": "WriteNotFound"
+      }
+    },
+    {
+      "t": 0,
+      "event": "request",
+      "payload": null
+    }
+  ],
+  "assert": [
+    "A Mini Program only sees outcomes of its own activities: writeOutcome answers null for another MP's activity, even when a record exists.",
+    "markOutcomeEmitted and confirmWriteOutcome reject WriteNotFound for another MP's activity.",
+    "Nothing is sent to the network."
+  ]
+}

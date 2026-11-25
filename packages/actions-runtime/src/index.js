@@ -7,7 +7,7 @@ export { createRecordStore, createMemoryBackend, createWebStorageBackend } from 
 export { createIdempotencyLedger, createInvalidationEpochs } from './idempotency-ledger.js';
 export { createOutcomeLedger } from './outcome-ledger.js';
 export { createConditionAnswers } from './condition-answers.js';
-export { classifyReadOutcome, readErrorOf, unlistedReadCode } from './read-outcome.js';
+export { classifyReadOutcome, readErrorOf, unlistedReadCode, READ_OUTCOME_CODES } from './read-outcome.js';
 export { createDurableQueue } from './durable-queue.js';
 export { createHostStoreQueue } from './host-store-queue.js';
 export { holdSubject, unsettledReason } from './held-writes.js';

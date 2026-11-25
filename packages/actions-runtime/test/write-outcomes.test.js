@@ -120,6 +120,22 @@ describe('writeOutcome (J4-outcome-hit-succeeded, J4-outcome-miss)', () => {
   });
 });
 
+describe('another Mini Program\'s outcome (J4-outcome-other-mp-not-found)', () => {
+  it('answers null, rejects WriteNotFound, and sends nothing, even when a record exists', async () => {
+    const f = fixture('J4-outcome-other-mp-not-found');
+    const given = f.given.record['account.mp_outcomes'];
+    const [read, marked, confirmed] = f.timeline;
+    const store = deviceStore([seedRecord(given.activity, given.key, { ...given, at: 1000 })]);
+    const { broker, serverInvoke } = await page({ store, now: 2000 });
+    await broker.outcomesReady();
+    const [, activity] = f.call.api[0].match(/writeOutcome\('([^']+)'/);
+    expect(broker.writeOutcome(f.given.caller, activity, given.key)).toBe(read.payload);
+    await expect(broker.markOutcomeEmitted(f.given.caller, activity, given.key)).rejects.toMatchObject(marked.payload);
+    await expect(broker.confirmWriteOutcome(f.given.caller, activity, given.key)).rejects.toMatchObject(confirmed.payload);
+    expect(serverInvoke).not.toHaveBeenCalled();
+  });
+});
+
 describe('a clock-out whose answer was lost (J6-outcome-unconfirmed-confirm-replayed)', () => {
   it('is unconfirmed after a restart, confirmed once with its recorded request, then marked emitted', async () => {
     const f = fixture('J6-outcome-unconfirmed-confirm-replayed');
