@@ -1,0 +1,105 @@
+{
+  "source": "designed",
+  "journey": "J6",
+  "surface": "S5",
+  "hostApi": 20,
+  "decisions": [
+    "D16",
+    "D8"
+  ],
+  "given": {
+    "manifest": {
+      "mp": "time-clock",
+      "condition": "attendances_in_range",
+      "heldFirst": true,
+      "freshness": {
+        "showAgeMs": 43200000,
+        "retryAfterMs": [
+          4000,
+          12000
+        ],
+        "sources": [
+          "workforce.attendances"
+        ]
+      }
+    },
+    "held": {
+      "account.mp_condition_answers": {
+        "viewer": "u-55",
+        "roleFingerprint": "rf-member-loc7",
+        "args": {
+          "teamMemberId": "55",
+          "from": "2026-11-24",
+          "to": "2026-11-30"
+        },
+        "answer": {
+          "attendances": [
+            {
+              "id": "tc-55-start-1764032520",
+              "team_member_id": "55",
+              "user_id": "u-55",
+              "status": "start",
+              "at": "2026-11-25T09:02:00+11:00",
+              "shift_id": 101
+            }
+          ]
+        },
+        "asOf": 1764041000000
+      }
+    },
+    "network": "offline",
+    "device": "phone (not kiosk)"
+  },
+  "call": {
+    "api": "tommy.actions.query('time-clock.attendances_in_range', args, { onRead })",
+    "args": {
+      "teamMemberId": "55",
+      "from": "2026-11-24",
+      "to": "2026-11-30"
+    }
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "resolve",
+      "payload": {
+        "answer": {
+          "attendances": [
+            {
+              "id": "tc-55-start-1764032520",
+              "team_member_id": "55",
+              "user_id": "u-55",
+              "status": "start",
+              "at": "2026-11-25T09:02:00+11:00",
+              "shift_id": 101
+            }
+          ]
+        },
+        "state": "held",
+        "asOf": 1764041000000,
+        "aged": false
+      }
+    },
+    {
+      "t": 50,
+      "event": "notice",
+      "payload": {
+        "state": "stale",
+        "answered": false,
+        "asOf": 1764041000000,
+        "aged": false,
+        "retrying": true,
+        "nextAttemptAt": 1764057604000,
+        "error": {
+          "code": "DATA_OFFLINE",
+          "status": null,
+          "message": "offline"
+        }
+      }
+    }
+  ],
+  "assert": [
+    "On a kiosk device the same ask finds nothing held after a restart (memory only, D8).",
+    "The week summary paints from the held answer."
+  ]
+}

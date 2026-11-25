@@ -1,0 +1,40 @@
+{
+  "source": "designed",
+  "journey": "J4",
+  "surface": "S6",
+  "hostApi": 20,
+  "decisions": [
+    "D7"
+  ],
+  "given": {
+    "record": {
+      "collection": "account.mp_outcomes",
+      "activity": "time-clock.record_attendance",
+      "key": "tc-55-stop-1764057000",
+      "state": "succeeded",
+      "at": 1764057000000,
+      "rpcId": "rpc-8812",
+      "emitted": false
+    }
+  },
+  "call": {
+    "api": "tommy.host.writeOutcome('record_attendance', 'tc-55-stop-1764057000')"
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "return",
+      "payload": {
+        "state": "succeeded",
+        "at": 1764057000000,
+        "rpcId": "rpc-8812",
+        "emitted": false,
+        "confirmable": false
+      }
+    }
+  ],
+  "assert": [
+    "Synchronous; sends nothing.",
+    "No result payload is stored or returned."
+  ]
+}

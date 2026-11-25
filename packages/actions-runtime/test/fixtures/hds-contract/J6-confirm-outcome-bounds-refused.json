@@ -1,0 +1,97 @@
+{
+  "source": "designed",
+  "journey": "J6",
+  "surface": "S6",
+  "hostApi": 20,
+  "decisions": [
+    "D7"
+  ],
+  "given": {
+    "records": [
+      {
+        "case": "already_confirmed",
+        "activity": "time-clock.record_attendance",
+        "key": "tc-55-stop-1764057900",
+        "state": "unconfirmed",
+        "at": 1764057300000,
+        "confirmSent": true
+      },
+      {
+        "case": "expired",
+        "activity": "time-clock.record_attendance",
+        "key": "tc-55-stop-1763960000",
+        "state": "unconfirmed",
+        "at": 1763967600000,
+        "confirmSent": false
+      },
+      {
+        "case": "not_eligible",
+        "activity": "time-clock.verify_kiosk_pin",
+        "key": "d-…",
+        "note": "derived_from_input, offlineReplayable false, input 'pin': never recorded for confirm"
+      },
+      {
+        "case": "no_request",
+        "activity": "time-clock.record_attendance",
+        "key": "tc-55-stop-never-sent",
+        "state": null
+      }
+    ],
+    "network": "online"
+  },
+  "call": {
+    "api": "tommy.host.confirmWriteOutcome(activity, key)"
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "reject",
+      "case": "already_confirmed",
+      "payload": {
+        "code": "WriteNotConfirmable",
+        "details": {
+          "reason": "already_confirmed"
+        }
+      }
+    },
+    {
+      "t": 0,
+      "event": "reject",
+      "case": "expired",
+      "payload": {
+        "code": "WriteNotConfirmable",
+        "details": {
+          "reason": "expired"
+        }
+      }
+    },
+    {
+      "t": 0,
+      "event": "reject",
+      "case": "not_eligible",
+      "payload": {
+        "code": "WriteNotConfirmable",
+        "details": {
+          "reason": "not_eligible"
+        }
+      }
+    },
+    {
+      "t": 0,
+      "event": "reject",
+      "case": "no_request",
+      "payload": {
+        "code": "WriteNotConfirmable",
+        "details": {
+          "reason": "no_request"
+        }
+      }
+    }
+  ],
+  "assert": [
+    "No request reaches the network in any case.",
+    "already_confirmed: one confirm request was already sent for this key (an offline attempt that sent nothing would not count).",
+    "expired: the record's at is more than 24 h old (here 25 h).",
+    "writeOutcome for the first two records answers confirmable: false."
+  ]
+}

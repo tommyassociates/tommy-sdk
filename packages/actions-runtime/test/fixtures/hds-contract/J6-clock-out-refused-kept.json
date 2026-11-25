@@ -1,0 +1,60 @@
+{
+  "source": "designed",
+  "journey": "J6",
+  "surface": "S7+S10",
+  "hostApi": 20,
+  "decisions": [
+    "D20"
+  ],
+  "given": {
+    "manifest": {
+      "mp": "time-clock",
+      "activity": "record_attendance",
+      "offlineReplayable": true,
+      "keepRefused": true
+    },
+    "server": {
+      "drain answer": {
+        "status": 422,
+        "code": "ATTENDANCE_ALREADY_CLOSED",
+        "message": "A manager already clocked you out at 6:58 pm"
+      }
+    }
+  },
+  "call": {
+    "api": "tommy.host.offlineQueue({ receipts: true })"
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "return",
+      "payload": {
+        "receipts": [
+          {
+            "id": "refused:q-9",
+            "activity": "time-clock.record_attendance",
+            "args": {
+              "teamMemberId": "55",
+              "status": "stop",
+              "at": "2026-11-25T19:05:00+11:00"
+            },
+            "queuedAt": 1764056700000,
+            "attempts": 0,
+            "state": "refused",
+            "refusedAt": 1764057600000,
+            "refusal": {
+              "code": "ATTENDANCE_ALREADY_CLOSED",
+              "message": "A manager already clocked you out at 6:58 pm",
+              "status": 422
+            },
+            "idempotencyKey": "tc-55-stop-1764057900"
+          }
+        ]
+      }
+    }
+  ],
+  "assert": [
+    "Time Clock shows the refused punch with its reason instead of dropping it (today: dropped, queued-refusals.js:12).",
+    "The refusal code here is illustrative; the receipt shape is the contract."
+  ]
+}

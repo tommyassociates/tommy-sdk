@@ -1,0 +1,28 @@
+{
+  "source": "designed",
+  "journey": "J10",
+  "surface": "S1/S4/S5",
+  "hostApi": 20,
+  "decisions": [
+    "D2"
+  ],
+  "given": {
+    "init": {
+      "hostApi": 19
+    }
+  },
+  "call": {
+    "mpCode": "const heldFirst = (init.hostApi ?? 0) >= 20; tommy.host.tasksBoard(params, heldFirst ? { onRead } : undefined)"
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "resolve",
+      "payload": "bare answer, as level 19"
+    }
+  ],
+  "assert": [
+    "Only needed by a bundle that must also run below 20; every adopting publish sets minHostApi: 20, so none is planned.",
+    "A level-19 host given an onRead option on a bridge ignores the second argument (it was never read)."
+  ]
+}

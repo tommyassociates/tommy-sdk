@@ -1,0 +1,60 @@
+{
+  "source": "designed",
+  "journey": "J4",
+  "surface": "S7+S10",
+  "hostApi": 20,
+  "decisions": [
+    "D20"
+  ],
+  "given": {
+    "manifest": {
+      "mp": "leave",
+      "activity": "approve_leave_request",
+      "offlineReplayable": true,
+      "keepRefused": true
+    },
+    "server": {
+      "drain answer": {
+        "status": 409,
+        "code": "LEAVE_ALREADY_DECIDED",
+        "message": "This request was already decided"
+      }
+    }
+  },
+  "call": {
+    "api": "tommy.host.offlineQueue({ receipts: true })",
+    "after": "connection returns and the queue drains"
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "return",
+      "payload": {
+        "receipts": [
+          {
+            "id": "refused:q-2",
+            "activity": "leave.approve_leave_request",
+            "args": {
+              "leaveRequestId": 78
+            },
+            "queuedAt": 1764057540000,
+            "attempts": 0,
+            "state": "refused",
+            "refusedAt": 1764057600000,
+            "refusal": {
+              "code": "LEAVE_ALREADY_DECIDED",
+              "message": "This request was already decided",
+              "status": 409
+            },
+            "idempotencyKey": "lv-78-app-1764057540"
+          }
+        ]
+      }
+    }
+  ],
+  "assert": [
+    "The refused write is kept because the activity declares keepRefused, not because 'leave' is in a hard-coded list.",
+    "It stays until discardQueuedWrite('refused:q-2').",
+    "An activity without keepRefused drops the refused write, as today."
+  ]
+}

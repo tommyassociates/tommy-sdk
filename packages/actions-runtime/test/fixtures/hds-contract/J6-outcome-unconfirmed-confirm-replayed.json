@@ -1,0 +1,99 @@
+{
+  "source": "designed",
+  "journey": "J6",
+  "surface": "S6",
+  "hostApi": 20,
+  "decisions": [
+    "D7",
+    "D27"
+  ],
+  "given": {
+    "story": "Clock-out sent online; the server committed it; the answer was lost; the app restarted.",
+    "record": {
+      "activity": "time-clock.record_attendance",
+      "key": "tc-55-stop-1764057900",
+      "state": "unconfirmed",
+      "at": 1764057300000,
+      "rpcId": null,
+      "emitted": false
+    },
+    "server": {
+      "POST /v1/mp/invokes": "see J6-api-invoke-replay-200"
+    }
+  },
+  "call": {
+    "api": [
+      "tommy.host.writeOutcome('record_attendance', 'tc-55-stop-1764057900')",
+      "tommy.host.confirmWriteOutcome('record_attendance', 'tc-55-stop-1764057900')",
+      "tommy.actions.emit('time-clock.clock_out', payload)",
+      "tommy.host.markOutcomeEmitted('record_attendance', 'tc-55-stop-1764057900')"
+    ]
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "return",
+      "payload": {
+        "state": "unconfirmed",
+        "at": 1764057300000,
+        "rpcId": null,
+        "emitted": false,
+        "confirmable": true
+      }
+    },
+    {
+      "t": 10,
+      "event": "request",
+      "payload": {
+        "method": "POST",
+        "path": "/v1/mp/invokes",
+        "idempotencyKey": "tc-55-stop-1764057900",
+        "args": {
+          "teamMemberId": "55",
+          "status": "stop",
+          "at": "2026-11-25T19:05:00+11:00"
+        },
+        "note": "the recorded request, same key, arguments byte for byte; at is the time of the tap, not of the confirm"
+      }
+    },
+    {
+      "t": 600,
+      "event": "resolve",
+      "payload": {
+        "state": "succeeded",
+        "result": {
+          "attendanceId": "88123",
+          "status": "stop"
+        },
+        "replayed": true,
+        "rpcId": "rpc-9001"
+      }
+    },
+    {
+      "t": 610,
+      "event": "emit",
+      "payload": {
+        "trigger": "time-clock.clock_out",
+        "payload": {
+          "teamMemberId": "55",
+          "shiftId": 101,
+          "clockInAt": "2026-11-25T09:02:00+11:00",
+          "at": "2026-11-25T19:05:00+11:00",
+          "attendanceId": "tc-55-stop-1764057900"
+        }
+      }
+    },
+    {
+      "t": 620,
+      "event": "resolve",
+      "payload": true
+    }
+  ],
+  "assert": [
+    "The server runs the clock-out zero more times (replay).",
+    "The re-sent body equals the recorded one byte for byte; the punch keeps its original client time (D7 bound 4, T0-8).",
+    "clock_out is emitted once; a second restart finds emitted: true and does not emit.",
+    "attendanceId in the emit payload is the idempotency key on every path, so a repeat derives the same subscriber key.",
+    "The timesheet row exists once (the server books it on the stop; upsert_timesheet merges)."
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "source": "designed",
+  "journey": "J9",
+  "surface": "S5",
+  "hostApi": 20,
+  "decisions": [
+    "D3",
+    "D16"
+  ],
+  "given": {
+    "manifest": {
+      "mp": "clients",
+      "condition": "client",
+      "heldFirst": true
+    },
+    "held": {
+      "account.mp_condition_answers": {
+        "args": {
+          "clientId": "c-3"
+        },
+        "answer": {
+          "client": {
+            "id": "c-3",
+            "name": "Mrs Avery"
+          }
+        },
+        "asOf": 1764041000000
+      }
+    },
+    "server": {
+      "handler": {
+        "throws": {
+          "code": "PermissionDenied",
+          "status": 403
+        }
+      }
+    }
+  },
+  "call": {
+    "api": "tommy.actions.query('clients.client', { clientId: 'c-3' }, { onRead })"
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "resolve",
+      "payload": {
+        "answer": {
+          "client": {
+            "id": "c-3",
+            "name": "Mrs Avery"
+          }
+        },
+        "state": "held",
+        "asOf": 1764041000000,
+        "aged": false
+      }
+    },
+    {
+      "t": 300,
+      "event": "notice",
+      "payload": {
+        "state": "refused",
+        "answered": false,
+        "asOf": null,
+        "aged": false,
+        "reason": "access",
+        "error": {
+          "code": "PermissionDenied",
+          "status": 403,
+          "message": "Permission denied"
+        }
+      }
+    }
+  ],
+  "assert": [
+    "The held entry is purged before the notice (O4).",
+    "The client line clears (HDS-24: today a refusal is folded into unresolved and the name stays)."
+  ]
+}

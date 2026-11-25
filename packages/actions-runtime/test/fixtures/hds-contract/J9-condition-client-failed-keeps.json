@@ -1,0 +1,79 @@
+{
+  "source": "designed",
+  "journey": "J9",
+  "surface": "S5",
+  "hostApi": 20,
+  "decisions": [
+    "D3",
+    "D16"
+  ],
+  "given": {
+    "manifest": {
+      "mp": "clients",
+      "condition": "client",
+      "heldFirst": true
+    },
+    "held": {
+      "account.mp_condition_answers": {
+        "args": {
+          "clientId": "c-3"
+        },
+        "answer": {
+          "client": {
+            "id": "c-3",
+            "name": "Mrs Avery"
+          }
+        },
+        "asOf": 1764041000000
+      }
+    },
+    "server": {
+      "handler": {
+        "throws": {
+          "code": "Timeout"
+        }
+      }
+    }
+  },
+  "call": {
+    "api": "tommy.actions.query('clients.client', { clientId: 'c-3' }, { onRead })"
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "resolve",
+      "payload": {
+        "answer": {
+          "client": {
+            "id": "c-3",
+            "name": "Mrs Avery"
+          }
+        },
+        "state": "held",
+        "asOf": 1764041000000,
+        "aged": false
+      }
+    },
+    {
+      "t": 2000,
+      "event": "notice",
+      "payload": {
+        "state": "stale",
+        "answered": false,
+        "asOf": 1764041000000,
+        "aged": false,
+        "retrying": true,
+        "nextAttemptAt": 1764057606000,
+        "error": {
+          "code": "Timeout",
+          "status": null,
+          "message": "condition timed out"
+        }
+      }
+    }
+  ],
+  "assert": [
+    "The client name stays.",
+    "A handler answer { unresolved: true } is not kept as a held answer and is reported as stale."
+  ]
+}

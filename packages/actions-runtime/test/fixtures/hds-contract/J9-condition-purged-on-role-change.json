@@ -1,0 +1,71 @@
+{
+  "source": "designed",
+  "journey": "J9",
+  "surface": "S5",
+  "hostApi": 20,
+  "decisions": [
+    "D16"
+  ],
+  "given": {
+    "designReview": "Gav reviews the purge triggers before the freeze (COUNCIL-S3)",
+    "account": "Lena (Location Manager)",
+    "manifest": {
+      "mp": "scheduling",
+      "condition": "shift_requests_for_location",
+      "heldFirst": true
+    },
+    "held": {
+      "account.mp_condition_answers": [
+        {
+          "viewer": "u-lena",
+          "roleFingerprint": "rf-lm-harbour-pier",
+          "args": {
+            "locationId": "9"
+          },
+          "answer": {
+            "requests": [
+              {
+                "id": 4
+              }
+            ]
+          },
+          "asOf": 1764041000000
+        }
+      ]
+    },
+    "event": "Priya removes Lena's Pier tag; the host's permission settle reports a changed location-tag set"
+  },
+  "call": {
+    "api": "tommy.actions.query('scheduling.shift_requests_for_location', { locationId: '9' }, { onRead })",
+    "after": "the event"
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "purge",
+      "payload": {
+        "collection": "account.mp_condition_answers",
+        "account": "Lena",
+        "reason": "role_or_location_change"
+      }
+    },
+    {
+      "t": 10,
+      "event": "request",
+      "payload": "handler dispatched; nothing held, so the asker waits"
+    },
+    {
+      "t": 400,
+      "event": "reject",
+      "payload": {
+        "code": "PermissionDenied",
+        "status": 403
+      }
+    }
+  ],
+  "assert": [
+    "The answer held under fingerprint rf-lm-harbour-pier is never served after the change (new fingerprint rf-lm-harbour).",
+    "The same purge runs on a permission change, team removal, sign-out, account switch, a new Scheduling version or a changed condition schema.",
+    "The condition name is illustrative; the purge behaviour is the contract."
+  ]
+}

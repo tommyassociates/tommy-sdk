@@ -1,0 +1,26 @@
+{
+  "source": "designed",
+  "journey": "J4",
+  "surface": "S6",
+  "hostApi": 20,
+  "decisions": [
+    "D7"
+  ],
+  "given": {
+    "record": null
+  },
+  "call": {
+    "api": "tommy.host.writeOutcome('record_attendance', 'tc-55-stop-never-sent')"
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "return",
+      "payload": null
+    }
+  ],
+  "assert": [
+    "null for a key never recorded or evicted.",
+    "Another MP's activity also answers null."
+  ]
+}

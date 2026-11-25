@@ -1,0 +1,105 @@
+{
+  "source": "designed",
+  "journey": "J9",
+  "surface": "S5",
+  "hostApi": 20,
+  "decisions": [
+    "D16"
+  ],
+  "given": {
+    "manifest": {
+      "mp": "scheduling",
+      "condition": "shift_requirements_for",
+      "heldFirst": true
+    },
+    "held": {
+      "account.mp_condition_answers": {
+        "viewer": "u-55",
+        "roleFingerprint": "rf-member-loc7",
+        "args": {
+          "shiftId": "101"
+        },
+        "answer": {
+          "requirements": [
+            {
+              "id": "r-1",
+              "title": "Wear name badge",
+              "done": false
+            }
+          ]
+        },
+        "asOf": 1764041000000
+      }
+    },
+    "server": {
+      "handler answer": {
+        "delayMs": 5000,
+        "returns": {
+          "requirements": [
+            {
+              "id": "r-1",
+              "title": "Wear name badge",
+              "done": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  "call": {
+    "api": "tommy.actions.query('scheduling.shift_requirements_for', { shiftId: '101' }, { onRead })"
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "resolve",
+      "payload": {
+        "answer": {
+          "requirements": [
+            {
+              "id": "r-1",
+              "title": "Wear name badge",
+              "done": false
+            }
+          ]
+        },
+        "state": "held",
+        "asOf": 1764041000000,
+        "aged": false
+      }
+    },
+    {
+      "t": 1,
+      "event": "notice",
+      "payload": {
+        "state": "checking",
+        "answered": false,
+        "asOf": 1764041000000,
+        "aged": false
+      }
+    },
+    {
+      "t": 5000,
+      "event": "notice",
+      "payload": {
+        "state": "fresh",
+        "answered": true,
+        "asOf": 1764057605000,
+        "aged": false,
+        "answer": {
+          "requirements": [
+            {
+              "id": "r-1",
+              "title": "Wear name badge",
+              "done": true
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "assert": [
+    "Shift details paints the task at once; it updates in place when the fresh answer lands.",
+    "The fresh value replaces the held entry in account.mp_condition_answers."
+  ]
+}

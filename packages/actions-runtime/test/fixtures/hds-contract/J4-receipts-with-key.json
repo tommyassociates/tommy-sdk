@@ -1,0 +1,57 @@
+{
+  "source": "designed",
+  "journey": "J4",
+  "surface": "S7",
+  "hostApi": 20,
+  "decisions": [
+    "D17"
+  ],
+  "given": {
+    "network": "offline",
+    "queue": [
+      {
+        "activity": "leave.reject_leave_request",
+        "args": {
+          "leaveRequestId": 77,
+          "reason": "Short staffed"
+        },
+        "idempotencyKey": "lv-77-rej-1764057600"
+      }
+    ]
+  },
+  "call": {
+    "api": "tommy.host.offlineQueue({ receipts: true })"
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "return",
+      "payload": {
+        "total": 1,
+        "bytesUsed": 214,
+        "bytesCap": 5242880,
+        "entriesCap": 500,
+        "expiredOnLoad": 0,
+        "receipts": [
+          {
+            "id": "q-1",
+            "activity": "leave.reject_leave_request",
+            "args": {
+              "leaveRequestId": 77,
+              "reason": "Short staffed"
+            },
+            "queuedAt": 1764057600000,
+            "attempts": 0,
+            "state": "queued",
+            "idempotencyKey": "lv-77-rej-1764057600"
+          }
+        ]
+      }
+    }
+  ],
+  "assert": [
+    "idempotencyKey is present on every receipt (null only for a row queued without one).",
+    "The row shows 'Waiting to sync'; Pending sync shows 1.",
+    "bytesCap / entriesCap values are illustrative; the shape is the contract."
+  ]
+}
