@@ -35,6 +35,11 @@ async function conditions() {
   const envelope: HeldFirstAnswer<{ ready: boolean }> = await actions.query<{ ready: boolean }>('mp.is_ready', {}, {
     onRead: (notice: ReadNotice<{ ready: boolean }>) => { const fresh: { ready: boolean } | undefined = notice.answer; void fresh; },
   });
+  const reused = { signal: new AbortController().signal, onRead: (notice: ReadNotice<{ ready: boolean }>) => { void notice; } };
+  const fromVariable: HeldFirstAnswer<{ ready: boolean }> = await actions.query<{ ready: boolean }>('mp.is_ready', {}, reused);
+  const signalOnly = { signal: new AbortController().signal };
+  const plainFromVariable: { ready: boolean } = await actions.query<{ ready: boolean }>('mp.is_ready', {}, signalOnly);
+  void fromVariable; void plainFromVariable;
   const state: 'held' | 'fresh' = envelope.state;
   // @ts-expect-error a refusal rejects; the envelope never says refused
   const refused: HeldFirstAnswer<unknown>['state'] = 'refused';

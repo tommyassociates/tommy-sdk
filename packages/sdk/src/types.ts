@@ -172,9 +172,9 @@ export interface SolutionSchema {
 export interface ActionsApi {
   emit(trigger: string, payload: unknown): Promise<EmitReceipt>;
 
-  query<R = unknown>(condition: string, args: unknown, options?: { signal?: AbortSignal }): Promise<R>;
   // A refusal rejects; it never resolves.
   query<R = unknown>(condition: string, args: unknown, options: { signal?: AbortSignal; onRead: (notice: ReadNotice<R>) => void }): Promise<HeldFirstAnswer<R>>;
+  query<R = unknown>(condition: string, args: unknown, options?: { signal?: AbortSignal; onRead?: undefined }): Promise<R>;
 
   invoke<R = unknown>(activity: string, args: unknown, options?: { idempotencyKey?: string }): Promise<InvokeResult<R>>;
 
