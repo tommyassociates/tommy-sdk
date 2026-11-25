@@ -1762,6 +1762,15 @@ export function createBroker({
     return isTommyError(own) && own.retryable === false && !UNSETTLED_CODES.has(own.code);
   }
 
+  // A queue that cannot settle keeps a refused write of a keepRefused activity as a refused receipt.
+  async function keptAsRefused(row, outcome) {
+    const activity = row.envelope?.activity;
+    if (outcome.ok || row.envelope?.trigger || typeof activity !== 'string' || typeof queueStore.markRefused !== 'function') return false;
+    const [ownerMpId, name] = splitQualified(activity);
+    if (ownerMpId !== row.sourceMpId || mps.get(ownerMpId)?.manifest?.activities?.[name]?.keepRefused !== true) return false;
+    try { return (await queueStore.markRefused(row.seq, { refusal: refusalOf(outcome.error), at: now() })) === true; } catch (_) { return false; }
+  }
+
   async function drainOfflineQueueInnerTracked() {
     await queueStore.ready?.();
     const bySource = new Map();
@@ -1774,7 +1783,7 @@ export function createBroker({
     for (const [, rows] of bySource) {
       rows.sort((a, b) => a.seq - b.seq);
       for (const row of rows) {
-        if (typeof row.subject === 'string') continue;
+        if (typeof row.subject === 'string' || row.refused) continue;
         if (queueStore.isHeld?.(row)) break;
         if (!queueStore.all().some((queued) => queued.seq === row.seq)) { unsettled.delete(row.id); continue; }
         const envelope = row.envelope;
@@ -1819,7 +1828,7 @@ export function createBroker({
             scheduleSettleRetry();
             break;
           }
-        } else {
+        } else if (!(await keptAsRefused(row, outcome))) { // eslint-disable-line no-await-in-loop
           // eslint-disable-next-line no-await-in-loop
           await queueStore.remove(row.seq);
         }
@@ -2030,6 +2039,7 @@ export function createBroker({
           const attempts = Number(row.attempts) || 0;
           let state = attempts > 0 ? 'failed' : 'queued';
           if (queueStore.isHeld?.(row) || drainingRows.has(row.id)) state = 'sending';
+          if (row.refused) state = 'refused';
           return {
             id: row.id,
             activity: row.envelope.activity,
@@ -2038,6 +2048,12 @@ export function createBroker({
             attempts,
             state,
             idempotencyKey: typeof row.envelope.idempotencyKey === 'string' ? row.envelope.idempotencyKey : null,
+            ...(row.refused ? {
+              refusal: {
+                code: row.refused.refusal?.code ?? null, message: String(row.refused.refusal?.message || ''), status: row.refused.refusal?.status ?? null,
+              },
+              refusedAt: row.refused.at,
+            } : {}),
           };
         });
     },

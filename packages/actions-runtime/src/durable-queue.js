@@ -237,6 +237,18 @@ export function createDurableQueue({
       return true;
     },
 
+    /** Keep a row the server refused for good (`{ refusal, at }`): no drain sends it again; it reads as a refused receipt. */
+    markRefused(rowSeq, refused) {
+      refresh();
+      const row = rows[rowAt(rowSeq)];
+      if (!row) return false;
+      const before = row.refused;
+      row.refused = { refusal: { ...(refused?.refusal || {}) }, at: refused?.at };
+      if (!persist()) { if (before === undefined) delete row.refused; else row.refused = before; return false; }
+      changes.committed([row]);
+      return true;
+    },
+
     /** Hold a queued row for a write running in this page; false when held already or gone. */
     hold(rowSeq) {
       refresh();
