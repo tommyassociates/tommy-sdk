@@ -1,0 +1,128 @@
+{
+  "source": "designed",
+  "journey": "J10",
+  "surface": "S10",
+  "hostApi": 20,
+  "decisions": [
+    "D1",
+    "D20",
+    "D19"
+  ],
+  "given": {
+    "schema": "tommy-sdk packages/manifest/src/schema/manifest-schema.json after the level-20 change; tommy-api vendored copy refreshed (B1)"
+  },
+  "call": {
+    "cli": "yarn workspace @tommy/manifest run cli validate <path>"
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "validate",
+      "case": "valid",
+      "payload": {
+        "activities": {
+          "record_attendance": {
+            "sideEffect": "server_write",
+            "idempotency": "client_key",
+            "offlineReplayable": true,
+            "keepRefused": true
+          }
+        },
+        "conditions": {
+          "attendances_in_range": {
+            "latencyBudgetMs": 800,
+            "heldFirst": true,
+            "freshness": {
+              "showAgeMs": 43200000,
+              "refreshAfterMs": 300000,
+              "retryAfterMs": [
+                4000,
+                12000
+              ],
+              "sources": [
+                "workforce.attendances"
+              ]
+            }
+          }
+        }
+      },
+      "result": "ok"
+    },
+    {
+      "t": 0,
+      "event": "validate",
+      "case": "keepRefused without offline replay",
+      "payload": {
+        "activities": {
+          "verify_kiosk_pin": {
+            "offlineReplayable": false,
+            "keepRefused": true
+          }
+        }
+      },
+      "result": {
+        "error": "keep-refused-requires-offline-replay"
+      }
+    },
+    {
+      "t": 0,
+      "event": "validate",
+      "case": "freshness without heldFirst",
+      "payload": {
+        "conditions": {
+          "time_clock_settings": {
+            "freshness": {
+              "showAgeMs": 60000
+            }
+          }
+        }
+      },
+      "result": {
+        "error": "freshness-needs-held-first"
+      }
+    },
+    {
+      "t": 0,
+      "event": "validate",
+      "case": "retry steps not ascending",
+      "payload": {
+        "conditions": {
+          "x": {
+            "heldFirst": true,
+            "freshness": {
+              "retryAfterMs": [
+                12000,
+                4000
+              ]
+            }
+          }
+        }
+      },
+      "result": {
+        "error": "schema: retryAfterMs ascending"
+      }
+    },
+    {
+      "t": 0,
+      "event": "validate",
+      "case": "unknown key",
+      "payload": {
+        "conditions": {
+          "x": {
+            "heldFirst": true,
+            "freshness": {
+              "maxAgeMs": 1
+            }
+          }
+        }
+      },
+      "result": {
+        "error": "schema: additionalProperties"
+      }
+    }
+  ],
+  "assert": [
+    "Activity and condition objects are abbreviated to the keys under test.",
+    "tommy-api publish checks give the same verdicts once B1 has landed (strict mode, checks_runner.rb:12)."
+  ]
+}

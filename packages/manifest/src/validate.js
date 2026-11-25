@@ -24,7 +24,7 @@ function validator() {
 
 // --- Ajv error → named-rule descriptor ------------------------------------
 
-const SEMANTIC_RE = /\/(triggers|activities|localData)\/additionalProperties\/allOf\//;
+const SEMANTIC_RE = /\/(triggers|activities|localData|conditions)\/additionalProperties\/allOf\//;
 
 function isSemantic(err) {
   return SEMANTIC_RE.test(err.schemaPath);
@@ -45,6 +45,13 @@ function describeSemantic(err) {
     // naturalKeyField guard. Naming them apart matters — reporting a
     // naturalKeyField misuse as an offline-replay error would send the author
     // to edit the wrong field.
+    if (/\/activities\/additionalProperties\/allOf\/5\//.test(err.schemaPath)) {
+      return {
+        path,
+        rule: 'keep-refused-requires-offline-replay',
+        message: `activity '${name}' declares keepRefused but is not offlineReplayable — only a write that waited in the offline queue can be refused after the caller moved on, so the declaration would do nothing.`,
+      };
+    }
     if (/\/activities\/additionalProperties\/allOf\/4\//.test(err.schemaPath)) {
       return {
         path,
@@ -63,6 +70,13 @@ function describeSemantic(err) {
       path,
       rule: 'offline-replay-requires-idempotency',
       message: `activity '${name}' is offlineReplayable but idempotency is 'none' — an offline-replayable activity must have an idempotency strategy.`,
+    };
+  }
+  if (/\/properties\/conditions\/additionalProperties\/allOf\//.test(err.schemaPath)) {
+    return {
+      path,
+      rule: 'freshness-needs-held-first',
+      message: `condition '${name}' declares freshness without heldFirst: true — freshness describes a held answer, and without heldFirst nothing is held.`,
     };
   }
   // The localData block now has TWO allOf branches, and naming them apart
@@ -165,6 +179,27 @@ function finalize(doc, lineCounter, d, layer, suggestion) {
     layer,
     ...(suggestion ? { suggestion } : {}),
   };
+}
+
+// --- Shape the schema cannot express --------------------------------------
+
+// A condition's `freshness.retryAfterMs` steps must ascend: each retry waits
+// longer than the one before. JSON Schema cannot compare items, so this runs
+// beside the schema layer.
+function retryStepErrors(doc, lineCounter, data) {
+  const errors = [];
+  for (const [name, cond] of Object.entries(data?.conditions ?? {})) {
+    const steps = cond?.freshness?.retryAfterMs;
+    if (!Array.isArray(steps)) continue;
+    if (steps.some((step, i) => i > 0 && !(Number(step) > Number(steps[i - 1])))) {
+      errors.push(finalize(doc, lineCounter, {
+        path: ['conditions', name, 'freshness', 'retryAfterMs'],
+        rule: 'retry-steps-ascending',
+        message: `condition '${name}' freshness.retryAfterMs must ascend: each retry waits longer than the one before.`,
+      }, 2));
+    }
+  }
+  return errors;
 }
 
 // --- Cross-reference layer -------------------------------------------------
@@ -399,7 +434,8 @@ export function validateManifest(source, opts = {}) {
     ajvErrors.filter((e) => !isSemantic(e)).map((e) => finalize(doc, lineCounter, describeShape(e), 2)),
   );
 
-  // Layer 2 — Schema shape
+  // Layer 2 — Schema shape (plus what JSON Schema cannot say about a shape)
+  shape.push(...retryStepErrors(doc, lineCounter, data));
   if (shape.length > 0) return { ok: false, manifestId, errors: shape };
 
   // Layer 3 — Catalogue

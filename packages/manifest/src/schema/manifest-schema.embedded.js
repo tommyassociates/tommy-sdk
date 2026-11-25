@@ -262,6 +262,22 @@ export default {
             "type": "integer",
             "minimum": 0
           },
+          "heldFirst": {
+            "description": "The broker keeps this condition's last answered value (one that validated against `returnSchema` and does not carry `unresolved: true`) per account, viewer, viewer role fingerprint and arguments, and an asker that passes `onRead` gets it at once while the handler runs in the background. Kept on the device in the host collection `account.mp_condition_answers` (memory only on a kiosk); purged on a refusal, a permission, role or location change, team removal, sign-out, account switch, a new version of this Mini Program or a schema change. Host API level 20; inert on older hosts.",
+            "type": "boolean",
+            "default": false
+          },
+          "freshness": {
+            "description": "How the host treats a held answer of this condition (needs `heldFirst: true`). `showAgeMs`: older than this, the answer is shown as aged (never hidden). `refreshAfterMs`: older than this, showing it starts a background read. `retryAfterMs`: the retry steps (ascending) after a failed read while it is shown. `sources`: the host collections the condition reads; a landed write that declares one of them marks the held answers stale.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "showAgeMs": { "type": "integer", "minimum": 1000, "maximum": 604800000 },
+              "refreshAfterMs": { "type": "integer", "minimum": 0, "maximum": 86400000 },
+              "retryAfterMs": { "type": "array", "items": { "type": "integer", "minimum": 1000, "maximum": 60000 }, "minItems": 1, "maxItems": 3 },
+              "sources": { "type": "array", "items": { "type": "string", "pattern": "^[a-z_]+\\.[a-z_]+$" }, "maxItems": 10 }
+            }
+          },
           "ai": {
             "$ref": "#/$defs/aiContext"
           },
@@ -277,7 +293,17 @@ export default {
           "deprecated": {
             "$ref": "#/$defs/deprecatedMarker"
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": { "required": ["freshness"] },
+            "then": {
+              "required": ["heldFirst"],
+              "properties": { "heldFirst": { "const": true } }
+            },
+            "$comment": "Freshness describes a held answer; without heldFirst nothing is held, so the block would do nothing."
+          }
+        ]
       }
     },
     "activities": {
@@ -350,6 +376,11 @@ export default {
           "offlineReplayable": {
             "description": "If true, the invocation can be queued offline and replayed on reconnect.",
             "type": "boolean"
+          },
+          "keepRefused": {
+            "description": "A queued write of this activity that the server refuses when it is replayed is kept (with its idempotency key and the refusal) and shown to the person, instead of being dropped from the queue. Requires `offlineReplayable: true`: only a queued write is refused later. Host API level 20; inert on older hosts.",
+            "type": "boolean",
+            "default": false
           },
           "retry": {
             "type": "object",
@@ -501,6 +532,14 @@ export default {
               }
             },
             "$comment": "A held write is resent only under its own client key, by a check again; it is never replayed from the offline queue, and only a server write can have an unknown outcome."
+          },
+          {
+            "if": { "required": ["keepRefused"], "properties": { "keepRefused": { "const": true } } },
+            "then": {
+              "required": ["offlineReplayable"],
+              "properties": { "offlineReplayable": { "const": true } }
+            },
+            "$comment": "Only a write that waited in the offline queue can be refused after the caller moved on; any other refusal is answered to the caller directly."
           }
         ]
       }

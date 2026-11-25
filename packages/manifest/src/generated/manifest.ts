@@ -449,6 +449,26 @@ returnSchema: JsonSchema1
 latencyBudgetMs: number
 cacheable?: boolean
 cacheTtlMs?: number
+/**
+ * The broker keeps this condition's last answered value (one that validated against `returnSchema` and does not carry `unresolved: true`) per account, viewer, viewer role fingerprint and arguments, and an asker that passes `onRead` gets it at once while the handler runs in the background. Kept on the device in the host collection `account.mp_condition_answers` (memory only on a kiosk); purged on a refusal, a permission, role or location change, team removal, sign-out, account switch, a new version of this Mini Program or a schema change. Host API level 20; inert on older hosts.
+ */
+heldFirst?: boolean
+/**
+ * How the host treats a held answer of this condition (needs `heldFirst: true`). `showAgeMs`: older than this, the answer is shown as aged (never hidden). `refreshAfterMs`: older than this, showing it starts a background read. `retryAfterMs`: the retry steps (ascending) after a failed read while it is shown. `sources`: the host collections the condition reads; a landed write that declares one of them marks the held answers stale.
+ */
+freshness?: {
+showAgeMs?: number
+refreshAfterMs?: number
+/**
+ * @minItems 1
+ * @maxItems 3
+ */
+retryAfterMs?: [number]|[number, number]|[number, number, number]
+/**
+ * @maxItems 10
+ */
+sources?: []|[string]|[string, string]|[string, string, string]|[string, string, string, string]|[string, string, string, string, string]|[string, string, string, string, string, string]|[string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string]
+}
 ai?: AiContext
 agentVisible?: AgentVisibility
 agentVisibilityReason?: AgentVisibilityReason
@@ -506,6 +526,10 @@ naturalKeyField?: string
  * If true, the invocation can be queued offline and replayed on reconnect.
  */
 offlineReplayable: boolean
+/**
+ * A queued write of this activity that the server refuses when it is replayed is kept (with its idempotency key and the refusal) and shown to the person, instead of being dropped from the queue. Requires `offlineReplayable: true`: only a queued write is refused later. Host API level 20; inert on older hosts.
+ */
+keepRefused?: boolean
 retry?: {
 maxAttempts?: number
 backoff?: ("none" | "linear" | "exponential")
