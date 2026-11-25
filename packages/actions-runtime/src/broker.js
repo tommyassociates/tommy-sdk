@@ -85,6 +85,15 @@ function hasSecretInput(schema, depth = 0, root = schema, seen = new Set()) {
 const confirmEligible = (activityDef) => activityDef?.idempotency === 'client_key'
   && activityDef.offlineReplayable === true && !hasSecretInput(activityDef.inputSchema);
 
+const ARGS_DEPTH_MAX = 16;
+// The arguments actually sent, not only the declared schema: a field the schema lets through may still be a secret.
+function argsHaveSecret(value, depth = 0) {
+  if (value === null || typeof value !== 'object') return false;
+  if (depth > ARGS_DEPTH_MAX) return true;
+  if (Array.isArray(value)) return value.some((item) => argsHaveSecret(item, depth + 1));
+  return Object.entries(value).some(([name, item]) => SECRET_INPUT_NAMES.has(String(name).toLowerCase()) || argsHaveSecret(item, depth + 1));
+}
+
 const RESTORE_CONTEXT_ALWAYS = new Set(['team.update_member']);
 // Only on a durable-queue drain: the server reads restoreContext as 'this write waited' and honours its captured time.
 const RESTORE_CONTEXT_ON_DRAIN = new Set(['time-clock.record_attendance', 'time-clock.record_booking_clock']);
@@ -154,7 +163,7 @@ export function createBroker({
   offlineQueue = createDurableQueue({ now }),
   // The queue is one store per device, so only a broker of the same owner sends a row.
   queueOwner = null,
-  replayEnvelope = (envelope) => envelope,
+  replayEnvelope = null,
   outcomeStore = null,
   conditionAnswerStore = null,
   viewerFingerprint = () => '',
@@ -180,6 +189,9 @@ export function createBroker({
   };
 
   const records = createRecordStore({ backend: recordBackend, now });
+  // Only a host that restores a sender's credentials can confirm a kept request; the saved request carries none.
+  const restoresIdentity = typeof replayEnvelope === 'function';
+  const replay = restoresIdentity ? replayEnvelope : (envelope) => envelope;
   const outcomes = createOutcomeLedger({ store: outcomeStore, now });
   outcomes.ready();
   let outcomeGeneration = 0;
@@ -1650,7 +1662,7 @@ export function createBroker({
     if (activityDef?.idempotency !== 'client_key' || !idempotencyKey || !outcomeScopeLive(scope)) return;
     const settled = state === 'succeeded' || state === 'refused';
     const open = state === 'queued' || state === 'unconfirmed';
-    const request = open && confirmEligible(activityDef) ? {
+    const request = open && restoresIdentity && confirmEligible(activityDef) && !argsHaveSecret(envelope.args) ? {
       sourceMpId: envelope.sourceMpId, activity: envelope.activity, args: envelope.args ?? {}, idempotencyKey,
     } : undefined;
     try {
@@ -1664,6 +1676,14 @@ export function createBroker({
     if (before && (before.state === 'queued' || before.state === 'unconfirmed')) noteOutcome(activityDef, envelope, idempotencyKey, 'succeeded', {}, scope);
   }
 
+  // A write refused for good before it ran is settled for its owner, so it never reads as waiting or confirmable.
+  function recordRefusalIfOpen(owner, activity, key, error, generation) {
+    if (!owner || typeof key !== 'string' || !key || retired || generation !== outcomeGeneration) return;
+    try {
+      if (confirmOpen(outcomes.get(owner, activity, key))) outcomes.record(owner, activity, key, { state: 'refused', refusal: refusalOf(error) });
+    } catch (_) { /* the record ages out */ }
+  }
+
   function ownActivity(sourceMpId, activity) {
     if (typeof activity !== 'string' || !activity || activity.includes('.')) return null;
     const activityDef = mps.get(sourceMpId)?.manifest?.activities?.[activity];
@@ -1671,7 +1691,7 @@ export function createBroker({
   }
 
   const confirmOpen = (record) => !!record && (record.state === 'queued' || record.state === 'unconfirmed');
-  const confirmable = (activityDef, record) => confirmEligible(activityDef) && confirmOpen(record) && !!record.request
+  const confirmable = (activityDef, record) => restoresIdentity && confirmEligible(activityDef) && confirmOpen(record) && !!record.request
     && record.confirmSent !== true && now() - record.at <= CONFIRM_WITHIN_MS;
 
   const notConfirmable = (reason, message) => Object.assign(
@@ -1685,6 +1705,13 @@ export function createBroker({
     try {
       if (confirmOpen(outcomes.get(owner, row.envelope.activity, key))) outcomes.remove(owner, row.envelope.activity, key);
     } catch (_) { /* the record ages out */ }
+  }
+
+  function restoredTenantOf(restored) {
+    if (known(restored?.identity?.tenantId)) return restored.identity.tenantId;
+    if (known(restored?.tenantId)) return restored.tenantId;
+    if (!restored?.capabilityToken) return undefined;
+    try { return authenticate(restored).tenantId; } catch (_) { return undefined; }
   }
 
   // A confirm answered from the idempotency ledger ran nothing new; its own run record names it.
@@ -1809,6 +1836,7 @@ export function createBroker({
         if (queueStore.isHeld?.(row)) break;
         if (!queueStore.all().some((queued) => queued.seq === row.seq)) { unsettled.delete(row.id); continue; }
         const envelope = row.envelope;
+        const rowScope = outcomeScopeFor(envelope?.identity?.tenantId ?? row.owner?.tenantId);
         const refusedBefore = row.id ? unsettled.get(row.id) : undefined;
         let outcome;
         if (refusedBefore) {
@@ -1821,7 +1849,7 @@ export function createBroker({
           }
           if (row.id) drainingRows.add(row.id);
           // eslint-disable-next-line no-await-in-loop
-          outcome = await Promise.resolve().then(() => replayEnvelope(envelope)).then((restored) => (restored.trigger
+          outcome = await Promise.resolve().then(() => replay(envelope)).then((restored) => (restored.trigger
             ? dispatchEmit(restored)
             : dispatchInvoke({
               ...restored, rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: true, restoreQueuedAt: row.queuedAt, idempotencyKey: envelope.idempotencyKey,
@@ -1838,6 +1866,9 @@ export function createBroker({
           break;
         }
         resendFailures.delete(envelope?.idempotencyKey);
+        if (!outcome.ok && !envelope.trigger) {
+          recordRefusalIfOpen(rowScope.owner, envelope.activity, envelope.idempotencyKey, outcome.error, rowScope.generation);
+        }
         // Settled in the same commit as the removal, so a page that dies before the observer runs keeps the refusal.
         if (!outcome.ok && !envelope.trigger && typeof queueStore.settle === 'function') {
           try {
@@ -2112,8 +2143,8 @@ export function createBroker({
     async confirmWriteOutcome(sourceMpId, activity, idempotencyKey, { tenantId } = {}) {
       const own = ownActivity(sourceMpId, activity);
       if (!own) throw err('WriteNotFound', `'${activity}' is not an activity of mp '${sourceMpId}'`, { retryable: false });
-      if (!confirmEligible(own.activityDef)) {
-        throw notConfirmable('not_eligible', `'${own.qualified}' cannot be confirmed: only a client_key, offline-replayable write with no secret input can`);
+      if (!restoresIdentity || !confirmEligible(own.activityDef)) {
+        throw notConfirmable('not_eligible', `'${own.qualified}' cannot be confirmed: only a client_key, offline-replayable write with no secret input, on a host that restores its sender, can`);
       }
       await outcomes.ready();
       const owner = recordOwner(tenantId);
@@ -2125,27 +2156,37 @@ export function createBroker({
       if (now() - record.at > CONFIRM_WITHIN_MS) throw notConfirmable('expired', `'${own.qualified}' was recorded more than 24 hours ago`);
       const offline = (message) => ({ state: 'unconfirmed', error: { code: 'DATA_OFFLINE', status: 0, message } });
       if (!isOnline) return offline(`'${own.qualified}' was not confirmed: the device is offline`);
+      const generation = outcomeGeneration;
       outcomes.patch(owner, own.qualified, idempotencyKey, { confirmSent: true });
-      const release = () => outcomes.patch(owner, own.qualified, idempotencyKey, { confirmSent: false });
+      const release = () => { if (generation === outcomeGeneration) outcomes.patch(owner, own.qualified, idempotencyKey, { confirmSent: false }); };
       const request = JSON.parse(JSON.stringify(record.request));
       const send = { started: false };
       let restored;
       let answer;
       try {
-        restored = await replayEnvelope(request);
+        restored = await replay(request);
+        // The request is sent only as the account it was kept for, and only if nothing purged it meanwhile.
+        if (generation !== outcomeGeneration || recordOwner(restoredTenantOf(restored) ?? tenantId) !== owner) {
+          release();
+          throw notConfirmable('no_request', `the account changed before '${own.qualified}' was confirmed; nothing was sent`);
+        }
         answer = await dispatchInvoke({
           ...restored, args: request.args, activity: request.activity, sourceMpId,
           rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: undefined, idempotencyKey: request.idempotencyKey,
           [CONFIRM_SEND]: send,
         });
       } catch (error) {
+        if (error?.code === 'WriteNotConfirmable') throw error;
         if (neverReachedServer(error) || error?.code === 'Offline') {
           release();
           return offline(String(error?.message || 'the request did not leave the device'));
         }
         // Nothing reached the network, so the one confirm is still to come.
         if (!send.started) release();
-        if (refusedForGood(error)) return { state: 'refused', refusal: refusalOf(error) };
+        if (refusedForGood(error)) {
+          if (!send.started) recordRefusalIfOpen(owner, own.qualified, idempotencyKey, error, generation);
+          return { state: 'refused', refusal: refusalOf(error) };
+        }
         return { state: 'unconfirmed', error: refusalOf(error) };
       }
       if (answer?.status === 'queued_offline') {

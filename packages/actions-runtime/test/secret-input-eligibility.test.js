@@ -36,6 +36,7 @@ async function brokerWith(inputSchema) {
     serverInvoke: vi.fn(async () => { throw Object.assign(new Error('no answer'), { code: 'Timeout' }); }),
     sleep: async () => {},
     queueOwner: () => ({ tenantId: TENANT }),
+    replayEnvelope: async (envelope) => envelope,
   });
   broker.registerMp({
     id: 'kiosk', version: '1.0.0', publisher: { type: 'first_party' }, triggers: {}, conditions: {},
