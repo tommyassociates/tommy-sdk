@@ -128,15 +128,16 @@ describe('provider readiness — an ANNOUNCED MP is waited for', () => {
   });
 
   it('an already-registered provider does NOT wait — announcing it is a no-op', async () => {
-    const w = await world({ registrationTimeoutMs: 50 });
+    const w = await world({ registrationTimeoutMs: 30_000 });
     registerProvider(w.broker);
     w.broker.expectMps(['leave']); // late, and must not re-arm a wait
 
-    // If this waited it would still resolve, so prove it did not: the timeout is
-    // 50ms and this must resolve well inside it.
+    // A wait would last the 30 s registration timeout, past the test's own
+    // timeout; resolving within a second proves there was none, even on a
+    // loaded machine.
     const started = Date.now();
     expect(await w.query()).toBe('requests');
-    expect(Date.now() - started).toBeLessThan(40);
+    expect(Date.now() - started).toBeLessThan(1_000);
   });
 });
 
