@@ -1489,7 +1489,8 @@ export function createBroker({
         validateAgainst(activityDef.resultSchema, result.result, 'ActivityFailed', `activity '${envelope.activity}' result`);
         const final = { rpcId: record.runId, status: 'succeeded', result: result.result, ...(result.replayed === true ? { replayed: true } : {}) };
         resendFailures.delete(idempotencyKey);
-        noteOutcome(activityDef, envelope, idempotencyKey, 'succeeded', { rpcId: record.runId }, outcomeScope);
+        const typedRefusal = typedRefusalOf(activityDef, result);
+        noteOutcome(activityDef, envelope, idempotencyKey, typedRefusal ? 'refused' : 'succeeded', { rpcId: record.runId, refusal: typedRefusal }, outcomeScope);
         await records.update(record.runId, { status: 'succeeded', result: result.result });
         if (processedKey) {
           processedKeys.set(processedKey, final);
@@ -1722,6 +1723,15 @@ export function createBroker({
     if (typeof activity !== 'string' || !activity || activity.includes('.')) return null;
     const activityDef = mps.get(sourceMpId)?.manifest?.activities?.[activity];
     return activityDef ? { activityDef, qualified: qualify(sourceMpId, activity) } : null;
+  }
+
+  // Recorded as refused only when the executor marks its answer and the declared result has `ok` and `code`; the answer is unchanged.
+  function typedRefusalOf(activityDef, answer) {
+    const declared = activityDef?.resultSchema?.properties;
+    const result = answer?.result;
+    if (answer?.typedRefusal !== true || !result || result.ok !== false || typeof result.code !== 'string' || !result.code) return null;
+    if (![].concat(declared?.ok?.type).includes('boolean') || ![].concat(declared?.code?.type).includes('string')) return null;
+    return { code: result.code, status: null, message: typeof result.message === 'string' ? result.message : '' };
   }
 
   const confirmOpen = (record) => !!record && (record.state === 'queued' || record.state === 'unconfirmed');
