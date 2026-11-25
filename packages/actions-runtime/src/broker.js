@@ -801,7 +801,9 @@ export function createBroker({
       identity, tenantId, ownerMpId, conditionName, ownerEntry, conditionDef, cacheKey,
     } = prepared;
     const heldKey = heldConditionKey(envelope, prepared);
-    const heldSeq = heldKey ? (conditionReadSeq += 1) : 0;
+    const heldSeq = (conditionReadSeq += 1);
+    // An older read never replaces a newer read's cached answer.
+    const newestFor = () => !cacheKey || !(conditionCache.get(cacheKey)?.seq > heldSeq);
     const heldFence = heldKey ? conditionAnswers.epoch(envelope.condition) : null;
     const epochAtDispatch = conditionCacheEpoch;
     await awaitQueryToken(envelope.sourceMpId);
@@ -857,9 +859,11 @@ export function createBroker({
               note: 'resolved after latency budget; the caller had already timed out',
             });
             // A moved epoch means an invalidation landed during the read, so this value must not refill the cache.
-            if (conditionCacheEpoch !== epochAtDispatch) return;
+            if (conditionCacheEpoch !== epochAtDispatch || !cacheKey || !newestFor()) return;
             if (conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !isKnownUnknown(late)) {
-              conditionCache.set(cacheKey, { value: late, expiresAt: now() + conditionDef.cacheTtlMs, condition: envelope.condition });
+              conditionCache.set(cacheKey, {
+                value: late, expiresAt: now() + conditionDef.cacheTtlMs, condition: envelope.condition, seq: heldSeq,
+              });
               pruneConditionCache(cacheKey);
             }
           })
@@ -876,12 +880,15 @@ export function createBroker({
       validateAgainst(conditionDef.returnSchema, value, 'ConditionError', `condition '${envelope.condition}' return`);
       await records.update(record.runId, { status: 'succeeded', result: value });
       // A zero-TTL entry could never be served, and a known-unknown must not be cached.
-      if (conditionCacheEpoch === epochAtDispatch && conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !isKnownUnknown(value)) {
-        conditionCache.set(cacheKey, { value, expiresAt: now() + conditionDef.cacheTtlMs, condition: envelope.condition });
+      const kept = heldKey && !isKnownUnknown(value) && heldKey.current() && conditionAnswers.epoch(envelope.condition) === heldFence
+        ? conditionAnswers.keep({ ...heldKey.entry, answer: value, at: now(), seq: heldSeq })
+        : null;
+      if (kept !== false && cacheKey && newestFor() && conditionCacheEpoch === epochAtDispatch
+        && conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !isKnownUnknown(value)) {
+        conditionCache.set(cacheKey, {
+          value, expiresAt: now() + conditionDef.cacheTtlMs, condition: envelope.condition, seq: heldSeq,
+        });
         pruneConditionCache(cacheKey);
-      }
-      if (heldKey && !isKnownUnknown(value) && heldKey.current() && conditionAnswers.epoch(envelope.condition) === heldFence) {
-        conditionAnswers.keep({ ...heldKey.entry, answer: value, at: now(), seq: heldSeq });
       }
       return value;
     } catch (cause) {
@@ -973,8 +980,18 @@ export function createBroker({
       for (let restarts = 0; ; restarts += 1) {
         const fence = conditionAnswers.epoch(envelope.condition);
         failure = null;
+        // Each attempt is authorized and resolved again: the provider or the caller's grant may have changed while it waited.
+        let live = null;
         try {
-          value = await runQuery({ ...envelope, onRead: undefined }, prepared);
+          live = await prepareQuery({ ...envelope, onRead: undefined });
+        } catch (error) {
+          failure = error;
+        }
+        if (failure) break;
+        if (conditionSignature(live.ownerEntry?.manifest?.version, live.conditionDef) !== key.entry.sig) { ended = true; return; }
+        if (ended || retired || callerSignal?.aborted || !key.current()) { ended = true; return; }
+        try {
+          value = await runQuery({ ...envelope, onRead: undefined }, live);
         } catch (error) {
           failure = error;
         }

@@ -97,6 +97,10 @@ export function createConditionAnswers({ store = null, maxRows = DEFAULT_MAX } =
             const stale = row.stale === true || whileLoading.stale.some((touched) => touched(row.condition));
             entries.delete(row.id);
             entries.set(row.id, copy({ ...row, stale }));
+            if (stale && row.stale !== true) {
+              const kept = copy({ ...row, stale });
+              persist(() => store.put?.(kept));
+            }
           }
           evict();
         }).catch(() => { /* an unreadable store leaves memory as it is */ })
