@@ -195,7 +195,7 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
      * list, re-flowed by the serializer on save), which is exactly what this
      * mode honours.
      */
-    mountSurface(el, { surface, viewerRoles = [], ctxFor, mpId, panelId, layout, pack = null, onDispose, onPanelElement, onClose, closeLabel }) {
+    mountSurface(el, { surface, viewerRoles = [], ctxFor, mpId, panelId, layout, pack = null, onDispose, onPanelElement, onClose, closeLabel, labels = null }) {
       // Per element (never another element hosting the same surface name). A
       // re-mount into an element this host already serves keeps its app and
       // patches its tiles by key: an unchanged tile keeps its component
@@ -237,7 +237,7 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
         tiles.length = SURFACE_PANEL_BUDGET;
       }
       const next = {
-        surface, tiles, pack, ctxFor, onPanelElement, onClose, closeLabel,
+        surface, tiles, pack, ctxFor, onPanelElement, onClose, closeLabel, labels,
       };
       const current = mounted.get(el);
       if (current?.view) {
@@ -259,7 +259,7 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
         render: () => h('div', { class: 'mp-panel-grid', 'data-mp-surface': view.surface },
           view.tiles.map(({ mpId, def, entry }) => {
             const {
-              surface: shownSurface, pack: shownPack, ctxFor: contextFor, onPanelElement: onElement, onClose: close, closeLabel: closeText,
+              surface: shownSurface, pack: shownPack, ctxFor: contextFor, onPanelElement: onElement, onClose: close, closeLabel: closeText, labels: tileLabels,
             } = view;
             // Composed placement is an INLINE style on the tile root (Vue
             // fallthrough onto PanelTile's single root div): explicit start
@@ -302,6 +302,7 @@ export function createPanelHost({ onEvent, installComponentRuntime } = {}) {
               onEvent,
               onClose: close,
               closeLabel: closeText,
+              labels: tileLabels,
             });
           })),
       });

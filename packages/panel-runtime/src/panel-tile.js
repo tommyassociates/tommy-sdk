@@ -2,20 +2,49 @@
  * panel-tile.js — one host-owned grid tile (panel-runtime.md §2).
  *
  * The host paints the skeleton INSTANTLY; the MP's panel definition fills a
- * Shadow-DOM root when its `load()` resolves (progressive reveal). Runtime
- * budgets per harden round-1: §2 only — 5 s per-panel load timeout, Retry
- * re-runs load, 3 consecutive failures escalate to a "Reload add-on" state.
- * (§8's 30 KB/200 ms/5 MB are review/harness checks, NOT runtime-enforced.)
+ * Shadow-DOM root when its `load()` resolves (progressive reveal). Time alone
+ * is never an error: past `LOAD_TIMEOUT_MS` a first boot keeps its skeleton
+ * with a "taking longer" note, and a tile that already rendered keeps its
+ * content with a stale mark and Retry, until the load answers or fails. A
+ * real failure shows the error card, Retry re-runs load, and 3 consecutive
+ * failures escalate to a "Reload add-on" state. A changed context (anything
+ * but the live objects it carries) loads and renders the tile again, keeping
+ * what it shows meanwhile. (§8's 30 KB/200 ms/5 MB are review/harness checks,
+ * NOT runtime-enforced.)
  *
  * Containment: load/render failures are caught here (the boundary pattern
  * — a broken panel is a fallback tile, siblings keep running) and reported
  * through the budget-hook event stream.
  */
-import { defineComponent, h, ref, onMounted, onBeforeUnmount, onErrorCaptured } from 'vue';
+import { defineComponent, h, ref, watch, onMounted, onBeforeUnmount, onErrorCaptured } from 'vue';
 import { isStaleWorldRefusal } from './stale-world.js';
 
 export const LOAD_TIMEOUT_MS = 5000;
 export const MAX_CONSECUTIVE_FAILURES = 3;
+
+/** The host-drawn words of a tile, in English unless the host passes its own. */
+export const DEFAULT_TILE_LABELS = Object.freeze({
+  stale: "Couldn't refresh — showing the last view",
+  retry: 'Try again',
+  slow: 'Taking longer than usual…',
+});
+
+// Context fields that are live objects (the MP's SDK, chat panes), not what
+// the panel shows: a new one alone never loads the tile again.
+const LIVE_CONTEXT_FIELDS = new Set(['tommy', 'chatPane', 'chatThreadPane', 'chatList']);
+
+/** A context as the panel shows it: its plain fields, without functions or live objects. */
+function contextSignature(ctx) {
+  try {
+    return JSON.stringify(ctx ?? null, (key, value) => {
+      if (typeof value === 'function') return undefined;
+      if (LIVE_CONTEXT_FIELDS.has(key)) return undefined;
+      return value;
+    });
+  } catch (_) {
+    return null;
+  }
+}
 
 /**
  * Base stylesheet adopted into every panel shadow root.
@@ -235,14 +264,23 @@ export const PanelTile = defineComponent({
     loadTimeoutMs: { type: Number, default: LOAD_TIMEOUT_MS },
     onClose: { type: Function, default: null },
     closeLabel: { type: String, default: 'Close' },
+    labels: { type: Object, default: null },    // { stale, retry, slow }: host words for the marks
     onEvent: { type: Function, default: null }, // budget hooks: (event) => void
   },
   setup(props, { expose }) {
     const status = ref('loading'); // loading | ready | error | reload_addon
     const failures = ref(0);
     const mountEl = ref(null);
+    // Rendered at least once: a later load keeps the content shown meanwhile.
+    const rendered = ref(false);
+    // Past the load timeout: `stale` over rendered content, `slow` under a first-boot skeleton.
+    const stale = ref(false);
+    const slow = ref(false);
     let shadowRoot = null;
     let alive = true;
+    // Only the latest load may settle the tile.
+    let bootSeq = 0;
+    const label = (key) => (props.labels && typeof props.labels[key] === 'string' && props.labels[key]) || DEFAULT_TILE_LABELS[key];
 
     const emitEvent = (type, extra = {}) => {
       try {
@@ -259,26 +297,37 @@ export const PanelTile = defineComponent({
     }
 
     async function boot() {
-      status.value = 'loading';
+      bootSeq += 1;
+      const seq = bootSeq;
+      const current = () => alive && seq === bootSeq;
+      const keep = rendered.value && (status.value === 'ready');
+      if (!keep) status.value = 'loading';
+      stale.value = false;
+      slow.value = false;
       emitEvent('panel-load-start');
       const startedAt = Date.now();
-      let timer;
-      const timeout = new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`panel '${props.def.id}' load exceeded ${props.loadTimeoutMs}ms`)), props.loadTimeoutMs);
-      });
+      // Time alone is never an error: past the timeout the tile says so and waits.
+      const timer = setTimeout(() => {
+        if (!current()) return;
+        if (keep) stale.value = true; else slow.value = true;
+        emitEvent(keep ? 'panel-stale' : 'panel-slow', { afterMs: props.loadTimeoutMs });
+      }, props.loadTimeoutMs);
       try {
         // Optional prefetch — both paths may declare load(). The component path
         // usually fetches inside the component's setup() via `tommy` instead.
         if (props.def.load) {
-          await Promise.race([Promise.resolve(props.def.load(props.ctx)), timeout]);
+          await Promise.resolve(props.def.load(props.ctx));
         }
-        if (!alive) return;
+        if (!current()) return;
         if (props.def.component) {
           // Component path: mount a Vue/F7 component declaratively into the
           // LIGHT-DOM content node (the render fn renders it once ready). No
           // shadow root (F7's global CSS can't cross a closed shadow boundary),
           // no def.render. Render errors are contained by onErrorCaptured below.
           status.value = 'ready';
+          rendered.value = true;
+          stale.value = false;
+          slow.value = false;
           failures.value = 0;
           emitEvent('panel-ready', { durationMs: Date.now() - startedAt });
           return;
@@ -298,16 +347,29 @@ export const PanelTile = defineComponent({
         // render() typically calls replaceChildren() on the root, which wipes a
         // <style> fallback node — the adopted-sheet path is idempotent.
         applyPanelBaseStyles(shadowRoot);
-        if (!alive) return;
+        if (!current()) return;
         status.value = 'ready';
+        rendered.value = true;
+        stale.value = false;
+        slow.value = false;
         failures.value = 0;
         emitEvent('panel-ready', { durationMs: Date.now() - startedAt });
       } catch (cause) {
-        if (alive) fail(cause);
+        if (current()) {
+          stale.value = false;
+          slow.value = false;
+          fail(cause);
+        }
       } finally {
         clearTimeout(timer);
       }
     }
+
+    // A changed context loads the tile again; what it shows stays meanwhile.
+    watch(() => contextSignature(props.ctx), (next, previous) => {
+      if (next === previous || !alive) return;
+      if (status.value === 'ready' || status.value === 'loading') boot();
+    });
 
     function retry() {
       emitEvent('panel-retry', { attempt: failures.value + 1 });
@@ -359,7 +421,23 @@ export const PanelTile = defineComponent({
           status.value === 'ready' ? [h(panelComponent, { tommy: props.ctx && props.ctx.tommy, ctx: props.ctx })] : [])
         : h('div', { class: 'mp-panel-tile__content', ref: mountEl, style: status.value === 'ready' ? undefined : { display: 'none' } }),
       status.value === 'loading'
-        ? h('div', { class: 'mp-panel-tile__skeleton', 'aria-busy': 'true' }, [h('div', { class: 'mp-panel-skeleton-bar' }), h('div', { class: 'mp-panel-skeleton-bar' })])
+        ? h('div', { class: 'mp-panel-tile__skeleton', 'aria-busy': 'true' }, [
+          h('div', { class: 'mp-panel-skeleton-bar' }),
+          h('div', { class: 'mp-panel-skeleton-bar' }),
+          slow.value ? h('p', { class: 'mp-panel-tile__slow', role: 'status', 'data-cy': 'mp-panel-slow-notice' }, label('slow')) : null,
+        ])
+        : null,
+      status.value === 'ready' && stale.value
+        ? h('div', { class: 'mp-panel-tile__stale', role: 'status', 'data-cy': 'mp-panel-stale-notice' }, [
+          h('span', { class: 'mp-panel-tile__stale-text' }, label('stale')),
+          h('button', {
+            class: 'mp-panel-tile__stale-retry',
+            type: 'button',
+            'data-cy': 'mp-panel-stale-retry-button',
+            style: { minWidth: '24px', minHeight: '24px' },
+            onClick: retry,
+          }, label('retry')),
+        ])
         : null,
       status.value === 'error'
         ? h('div', { class: 'mp-panel-tile__error' }, [

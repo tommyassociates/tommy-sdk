@@ -1,7 +1,7 @@
 /**
  * panel-host.test.js (ac1) — grid mounting, skeleton -> progressive reveal,
  * a THROWING panel contained to its tile (siblings alive), retry + the
- * 3-failure "Reload add-on" escalation, load timeout, rbac layout, budget
+ * 3-failure "Reload add-on" escalation, a slow first load, rbac layout, budget
  * hooks, and contract-first registration.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -105,7 +105,7 @@ describe('panel host', () => {
     expect(events.some((e) => e.type === 'panel-reload-required')).toBe(true);
   });
 
-  it(`a load stuck past ${LOAD_TIMEOUT_MS}ms is a contained timeout failure`, async () => {
+  it(`a first boot stuck past ${LOAD_TIMEOUT_MS}ms keeps its skeleton and says it is taking longer, never an error`, async () => {
     vi.useFakeTimers();
     const api = host.panelsApiFor('time-clock', manifestPanels);
     api.register({ id: 'my-week', load: () => new Promise(() => {}), render: vi.fn() });
@@ -113,8 +113,12 @@ describe('panel host', () => {
     await vi.advanceTimersByTimeAsync(LOAD_TIMEOUT_MS + 10);
     vi.useRealTimers();
     await flush();
-    expect(el.querySelector('[data-panel-id="my-week"]').className).toContain('mp-panel-tile--error');
-    expect(events.some((e) => e.type === 'panel-error' && /exceeded/.test(e.message))).toBe(true);
+    const tile = el.querySelector('[data-panel-id="my-week"]');
+    expect(tile.className).toContain('mp-panel-tile--loading');
+    expect(tile.querySelector('[data-cy="mp-panel-slow-notice"]').textContent).toBe('Taking longer than usual…');
+    expect(tile.textContent).not.toContain("This panel couldn't load.");
+    expect(events.some((e) => e.type === 'panel-error')).toBe(false);
+    expect(events.some((e) => e.type === 'panel-slow')).toBe(true);
   });
 
   it('layoutFor filters by surface and manifest rbac.roles', () => {
