@@ -5,7 +5,7 @@ import addFormats from 'ajv-formats';
 import {
   DEFAULT_THROTTLE_PROFILE, QUERY_RATE_WAIT_MAX_MS, QUEUE_MAX_ENTRIES, QUEUE_MAX_BYTES, SYNC_EMIT_TIMEOUT_MS, DEFAULT_RETRY,
   retryDelayMs,
-  queueResendDelayMs,
+  queueResendDelayMs, QUEUE_THROTTLE_MAX_MS,
   SENSITIVE_CONDITIONS, domainScopeForMp,
 } from './constants.js';
 import { createRecordStore } from './records.js';
@@ -1546,8 +1546,9 @@ export function createBroker({
         }
         lastError = isTommyError(cause) ? cause : err('ActivityFailed', String(cause && cause.message), { retryable: false, cause });
         if (!lastError.retryable) break;
-        // Never reached the server: resending now resends the whole body for nothing; the queue spaces it.
-        if (activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable && neverReachedServer(lastError)) break;
+        // Never reached the server, or throttled: resending now resends the whole body for nothing; the queue spaces it.
+        if (activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable
+          && (neverReachedServer(lastError) || (!activityDef.holdUnsettled && throttleOf(lastError)))) break;
       }
     }
 
@@ -1563,10 +1564,13 @@ export function createBroker({
       }), { unsettled: { reason: unsettledWhy } });
     }
 
+    const throttle = activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable && !activityDef.holdUnsettled
+      ? throttleOf(lastError) : null;
     if (activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable
-      && !envelope.restoreDrain && neverReachedServer(lastError)) {
+      && !envelope.restoreDrain && (neverReachedServer(lastError) || throttle)) {
       if (heldSeq === null) await enqueueOffline(envelope.sourceMpId, { ...envelope, identity, idempotencyKey });
-      noteResendFailure(idempotencyKey);
+      if (throttle) noteResendFailure(idempotencyKey, throttle.waitMs);
+      else noteResendFailure(idempotencyKey);
       await records.update(record.runId, { status: 'queued_offline', attempts: attempt });
       noteOutcome(activityDef, envelope, idempotencyKey, 'queued', { rpcId: record.runId }, outcomeScope);
       return { rpcId: record.runId, status: 'queued_offline' };
@@ -1575,7 +1579,7 @@ export function createBroker({
     if (refusedForGood(lastError)) {
       noteOutcome(activityDef, envelope, idempotencyKey, 'refused', { rpcId: record.runId, refusal: refusalOf(lastError) }, outcomeScope);
     } else {
-      noteOutcome(activityDef, envelope, idempotencyKey, envelope.restoreDrain && neverReachedServer(lastError) ? 'queued' : 'unconfirmed', { rpcId: record.runId }, outcomeScope);
+      noteOutcome(activityDef, envelope, idempotencyKey, envelope.restoreDrain && (neverReachedServer(lastError) || throttle) ? 'queued' : 'unconfirmed', { rpcId: record.runId }, outcomeScope);
     }
     if (heldSeq !== null) await queueStore.remove(heldSeq);
     await records.update(record.runId, {
@@ -1805,10 +1809,12 @@ export function createBroker({
   const resendFailures = new Map();
   let resendTimer = null;
 
-  function noteResendFailure(key) {
+  // A server's Retry-After, when given, decides the wait; otherwise the queue's own spacing.
+  function noteResendFailure(key, retryAfterMs = null) {
     if (key === undefined || key === null) return;
     const failures = (resendFailures.get(key)?.failures || 0) + 1;
-    const waitMs = queueResendDelayMs(failures);
+    const waitMs = Number.isFinite(retryAfterMs) && retryAfterMs > 0
+      ? Math.min(retryAfterMs, QUEUE_THROTTLE_MAX_MS) : queueResendDelayMs(failures);
     resendFailures.set(key, { failures, dueAt: now() + waitMs });
     wakeDrainIn(waitMs);
   }
@@ -1843,6 +1849,28 @@ export function createBroker({
       cause = cause.cause;
     }
     return false;
+  }
+
+  // A 429 on the cause chain: the server did not run the write. `waitMs` is its Retry-After, or null.
+  function throttleOf(error) {
+    let cause = error;
+    for (let depth = 0; cause && depth < 8; depth += 1) {
+      const status = Number(cause.status ?? cause.response?.status);
+      if (status === 429) return { waitMs: retryAfterOf(cause) };
+      if (status >= 100) return null;
+      cause = cause.cause;
+    }
+    return null;
+  }
+
+  function retryAfterOf(cause) {
+    if (Number.isSafeInteger(cause.retryAfterMs) && cause.retryAfterMs > 0) return cause.retryAfterMs;
+    const headers = cause.data?._headers; // eslint-disable-line no-underscore-dangle
+    const header = headers && typeof headers === 'object'
+      ? Object.entries(headers).find(([name]) => name.toLowerCase() === 'retry-after')?.[1] : undefined;
+    const seconds = typeof header === 'string' && /^\s*[0-9]+\s*$/.test(header) ? Number(header)
+      : (cause.data?.details?.retry_after_seconds ?? cause.details?.retry_after_seconds);
+    return Number.isSafeInteger(seconds) && seconds > 0 ? seconds * 1000 : null;
   }
 
   function refusedForGood(error) {
@@ -1908,7 +1936,9 @@ export function createBroker({
         // Later rows of the same MP stay queued too: a clock-out never goes before its clock-in.
         if (!outcome.ok && !refusedForGood(outcome.error)) {
           await queueStore.noteAttempt?.(row.seq);
+          const throttle = throttleOf(outcome.error);
           if (neverReachedServer(outcome.error)) noteResendFailure(envelope?.idempotencyKey);
+          else if (throttle) noteResendFailure(envelope?.idempotencyKey, throttle.waitMs);
           break;
         }
         resendFailures.delete(envelope?.idempotencyKey);

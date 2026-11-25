@@ -82,6 +82,9 @@ export const RETRY_MAX_DELAY_MS = 400;
 export const QUEUE_RESEND_BASE_MS = 5000;
 export const QUEUE_RESEND_MAX_MS = 120000;
 
+/** The longest Retry-After a throttled queued write waits for before its next send. */
+export const QUEUE_THROTTLE_MAX_MS = 60 * 60 * 1000;
+
 /** The wait after the `failures`-th unanswered send of a queued write. */
 export function queueResendDelayMs(failures) {
   if (!(failures > 0)) return 0;
