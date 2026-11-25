@@ -1,18 +1,6 @@
-// Permission catalogue — load, search, explain, and nearest-scope suggestion.
-// The catalogue shipped inside this package is the source of truth for
-// validation layer 3 (README §Validation layers). A pinned @tommy/manifest
-// version pins the catalogue version.
-
-// Embedded JS twin of the vendored JSON (scripts/embed-assets.mjs) — loads in
-// node AND the browser/vite pipeline; the JSON stays the drift-checked truth.
 import embeddedCatalogue from './catalogue/permission-catalogue.embedded.js';
 
-/**
- * Load a permission catalogue. Defaults to the embedded one. An override must
- * be a pre-parsed OBJECT (browser-safe); the CLI resolves --catalogue file
- * paths to objects before calling in (keeping this module free of node
- * builtins for the in-process loader).
- */
+// An override must be a pre-parsed object so this module stays browser-safe.
 export function loadCatalogue(override) {
   let raw = embeddedCatalogue;
   if (override && typeof override === 'object') {
@@ -30,7 +18,6 @@ export function loadCatalogue(override) {
   };
 }
 
-/** Levenshtein edit distance (small strings; suggestion only). */
 export function editDistance(a, b) {
   const m = a.length;
   const n = b.length;
@@ -45,13 +32,7 @@ export function editDistance(a, b) {
   return dp[m][n];
 }
 
-/**
- * Suggest the closest catalogue scope to an unknown scope, or null when nothing
- * is close enough to be a useful "did you mean".
- */
 export function suggestScope(catalogue, unknown) {
-  // Prefer candidates sharing the same verb (before ':') so a 'read:*' typo is
-  // not "corrected" to an unrelated 'write:*'; this keeps suggestions honest.
   const [verb] = unknown.split(':');
   const sameVerb = [...catalogue.scopes].filter((s) => s.startsWith(`${verb}:`));
   const pool = sameVerb.length ? sameVerb : [...catalogue.scopes];
@@ -65,13 +46,11 @@ export function suggestScope(catalogue, unknown) {
       best = scope;
     }
   }
-  // Suggest only for genuine near-misses (tight typo distance), never a loose
-  // nearest — a misleading "did you mean" sends an AI author to the wrong scope.
+  // Suggest only for genuine near-misses (tight typo distance).
   const threshold = Math.max(2, Math.floor(unknown.length / 4));
   return best && bestDist <= threshold ? best : null;
 }
 
-/** Filter helper for `tommy manifest catalogue`. */
 export function searchCatalogue(catalogue, { search, category } = {}) {
   let list = catalogue.permissions;
   if (category) list = list.filter((p) => p.category === category);

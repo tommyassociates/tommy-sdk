@@ -39,11 +39,8 @@ const baselinePath =
 const reportPaths = fileArgs.filter((f) => !f.endsWith('coupling-baseline.json'));
 
 const counts = { eslint: {}, depcruise: {} };
-// Tools that actually produced a parsed report this run. A tool with a
-// non-zero baseline and NO report must FAIL --check: otherwise a broken
+// A non-zero baseline with no report must fail --check, or a broken tool would pass.
 // linter (eslint exit 2 writes no output file, and the yarn script's
-// `|| true` swallows it) reads as "all violations fixed" and the freeze
-// silently disables itself.
 const toolsSeen = new Set();
 
 for (const p of reportPaths) {
@@ -63,12 +60,11 @@ for (const p of reportPaths) {
     toolsSeen.add('eslint');
     for (const file of data) {
       for (const msg of file.messages || []) {
-        if (!msg.ruleId) continue; // parse errors etc.
+        if (!msg.ruleId) continue;
         counts.eslint[msg.ruleId] = (counts.eslint[msg.ruleId] || 0) + 1;
       }
     }
   } else if (data && data.summary && Array.isArray(data.summary.violations)) {
-    // dependency-cruiser JSON output
     toolsSeen.add('depcruise');
     for (const v of data.summary.violations) {
       const name = v.rule && v.rule.name;
@@ -92,7 +88,6 @@ if (mode === '--write') {
   process.exit(0);
 }
 
-// --check
 if (!fs.existsSync(baselinePath)) {
   console.error(
     `[compare-to-baseline] no baseline at ${path.resolve(baselinePath)} — generate one with --write and commit it`
@@ -103,8 +98,7 @@ const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
 let increased = false;
 let decreased = false;
 
-// Fail-closed guard: every tool the baseline tracks (non-zero counts) must
-// have produced a report this run.
+// Fail closed: every tool the baseline tracks must have reported.
 for (const tool of ['eslint', 'depcruise']) {
   const baselineTotal = Object.values(baseline[tool] || {}).reduce((a, b) => a + b, 0);
   if (baselineTotal > 0 && !toolsSeen.has(tool)) {

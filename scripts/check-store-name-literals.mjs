@@ -1,22 +1,12 @@
 #!/usr/bin/env node
-/**
- * check-store-name-literals.mjs — offline-sync.md §8.8 requirement 3.
- *
- * No code path may open a store by a literal namespace name: a tenant-less
- * `tommy-mp:{mpId}` reads a cross-tenant/empty store; a hand-built
- * `tommy-core:{tenantId}:{domain}` bypasses the core-domain registry. The
- * `tommy.data` wrapper (@tommy/offline-sync src/names.js) is the ONLY name
- * resolver — this blocking check rejects literal `tommy-mp:` / `tommy-core:`
- * construction anywhere else (comments included, same posture as the other
- * isolation detectors).
- */
+// No store may be opened by a literal name: a tenant-less name reads a cross-tenant or empty store.
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, extname, relative } from 'node:path';
 
 const ROOTS = ['packages', 'addons', 'src'];
 const ALLOW = [
-  'packages/offline-sync/src/names.js',        // the ONE resolver
-  'packages/offline-sync/test/data-store.test.js', // asserts the resolver's output
+  'packages/offline-sync/src/names.js',
+  'packages/offline-sync/test/data-store.test.js',
   'scripts/check-store-name-literals.mjs',
 ];
 const NEEDLES = ['tommy-mp:', 'tommy-core:'];

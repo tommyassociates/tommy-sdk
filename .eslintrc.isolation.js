@@ -15,9 +15,7 @@
 const iso = require('./eslint-mp-isolation.json');
 
 // Strip _-prefixed annotation keys (_scope, _comment) the ESLint schema
-// rejects, and drop the production/ tree globs: production is a release-sync
-// copy of development/src (never hand-edited), so scanning it double-counts
-// debt and a routine sync PR would trip the block-on-increase freeze.
+// production/ is a release-sync copy of development/src, so scanning it double-counts.
 const overrides = iso.overrides.map((o) => ({
   ...Object.fromEntries(Object.entries(o).filter(([k]) => !k.startsWith('_'))),
   files: o.files.filter((g) => !g.includes('/production/')),

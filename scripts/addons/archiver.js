@@ -3,7 +3,7 @@ const path = require('path')
 const archiver = require('archiver')
 const helpers = require('../helpers')
 
-module.exports = function(pkg, environment, version) { //, callback
+module.exports = function(pkg, environment, version) {
   const localAddonFilePath = helpers.getLocalAddonFilePath(pkg, environment, version, '')
 
   const archivePath = helpers.archivePath(pkg, environment, version)

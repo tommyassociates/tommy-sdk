@@ -1,6 +1,5 @@
 export const CHAT_SEND_NOTICE_MS = 30_000;
 
-/** Local presentation deadlines only. Receipt recovery belongs to the host. */
 export function createChatSendFeedback({ read, onChange, now = () => Date.now(),
   setTimer = (callback, delay) => setTimeout(callback, delay), clearTimer = (timer) => clearTimeout(timer) }) {
   let timer = null;

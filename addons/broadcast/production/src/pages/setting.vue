@@ -31,7 +31,6 @@
       </f7-list-item>
     </f7-list>
 
-    <!-- Popup -->
     <group-popup-cmp 
       :opened="customerPopupOpened"
       @closed="customerPopupOpened = false"

@@ -11,7 +11,6 @@
         smart-select
         title="Current Account"
       >
-        <!-- {{ account.id }} -->
         <select :value="`${account.id}:${account.type}`" @change="changeAccount">
           <option
             v-for="(account, index) in accounts"

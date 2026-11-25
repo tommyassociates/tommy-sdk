@@ -5,10 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import packageJson from './package.json';
 
-// import { ViteDevServer } from 'vite';
-
 export function pluginWatchNodeModules(modules) {
-	// Merge module into pipe separated string for RegExp() below.
 	let pattern = `/node_modules\\/(?!${modules.join('|')}).*/`;
 	return {
 		name: 'watch-node-modules',
@@ -26,16 +23,6 @@ export function pluginWatchNodeModules(modules) {
 
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  // const entries = Object.fromEntries(
-  //   Object.entries(env).map(([key, val]) => {
-  //   if (key.startsWith('TOMMY_')) {
-  //     return [
-  //       [`import.meta.env.${key}`, val],
-  //       [`process.env.${key}`, val],
-  //     ]
-  //   }
-  // }).filter(Boolean).flat());
-
   Object.entries(env).map(([key, val]) => {
     if (key.startsWith('TOMMY_')) {
       process.env[key] = val
@@ -45,7 +32,6 @@ export default defineConfig(({ command, mode }) => {
   return {
     plugins: [vue(), pluginWatchNodeModules(['tommy-core'])],
     test: {
-      // The retiring-path monitor (core/src/retiring), in a run from the SDK root.
       setupFiles: [path.resolve(__dirname, 'vitest.retiring-setup.js')],
       globalSetup: [path.resolve(__dirname, 'vitest.retiring-global-setup.js')],
     },
@@ -53,7 +39,6 @@ export default defineConfig(({ command, mode }) => {
     define: {
       'import.meta.env.SDK_PRIVATE_PATH': JSON.stringify(`/@fs${path.resolve(__dirname, '../sdk-private')}`),
     },
-    // define: entries,
     server: {
       port: 8080,
       fs: {

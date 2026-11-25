@@ -13,7 +13,6 @@
       v-model:value="search"
       style="margin: 16px; border:1px solid #999; padding: 8px;font-size:21px;"
     />
-		<!-- Main addons views list -->
 		<f7-block-title>Views</f7-block-title>
     <f7-list>
       <template v-for="(addon, index) in addonsSorted" :key="index">
@@ -43,9 +42,6 @@ export default {
     }
   },
   mounted() {
-    // Alternative implementation of default 'starting_page'
-    // by re-routing to desired starting_page.
-    // this.f7router.navigate({ name: config.starting_page })
   },
   methods: {
     addonUrl(addon) {
@@ -57,7 +53,7 @@ export default {
   },
   computed: {
     addonsSorted() {
-      let addons = this.$store.state.addons.addonInstalls; //$root.addons;
+      let addons = this.$store.state.addons.addonInstalls;
       if (this.search) {
         addons = addons.filter((addon) => {
           const title = addon.title.toUpperCase();

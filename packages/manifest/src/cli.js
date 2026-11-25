@@ -1,8 +1,3 @@
-// `tommy manifest …` CLI (cli-spec.md).
-// Exit codes — 0 success · 1 a checkable failure (invalid manifest / unknown
-// scope) · 2 usage / IO error. CI and review-cli branch on these; AI agents
-// branch on --json `ok`.
-
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { basename, join, dirname } from 'node:path';
 import { validateFile } from './validate-file.js';
@@ -10,7 +5,6 @@ import { typegenFromSource } from './typegen.js';
 import { readFileSync } from 'node:fs';
 import { loadCatalogue, searchCatalogue } from './catalogue.js';
 
-/** CLI-only: resolve a --catalogue file path to the parsed object. */
 function readCatalogueOverride(path) {
   return path ? JSON.parse(readFileSync(path, 'utf8')) : undefined;
 }
@@ -29,8 +23,7 @@ class UsageError extends Error {
 function parseFlags(args, spec) {
   const flags = {};
   const positional = [];
-  // A value must not itself look like a flag — otherwise `-o --watch` would
-  // silently treat `--watch` as the output dir.
+  // A value must not itself look like a flag, or `-o --watch` would swallow the flag.
   const readValue = (i, label) => {
     const v = args[i];
     if (v === undefined || (v.startsWith('-') && v !== '-')) {
@@ -51,7 +44,7 @@ function parseFlags(args, spec) {
       }
     } else if (a.startsWith('-') && a !== '-') {
       const alias = a.length === 2 ? { o: 'out' }[a[1]] : undefined;
-      if (!alias) throw new UsageError(`unknown flag ${a}`); // e.g. -xy, -oo
+      if (!alias) throw new UsageError(`unknown flag ${a}`);
       i += 1;
       flags[alias] = readValue(i, a);
     } else {
@@ -86,8 +79,6 @@ function cmdValidate(args, io) {
   try {
     result = validateFile(path, { catalogueOverride: readCatalogueOverride(flags.catalogue), strictAi: flags['strict-ai'] });
   } catch (e) {
-    // Any filesystem error (ENOENT/EISDIR/EACCES/…) is a usage/IO failure (exit 2)
-    // reported in the SAME { ok, manifestId, errors } shape as a validation result.
     if (e && typeof e.code === 'string' && e.code.startsWith('E')) {
       const msg =
         e.code === 'ENOENT' ? `file not found: ${path}`
@@ -185,10 +176,6 @@ function cmdExplain(args, io) {
   return EXIT_OK;
 }
 
-/**
- * Run the CLI. `argv` excludes node + script (i.e. process.argv.slice(2)).
- * @returns {Promise<number>} exit code
- */
 export async function run(argv, io = { out: console.log, err: console.error }) {
   try {
     if (argv[0] !== 'manifest') {

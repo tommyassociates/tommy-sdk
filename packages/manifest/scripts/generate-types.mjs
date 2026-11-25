@@ -1,8 +1,3 @@
-// Build step — generate the `Manifest` TypeScript type from the vendored schema
-// (json-schema-to-typescript). This is the build-time contract type exported by
-// @tommy/manifest for @tommy/sdk and the loader.
-// It is DISTINCT from `tommy manifest typegen`, which emits per-MP contract types.
-
 import { compile } from 'json-schema-to-typescript';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -25,7 +20,6 @@ const compiled = await compile(schema, 'Manifest', {
   unreachableDefinitions: true,
 });
 // json-schema-to-typescript preserves spaces on otherwise blank JSDoc lines.
-// Keep generated output clean without changing its type semantics.
 const ts = compiled.replace(/[ \t]+(?=\r?\n)/g, '');
 
 mkdirSync(outDir, { recursive: true });

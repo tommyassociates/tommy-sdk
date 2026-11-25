@@ -38,7 +38,6 @@ const refuse = (message, code) => Object.assign(new Error(message), {
   name: 'DataServiceError', code, retryable: code === 'DATA_TARGET_LIMIT',
 });
 
-/** Bounded freshness bookkeeping; rows and read barriers stay with the service. */
 export default function createTargetStateBudget({ states, budgetOf }) {
   const groups = new Map();
   let retired = false;
@@ -108,7 +107,6 @@ export default function createTargetStateBudget({ states, budgetOf }) {
     if (!requested && !whole) return { state: unknown() };
     const group = groupOf(collection);
     const wholeKey = JSON.stringify([collection, null, null, null]);
-    // Collection access/failure status always survives exact-target turnover.
     if (!group.entries.has(wholeKey)) allocate(group, wholeKey, true, budget);
     const entry = whole ? group.entries.get(wholeKey) : allocate(group, key, false, budget);
     return { entry, group, state: entry.state };

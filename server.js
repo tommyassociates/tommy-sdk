@@ -7,19 +7,11 @@ const addonUploader = require('./scripts/addons/uploader')
 const helpers = require('./scripts/helpers')
 
 
-// console.log(helpers.readLocalAddons())
-
 const env = process.env.NODE_ENV || 'development'
 
 const app = express()
 const fs = require('fs')
 
-// Middleware
-// --------------------------
-
-
-// Routes
-// --------------------------
 
 app.get('/addons', (req, res) => {
   res.send(helpers.readLocalAddons())
@@ -103,5 +95,4 @@ app.post('/addon/store/submit/:package/:environment/:version', (req, res) => {
   })
 })
 
-// app.listen(helpers.port, () => console.log(`SDK emulator listening on port ${helpers.getSdkUrl()}`))
 ViteExpress.listen(app, helpers.port, () => console.log(`SDK emulator listening on port ${helpers.getSdkUrl()}`))

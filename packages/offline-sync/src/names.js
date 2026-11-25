@@ -1,14 +1,4 @@
-/**
- * names.js — the ONLY resolver of per-(tenant, MP) store names
- * (offline-sync.md §1, §8.8 requirement 3).
- *
- * `tommy-mp:{tenantId}:{mpId}` — the tenantId segment is ALWAYS derived from
- * the active capability token, never caller-supplied: without it two teams
- * with the same MP collide on one store (the D-multi-team regression). No
- * caller may construct `tommy-mp:` names directly — a blocking static check
- * (sdk `check:store-name-literals`) rejects literal construction outside
- * this module.
- */
+// The only resolver of store names; tenantId always comes from the capability token, never a caller.
 
 export function databaseName(issuedToken, mpId) {
   const tenantId = issuedToken && issuedToken.tenantId;
@@ -20,15 +10,10 @@ export function databaseName(issuedToken, mpId) {
   return ['tommy-mp', tenantId, mpId].join(':');
 }
 
-/**
- * The name a store the device keeps for one viewer is opened under when no
- * host backend is given: the MP's database name with the viewer the host
- * names (any stable string; it is encoded, so it cannot reach another name).
- */
+// The viewer is encoded, so it cannot reach another name.
 export function viewerDatabaseName(issuedToken, mpId, viewer) {
   if (typeof viewer !== 'string' || !viewer) throw new Error('viewerDatabaseName: viewer required');
   return [databaseName(issuedToken, mpId), `viewer=${encodeURIComponent(viewer)}`].join(':');
 }
 
-/** The broker's own store — action-run records + trigger queue; not MP-reachable. */
 export const BROKER_DATABASE = ['tommy', 'broker'].join('-');

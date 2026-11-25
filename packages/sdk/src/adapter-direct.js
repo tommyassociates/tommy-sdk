@@ -1,44 +1,15 @@
-/**
- * adapter-direct.js — the in-process transport (M1, built first).
- *
- * Direct function calls into the host broker's entry points; the init context
- * is handed over by the in-process loader (no handshake, no heartbeats —
- * execution-modes.md "in-process lifecycle"). The adapter still preserves the
- * postMessage timeout/correlation semantics so the SDK surface behaves
- * identically in both modes (03-sdk-runtime/README:83): every RPC gets an
- * rpcId and a per-RPC timeout that rejects TommyError{code:'Timeout'}.
- *
- * Mode opacity: nothing this adapter returns or throws identifies the mode;
- * the broker reference is held in closure, never exposed.
- */
 import { TommyError, isTommyError } from './errors.js';
 import { DEFAULT_RPC_TIMEOUT_MS, DEFAULT_WRITE_TIMEOUT_MS, WRITE_RPC_KINDS } from './adapter.js';
 
 let rpcSeq = 0;
 const nextRpcId = (instanceId) => `rpc-${instanceId}-${(rpcSeq += 1)}`;
 
-/**
- * @param {object} opts
- * @param {object} opts.broker host broker entry points:
- *   { emit(env), query(env), invoke(env), subscribe(mpId, trigger, handler, { tenantId }),
- *     teardown(instanceId) } — all enforcement lives THERE, never here.
- * @param {object} opts.init the MpInit payload the loader hands over
- * @param {number} [opts.rpcTimeoutMs] how long a call is waited for. Named on
- *   its own it holds for every call, writes included.
- * @param {number} [opts.writeTimeoutMs] how long a write (`WRITE_RPC_KINDS`)
- *   is waited for; DEFAULT_WRITE_TIMEOUT_MS when neither is named.
- * @param {function} [opts.getCapabilityToken] host-supplied async provider that
- *   returns the CURRENT capability token, re-minting it when it nears expiry
- *   (capability tokens carry a short TTL — security-model §3). Omitted in tests
- *   and legacy callers, which fall back to the frozen `init.capabilityToken`.
- */
 export function createDirectAdapter({
   broker, init, rpcTimeoutMs: callTimeoutMs, writeTimeoutMs, getCapabilityToken,
 }) {
   if (!broker) throw new Error('createDirectAdapter: broker required');
   if (!init) throw new Error('createDirectAdapter: init required');
   const rpcTimeoutMs = callTimeoutMs ?? DEFAULT_RPC_TIMEOUT_MS;
-  // A caller that names one deadline gets it for every call.
   const writeMs = writeTimeoutMs ?? (callTimeoutMs === undefined ? DEFAULT_WRITE_TIMEOUT_MS : callTimeoutMs);
 
   const subscriptions = new Set();
@@ -57,10 +28,7 @@ export function createDirectAdapter({
 
   async function rpc(envelope) {
     const rpcId = envelope.rpcId || nextRpcId(init.instanceId);
-    // Re-mint a token that has aged past its TTL BEFORE it is stamped on the
-    // envelope; the broker (and the server on every server_write) rejects an
-    // expired token, so a panel left open past the ≤15-min TTL would otherwise
-    // fail its next invoke with 'capability token expired'.
+    // Re-mint an aged token before stamping: an expired one would fail the next invoke.
     const capabilityToken = getCapabilityToken ? await getCapabilityToken() : init.capabilityToken;
     const env = {
       ...envelope,
@@ -70,10 +38,6 @@ export function createDirectAdapter({
       instanceId: init.instanceId,
       ...(envelope.activity === 'team.update_member'
         ? { restoreDeadlineAt: Date.now() + rpcTimeoutMs } : {}),
-      // The deadline the broker reads: a join of a write already running
-      // gives up before it and answers with its own, more specific error. It
-      // is the call deadline for a write too, though a write is waited for
-      // longer here.
       rpcDeadlineAt: Date.now() + rpcTimeoutMs,
     };
     const ENTRY_BY_KIND = {
@@ -92,9 +56,6 @@ export function createDirectAdapter({
         WRITE_RPC_KINDS.includes(env.kind) ? writeMs : rpcTimeoutMs);
     } catch (err) {
       if (err instanceof TommyError) throw err;
-      // A TommyError of another copy of this SDK (the host's broker is built
-      // with its own): the same error as this SDK's class, so an MP's
-      // `instanceof TommyError` holds for every rejection.
       if (isTommyError(err)) {
         throw new TommyError({
           code: err.code, message: err.message, rule: err.rule, retryable: err.retryable, runId: err.runId, cause: err.cause,
@@ -114,8 +75,6 @@ export function createDirectAdapter({
       return () => { subscriptions.delete(unsubscribe); unsubscribe(); };
     },
     async teardown() {
-      // mp:teardown flush semantics: drop live subscriptions, then let the
-      // broker flush anything pending for this instance.
       for (const unsubscribe of subscriptions) unsubscribe();
       subscriptions.clear();
       if (typeof broker.teardown === 'function') await broker.teardown(init.instanceId);

@@ -1,7 +1,4 @@
-/**
- * i18n.js — t() bound to the MP's OWN bundled locales, never the shared
- * window.i18n (audit 1.2 — no ambient globals). `{{var}}` interpolation only.
- */
+// Bound to the MP's own bundled locales, never the shared window.i18n.
 export function createT({ locales = {}, locale = 'en' } = {}) {
   const table = locales[locale] || locales[String(locale).split('-')[0]] || {};
   return function t(key, fallback, vars) {
