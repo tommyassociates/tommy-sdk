@@ -1135,7 +1135,7 @@ export function createBroker({
     const handler = ownerEntry.handlers?.activities?.[activityName];
     if (activityDef.sideEffect === 'server_write') {
       if (!serverInvoke) throw err('ActivityFailed', `server_write activity '${envelope.activity}' has no server executor wired`, { retryable: true });
-      if (envelope[CONFIRM_SEND]) envelope[CONFIRM_SEND].started = true;
+      if (envelope[CONFIRM_SEND]) admitConfirmSend(envelope[CONFIRM_SEND]);
       return serverInvoke({
         rpcId: record.runId,
         kind: 'invoke',
@@ -1155,7 +1155,7 @@ export function createBroker({
       });
     }
     if (!handler) throw err('UnknownActivity', `activity '${envelope.activity}' has no registered handler`, { retryable: false });
-    if (envelope[CONFIRM_SEND]) envelope[CONFIRM_SEND].started = true;
+    if (envelope[CONFIRM_SEND]) admitConfirmSend(envelope[CONFIRM_SEND]);
     const parent = {
       ownerMpId,
       keys: new Set(envelope[PARENT_RUN]?.keys || []),
@@ -1221,7 +1221,9 @@ export function createBroker({
   async function dispatchInvokeInner(envelope) {
     const identity = envelope.identity || authenticate(envelope);
     const tenantId = envelope.tenantId || identity.tenantId;
-    const outcomeScope = outcomeScopeFor(tenantId);
+    // A confirm's outcome belongs to the owner it was kept for, never to whoever is current when it runs.
+    const confirming = envelope[CONFIRM_SEND];
+    const outcomeScope = confirming ? { owner: confirming.owner, generation: confirming.generation } : outcomeScopeFor(tenantId);
     takeToken(envelope.sourceMpId, 'invoke');
 
     const [ownerMpId, activityName] = splitQualified(envelope.activity);
@@ -1367,7 +1369,8 @@ export function createBroker({
         chainPath: chain.chainPath,
         online: isOnline,
       });
-      noteOutcome(activityDef, envelope, idempotencyKey, 'queued', { rpcId: record.runId }, outcomeScope);
+      // A confirm leaves the record as it is until its send settles.
+      if (!envelope[CONFIRM_SEND]) noteOutcome(activityDef, envelope, idempotencyKey, 'queued', { rpcId: record.runId }, outcomeScope);
       return await attemptAdmittedInvoke({
         envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, idempotencyKey, processedKey, record, heldSeq, outcomeScope,
       });
@@ -1518,6 +1521,11 @@ export function createBroker({
         }
         return final;
       } catch (cause) {
+        if (cause?.confirmFenced) {
+          if (heldSeq !== null) { try { await queueStore.remove(heldSeq); } catch (_) { /* released below; never sent */ } }
+          await records.update(record.runId, { status: 'failed', error: { code: cause.code, message: cause.message }, attempts: attempt });
+          throw cause;
+        }
         lastError = isTommyError(cause) ? cause : err('ActivityFailed', String(cause && cause.message), { retryable: false, cause });
         if (!lastError.retryable) break;
         // Never reached the server: resending now resends the whole body for nothing; the queue spaces it.
@@ -1711,6 +1719,21 @@ export function createBroker({
     } catch (_) { /* the record ages out */ }
   }
 
+  const inFlightConfirms = new Map();
+  const confirmKeyOf = (owner, activity, key) => `${owner}\u0000${activity}\u0000${key}`;
+  const confirmLive = (send) => !send.cancelled && !retired && send.generation === outcomeGeneration
+    && recordOwner(send.tenantId) === send.owner;
+
+  // Checked immediately before the executor runs: an account switch, a purge or a discard while it waited sends nothing.
+  function admitConfirmSend(send) {
+    if (!confirmLive(send)) {
+      throw Object.assign(err('WriteNotConfirmable', 'the account changed, or the write was discarded, before it was confirmed; nothing was sent', {
+        retryable: false,
+      }), { details: { reason: 'no_request' }, confirmFenced: true });
+    }
+    send.started = true;
+  }
+
   function restoredTenantOf(restored) {
     if (known(restored?.identity?.tenantId)) return restored.identity.tenantId;
     if (known(restored?.tenantId)) return restored.tenantId;
@@ -1719,14 +1742,14 @@ export function createBroker({
   }
 
   // A confirm answered from the idempotency ledger ran nothing new; its own run record names it.
-  async function confirmRunId(own, request, restored) {
+  async function confirmRunId(own, request, tenantId) {
     const [targetMpId] = splitQualified(own.qualified);
     const run = await records.open({
       kind: 'invoke',
       activityName: own.qualified,
       sourceMpId: request.sourceMpId,
       targetMpId,
-      tenantId: restored?.identity?.tenantId ?? restored?.tenantId,
+      tenantId,
       args: request.args,
       idempotencyKey: request.idempotencyKey,
       rootRunId: undefined,
@@ -2176,46 +2199,58 @@ export function createBroker({
       outcomes.patch(owner, own.qualified, idempotencyKey, { confirmSent: true });
       const release = () => { if (generation === outcomeGeneration) outcomes.patch(owner, own.qualified, idempotencyKey, { confirmSent: false }); };
       const request = JSON.parse(JSON.stringify(record.request));
-      const send = { started: false };
-      let restored;
-      let answer;
+      const send = {
+        started: false, cancelled: false, owner, generation, tenantId,
+      };
+      const confirmKey = confirmKeyOf(owner, own.qualified, idempotencyKey);
+      inFlightConfirms.set(confirmKey, send);
       try {
-        restored = await replay(request);
-        // The request is sent only as the account it was kept for, and only if nothing purged it meanwhile.
-        if (generation !== outcomeGeneration || recordOwner(restoredTenantOf(restored) ?? tenantId) !== owner) {
+        let restored;
+        let answer;
+        try {
+          restored = await replay(request);
+          send.tenantId = restoredTenantOf(restored) ?? tenantId;
+          // The request is sent only as the account it was kept for, and only if nothing purged or discarded it meanwhile.
+          if (!confirmLive(send)) {
+            release();
+            throw notConfirmable('no_request', `the account changed, or '${own.qualified}' was discarded, before it was confirmed; nothing was sent`);
+          }
+          answer = await dispatchInvoke({
+            ...restored, args: request.args, activity: request.activity, sourceMpId: request.sourceMpId || sourceMpId,
+            rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: undefined, idempotencyKey: request.idempotencyKey,
+            [CONFIRM_SEND]: send,
+          });
+        } catch (error) {
+          if (error?.code === 'WriteNotConfirmable') {
+            if (!send.started) release();
+            throw error;
+          }
+          if (neverReachedServer(error) || error?.code === 'Offline') {
+            release();
+            return offline(String(error?.message || 'the request did not leave the device'));
+          }
+          // Nothing reached the network, so the one confirm is still to come.
+          if (!send.started) release();
+          if (refusedForGood(error)) {
+            if (!send.started) recordRefusalIfOpen(owner, own.qualified, idempotencyKey, error, generation);
+            return { state: 'refused', refusal: refusalOf(error) };
+          }
+          return { state: 'unconfirmed', error: refusalOf(error) };
+        }
+        if (answer?.status === 'queued_offline') {
           release();
-          throw notConfirmable('no_request', `the account changed before '${own.qualified}' was confirmed; nothing was sent`);
+          return offline(`'${own.qualified}' did not leave the device; it waits in the queue`);
         }
-        answer = await dispatchInvoke({
-          ...restored, args: request.args, activity: request.activity, sourceMpId,
-          rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: undefined, idempotencyKey: request.idempotencyKey,
-          [CONFIRM_SEND]: send,
-        });
-      } catch (error) {
-        if (error?.code === 'WriteNotConfirmable') throw error;
-        if (neverReachedServer(error) || error?.code === 'Offline') {
-          release();
-          return offline(String(error?.message || 'the request did not leave the device'));
+        if (answer?.status === 'succeeded') {
+          const rpcId = answer.rpcId ?? record.rpcId ?? await confirmRunId(own, request, send.tenantId);
+          return {
+            state: 'succeeded', result: answer.result, replayed: answer.idempotentReplay === true || answer.replayed === true, rpcId,
+          };
         }
-        // Nothing reached the network, so the one confirm is still to come.
-        if (!send.started) release();
-        if (refusedForGood(error)) {
-          if (!send.started) recordRefusalIfOpen(owner, own.qualified, idempotencyKey, error, generation);
-          return { state: 'refused', refusal: refusalOf(error) };
-        }
-        return { state: 'unconfirmed', error: refusalOf(error) };
+        return { state: 'unconfirmed', error: { code: null, status: null, message: `'${own.qualified}' answered ${answer?.status || 'nothing'}` } };
+      } finally {
+        if (inFlightConfirms.get(confirmKey) === send) inFlightConfirms.delete(confirmKey);
       }
-      if (answer?.status === 'queued_offline') {
-        release();
-        return offline(`'${own.qualified}' did not leave the device; it waits in the queue`);
-      }
-      if (answer?.status === 'succeeded') {
-        const rpcId = answer.rpcId ?? record.rpcId ?? await confirmRunId(own, request, restored);
-        return {
-          state: 'succeeded', result: answer.result, replayed: answer.idempotentReplay === true || answer.replayed === true, rpcId,
-        };
-      }
-      return { state: 'unconfirmed', error: { code: null, status: null, message: `'${own.qualified}' answered ${answer?.status || 'nothing'}` } };
     },
 
     purgeOutcomes() {
@@ -2238,6 +2273,10 @@ export function createBroker({
         if (!row || !row.envelope?.activity || typeof row.subject === 'string' || queueStore.isHeld?.(row)
           || drainingRows.has(row.id) || discardingRows.has(row.id)) return false;
         const owner = recordOwner(row.envelope?.identity?.tenantId ?? row.owner?.tenantId);
+        // A confirm already sending this write keeps it; one still restoring its sender is stopped.
+        const confirming = owner ? inFlightConfirms.get(confirmKeyOf(owner, row.envelope.activity, row.envelope.idempotencyKey)) : null;
+        if (confirming?.started) return false;
+        if (confirming) confirming.cancelled = true;
         // Claimed in the same turn as the check, so a drain starting meanwhile skips it.
         discardingRows.add(row.id);
         let removed;
