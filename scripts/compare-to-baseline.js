@@ -1,29 +1,5 @@
 #!/usr/bin/env node
-/**
- * compare-to-baseline.js — the coupling freeze (block-on-increase).
- *
- * Parses ESLint JSON reports (array of file results) and dependency-cruiser
- * JSON reports ({ summary: { violations: [...] } }), counts violations per
- * rule, and compares against the committed coupling-baseline.json:
- *
- *   { "eslint": { "<ruleId>": <count> }, "depcruise": { "<ruleName>": <count> } }
- *
- * Usage:
- *   node scripts/compare-to-baseline.js --write <report.json>... [baseline.json]
- *   node scripts/compare-to-baseline.js --check <report.json>... [baseline.json]
- *
- * --write  regenerate the baseline from the report(s) and exit 0.
- * --check  exit 1 if ANY rule's count increased vs the baseline. On a
- *          decrease, print a reminder to commit the updated baseline
- *          (run --write) but still exit 0.
- *
- * Report type is detected by shape, so arguments may be passed in any order.
- * The baseline path is any argument ending in coupling-baseline.json
- * (default ./coupling-baseline.json). Missing report files are skipped with
- * a warning so one command works across repos with different tool sets.
- *
- * Design: plans/refactor-plan/06-instrumentation/detectors-in-ci.md.
- */
+// Coupling freeze: fails when ESLint or dependency-cruiser violation counts exceed coupling-baseline.json.
 const fs = require('fs');
 const path = require('path');
 
@@ -40,7 +16,6 @@ const reportPaths = fileArgs.filter((f) => !f.endsWith('coupling-baseline.json')
 
 const counts = { eslint: {}, depcruise: {} };
 // A non-zero baseline with no report must fail --check, or a broken tool would pass.
-// linter (eslint exit 2 writes no output file, and the yarn script's
 const toolsSeen = new Set();
 
 for (const p of reportPaths) {
