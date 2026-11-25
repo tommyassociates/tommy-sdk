@@ -1,4 +1,4 @@
-// Refusals a world gets once its account is no longer displayed (every switch, for panels still on screen).
+// Refusals a world gets once its account is not the displayed one (every switch, for open panels).
 export const STALE_WORLD_CODES = Object.freeze(['ACCOUNT_NOT_DISPLAYED', 'TIMEZONE_CONTEXT_STALE']);
 
 export function markStaleWorld(error) {
