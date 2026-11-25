@@ -270,6 +270,14 @@ export interface ActionsApi {
 
   /** Evaluate another MP's condition. Rejects Timeout / UnknownCondition / ConditionError. */
   query<R = unknown>(condition: string, args: unknown, options?: { signal?: AbortSignal }): Promise<R>;
+  /**
+   * Host API level 20. With `onRead` the promise resolves to the held-first
+   * envelope: a condition that declares `heldFirst` answers its held value at
+   * once (`state: 'held'`) and the handler's answer arrives as one terminal
+   * notice; any other condition resolves `state: 'fresh'` once the handler
+   * answers, with no notice. A refusal rejects; it never resolves.
+   */
+  query<R = unknown>(condition: string, args: unknown, options: { signal?: AbortSignal; onRead: (notice: ReadNotice<R>) => void }): Promise<HeldFirstAnswer<R>>;
 
   /**
    * Invoke another MP's activity. Idempotency key formed per the target manifest.
@@ -277,7 +285,7 @@ export interface ActionsApi {
    * from the Action's InputMap (see InputMapSource), so `args` is broker-supplied
    * rather than caller-supplied in that path.
    */
-  invoke<R = unknown>(activity: string, args: unknown): Promise<InvokeResult<R>>;
+  invoke<R = unknown>(activity: string, args: unknown, options?: { idempotencyKey?: string }): Promise<InvokeResult<R>>;
 
   /** Subscribe to a trigger. Returns an unsubscribe fn; also auto-removed on MP teardown. */
   subscribe<P = unknown>(trigger: string, handler: Handler<P>): Unsubscribe;
@@ -585,7 +593,18 @@ export interface HostCollection<Rec = unknown> {
    * once, then whenever they change; revalidated through that method's read.
    * Host API level 11.
    */
-  subscribe(callback: (rows: readonly Rec[]) => void, options: { method: string; params: Record<string, unknown>; onError?: (error: unknown) => void }): () => void;
+  subscribe(callback: (rows: readonly Rec[]) => void, options: {
+    method: string;
+    params: Record<string, unknown>;
+    /**
+     * Read status of the method's revalidation (host API level 11; `state`,
+     * `asOf`, `aged`, `nextAttemptAt`, `error`, `reason` and the `checking` and
+     * `refused` notices since level 20). With it, `callback` is called only
+     * when the rows changed.
+     */
+    onRead?: (notice: ReadNotice) => void;
+    onError?: (error: unknown) => void;
+  }): () => void;
   /** The rows now, then whenever their rows or read status changes, while the account is displayed. */
   subscribe(callback: (rows: readonly Rec[]) => void, options?: { onError?: (error: unknown) => void }): () => void;
   /** The collection's status; `complete` only when every collection the profile reads has completed a read. */
@@ -762,6 +781,129 @@ export interface DataStatus {
   readonly state: 'fresh' | 'stale' | 'refreshing' | 'offline' | 'error';
   readonly syncedAt: number | null;
   readonly error: { code: string | null; status: number | null; message: string } | null;
+  /** Host API level 20: `syncedAt` is older than the source's declared `showAgeMs`. Never hides anything. */
+  readonly aged?: boolean;
+}
+
+// ============================================================================
+// Held-first reads (host API level 20)
+// ============================================================================
+
+/** What a view is showing. */
+export type ReadState =
+  /** What the device holds, before any completed server read of it in this ask or follow. */
+  | 'held'
+  /** Held data shown while a server read is in flight. */
+  | 'checking'
+  /** The answer of a completed server read. */
+  | 'fresh'
+  /** The last read failed (offline, timeout, 5xx, busy); held data stays. */
+  | 'stale'
+  /** The server refused this viewer; clear what is held. */
+  | 'refused'
+  /** Nothing held and no completed read (a promise rejects `DATA_NOT_READ`; a follow delivers []). */
+  | 'not_read';
+
+export interface ReadError { code: string | null; status: number | null; message: string }
+
+/** Delivered through `onRead` on a method subscription, a contract-read bridge and a condition query. */
+export interface ReadNotice<T = unknown> {
+  state: 'checking' | 'fresh' | 'stale' | 'refused';
+  /** True only with state 'fresh'. */
+  answered: boolean;
+  /** ms since epoch of the answer the caller should now show; null when unknown. */
+  asOf: number | null;
+  /** asOf is older than the declared showAgeMs. Never hides anything. */
+  aged: boolean;
+  /** state 'stale' only: the host will read again by itself. */
+  retrying?: boolean;
+  /** state 'stale' only: when the next attempt is due, or null. */
+  nextAttemptAt?: number | null;
+  /** 'stale' and 'refused'. */
+  error?: ReadError | null;
+  /** 'refused' only: 'access' (this viewer may not read it) or 'unavailable' (nothing serves it). */
+  reason?: 'access' | 'unavailable';
+  /** Bridges and conditions, state 'fresh' only: the completed answer. A subscription delivers rows through its callback instead. */
+  answer?: T;
+  /** 'last_known' when held rows were delivered under the last confirmed permissions. */
+  permissions?: 'confirmed' | 'last_known';
+}
+
+/** What a contract-read bridge or a condition query resolves to when `onRead` is passed. */
+export interface HeldFirstAnswer<T> {
+  answer: T;
+  /** Never 'refused': a refusal rejects the promise (nothing held) or arrives as the terminal notice. */
+  state: 'held' | 'fresh';
+  asOf: number | null;
+  aged: boolean;
+}
+
+export type WriteOutcomeState = 'succeeded' | 'refused' | 'unconfirmed' | 'queued';
+
+/** The recorded outcome of one of this MP's `idempotency: client_key` writes, by its key. No result payload is kept. */
+export interface WriteOutcome {
+  state: WriteOutcomeState;
+  /** ms epoch the state was recorded. */
+  at: number;
+  rpcId: string | null;
+  /** state 'refused'. */
+  refusal?: ReadError;
+  /** The caller marked a follow-up emit as done (`markOutcomeEmitted`). */
+  emitted: boolean;
+  /** `confirmWriteOutcome` would be accepted now. */
+  confirmable: boolean;
+}
+
+export type ConfirmWriteOutcomeAnswer =
+  | { state: 'succeeded'; result: unknown; replayed: boolean; rpcId: string }
+  | { state: 'refused'; refusal: ReadError }
+  | { state: 'unconfirmed'; error: ReadError };
+
+/** One of this MP's writes waiting in (or refused from) the host queue. */
+export interface QueuedWriteReceipt {
+  readonly id: string;
+  readonly activity: string;
+  readonly args: Readonly<Record<string, unknown>>;
+  readonly queuedAt: number;
+  readonly attempts: number;
+  readonly state: 'queued' | 'sending' | 'failed' | 'refused';
+  /** Host API level 20: the key the write was queued under; null only for a row queued without one. */
+  readonly idempotencyKey: string | null;
+  /** state 'refused'. */
+  readonly refusal?: { code: string | null; message: string; status: number | null };
+  readonly refusedAt?: number;
+}
+
+export interface OfflineQueueAnswer {
+  readonly total: number;
+  readonly bytesUsed: number;
+  readonly bytesCap: number | null;
+  readonly entriesCap: number | null;
+  readonly expiredOnLoad: number;
+  /** With `{ receipts: true }`. */
+  readonly receipts?: readonly QueuedWriteReceipt[];
+}
+
+/** A queued punch of this account, by its key. */
+export interface PendingAttendance {
+  idempotencyKey: string;
+  status: 'start' | 'stop' | 'pause' | 'resume';
+  at: string;
+  teamMemberId: string;
+}
+
+/** The attendance bridges' answer (`attendancesSnapshot`, `followAttendances`). */
+export interface AttendanceSnapshot<A = Readonly<Record<string, unknown>>> {
+  attendances: A[];
+  unresolved: boolean;
+  /** Host API level 20; null when `unresolved` is false. */
+  why: 'not_fresh' | 'access_unknown' | null;
+  /** Host API level 20: the rows are vouched from the device, not a fresh proof. */
+  held: boolean;
+  /** Host API level 20. */
+  asOf: number | null;
+  /** Host API level 20: this account's queued punches, by key (possibly empty). */
+  pending: PendingAttendance[];
 }
 
 // ============================================================================
@@ -1249,6 +1391,25 @@ export interface HeldWrite {
 export interface HostApi {
   /** Payload-free invalidation of this MP's committed queue in its account. */
   onQueuedWritesChange(callback: () => void): () => void;
+  /** This MP's share of the host queue; with `receipts: true`, its waiting (and refused) writes. */
+  offlineQueue(options?: { receipts?: boolean }): OfflineQueueAnswer;
+  /**
+   * Host API level 20. The recorded outcome of this MP's own `client_key`
+   * activity (name without the MP prefix) by its key, or null (never
+   * recorded, evicted, or another MP's activity). Synchronous; never sends.
+   */
+  writeOutcome(activity: string, idempotencyKey: string): WriteOutcome | null;
+  /** Host API level 20. Marks a `succeeded` record's follow-up emit as done; false when there is no such record. */
+  markOutcomeEmitted(activity: string, idempotencyKey: string): Promise<boolean>;
+  /**
+   * Host API level 20. Sends the recorded request again under the same key,
+   * byte for byte, once per key and within 24 hours, for an eligible activity
+   * whose record is `unconfirmed` or `queued`. Rejects `WriteNotFound`, or
+   * `WriteNotConfirmable` with `details.reason` `already_confirmed`,
+   * `expired`, `not_eligible` or `no_request`. Offline it resolves
+   * `unconfirmed` and sends nothing.
+   */
+  confirmWriteOutcome(activity: string, idempotencyKey: string): Promise<ConfirmWriteOutcomeAnswer>;
   /**
    * The held write of one subject for this MP's activity that declares
    * `holdUnsettled` (name without the MP prefix), or null. `reason` is the
