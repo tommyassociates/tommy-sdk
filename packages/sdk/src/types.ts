@@ -52,6 +52,10 @@ export type TommyErrorCode =
   | 'Offline_QueueFull'
   /** A write of an activity that declares holdUnsettled for a subject whose write is held (or already being checked). */
   | 'WriteHeld'
+  /** Host API level 20: `markOutcomeEmitted` / `confirmWriteOutcome` named an activity this MP does not own. */
+  | 'WriteNotFound'
+  /** Host API level 20: `confirmWriteOutcome` refused; `details.reason` is `already_confirmed`, `expired`, `not_eligible` or `no_request`. */
+  | 'WriteNotConfirmable'
   | 'RateLimited'
   | 'CapabilityTokenInvalid'
   | 'LoopDetected'
@@ -84,6 +88,8 @@ export interface TommyError {
    * refusal for another reason, such as too many writes in flight).
    */
   readonly retryAfterMs?: number;
+  /** On a `WriteNotConfirmable` refusal: `{ reason }`. */
+  readonly details?: Readonly<Record<string, unknown>>;
 }
 
 // ============================================================================

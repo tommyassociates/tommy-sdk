@@ -20,6 +20,7 @@ import { createDurableQueue } from './durable-queue.js';
 import { validateToken } from './capability.js';
 import { evaluatePredicate as evaluateDeclaredPredicate } from './predicate.js';
 import { holdSubject, unsettledReason } from './held-writes.js';
+import { createOutcomeLedger } from './outcome-ledger.js';
 
 const err = (code, message, extra = {}) => new TommyError({ code, message, ...extra });
 
@@ -51,6 +52,28 @@ const INFLIGHT_RUNS_MAX = 500;
 // row; later drains (reconnect, a new write) try again as well.
 const SETTLE_RETRY_AFTER_MS = 2000;
 const SETTLE_RETRY_DRAINS = 3;
+// A write's outcome may be confirmed (sent once more under its key) only this
+// long after it was recorded.
+const CONFIRM_WITHIN_MS = 24 * 60 * 60 * 1000;
+// Input names that mark an argument as a secret: a write that takes one is
+// never kept for a confirm.
+const SECRET_INPUT_NAMES = new Set(['pin', 'passcode', 'password', 'secret', 'token', 'otp']);
+
+/** Whether a JSON schema names (or marks writeOnly) a secret input anywhere in its properties. */
+function hasSecretInput(schema, depth = 0) {
+  if (!schema || typeof schema !== 'object' || depth > 8) return false;
+  if (schema.writeOnly === true) return true;
+  for (const [name, property] of Object.entries(schema.properties || {})) {
+    if (SECRET_INPUT_NAMES.has(String(name).toLowerCase())) return true;
+    if (hasSecretInput(property, depth + 1)) return true;
+  }
+  if (schema.items && hasSecretInput(schema.items, depth + 1)) return true;
+  return ['allOf', 'anyOf', 'oneOf'].some((key) => Array.isArray(schema[key]) && schema[key].some((part) => hasSecretInput(part, depth + 1)));
+}
+
+/** A client_key, offline-replayable activity with no secret input: its request may be kept and confirmed. */
+const confirmEligible = (activityDef) => activityDef?.idempotency === 'client_key'
+  && activityDef.offlineReplayable === true && !hasSecretInput(activityDef.inputSchema);
 
 // Server-write activities whose host adapter gets replay provenance (see
 // executeInvoke). `team.update_member` always gets it: the member-restore gate
@@ -171,6 +194,12 @@ export function createBroker({
   queueOwner = null,
   replayEnvelope = (envelope) => envelope,
   /**
+   * The durable half of the write outcome records (`writeOutcome`,
+   * `confirmWriteOutcome`): `{ load(), put(record), remove(id) }`. Without
+   * one (a kiosk device, tests) records live in memory only.
+   */
+  outcomeStore = null,
+  /**
    * How long a dispatch waits for an MP announced through `expectMps()` but not
    * yet registered before raising Unknown{Condition,Activity}. Larger than a
    * condition's `latencyBudgetMs`: it covers bundle fetch + eval on a cold radio.
@@ -210,6 +239,9 @@ export function createBroker({
   };
 
   const records = createRecordStore({ backend: recordBackend, now });
+  const outcomes = createOutcomeLedger({ store: outcomeStore, now });
+  // Read what the store holds now, so `writeOutcome` (synchronous) can answer it.
+  outcomes.ready();
 
   // --- registries -----------------------------------------------------------
   const mps = new Map();              // mpId -> { manifest, handlers, firstParty }
@@ -1191,12 +1223,14 @@ export function createBroker({
       // the hold's cleanup awaits, which another write could evict it in).
       const stored = processedKeys.get(processedKey);
       await releaseSettledHold(activityDef, envelope);
+      noteReplayedSuccess(activityDef, envelope, idempotencyKey);
       return { ...stored, idempotentReplay: true };
     }
     if (processedKey && appliedKeysOverflow.has(processedKey)) {
       // Applied this session but its result was released by the cap: still
       // suppressed, in the durable-ledger hit's shape.
       await releaseSettledHold(activityDef, envelope);
+      noteReplayedSuccess(activityDef, envelope, idempotencyKey);
       return { status: 'succeeded', idempotentReplay: true, resultRetained: false };
     }
 
@@ -1206,6 +1240,7 @@ export function createBroker({
     // the args and would put tenant data on disk.
     if (processedKey && activityDef.idempotency === 'client_key' && idempotencyLedger?.has(processedKey)) {
       await releaseSettledHold(activityDef, envelope);
+      noteReplayedSuccess(activityDef, envelope, idempotencyKey);
       return { status: 'succeeded', idempotentReplay: true, resultRetained: false };
     }
 
@@ -1231,6 +1266,7 @@ export function createBroker({
           online: false,
         });
         await records.update(queuedRecord.runId, { status: 'queued_offline' });
+        noteOutcome(activityDef, envelope, idempotencyKey, 'queued', { rpcId: queuedRecord.runId });
         return { rpcId: queuedRecord.runId, status: 'queued_offline' };
       }
       throw err('Offline', `activity '${envelope.activity}' is not offlineReplayable and the device is offline`, { retryable: false });
@@ -1328,6 +1364,8 @@ export function createBroker({
         chainPath: chain.chainPath,
         online: isOnline,
       });
+      // Until an answer settles it, the write is waiting: a restart finds it queued.
+      noteOutcome(activityDef, envelope, idempotencyKey, 'queued', { rpcId: record.runId });
       return await attemptAdmittedInvoke({
         envelope, identity, tenantId, ownerEntry, ownerMpId, activityName, activityDef, idempotencyKey, processedKey, record, heldSeq,
       });
@@ -1447,8 +1485,10 @@ export function createBroker({
         }
         if (result.status && result.status === 'failed') throw err('ActivityFailed', result.error?.message || 'executor reported failure', { retryable: false });
         validateAgainst(activityDef.resultSchema, result.result, 'ActivityFailed', `activity '${envelope.activity}' result`);
-        const final = { rpcId: record.runId, status: 'succeeded', result: result.result };
+        // `replayed`: the server answered a key it had already applied.
+        const final = { rpcId: record.runId, status: 'succeeded', result: result.result, ...(result.replayed === true ? { replayed: true } : {}) };
         resendFailures.delete(idempotencyKey);
+        noteOutcome(activityDef, envelope, idempotencyKey, 'succeeded', { rpcId: record.runId });
         await records.update(record.runId, { status: 'succeeded', result: result.result });
         if (processedKey) {
           processedKeys.set(processedKey, final);
@@ -1524,6 +1564,7 @@ export function createBroker({
     // again does. A final answer removes it below.
     const unsettledWhy = activityDef.holdUnsettled && heldSeq !== null ? unsettledReason(lastError, activityDef.holdUnsettled) : null;
     if (unsettledWhy) {
+      noteOutcome(activityDef, envelope, idempotencyKey, 'unconfirmed', { rpcId: record.runId });
       try { await queueStore.markUnsettled(heldSeq, { reason: unsettledWhy, at: now() }); } catch (_) { /* unmarked rows read as unconfirmed */ }
       await records.update(record.runId, {
         status: 'dead_letter', error: { code: lastError.code, message: lastError.message }, attempts: attempt,
@@ -1543,9 +1584,17 @@ export function createBroker({
       if (heldSeq === null) await enqueueOffline(envelope.sourceMpId, { ...envelope, identity, idempotencyKey });
       noteResendFailure(idempotencyKey);
       await records.update(record.runId, { status: 'queued_offline', attempts: attempt });
+      noteOutcome(activityDef, envelope, idempotencyKey, 'queued', { rpcId: record.runId });
       return { rpcId: record.runId, status: 'queued_offline' };
     }
 
+    // A refusal settles the write; a drained row whose send never left the
+    // device still waits in the queue; anything else got no settling answer.
+    if (refusedForGood(lastError)) {
+      noteOutcome(activityDef, envelope, idempotencyKey, 'refused', { rpcId: record.runId, refusal: refusalOf(lastError) });
+    } else {
+      noteOutcome(activityDef, envelope, idempotencyKey, envelope.restoreDrain && neverReachedServer(lastError) ? 'queued' : 'unconfirmed', { rpcId: record.runId });
+    }
     // Budget exhausted or non-retryable: dead-letter. The server
     // answered (or the write failed for good), so its held row goes.
     if (heldSeq !== null) await queueStore.remove(heldSeq);
@@ -1626,6 +1675,76 @@ export function createBroker({
     const holder = currentQueueOwner();
     return queueStore.all().filter((row) => ownsQueuedRow(row, holder));
   }
+
+  // --- write outcomes ---------------------------------------------------------
+
+  /** Whose outcome records these are: the queue owner (person and account); every record is ours without one. */
+  function outcomeOwner() {
+    const holder = currentQueueOwner();
+    if (!holder) return '*';
+    return JSON.stringify(['tenantId', ...OWNER_FIELDS].map((key) => (known(holder[key]) ? String(holder[key]) : null)));
+  }
+
+  /** The refusal of an answered write, as `{ code, status, message }`. */
+  function refusalOf(error) {
+    // The answer itself (the cause with an HTTP status), else the innermost
+    // error that is more than the broker's own ActivityFailed wrapping.
+    let answered = null;
+    let inner = error;
+    let cause = error;
+    for (let depth = 0; cause && depth < 8; depth += 1) {
+      const status = Number(cause.status ?? cause.response?.status);
+      if (!answered && Number.isFinite(status) && status >= 100) answered = cause;
+      if (cause.code !== 'ActivityFailed' || !inner || inner.code === 'ActivityFailed') inner = cause;
+      cause = cause.cause;
+    }
+    const source = answered || inner || error;
+    const status = answered ? Number(answered.status ?? answered.response?.status) : null;
+    return {
+      code: source?.data?.code || source?.response?.data?.code || source?.code || error?.code || null,
+      status,
+      message: String(source?.message || error?.message || ''),
+    };
+  }
+
+  /**
+   * Record what happened to a `client_key` write. Its request is kept (for a
+   * confirm) only for an eligible activity while it waits or is unconfirmed;
+   * the result is never kept.
+   */
+  function noteOutcome(activityDef, envelope, idempotencyKey, state, { rpcId, refusal } = {}) {
+    if (activityDef?.idempotency !== 'client_key' || !idempotencyKey) return;
+    // An rpc id is recorded only once an answer settled the write.
+    const settled = state === 'succeeded' || state === 'refused';
+    const open = state === 'queued' || state === 'unconfirmed';
+    const request = open && confirmEligible(activityDef) ? {
+      sourceMpId: envelope.sourceMpId, activity: envelope.activity, args: envelope.args ?? {}, idempotencyKey,
+    } : undefined;
+    try {
+      outcomes.record(outcomeOwner(), envelope.activity, idempotencyKey, { state, rpcId: settled ? rpcId ?? null : null, refusal, request });
+    } catch (_) { /* a record that cannot be kept never fails the write */ }
+  }
+
+  /** A replayed success settles a record still waiting or unconfirmed. */
+  function noteReplayedSuccess(activityDef, envelope, idempotencyKey) {
+    const before = idempotencyKey ? outcomes.get(outcomeOwner(), envelope.activity, idempotencyKey) : null;
+    if (before && (before.state === 'queued' || before.state === 'unconfirmed')) noteOutcome(activityDef, envelope, idempotencyKey, 'succeeded');
+  }
+
+  /** This MP's own activity (name without its prefix), or null for another MP's or an unknown one. */
+  function ownActivity(sourceMpId, activity) {
+    if (typeof activity !== 'string' || !activity || activity.includes('.')) return null;
+    const activityDef = mps.get(sourceMpId)?.manifest?.activities?.[activity];
+    return activityDef ? { activityDef, qualified: qualify(sourceMpId, activity) } : null;
+  }
+
+  const confirmOpen = (record) => !!record && (record.state === 'queued' || record.state === 'unconfirmed');
+  const confirmable = (activityDef, record) => confirmEligible(activityDef) && confirmOpen(record) && !!record.request
+    && record.confirmSent !== true && now() - record.at <= CONFIRM_WITHIN_MS;
+
+  const notConfirmable = (reason, message) => Object.assign(
+    err('WriteNotConfirmable', message, { retryable: false }), { details: { reason } },
+  );
 
   async function enqueueOffline(sourceMpId, envelope, { held = false } = {}) {
     // Keep the existing payload budgets in UTF-16 code units on every backend.
@@ -2072,6 +2191,109 @@ export function createBroker({
           };
         });
     },
+
+    /**
+     * The recorded outcome of one of this Mini Program's own `client_key`
+     * writes (`activity` without its prefix) by its idempotency key:
+     * `{ state, at, rpcId, refusal?, emitted, confirmable }`, or null when
+     * none is recorded (never written, evicted, expired, or another MP's
+     * activity). Synchronous; never sends. No result is kept.
+     */
+    writeOutcome(sourceMpId, activity, idempotencyKey) {
+      const own = ownActivity(sourceMpId, activity);
+      if (!own || typeof idempotencyKey !== 'string' || !idempotencyKey) return null;
+      const record = outcomes.get(outcomeOwner(), own.qualified, idempotencyKey);
+      if (!record) return null;
+      return {
+        state: record.state,
+        at: record.at,
+        rpcId: record.rpcId ?? null,
+        ...(record.state === 'refused' && record.refusal ? { refusal: { ...record.refusal } } : {}),
+        emitted: record.emitted === true,
+        confirmable: confirmable(own.activityDef, record),
+      };
+    },
+
+    /**
+     * Marks the follow-up a Mini Program emitted for one of its succeeded
+     * writes as done. True when it marked a `succeeded` record; false when
+     * there is none. Rejects `WriteNotFound` for an activity this MP does not
+     * own.
+     */
+    async markOutcomeEmitted(sourceMpId, activity, idempotencyKey) {
+      const own = ownActivity(sourceMpId, activity);
+      if (!own) throw err('WriteNotFound', `'${activity}' is not an activity of mp '${sourceMpId}'`, { retryable: false });
+      await outcomes.ready();
+      const owner = outcomeOwner();
+      const record = outcomes.get(owner, own.qualified, idempotencyKey);
+      if (!record || record.state !== 'succeeded') return false;
+      if (record.emitted !== true) outcomes.patch(owner, own.qualified, idempotencyKey, { emitted: true });
+      return true;
+    },
+
+    /**
+     * Sends one of this Mini Program's writes once more under its own key,
+     * with the recorded arguments byte for byte, when its outcome is not
+     * known. Refused with `WriteNotConfirmable` (`details.reason`) unless, in
+     * this order: the activity is eligible (client_key, offline-replayable,
+     * no secret input) — `not_eligible`; a request is recorded as queued or
+     * unconfirmed — `no_request`; no confirm has left the device for this key
+     * — `already_confirmed`; it was recorded within 24 hours — `expired`.
+     * `WriteNotFound` for an activity this MP does not own. Offline it sends
+     * nothing and answers `unconfirmed` (that does not count as the confirm).
+     */
+    async confirmWriteOutcome(sourceMpId, activity, idempotencyKey) {
+      const own = ownActivity(sourceMpId, activity);
+      if (!own) throw err('WriteNotFound', `'${activity}' is not an activity of mp '${sourceMpId}'`, { retryable: false });
+      if (!confirmEligible(own.activityDef)) {
+        throw notConfirmable('not_eligible', `'${own.qualified}' cannot be confirmed: only a client_key, offline-replayable write with no secret input can`);
+      }
+      await outcomes.ready();
+      const owner = outcomeOwner();
+      const record = outcomes.get(owner, own.qualified, idempotencyKey);
+      if (!confirmOpen(record) || !record.request) {
+        throw notConfirmable('no_request', `no waiting or unconfirmed request of '${own.qualified}' is recorded for this key`);
+      }
+      if (record.confirmSent === true) throw notConfirmable('already_confirmed', `'${own.qualified}' was already confirmed for this key`);
+      if (now() - record.at > CONFIRM_WITHIN_MS) throw notConfirmable('expired', `'${own.qualified}' was recorded more than 24 hours ago`);
+      const offline = (message) => ({ state: 'unconfirmed', error: { code: 'DATA_OFFLINE', status: 0, message } });
+      if (!isOnline) return offline(`'${own.qualified}' was not confirmed: the device is offline`);
+      // Claimed in this turn, before any await, so a second confirm is refused.
+      outcomes.patch(owner, own.qualified, idempotencyKey, { confirmSent: true });
+      const release = () => outcomes.patch(owner, own.qualified, idempotencyKey, { confirmSent: false });
+      const request = JSON.parse(JSON.stringify(record.request));
+      let answer;
+      try {
+        const restored = await replayEnvelope(request);
+        answer = await dispatchInvoke({
+          ...restored, args: request.args, activity: request.activity, sourceMpId,
+          rpcDeadlineAt: undefined, restoreReplay: true, restoreDrain: undefined, idempotencyKey: request.idempotencyKey,
+        });
+      } catch (error) {
+        if (neverReachedServer(error) || error?.code === 'Offline') {
+          release();
+          return offline(String(error?.message || 'the request did not leave the device'));
+        }
+        if (refusedForGood(error)) return { state: 'refused', refusal: refusalOf(error) };
+        return { state: 'unconfirmed', error: refusalOf(error) };
+      }
+      if (answer?.status === 'queued_offline') {
+        release();
+        return offline(`'${own.qualified}' did not leave the device; it waits in the queue`);
+      }
+      if (answer?.status === 'succeeded') {
+        return {
+          state: 'succeeded', result: answer.result, replayed: answer.idempotentReplay === true || answer.replayed === true, rpcId: answer.rpcId ?? record.rpcId ?? null,
+        };
+      }
+      return { state: 'unconfirmed', error: { code: null, status: null, message: `'${own.qualified}' answered ${answer?.status || 'nothing'}` } };
+    },
+
+    /** Drops every write outcome record (sign-out). */
+    purgeOutcomes() { outcomes.clear(); },
+
+    /** Resolves once the outcome records the store held are read, and every record written so far is stored. */
+    outcomesReady() { return outcomes.ready().then(() => outcomes.flush()); },
 
     /**
      * Discard one of this Mini Program's waiting writes by its receipt id, so
