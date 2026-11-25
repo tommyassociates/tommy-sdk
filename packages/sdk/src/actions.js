@@ -31,12 +31,17 @@ export function createActionsApi({ adapter, mpId }) {
      * Evaluate another MP's condition. Never queued offline (reads fail fast).
      * `signal` (the asking surface's shown signal) is handed to the condition
      * handler's own signal, so a read still waiting when it aborts can stop.
+     * With `onRead` (host API level 20) it resolves the held-first envelope
+     * `{ answer, state, asOf, aged }` and later notices arrive through it.
      */
-    async query(condition, args, { signal } = {}) {
+    async query(condition, args, { signal, onRead } = {}) {
       if (typeof condition !== 'string' || !condition) {
         throw new TommyError({ code: 'InvalidPayload', message: 'query: condition name required', retryable: false });
       }
-      return adapter.rpc({ kind: 'query', condition, args, ...(signal ? { signal } : {}) });
+      if (onRead !== undefined && typeof onRead !== 'function') {
+        throw new TommyError({ code: 'InvalidPayload', message: 'query: onRead must be a function', retryable: false });
+      }
+      return adapter.rpc({ kind: 'query', condition, args, ...(signal ? { signal } : {}), ...(onRead ? { onRead } : {}) });
     },
 
     /** Invoke another MP's activity; resolves InvokeResult. */

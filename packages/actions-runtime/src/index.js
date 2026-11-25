@@ -6,6 +6,8 @@ export { createBroker, SCOPED_INVOKE_HOST_API } from './broker.js';
 export { createRecordStore, createMemoryBackend, createWebStorageBackend } from './records.js';
 export { createIdempotencyLedger, createInvalidationEpochs } from './idempotency-ledger.js';
 export { createOutcomeLedger } from './outcome-ledger.js';
+export { createConditionAnswers } from './condition-answers.js';
+export { classifyReadOutcome, readErrorOf, unlistedReadCode } from './read-outcome.js';
 export { createDurableQueue } from './durable-queue.js';
 export { createHostStoreQueue } from './host-store-queue.js';
 export { holdSubject, unsettledReason } from './held-writes.js';

@@ -21,6 +21,8 @@ import { validateToken } from './capability.js';
 import { evaluatePredicate as evaluateDeclaredPredicate } from './predicate.js';
 import { holdSubject, unsettledReason } from './held-writes.js';
 import { createOutcomeLedger } from './outcome-ledger.js';
+import { createConditionAnswers } from './condition-answers.js';
+import { classifyReadOutcome, readErrorOf } from './read-outcome.js';
 
 const err = (code, message, extra = {}) => new TommyError({ code, message, ...extra });
 
@@ -200,6 +202,20 @@ export function createBroker({
    */
   outcomeStore = null,
   /**
+   * The durable half of held condition answers (`account.mp_condition_answers`):
+   * `{ load(), put(entry), remove(id) }`. Without one (a kiosk device, tests)
+   * they live in memory only.
+   */
+  conditionAnswerStore = null,
+  /**
+   * `() => string`: the viewer's role fingerprint (role, Team Admin or Team
+   * Member mode, location-tag set). A held condition answer is served only
+   * under the fingerprint it was kept under.
+   */
+  viewerFingerprint = () => '',
+  /** `(code, status)`: a read failed with a code the refusal lists do not name. */
+  reportReadCode = null,
+  /**
    * How long a dispatch waits for an MP announced through `expectMps()` but not
    * yet registered before raising Unknown{Condition,Activity}. Larger than a
    * condition's `latencyBudgetMs`: it covers bundle fetch + eval on a cold radio.
@@ -242,6 +258,10 @@ export function createBroker({
   const outcomes = createOutcomeLedger({ store: outcomeStore, now });
   // Read what the store holds now, so `writeOutcome` (synchronous) can answer it.
   outcomes.ready();
+  const conditionAnswers = createConditionAnswers({ store: conditionAnswerStore });
+  conditionAnswers.ready();
+  // Orders the reads that may keep a held condition answer.
+  let conditionReadSeq = 0;
 
   // --- registries -----------------------------------------------------------
   const mps = new Map();              // mpId -> { manifest, handlers, firstParty }
@@ -910,6 +930,15 @@ export function createBroker({
   function dispatchQuery(...args) { return trackWork(() => dispatchQueryInnerTracked(...args)); }
 
   async function dispatchQueryInnerTracked(envelope) {
+    const prepared = await prepareQuery(envelope);
+    if (typeof envelope.onRead === 'function') return heldFirstQuery(envelope, prepared);
+    const cached = cachedConditionAnswer(prepared);
+    if (cached) return cached.value;
+    return runQuery(envelope, prepared);
+  }
+
+  /** Authenticate, resolve, authorize and validate a query; throws as a query does. */
+  async function prepareQuery(envelope) {
     const identity = envelope.identity || authenticate(envelope);
     const tenantId = envelope.tenantId || identity.tenantId;
 
@@ -922,13 +951,25 @@ export function createBroker({
     validateAgainst(conditionDef.inputSchema, envelope.args, 'InvalidPayload', `condition '${envelope.condition}' args`);
 
     const cacheKey = `${tenantStateKey(tenantId)}:${envelope.condition}:${JSON.stringify(envelope.args)}`;
-    if (conditionDef.cacheable) {
-      const hit = conditionCache.get(cacheKey);
-      if (hit && hit.expiresAt > now()) return hit.value;
-      // Reclaim an expired entry rather than skip it.
-      if (hit) conditionCache.delete(cacheKey);
-    }
+    return { identity, tenantId, ownerMpId, conditionName, ownerEntry, conditionDef, cacheKey };
+  }
 
+  /** A `cacheable` condition's unexpired cached answer, as `{ value }`, or null. */
+  function cachedConditionAnswer({ conditionDef, cacheKey }) {
+    if (!conditionDef.cacheable) return null;
+    const hit = conditionCache.get(cacheKey);
+    if (hit && hit.expiresAt > now()) return { value: hit.value };
+    // Reclaim an expired entry rather than skip it.
+    if (hit) conditionCache.delete(cacheKey);
+    return null;
+  }
+
+  /** Run a prepared query's handler: rate token, run record, deadline, return validation, cache. */
+  async function runQuery(envelope, {
+    identity, tenantId, ownerMpId, conditionName, ownerEntry, conditionDef, cacheKey,
+  }) {
+    const heldKey = heldConditionKey(envelope, conditionDef);
+    const heldSeq = heldKey ? (conditionReadSeq += 1) : 0;
     // The rate token is taken here, after the cache: an answer the broker
     // already holds runs nothing, so it is not throttled. A read that runs
     // the handler waits briefly for a token rather than failing at once.
@@ -1024,16 +1065,188 @@ export function createBroker({
         conditionCache.set(cacheKey, { value, expiresAt: now() + conditionDef.cacheTtlMs });
         pruneConditionCache(cacheKey);
       }
+      // A heldFirst condition keeps its answer (validated above) for the next asker.
+      if (heldKey && !isKnownUnknown(value) && heldKey.current()) {
+        conditionAnswers.keep({ ...heldKey.entry, answer: value, at: now(), seq: heldSeq });
+      }
       return value;
     } catch (cause) {
       const wrapped = isTommyError(cause) ? cause
         : err('ConditionError', `condition '${envelope.condition}' threw: ${String(cause && cause.message)}`, { retryable: false, cause });
+      // A refusal purges what this viewer held of the condition's answer.
+      if (heldKey && heldKey.current() && classifyReadOutcome(wrapped).state === 'refused') conditionAnswers.remove(heldKey.id);
       await records.update(record.runId, { status: 'failed', error: { code: wrapped.code, message: wrapped.message } });
       throw wrapped;
     } finally {
       clearTimeout(timer);
       unlinkCallerLater(callerSignal, callerGone, deadline.signal);
     }
+  }
+
+  // --- held-first conditions --------------------------------------------------
+
+  /**
+   * Where a `heldFirst` condition's answer to these arguments is kept for the
+   * current queue owner and viewer role fingerprint, with `current()` saying
+   * whether both are still the ones it was taken for. Null for any other condition.
+   */
+  function heldConditionKey(envelope, conditionDef) {
+    if (conditionDef?.heldFirst !== true) return null;
+    const owner = outcomeOwner();
+    let fingerprint = '';
+    try { fingerprint = String(viewerFingerprint?.() ?? ''); } catch (_) { fingerprint = ''; }
+    const id = conditionAnswers.idFor(owner, fingerprint, envelope.condition, canonicalJson(envelope.args ?? null));
+    const current = () => {
+      let fingerprintNow = '';
+      try { fingerprintNow = String(viewerFingerprint?.() ?? ''); } catch (_) { fingerprintNow = ''; }
+      return !retired && outcomeOwner() === owner && fingerprintNow === fingerprint;
+    };
+    return { id, owner, fingerprint, current, entry: { id, owner, fingerprint, condition: envelope.condition } };
+  }
+
+  /** Whether a held answer read at `at` is older than the condition's declared showAgeMs. */
+  function agedAt(conditionDef, at) {
+    const showAgeMs = conditionDef?.freshness?.showAgeMs;
+    return Number.isFinite(showAgeMs) && Number.isFinite(at) && now() - at > showAgeMs;
+  }
+
+  /** The declared retry steps, ascending, at most 3; the host default otherwise. */
+  function retryStepsOf(conditionDef) {
+    const steps = conditionDef?.freshness?.retryAfterMs;
+    if (Array.isArray(steps) && steps.length && steps.length <= 3 && steps.every((step, i) => Number.isFinite(step) && step > 0 && (i === 0 || step > steps[i - 1]))) return steps;
+    return [4000, 12000];
+  }
+
+  /**
+   * A query with `onRead`. A `cacheable` hit answers fresh. A condition that
+   * does not declare `heldFirst` answers fresh once its handler answers, with
+   * no notice. A `heldFirst` condition with an answer held for this owner,
+   * fingerprint and arguments resolves it at once (`state: 'held'`) and reads
+   * again in the background, telling the asker through `onRead`; with nothing
+   * held it waits for the handler as a query does. A refusal rejects; it
+   * never resolves.
+   */
+  async function heldFirstQuery(envelope, prepared) {
+    const { conditionDef } = prepared;
+    const cached = cachedConditionAnswer(prepared);
+    if (cached) return { answer: cached.value, state: 'fresh', asOf: now(), aged: false };
+    const key = heldConditionKey(envelope, conditionDef);
+    if (key) await conditionAnswers.ready();
+    const held = key ? conditionAnswers.get(key.id) : null;
+    if (!held) {
+      const value = await runQuery(envelope, prepared).catch((error) => { throw asRefusal(error); });
+      return { answer: value, state: 'fresh', asOf: now(), aged: false };
+    }
+    const refreshAfterMs = conditionDef.freshness?.refreshAfterMs;
+    const young = Number.isFinite(refreshAfterMs) && now() - held.at < refreshAfterMs;
+    if (held.stale || !young) revalidateHeld(envelope, prepared, key, held);
+    return {
+      answer: JSON.parse(JSON.stringify(held.answer)), state: 'held', asOf: held.at, aged: agedAt(conditionDef, held.at),
+    };
+  }
+
+  /**
+   * Read a held condition answer again in the background and tell the asker:
+   * `checking` as each attempt starts (`stale` instead while a landed write
+   * marked the answer stale), then one terminal notice — `fresh` with the
+   * answer (kept), `refused` (the held answer purged first), or `stale` with
+   * `retrying: false` once the retry steps are used up. A failed attempt with
+   * steps left says `stale` with `retrying: true` and when it reads again.
+   * Notices go after the held answer was delivered, never inside the call,
+   * never after the owner or fingerprint changed, and a throw in `onRead`
+   * touches nothing else.
+   */
+  function revalidateHeld(envelope, prepared, key, held) {
+    const { conditionDef } = prepared;
+    const { onRead } = envelope;
+    const steps = retryStepsOf(conditionDef);
+    const callerSignal = envelope.signal && typeof envelope.signal.aborted === 'boolean' ? envelope.signal : null;
+    let shownAt = held.at;
+    let ended = false;
+    let markedStale = held.stale === true;
+    // The first notice waits for a turn of the event loop, so the asker has its held answer first.
+    let chain = new Promise((resolve) => { setTimeout(resolve, 0); });
+    const deliver = (notice, terminal = false) => {
+      chain = chain.then(() => {
+        if (ended) return;
+        if (!key.current()) { ended = true; return; }
+        if (terminal) ended = true;
+        try { onRead(notice); } catch (_) { /* the asker's own error */ }
+      });
+    };
+    const base = () => ({ answered: false, asOf: shownAt, aged: agedAt(conditionDef, shownAt) });
+    const attempt = async (index) => {
+      if (ended || retired || callerSignal?.aborted || !key.current()) { ended = true; return; }
+      deliver(markedStale
+        ? { state: 'stale', ...base(), retrying: true, nextAttemptAt: null, error: null }
+        : { state: 'checking', ...base() });
+      let value;
+      let failure = null;
+      try {
+        value = await runQuery({ ...envelope, onRead: undefined }, prepared);
+      } catch (error) {
+        failure = error;
+      }
+      if (!failure && isKnownUnknown(value)) {
+        failure = Object.assign(new Error(`condition '${envelope.condition}' answered unresolved`), { code: 'DATA_NOT_READ' });
+      }
+      if (!failure) {
+        // runQuery kept the answer; the notice carries when it was read.
+        const at = conditionAnswers.get(key.id)?.at ?? now();
+        shownAt = at;
+        markedStale = false;
+        deliver({ state: 'fresh', answered: true, asOf: at, aged: false, answer: value }, true);
+        return;
+      }
+      const outcome = classifyReadOutcome(failure, { report: reportReadCode });
+      if (outcome.state === 'silent') { ended = true; return; }
+      if (outcome.state === 'refused') {
+        if (key.current()) conditionAnswers.remove(key.id);
+        deliver({
+          state: 'refused', answered: false, asOf: null, aged: false, reason: outcome.reason, error: readErrorOf(failure),
+        }, true);
+        return;
+      }
+      const error = readErrorOf(failure);
+      if (outcome.retrying && index < steps.length) {
+        const waitMs = steps[index];
+        deliver({ state: 'stale', ...base(), retrying: true, nextAttemptAt: now() + waitMs, error });
+        setTimer(() => { attempt(index + 1).catch(() => {}); }, waitMs);
+        return;
+      }
+      deliver({ state: 'stale', ...base(), retrying: false, nextAttemptAt: null, error }, true);
+    };
+    attempt(0).catch(() => {});
+  }
+
+  /**
+   * A handler's refusal reaches an `onRead` asker as a refusal, not as the
+   * ConditionError that wraps it: `PermissionDenied` with the refusal as its
+   * cause. Any other error is unchanged.
+   */
+  function asRefusal(error) {
+    if (!isTommyError(error) || error.code !== 'ConditionError') return error;
+    const outcome = classifyReadOutcome(error);
+    if (outcome.state !== 'refused' || outcome.reason !== 'access') return error;
+    return err('PermissionDenied', error.message, { retryable: false, cause: error.cause || error });
+  }
+
+  /** Drop every held condition answer (a permission, role, location or team change, sign-out, account switch). */
+  function purgeConditionAnswers() { conditionAnswers.purge(); }
+
+  /**
+   * A landed write touched these host collections: held answers of every
+   * condition whose `freshness.sources` names one of them are marked stale
+   * (still answered first, always read again, `stale` until a fresh answer).
+   */
+  function markConditionAnswersStale(collectionIds) {
+    const touched = new Set((Array.isArray(collectionIds) ? collectionIds : [collectionIds]).filter((id) => typeof id === 'string'));
+    if (!touched.size) return;
+    conditionAnswers.markStale((condition) => {
+      const [ownerMpId, conditionName] = splitQualified(condition);
+      const sources = mps.get(ownerMpId)?.manifest?.conditions?.[conditionName]?.freshness?.sources;
+      return Array.isArray(sources) && sources.some((source) => touched.has(source));
+    });
   }
 
   // Keeps a settled query's handler signal following its caller's signal for
@@ -1938,6 +2151,12 @@ export function createBroker({
      * invokeContext supplies the handler MP's current authenticated envelope.
      */
     registerMp(manifest, { handlers, firstParty, minHostApi = 0, invokeContext } = {}) {
+      // A new version of an MP, or a change to its conditions' schemas, makes
+      // every held condition answer suspect.
+      const before = mps.get(manifest.id)?.manifest;
+      const conditionShapes = (m) => canonicalJson(Object.fromEntries(Object.entries(m?.conditions || {})
+        .map(([name, def]) => [name, { inputSchema: def.inputSchema ?? null, returnSchema: def.returnSchema ?? null }])));
+      if (before && (before.version !== manifest.version || conditionShapes(before) !== conditionShapes(manifest))) purgeConditionAnswers();
       mps.set(manifest.id, {
         manifest,
         minHostApi,
@@ -2291,6 +2510,13 @@ export function createBroker({
 
     /** Drops every write outcome record (sign-out). */
     purgeOutcomes() { outcomes.clear(); },
+
+    /** Drops every held condition answer. */
+    purgeConditionAnswers,
+    /** Marks stale the held answers of conditions that read any of these host collections. */
+    markConditionAnswersStale,
+    /** Resolves once the held condition answers the store held are read, and every one kept so far is stored. */
+    conditionAnswersReady() { return conditionAnswers.ready().then(() => conditionAnswers.flush()); },
 
     /** Resolves once the outcome records the store held are read, and every record written so far is stored. */
     outcomesReady() { return outcomes.ready().then(() => outcomes.flush()); },
