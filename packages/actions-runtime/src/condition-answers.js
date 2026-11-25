@@ -62,12 +62,13 @@ export function createConditionAnswers({ store = null, maxRows = DEFAULT_MAX } =
     return entry;
   }
 
-  function remove(id) {
+  // A refusal fences the condition even with nothing held yet, so an older read in flight cannot keep its answer.
+  function remove(id, condition = null) {
     if (!loaded) whileLoading.removed.add(id);
     const entry = entries.get(id);
+    if (entry || condition) bump(entry?.condition ?? condition);
     if (!entry) return;
     entries.delete(id);
-    bump(entry.condition);
     persist(() => store.remove?.(id));
   }
 

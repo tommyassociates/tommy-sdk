@@ -201,6 +201,7 @@ export function createBroker({
   const conditionAnswers = createConditionAnswers({ store: conditionAnswerStore });
   conditionAnswers.ready();
   let conditionReadSeq = 0;
+  let revalidations = 0;
 
   const mps = new Map();
   // Panels can query an MP still loading; announced MPs are awaited instead of failing as UnknownCondition.
@@ -807,12 +808,12 @@ export function createBroker({
   function cachedConditionAnswer({ conditionDef, cacheKey }) {
     if (!conditionDef.cacheable || !cacheKey) return null;
     const hit = conditionCache.get(cacheKey);
-    if (hit && hit.expiresAt > now()) return { value: hit.value };
+    if (hit && hit.expiresAt > now()) return { value: hit.value, at: Number.isFinite(hit.at) ? hit.at : now() };
     if (hit) conditionCache.delete(cacheKey);
     return null;
   }
 
-  async function runQuery(envelope, prepared) {
+  async function runQuery(envelope, prepared, meta = {}) {
     const {
       identity, tenantId, ownerMpId, conditionName, ownerEntry, conditionDef, cacheKey,
     } = prepared;
@@ -821,6 +822,8 @@ export function createBroker({
     // An older read never replaces a newer read's cached answer.
     const newestFor = () => !cacheKey || !(conditionCache.get(cacheKey)?.seq > heldSeq);
     const heldFence = heldKey ? conditionAnswers.epoch(envelope.condition) : null;
+    // A purge, a stale mark or a refusal of this condition since the read began fences both caches.
+    const fenced = () => !!heldKey && conditionAnswers.epoch(envelope.condition) !== heldFence;
     const epochAtDispatch = conditionCacheEpoch;
     await awaitQueryToken(envelope.sourceMpId);
 
@@ -875,10 +878,10 @@ export function createBroker({
               note: 'resolved after latency budget; the caller had already timed out',
             });
             // A moved epoch means an invalidation landed during the read, so this value must not refill the cache.
-            if (conditionCacheEpoch !== epochAtDispatch || !cacheKey || !newestFor()) return;
+            if (conditionCacheEpoch !== epochAtDispatch || fenced() || !cacheKey || !newestFor()) return;
             if (conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !isKnownUnknown(late)) {
               conditionCache.set(cacheKey, {
-                value: late, expiresAt: now() + conditionDef.cacheTtlMs, condition: envelope.condition, seq: heldSeq,
+                value: late, expiresAt: now() + conditionDef.cacheTtlMs, condition: envelope.condition, seq: heldSeq, at: now(),
               });
               pruneConditionCache(cacheKey);
             }
@@ -896,13 +899,14 @@ export function createBroker({
       validateAgainst(conditionDef.returnSchema, value, 'ConditionError', `condition '${envelope.condition}' return`);
       await records.update(record.runId, { status: 'succeeded', result: value });
       // A zero-TTL entry could never be served, and a known-unknown must not be cached.
-      const kept = heldKey && !isKnownUnknown(value) && heldKey.current() && conditionAnswers.epoch(envelope.condition) === heldFence
+      const kept = heldKey && !isKnownUnknown(value) && heldKey.current() && !fenced()
         ? conditionAnswers.keep({ ...heldKey.entry, answer: value, at: now(), seq: heldSeq })
         : null;
-      if (kept !== false && cacheKey && newestFor() && conditionCacheEpoch === epochAtDispatch
+      meta.kept = kept;
+      if (kept !== false && !fenced() && cacheKey && newestFor() && conditionCacheEpoch === epochAtDispatch
         && conditionDef.cacheable && conditionDef.cacheTtlMs > 0 && !isKnownUnknown(value)) {
         conditionCache.set(cacheKey, {
-          value, expiresAt: now() + conditionDef.cacheTtlMs, condition: envelope.condition, seq: heldSeq,
+          value, expiresAt: now() + conditionDef.cacheTtlMs, condition: envelope.condition, seq: heldSeq, at: now(),
         });
         pruneConditionCache(cacheKey);
       }
@@ -910,7 +914,7 @@ export function createBroker({
     } catch (cause) {
       const wrapped = isTommyError(cause) ? cause
         : err('ConditionError', `condition '${envelope.condition}' threw: ${String(cause && cause.message)}`, { retryable: false, cause });
-      if (heldKey && heldKey.current() && classifyReadOutcome(wrapped).state === 'refused') conditionAnswers.remove(heldKey.id);
+      if (heldKey && heldKey.current() && classifyReadOutcome(wrapped).state === 'refused') conditionAnswers.remove(heldKey.id, envelope.condition);
       await records.update(record.runId, { status: 'failed', error: { code: wrapped.code, message: wrapped.message } });
       throw wrapped;
     } finally {
@@ -949,7 +953,7 @@ export function createBroker({
   async function heldFirstQuery(envelope, prepared) {
     const { conditionDef } = prepared;
     const cached = cachedConditionAnswer(prepared);
-    if (cached) return { answer: cached.value, state: 'fresh', asOf: now(), aged: false };
+    if (cached) return { answer: cached.value, state: 'fresh', asOf: cached.at, aged: agedAt(conditionDef, cached.at) };
     const key = heldConditionKey(envelope, prepared);
     if (key) await conditionAnswers.ready();
     const found = key && key.current() ? conditionAnswers.get(key.id) : null;
@@ -974,25 +978,33 @@ export function createBroker({
     const callerSignal = envelope.signal && typeof envelope.signal.aborted === 'boolean' ? envelope.signal : null;
     let shownAt = held.at;
     let ended = false;
+    // Counted as pending work until it ends, so a host never retires the broker under a read or a retry wait.
+    revalidations += 1;
+    const end = () => {
+      if (ended) return;
+      ended = true;
+      revalidations -= 1;
+    };
     let markedStale = held.stale === true;
     // Wait a turn so the asker has its held answer before the first notice.
     let chain = new Promise((resolve) => { setTimeout(resolve, 0); });
     const deliver = (notice, terminal = false) => {
       chain = chain.then(() => {
         if (ended) return;
-        if (callerSignal?.aborted || !key.current()) { ended = true; return; }
-        if (terminal) ended = true;
+        if (callerSignal?.aborted || !key.current()) { end(); return; }
+        if (terminal) end();
         try { onRead(notice); } catch (_) { /* the asker's own error */ }
       });
     };
     const base = () => ({ answered: false, asOf: shownAt, aged: agedAt(conditionDef, shownAt) });
     const attempt = async (index) => {
-      if (ended || retired || callerSignal?.aborted || !key.current()) { ended = true; return; }
+      if (ended || retired || callerSignal?.aborted || !key.current()) { end(); return; }
       deliver(markedStale
         ? { state: 'stale', ...base(), retrying: true }
         : { state: 'checking', ...base() });
       let value;
       let failure = null;
+      let read = {};
       for (let restarts = 0; ; restarts += 1) {
         const fence = conditionAnswers.epoch(envelope.condition);
         failure = null;
@@ -1004,16 +1016,17 @@ export function createBroker({
           failure = error;
         }
         if (failure) break;
-        if (conditionSignature(live.ownerEntry?.manifest?.version, live.conditionDef) !== key.entry.sig) { ended = true; return; }
-        if (ended || retired || callerSignal?.aborted || !key.current()) { ended = true; return; }
+        if (conditionSignature(live.ownerEntry?.manifest?.version, live.conditionDef) !== key.entry.sig) { end(); return; }
+        if (ended || retired || callerSignal?.aborted || !key.current()) { end(); return; }
+        read = {};
         try {
-          value = await runQuery({ ...envelope, onRead: undefined }, live);
+          value = await runQuery({ ...envelope, onRead: undefined }, live, read);
         } catch (error) {
           failure = error;
         }
         if (failure && classifyReadOutcome(failure).state === 'refused') break;
         if (conditionAnswers.epoch(envelope.condition) === fence) break;
-        if (ended || retired || callerSignal?.aborted || !key.current()) { ended = true; return; }
+        if (ended || retired || callerSignal?.aborted || !key.current()) { end(); return; }
         if (restarts >= FENCE_RESTARTS_MAX) {
           failure = Object.assign(new Error(`condition '${envelope.condition}' changed while it was read`), { code: 'REFRESH_BUSY' });
           break;
@@ -1023,16 +1036,21 @@ export function createBroker({
         failure = Object.assign(new Error(`condition '${envelope.condition}' answered unresolved`), { code: 'DATA_NOT_READ' });
       }
       if (!failure) {
-        const at = conditionAnswers.get(key.id)?.at ?? now();
+        const entry = conditionAnswers.get(key.id);
+        // A newer read already kept its answer: deliver that one, with its own time.
+        const winner = read.kept === false && entry ? entry : null;
+        const at = winner ? winner.at : (entry?.at ?? now());
         shownAt = at;
         markedStale = false;
-        deliver({ state: 'fresh', answered: true, asOf: at, aged: false, answer: value }, true);
+        deliver({
+          state: 'fresh', answered: true, asOf: at, aged: false, answer: winner ? JSON.parse(JSON.stringify(winner.answer)) : value,
+        }, true);
         return;
       }
       const outcome = classifyReadOutcome(failure, { report: reportReadCode });
-      if (outcome.state === 'silent' || outcome.state === 'held' || outcome.state === 'signed_out') { ended = true; return; }
+      if (outcome.state === 'silent' || outcome.state === 'held' || outcome.state === 'signed_out') { end(); return; }
       if (outcome.state === 'refused') {
-        if (key.current()) conditionAnswers.remove(key.id);
+        if (key.current()) conditionAnswers.remove(key.id, envelope.condition);
         deliver({
           state: 'refused', answered: false, asOf: null, aged: false, reason: outcome.reason, error: readErrorOf(failure),
         }, true);
@@ -1042,12 +1060,12 @@ export function createBroker({
       if (outcome.retrying && index < steps.length) {
         const waitMs = steps[index];
         deliver({ state: 'stale', ...base(), retrying: true, nextAttemptAt: now() + waitMs, error });
-        setTimer(() => { attempt(index + 1).catch(() => {}); }, waitMs);
+        setTimer(() => { attempt(index + 1).catch(() => { end(); }); }, waitMs);
         return;
       }
       deliver({ state: 'stale', ...base(), retrying: false, nextAttemptAt: null, error }, true);
     };
-    attempt(0).catch(() => {});
+    attempt(0).catch(() => { end(); });
   }
 
   function asRefusal(error) {
@@ -2315,7 +2333,7 @@ export function createBroker({
     },
 
     // Host retention must not retire a running action or delayed delivery.
-    hasPendingWork: () => pendingWork > 0 || debouncePending.size > 0,
+    hasPendingWork: () => pendingWork > 0 || debouncePending.size > 0 || revalidations > 0,
     async teardown(instanceId) {
       if (instanceId != null) return;
       retired = true;
