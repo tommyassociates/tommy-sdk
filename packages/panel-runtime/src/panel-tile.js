@@ -233,8 +233,6 @@ export const PanelTile = defineComponent({
     let shadowRoot = null;
     let alive = true;
     let bootSeq = 0;
-    // One render at a time into the shadow root, so an older render never writes over a newer one.
-    let rendering = Promise.resolve();
     const label = (key) => (props.labels && typeof props.labels[key] === 'string' && props.labels[key]) || DEFAULT_TILE_LABELS[key];
 
     const emitEvent = (type, extra = {}) => {
@@ -288,21 +286,13 @@ export const PanelTile = defineComponent({
             if (import.meta.env && import.meta.env.DEV) mountEl.value.__mpShadowRoot = shadowRoot;
           } catch (_) { /* no import.meta.env outside vite */ }
         }
-        const root = shadowRoot;
-        // A render that never settles holds the next one only up to the load timeout.
-        let waitTimer;
-        const previous = Promise.race([rendering, new Promise((resolve) => { waitTimer = setTimeout(resolve, props.loadTimeoutMs); })])
-          .finally(() => clearTimeout(waitTimer));
-        const turn = previous.then(async () => {
-          if (!current()) return false;
-          root.replaceChildren();
-          await props.def.render(root, props.ctx);
-          applyPanelBaseStyles(root);
-          return true;
-        });
-        rendering = turn.catch(() => {});
-        const drawn = await turn;
-        if (!drawn || !current()) return;
+        // Each render draws into its own detached root; only the current one replaces what is shown, once it is done.
+        const stage = document.createElement('div').attachShadow({ mode: 'closed' });
+        await props.def.render(stage, props.ctx);
+        applyPanelBaseStyles(stage);
+        if (!current()) return;
+        shadowRoot.replaceChildren(...stage.childNodes);
+        try { shadowRoot.adoptedStyleSheets = [...stage.adoptedStyleSheets]; } catch (_) { /* no constructed sheets here */ }
         status.value = 'ready';
         rendered.value = true;
         stale.value = false;
