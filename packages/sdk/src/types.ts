@@ -473,7 +473,8 @@ export interface QueuedWriteReceipt {
   readonly args: Readonly<Record<string, unknown>>;
   readonly queuedAt: number;
   readonly attempts: number;
-  readonly state: 'queued' | 'sending' | 'failed' | 'refused';
+  /** Level 21: 'expired' is a write with files that passed the 7-day limit unsent; listed until discarded. */
+  readonly state: 'queued' | 'sending' | 'failed' | 'refused' | 'expired';
   readonly idempotencyKey: string | null;
   readonly refusal?: { code: string | null; message: string; status: number | null };
   readonly refusedAt?: number;
@@ -483,6 +484,12 @@ export interface QueuedWriteReceipt {
   readonly attachments?: readonly KeptAttachment[];
   /** Level 21, beside `attachments`: upload progress 0-1 while sending, otherwise null. */
   readonly progress?: number | null;
+  /** Level 21, beside `attachments`: when a waiting write is sent again (epoch ms), otherwise null. */
+  readonly retryAt?: number | null;
+  /** Level 21, beside `attachments`: true when the server asked the write to wait (429 Retry-After). */
+  readonly throttled?: boolean;
+  /** Level 21, on an `expired` receipt: when its files were removed (epoch ms). */
+  readonly expiredAt?: number;
 }
 
 /** Level 21: a file the host keeps on the device for a write; put it in an `attachments` field. */

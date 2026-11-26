@@ -1654,7 +1654,7 @@ export function createBroker({
     if (activityDef.sideEffect === 'server_write' && activityDef.offlineReplayable
       && !envelope.restoreDrain && (neverReachedServer(lastError) || throttle)) {
       if (heldSeq === null) await enqueueOffline(envelope.sourceMpId, { ...envelope, identity, idempotencyKey });
-      if (throttle) noteResendFailure(idempotencyKey, throttle.waitMs);
+      if (throttle) noteResendFailure(idempotencyKey, throttle.waitMs, true);
       else noteResendFailure(idempotencyKey);
       await records.update(record.runId, { status: 'queued_offline', attempts: attempt });
       noteOutcome(activityDef, envelope, idempotencyKey, 'queued', { rpcId: record.runId }, outcomeScope);
@@ -1907,12 +1907,12 @@ export function createBroker({
   let resendTimer = null;
 
   // A server's Retry-After, when given, decides the wait; otherwise the queue's own spacing.
-  function noteResendFailure(key, retryAfterMs = null) {
+  function noteResendFailure(key, retryAfterMs = null, throttled = false) {
     if (key === undefined || key === null) return;
     const failures = (resendFailures.get(key)?.failures || 0) + 1;
     const waitMs = Number.isFinite(retryAfterMs) && retryAfterMs > 0
       ? Math.min(retryAfterMs, QUEUE_THROTTLE_MAX_MS) : queueResendDelayMs(failures);
-    resendFailures.set(key, { failures, dueAt: now() + waitMs });
+    resendFailures.set(key, { failures, dueAt: now() + waitMs, throttled });
     wakeDrainIn(waitMs);
   }
 
@@ -2035,7 +2035,7 @@ export function createBroker({
           await queueStore.noteAttempt?.(row.seq);
           const throttle = throttleOf(outcome.error);
           if (neverReachedServer(outcome.error)) noteResendFailure(envelope?.idempotencyKey);
-          else if (throttle) noteResendFailure(envelope?.idempotencyKey, throttle.waitMs);
+          else if (throttle) noteResendFailure(envelope?.idempotencyKey, throttle.waitMs, true);
           break;
         }
         resendFailures.delete(envelope?.idempotencyKey);
@@ -2282,9 +2282,13 @@ export function createBroker({
         if (state === 'sending') {
           try { const value = attachmentStore.progress?.(request); progress = Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : null; } catch (_) { progress = null; }
         }
+        const resend = state === 'sending' ? null : resendFailures.get(key);
+        const waiting = Number(resend?.dueAt) > now();
         return {
           attachments: files.map((file) => ({ ref: String(file.ref), name: String(file.name ?? ''), size: Number(file.size) || 0, type: String(file.type ?? '') })),
           progress,
+          retryAt: waiting ? resend.dueAt : null,
+          throttled: waiting && resend.throttled === true,
         };
       };
       return ownQueuedRows()

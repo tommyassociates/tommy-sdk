@@ -17,6 +17,9 @@ export async function submitWithFiles(): Promise<void> {
 export function receiptFiles(receipt: QueuedWriteReceipt): number {
   const progress: number | null | undefined = receipt.progress;
   const summary: string | undefined = receipt.summary;
-  void progress; void summary;
+  const retryAt: number | null | undefined = receipt.retryAt;
+  const throttled: boolean | undefined = receipt.throttled;
+  const expiredAt: number | undefined = receipt.state === 'expired' ? receipt.expiredAt : undefined;
+  void progress; void summary; void retryAt; void throttled; void expiredAt;
   return (receipt.attachments ?? []).reduce((sum, file) => sum + file.size, 0);
 }

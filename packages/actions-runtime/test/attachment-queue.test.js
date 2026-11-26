@@ -54,6 +54,7 @@ function fakeAttachments(queue) {
 
 async function page({
   online = false, serverInvoke = vi.fn(async () => ({ result: { documentId: 'd-1' } })), keepRefused = false, store = true, queue = null, maxFiles,
+  now,
 } = {}) {
   const issuer = createFakeIssuer();
   const offlineQueue = queue || createDurableQueue({ storage: null, held: new Set() });
@@ -64,6 +65,7 @@ async function page({
     serverInvoke,
     online,
     sleep: async () => {},
+    ...(now ? { now, setTimer: () => 0, clearTimer: () => {} } : {}),
     offlineQueue,
     ...(attachments ? { attachmentStore: attachments } : {}),
     queueOwner: () => ({ tenantId: 'team-1', person: '5', accountType: 'TeamMember', accountId: '9' }),
@@ -189,6 +191,38 @@ describe('a queued write that carries attachments', () => {
     expect(attachments.kept.get('a-1')).toMatchObject({ pin: 'documents|documents.submit_document|k-1' });
     expect(attachments.events.some((event) => event[0] === 'settle')).toBe(false);
     expect(broker.queuedWrites('documents')).toHaveLength(1);
+  });
+
+  it('a write the server asked to wait for shows when it is sent again, and that the server is busy', async () => {
+    const clock = { t: 1_000_000 };
+    const busy = () => Object.assign(new Error('Too many requests'), { status: 429, retryAfterMs: 90_000 });
+    const { broker, invoke, attachments } = await page({ online: true, now: () => clock.t, serverInvoke: vi.fn(async () => { throw busy(); }) });
+    attachments.keep('a-1', 'documents');
+    expect((await invoke('k-1', [fileRef('a-1')])).status).toBe('queued_offline');
+    expect(broker.queuedWrites('documents')[0]).toMatchObject({ retryAt: 1_090_000, throttled: true });
+    clock.t += 90_000;
+    expect(broker.queuedWrites('documents')[0]).toMatchObject({ retryAt: null, throttled: false });
+  });
+
+  it('a write spaced by the queue after a failed connection shows its resend time, not a busy server', async () => {
+    const clock = { t: 1_000_000 };
+    const unreachable = () => Object.assign(new TypeError('Failed to fetch'), { status: 0 });
+    const { broker, invoke, attachments } = await page({ online: true, now: () => clock.t, serverInvoke: vi.fn(async () => { throw unreachable(); }) });
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')]);
+    const [receipt] = broker.queuedWrites('documents');
+    expect(receipt.retryAt).toBeGreaterThan(clock.t);
+    expect(receipt.throttled).toBe(false);
+  });
+
+  it('a write without files carries no resend time', async () => {
+    const clock = { t: 1_000_000 };
+    const busy = () => Object.assign(new Error('Too many requests'), { status: 429, retryAfterMs: 90_000 });
+    const { broker, invoke } = await page({ online: true, now: () => clock.t, serverInvoke: vi.fn(async () => { throw busy(); }) });
+    await invoke('k-2', []);
+    const [receipt] = broker.queuedWrites('documents');
+    expect(receipt).not.toHaveProperty('retryAt');
+    expect(receipt).not.toHaveProperty('throttled');
   });
 
   it('an answer that never came holds the files for the confirm window', async () => {
