@@ -26,7 +26,7 @@ export function createActionsApi({ adapter, mpId }) {
       return adapter.rpc({ kind: 'query', condition, args, ...(signal ? { signal } : {}), ...(onRead ? { onRead } : {}) });
     },
 
-    async invoke(activity, args, { idempotencyKey } = {}) {
+    async invoke(activity, args, { idempotencyKey, summary } = {}) {
       if (typeof activity !== 'string' || !activity.includes('.')) {
         throw new TommyError({
           code: 'InvalidPayload',
@@ -35,7 +35,12 @@ export function createActionsApi({ adapter, mpId }) {
           retryable: false,
         });
       }
-      return adapter.rpc({ kind: 'invoke', activity, args, idempotencyKey: idempotencyKey || nextClientKey(mpId) });
+      if (summary !== undefined && typeof summary !== 'string') {
+        throw new TommyError({ code: 'InvalidPayload', message: 'invoke: summary must be text', retryable: false });
+      }
+      return adapter.rpc({
+        kind: 'invoke', activity, args, idempotencyKey: idempotencyKey || nextClientKey(mpId), ...(summary !== undefined ? { summary } : {}),
+      });
     },
 
     subscribe(trigger, handler) {

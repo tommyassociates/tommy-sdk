@@ -176,7 +176,8 @@ export interface ActionsApi {
   query<R = unknown>(condition: string, args: unknown, options: { signal?: AbortSignal; onRead: (notice: ReadNotice<R>) => void }): Promise<HeldFirstAnswer<R>>;
   query<R = unknown>(condition: string, args: unknown, options?: { signal?: AbortSignal; onRead?: undefined }): Promise<R>;
 
-  invoke<R = unknown>(activity: string, args: unknown, options?: { idempotencyKey?: string }): Promise<InvokeResult<R>>;
+  // `summary` (plain text, cut to 80 characters) labels the write in Pending sync; it is kept on the device and never sent.
+  invoke<R = unknown>(activity: string, args: unknown, options?: { idempotencyKey?: string; summary?: string }): Promise<InvokeResult<R>>;
 
   subscribe<P = unknown>(trigger: string, handler: Handler<P>): Unsubscribe;
 
@@ -472,10 +473,44 @@ export interface QueuedWriteReceipt {
   readonly args: Readonly<Record<string, unknown>>;
   readonly queuedAt: number;
   readonly attempts: number;
-  readonly state: 'queued' | 'sending' | 'failed' | 'refused';
+  /** Level 21: 'expired' is a write with files that passed the 7-day limit unsent; listed until discarded. */
+  readonly state: 'queued' | 'sending' | 'failed' | 'refused' | 'expired';
   readonly idempotencyKey: string | null;
   readonly refusal?: { code: string | null; message: string; status: number | null };
   readonly refusedAt?: number;
+  /** Level 21: the write's summary, when it was given one. */
+  readonly summary?: string;
+  /** Level 21: the files a write carries by reference; present only on a write with files. */
+  readonly attachments?: readonly KeptAttachment[];
+  /** Level 21, beside `attachments`: upload progress 0-1 while sending, otherwise null. */
+  readonly progress?: number | null;
+  /** Level 21, beside `attachments`: when a waiting write is sent again (epoch ms), otherwise null. */
+  readonly retryAt?: number | null;
+  /** Level 21, beside `attachments`: true when the server asked the write to wait (429 Retry-After). */
+  readonly throttled?: boolean;
+  /** Level 21, on an `expired` receipt: when its files were removed (epoch ms). */
+  readonly expiredAt?: number;
+}
+
+/** Level 21: a file the host keeps on the device for a write; put it in an `attachments` field. */
+export interface KeptAttachment {
+  readonly ref: string;
+  readonly name: string;
+  readonly size: number;
+  readonly type: string;
+}
+
+export interface AttachmentInfo extends KeptAttachment {
+  /** kept: not yet sent with a write; pinned: carried by a queued write; refused: kept with a refused write; expired: its write was never sent. */
+  readonly state: 'kept' | 'pinned' | 'refused' | 'expired';
+}
+
+/** Level 21. Errors: ATTACHMENT_NOT_FOUND, ATTACHMENT_TOO_LARGE, ATTACHMENT_SPACE, ATTACHMENT_IN_USE, ATTACHMENT_LOST, ATTACHMENTS_UNAVAILABLE. */
+export interface HostAttachments {
+  keep(files: readonly Blob[], options: { activity: string }): Promise<KeptAttachment[]>;
+  drop(ref: string): Promise<boolean>;
+  info(ref: string): Promise<AttachmentInfo | null>;
+  read(ref: string): Promise<Blob | null>;
 }
 
 export interface OfflineQueueAnswer {
@@ -886,6 +921,7 @@ export interface HeldWrite {
   readonly heldAt: number;
 }
 export interface HostApi {
+  readonly attachments: HostAttachments;
   onQueuedWritesChange(callback: () => void): () => void;
   offlineQueue(options?: { receipts?: boolean }): OfflineQueueAnswer;
   writeOutcome(activity: string, idempotencyKey: string): WriteOutcome | null;

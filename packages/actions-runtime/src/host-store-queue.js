@@ -20,7 +20,7 @@ const valid = (row) => row && typeof row.id === 'string' && row.envelope && Numb
 // The request's data and stable key survive; authority and deadlines belong to
 // the live world that sends it, never to device storage.
 const envelopeOf = (envelope) => copy(Object.fromEntries([
-  'sourceMpId', 'activity', 'args', 'trigger', 'payload', 'idempotencyKey', 'txnId', 'chain',
+  'sourceMpId', 'activity', 'args', 'trigger', 'payload', 'idempotencyKey', 'txnId', 'chain', 'summary',
 ].filter((key) => envelope[key] !== undefined).map((key) => [key, envelope[key]])));
 
 /**
