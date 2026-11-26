@@ -41,6 +41,7 @@ function fakeAttachments(queue) {
         if (row.pin !== keyOf(request)) continue;
         if (request.state === 'unconfirmed') row.hold = true;
         else if (request.state === 'refused' && request.keep) row.refused = true;
+        else if (request.state === 'released') row.pin = null;
         else kept.delete(ref);
       }
     },
@@ -242,7 +243,7 @@ describe('a queued write that carries attachments', () => {
     expect(attachments.kept.has('a-1')).toBe(false);
   });
 
-  it('a queue that cannot keep the write releases the files it pinned', async () => {
+  it('a queue that cannot keep the write unpins its files, so they can be sent under another key', async () => {
     const issuer = createFakeIssuer();
     const full = {
       ...createDurableQueue({ storage: null }),
@@ -262,7 +263,10 @@ describe('a queued write that carries attachments', () => {
       sourceMpId: 'documents', instanceId: 'i-d', capabilityToken: token, activity: 'documents.submit_document',
       args: { documentTypeId: '7', files: [fileRef('a-1')] }, idempotencyKey: 'k-1',
     })).rejects.toMatchObject({ code: 'Offline_QueueFull' });
-    expect(attachments.kept.has('a-1')).toBe(false);
+    expect(attachments.kept.get('a-1')).toMatchObject({ pin: null });
+    await expect(attachments.pin({
+      sourceMpId: 'documents', activity: 'documents.submit_document', idempotencyKey: 'k-2', refs: ['a-1'],
+    })).resolves.toBeUndefined();
   });
 
   it('a summary is plain text up to 80 characters, kept with the host-store row', async () => {
