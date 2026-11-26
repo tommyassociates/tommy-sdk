@@ -1,6 +1,3 @@
-// A rejection the broker raises with another copy of this SDK's TommyError
-// (the host bundles its own) reaches the MP as this SDK's TommyError, with
-// its code, rule and retryability kept.
 import { describe, it, expect } from 'vitest';
 import { createDirectAdapter, TommyError } from '../src/index.js';
 

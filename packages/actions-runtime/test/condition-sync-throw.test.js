@@ -1,9 +1,3 @@
-/**
- * condition-sync-throw.test.js — a condition handler that throws before it
- * returns a promise is treated like one that rejects: the caller gets a
- * ConditionError, the run is recorded as failed, the deadline timer is
- * cleared and the caller's signal is let go.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 

@@ -1,11 +1,4 @@
 // @vitest-environment node
-/**
- * The data service's pushes and reads, for sources and `mutate`: local
- * changes are never overwritten, lost or sent stale; a refusal for access is
- * kept on the row; removals and a principal switch fence queued changes;
- * queries page and refuse what they cannot honour; results carry no storage
- * metadata and never hand out a live row.
- */
 import { describe, it, expect, vi } from 'vitest';
 import { createDataService, createDataStore, createMemoryStoreBackend } from '../src/index.js';
 import { createHostStoreChangeFeed } from '../src/host-store/index.js';
@@ -13,12 +6,10 @@ import { createHostStoreChangeFeed } from '../src/host-store/index.js';
 const settle = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 const INDEXES = { byChat: ['chat_id', 'seq'] };
 
-/** A service over one memory collection; `store` can be shared between services (two tabs, a restart). */
 function service({ store = createDataStore({ name: 'items', backend: createMemoryStoreBackend(), indexes: INDEXES }), ...options } = {}) {
   const data = createDataService({ resolve: (name) => (name === 'items' ? { store, decl: { keyPath: 'id' } } : null), ...options });
   return { data, store };
 }
-/** A scheduler that holds each run until released. */
 function heldScheduler() {
   const held = [];
   return {
@@ -27,7 +18,6 @@ function heldScheduler() {
     releaseAll() { held.splice(0).forEach((run) => run()); },
   };
 }
-/** A scheduler that holds every run until released, and runs a failed run once more, as the host's retries do. */
 function retryingScheduler() {
   let release;
   const gate = new Promise((resolve) => { release = resolve; });
@@ -39,7 +29,6 @@ function retryingScheduler() {
     },
   };
 }
-/** How `promise` settled within `ms`: `{ value }`, `{ error }`, or 'unsettled'. */
 const outcome = (promise, ms = 200) => Promise.race([promise.then((value) => ({ value }), (error) => ({ error })),
   new Promise((resolve) => { setTimeout(() => resolve('unsettled'), ms); })]);
 
@@ -69,7 +58,6 @@ describe('sources never overwrite or lose local changes', () => {
         if (prop !== 'getRaw') return target[prop];
         return async (key) => {
           const row = await target.getRaw(key);
-          // A local change lands while the refresh holds its first look at the row.
           if (first) { first = false; await target.put({ id: 'a', v: 'local' }); }
           return row;
         };
@@ -90,11 +78,9 @@ describe('a local delete waiting to be sent', () => {
     data.source('items', { fetch: async () => [], push: offline });
     await data.mutate('items', { op: 'delete', key: 'a' });
     await settle();
-    // Hidden from every read, kept for the push.
     expect(await data.read('items', 'a')).toBeNull();
     expect(await data.read('items')).toEqual([]);
     expect((await store.getRaw('a'))._dirty).toBe(true);
-    // The service is rebuilt (a reload): the delete goes out again.
     data.dispose();
     const sent = [];
     const next = service({ store }).data;
@@ -121,7 +107,6 @@ describe('a service for one account among several', () => {
     expect(contexts).toEqual([['fetch', { principal, background: true }], ['push', { principal, background: true }]]);
     expect(jobs.map((job) => [job.key.split(':')[1], job.target])).toEqual([['team-44', 'team-44|items'], ['team-44', 'push:team-44|items']]);
     expect(jobs[0]).toMatchObject({ visible: true, priority: 2 });
-    // Another account is displayed now: this one's work waits behind it.
     displayed = false;
     jobs.length = 0;
     await data.refresh('items', { mode: 'visible' });
@@ -138,7 +123,6 @@ describe('whether a service is idle', () => {
       fetch: () => new Promise((resolve) => { answer = () => resolve([]); }),
       push: async () => {},
     });
-    // The restore of unsent rows the push started counts too, until it ends.
     await vi.waitFor(() => expect(data.idle()).toBe(true));
     const read = data.refresh('items', { mode: 'visible' });
     expect(data.idle()).toBe(false);
@@ -190,7 +174,6 @@ describe('a change restored after a restart', () => {
     const push = vi.fn(async () => {});
     data.source('items', { fetch: async () => [], push });
     await vi.waitFor(() => expect(scheduler.held.length).toBe(1));
-    // Another tab sends it first: its push acknowledges the row.
     await store.markSynced('a', { pushed: true });
     scheduler.releaseAll();
     await settle(); await settle();
@@ -239,7 +222,6 @@ describe('a push refused for access', () => {
     next.source('items', { fetch: async () => [], push });
     await vi.waitFor(() => expect(next.pending().map((entry) => [entry.key, entry.state])).toEqual([['a', 'access_changed']]));
     expect(push).not.toHaveBeenCalled();
-    // Only an explicit retry sends it again.
     await next.retry('items', 'a');
     expect(push).toHaveBeenCalledTimes(1);
     await vi.waitFor(async () => expect((await store.getRaw('a'))._dirty).toBe(false));
@@ -258,20 +240,17 @@ describe('a push refused for access', () => {
     });
     await data.mutate('items', { op: 'put', record: { id: 'a', v: 'first' } });
     await vi.waitFor(() => expect(data.pending()[0]?.state).toBe('access_changed'));
-    // A later edit of the refused row is kept on the device, unsent, with it.
     const later = data.mutate('items', { op: 'patch', key: 'a', patch: { v: 'second' } }, { wait: true });
     await expect(later).rejects.toBeTruthy();
     await settle();
     expect(pushes).toHaveLength(1);
     expect(data.pending().map((entry) => [entry.key, entry.state])).toEqual([['a', 'access_changed']]);
     expect(await store.getRaw('a')).toMatchObject({ v: 'second', _dirty: true, _pushRefused: 'access' });
-    // A restart lists it as refused and sends nothing.
     data.dispose();
     const next = service({ store }).data;
     next.source('items', { fetch: async () => [], push: async (command) => { pushes.push(command); } });
     await vi.waitFor(() => expect(next.pending().map((entry) => entry.state)).toEqual(['access_changed']));
     expect(pushes).toHaveLength(1);
-    // Asked: one push, of the latest state.
     refuse = false;
     await next.retry('items', 'a');
     expect(pushes).toHaveLength(2);
@@ -394,7 +373,6 @@ describe('a whole-collection read', () => {
   it('stops at its byte budget when it has to page, as a complete read does', async () => {
     const MiB = 1024 * 1024;
     const rows = Array.from({ length: 40 }, (_, index) => ({ key: `r${index}`, value: { id: `r${index}` }, revision: 1, bytes: MiB }));
-    // A backend whose complete read refuses (too large) and pages 10 rows at a time.
     const backend = {
       transactional: true, policy: 'authored', limits: { maxRows: 50000 },
       async getAll() { throw Object.assign(new Error('scan-required'), { name: 'StorageReadError', reason: 'scan-required' }); },
@@ -431,7 +409,6 @@ describe('results', () => {
     await settle();
     off();
     expect(Object.keys(seen[0][0]).filter((field) => field.startsWith('_'))).toEqual([]);
-    // Writers asking for the raw view still get what is stored.
     const [raw] = await data.read('items', null, { raw: true });
     expect(raw).toHaveProperty('_rev');
   });
@@ -458,7 +435,6 @@ describe('fencing, cleanup after a sent delete, and queued deletes', () => {
     data.source('items', { fetch: async () => [], push: async (command) => { if (command.op === 'delete') await gate; } });
     const sent = data.mutate('items', { op: 'delete', key: 'k' }, { wait: true });
     await settle();
-    // A new row for the key lands while the delete is on its way.
     await store.put({ id: 'k', v: 'new' });
     release();
     await sent;
@@ -519,7 +495,6 @@ describe('fencing, cleanup after a sent delete, and queued deletes', () => {
     const sent = [];
     data.source('items', { fetch: async () => [], push: async (command) => { sent.push(command.record?.v); } });
     await vi.waitFor(() => expect(scheduler.held.length).toBe(1));
-    // Two newer edits are queued behind the restored change.
     const b = data.mutate('items', { op: 'put', record: { id: 'a', v: 'B' } }, { wait: true });
     const c = data.mutate('items', { op: 'put', record: { id: 'a', v: 'C' } }, { wait: true });
     await settle();
@@ -553,7 +528,6 @@ describe('fencing, cleanup after a sent delete, and queued deletes', () => {
     first.source('items', { fetch: async () => [], push: async (command) => { firstSent.push(command.record?.v); } });
     const queued = first.mutate('items', { op: 'put', record: { id: 'a', v: 'B' } }, { wait: true });
     await vi.waitFor(() => expect(scheduler.held.length).toBe(1));
-    // Another tab sends that row, then a newer edit of its own.
     const { data: second } = service({ store });
     const secondSent = [];
     second.source('items', { fetch: async () => [], push: async (command) => { secondSent.push(command.record?.v); } });
@@ -575,7 +549,6 @@ describe('fencing, cleanup after a sent delete, and queued deletes', () => {
     await data.mutate('items', { op: 'put', record: { id: 'a', v: 'one' } });
     const second = data.mutate('items', { op: 'put', record: { id: 'a', v: 'two' } }, { wait: true });
     await settle();
-    // An MP's own reconcile stores the server's row over the unsent edit.
     await store.reconcile([{ id: 'a', v: 'server' }], { prune: false });
     release();
     expect(await outcome(second)).toEqual({ value: { key: 'a', pushed: true } });
@@ -585,7 +558,6 @@ describe('fencing, cleanup after a sent delete, and queued deletes', () => {
 
   it('sends a restored change whose row a server read overwrote or a purge removed, and skips one a push acknowledged', async () => {
     const { store } = service();
-    // Unsent changes from an earlier session.
     await store.put({ id: 'a', v: 'A' });
     await store.put({ id: 'b', v: 'B' });
     await store.put({ id: 'c', v: 'C' });
@@ -594,8 +566,6 @@ describe('fencing, cleanup after a sent delete, and queued deletes', () => {
     const sent = [];
     data.source('items', { fetch: async () => [], push: async (command) => { sent.push(command.record?.v); } });
     await vi.waitFor(() => expect(scheduler.held.length).toBe(3));
-    // A server read stores its copy over a and c (acknowledging neither), c is
-    // then removed as a clean row, and another tab's push acknowledges b.
     await store.reconcile([{ id: 'a', v: 'server' }, { id: 'c', v: 'server' }], { prune: false });
     await store.delete('c');
     await store.markSynced('b', { pushed: true });
@@ -607,7 +577,6 @@ describe('fencing, cleanup after a sent delete, and queued deletes', () => {
   it('never reports a push the server acknowledged as failed when its store was retired meanwhile, nor sends it again', async () => {
     const store = createDataStore({ name: 'items', backend: createMemoryStoreBackend(), indexes: INDEXES });
     const failures = [];
-    // A scheduler that runs a failed job again, as the host's does.
     const scheduler = {
       async request(job) {
         try { return await job.run(() => true); } catch (error) { failures.push(error); return job.run(() => true); }
@@ -708,14 +677,12 @@ describe('fencing, cleanup after a sent delete, and queued deletes', () => {
 describe('a restored change refused for access while it waited', () => {
   it('is not sent, stays refused through its wait, and goes only when a person retries', async () => {
     const store = createDataStore({ name: 'items', backend: createMemoryStoreBackend(), indexes: INDEXES });
-    // An unsent row from before this service (a reload): restored as a change.
     await store.put({ id: 'd1', chat_id: 7, seq: 1, v: 'draft' });
     const scheduler = heldScheduler();
     const push = vi.fn(async () => ({}));
     const { data } = service({ store, scheduler });
     data.source('items', { fetch: async () => [], push });
     await vi.waitFor(() => expect(scheduler.held).toHaveLength(1));
-    // Another tab's push of the row was refused meanwhile.
     await store.markRow('d1', { _pushRefused: 'access' });
     scheduler.releaseAll();
     await settle();
@@ -723,7 +690,6 @@ describe('a restored change refused for access while it waited', () => {
     expect(push).not.toHaveBeenCalled();
     expect(data.pending()).toEqual([expect.objectContaining({ key: 'd1', state: 'access_changed' })]);
     expect(await store.getRaw('d1')).toMatchObject({ _pushRefused: 'access', _dirty: true });
-    // A person retries: the refusal is cleared and the row goes once.
     const retrying = data.retry('items', 'd1');
     await vi.waitFor(() => expect(scheduler.held).toHaveLength(1));
     scheduler.releaseAll();
@@ -750,7 +716,6 @@ describe('a change held until its account is displayed', () => {
     const [entry] = data.pending('items');
     expect(entry).toMatchObject({ key: 'a', state: 'queued' });
     expect(entry.state).not.toBe('access_changed');
-    // Its account displayed again: the host sends it again.
     displayed = true;
     await data.retryFailed();
     expect(sent).toEqual(['a']);
@@ -776,7 +741,6 @@ describe('a change held until its account is displayed', () => {
     displayed = true;
     const going = data.retryHeld();
     await vi.waitFor(() => expect(typeof release).toBe('function'));
-    // On its way, it is sending, no longer waiting for its account.
     const sending = data.pending('items').find((entry) => entry.key === 'a');
     expect(sending.state).toBe('sending');
     expect(sending.waiting).toBeUndefined();

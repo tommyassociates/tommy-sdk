@@ -28,9 +28,9 @@ function isPrivateAddon(pkg) {
 
 function getLocalAddonFilePath(pkg, environment, version, file) {
   if (isPrivateAddon(pkg)) {
-    return resolvePath(privateDir, pkg, environment, file) //, version
+    return resolvePath(privateDir, pkg, environment, file)
   } else {
-    return resolvePath(publicDir, pkg, environment, file) //, version
+    return resolvePath(publicDir, pkg, environment, file)
   }
 }
 
@@ -56,7 +56,7 @@ function readLocalAddonFromManifestPath(path) {
 function initAddon(addon) {
   const base = `/addons/${addon.package}/${addon.environment || 'production'}/${addon.version}/files/`
   addon.url = url.resolve(getSdkUrl(), base)
-  addon.icon_url = url.resolve(addon.url, 'icon.png') // path + '/icon.png'
+  addon.icon_url = url.resolve(addon.url, 'icon.png')
   addon.file_base_url = url.resolve(getSdkUrl(), base)
   addon.dir_prefix = isPrivateAddon(addon.package) ? privateDir : publicDir
   addon.local = true
@@ -83,7 +83,6 @@ function initAddon(addon) {
       views.push(view)
     })
 
-    // convert views to an array
     addon.views = views
   }
 

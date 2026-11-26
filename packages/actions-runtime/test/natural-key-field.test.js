@@ -1,16 +1,3 @@
-/**
- * natural-key-field.test.js (L22) — a manifest-declared `naturalKeyField` is
- * actually honoured by the broker, and omitting it keeps today's behaviour.
- *
- * The defect: `idempotencyKeyFor` has always read
- * `activityDef.naturalKeyField || 'id'`, but the manifest schema's activity
- * object is `additionalProperties: false` and did not list the field, so no
- * manifest could set it. With no `args.id` — which is true of ALL 108
- * `natural_key` activities in the estate — the broker fell through to hashing
- * the whole args, making `natural_key` indistinguishable from
- * `derived_from_input`. These tests exercise the runtime half of the fix that
- * `@tommy/manifest`'s schema half unlocks.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 
@@ -31,13 +18,9 @@ const manifest = {
   triggers: {},
   conditions: {},
   activities: {
-    // The real shape: team.archive_invitation keys on the invitation TOKEN.
     archive_declared: activity({ naturalKeyField: 'token' }),
-    // The same activity without the declaration — today's estate-wide default.
     archive_undeclared: activity(),
-    // A dotted path, which dottedGet resolves.
     archive_nested: activity({ naturalKeyField: 'invitation.token' }),
-    // The default when args DO carry an id.
     delete_by_id: activity(),
   },
   actions: {},
@@ -73,7 +56,7 @@ describe('L22 — naturalKeyField is honoured by the broker', () => {
     expect(first.idempotentReplay).toBeUndefined();
     expect(second.idempotentReplay).toBe(true);
     expect(second.result).toEqual(first.result);
-    expect(w.applied).toHaveLength(1); // the second never reached the handler
+    expect(w.applied).toHaveLength(1);
   });
 
   it('DECLARED: a DIFFERENT key is a different fact and still applies', async () => {
@@ -88,7 +71,6 @@ describe('L22 — naturalKeyField is honoured by the broker', () => {
     const w = await world();
     const first = await w.call('archive_undeclared', { token: 'tok-1', reason: 'left the team' });
     const second = await w.call('archive_undeclared', { token: 'tok-1', reason: 'typo fix' });
-    // No args.id ⇒ whole-args hash ⇒ natural_key degrades to derived_from_input.
     expect(first.idempotentReplay).toBeUndefined();
     expect(second.idempotentReplay).toBeUndefined();
     expect(w.applied).toHaveLength(2);
@@ -111,9 +93,6 @@ describe('L22 — naturalKeyField is honoured by the broker', () => {
   });
 
   it('EQUIVALENCE — for a single-property activity, declaring the field changes the key STRING but not which calls collide', async () => {
-    // This is the safety argument for the 33 declarations made in this wave:
-    // where inputSchema has exactly one required property, `n-<value>` and
-    // `n-<JSON of the whole args>` partition the call space identically.
     const w = await world();
     await w.call('archive_declared', { token: 'tok-1' });
     const sameDeclared = await w.call('archive_declared', { token: 'tok-1' });

@@ -1,4 +1,4 @@
-/** Shared local presentation helper. Visibility never grants server access. */
+// Visibility never grants server access.
 function visibleChatIds(elements, idKey, { active = false, viewport, windowBounds } = {}) {
   if (active !== true || !viewport || !windowBounds) return [];
   const finite = (rect) => ['top', 'left', 'bottom', 'right'].every((key) => Number.isFinite(rect?.[key]));
@@ -21,7 +21,6 @@ function visibleChatIds(elements, idKey, { active = false, viewport, windowBound
     if (!finite(rect) || rect.bottom <= rect.top || rect.right <= rect.left) continue;
     const height = Math.min(rect.bottom, visible.bottom) - Math.max(rect.top, visible.top);
     const width = Math.min(rect.right, visible.right) - Math.max(rect.left, visible.left);
-    // A tall message can be observed without requiring it to fit on the screen.
     if (width > 0 && height >= Math.min(rect.bottom - rect.top, visible.bottom - visible.top) / 2) ids.add(String(id));
   }
   return [...ids];

@@ -1,9 +1,3 @@
-/**
- * CI's sibling checkout (scripts/clone-ci-sibling.sh) against a fake `git`:
- * the same-named sibling branch when it exists, the release branch
- * (mp-platform-rc8, or CI_SIBLING_FALLBACK_BRANCH) only once the branch is
- * proven missing, and no checkout at all on an auth or transport failure.
- */
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

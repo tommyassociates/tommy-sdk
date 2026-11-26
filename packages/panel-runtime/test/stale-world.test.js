@@ -1,14 +1,3 @@
-/**
- * stale-world.test.js — a panel tile takes a stale-world refusal quietly.
- *
- * An account switch commits the new account while the old world's panels are
- * still mounted; their time display and host reads then refuse
- * (`TIMEZONE_CONTEXT_STALE`, `ACCOUNT_NOT_DISPLAYED`, the directory's
- * "belongs to another account" refusal). The tile shows no error card, emits
- * no `panel-error` and lets nothing reach the app's error handler; the panel
- * stays mounted and answers normally once its world is displayed again.
- * Any other error keeps the error card.
- */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { h, ref, nextTick } from 'vue';
 import {
@@ -62,7 +51,6 @@ describe('a panel tile whose world stops being displayed', () => {
     renders = 0;
     host = createPanelHost({
       onEvent: (e) => events.push(e),
-      // The app's error net hangs off the surface app's errorHandler.
       installComponentRuntime: (app) => { app.config.errorHandler = errorHandler; },
     });
     el = document.createElement('div');
@@ -80,8 +68,6 @@ describe('a panel tile whose world stops being displayed', () => {
     host.mountSurface(el, { surface: 'dashboard', ctxFor: (_mp, def) => ({ panelId: def.id, tommy: {} }) });
   }
 
-  // A panel whose render reads its world's display state, as the time display
-  // does (it reads the store's account, token and user), and keeps local state.
   const renderingPanel = (refusal) => ({
     name: 'RenderingPanel',
     data: () => ({ picked: 0 }),
@@ -112,7 +98,6 @@ describe('a panel tile whose world stops being displayed', () => {
     expect(tile().className).toContain('mp-panel-tile--ready');
     expect(panelErrors()).toEqual([]);
     expect(errorHandler).not.toHaveBeenCalled();
-    // The refused render left the panel empty; the sibling is untouched.
     expect(tile().querySelector('.panel-body')).toBeNull();
     expect(el.querySelector('.sibling-body')).toBeTruthy();
   });
@@ -124,7 +109,6 @@ describe('a panel tile whose world stops being displayed', () => {
     shown.value = false;
     await flush();
     await flush();
-    // One re-render for the one change it reads, refused once, then quiet.
     expect(renders).toBe(before + 1);
   });
 
@@ -143,7 +127,6 @@ describe('a panel tile whose world stops being displayed', () => {
     await flush();
     expect(tile().className).toContain('mp-panel-tile--ready');
     expect(tile().querySelector('.mp-panel-tile__error')).toBeNull();
-    // The same instance, its state kept.
     expect(tile().querySelector('.pick').textContent).toBe('picked 1');
     expect(panelErrors()).toEqual([]);
     expect(errorHandler).not.toHaveBeenCalled();

@@ -1,10 +1,4 @@
 // @vitest-environment node
-/**
- * A selector subscription over a host-store collection too large for one
- * complete read takes its first value from the same paged whole read that
- * later changes are compared with, so a change the selector does not read
- * tells it nothing.
- */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDataService, createDataStore } from '../src/index.js';
 import { createHostStorePort } from '../src/host-store/index.js';
@@ -13,11 +7,6 @@ import { DATABASES, identity } from './helpers/host-databases.js';
 
 const scanRequired = () => Object.assign(new Error('scan-required'), { name: 'StorageReadError', reason: 'scan-required' });
 
-/**
- * A host-store-backed collection the way the app opens one: its complete read
- * is refused past COMPLETE_ROWS, and `pages` counts the paged reads that
- * reached the last row.
- */
 function boundedBackend(port, options, pages) {
   let handle;
   const ready = () => (handle ||= port.open(options));
@@ -69,7 +58,6 @@ describe.each(DATABASES)('a selector subscription over a paged collection (%s)',
     const errors = [];
     const before = pages.last;
     store.subscribeQuery((query) => query.get('5')?.hours, (value) => heard.push(value), { onError: (error) => errors.push(error.reason) });
-    // Its first value is read (or refused) before anything changes.
     await vi.waitFor(() => expect(errors.length + pages.last - before).toBeGreaterThan(0));
 
     await store.put({ id: '900', hours: 1 });

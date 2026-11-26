@@ -1,7 +1,3 @@
-/**
- * queueStats() carries per-partition byte usage and the caps (additive), so a
- * host read can report one MP's queue pressure without exposing another's rows.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer, createDurableQueue } from '../src/index.js';
 import { QUEUE_MAX_BYTES, QUEUE_MAX_ENTRIES } from '../src/constants.js';
@@ -63,7 +59,6 @@ describe('the offline queue caps, in the units Web Storage charges', () => {
     broker.registerMp(mp('time-clock', 'record_attendance'), { handlers: { activities: {} } });
     const tc = await issuer.issue('time-clock', '1.0.0', 'team-A', [], 'i-tc');
     const shell = JSON.stringify({ note: '' }).length;
-    // 'é' is one UTF-16 code unit (two UTF-8 bytes): exactly the cap in units.
     await broker.invoke({ sourceMpId: 'time-clock', instanceId: 'i-tc', capabilityToken: tc, activity: 'time-clock.record_attendance', args: { note: 'é'.repeat(QUEUE_MAX_BYTES - shell) }, idempotencyKey: 'at-cap' });
     expect(broker.queueStats().bytesBySource['time-clock']).toBe(QUEUE_MAX_BYTES);
     await expect(broker.invoke({ sourceMpId: 'time-clock', instanceId: 'i-tc', capabilityToken: tc, activity: 'time-clock.record_attendance', args: {}, idempotencyKey: 'past-cap' }))

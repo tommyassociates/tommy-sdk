@@ -1,8 +1,3 @@
-/**
- * replay.test.js (ac4) — the offline contract: 3 queued triggers replay in
- * FIFO order; a duplicated clock-out-style client_key produces NO second
- * side effect (offline-sync.md §3; actions-runtime.md §3.2).
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer, QUEUE_MAX_ENTRIES } from '@tommy/actions-runtime';
 import { createReplayCoordinator } from '../src/index.js';
@@ -45,9 +40,6 @@ async function world({ throttleOverrides } = {}) {
   const applied = [];
   const serverSeenKeys = new Set();
   const serverInvoke = async (envelope) => {
-    // The schema-version-aware executor keeps its own processed-key set too —
-    // simulate a server that already saw a key (the "reached the server
-    // before the connection dropped" case).
     if (serverSeenKeys.has(envelope.idempotencyKey)) {
       return { rpcId: envelope.rpcId, status: 'succeeded', result: { entryId: 'stored-prior' }, replayed: true };
     }
@@ -91,7 +83,7 @@ describe('offline replay', () => {
 
     const coordinator = createReplayCoordinator({ broker: w.broker, addOnlineListener: () => () => {} });
     await coordinator.drain();
-    expect(w.received).toEqual([1, 2, 3]); // FIFO per source MP
+    expect(w.received).toEqual([1, 2, 3]);
     expect(w.broker.queueStats().total).toBe(0);
   });
 
@@ -101,8 +93,6 @@ describe('offline replay', () => {
     await w.broker.invoke(invokeEnv(w, KEY, 1));
     expect(w.applied).toHaveLength(1);
 
-    // Same key again — even OFFLINE, a repeat key answers with the stored
-    // prior result instead of queuing a second application (§3.2).
     w.broker.setOnline(false);
     const repeat = await w.broker.invoke(invokeEnv(w, KEY, 1));
     expect(repeat.idempotentReplay).toBe(true);
@@ -113,12 +103,9 @@ describe('offline replay', () => {
   it('a duplicated client_key across a device restart is de-duped by the SERVER on replay', async () => {
     const w = await world();
     const KEY = 'tc-clockout-shift-129-tm-8842';
-    // Reached the server; connection dropped before the app knew.
     await w.broker.invoke(invokeEnv(w, KEY, 1));
     expect(w.applied).toHaveLength(1);
 
-    // Device restart: fresh broker, empty processed-key set — the queued
-    // duplicate replays with the ORIGINAL key and the executor de-dups.
     const rebooted = w.makeBroker({ online: false });
     const queued = await rebooted.invoke(invokeEnv(w, KEY, 1));
     expect(queued.status).toBe('queued_offline');
@@ -126,7 +113,7 @@ describe('offline replay', () => {
     const results = await coordinator.drain();
     expect(results).toHaveLength(1);
     expect(results[0].ok).toBe(true);
-    expect(w.applied).toHaveLength(1); // server answered stored-prior, not re-applied
+    expect(w.applied).toHaveLength(1);
   });
 
   it('replay carries the ORIGINAL idempotency key (server-side de-dup holds too)', async () => {
@@ -141,7 +128,6 @@ describe('offline replay', () => {
   });
 
   it('rejects new queue entries past the per-MP cap with Offline_QueueFull', async () => {
-    // Rate limits stay out of the way: this probes the QUEUE cap, not the throttle.
     const w = await world({ throttleOverrides: { 'time-clock': { burst: 1000, invokesPerMin: 100000 } } });
     w.broker.setOnline(false);
     for (let i = 0; i < QUEUE_MAX_ENTRIES; i += 1) {

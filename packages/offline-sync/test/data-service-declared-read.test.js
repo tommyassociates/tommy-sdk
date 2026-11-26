@@ -1,14 +1,4 @@
 // @vitest-environment node
-/**
- * A source that declares its read (`read`): the service keeps the read's
- * cursor in the collection's source meta (never among its rows), asks only
- * for what changed while the stored rows are still the whole set the last
- * read left (their key digest) and a whole read ran within `fullEveryMs`,
- * removes rows the server marks removed, stamps the collection synced only
- * for a read that completed, purges an account's rows when the server
- * refuses the read, and never lets a read undo a change stored after it
- * began. Writes to the collection take turns with the read's commit.
- */
 import {
   describe, it, expect, vi, afterEach,
 } from 'vitest';
@@ -23,7 +13,6 @@ function service({ at = () => 1_000_000, store: given = null } = {}) {
   const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: at, sourceMeta });
   return { data, store, sourceMeta };
 }
-/** A server answering from `rows`, recording the `since` each read asked with. */
 function server(initial) {
   let rows = initial.map((row) => ({ ...row }));
   const asked = [];
@@ -51,7 +40,6 @@ describe('a declared read', () => {
     api.set([{ id: 'a', updated: 'c0' }, { id: 'b', updated: 'c3', deleted_at: '2026-09-30' }, { id: 'c', updated: 'c3' }]);
     await data.refresh('members', { mode: 'visible' });
     expect(api.asked).toEqual([null, 'c2']);
-    // The removed row went, the new one came, and the cursor moved with them.
     expect(await ids(data)).toEqual(['a', 'c']);
     expect(await sourceMeta.get('members')).toMatchObject({ cursor: 'c3', count: 2 });
     expect((await data.query('members', { limit: 50 })).rows.map((row) => row.id)).toEqual(['a', 'c']);
@@ -65,10 +53,8 @@ describe('a declared read', () => {
     await data.refresh('members', { mode: 'visible' });
     at += DAY + 1;
     await data.refresh('members', { mode: 'visible' });
-    // A row gone from the device (evicted): the next read is whole.
     await store.delete('a');
     await data.refresh('members', { mode: 'visible' });
-    // Asked for the whole collection: whole, whatever the cursor.
     await data.refresh('members', { mode: 'visible', full: true });
     expect(api.asked).toEqual([null, null, null, null]);
   });
@@ -121,13 +107,11 @@ describe('a declared read', () => {
     await data.refresh('members', { maxAge: 0, fromNow: true });
     expect(await ids(data)).toEqual(['a']);
     expect(data.status('members').state).toBe('error');
-    // An answered read in between forgets the refusal.
     refuse = false;
     await data.refresh('members', { maxAge: 0, fromNow: true });
     refuse = true;
     await data.refresh('members', { maxAge: 0, fromNow: true });
     expect(await ids(data)).toEqual(['a']);
-    // Refused twice in a row: the account lost the collection.
     await data.refresh('members', { maxAge: 0, fromNow: true });
     expect(await ids(data)).toEqual([]);
   });
@@ -149,7 +133,6 @@ describe('a declared read', () => {
       ? data.refresh(target, { mode: 'visible' })
       : data.reconcileWindow('members', { fetch: pending, scope: () => true });
     await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
-    // Another read is refused: the account lost the collection.
     await data.refresh('members', { mode: 'visible' }).catch(() => {});
     answer(target ? { id: 'x', name: 'Not theirs' } : [{ id: 'x', name: 'Not theirs' }]);
     await Promise.resolve(older).catch(() => {});
@@ -168,10 +151,8 @@ describe('a declared read', () => {
     await data.ingest('members', [{ id: 'a' }, { id: 'b' }], { replace: true });
     const reading = data.refresh('members', { mode: 'visible' });
     await new Promise((resolve) => { setTimeout(resolve, 0); });
-    // While the read is on its way: a member is added, and another removed.
     await data.ingest('members', [{ id: 'c' }]);
     await data.purge('members', { keys: ['b'] });
-    // The read answers what the server had before both.
     answer({ rows: [{ id: 'a' }, { id: 'b' }] });
     await reading;
     expect(await ids(data)).toEqual(['a', 'c']);
@@ -187,7 +168,6 @@ describe('a declared read', () => {
     await data.ingest('members', [{ id: 'a', name: 'Ana', member: false }, { id: 'b', name: 'Ben', member: false }], { replace: true });
     const reading = data.refresh('members', { mode: 'visible' });
     await new Promise((resolve) => { setTimeout(resolve, 0); });
-    // Renamed meanwhile; then the server's change is patched on.
     await data.ingest('members', [{ id: 'a', name: 'Ana Maria', member: false }]);
     await expect(data.patchRows('members', ['a', 'gone'], { member: true })).resolves.toEqual({
       patched: ['a'], unsaved: [], skipped: [{ key: 'gone', reason: 'gone' }], refused: [],
@@ -197,7 +177,6 @@ describe('a declared read', () => {
     expect(await data.read('members', 'a')).toEqual({ id: 'a', name: 'Ana Maria', member: true });
     expect(await data.read('members', 'gone')).toBeNull();
     expect(await ids(data)).toEqual(['a', 'b']);
-    // A row with an unsent local write keeps that write.
     await data.mutate('members', { op: 'patch', key: 'b', patch: { name: 'Benny' } });
     await expect(data.patchRows('members', ['b'], { member: true })).resolves.toEqual({
       patched: [], unsaved: [], skipped: [{ key: 'b', reason: 'unsent' }], refused: [],
@@ -262,7 +241,6 @@ describe('a declared read', () => {
     data.source('members', { fetch: async () => ({ rows: rows.map((row) => ({ ...row })) }), read: { cursor: false } });
     await data.refresh('members', { mode: 'visible' });
     expect(written).toBe(1000);
-    // One renamed, one gone: one row written, one removed.
     written = 0;
     at += 60 * 1000;
     rows = rows.filter((row) => row.id !== 'm5').map((row) => (row.id === 'm7' ? { ...row, name: 'Renamed' } : row));
@@ -271,13 +249,11 @@ describe('a declared read', () => {
     expect((await data.read('members')).length).toBe(999);
     expect((await data.read('members', 'm7')).name).toBe('Renamed');
     expect(await data.read('members', 'm5')).toBeNull();
-    // Nothing changed: freshness advances without submitting a row write.
     written = 0;
     at += 60 * 1000;
     await data.refresh('members', { mode: 'visible' });
     expect(written).toBe(0);
     expect(data.status('members')).toMatchObject({ state: 'fresh', syncedAt: at });
-    // A day on, every row is confirmed again.
     written = 0;
     at += 25 * 60 * 60 * 1000;
     await data.refresh('members', { mode: 'visible' });
@@ -316,7 +292,6 @@ describe('a declared read', () => {
     await data.refresh('members', { mode: 'visible' });
     const reading = data.refresh('members', { mode: 'visible' });
     await vi.waitFor(() => expect(typeof answer).toBe('function'));
-    // Changed underneath, with no notice.
     await base.reconcile([{ id: 'a', updated: 'c1', note: 'kept' }], { prune: false });
     answer();
     await reading;
@@ -366,7 +341,6 @@ describe('a declared read', () => {
     });
     await data.refresh('members', { mode: 'visible' });
     expect(await ids(data)).toEqual(['a', 'b']);
-    // Rows that cannot be keyed: the read fails and the stored rows stay.
     answer = { rows: [{ nothing: 1 }] };
     await expect(data.refresh('members', { mode: 'visible' })).rejects.toMatchObject({ code: 'DATA_INVALID' });
     expect(await ids(data)).toEqual(['a', 'b']);
@@ -379,7 +353,6 @@ describe('a declared read', () => {
     await data.ingest('members', [{ id: 'a' }, { id: 'b' }], { replace: true });
     const reading = data.refresh('members', { mode: 'visible' });
     await new Promise((resolve) => { setTimeout(resolve, 0); });
-    // A whole answer from elsewhere replaces the set, leaving b out.
     await data.ingest('members', [{ id: 'a' }], { replace: true });
     answer({ rows: [{ id: 'a' }, { id: 'b' }] });
     await expect(reading).rejects.toMatchObject({ code: 'REFRESH_DROPPED' });
@@ -403,7 +376,6 @@ describe('a declared read', () => {
     const api = server([{ id: 'a', updated: 'c0' }, { id: 'b', updated: 'c0' }]);
     data.source('members', { fetch: api.fetch, read: { cursor: true } });
     await data.refresh('members', { mode: 'visible' });
-    // The device dropped a (an eviction) and holds c from elsewhere: still two rows.
     await store.delete('a');
     await store.put({ id: 'c', updated: 'c0' });
     await store.markSynced('c');
@@ -417,7 +389,6 @@ describe('a declared read', () => {
     const api = server([{ id: 'a', updated: 'c0' }, { id: 'b', updated: 'c0' }]);
     data.source('members', { fetch: api.fetch, read: { cursor: true } });
     await data.refresh('members', { mode: 'visible' });
-    // A write-back adds a member and removes another.
     await data.ingest('members', [{ id: 'c', updated: 'c0' }]);
     await data.purge('members', { keys: ['b'] });
     await data.refresh('members', { mode: 'visible' });
@@ -440,7 +411,6 @@ describe('a declared read', () => {
     const { data, store } = service();
     const rows = Array.from({ length: 501 }, (_, at) => ({ id: `m${String(at).padStart(3, '0')}`, updated: 'c0' }));
     data.source('members', { fetch: async () => ({ rows }), read: { cursor: false } });
-    // The first chunk's commit waits until the ingest has been asked.
     const reconcile = store.reconcile.bind(store);
     let release;
     const held = new Promise((resolve) => { release = resolve; });
@@ -478,10 +448,8 @@ describe('a declared read', () => {
     data.source('members', { fetch: () => new Promise((resolve) => { answers.push(resolve); }), read: { cursor: false } });
     const reading = data.refresh('members', { mode: 'visible' });
     await vi.waitFor(() => expect(answers).toHaveLength(1));
-    // x changes on the device, then more keys are touched than are kept.
     await data.ingest('members', [{ id: 'x', v: 2 }]);
     await data.ingest('members', Array.from({ length: 5000 }, (_, at) => ({ id: `t${at}`, v: 1 })));
-    // The read answers what the server had before x changed.
     answers[0]({ rows: [{ id: 'x', v: 1 }] });
     await vi.waitFor(() => expect(answers).toHaveLength(2));
     expect((await data.read('members', 'x')).v).toBe(2);
@@ -507,11 +475,9 @@ describe('writes that land while a declared read is on its way', () => {
     data.source('members', { fetch, read: { cursor: false } });
     const reading = data.refresh('members', { mode: 'visible' });
     await vi.waitFor(() => expect(answer).toBeTypeOf('function'));
-    // A keyed refresh stores a newer a; a trim removes the oldest (a) of the range.
     await data.refresh({ collection: 'members', key: 'a' }, { mode: 'visible' });
     expect((await data.read('members', 'a')).v).toBe(2);
     await data.trim('members', { index: 'bySeq', keep: 2 });
-    // The read answers what the server had before both.
     answer({ rows: [{ id: 'a', seq: 1, v: 1 }, { id: 'b', seq: 2, v: 1 }, { id: 'c', seq: 3, v: 1 }] });
     await reading;
     expect(await ids(data)).toEqual(['b', 'c']);
@@ -526,7 +492,6 @@ describe('a read that answers no list', () => {
     await data.refresh('members', { mode: 'visible' });
     expect(await ids(data)).toEqual(['a', 'b']);
     expect(data.status('members').state).not.toBe('fresh');
-    // A source with no declared read, answering nothing.
     const plain = service();
     await plain.data.ingest('members', [{ id: 'a' }], { replace: true });
     plain.data.source('members', { fetch: async () => undefined });
@@ -572,7 +537,6 @@ describe('a declared read\'s reads of the stored rows', () => {
     reads = 0;
     await data.refresh('members', { mode: 'visible' });
     expect(reads).toBe(1);
-    // A row arrives while the next read is on its way: the commit reads again.
     reads = 0;
     during = () => data.ingest('members', [{ id: 'b', updated: 'c0' }]);
     await data.refresh('members', { mode: 'visible' });
@@ -604,7 +568,6 @@ describe('a declared read on a store that cannot keep a row', () => {
       setItem: (key, value) => { storage.set(key, String(value)); },
       removeItem: (key) => { storage.delete(key); },
     };
-    // A store that never evicts, with room for a few small rows.
     const store = createDataStore({
       name: 'members', backend: createLocalStorageBackend('declared-read', 'members', { maxBytes: 1200, evict: false }), syncStrategy: 'last_write_wins',
     });
@@ -613,7 +576,6 @@ describe('a declared read on a store that cannot keep a row', () => {
     data.source('members', { fetch: api.fetch, read: { cursor: true } });
     await data.refresh('members', { mode: 'visible' });
     expect(await sourceMeta.get('members')).toMatchObject({ cursor: 'c2' });
-    // b grows past what the store can hold (the store refuses it), and c is added.
     api.set([{ id: 'a', updated: 'c0' }, { id: 'b', updated: 'c3', note: 'x'.repeat(2000) }, { id: 'c', updated: 'c3' }]);
     await data.refresh('members', { mode: 'visible' });
     expect(api.asked).toEqual([null, 'c2']);
@@ -642,7 +604,6 @@ describe('the read guard records exactly what was stored', () => {
         ? new Promise((resolve) => { answerOlder = resolve; })
         : Promise.resolve(Array.from({ length: 501 }, (_, at) => ({ id: `r${at}`, v: 2 })))),
     });
-    // An older keyed read is on its way when the whole read stores its first chunk and fails on the second.
     const older = data.refresh({ collection: 'members', key: 'r0' }, { mode: 'visible' });
     await vi.waitFor(() => expect(answerOlder).toBeTypeOf('function'));
     await expect(data.refresh('members', { mode: 'visible' })).rejects.toBeTruthy();
@@ -683,7 +644,6 @@ describe('a whole read asked while a read of changes is on its way', () => {
     });
     await data.refresh('members', { mode: 'visible' });
     expect(asked).toEqual([null]);
-    // A read of changes is on its way.
     const changes = data.refresh('members', { mode: 'visible' });
     await vi.waitFor(() => expect(release).toBeTypeOf('function'));
     const whole = data.refresh('members', { mode: 'visible', full: true });

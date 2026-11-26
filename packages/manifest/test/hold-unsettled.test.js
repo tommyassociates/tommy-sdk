@@ -1,7 +1,3 @@
-// An activity may declare `holdUnsettled`: the host queue keeps its write
-// from before it is sent until an answer settles it. The declaration is
-// closed, its key names input fields, and it is refused beside anything but a
-// server_write with idempotency client_key that is not offline-replayable.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

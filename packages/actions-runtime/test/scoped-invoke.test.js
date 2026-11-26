@@ -85,7 +85,6 @@ describe('handler-scoped invoke contract', () => {
         child: async () => 'other child',
       } },
     });
-    // The initiating MP owns only its declared cross-MP grant.
     await expect(broker.invoke({
       sourceMpId: 'test', identity: { tenantId: 't', scopes: ['invoke:other.outer'] },
       activity: 'test.write', args: {}, idempotencyKey: 'cross',

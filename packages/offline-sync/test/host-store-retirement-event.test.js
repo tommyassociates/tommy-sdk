@@ -13,7 +13,6 @@ async function retired(selector) {
   const observed = observeHostStorePort({ retirePrincipal: async () => ({ ok: true }) }, feed);
   await observed.retirePrincipal(selector);
   feed.close();
-  // What the announcement says (the feed adds its own envelope fields).
   return heard.map(({ type, principal, label }) => ({ type, principal, ...(label === undefined ? {} : { label }) }));
 }
 

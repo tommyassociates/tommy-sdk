@@ -1,8 +1,3 @@
-/**
- * A drain that loses the connection part way keeps every row it has not sent
- * where it is: a queued write is never queued again beside itself, so a full
- * queue can never turn it into a refusal that removes it unsent.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer, createDurableQueue } from '../src/index.js';
 
@@ -20,7 +15,6 @@ describe('a drain that goes offline part way', () => {
     broker = createBroker({
       capabilityService: issuer, offlineQueue: queue, online: false, idempotencyLedger: null,
       serverInvoke: async (envelope) => { sent.push(envelope.idempotencyKey); return { status: 'succeeded', result: {} }; },
-      // The connection drops once the first write is answered, before the next is sent.
       onOfflineOutcome: () => { broker.setOnline(false); },
       replayEnvelope: async (envelope) => ({ ...envelope, instanceId: 'live', capabilityToken: token }),
     });
@@ -35,7 +29,6 @@ describe('a drain that goes offline part way', () => {
     broker.setOnline(true);
     await broker.drainOfflineQueue();
     expect(sent).toEqual(['k-1']);
-    // The same row, once: not removed, not copied.
     expect(queue.all().map((row) => [row.envelope.idempotencyKey, row.seq])).toEqual([['k-2', second.seq]]);
   });
 });

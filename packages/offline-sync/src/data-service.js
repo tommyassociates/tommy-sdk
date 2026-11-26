@@ -1,37 +1,3 @@
-/**
- * data-service.js — the small data surface over DataStores:
- *
- *   read(collection, key?)            rows as stored (the paint ceiling applies)
- *   query(collection, spec)           rows by a declared index, in index order
- *   subscribe(target, callback)       the current value now, then on every change
- *   refresh(target, options)          a scheduled, coalesced background sync (experimental);
- *                                     `{ collection, method, params }` runs one of the
- *                                     source's named refresh methods
- *   ingest(collection, rows, options) server rows a domain received, stored synced
- *   mutate(collection, command)       an optimistic write, pushed when possible (experimental)
- *   purge(collection, options)        clear cached rows (never dirty ones unless forced)
- *   trim(collection, options)         keep a subject's newest rows by index order
- *   status(target)                    fresh | stale | refreshing | offline | error
- *
- * A declared read (`read`) keeps its cursor in the collection's source meta
- * and asks only for changes while a digest of the stored keys proves the rows
- * are still the whole set the last read left (any unaccounted write or
- * eviction makes the next read whole). A read never undoes a change stored
- * after it began.
- *
- * Writes to one collection take turns: a declared read's commit, ingests,
- * purges, trims and a refresh's store step never interleave.
- *
- * Named refresh methods (`methods`) read part of the collection with typed,
- * canonicalised params; their answers merge and never mark the collection
- * synced or remove a row they left out.
- *
- * `source`, `refresh` and `mutate` with a source's `push` are experimental.
- *
- * Rows on disk are display candidates: anything that acts still needs a fresh
- * server answer. Views render from subscriptions; network results are written
- * into the stores first and observed from there.
- */
 import {
   reconcileFetched, windowKeyOf, previousByKey, reportRejected,
 } from './reconcile.js';
@@ -41,26 +7,15 @@ import { storeMutationOrigin, withStoreMutationOrigin } from './store-mutation-o
 import createTargetStateBudget from './target-state-budget.js'; // eslint-disable-line import/extensions
 
 export const DATA_STATES = Object.freeze(['fresh', 'stale', 'refreshing', 'offline', 'error']);
-// A store's methods that change its rows: called only on the handles a
-// collection's turn gives (see inTurn), never on the store `local()` answers.
+// Writes go in the collection's turn, never on the store `local()` answers.
 const WRITE_METHODS = new Set(['put', 'delete', 'deleteMany', 'markRow', 'markSynced', 'reconcile', 'patchSynced', 'replaceSynced']);
-/**
- * The service's public methods that answer at once; every other one is
- * tracked from its call to its end (`idle()` is false meanwhile).
- */
 export const DATA_SERVICE_SYNC_METHODS = Object.freeze([
   'writer', 'watch', 'subscribe', 'source', 'sends', 'hasSource', 'pending', 'fence', 'status', 'statuses', 'methodStatuses', 'onStatusChange', 'idle', 'dispose',
 ]);
 const PRIORITIES = { visible: 0, high: 1, normal: 2, background: 3 };
 export const DEFAULT_STALE_AFTER_MS = 5 * 60000;
-// A declared read with a cursor reads the whole collection at least this often.
 const FULL_EVERY_MS = 24 * 60 * 60000;
 
-/**
- * Runs work at once, one flight per key; hosts inject their own scheduler.
- * Like the host's, a job whose `valid()` is false when its turn comes settles
- * dropped without running.
- */
 export function createImmediateScheduler() {
   const flights = new Map();
   const valid = (job) => { try { return !job.valid || !!job.valid(); } catch (_) { return false; } };
@@ -80,10 +35,6 @@ export function createImmediateScheduler() {
 
 const serviceError = (message, code) => Object.assign(new Error(message), { name: 'DataServiceError', code });
 
-/**
- * The scheduler's REFRESH_TIMEOUT is made by its timer, so its stack names no
- * caller; rethrow it with the collection named and the caller's stack.
- */
 export function timedOutFor(error, collection, asked) {
   if (error?.code !== 'REFRESH_TIMEOUT' || !asked) return error;
   const named = Object.assign(new Error(`Refresh took too long: '${collection}'`), error, { collection, cause: error });
@@ -92,12 +43,7 @@ export function timedOutFor(error, collection, asked) {
   return named;
 }
 
-/**
- * A scheduled read's attempts as its callers see them: callers are not held
- * through the scheduler's retry backoff. Each is answered by the read's
- * outcome or the first attempt to fail after it asked, whichever comes first;
- * retries go on in the background.
- */
+// Callers are not held through the scheduler's retry backoff.
 function readAttempts(onFailure = () => {}) {
   let failure = null;
   let done = false;
@@ -108,8 +54,6 @@ function readAttempts(onFailure = () => {}) {
       try {
         return await work(...args);
       } catch (error) {
-        // An attempt that fails after its read settled answers no one and
-        // shows nothing: what came after the read stands.
         if (done) throw error;
         failure = { error };
         const answered = [...waiting];
@@ -131,10 +75,6 @@ function readAttempts(onFailure = () => {}) {
   };
 }
 
-/**
- * Source meta kept in memory. A host injects a durable one per principal;
- * without it the first declared read after a restart is whole.
- */
 export function createMemorySourceMeta() {
   const metas = new Map();
   return {
@@ -143,8 +83,6 @@ export function createMemorySourceMeta() {
   };
 }
 
-// An order-independent digest of a set of keys: two 32-bit hashes per key,
-// XORed over the set.
 /* eslint-disable no-bitwise */
 function keyHashes(key) {
   let fnv = 0x811c9dc5;
@@ -168,33 +106,23 @@ function keysDigest(keys) {
 }
 /* eslint-enable no-bitwise */
 const rawRows = (store) => (store.getAllRaw ? store.getAllRaw() : store.getAll());
-// A read that answered no list: nothing is removed or stamped for it.
 const NO_SNAPSHOT = Symbol('no snapshot');
-// A read overtaken by a whole replacement or purge: it stored nothing.
 const DROPPED = Symbol('dropped');
-// A read stopped on its way (reads paused, service disposed): the collection is not fresh from it.
 const STOPPED = Symbol('stopped');
-// A batched method ask whose ids were all fresh: answered with nothing read.
 const ANSWERED_FRESH = Symbol('answered fresh');
-/** The rows a read answered, or null for no list: only an explicit list may replace rows. */
 function snapshotRows(answer) {
   if (Array.isArray(answer)) return answer;
   if (answer && typeof answer === 'object' && Array.isArray(answer.rows)) return answer.rows;
   return null;
 }
-// One reconcile carries at most this many rows and about WRITE_BATCH_BYTES.
 const INGEST_CHUNK = 500;
 const ingestChunks = (rows) => boundedBatches(rows, { maxItems: INGEST_CHUNK });
-// A whole read rewrites an unchanged row only once it was last written this
-// long ago (or half the store's age limit), so age limits count from a recent
-// confirmation.
 const CONFIRM_AFTER_MS = 24 * 60 * 60 * 1000;
 const confirmAfterMs = (store) => {
   let limit = null;
   try { limit = typeof store?.ageLimitMs === 'function' ? store.ageLimitMs() : null; } catch (_) { limit = null; }
   return Number.isFinite(limit) && limit > 0 ? Math.min(CONFIRM_AFTER_MS, limit / 2) : CONFIRM_AFTER_MS;
 };
-// A value's content, whatever the order of its fields.
 function contentValue(value) {
   if (Array.isArray(value)) return `[${value.map(contentValue).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -203,18 +131,12 @@ function contentValue(value) {
   }
   return JSON.stringify(value) ?? 'null';
 }
-// A row's content, without its root storage fields.
 const contentOf = (row) => contentValue(Object.fromEntries(Object.entries(row || {}).filter(([field]) => !field.startsWith('_'))));
 // Keys whose last local change a read still on its way must keep, per collection.
 const TOUCHES_KEPT = 5000;
-// A declared read whose protection was dropped reads again at most this often.
 const READ_TRIES = 3;
-// A physical index read returns at most this many rows per page.
 const PAGE_ROWS = 100;
-// A whole-collection subscription re-reads changed rows one key at a time up
-// to this many keys; more changed keys than this read the collection whole.
 const KEYED_REREAD_KEYS = 500;
-// The most rows one query or subscription returns, however it pages.
 export const MAX_QUERY_ROWS = 5000;
 function queryLimit(limit) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_QUERY_ROWS) {
@@ -223,14 +145,12 @@ function queryLimit(limit) {
   return limit;
 }
 
-/** Rows of an index range in index order, paged; `raw` includes rows past the paint ceiling, for writers. */
 async function queryPages(store, index, range, { limit = 50, cursor: start = null, raw = false } = {}) {
   queryLimit(limit);
   const rows = [];
   let cursor = start;
   let complete = false;
   do {
-    // Each page continues from the cursor the previous one returned.
     // eslint-disable-next-line no-await-in-loop
     const page = await store.query(index, range, { limit: Math.min(PAGE_ROWS, limit - rows.length), cursor, ...(raw ? { raw: true } : {}) });
     rows.push(...page.rows);
@@ -239,9 +159,7 @@ async function queryPages(store, index, range, { limit = 50, cursor: start = nul
   } while (cursor !== null && rows.length < limit);
   return { rows, nextCursor: complete ? null : cursor, complete };
 }
-// The fields of an index range; a purge or trim acts on the whole range.
 const RANGE_FIELDS = new Set(['index', 'equals', 'prefix', 'lower', 'upper']);
-// `keep` belongs to a trim only: a purge refuses it rather than clear the range.
 function wholeRange(spec, operation) {
   const extra = Object.keys(spec || {}).filter((field) => !RANGE_FIELDS.has(field) && !(field === 'keep' && operation === 'trim'));
   if (typeof spec?.index !== 'string' || extra.length) {
@@ -250,12 +168,10 @@ function wholeRange(spec, operation) {
   const { index, keep: _keep, ...range } = spec;
   return { index, range };
 }
-/** Every key of an index range in index order, with its dirty flag, page by page. */
 async function rangeKeys(store, keyPath, { index, range }) {
   const keys = [];
   let cursor = null;
   do {
-    // Each page continues from the cursor the previous one returned.
     // eslint-disable-next-line no-await-in-loop
     const page = await store.query(index, range, { limit: PAGE_ROWS, cursor, raw: true });
     page.rows.forEach((row) => keys.push({ key: String(row[keyPath]), dirty: !!row._dirty }));
@@ -266,12 +182,10 @@ async function rangeKeys(store, keyPath, { index, range }) {
 const same = (a, b) => {
   try { return JSON.stringify(a) === JSON.stringify(b); } catch (_) { return false; }
 };
-// A row as a caller gets it: a copy, without storage metadata (`_rev`, …).
 const clean = (row) => (row && typeof row === 'object'
   ? JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(row).filter(([field]) => !field.startsWith('_'))))) : row ?? null);
 const copyRow = (row) => (row && typeof row === 'object' ? JSON.parse(JSON.stringify(row)) : row ?? null);
 const asIs = (row) => row ?? null;
-/** Refuses a declared read it could not honour: only its known fields, in their shapes. */
 function checkRead(read) {
   const known = ['cursor', 'removedField', 'fullEveryMs', 'forbidden'];
   const fields = read && typeof read === 'object' && !Array.isArray(read) ? Object.keys(read) : null;
@@ -287,24 +201,14 @@ export const MAX_METHOD_IDS = 200;
 export const MAX_METHOD_ROWS = 5000;
 export const MAX_METHOD_GONE = 5000;
 export const METHOD_PARAM_TYPES = Object.freeze(['ids', 'id', 'string', 'date', 'boolean', 'page']);
-// A method fetch unanswered after this is not joined: a later ask fetches again rather than wait on a stalled one.
 export const METHOD_SHARE_MS = 30 * 1000;
 const METHOD_FRESH_KEPT = 5000;
 const METHOD_GROUPS_KEPT = 500;
-// Params whose answer this device refused (rows outside them, no key, too
-// many rows) are not read again for this long, doubling on each refusal; an
-// accepted answer ends the hold.
 export const METHOD_REFUSAL_HOLD_MS = Object.freeze([30 * 1000, 5 * 60 * 1000]);
 const METHOD_REFUSALS_KEPT = 200;
 const HELD_REFUSAL_CODES = new Set(['DATA_INVALID', 'DATA_TOO_LARGE']);
 const METHOD_NAME = /^[a-z][A-Za-z0-9]{0,63}$/;
 const MAX_METHOD_STRING = 200;
-/**
- * Refuses refresh methods it could not honour. A non-batched `strictReceipt`
- * method needs complete canonical admission and a collection change observer;
- * its status carries the stored turn's `receiptRevision`, which later row
- * changes do not recapture.
- */
 function checkMethods(methods) {
   const refuse = (why) => { throw serviceError(`source.methods: ${why}`, 'DATA_INVALID'); };
   if (!methods || typeof methods !== 'object' || Array.isArray(methods)) refuse('an object of named methods');
@@ -328,7 +232,6 @@ function checkMethods(methods) {
     if (method.batch !== undefined && (params[method.batch]?.type !== 'ids' || params[method.batch]?.optional)) refuse(`'${name}.batch' must name a required ids param`);
     if (method.cadenceMs !== undefined && !(Number.isFinite(method.cadenceMs) && method.cadenceMs >= 0)) refuse(`'${name}.cadenceMs' must be a duration`);
     if (method.field !== undefined && (!method.batch || typeof method.field !== 'string' || !method.field)) refuse(`'${name}.field' names the row field a batched method's ids name`);
-    // Stored rows `prunesWhere(row, params)` names that a complete answer left out are gone.
     if (method.prunesWhere !== undefined && (typeof method.prunesWhere !== 'function' || method.batch)) refuse(`'${name}.prunesWhere' is a row predicate of a method that is not batched`);
     if (method.available !== undefined && typeof method.available !== 'function') refuse(`'${name}.available' must be a function`);
     if (method.strictReceipt !== undefined && (typeof method.strictReceipt !== 'boolean' || method.batch)) {
@@ -342,9 +245,7 @@ const methodId = (value) => {
   if (typeof value === 'string' && METHOD_ID.test(value)) return value;
   return null;
 };
-// Ids in one order: numbers by value, then the rest as strings.
 const idOrder = (a, b) => (a.length - b.length) || (a < b ? -1 : Number(a > b));
-/** A method's params, checked against its declaration, in one canonical form (keys sorted, ids unique and sorted). */
 function methodParams(collection, name, method, given) {
   const refuse = (why) => { throw serviceError(`refresh '${collection}' ${name}: ${why}`, 'DATA_INVALID'); };
   const values = given === undefined || given === null ? {} : given;
@@ -388,7 +289,6 @@ function methodParams(collection, name, method, given) {
   });
   return Object.freeze(out);
 }
-/** Refuses, at once, a query spec a read could not honour. */
 export const MAX_ANY_OF = 500;
 function checkQuery(spec = {}) {
   const { index, limit = 50, cursor = null, where, raw: _raw, ...range } = spec;
@@ -410,15 +310,11 @@ async function runQuery(store, keyPath, spec = {}) {
   checkQuery(spec);
   const { index, limit = 50, cursor = null, where, raw = false, ...range } = spec;
   if (index && Array.isArray(range.anyOf)) {
-    // Rows of each value in the order asked, each row once, up to `limit`. A
-    // value names the index's leading fields (a prefix of a compound index).
     const keyOf = (row) => String(row[keyPath]);
     const seen = new Set();
     const rows = [];
     let complete = true;
     const values = [...new Map(range.anyOf.map((value) => [JSON.stringify(value), value])).values()];
-    // Pages of at least the usual size, so rows an overlapping prefix already
-    // gave cost a page at a time, not a read each.
     const pageRows = Math.max(limit, PAGE_ROWS);
     for (const value of values) {
       if (!complete) break;
@@ -427,7 +323,6 @@ async function runQuery(store, keyPath, spec = {}) {
         if (rows.length >= limit) { complete = false; break; }
         // eslint-disable-next-line no-await-in-loop
         const page = await queryPages(store, index, { prefix: Array.isArray(value) ? value : [value] }, { limit: pageRows, cursor: next, raw: raw === true });
-        // A distinct row past the limit means the answer is not all of them.
         const over = page.rows.some((row) => {
           if (seen.has(keyOf(row))) return false;
           if (rows.length >= limit) return true;
@@ -459,16 +354,10 @@ export function createDataService({
   resolve,
   scheduler = createImmediateScheduler(),
   feed = null,
-  // How long an unchanged collection's whole read is reused; 0 never. A
-  // function of the collection name sets it per collection.
   wholeReadReuseMs = 0,
-  // A value that changes whenever a write is sent or settles: a `fromNow` +
-  // `sinceWrite` method read may join or reuse (for `reuseSinceWriteMs`) a
-  // read of the same params begun since the last write.
   writeMark = null,
   reuseSinceWriteMs = 0,
-  // The durable owner pinned by the host; account forms and client subjects
-  // may share collection labels but never share completeness.
+  // Collections may share labels but never share completeness.
   changeOwner = null,
   labelOf = (name) => name,
   now = () => Date.now(),
@@ -476,18 +365,10 @@ export function createDataService({
   staleAfterMs = DEFAULT_STALE_AFTER_MS,
   onPersistError,
   budgetKey = namespace || 'host',
-  // The account (opaque) passed to every fetch and push, or a function naming
-  // it now; each read or change keeps the one it was asked under. `lane`
-  // separates scheduler jobs per account; non-foreground collections wait
-  // behind the displayed account's.
   principal = null,
   lane = null,
   foreground = () => true,
-  // Off-foreground multiplier on read cadences (`maxAge`, method cadence).
-  // Infinity pauses reads, queued ones and retries included; a read paused
-  // while it runs stores nothing (sends go on).
   backgroundCadence = () => 1,
-  // Declared reads' cursors and key digests, per collection, for this principal.
   sourceMeta = createMemorySourceMeta(),
 } = {}) {
   if (typeof resolve !== 'function') throw serviceError('createDataService: resolve(collection) is required', 'DATA_INVALID');
@@ -498,7 +379,6 @@ export function createDataService({
     if (typeof writeMark !== 'function') return null;
     try { const mark = writeMark(); return mark === undefined ? null : mark; } catch (_) { return null; }
   };
-  // Which principal a context names, to tell two forms of one account apart.
   const formOf = (context) => { try { return JSON.stringify(context.principal ?? null); } catch (_) { return null; } };
   const laned = (label) => (lane === null ? label : `${lane}|${label}`);
   const lanedKey = (kind, rest) => (lane === null ? `${kind}:${rest}` : `${kind}:${lane}:${rest}`);
@@ -515,20 +395,15 @@ export function createDataService({
   const listeners = new Set();
   let disposed = false;
   const live = () => { if (disposed) throw serviceError('Data service retired', 'DATA_RETIRED'); };
-  // Per collection, when each key was last written outside a declared read,
-  // so a read that began before never undoes it. A marker evicted past
-  // TOUCHES_KEPT raises the `lost` point: a read begun before it reads again.
   const touches = new Map();
   const lostTouches = new Map();
   let touchSequence = 0;
-  // `at`: the point its data is from (a declared read's start), else now.
   function noteTouched(name, keys, at = null) {
     if (!touches.has(name)) touches.set(name, new Map());
     const seen = touches.get(name);
     keys.forEach((key) => {
       let stamp = at;
       if (stamp === null) { touchSequence += 1; stamp = touchSequence; }
-      // A key touched later than this keeps its later mark.
       if ((seen.get(String(key)) || 0) > stamp) return;
       seen.delete(String(key));
       seen.set(String(key), stamp);
@@ -540,8 +415,6 @@ export function createDataService({
     }
   }
   const touchedAfter = (name, since) => new Set([...(touches.get(name) || new Map())].filter(([, at]) => at > since).map(([key]) => key));
-  // Per collection and field, values a method answer found gone, as of its
-  // read's start: a read that began before never stores a row naming one.
   const goneValues = new Map();
   function noteGoneValues(name, field, values, at) {
     if (!values.length) return;
@@ -554,7 +427,6 @@ export function createDataService({
       seen.delete(String(value));
       seen.set(String(value), at);
     });
-    // An evicted marker's protection is lost: a read begun before it reads again.
     while (seen.size > TOUCHES_KEPT) {
       const [oldest, stamp] = seen.entries().next().value;
       seen.delete(oldest);
@@ -568,7 +440,6 @@ export function createDataService({
       && (seen.get(String(record[field])) || 0) > since);
   };
   const protectionLost = (name, since) => (lostTouches.get(name) || 0) > since;
-  // When a replacing ingest from outside a declared read last ran, by collection.
   const replaced = new Map();
   function noteReplaced(name, at = null) {
     let stamp = at;
@@ -576,19 +447,13 @@ export function createDataService({
     replaced.set(name, Math.max(replaced.get(name) || 0, stamp));
   }
   const replacedAfter = (name, since) => (replaced.get(name) || 0) > since;
-  /**
-   * Every commit path records what it did here, so a read that began before
-   * never undoes it: a whole replacement raises the collection barrier, any
-   * other write marks its keys. `at`: a fetched write's read start, else now.
-   */
+  // Every commit path records its effect here, so a read that began before never undoes it.
   function recordEffect(name, {
     whole = false, changedKeys = [], removedKeys = [], at = null,
   } = {}) {
     if (whole) { noteReplaced(name, at); return; }
     noteTouched(name, [...changedKeys, ...removedKeys].filter((key) => key !== undefined && key !== null), at);
   }
-  // One writer at a time per collection. The task gets the only handles that
-  // write it: `store` (records each change) and `raw` (a declared read's commit).
   const turns = new Map();
   function inTurn(name, task, { at = null } = {}) {
     const next = (turns.get(name) || Promise.resolve()).then(() => {
@@ -603,13 +468,10 @@ export function createDataService({
     tail.then(() => { if (turns.get(name) === tail) turns.delete(name); });
     return next;
   }
-  /** The turn's store: each write records the keys it changed, as of `at`. */
   function touching(name, store, keyPath, at = null) {
     const keyOf = (row) => (row && typeof row === 'object' ? row[keyPath] : undefined);
     const changed = (keys) => recordEffect(name, { changedKeys: keys, at });
-    // A fetched write stores no row naming a value found gone after its read began.
     const barred = at === null ? () => false : barredAfter(name, at);
-    // A write the store refused changed nothing; one kept in memory only (`retained`) did.
     const recorded = async (work, keysOf, failedKeys) => {
       let result;
       try { result = await work(); } catch (error) {
@@ -636,9 +498,6 @@ export function createDataService({
         (outcome) => (outcome?.replaced === true ? [key] : []),
         () => [key]
       ),
-      // An unscoped prune (or `whole`) replaces the collection; a scoped one
-      // records only the rows it wrote and removed. A failed reconcile may
-      // have stored some rows, so it records all it was given.
       reconcile: async (given = [], { whole: replacesAll = false, ...options } = {}) => {
         const records = given.filter((record) => !barred(record));
         const whole = replacesAll === true || (options.prune !== false && typeof options.scope !== 'function');
@@ -647,7 +506,6 @@ export function createDataService({
           changed(records.map(keyOf));
           throw error;
         }
-        // Rows left as they were (an unsent local write kept) were not written.
         const left = new Set((Array.isArray(result?.skipped) ? result.skipped : []).map(String));
         changed(records.map(keyOf).filter((key) => !left.has(String(key))));
         if (whole) recordEffect(name, { whole: true, at });
@@ -664,11 +522,6 @@ export function createDataService({
     });
   }
   const metaOf = async (name) => { try { return await sourceMeta.get(name); } catch (_) { return null; } };
-  /**
-   * When the last whole declared read ran, while the stored rows are still
-   * the set it left (count and key digest), else null: stands in for a read
-   * after a restart when a refresh asks within a `maxAge`.
-   */
   async function storedFreshAt(name, store, keyPath, context) {
     try {
       const [meta, rows] = await Promise.all([metaOf(name), rawRows(store)]);
@@ -677,16 +530,11 @@ export function createDataService({
       return meta.count === keys.length && meta.digest === keysDigest(keys) ? meta.fullAt : null;
     } catch (_) { return null; }
   }
-  // Per collection, a count of heard changes (store notices and the change
-  // feed): a declared read reuses rows read before fetching if none came.
   const generations = new Map();
   const watchedStores = new Map();
   const generationOf = (name) => generations.get(name) || 0;
-  // Collections whose last declared read was refused (403/404): `forbidden:
-  // 'confirm'` purges only on a second refusal in a row.
   const refusedOnce = new Set();
   const bump = (name) => generations.set(name, generationOf(name) + 1);
-  // Only a collection whose changes are heard may reuse rows read earlier.
   function watchChanges(name, store) {
     if (watchedStores.has(name)) return true;
     if (typeof store.onChange !== 'function') return false;
@@ -703,10 +551,6 @@ export function createDataService({
       return true;
     } catch (_) { return false; }
   }
-  /**
-   * Keeps a cursor read's source meta in step with keys whose presence a
-   * write toggled, or forgets it (`null`): the next declared read is whole.
-   */
   async function adjustMeta(name, toggled) {
     const spec = sources.get(name) || resolve(name)?.decl?.source;
     if (!spec?.read || (!spec.read.cursor && toggled !== null)) return;
@@ -725,12 +569,10 @@ export function createDataService({
     });
   }
 
-  /** A collection name within this service's namespace, or a thrown refusal. */
   function local(name) {
     if (typeof name !== 'string' || !name) throw serviceError('A collection name is required', 'DATA_INVALID');
     let bare = name;
     if (namespace) {
-      // A declared name may itself hold a dot; any other dotted name is foreign.
       if (name.startsWith(`${namespace}.`)) bare = name.slice(namespace.length + 1);
       else if (name.includes('.') && !resolve(name)?.store) throw serviceError(`'${name}' is outside ${namespace}`, 'DATA_FORBIDDEN');
     }
@@ -739,7 +581,6 @@ export function createDataService({
     knownCollections.add(bare);
     return { name: bare, label: labelOf(bare), ...found, store: readOnly(bare, found.store) };
   }
-  // Readers' view of a store: writes go through a turn's handles only.
   const readOnlyStores = new WeakMap();
   function readOnly(name, store) {
     if (!readOnlyStores.has(store)) {
@@ -758,7 +599,6 @@ export function createDataService({
   }
   const targetStates = createTargetStateBudget({ states, budgetOf: (name) => local(name).decl?.targetStateBudget });
   const targetOf = (target) => (typeof target === 'string' ? { collection: target } : { ...target });
-  // A `where` is keyed by function identity: two predicates are two targets.
   const predicates = new WeakMap();
   let predicateCount = 0;
   const predicateId = (where) => {
@@ -777,7 +617,6 @@ export function createDataService({
     if (value !== 'refreshing' && !isOnline()) value = 'offline';
     else if (value === 'fresh' && (state.syncedAt === null || now() - state.syncedAt > staleAfterMs)) value = 'stale';
     const status = { state: value, syncedAt: state.syncedAt, error: state.error };
-    // A failed attempt of a read the scheduler is still trying again.
     if (value === 'error' && state.flight) status.retrying = true;
     return status;
   }
@@ -792,10 +631,8 @@ export function createDataService({
     return (await store.getAll()).map(project);
   }
 
-  // One entry per row with unsent changes, oldest change first.
   const outbox = new Map();
   const writes = new Map();
-  // Calls in flight: a service with any is not idle.
   let working = 0;
   const tracked = (work) => {
     working += 1;
@@ -807,14 +644,11 @@ export function createDataService({
   const bare = (row) => Object.fromEntries(Object.entries(row || {}).filter(([field]) => !field.startsWith('_')));
   const pushOf = (name, decl) => (sources.get(name) || decl?.source)?.push || decl?.push;
   const describeError = (error) => ({ code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) });
-  // Refused for access (role or scopes changed): the row stays unsent, listed
-  // as access changed, never sent again on its own.
+  // A change refused for access is never sent again on its own.
   const refusedAccess = (error) => Number(error?.status) === 403 || error?.code === 'PermissionDenied' || error?.code === 'DATA_ACCESS_CHANGED';
-  // Held until its account is displayed again; lists as waiting, not failed.
   const heldBack = (error) => error?.code === 'ACCOUNT_NOT_DISPLAYED';
   const heldNow = (entry) => entry.held === true && entry.state === 'failed';
 
-  /** Runs `task` after every earlier task for the same id. */
   function serial(id, task) {
     const next = (writes.get(id) || Promise.resolve()).then(task);
     const tail = next.then(() => {}, () => {});
@@ -823,7 +657,6 @@ export function createDataService({
     return next;
   }
 
-  /** Drops a row's unsent changes: the caller removed the row itself. */
   function dropPending(label, key) {
     const id = `${label}:${String(key)}`;
     const entry = outbox.get(id);
@@ -832,17 +665,13 @@ export function createDataService({
     outbox.delete(id);
     entry.changes.splice(0).forEach((change) => change.reject(serviceError('Change discarded', 'DATA_DISCARDED')));
   }
-  /**
-   * Rows removed elsewhere: a queued change for a row that is gone is
-   * dropped so it never brings the row back on the server. A delete is kept.
-   */
+  // A queued change for a row gone elsewhere is dropped so it never brings the row back on the server.
   function dropOrphaned(event) {
     if (!outbox.size || (!event?.remote && !['purge', 'evict'].includes(event?.type))) return;
     const touched = (entry) => event.label === entry.label || event.labels?.includes(entry.label) || (event.type === 'purge' && !event.label);
     [...outbox.values()].filter(touched).forEach((entry) => {
       serial(entry.id, async () => {
         if (outbox.get(entry.id) !== entry) return;
-        // A delete of a key that held no row has nothing on the device to lose.
         const last = entry.changes.at(-1);
         if (last?.command.op === 'delete' && (last.revision === undefined || last.revision === null)) return;
         const row = await entry.store.getRaw(entry.key);
@@ -853,10 +682,6 @@ export function createDataService({
     });
   }
   const offOrphanFeed = feed?.subscribe((event) => dropOrphaned(event));
-  /**
-   * Removes one row in turn with local writes to it: a row dirty since it was
-   * listed stays unless `force`, which also drops its unsent changes.
-   */
   function removeRow({ label, store, key, force, origin = null }) {
     return serial(`${label}:${key}`, async () => {
       const row = await store.getRaw(key);
@@ -864,7 +689,6 @@ export function createDataService({
       try {
         await store.delete(key, withStoreMutationOrigin({ silent: true, ...(Number.isSafeInteger(row._rev) ? { expectedRevision: row._rev } : {}) }, origin));
       } catch (error) {
-        // Another tab wrote the row since: it stays.
         if (error?.reason === 'conflict') return false;
         throw error;
       }
@@ -872,10 +696,6 @@ export function createDataService({
       return true;
     });
   }
-  /**
-   * Removes the listed rows: in batched commits that re-check each row (a
-   * dirty one stays), or row by row when forced or without batch deletes.
-   */
   async function removeRows({ label, store, keys, force, origin = null }) {
     const removed = [];
     if (force || typeof store.deleteMany !== 'function') {
@@ -889,7 +709,6 @@ export function createDataService({
         removed.push(...await store.deleteMany(keys.slice(start, start + PAGE_ROWS), withStoreMutationOrigin({ keep: (row) => !!row._dirty, silent: true }, origin)));
       }
     }
-    // Subscribers hear of the removals once, together.
     if (removed.length) await store.revalidateSubscribers?.(removed);
     return removed;
   }
@@ -917,7 +736,6 @@ export function createDataService({
   function enqueuePush(target, change) {
     const entry = entryFor(target);
     const done = addChange(entry, change);
-    // A later change joins an access-refused row, unsent, until a person retries.
     if (entry.state === 'access_changed') {
       entry.changes.at(-1).reject(serviceError('Access changed: kept on this device until retried', 'DATA_ACCESS_CHANGED'));
       emitStatus();
@@ -928,7 +746,6 @@ export function createDataService({
     drain(entry).catch(() => {});
     return done;
   }
-  /** A dirty row with no change in memory, sent again as the row is when it goes out. */
   function restoreEntry(target, row) {
     const entry = entryFor(target);
     const record = bare(row);
@@ -952,11 +769,6 @@ export function createDataService({
       if (entry.state !== 'access_changed') drain(entry).catch(() => {});
     });
   }
-  /**
-   * Settles a sent change's row while it is still that change: a delete drops
-   * its tombstone, a put is marked synced and acknowledged (`_ackRev`). Best
-   * effort: the server has the change, so nothing here fails the send.
-   */
   async function settleSent(entry, change) {
     if (change.revision === undefined || change.revision === null) return;
     try {
@@ -972,13 +784,7 @@ export function createDataService({
       await inTurn(entry.collection, ({ store }) => store.markSynced(entry.key, { expectedRevision: change.revision, pushed: true }));
     } catch (_) { /* written again since, or its store is closed: it stays as it is */ }
   }
-  /**
-   * Sends one row's changes oldest first; a failure keeps every change for a
-   * retry. A change already acknowledged (`_ackRev` at or past its revision)
-   * is skipped, as sending it would put an older state on the server; a server
-   * read overwriting the row is no acknowledgement. Queued edits the send
-   * already covers settle with it but stay queued until then.
-   */
+  // An already-acknowledged change is skipped: sending it would put an older state on the server.
   function drain(entry) {
     if (entry.draining) return entry.draining;
     entry.draining = (async () => {
@@ -988,7 +794,6 @@ export function createDataService({
           const change = entry.changes[0];
           let sent = false;
           try {
-            // Changes to one row go out one at a time, in order.
             // eslint-disable-next-line no-await-in-loop
             // A write: the scheduler never gives up its ownership before it settles.
             await scheduler.request({
@@ -999,7 +804,6 @@ export function createDataService({
               run: async () => {
                 const push = pushOf(entry.collection, entry.decl);
                 if (typeof push !== 'function') throw serviceError(`'${entry.label}' has no push`, 'DATA_NO_SOURCE');
-                // Refused for access meanwhile (another service or tab): not sent.
                 const row = await entry.store.getRaw(entry.key);
                 if (row?._pushRefused === 'access') throw serviceError('Access changed: kept on this device until retried', 'DATA_ACCESS_CHANGED');
                 const held = (revision) => entry.changes.slice(1)
@@ -1008,8 +812,6 @@ export function createDataService({
                 const skip = () => { sent = true; change.skipped = true; change.carries = acked === null ? [] : held(acked); };
                 const acknowledged = row && !row._dirty && acked !== null && Number.isSafeInteger(change.revision) && acked >= change.revision;
                 if (change.restored) {
-                  // Sent as the row is now while still dirty; once not, skipped only
-                  // if acknowledged (or a delete's tombstone is gone), else sent as restored.
                   if (row?._dirty) {
                     change.command = row._deleted ? { op: 'delete', key: entry.key } : { op: 'put', record: bare(row) };
                     change.record = row._deleted ? null : bare(row);
@@ -1037,7 +839,6 @@ export function createDataService({
               entry.state = refused ? 'access_changed' : 'failed'; entry.lastError = describeError(error);
               entry.held = !refused && heldBack(error);
               emitStatus();
-              // The refusal stays with the row, so a restart does not send it again on its own.
               if (refused) {
                 try {
                   await inTurn(entry.collection, ({ store }) => store.markRow?.(entry.key, { _pushRefused: 'access' }));
@@ -1062,7 +863,6 @@ export function createDataService({
     return entry.draining;
   }
 
-  /** Stores server rows (see `ingest`), noting nothing as a change of its own. */
   async function ingestRows(collection, incomingRows, { replace = false, scope = null, complete = false } = {}, store) {
     live();
     const { name, decl } = local(collection);
@@ -1073,9 +873,6 @@ export function createDataService({
       return domain;
     });
     const keyPath = decl?.keyPath || 'id';
-    // A source's `ingestRecord(dto, prev)` merges each row stored from outside
-    // its declared read with the stored row of the same key, read in this
-    // turn, so nothing written between the read and the write is undone.
     const spec = sources.get(name) || decl?.source;
     let rows = given;
     if (typeof spec?.ingestRecord === 'function') {
@@ -1106,23 +903,18 @@ export function createDataService({
       await upsert(rows, scoped ? { scope: inScope } : {});
     } else {
       for (const chunk of chunks) {
-        // Chunks commit in order; each is a bounded complete set.
         // eslint-disable-next-line no-await-in-loop
         await upsert(chunk, { prune: false });
       }
       if (replace) await store.reconcile([], { scope: (row) => inScope(row) && !kept.has(String(row[keyPath])), whole: !scoped });
     }
     const written = stored.size;
-    // Only a complete set or whole replacement can cover a batched method's ask:
-    // every row given must be stored, checked in one read of the collection.
     const distinct = new Set(rows.filter((row) => row && typeof row === 'object').map((row) => String(row[keyPath])));
     let everyRow = false;
     if ((complete === true || (replace && !scoped)) && kept.size === distinct.size && !unsaved.size) {
       const present = new Set((await rawRows(store)).map((row) => String(row[keyPath])));
       everyRow = [...kept].every((key) => present.has(key));
     }
-    // A scoped replacement retains its existing collection-status contract.
-    // Whole-set ingests are stamped only after retained coverage is checked.
     if (replace && scoped && complete !== true) {
       const state = stateFor(targetKey({ collection: name }));
       state.freshForm = formOf(jobContextNow());
@@ -1132,7 +924,6 @@ export function createDataService({
     return { written, ...(unsaved.size ? { unsaved: [...unsaved] } : {}), everyRow };
   }
 
-  // Every listener this service installed; disposing removes them, the shared feed's included.
   const installed = new Set();
   function held(off) {
     let done = false;
@@ -1145,16 +936,9 @@ export function createDataService({
     installed.add(stop);
     return stop;
   }
-  // A commit that lost its protection part way asks for the read again.
   const READ_AGAIN = Symbol('read again');
-  // Coverage order for overlapping reads of the same window: a newer answer,
-  // even an empty one, vouches that an older one must not introduce keys.
   const windowReads = new Map();
-  /**
-   * The guard every stored server read goes through: in the collection's
-   * turn, a replacement since the read began drops its answer, lost
-   * protection reads again, and rows changed since are left alone.
-   */
+  // Every stored server read goes through this guard: replacements drop its answer, changed rows are left alone.
   async function guardedRead(name, read, commit, { isCurrent = () => true, storing = null } = {}) {
     for (let attempt = 0; attempt < READ_TRIES; attempt += 1) {
       touchSequence += 1;
@@ -1162,12 +946,9 @@ export function createDataService({
       // eslint-disable-next-line no-await-in-loop
       const answer = await read(startedAt);
       if (!isCurrent()) return undefined;
-      // Waiting for the turn and storing is local work: not counted against a
-      // visible read's server deadline.
       const stored = typeof storing === 'function' ? storing() : null;
       let outcome;
       try {
-        // Recorded as of the read's start, so a later read is not taken for a local edit.
         // eslint-disable-next-line no-await-in-loop
         outcome = await inTurn(name, async (turn) => {
           if (!isCurrent()) return { dropped: true };
@@ -1184,12 +965,10 @@ export function createDataService({
     }
     throw serviceError(`'${name}' changed on this device faster than it could be read`, 'DATA_BUSY');
   }
-  /** A caller's own fetch (window cache, live query) stored through the guard; resolves the rows in `scope`. */
   async function reconcileWindow(name, store, keyPath, {
     fetch, toRecord = (dto) => dto, keyOf, scope = () => true, window, windowKey, complete = false, keepDirty = false, rethrow = false, readKey, onReadDropped, context,
   }) {
     if (typeof fetch !== 'function') return store.readWhere(scope);
-    // A window alone does not identify coverage (kinds or actors can share it).
     const identity = typeof readKey === 'function' ? readKey(window) : readKey;
     const coverageKey = typeof identity === 'string' && identity
       ? `read:${identity}` : (complete && window == null ? 'whole' : null);
@@ -1243,11 +1022,6 @@ export function createDataService({
       }
     }
   }
-  /**
-   * A declared read of a whole collection: with `read.cursor`, only changes
-   * while the stored key digest matches the meta and a whole read ran within
-   * `fullEveryMs`. A 403/404 purges the collection's rows, unsent ones kept.
-   */
   async function readDeclared(target, spec, wanted, isCurrent, { full = false, context = jobContextNow(), storing = null } = {}) {
     const { name, store, keyPath } = target;
     const { cursor: keepsCursor = false, fullEveryMs = FULL_EVERY_MS, forbidden = 'purge' } = spec.read;
@@ -1271,8 +1045,6 @@ export function createDataService({
         return { answer, since, read };
       } catch (error) {
         const refused = [403, 404].includes(Number(error?.status)) && isCurrent();
-        // 'confirm': a single refusal (a token or team switch caught mid-way)
-        // keeps the rows; a second one in a row is the account losing them.
         if (refused && (forbidden === 'purge' || (forbidden === 'confirm' && refusedOnce.has(name)))) {
           await service.purge(name, {}).catch(() => {}); // eslint-disable-line no-use-before-define
         }
@@ -1289,29 +1061,19 @@ export function createDataService({
     return outcome === NO_SNAPSHOT || outcome === DROPPED ? outcome : undefined;
   }
 
-  /**
-   * Stores a declared read's answer in the collection's turn. Keys changed by
-   * anything else since the read began keep that change (re-checked per
-   * chunk); lost protection answers `read_again`. The source meta is written
-   * last: with every row stored, the new cursor and key digest; otherwise the
-   * old cursor and no digest, so the refused change is asked for again.
-   */
   async function commitDeclared({ name, label, store, keyPath }, spec, answer, {
     startedAt, since, isCurrent, read = null, turn, context,
   }) {
-    // Raw store: this is the read the others' recorded changes are kept from.
     const { raw } = turn;
     const { cursor: keepsCursor = false, removedField = null } = spec.read;
     if (!isCurrent()) return 'dropped';
     const keyOf = (row) => String(row[keyPath]);
-    // The rows read before fetching, while nothing has changed them since.
     const rows = read && generationOf(name) === read.generation ? read.rows : await rawRows(store);
     const present = new Set(rows.map(keyOf));
     const dtos = snapshotRows(answer) || [];
     const toRecord = spec.toRecord || ((dto) => dto);
     const dtoKey = typeof spec.keyOf === 'function' ? spec.keyOf : (dto) => dto[keyPath];
     const previous = previousByKey(rows, keyPath);
-    // One entry that is not a row with a key fails the whole answer.
     const invalid = () => Object.assign(new Error(`'${name}': an answered entry is not a row with a key`), { name: 'DataServiceError', code: 'DATA_INVALID' });
     if (dtos.some((dto) => !dto || typeof dto !== 'object')) throw invalid();
     const mapped = dtos.map((dto) => {
@@ -1330,7 +1092,6 @@ export function createDataService({
       return !why;
     });
     if (refusals.length) reportRejected(store, refusals, onPersistError);
-    // Refused whole: storing part of it would look like the whole list.
     const limit = local(name).decl?.maxRows;
     if (!changesOnly && Number.isSafeInteger(limit) && records.length > limit) {
       throw serviceError(`'${name}' answered ${records.length} rows; this device keeps at most ${limit}`, 'DATA_TOO_LARGE');
@@ -1355,7 +1116,6 @@ export function createDataService({
       });
     };
     let removed = [];
-    // Rows sent to the store: a chunk that fails part way may have stored some.
     const attempted = new Set();
     const commitChunk = async (chunk, options) => {
       chunk.forEach((record) => attempted.add(keyOf(record)));
@@ -1375,23 +1135,18 @@ export function createDataService({
           if (halted()) return stopHere();
           const touched = touchedAfter(name, startedAt);
           const chunk = batch.filter(unchanged(touched));
-          // Chunks commit in order.
           // eslint-disable-next-line no-await-in-loop
           if (chunk.length) await commitChunk(chunk, { prune: false, keepDirty: true });
         }
       } else {
-        // Refused before anything goes: the stored rows stay as the last usable set.
         const unfit = typeof raw.fitsWhole === 'function' ? raw.fitsWhole(records) : null;
         if (unfit) throw Object.assign(serviceError(`'${name}' answered rows this device cannot keep (${unfit})`, 'DATA_TOO_LARGE'), { reason: unfit });
-        // Removals go first, so no answered row is evicted to make room.
         const answered = new Set(records.map(keyOf));
         const touchedBefore = touchedAfter(name, startedAt);
         removed = await removeRows({
           label, store: raw, keys: rows.filter((row) => !row._dirty && !answered.has(keyOf(row)) && !touchedBefore.has(keyOf(row))).map(keyOf), force: false,
         });
         if (halted()) return stopHere();
-        // Writes changed rows and stale confirmations. An answer of only
-        // unchanged rows stamps the store synced without writing a row.
         const touched = touchedAfter(name, startedAt);
         const stored = new Map(rows.map((row) => [keyOf(row), row]));
         const confirmBefore = now() - confirmAfterMs(store);
@@ -1442,11 +1197,8 @@ export function createDataService({
     return 'stored';
   }
 
-  // Refresh method groups: one per principal, collection, method and params
-  // other than the batched ids.
   const methodGroups = new Map();
   let methodBatches = 0;
-  // Refused non-batched params by group key: { until, holdMs, error }.
   const methodRefusals = new Map();
   const holdRefusal = (key, error) => {
     if (error?.retryable !== false || !HELD_REFUSAL_CODES.has(error?.code)) return;
@@ -1459,7 +1211,6 @@ export function createDataService({
   };
   function methodGroup(key, collection) {
     if (!methodGroups.has(key)) {
-      // Idle groups beyond the bound go, oldest first.
       if (methodGroups.size >= METHOD_GROUPS_KEPT) {
         [...methodGroups.entries()].filter(([, group]) => !group.flying.size && !group.open && !group.state.flight)
           .slice(0, methodGroups.size - METHOD_GROUPS_KEPT + 1).forEach(([old]) => methodGroups.delete(old));
@@ -1470,8 +1221,6 @@ export function createDataService({
     }
     return methodGroups.get(key);
   }
-  // A receipt names the completed query (an empty answer included); a new
-  // flight or lost coverage withdraws it.
   function describeMethod(state, strictReceipt = false) {
     const status = describeState(state);
     return {
@@ -1504,13 +1253,10 @@ export function createDataService({
     if (retired) emitStatus();
   }
   const methodsWorking = () => [...methodGroups.values()].some((group) => group.flying.size || group.open || group.state.flight);
-  // Per collection, in `coverageSeq`: when a purge or trim last voided what
-  // methods know, and what the last whole read covers.
   let coverageSeq = 0;
   const coverageVoid = new Map();
   const coverageLoss = new Map();
   const wholeCovers = new Map();
-  // Coverage is per account form: another form may see other rows.
   const coverKey = (form, name) => JSON.stringify([form, name]);
   const forgetMethods = (name) => {
     coverageSeq += 1;
@@ -1523,8 +1269,6 @@ export function createDataService({
     emitStatus();
   };
   const voidOf = (name) => coverageVoid.get(name) || 0;
-  // Per collection, when a whole purge last emptied it: every target reads
-  // again whatever its `maxAge`, and a read begun before never marks it fresh.
   const purgedAt = new Map();
   function voidReads(name) {
     coverageSeq += 1;
@@ -1539,8 +1283,7 @@ export function createDataService({
   const ownsChange = (event) => {
     if (changeOwner === null) return true;
     if (typeof event?.owner === 'string') return event.owner === changeOwner;
-    // A principal purge has no account owner and may remove any of this
-    // viewer's forms; unknown identities never grant coverage.
+    // Unknown identities never grant coverage.
     if (event?.type !== 'purge' || typeof event.principal !== 'string') return false;
     try { return JSON.stringify(JSON.parse(changeOwner).slice(0, 2)) === event.principal; } catch (_) { return false; }
   };
@@ -1575,18 +1318,12 @@ export function createDataService({
     if (invalidated) emitStatus();
   });
 
-  // `present`: the answer held a row for the id (true), not (false), or cannot say (null).
   function noteFetched(group, id, at, present = null) {
     group.fetched.delete(id);
     group.fetched.set(id, { at, present });
     while (group.fetched.size > METHOD_FRESH_KEPT) group.fetched.delete(group.fetched.keys().next().value);
   }
-  /**
-   * Merges one method answer (`rows`, or `{ rows, gone, more }`) in the
-   * collection's turn as of `startedAt`. It removes only keys named gone (or
-   * by `unanswered`), never one changed locally since or unsent; a gone key is
-   * recorded removed even if not held, so an older read never brings it back.
-   */
+  // Removes only keys named gone, never one changed locally since or unsent.
   async function commitMethod({ name, label, store, decl }, spec, answer, {
     touched, turn, startedAt, current, unanswered = null, strictReceipt = false,
   }) {
@@ -1657,7 +1394,6 @@ export function createDataService({
     await adjustMeta(name, { added: keys.filter((key, at) => !before[at] && after[at]), removed });
     return { keys, more: !Array.isArray(answer) && answer?.more === true, absent: unanswered ? left.values : null };
   }
-  /** A refresh method's run as the principal in `context`; `retry` ends a refusal hold. */
   function refreshMethodAs(wanted, {
     mode = 'silent', priority = 'normal', maxAge = 0, reason = null, fromNow = false, sinceWrite = false, retry = false,
     stillWanted = null,
@@ -1675,7 +1411,6 @@ export function createDataService({
     if (!method) return Promise.reject(serviceError(`'${wanted.collection}' has no refresh method '${wanted.method}'`, 'DATA_INVALID'));
     let params;
     try { params = methodParams(name, wanted.method, method, wanted.params); } catch (error) { return Promise.reject(error); }
-    // Refused before anything is scheduled, so no circuit counts it.
     let available = true;
     try { available = typeof method.available !== 'function' || method.available(params) !== false; } catch (_) { available = false; }
     const form = formOf(context);
@@ -1684,8 +1419,6 @@ export function createDataService({
     const shared = batchParam ? Object.fromEntries(Object.entries(params).filter(([param]) => param !== batchParam)) : params;
     const groupKey = JSON.stringify([form, name, wanted.method, shared]);
     let group = methodGroup(groupKey, name);
-    // An ask whose ids are all fresh is answered fresh, whatever another id's
-    // read left on the method's status.
     const outcome = (value) => {
       if (value === ANSWERED_FRESH) return { ...describeState(group.state), state: 'fresh', error: null };
       return batchParam ? describeState(group.state)
@@ -1702,12 +1435,9 @@ export function createDataService({
     if (factor === Infinity) return settle(Promise.resolve());
     const age = Math.max(Number(maxAge) || 0, method.cadenceMs || 0) * factor;
     const askedAt = now();
-    // A fresh or in-flight whole read answers a batched method (never a
-    // search); one from before a purge or trim covers nothing.
     const whole = stateFor(targetKey({ collection: name }));
     const dropped = () => Object.assign(serviceError(`'${wanted.collection}' refresh method '${wanted.method}' is no longer current`, 'REFRESH_DROPPED'), { retryable: false });
     const failed = (error, isCurrent = null) => {
-      // An inactive read may not publish its failure over the current query's status.
       if (isCurrent && !isCurrent()) return dropped();
       group.state.state = isOnline() ? 'error' : 'offline';
       group.state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
@@ -1718,7 +1448,6 @@ export function createDataService({
       const refusal = Object.assign(serviceError(`'${name}' cannot observe strict method coverage`, 'DATA_INCOMPLETE'), { retryable: false });
       return settle(Promise.reject(failed(refusal)));
     }
-    // `fromNow`: only a read begun after this ask (one after a write) answers it.
     if (batchParam && !fromNow) {
       const covered = (wholeCovers.get(coverKey(form, name)) || 0) > voidOf(name);
       if (covered && whole.freshForm === form && age > 0 && whole.syncedAt !== null && askedAt - whole.syncedAt < age && whole.state !== 'error') {
@@ -1739,7 +1468,6 @@ export function createDataService({
             group.state.syncedAt = stateFor(targetKey({ collection: name })).syncedAt;
             return undefined;
           }
-          // Re-checked as a new ask: idle groups may have been cleared while it waited.
           const refuse = (message, code) => {
             const error = Object.assign(serviceError(message, code), { retryable: false });
             group.state.state = 'error';
@@ -1781,7 +1509,6 @@ export function createDataService({
       const freshEntry = (entry) => !!entry && fresh(entry.at);
       const evicted = batchParam ? await evictedIds(params[batchParam]
         .filter((id) => { const entry = group.fetched.get(id); return freshEntry(entry) && entry.present === true; })) : new Set();
-      // Stored rows whose `field` names an asked id the answer left out are gone.
       const unansweredBy = (ids) => (method.field && ids ? async (records, keyPath) => {
         const answeredValues = new Set(records.map((record) => String(record[method.field])));
         const missing = ids.filter((id) => !answeredValues.has(id));
@@ -1800,7 +1527,6 @@ export function createDataService({
         }).map((row) => String(row[keyPath]));
         return { keys, field: null, values: [] };
       } : null);
-      // A purge or trim while it was out leaves what it asked for not fetched.
       const run = async (asked, ids, isCurrent, afterDeadline = () => false, storing = null) => {
         const current = () => !disposed && isCurrent();
         if (!batchParam && !current()) {
@@ -1825,8 +1551,6 @@ export function createDataService({
             if (!batchParam && !current()) return undefined;
             return method.fetch(asked, context);
           }, async (answer, touched, startedAt, turn) => {
-            // A capped (incomplete) answer stores nothing: its rows would crowd
-            // out other windows under the store's bounds.
             if (answer && !Array.isArray(answer) && answer.complete === false) {
               truncated = true;
               return;
@@ -1870,8 +1594,6 @@ export function createDataService({
           throw reported;
         }
       };
-      // A job the scheduler refuses without running (full queue, open circuit)
-      // shows in the method's status too. Lower rank goes first.
       const standing = inForeground(name)
         ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
         : { priority: PRIORITIES.background, visible: false };
@@ -1882,7 +1604,6 @@ export function createDataService({
         budgetKey: spec.budgetKey || budgetKey,
         reason,
         ...standing,
-        // A read other runs wait on from inside their own starts past the visible cap.
         ...(spec.gate === true ? { gate: true } : {}),
         // Never run, or run again, once this service is disposed or its reads paused.
         valid: () => !disposed && cadenceFactor(name) !== Infinity && (!isCurrent || isCurrent()),
@@ -1898,10 +1619,6 @@ export function createDataService({
           emitStatus();
           return Promise.reject(Object.assign(serviceError(held.error.message, held.error.code), { retryable: false, held: true }));
         }
-        // An ask that shares a queued flight raises it to the ask's rank when
-        // that is higher (the scheduler keeps the stronger of the two), as when
-        // a screen joins a read the screen before it asked and the scheduler
-        // lowered on leaving.
         const join = (flying) => {
           if (stillWanted) flying.askers.wanted.add(stillWanted);
           else flying.askers.always = true;
@@ -1913,11 +1630,6 @@ export function createDataService({
           return flying.attempts.answer(flying.promise);
         };
         if (!fromNow && group.state.flight && at - group.state.flight.at < METHOD_SHARE_MS) return join(group.state.flight);
-        // `fromNow` + `sinceWrite` needs only a read begun after the last write:
-        // it joins a queued flight (or, by `writeMark`, one begun since the last
-        // write) unless that flight ranks lower, is failing or predates a purge,
-        // so a burst of panels revalidating is one read. A recent read within
-        // `reuseSinceWriteMs` answers it too. Plain `fromNow` reads on its own.
         const sharesSinceWrite = fromNow && sinceWrite === true;
         const last = group.state.answered;
         if (sharesSinceWrite && reuseSinceWriteMs > 0 && last && method.strictReceipt !== true && group.state.state === 'fresh'
@@ -1931,11 +1643,8 @@ export function createDataService({
           && (!flying.begun || (flying.writeMark !== null && flying.writeMark === writeMarkNow()))) {
           return join(flying);
         }
-        // An asker that has stopped waiting starts no read.
         if (stillWanted && !(() => { try { return !!stillWanted(); } catch (_) { return false; } })()) return Promise.reject(dropped());
         methodBatches += 1;
-        // Only the newest flight stores and answers; `flightSeq` is numbered
-        // across the service, so a group cleared and remade never matches it.
         const voidAtAsk = voidOf(name);
         const flight = {
           at,
@@ -1948,23 +1657,18 @@ export function createDataService({
           rank: askRank,
           voidAtAsk,
           writeMark: null,
-          // Whether anyone still waits for this read: an asker without
-          // `stillWanted` always does; otherwise any asker's own answer.
           askers: { always: !stillWanted, wanted: new Set(stillWanted ? [stillWanted] : []) },
         };
         const stillAsked = () => flight.askers.always || [...flight.askers.wanted].some((asker) => { try { return !!asker(); } catch (_) { return false; } });
         group.state.flightSeq = flight.seq;
         group.state.flight = flight;
-        // Only a retryable timeout lets the read continue past its caller's deadline.
         const afterDeadline = () => flight.settled && flight.deadlineRetry;
         const current = () => !disposed && cadenceFactor(name) !== Infinity
           && methodGroups.get(groupKey) === group && (group.state.flight === flight || afterDeadline()) && group.state.flightSeq === flight.seq
           && (sources.get(name) || decl?.source) === spec && formOf(jobContextNow()) === form && voidOf(name) === voidAtAsk;
-        // Install the joinable promise before an inline scheduler can notify.
         let resolveFlight;
         let rejectFlight;
         flight.promise = new Promise((_resolve, _reject) => { resolveFlight = _resolve; rejectFlight = _reject; });
-        // The previous receipt stops vouching for rows once a read is queued.
         group.state.state = 'refreshing';
         group.state.error = null;
         let scheduled;
@@ -1973,7 +1677,6 @@ export function createDataService({
             // Taken once: a retry reads after the same writes.
             if (!flight.begun) flight.writeMark = writeMarkNow();
             flight.begun = true;
-            // Once begun, the read is finished and stored for whoever asks next.
             flight.askers.always = true;
             return run(params, null, () => isCurrent() && current(), afterDeadline, helpers?.storing).then((value) => {
               if (group.state.flight === flight && group.state.state === 'fresh') {
@@ -2003,9 +1706,6 @@ export function createDataService({
               && !flight.deadlineRetry && group.state.state === 'refreshing') {
               group.state.state = 'stale';
             }
-            // A failed read's `retrying` ends with its flight; its waiters hear
-            // it. A read that ends otherwise (dropped, purged) changes nothing
-            // its listeners are told about.
             if (!disposed && ended === 'error') emitStatus();
           })
           .then(resolveFlight, rejectFlight)
@@ -2013,7 +1713,6 @@ export function createDataService({
         if (current()) emitStatus();
         return flight.attempts.answer(flight.promise);
       }
-      // Fresh ids are answered; ids in flight join that fetch; the rest join or start a batch.
       const max = method.params[batchParam].max || MAX_METHOD_IDS;
       const waits = new Set();
       // Batches go to the scheduler only once every id is in, so an immediate scheduler never reads part.
@@ -2022,7 +1721,6 @@ export function createDataService({
         if (freshEntry(group.fetched.get(id)) && !evicted.has(id)) return;
         const flying = group.flying.get(id);
         if (!fromNow && flying && at - flying.at < METHOD_SHARE_MS) { waits.add(flying); return; }
-        // A batch full, or waiting past the share window without starting, takes no more.
         if (!group.open || group.open.ids.size >= max || at - group.open.at >= METHOD_SHARE_MS) {
           methodBatches += 1;
           const batch = {
@@ -2042,8 +1740,6 @@ export function createDataService({
       });
       if (!waits.size) return Promise.resolve(ANSWERED_FRESH);
       const answers = [...waits].map((batch) => batch.attempts.answer(batch.promise));
-      // An ask that waits on a batch an earlier ask queued raises it to the
-      // ask's rank when that is higher, as a joined unbatched flight is.
       if (inForeground(name) && typeof scheduler.raise === 'function') {
         waits.forEach((batch) => {
           if (batch.begun || started.includes(batch)) return;
@@ -2053,7 +1749,6 @@ export function createDataService({
       started.forEach((batch) => {
         job(batch.key, (isCurrent, helpers) => {
           batch.begun = true;
-          // A batch takes no more ids once it runs.
           if (group.open === batch) group.open = null;
           const ids = [...batch.ids].sort(idOrder);
           return run({ ...shared, [batchParam]: ids }, ids, isCurrent, undefined, helpers?.storing);
@@ -2063,7 +1758,6 @@ export function createDataService({
     }
   }
 
-  /** A refresh of `target` as the principal in `context` (taken when it was asked). */
   function refreshAs(target, {
     mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false, fromNow = false, sinceWrite = false, nextAttempt = false,
     storedChecked = false, retry = false, stillWanted = null,
@@ -2091,7 +1785,6 @@ export function createDataService({
       return release ? answer.finally(release) : answer;
     };
     try {
-      // An invalidation makes the next ask wait for a read begun after it.
       if (state.flight && state.flightSeq <= voidOf(name)) fromNow = true;
       if (!spec) return settle(Promise.reject(serviceError(`'${wanted.collection}' has no source`, 'DATA_NO_SOURCE')));
       const factor = cadenceFactor(name);
@@ -2105,8 +1798,6 @@ export function createDataService({
       }
       state.freshForm = form;
       if (!fromNow && age > 0 && state.syncedAt !== null && now() - state.syncedAt < age && state.state !== 'error') return settle(Promise.resolve());
-      // The source meta's last whole read stands in for one this service has
-      // not run; checked once per target state, concurrent asks share it.
       if (!storedChecked && !fromNow && age > 0 && state.syncedAt === null && !state.flight && state.state !== 'error'
         && spec?.read && !wanted.query && !wanted.window && (wanted.key === undefined || wanted.key === null) && typeof spec.scope !== 'function'
         && (!state.storedCheck || state.storedCheck.pending)) {
@@ -2134,10 +1825,6 @@ export function createDataService({
         emitStatus();
         return settle(Promise.reject(serviceError('Offline', 'DATA_OFFLINE')));
       }
-      // Not joined: a flight as another account form, or a changes read by a `full` ask.
-      // A person's retry of a read waiting out its backoff runs that read's
-      // next attempt now and is answered by it: that attempt begins after
-      // the ask.
       if (retry === true && state.flight && state.flightForm === form && (!full || state.flightFull) && state.attempts?.failing()
         && state.flightJobKey && typeof scheduler.retryNow === 'function') {
         let woken = false;
@@ -2154,9 +1841,6 @@ export function createDataService({
         }
       }
       if (state.flight && state.flightForm === form && (!full || state.flightFull) && !fromNow) {
-        // An ask that joins a read still queued (a boot warm-up) raises it to
-        // its own visibility and priority, so a screen waiting on it is not
-        // held at the warm-up's rank.
         if (state.flightJobKey && inForeground(name) && typeof scheduler.raise === 'function') {
           try { scheduler.raise(state.flightJobKey, { visible: mode === 'visible', priority: PRIORITIES[priority] ?? PRIORITIES.normal }); } catch (_) { /* the read keeps its rank */ }
         }
@@ -2167,14 +1851,12 @@ export function createDataService({
         return settle(state.attempts.answer(state.flight, { nextAttempt }));
       }
       if (state.flight) {
-        // Read after it; while it waits to retry a failure, answer with that failure.
         const { attempts } = state;
         const after = () => refreshAs(target, {
           mode: 'visible', priority, maxAge: 0, reason, full, stillWanted,
         }, context);
         return settle(attempts.answer(state.flight, { nextAttempt }).then(after, (error) => (nextAttempt || attempts.failing() ? Promise.reject(error) : after())));
       }
-      // An asker that has stopped waiting starts no read.
       if (stillWanted && !stillWanted()) {
         return settle(Promise.reject(Object.assign(serviceError(`'${wanted.collection}' is no longer wanted`, 'REFRESH_DROPPED'), { retryable: false })));
       }
@@ -2188,7 +1870,6 @@ export function createDataService({
           await guardedRead(name, () => spec.fetch(wanted, context), async (dto, touched, _startedAt, { store: writer }) => {
             if (touched.has(rowKey)) return;
             if (!dto) {
-              // Decided in turn with local writes to the row, on the row as it is then.
               await serial(`${label}:${rowKey}`, async () => {
                 const current = await store.getRaw?.(rowKey);
                 if (!current || current._dirty) return;
@@ -2200,7 +1881,6 @@ export function createDataService({
             }
             const prev = await store.getRaw?.(rowKey);
             const record = (spec.toRecord || ((value) => value))(dto, prev ? previousByKey([prev], keyPath).get(rowKey) : prev);
-            // One record leaves the collection's synced stamp as it was.
             await writer.reconcile([record], { prune: false, keepDirty: true, syncedAt: null });
           }, { isCurrent, storing });
           return;
@@ -2208,7 +1888,6 @@ export function createDataService({
         if (spec.read && !wanted.query && !wanted.window && typeof spec.scope !== 'function') {
           return readDeclared({ name, label, store, keyPath }, spec, wanted, isCurrent, { full, context, storing });
         }
-        // A query target prunes only its own rows; others the source's scope.
         let scope = typeof spec.scope === 'function' ? spec.scope(wanted) : () => true;
         if (wanted.query && typeof spec.scope !== 'function') {
           const { limit: _limit, cursor: _cursor, raw: _raw, where, ...range } = wanted.query;
@@ -2217,7 +1896,6 @@ export function createDataService({
             scope = (row) => held.has(String(row[keyPath]));
           } else if (typeof where === 'function') scope = (row) => where(row);
         }
-        // Only a read of the whole collection marks it synced.
         const whole = !wanted.query && typeof spec.scope !== 'function';
         return guardedRead(name, async () => snapshotRows(await spec.fetch(wanted, context)), (dtos, touched, _startedAt, turn) => (dtos === null ? NO_SNAPSHOT
           : reconcileFetched(turn.store, keyPath, { fetch: () => dtos, toRecord: spec.toRecord || ((dto) => dto), keyOf: spec.keyOf },
@@ -2228,7 +1906,6 @@ export function createDataService({
       state.flightForm = form;
       state.flightFull = full === true;
       const attempts = readAttempts((error) => {
-        // Only the read now in flight shows its failure.
         if (states.get(key) !== state || state.attempts !== attempts) return;
         state.state = isOnline() ? 'error' : 'offline'; state.error = { code: error?.code || null, status: error?.status ?? null, message: error?.message || String(error) };
         emitStatus();
@@ -2238,9 +1915,7 @@ export function createDataService({
       coverageSeq += 1;
       const flightSeq = coverageSeq;
       state.flightSeq = flightSeq;
-      // Only a read of every row answers a batched method that joins it.
       state.flightWhole = wholeRead;
-      // Fresh only if it stored and nothing overtook or purged it.
       const landed = (outcome) => {
         if (outcome === DROPPED) {
           if (state.state === 'refreshing') state.state = 'stale';
@@ -2265,8 +1940,6 @@ export function createDataService({
         state.state = 'fresh'; state.syncedAt = now(); state.error = null;
         if (wholeRead) wholeCovers.set(coverKey(form, name), Math.max(wholeCovers.get(coverKey(form, name)) || 0, flightSeq));
       };
-      // After a retryable REFRESH_TIMEOUT the read goes on in the background;
-      // its outcome lands here unless a later read of the target began.
       let answeredLate = false;
       const landLate = (outcome) => {
         if (!answeredLate || disposed || states.get(key) !== state || state.flight || state.flightSeq !== flightSeq) return;
@@ -2274,8 +1947,6 @@ export function createDataService({
         emitStatus();
       };
       state.flightJobKey = lanedKey('data', `${label}:${key}`);
-      // Whether anyone still waits for this read: an asker without
-      // `stillWanted` always does; otherwise any asker's own answer.
       const askers = { always: !stillWanted, wanted: new Set(stillWanted ? [stillWanted] : []) };
       const stillAsked = () => askers.always || [...askers.wanted].some((asker) => { try { return !!asker(); } catch (_) { return false; } });
       state.flightAskers = askers;
@@ -2284,15 +1955,11 @@ export function createDataService({
         ...(inForeground(name)
           ? { priority: PRIORITIES[priority] ?? PRIORITIES.normal, visible: mode === 'visible' }
           : { priority: PRIORITIES.background, visible: false }),
-        // The scheduler keeps a visible slot free beside it for bounded reads.
         whole: true,
-        // A read other runs wait on from inside their own starts past the visible cap.
         ...(spec.gate === true ? { gate: true } : {}),
-        // Never run, or run again, once this service is disposed, its reads
-        // paused, or no asker still waits for it.
+        // Never run, or run again, once this service is disposed or nobody still asks.
         valid: () => !disposed && cadenceFactor(name) !== Infinity && stillAsked(),
         run: attempts.run(async (isCurrent, helpers) => {
-          // Once begun, the read is finished and stored for whoever asks next.
           askers.always = true;
           let stopped = false;
           const value = await run(() => {
@@ -2325,11 +1992,6 @@ export function createDataService({
     }
   }
 
-  // With `wholeReadReuseMs`, a whole read is reused while nothing changed the
-  // rows (needs the feed for other tabs' changes): on a phone each read is
-  // several queued native SQLite calls, and repeated reads stalled boot. Kept
-  // briefly so the paint ceiling and age limit still apply. `own`: the rows
-  // were copied for this caller alone.
   const wholeReads = new Map();
   async function readWhole(name, store, raw) {
     const id = JSON.stringify([raw, name, formOf(jobContextNow())]);
@@ -2355,8 +2017,6 @@ export function createDataService({
 
   const service = {
     namespace,
-    // Copies without storage metadata. `raw` reads as writers see the
-    // collection (past the paint ceiling and age limit, tombstones, metadata).
     async read(collection, key, { raw = false, storageMetadata = false } = {}) {
       live();
       const { name, store } = local(collection);
@@ -2368,19 +2028,16 @@ export function createDataService({
       if (own) return rows.map(raw || storageMetadata ? asIs : bare);
       return rows.map(raw ? copyRow : project);
     },
-    // By a declared index (no `where`), or over the whole collection in key order.
     async query(collection, spec = {}) {
       live();
       const { store, decl } = local(collection);
       return runQuery(store, decl?.keyPath || 'id', spec);
     },
-    /** The caller's own `fetch(window, context)` stored through the read guard; `rethrow` to hear a failure. */
     async reconcileWindow(collection, options = {}) {
       live();
       const { name, store, decl } = local(collection);
       return reconcileWindow(name, store, decl?.keyPath || 'id', { ...options, context: jobContextNow() });
     },
-    /** A caller's single-record fetch, protected by the same read guard as a window. */
     async reconcileRecord(collection, key, { fetch, toRecord = (dto) => dto, keepDirty = false } = {}) {
       live();
       const { name, store, decl } = local(collection);
@@ -2388,7 +2045,6 @@ export function createDataService({
       const rowKey = String(key);
       const outcome = await guardedRead(name, fetch, async (dto, touched, _startedAt, turn) => {
         if (!dto) return undefined;
-        // A write, removal or eviction after transport began wins over its answer.
         if (touched.has(rowKey)) return (await store.get(rowKey)) || undefined;
         const previous = await store.getRaw(rowKey);
         const record = toRecord(dto, previous ? previousByKey([previous], keyPath).get(rowKey) : undefined);
@@ -2402,10 +2058,7 @@ export function createDataService({
       }, { isCurrent: () => !disposed });
       return outcome === DROPPED ? (await store.get(rowKey)) || undefined : outcome;
     },
-    /**
-     * A store handle whose writes go in the collection's turn, so a read on its
-     * way never undoes them; after dispose they reject as a closed store's do.
-     */
+    // Writes go in the collection's turn, so a read on its way never undoes them.
     writer(collection) {
       live();
       const { name, store } = local(collection);
@@ -2420,10 +2073,6 @@ export function createDataService({
         },
       });
     },
-    /**
-     * Calls `listener(notice)` whenever the collection may have changed, without
-     * reading it. `notice` is `{ keys }` when every changed key is known, else null.
-     */
     watch(collection, listener) {
       live();
       const { store, label } = local(collection);
@@ -2433,7 +2082,6 @@ export function createDataService({
       };
       const offStore = typeof store.onChange === 'function' ? store.onChange(fire) : store.subscribe(() => fire(null));
       const offFeed = feed?.subscribe((event) => {
-        // Another owner's change shares the label but none of this service's rows.
         if (!ownsChange(event)) return;
         if (event.type === 'purge' && !event.label) fire(null);
         else if (event.label === label) fire(event.type === 'purge' ? null : event);
@@ -2441,11 +2089,6 @@ export function createDataService({
       });
       return held(() => { offStore?.(); offFeed?.(); });
     },
-    /**
-     * `target`: a collection name, `{ collection, key }` or
-     * `{ collection, query: { index, … } }`. Fires with the current value, then
-     * whenever it changes — in this tab or another.
-     */
     subscribe(target, callback, { onError, storageMetadata = false } = {}) {
       live();
       const wanted = targetOf(target);
@@ -2466,11 +2109,6 @@ export function createDataService({
           callback(value);
         }).catch(report);
       };
-      // A whole-collection subscription keeps the keys of its last value in
-      // the same order, so a change that names its keys re-reads only those
-      // rows. A change with unknown keys, or a new key in a store that does
-      // not read in key order (`keyOrdered`), reads the collection again.
-      // Changes that arrive while a read runs are read together after it.
       const keyPath = decl?.keyPath || 'id';
       const project = storageMetadata ? copyRow : clean;
       let lastKeys = null;
@@ -2534,7 +2172,6 @@ export function createDataService({
             const keys = [...pending];
             pending = new Set();
             pendingWhole = false;
-            // Each read starts from the value the previous one delivered.
             // eslint-disable-next-line no-await-in-loop
             const next = readAll ? await readEveryRow() : await readKeys(keys);
             if (!active) return;
@@ -2544,10 +2181,6 @@ export function createDataService({
               keyOrdered = next.ordered;
               if (next.changed) { skipped = behind; behind = true; last = next.value; }
             }
-            // A value a newer change already supersedes is not delivered; once
-            // caught up, the caller gets the latest (in its own array, so
-            // sorting it leaves the kept order alone) unless it is the one
-            // delivered last.
             if (behind && active && !pendingWhole && !pending.size) {
               behind = false;
               const repeat = skipped && shown !== undefined && same(last, shown);
@@ -2562,20 +2195,16 @@ export function createDataService({
         } finally {
           draining = false;
         }
-        // After a failure the next change reads again; nothing retries on its own.
         if (!failed && active && (pendingWhole || pending.size)) catchUp();
       };
       const changed = (keys) => {
         if (!active) return;
         if (!whole) { emit(); return; }
-        // Keys named during the first read are read by key after it: a row
-        // the first read already holds is replaced by what the key reads now.
         if (Array.isArray(keys)) keys.forEach((key) => pending.add(String(key)));
         else pendingWhole = true;
         if (pending.size > KEYED_REREAD_KEYS) { pendingWhole = true; pending = new Set(); }
         catchUp();
       };
-      // A change listener reads only this target, however large the collection.
       const offStore = typeof store.onChange === 'function'
         ? store.onChange((notice) => changed(notice?.keys)) : store.subscribe(() => changed(null));
       const offFeed = feed?.subscribe((event) => {
@@ -2587,14 +2216,6 @@ export function createDataService({
       if (whole) catchUp(); else emit();
       return held(() => { active = false; offStore?.(); offFeed?.(); });
     },
-    /**
-     * Registers how a collection syncs: `fetch(target)`, optional `budgetKey`,
-     * `gate`, `toRecord(dto, prev)`, `ingestRecord(dto, prev)` (how a row
-     * stored from outside the declared read, `ingest`, merges with the
-     * stored row of its key), `keyOf(dto)`, `scope(target)` (rows in
-     * scope missing from the answer are pruned, dirty ones never), `read`,
-     * `methods` and `push(command, record)`.
-     */
     source(collection, spec) {
       live();
       const { name } = local(collection);
@@ -2608,7 +2229,6 @@ export function createDataService({
       const before = sources.get(name) || resolve(name)?.decl?.source;
       sources.set(name, spec);
       if (before !== spec) retireStrictMethods(name, before, spec);
-      // With a push, dirty rows this service has no record of (it was rebuilt) are sent again.
       if (typeof spec.push === 'function') {
         const { label, store, decl } = local(collection);
         tracked(restoreDirty({ name, label, store, decl })).catch(() => {});
@@ -2619,44 +2239,20 @@ export function createDataService({
         retireStrictMethods(name, spec, resolve(name)?.decl?.source);
       };
     },
-    /** Whether `collection` sends its local changes (a push is registered or declared). */
     sends(collection) {
       const { name, decl } = local(collection);
       return typeof pushOf(name, decl) === 'function';
     },
-    /** Whether `collection` can refresh (a source is registered or declared). */
     hasSource(collection) {
       const { name, decl } = local(collection);
       return !!(sources.get(name) || decl?.source);
     },
-    /**
-     * A background sync of `target` through the scheduler, coalesced by target.
-     * `mode: 'silent'` never rejects (status carries the error); `'visible'`
-     * rejects. `maxAge` skips a fetch while the last sync is younger. `full`
-     * reads a declared read whole. `fromNow` never joins a read in flight.
-     * `nextAttempt` (host-internal, collection or exact key only) waits for a
-     * failed read's next attempt instead of its previous error. `retry` (a
-     * person asked) runs a read waiting out its backoff now, where the
-     * scheduler can, and answers with that attempt.
-     *
-     * `{ collection, method, params }` runs a refresh method: never more often
-     * than its `cadenceMs`, whatever `maxAge` asks; invalid params reject even
-     * in silent mode. `sinceWrite` (with `fromNow`) accepts any read begun
-     * after this device's last write. `retry` ends a refusal hold.
-     */
     refresh(target, options = {}) {
       const asked = options?.mode === 'visible' ? new Error() : null;
       const answer = refreshAs(target, options, jobContextNow());
       if (!asked) return answer;
       return answer.catch((error) => { throw timedOutFor(error, targetOf(target).collection, asked); });
-    },    /**
-     * Stores server rows a domain received as synced rows; nothing is pushed
-     * and an unsent local write is kept. `replace`: the complete set for
-     * `scope`, removing rows it leaves out (never dirty ones). Only `replace`
-     * or `complete` stamps the collection synced, and only if every row was
-     * retained. `unsaved`: keys kept in memory only. `ifEmpty`: stored only
-     * while the collection holds none, as rows any read replaces.
-     */
+    },
     async ingest(collection, rows, options = {}) {
       live();
       const { name, store, decl } = local(collection);
@@ -2664,7 +2260,6 @@ export function createDataService({
       const ingestForm = formOf(jobContextNow());
       watchChanges(name, store);
       return inTurn(name, async (turn) => {
-        // A replacement voids a cursor's meta; a few rows keep it in step.
         const tracksMeta = !!(sources.get(name) || decl?.source)?.read?.cursor;
         if (options?.ifEmpty === true) {
           if ((await store.getAllRaw()).length) return { written: 0 };
@@ -2697,12 +2292,6 @@ export function createDataService({
         return result;
       });
     },
-    /**
-     * Applies a server change (`patch`) to the rows of `keys` in one
-     * revision-checked step per row, so another tab's change that lands first
-     * is kept; gone rows stay gone, unsent writes are kept, nothing is pushed.
-     * Resolves `{ patched, unsaved, skipped: [{ key, reason }], refused: [{ key, reason }] }`.
-     */
     async patchRows(collection, keys, patch) {
       live();
       const { name, store, decl } = local(collection);
@@ -2724,12 +2313,6 @@ export function createDataService({
         return outcome;
       });
     },
-    /**
-     * Internal canonical-store hook: replace or remove a synced row only
-     * while its current raw value passes `when`. The predicate runs inside
-     * each revision-checked commit; a receipt is opaque storage metadata.
-     * No push, outbox, or whole-source freshness is created.
-     */
     async replaceSyncedRow(collection, key, record, { when, receipt = null, guardKey = null } = {}) {
       live();
       const generation = fenceGeneration;
@@ -2744,10 +2327,6 @@ export function createDataService({
         when: (previous, guard) => !disposed && generation === fenceGeneration && when(previous, guard) === true,
       }));
     },
-    /**
-     * `{ op: 'put', record } | { op: 'patch', key, patch } | { op: 'delete', key }`,
-     * written at once (dirty until pushed). `wait: true` resolves once sent.
-     */
     async mutate(collection, command, { wait = false } = {}) {
       live();
       const context = jobContextNow();
@@ -2757,7 +2336,6 @@ export function createDataService({
       if (!['put', 'patch', 'delete'].includes(command?.op)) throw serviceError('mutate: op must be put, patch or delete', 'DATA_INVALID');
       const key = String(command.op === 'put' ? command.record?.[keyPath] : command.key);
       const push = pushOf(name, decl);
-      // One local write per row at a time, so each push knows the revision it wrote.
       const written = await inTurn(name, ({ store: writer }) => serial(`${label}:${key}`, async () => {
         let record = null;
         let held = null;
@@ -2768,14 +2346,12 @@ export function createDataService({
           record = bare({ ...((await store.getRaw(key)) || {}), ...command.patch });
           await writer.put(record);
         } else if (typeof push === 'function' && typeof store.markRow === 'function' && (held = await store.getRaw(key))) {
-          // A hidden tombstone until sent, so a reload sends it again; key only, so no indexed value.
           await writer.markRow(key, { _deleted: true }, { dirty: true, body: { [keyPath]: held[keyPath] } });
         } else await writer.delete(key);
         const revision = typeof push !== 'function' ? undefined : (await store.getRaw(key))?._rev;
         return { record, revision };
       }));
       if (typeof push !== 'function') return { key, pushed: false };
-      // Fenced meanwhile: the row stays unsent on disk for its principal.
       if (generation !== fenceGeneration || disposed) return { key, pushed: false };
       const change = enqueuePush({ name, label, key, store, decl }, {
         command, record: written.record, revision: written.revision, context,
@@ -2784,11 +2360,6 @@ export function createDataService({
       change.catch(() => {});
       return { key, pushed: false };
     },
-    /**
-     * Queued and failed pushes, one per row, for a pending-sync view. `state`
-     * is queued, sending, failed (sent again on retry or reconnect) or
-     * access_changed (refused for access; sent again only when asked).
-     */
     pending(collection = null) {
       const wanted = collection === null ? null : local(collection).name;
       return [...outbox.values()].filter((entry) => wanted === null || entry.collection === wanted).map((entry) => ({
@@ -2804,7 +2375,6 @@ export function createDataService({
         restored: entry.restored,
       }));
     },
-    /** Sends a row's unsent changes again (a dirty row with none in memory as the stored row). */
     async retry(collection, key) {
       const { name, label, store, decl } = local(collection);
       const id = `${label}:${String(key)}`;
@@ -2817,7 +2387,6 @@ export function createDataService({
         entry = outbox.get(id) || restoreEntry({ name, label, key: String(key), store, decl }, row);
       }
       if (!entry.draining && ['failed', 'access_changed'].includes(entry.state)) {
-        // A person asked: clear an access refusal and send the row once, as it is now.
         if (entry.state === 'access_changed') {
           try { await inTurn(name, ({ store: writer }) => writer.markRow?.(String(key), { _pushRefused: null })); } catch (_) { /* sent anyway */ }
           const row = await store.getRaw?.(String(key));
@@ -2832,21 +2401,19 @@ export function createDataService({
       }
       return drain(entry);
     },
-    /** Sends again every change held until its account was displayed; the host calls it then. */
     retryHeld() {
       return Promise.allSettled([...outbox.values()].filter((entry) => heldNow(entry) && !entry.draining).map((entry) => {
         entry.state = 'queued';
         return drain(entry);
       }));
     },
-    /** Sends again every change that failed (never one refused for access), e.g. on reconnect. */
+    // Never resends one refused for access.
     retryFailed() {
       return Promise.allSettled([...outbox.values()].filter((entry) => entry.state === 'failed' && !entry.draining).map((entry) => {
         entry.state = 'queued';
         return drain(entry);
       }));
     },
-    /** Drops queued changes from memory (principal switch); rows stay unsent on disk for its next service. */
     fence() {
       fenceGeneration += 1;
       outbox.forEach((entry) => {
@@ -2854,11 +2421,9 @@ export function createDataService({
         entry.changes.splice(0).forEach((change) => change.reject(serviceError('Change fenced', 'DATA_FENCED')));
       });
       outbox.clear();
-      // Their jobs end now, queued retries included.
       try { scheduler.revalidate?.(); } catch (_) { /* a scheduler without it checks before each run */ }
       emitStatus();
     },
-    /** Drops a pending local change, in turn with local writes so one made just before goes too. */
     async discard(collection, key) {
       const { name, label } = local(collection);
       await inTurn(name, ({ store: writer }) => serial(`${label}:${String(key)}`, async () => {
@@ -2867,13 +2432,8 @@ export function createDataService({
       }));
       emitStatus();
     },
-    /**
-     * Clears a collection's cached rows, or only `keys`, or an index range
-     * (`query`). Dirty rows stay unless `force`, which drops their unsent changes.
-     */
     async purge(collection, options = {}) {
       live();
-      // A misspelt option is refused rather than clear the whole collection.
       const invalid = !options || typeof options !== 'object' || Array.isArray(options)
         || Object.keys(options).some((field) => !['force', 'keys', 'query'].includes(field))
         || (options.force !== undefined && typeof options.force !== 'boolean')
@@ -2889,8 +2449,7 @@ export function createDataService({
       const range = query ? wholeRange(query, 'purge') : null;
       const whole = !Array.isArray(keys) && !query;
       return inTurn(name, async (turn) => {
-        // A barrier as wide as the purge, whatever it finds: a read begun before
-        // never brings a purged (or not yet held) row back.
+        // Recorded so a read on its way never brings a purged row back.
         if (Array.isArray(keys)) recordEffect(name, { changedKeys: keys.map(String) });
         else recordEffect(name, { whole: true });
         if (whole) voidReads(name);
@@ -2908,10 +2467,7 @@ export function createDataService({
         return { removed };
       });
     },
-    /**
-     * Keeps the newest `keep` rows of an index range (the last in index
-     * order) and removes the older ones. Dirty rows are never removed.
-     */
+    // Dirty rows are never removed.
     async trim(collection, spec = {}) {
       live();
       const {
@@ -2940,7 +2496,6 @@ export function createDataService({
           throw serviceError('status: the method target is outside its declared contract', 'DATA_INVALID');
         }
         const params = methodParams(name, wanted.method, method, wanted.params);
-        // A batched group covers several id sets, so it has no single query receipt.
         if (!method.batch) {
           const group = methodGroups.get(JSON.stringify([formOf(jobContextNow()), name, wanted.method, params]));
           return { ...describeMethod(group?.state || { state: 'stale', syncedAt: null, error: null }, method.strictReceipt === true),
@@ -2959,14 +2514,12 @@ export function createDataService({
           ? JSON.stringify([state.flightSeq || 0, covered, voidOf(name), lossOf(name)]) : null,
       };
     },
-    /** Status of every target this service has refreshed. */
     statuses() {
       return [...states.entries()].map(([key, state]) => {
         const [collection, rowKey, window] = JSON.parse(key);
         return { collection, label: labelOf(collection), key: rowKey, window, ...describeState(principalState(state)) };
       });
     },
-    /** Status of every non-batched refresh method read asked as the current account form. */
     methodStatuses() {
       const form = formOf(jobContextNow());
       return [...methodGroups.entries()].flatMap(([groupKey, group]) => {
@@ -2981,7 +2534,6 @@ export function createDataService({
       });
     },
     onStatusChange(listener) { listeners.add(listener); return () => listeners.delete(listener); },
-    /** Whether nothing is queued or running. */
     idle() {
       return outbox.size === 0 && writes.size === 0 && turns.size === 0 && working === 0
         && ![...states.values()].some((state) => state.flight) && !methodsWorking();
@@ -2995,7 +2547,6 @@ export function createDataService({
       watchedStores.clear();
       listeners.clear();
       sources.clear();
-      // Unsent rows stay dirty on disk; the next service sends them again.
       fenceGeneration += 1;
       outbox.forEach((entry) => {
         entry.discarded = true;
@@ -3011,11 +2562,9 @@ export function createDataService({
       wholeCovers.clear();
       knownCollections.clear();
       windowReads.clear();
-      // Queued jobs and retries end now: none runs for a disposed service.
       try { scheduler.revalidate?.(); } catch (_) { /* a scheduler without it checks before each run */ }
     },
   };
-  // Every call but the synchronous ones counts as work until it settles.
   Object.keys(service).forEach((method) => {
     const call = service[method];
     if (typeof call !== 'function' || DATA_SERVICE_SYNC_METHODS.includes(method)) return;

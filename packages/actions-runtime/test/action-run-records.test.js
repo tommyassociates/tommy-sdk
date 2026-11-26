@@ -1,8 +1,3 @@
-/**
- * action-run-records.test.js (ac3) — a scripted trigger→condition→activity
- * chain produces queryable records with per-step detail (§5), chain stamps
- * (§7.1), the replay entry point, dead-letter, and the D21 suppression tally.
- */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 
@@ -49,7 +44,6 @@ const timesheets = {
       retry: { maxAttempts: 2 },
     },
   },
-  // The declared Action: time-clock.clock_out -> (shift_is_open) -> record_timesheet
   actions: {
     record_timesheet_on_clock_out: {
       title: 'Record timesheet on clock-out',
@@ -124,7 +118,6 @@ describe('action-run records', () => {
     expect(invokes[0].activityName).toBe('timesheets.record_timesheet');
     expect(invokes[0].status).toBe('succeeded');
     expect(invokes[0].rootRunId).toBe(emitRecord.rootRunId);
-    // inputMap assembled base-four sources + default:
     expect(w.recorded[0]).toEqual({ shiftId: 's-77', note: 'auto', fallbackRate: 0 });
     expect(invokes[0].durationMs).toBeGreaterThanOrEqual(0);
   });
@@ -146,7 +139,6 @@ describe('action-run records', () => {
     await new Promise((resolve) => { setTimeout(resolve, 20); });
     const [dead] = await failing.broker.records.query({ kind: 'invoke', status: 'dead_letter' });
 
-    // "Fix the bug", then replay from the inspector with the SAME args.
     failing.recorded.length = 0;
     const fixedWorld = failing;
     fixedWorld.broker.registerMp(timesheets, {
@@ -170,7 +162,6 @@ describe('action-run records', () => {
   });
 
   it('D21: a trigger with zero consumers is suppressed with a per-(trigger,day) tally, no per-event record', async () => {
-    // Disable the required action is forbidden; use a fresh world without the action wired.
     const issuer = createFakeIssuer();
     const broker = createBroker({ capabilityService: issuer });
     broker.registerMp(timeClock, { handlers: {} });

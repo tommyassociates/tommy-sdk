@@ -1,8 +1,6 @@
 // @vitest-environment node
 /* eslint no-underscore-dangle: "off" */
-/** Conditional canonical replacements on memory and both transactional engines. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-// Node ESM requires the file extensions on the package's relative modules.
 // eslint-disable-next-line import/extensions
 import { createDataService, createDataStore, createMemoryStoreBackend, createDataManager } from '../src/index.js';
 // eslint-disable-next-line import/extensions
@@ -10,11 +8,9 @@ import { createHostStorePort } from '../src/host-store/index.js';
 // eslint-disable-next-line import/extensions
 import { DATABASES, identity } from './helpers/host-databases.js';
 
-/** A host-store-backed collection the way the app opens one. */
 function transactionalBackend(port, opened, options) {
   let handle;
   const ready = () => { handle ||= port.open(options); return handle; };
-  // A writer's read (`aged`) includes rows past the age limit, as the app's backend asks.
   const read = async ({ aged = false, ...input }) => {
     const h = await ready();
     const result = await port.read({ handle: h.handle, expectedEpoch: h.epoch, ...input, ...(aged ? { includeAged: true } : {}) });
@@ -31,7 +27,6 @@ function transactionalBackend(port, opened, options) {
     async getAll({ aged = false } = {}) {
       const rows = []; let afterKey = null;
       do {
-        // Each page follows the previous page's cursor.
         // eslint-disable-next-line no-await-in-loop
         const page = await read({ afterKey, limit: 100, aged });
         rows.push(...page.rows.map((row) => row.value));
@@ -169,8 +164,6 @@ describe.each(ENGINES)('conditional canonical rows on %s', (_name, create) => {
     const held = vi.spyOn(backend, method).mockImplementationOnce(async (...args) => { await gate; return original(...args); });
     const first = data.replaceSyncedRow(NAME, KEY, row('first'), { when: () => true });
     await vi.waitFor(() => expect(held).toHaveBeenCalled());
-    // This deliberately invalid nested body is refused after the queued turn;
-    // mutating it to a valid body cannot change what the ask submitted.
     const submitted = { id: KEY, data: { nested: 'original' } };
     const pending = data.replaceSyncedRow(NAME, KEY, submitted, { when: () => true });
     pending.catch(() => {});
@@ -180,7 +173,6 @@ describe.each(ENGINES)('conditional canonical rows on %s', (_name, create) => {
     await first;
     await expect(pending).rejects.toThrow(/recordSchema/);
     expect(await data.read(NAME, KEY)).toEqual(row('first'));
-    // The low-level memory hook also snapshots rather than sharing nested data.
     const nestedBackend = createMemoryStoreBackend();
     const nested = createDataStore({ name: NAME, backend: nestedBackend });
     const body = { id: KEY, data: { nested: 'original' } };
@@ -281,7 +273,6 @@ describe.each(DATABASES)('pinned canonical beforeimages on %s', (_name, create) 
     release();
     await expect(pending).resolves.toEqual({ replaced: false });
     expect(await data.read(NAME, KEY)).toEqual(latest[0] || null);
-    // A new command created after this canonical receipt remains legitimate.
     const fresh = await store.getRaw(KEY);
     await expect(data.replaceSyncedRow(NAME, KEY, row('fresh'), {
       guardKey: '~read',
@@ -375,7 +366,6 @@ describe.each(ENGINES)('projected MP handles on %s', (_name, create) => {
         when: () => false, receipt: 'public-attempt', guardKey: '~read',
       });
       expect(await handle.getRaw(KEY)).not.toHaveProperty('_writeReceipt');
-      // Neither the new options nor the internal deletion flag enter the MP contract.
       await expect(handle.delete(KEY, { when: () => false, guardKey: '~read' })).resolves.toBeUndefined();
       expect(await handle.getRaw(KEY)).toBeUndefined();
       await expect(handle.delete(KEY)).resolves.toBeUndefined();

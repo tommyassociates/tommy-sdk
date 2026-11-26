@@ -1,11 +1,3 @@
-/**
- * record-read-through.test.js — DataApi.record, the single-record read-through.
- *
- * The bug it exists to prevent: a detail/edit surface reading `store.get(id)`
- * alone treats "not cached" as "no data" and paints an empty form. Timesheets
- * shipped exactly that — an edit form for any timesheet outside the loaded
- * window rendered blank over `Total Hours 0m` (measured 2026-09-10).
- */
 import { describe, it, expect, vi } from 'vitest';
 import { createDataManager } from '../src/index.js';
 
@@ -41,7 +33,6 @@ describe('DataApi.record', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  // THE REGRESSION. Cache-only returns undefined here, and the caller paints blank.
   it('fetches on a MISS and writes the record through', async () => {
     const data = manager();
     const fetch = vi.fn().mockResolvedValue({ id: '2', shiftId: 's2', hours: 8 });
@@ -51,7 +42,6 @@ describe('DataApi.record', () => {
     expect(row, 'a cache miss must reach the server, not return undefined').toMatchObject({ id: '2', hours: 8 });
     expect(fetch).toHaveBeenCalledWith('2');
 
-    // Written through: the second read is served from cache.
     const again = await rec.get('2');
     expect(again).toMatchObject({ id: '2', hours: 8 });
     expect(fetch, 'the fetched record must be cached, or every read hits the network').toHaveBeenCalledTimes(1);
@@ -71,9 +61,6 @@ describe('DataApi.record', () => {
     expect(await data.record('entries', { fetch }).get('404')).toBeUndefined();
   });
 
-  // "Unreachable" and "gone" are different answers. Conflating them is how the
-  // blank form happened, so a failing fetch must REJECT rather than resolve
-  // undefined — the caller decides what to show.
   it('propagates a fetch failure instead of masking it as a miss', async () => {
     const data = manager();
     const fetch = vi.fn().mockRejectedValue(new Error('offline'));
@@ -164,7 +151,6 @@ describe('DataApi.record', () => {
     release();
     await expect(second).resolves.toEqual({ key: '5', pushed: true });
     expect(pushed).toEqual([1, 7]);
-    // A record fetched where nothing waits to be sent is stored synced.
     const fetched = data.record('entries', { fetch: async () => ({ id: '8', shiftId: 's8', hours: 2 }) });
     await fetched.get('8');
     expect(await data.read('entries', '8', { raw: true })).toMatchObject({ hours: 2, _dirty: false });

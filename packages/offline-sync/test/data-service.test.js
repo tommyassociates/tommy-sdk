@@ -1,9 +1,4 @@
 // @vitest-environment node
-/**
- * The data service surface over the DataStore layer, on memory and on the
- * host store (both engines): read/query/subscribe/refresh/mutate/purge/status,
- * cross-tab change notification, MP namespace confinement.
- */
 import { describe, it, expect, vi } from 'vitest';
 import { createDataService, createDataStore, createMemoryStoreBackend, createLocalStorageBackend, createDataManager } from '../src/index.js';
 import { PREFS_DECL } from '../src/manager.js';
@@ -19,11 +14,9 @@ function memoryService(options = {}) {
   return createDataService({ resolve: (name) => (stores.has(name) ? { store: stores.get(name), decl: { keyPath: 'id' } } : null), ...options });
 }
 
-/** A host-store-backed collection the way the app opens one. */
 function transactionalBackend(port, opened, options) {
   let handle;
   const ready = () => (handle ||= port.open(options));
-  // A writer's read (`aged`) includes rows past the age limit, as the app's backend asks.
   const read = async ({ aged = false, ...input }) => {
     const h = await ready();
     const result = await port.read({ handle: h.handle, expectedEpoch: h.epoch, ...input, ...(aged ? { includeAged: true } : {}) });
@@ -63,7 +56,6 @@ describe('data service on memory stores', () => {
     data.source('chats.messages', { fetch });
     const first = data.refresh('chats.messages', { mode: 'visible', maxAge: 0 }).catch((error) => error);
     await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
-    // The host's invalidateCollection binding purges the collection.
     if (invalidated) await data.purge('chats.messages', {});
     let answered = false;
     const second = data.refresh('chats.messages', { mode: 'visible', maxAge: 0 });
@@ -157,14 +149,12 @@ describe('data service on memory stores', () => {
       fetch: async (target, context) => { read.push(context.principal.accountType); if (read.length === 1) await readGate; return []; },
       push: async (command, record, context) => { pushed.push(context.principal.accountType); },
     });
-    // A change asked as the team; the form changes while its row is written.
     const change = data.mutate('chats.messages', { op: 'put', record: { id: 'a' } }, { wait: true });
     await settle();
     form = { accountType: 'TeamMember', accountId: '90' };
     releasePut();
     await change;
     expect(pushed).toEqual(['Team']);
-    // A read asked as the member while one as the team is in flight; the form changes again before it goes.
     form = { accountType: 'Team', accountId: '44' };
     const first = data.refresh('chats.messages', { mode: 'visible' });
     await settle();
@@ -198,7 +188,6 @@ describe('data service on memory stores', () => {
     const service = memoryService();
     await service.ingest('chats.messages', [{ id: 'a', chat_id: 'c', seq: 1 }]);
     const refused = (range) => expect(service.query('chats.messages', { index: 'byChat', ...range })).rejects.toMatchObject({ reason: 'unserializable' });
-    // `equals` names every field of the index; a part is a `prefix`.
     await refused({ equals: ['c'] });
     await refused({ equals: ['c', 1, 'x'] });
     await refused({ prefix: ['c', 1, 'x'] });
@@ -228,8 +217,6 @@ describe('data service on memory stores', () => {
     const answer = await service.query('chats.messages', { index: 'byChat', anyOf: [['c', 1], 'c'], limit: 5000 });
     expect(answer.rows).toHaveLength(5000);
     expect(answer.complete).toBe(true);
-    // The second value's rows the first already gave are skipped a store page
-    // (100 rows) at a time, not one query per row: about 50 pages a value.
     expect(query.mock.calls.length).toBeLessThanOrEqual(102);
   });
 
@@ -240,7 +227,6 @@ describe('data service on memory stores', () => {
     const rows = Array.from({ length: 5000 }, (_, at) => ({ id: `m${at}`, chat_id: 'c', seq: at }));
     await service.ingest('chats.messages', rows);
     expect(getRaw).not.toHaveBeenCalled();
-    // A complete set checks it was kept in one read of the collection.
     await service.ingest('chats.messages', rows, { complete: true });
     expect(getRaw).not.toHaveBeenCalled();
   });
@@ -271,7 +257,6 @@ describe('data service on memory stores', () => {
     await data.mutate('chats.messages', { op: 'put', record: { id: 'd', chat_id: 7, seq: 5 } });
     await settle();
     expect(seen).toEqual([['b', 'a'], ['b', 'd', 'a']]);
-    // A change that leaves the value the same does not fire again.
     await data.mutate('chats.messages', { op: 'put', record: { id: 'e', chat_id: 12, seq: 9 } });
     await settle();
     expect(seen).toHaveLength(2);
@@ -317,7 +302,6 @@ describe('data service on memory stores', () => {
     fetch.mockRejectedValueOnce(Object.assign(new Error('Overloaded'), { status: 503 }));
     await expect(data.refresh('chats.messages', { mode: 'visible', priority: 'visible' })).rejects.toMatchObject({ status: 503 });
     expect(requests.at(-1)).toMatchObject({ visible: true, priority: 0 });
-    // Rows already shown stay through failed refreshes.
     expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['a']);
   });
 
@@ -342,7 +326,6 @@ describe('data service on memory stores', () => {
     await settle();
     expect(data.pending()).toEqual([expect.objectContaining({ key: 'draft', state: 'access_changed', attempts: 1 })]);
     expect((await data.read('chats.messages', 'draft', { raw: true }))._dirty).toBe(true);
-    // A refusal by code reads the same.
     push.mockImplementationOnce(async () => { throw Object.assign(new Error('Denied'), { code: 'PermissionDenied' }); });
     await data.mutate('chats.messages', { op: 'put', record: { id: 'other', chat_id: 7, seq: 3 } });
     await settle();
@@ -389,7 +372,6 @@ describe('data service on memory stores', () => {
     expect(data.pending()).toEqual([expect.objectContaining({ key: 'a', changes: 2, state: 'sending', op: 'patch' })]);
     releases[0]();
     await vi.waitFor(() => expect(push).toHaveBeenCalledTimes(2));
-    // The first push is confirmed, but the row has a later local write.
     expect((await data.read('chats.messages', 'a', { raw: true }))._dirty).toBe(true);
     releases[1]();
     await expect(second).resolves.toEqual({ key: 'a', pushed: true });
@@ -407,7 +389,6 @@ describe('data service on memory stores', () => {
     await settle();
     expect(first.pending()).toEqual([expect.objectContaining({ key: 'a', state: 'failed' })]);
     first.dispose();
-    // A rebuilt service sends it when its push is registered.
     const push = vi.fn(async () => {});
     const second = make();
     second.source('chats.messages', { fetch: async () => [], push });
@@ -416,7 +397,6 @@ describe('data service on memory stores', () => {
     await vi.waitFor(async () => expect((await store.getRaw('a'))._dirty).toBe(false));
     expect(second.pending()).toEqual([]);
     second.dispose();
-    // A declared push with no registration is sent on retry.
     await store.put({ id: 'b', chat_id: 7, seq: 4 });
     const declared = vi.fn(async () => {});
     const third = make({ keyPath: 'id', push: declared });
@@ -505,7 +485,6 @@ describe('MP data API confinement', () => {
   });
 
   it('keeps each world\'s changes apart on a shared scheduler: the same store and key in two accounts both send', async () => {
-    // A scheduler that joins a job to one already queued under the same key, as the host's does.
     const queued = new Map();
     let release;
     const gate = new Promise((resolve) => { release = resolve; });
@@ -541,7 +520,6 @@ describe('MP data API confinement', () => {
     const fetch = () => new Promise((resolve) => { answer = resolve; });
     const reading = kind === 'liveQuery' ? data.liveQuery('shifts', { fetch }).revalidate() : data.windowCache('shifts', { fetch }).sync('week');
     await settle();
-    // Newer than the read: an ingest of row 1, and a removal of row 2.
     await data.ingest('shifts', [{ id: '1', at: 'moved' }]);
     await data.purge('shifts', { keys: ['2'] });
     answer([{ id: '1', at: 'mon' }, { id: '2', at: 'tue' }]);
@@ -556,7 +534,6 @@ describe('MP data API confinement', () => {
     let answer;
     const revalidating = data.liveQuery('shifts', { fetch: () => new Promise((resolve) => { answer = resolve; }) }).revalidate();
     await settle();
-    // A detail read fetches a row the list did not have yet.
     await data.record('shifts', { fetch: async (id) => ({ id, at: 'tue' }) }).get('2');
     answer([{ id: '1', at: 'mon' }]);
     await revalidating;
@@ -668,7 +645,6 @@ describe('MP data API confinement', () => {
     try {
       const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, viewer: 'user-7' });
       await data.prefs.set('layout', 'grid');
-      // Each too big to save; the second past what the refused ones may hold.
       await expect(data.prefs.set('big1', 'x'.repeat(600000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
       await expect(data.prefs.set('big2', 'x'.repeat(600000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
       await data.prefs.remove('big1');
@@ -687,7 +663,6 @@ describe('MP data API confinement', () => {
     await expect(data.windowCache('cache.rows', { fetch: async () => [{ id: '1' }] }).sync('week')).resolves.toEqual([{ id: '1' }]);
     await expect(data.liveQuery('cache.rows', { fetch: async () => [{ id: '2' }] }).revalidate()).resolves.toEqual([{ id: '2' }]);
     await expect(data.record('cache.rows', { fetch: async (id) => ({ id: String(id) }) }).get('3', { refresh: true })).resolves.toMatchObject({ id: '3' });
-    // Read by its declared name, and by its full one; another namespace's name stays refused.
     expect((await data.read('cache.rows')).map((row) => row.id).sort()).toEqual(['2', '3']);
     expect((await data.read('mp.reports.cache.rows')).map((row) => row.id).sort()).toEqual(['2', '3']);
     await expect(data.read('chats.rows')).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
@@ -724,7 +699,6 @@ describe('MP data API confinement', () => {
       ...inner,
       getAll: async (...args) => {
         const rows = await inner.getAll(...args);
-        // The load's read only: it answers the rows it read, once released.
         if (holdReads) { holdReads = false; await gate; }
         return rows;
       },
@@ -735,7 +709,6 @@ describe('MP data API confinement', () => {
       backendFactory: (_db, storeName) => (storeName === 'prefs' ? held : createMemoryStoreBackend()) });
     holdReads = true;
     const loading = data.prefs.ready();
-    // A set saves while the load, which read 'grid', is still on its way.
     await data.prefs.set('layout', 'list');
     release();
     await loading;
@@ -765,7 +738,6 @@ describe('MP data API confinement', () => {
       await data.prefs.set('layout', 'grid');
       await expect(data.prefs.set('big', 'x'.repeat(600000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
       await expect(data.prefs.set('layout', 'x'.repeat(600000))).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
-      // Each reads as it was saved: nothing, and the earlier choice.
       expect(data.prefs.get('big', 'none')).toBe('none');
       expect(data.prefs.get('layout')).toBe('grid');
       await data.prefs.set('theme', 'dark');
@@ -784,7 +756,6 @@ describe('MP data API confinement', () => {
     await cache.reconcile([{ id: '1' }, { id: '2' }], { prune: false });
     await cache.reconcile([{ id: '3' }], { prune: false });
     expect(await cache.getAll()).toHaveLength(2);
-    // Nor does window retention: an older window's rows stay.
     const paged = createDataStore({ name: 'notes', backend: createMemoryStoreBackend(), syncStrategy: 'last_write_wins', maxWindows: 1 });
     await paged.reconcile([{ id: 'a' }], { prune: false, windowKey: 'mon' });
     await paged.reconcile([{ id: 'b' }], { prune: false, windowKey: 'tue' });
@@ -805,7 +776,6 @@ describe('MP data API confinement', () => {
       await data.prefs.set('a', 1);
       full = true;
       await expect(data.prefs.remove('a')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
-      // Still there, as saved.
       expect(data.prefs.get('a')).toBe(1);
     } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
   });
@@ -848,7 +818,6 @@ describe('MP data API confinement', () => {
       const store = createDataStore({ name: 'chats.messages', backend: createLocalStorageBackend('db-unsaved', 'chats.messages') });
       const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
       expect(await data.ingest('chats.messages', [{ id: 'a', chat_id: 7, seq: 1 }])).toEqual({ written: 0, unsaved: ['a'] });
-      // Still shown: the store keeps it for the session.
       expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['a']);
     } finally { if (saved === undefined) delete globalThis.localStorage; else globalThis.localStorage = saved; }
   });
@@ -864,7 +833,6 @@ describe('MP data API confinement', () => {
     const value = data.prefs.get('filters');
     value.status.push('mutated');
     expect(data.prefs.get('filters')).toEqual({ status: ['open'] });
-    // Stored per MP, not pending: a new manager over the same stores reads them back.
     expect(data.pending()).toEqual([]);
     const next = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
     await next.prefs.ready();
@@ -873,7 +841,6 @@ describe('MP data API confinement', () => {
     const third = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
     await third.prefs.ready();
     expect(third.prefs.get('layout', 'list')).toBe('list');
-    // Other MPs cannot reach them.
     await expect(next.read('mp.time-clock.prefs')).rejects.toMatchObject({ code: 'DATA_FORBIDDEN' });
   });
 
@@ -942,7 +909,6 @@ describe('MP data API confinement', () => {
     expect(backends.get('prefs').decl).toEqual(PREFS_DECL);
     await new Promise((resolve) => { setTimeout(resolve, 5); });
     expect(reads).toEqual([]);
-    // The first read starts the load and answers the fallback; ready() then has it.
     expect(data.prefs.get('layout', 'list')).toBe('list');
     await data.prefs.ready();
     expect(reads).toEqual(['prefs']);
@@ -968,12 +934,10 @@ describe('MP data API confinement', () => {
     await first.prefs.set('columns', ['name']);
     const data = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
     failRead = true;
-    // The first load fails; the next ready() loads.
     await data.prefs.ready();
     expect(data.prefs.get('layout', 'list')).toBe('list');
     await data.prefs.ready();
     expect(data.prefs.get('layout', 'list')).toBe('board');
-    // A remove made while a load runs stays removed.
     const again = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData: {}, backendFactory: factory });
     let open;
     gate = new Promise((resolve) => { open = resolve; });
@@ -983,7 +947,6 @@ describe('MP data API confinement', () => {
     await Promise.all([loading, removing]);
     gate = null;
     expect(again.prefs.get('columns', 'none')).toBe('none');
-    // A value the store refuses is not reported as saved.
     await expect(again.prefs.set('cycle', { toJSON() { throw new Error('unserializable'); } })).rejects.toThrow();
   });
 
@@ -1078,7 +1041,6 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     const backend = transactionalBackend(port, null, options);
     let meddle = null;
     const commit = backend.commit.bind(backend);
-    // The other tab writes after this tab read the rows and before it commits.
     backend.commit = async (...args) => { if (meddle) { const run = meddle; meddle = null; await run(); } return commit(...args); };
     const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store: createDataStore({ name, backend }), decl: { keyPath: 'id' } } : null) });
     await data.ingest('chats.messages', [{ id: 'a', chat_id: 7, seq: 1, name: 'Ana' }, { id: 'b', chat_id: 7, seq: 2, name: 'Ben' }]);
@@ -1158,7 +1120,6 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     await whole.data.refresh('chats.messages', { mode: 'visible' });
     expect(await whole.syncedAt()).toEqual(expect.any(Number));
     await whole.close();
-    // A source whose reads each cover a part of the collection (its scope).
     const scoped = open();
     scoped.data.source('chats.messages', { fetch, scope: (target) => (row) => row.chat_id === target.window?.chat });
     await scoped.data.refresh({ collection: 'chats.messages', window: { chat: 7 } }, { mode: 'visible' });
@@ -1199,7 +1160,6 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
     });
     const data = createDataManager({ capabilityToken: { tenantId: 'team-44', mpId: 'scheduling' }, mpId: 'scheduling', localData: {}, backendFactory: factory });
     await data.prefs.set('first', 'ok');
-    // The store holds one row: a second pref cannot be saved.
     await expect(data.prefs.set('second', 'ok')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
     const refused = await data.prefs.set('cycle', { toJSON() { throw new Error('unserializable'); } }).catch((error) => error);
     expect(refused).toBeInstanceOf(Error);
@@ -1228,7 +1188,6 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
       limits: { maxRows: 1000, maxAgeMs: 86400000, maxBytes: null } };
     const store = createDataStore({ name: 'shifts', backend: transactionalBackend(port, null, options) });
     await store.reconcile([{ id: 's1', title: 'Early' }], { windowKey: 'week-40' });
-    // A detail read of the same shift: no window of its own.
     await store.reconcile([{ id: 's1', title: 'Early (edited)' }], { prune: false, syncedAt: null });
     expect(await store.getRaw('s1')).toMatchObject({ title: 'Early (edited)', _window: 'week-40' });
     await database.close();
@@ -1268,7 +1227,6 @@ describe.each(DATABASES)('data service on the host store (%s)', (_name, create) 
   });
 });
 
-/** A host-store-backed data service over `chats.messages`, counting commits. */
 function hostService(create, { maxRows = 5000 } = {}) {
   const database = create();
   const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
@@ -1277,7 +1235,6 @@ function hostService(create, { maxRows = 5000 } = {}) {
   const options = { identity: identity(), storeName: 'chats.messages', policy: 'cache', schemaVersion: 1, cacheFingerprint: 'fp',
     limits: { maxRows, maxAgeMs: 86400000, maxBytes: null }, indexes: INDEXES };
   const backend = transactionalBackend(counted, null, options);
-  // The shell adapter refuses a complete read past COMPLETE_ROWS, as here.
   const completeReads = { count: 0 };
   const bounded = { ...backend, async getAll() {
     completeReads.count += 1;
@@ -1304,7 +1261,6 @@ describe.each([
       ['7:1', false], ['7:2', false], ['7:3', false], ['8:1', false], ['8:2', false], ['draft', true],
     ]);
     expect(data.pending()).toEqual([]);
-    // A complete set for chat 7 prunes the chat-7 rows it leaves out; dirty rows stay.
     await data.ingest('chats.messages', messages(7, 2, 3), { replace: true, scope: (row) => row.chat_id === 7 });
     expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['7:2', '7:3', '8:1', '8:2', 'draft']);
     expect(data.status('chats.messages').state).toBe('fresh');
@@ -1316,7 +1272,6 @@ describe.each([
     await data.mutate('chats.messages', { op: 'put', record: { id: '7:2', chat_id: 7, seq: 2, body: 'unsent' } });
     expect(await data.ingest('chats.messages', messages(7, 1, 3))).toEqual({ written: 2 });
     expect(await data.read('chats.messages', '7:2', { raw: true })).toMatchObject({ body: 'unsent', _dirty: true });
-    // A replacement, and one past a single chunk, keep it too.
     expect(await data.ingest('chats.messages', messages(7, 1, 3), { replace: true, scope: (row) => row.chat_id === 7 })).toEqual({ written: 2 });
     expect(await data.ingest('chats.messages', messages(7, 1, 600), { replace: true })).toEqual({ written: 599 });
     expect(await data.read('chats.messages', '7:2', { raw: true })).toMatchObject({ body: 'unsent', _dirty: true });
@@ -1377,7 +1332,6 @@ describe.each([
   });
 });
 
-// A fake Web Storage for a store kept there (node has none).
 function webStorageStore() {
   const saved = globalThis.localStorage;
   const map = new Map();
@@ -1406,7 +1360,6 @@ describe.each([
     await store.put({ id: 'a', chat_id: 7, seq: 1, body: 'new' });
     const after = (await store.getRaw('a'))._rev;
     expect(after).toBeGreaterThan(before);
-    // A delete at the old revision leaves the new row alone.
     await expect(store.delete('a', { expectedRevision: before })).rejects.toMatchObject({ reason: 'conflict' });
     expect(await store.get('a')).toMatchObject({ body: 'new' });
     await close();
@@ -1430,7 +1383,6 @@ describe.each([
     answers[0].resolve();
     await settle(); await settle();
     expect(await store.getRaw('a')).toMatchObject({ body: 'B', _dirty: true });
-    // B's own push fails: B stays unsent, listed, and on the device.
     answers[1].reject(Object.assign(new Error('Offline'), { status: 0 }));
     await vi.waitFor(() => expect(data.pending()).toEqual([expect.objectContaining({ key: 'a', state: 'failed' })]));
     expect(await store.getRaw('a')).toMatchObject({ body: 'B', _dirty: true });
@@ -1457,7 +1409,6 @@ describe.each(DATABASES)('a store cleared from Settings while a push is on the w
   });
 });
 
-/** A memory store whose next read of `method` answers late: the value it read, after `release()`. */
 function lateStore(method) {
   const inner = createMemoryStoreBackend();
   let gate = null;
@@ -1565,7 +1516,6 @@ describe('whole-range purge and trim, and the rows an ingest stored', () => {
     const store = createDataStore({ name: 'chats.messages', backend: createMemoryStoreBackend(), indexes: INDEXES });
     let data;
     let edit = null;
-    // A local edit lands after the range was listed, before its rows are removed.
     const listing = new Proxy(store, { get(target, property) {
       if (property !== 'query') return typeof target[property] === 'function' ? target[property].bind(target) : target[property];
       return async (...args) => {
@@ -1604,7 +1554,6 @@ describe('whole-range purge and trim, and the rows an ingest stored', () => {
     } });
     const data = createDataService({ resolve: (name) => (name === 'chats.messages' ? { store, decl: { keyPath: 'id' } } : null) });
     const many = messages(7, 1, 500);
-    // The last key of the first chunk comes again in the second.
     expect(await data.ingest('chats.messages', [...many, { ...many[499], seq: 9999 }])).toEqual({ written: 500 });
     await data.ingest('chats.messages', [{ id: 'old', chat_id: 7, seq: 0 }]);
     const replacement = [...messages(8, 1, 500), { id: 'old', chat_id: 'not a number' }];
@@ -1641,7 +1590,6 @@ describe.each(DATABASES)('large collections on the host store (%s)', (_name, cre
     commits.count = 0;
     expect((await data.trim('chats.messages', { index: 'byChat', prefix: [8], keep: 20 })).removed).toHaveLength(230);
     expect(commits.count).toBeLessThanOrEqual(3);
-    // A local write lands after the range was listed, before its rows go.
     let edited;
     const listing = new Proxy(store, { get(target, property) {
       if (property !== 'query') return typeof target[property] === 'function' ? target[property].bind(target) : target[property];
@@ -1714,7 +1662,6 @@ describe.each(DATABASES)('large collections on the host store (%s)', (_name, cre
     await close();
   });
 
-  // Three rows that each fit one commit, and together are past its 8 MiB.
   const MIB = 1024 * 1024;
   const wide = (id) => ({ id, chat_id: 5, seq: Number(id.slice(1)), body: id.repeat(3 * MIB / id.length) });
 
@@ -1771,7 +1718,6 @@ describe.each(DATABASES)('two stores open on one host store (%s)', (_name, creat
     const heard = [];
     a.subscribeQuery((query) => query.getAll().map((row) => row.id).sort(), (ids) => heard.push(ids));
     await settle();
-    // The other store commits while this one reads its rows back after a write.
     const read = backendA.getAll.bind(backendA);
     let interleave = true;
     backendA.getAll = async (...args) => {
@@ -1789,8 +1735,6 @@ describe.each(DATABASES)('two stores open on one host store (%s)', (_name, creat
 });
 
 describe.each(DATABASES)('a pref removal another tab overtakes (%s)', (_name, create) => {
-  // A prefs store on the host store whose next removals find the row written
-  // again by another tab after it was read (`overtakes` times).
   function overtaken(overtakes) {
     const database = create();
     const port = createHostStorePort({ database, backend: database.kind === 'sqlite' ? 'electron_sqlite' : 'indexeddb' });
@@ -1824,7 +1768,6 @@ describe.each(DATABASES)('a pref removal another tab overtakes (%s)', (_name, cr
     overtake();
     await data.prefs.remove('a');
     expect(data.prefs.get('a', 'fallback')).toBe('fallback');
-    // Gone from the device too: a reload finds nothing.
     expect(await data.read('prefs', 'a')).toBeNull();
     await close();
   });
@@ -1855,7 +1798,6 @@ describe.each(DATABASES)('a cursor whose rows age out before its next whole read
     });
     const asked = [];
     data.source('chats.messages', {
-      // A whole read only once a week; the rows age out after a day.
       read: { cursor: true, fullEveryMs: 7 * DAY },
       fetch: async (_target, context) => {
         asked.push(context.since);
@@ -1868,7 +1810,6 @@ describe.each(DATABASES)('a cursor whose rows age out before its next whole read
     await data.refresh('chats.messages', { mode: 'visible' });
     clock += 0.6 * DAY;
     expect((await data.read('chats.messages')).map((row) => row.id).sort()).toEqual(['a', 'b']);
-    // The second read was whole: a read of changes would have left the rows to age out.
     expect(asked[1]).toBeNull();
     await database.close();
   });
@@ -1886,7 +1827,6 @@ describe.each(DATABASES)('a whole answer the store cannot keep (%s)', (_name, cr
     data.source('chats.messages', { read: {}, fetch: async () => answer });
     await data.refresh('chats.messages', { mode: 'visible' });
     expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['old']);
-    // The next whole answer holds a row larger than the store may keep.
     answer = [{ id: 'big', chat_id: 7, seq: 2, body: 'x'.repeat(500) }];
     await expect(data.refresh('chats.messages', { mode: 'visible' })).rejects.toBeTruthy();
     expect((await data.read('chats.messages')).map((row) => row.id)).toEqual(['old']);

@@ -1,13 +1,3 @@
-/**
- * adapter-contract.test.js — THE D2 safeguard suite (harden round-1).
- *
- * Runs against the `adapter` INTERFACE with the adapter injected — the same
- * suite the M4 postMessage adapter must pass unchanged. Covers: every
- * ActionsApi method incl. batch/transaction; errors as TommyError with
- * correct `retryable`; queued_offline + EmitReceipt semantics; timeout
- * rejection; MODE OPACITY (no adapter-identifying property reachable from
- * the SDK surface); the unknown-method guard.
- */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { buildSdk, createDirectAdapter, TommyError, TommySDKError } from '../src/index.js';
 import { createBroker, createFakeIssuer } from '@tommy/actions-runtime';
@@ -79,12 +69,10 @@ const timesheetsManifest = {
   actions: {},
 };
 
-/** Build a world: broker + registered MPs + an SDK for time-clock via the injected adapter factory. */
 async function makeWorld({ adapterFactory = createDirectAdapter, rpcTimeoutMs } = {}) {
   const issuer = createFakeIssuer();
   const applied = [];
   const undone = [];
-  // The server_write seam — stands in for the F0 typed client's invoke.
   const serverInvoke = async (envelope) => {
     applied.push(envelope.args);
     return { rpcId: envelope.rpcId, status: 'succeeded', result: { entryId: `entry-${applied.length}` } };
@@ -161,7 +149,6 @@ describe('adapter contract (parameterised — direct adapter at M1)', () => {
     expect(seen[0].meta.emitterMpId).toBe('time-clock');
     expect(seen[0].meta.live).toBe(true);
     unsubscribe();
-    // No consumer left -> suppressed by the Active Trigger Index, no delivery.
     await world.sdk.actions.emit('clock_out', { shiftId: 's-3' });
     expect(seen).toHaveLength(1);
   });
@@ -231,16 +218,10 @@ describe('adapter contract (parameterised — direct adapter at M1)', () => {
   });
 
   it('tolerates framework introspection markers so the proxy is Vue-prop-safe', () => {
-    // Vue hands panels the `tommy` proxy as a component prop/ctx and probes it
-    // during reactivity + warning-trace formatting (`isRef(tommy)` reads
-    // `tommy.__v_isRef`). Those dunder markers must return undefined, NOT throw —
-    // else a benign Vue warning crashes the whole panel (the leave-main navbar
-    // regression; project_mp_tommy_proxy_not_reactive).
     for (const marker of ['__v_isRef', '__v_isReactive', '__v_isReadonly', '__v_isShallow', '__v_raw', '__v_skip', '__vue__']) {
       expect(() => world.sdk[marker]).not.toThrow();
       expect(world.sdk[marker]).toBeUndefined();
     }
-    // A real typo (no dunder prefix) still throws its helpful error.
     expect(() => world.sdk.emitt).toThrow(TommySDKError);
   });
 

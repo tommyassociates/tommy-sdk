@@ -1,8 +1,3 @@
-/**
- * Ephemeral call-context identity for a canonical store mutation. This is not
- * a principal, permission, source receipt or storage value. Only exact opaque
- * identity lets a caller recognise its own operation across an awaited turn.
- */
 const ORIGIN = Symbol('canonical-store-mutation-origin');
 export function storeMutationOrigin(options) {
   return options && typeof options === 'object' ? options[ORIGIN] ?? null : null;

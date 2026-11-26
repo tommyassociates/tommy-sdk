@@ -1,17 +1,3 @@
-/**
- * index.js — builds + freezes the `tommy` object; installs the unknown-method
- * guard on every namespace (03-sdk-runtime/README module map).
- *
- * M1 namespace split (sdk-broker harden round-1): IMPLEMENTED here — `init`,
- * `actions`, `data` (via @tommy/offline-sync, injected), `log`, `t`, errors +
- * the guard. STUBBED as guard-throwing placeholders — `panels` (owned by
- * @tommy/panel-runtime + the loader, injected when present), `ui`, `directory`,
- * `device`, `host`, `navigation`, `theme`, `messaging`, `clock`, `lifecycle`,
- * `notifications`, `session`, `user`, `billing` (host-services work, later
- * milestones). ALL types ported verbatim (src/types.ts).
- *
- * Mode opacity: the returned object exposes nothing adapter-identifying.
- */
 import { guard, TommyError, TommySDKError, isTommyError } from './errors.js';
 import { createActionsApi } from './actions.js';
 import { createT } from './i18n.js';
@@ -26,59 +12,21 @@ export { default as createDisplayOwner } from './display-owner.js';
 const STUB_NAMESPACES = [
   'ui', 'directory', 'device', 'host', 'navigation', 'theme', 'messaging',
   'clock', 'lifecycle', 'notifications', 'session', 'user', 'billing',
-  // Manifest-driven settings runtime delivery: `tommy.settings.get()` reads
-  // THIS MP's own declared settings document. There is no cross-MP read on
-  // this namespace — an MP reads another's setting only through a declared
-  // `{ from: setting, mp }` source, so the dependency is in the manifest.
+  // No cross-MP read here: another MP's setting comes only through a declared source.
   'settings',
-  // `tommy.prefs` — this MP's own small UI choices (a layout, a filter, a
-  // toggle), kept per account on the device by the host instead of browser
-  // storage: `get(key, fallback)` reads at once once `ready()` resolved,
-  // `set(key, value)` / `remove(key)` write through. Hosts from API level 5.
+  // Kept per account on the device by the host instead of browser storage.
   'prefs',
-  // PARKED A.1 — `tommy.tours.start(id)` / `.available()`, a handle on the HOST's
-  // existing tour runtime (tommy-core/src/tour). REGISTRATION IS NOT HERE, on
-  // purpose: the host registers an MP's DECLARED tours at load, because the
-  // manifest is what the publish-time checker vets (M19-M22) and a tour
-  // registered imperatively at runtime would route around all four gates.
+  // Tour registration is not here: the host registers declared tours, which the publish checker vets.
   'tours',
-  // `tommy.calls.*` — the Calls MP's window onto the HOST calling runtime
-  // (2026-08-24, migrating `video_calls`, the last legacy addon, to an MP).
-  // The runtime — tommy-core's video_calls store and the webrtc/device/pip/
-  // media-state managers — deliberately stays host-side: the global
-  // incoming-call modal and the public guest-join page depend on it and are not
-  // part of the MP, so moving it would fork call state across two owners. Every
-  // method is scope-gated (`read:calls` / `write:calls`), and anything opening a
-  // camera or microphone additionally passes tripleGate.
   'calls',
-  // A.8 — `tommy.identity.subject()`, WHOSE data the surface is scoped to.
-  // READ-ONLY by ruling: the acting subject is device-wide and outlives the
-  // navigation that set it, so an MP that could re-point it would change what
-  // ANOTHER MP shows on its next mount. Setting stays with navigation
-  // (`?actor_id=`) and the shell.
   'identity',
   'time',
 ];
 
 function stubNamespace(name) {
-  // An EMPTY guarded object: every access throws UnknownMethod with the
-  // namespace named — a placeholder, not a silent undefined.
   return guard({}, name);
 }
 
-/**
- * @param {object} opts
- * @param {object} opts.adapter transport adapter (createDirectAdapter at M1)
- * @param {object} opts.init the MpInit payload (loader-supplied)
- * @param {object} [opts.data] DataApi from @tommy/offline-sync (loader-injected)
- * @param {object} [opts.panels] PanelsApi from @tommy/panel-runtime (loader-injected)
- * @param {object} [opts.locales] this MP's bundled locale tables
- * @param {function} [opts.logSink] host log sink; defaults to console
- * @param {object} [opts.namespaces] host-provided implementations for stub
- *   namespaces (device, host, ui, lifecycle, …) — loader-injected per MP
- *   (M2 host-capability surface). Unknown keys are rejected; anything not
- *   provided stays a guard-throwing stub.
- */
 export function buildSdk({ adapter, init, data, panels, locales, logSink, namespaces } = {}) {
   if (!adapter) throw new Error('buildSdk: adapter required');
   if (!init) throw new Error('buildSdk: init required');

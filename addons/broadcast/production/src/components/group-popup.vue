@@ -10,7 +10,6 @@
 						<f7-link popup-close icon-f7="close"></f7-link>
 					</f7-nav-right>
 				</f7-navbar>
-				<!-- <f7-searchbar search-container=".broadcast-message-customers-list"></f7-searchbar> -->
 				<f7-list class="broadcast-message-customers-list">
 					<f7-list-item
 						v-for="item in items"

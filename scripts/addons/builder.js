@@ -5,14 +5,13 @@ const helpers = require('../helpers')
 
 module.exports = async function(pkg, environment, version) {
   const localAddonFilePath = helpers.getLocalAddonFilePath(pkg, environment, version, '')
-  console.log('addon building', pkg, environment, version) // , 'in', env
+  console.log('addon building', pkg, environment, version)
 
   const entry = path.join(localAddonFilePath, 'src/addon.js')
   const outDir = path.join(localAddonFilePath, 'build')
   console.log('addon building: entry', entry)
   console.log('addon building: out dir', outDir)
 
-  // https://vitejs.dev/guide/build.html#library-mode
   const result = await build({
     build: {
       outDir,
@@ -45,8 +44,6 @@ module.exports = async function(pkg, environment, version) {
     },
   })
 
-  // Rename to addon.js
-  // This may be possible via Vite but this was easier
   fs.renameSync(outDir + '/addon.iife.js', outDir + '/addon.js')
   return result
 }

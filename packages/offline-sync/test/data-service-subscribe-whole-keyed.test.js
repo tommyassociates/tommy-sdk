@@ -1,17 +1,9 @@
 // @vitest-environment node
-/**
- * A subscription to a whole collection re-reads only the keys a change names:
- * an updated row is replaced in place, a removed row leaves, and a new row is
- * placed by key when the store reads in key order (the host stores). Changes
- * that arrive while a read runs are read together after it, and every value
- * delivered equals what a fresh whole read answers.
- */
 import { afterEach, describe, expect, it } from 'vitest';
 import { createDataService, createDataStore, createMemoryStoreBackend } from '../src/index.js';
 import { createHostStorePort } from '../src/host-store/index.js';
 import { DATABASES, identity } from './helpers/host-databases.js';
 
-/** A host-store-backed collection the way the app opens one. */
 function transactionalBackend(port, options) {
   let handle;
   const ready = () => (handle ||= port.open(options));
@@ -92,8 +84,6 @@ describe.each([...DATABASES, ['memory', null]])('a whole-collection subscription
     await data.writer('shifts').put({ id: '1015', user_id: 'new' });
     await settle();
     expect(seen.at(-1)).toEqual(await whole());
-    // A host store reads in key order, so the new row is placed by key; the
-    // memory store reads in insertion order and reads the collection again.
     expect(counts.getAll).toBe(name === 'memory' ? 2 : 1);
     expect(counts.get).toBeGreaterThanOrEqual(3);
     off();

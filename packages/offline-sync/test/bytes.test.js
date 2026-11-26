@@ -1,7 +1,3 @@
-/**
- * bytes.test.js — the one UTF-8 measure every store byte budget uses, and
- * the UTF-16 count Web Storage quotas take.
- */
 import { describe, it, expect } from 'vitest';
 import { utf8Bytes, jsonBytes, utf16Units } from '../src/bytes.js';
 

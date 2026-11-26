@@ -1,17 +1,8 @@
-/**
- * composed-layout.test.js (scope 01c) — resolveComposedLayout (the join of a
- * `dashboards`-Setting tab's panels[] against manifest declarations: ordering,
- * size clamping, surface eligibility, rbac, audience AND/OR, unknown-decl
- * KEPT, malformed SKIPPED) and mountSurface's composed mode (layout order is
- * tile order, grid placement styles, unavailable tiles, budget event, the
- * ctxFor third argument, declaration mode untouched when layout is absent).
- */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createPanelHost, resolveComposedLayout, SURFACE_PANEL_BUDGET } from '../src/index.js';
 
 const flush = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 
-// Manifest `panels` blocks keyed by mpId — the contract-shape fixture.
 const panelsByMp = {
   'time-clock': {
     'whos-clocked-in': { surfaces: ['dashboard'], rbac: { roles: ['Team Admin'] }, size: { defaultW: 6, defaultH: 2, minW: 4, maxW: 8, minH: 2, maxH: 4 } },
@@ -43,8 +34,8 @@ describe('resolveComposedLayout', () => {
 
   it('clamps w/h into the declaration size envelope — clamp, never reject', () => {
     const composed = [
-      place('time-clock', 'whos-clocked-in', { w: 2, h: 1 }),   // below minW/minH
-      place('time-clock', 'whos-clocked-in', { w: 12, h: 9 }),  // above maxW/maxH
+      place('time-clock', 'whos-clocked-in', { w: 2, h: 1 }),
+      place('time-clock', 'whos-clocked-in', { w: 12, h: 9 }),
     ];
     const out = resolveComposedLayout(composed, 'dashboard', { panelsByMp, viewer: { roles: ['Team Admin'] } });
     expect(out.map((e) => [e.cell.w, e.cell.h])).toEqual([[4, 2], [8, 4]]);
@@ -66,7 +57,6 @@ describe('resolveComposedLayout', () => {
     const admin = resolveComposedLayout(composed, 'dashboard', { panelsByMp, viewer: { roles: ['Team Admin'] } });
     expect(admin.map((e) => e.instance.panelId)).toEqual(['whos-clocked-in', 'doc-inbox']);
     const member = resolveComposedLayout(composed, 'dashboard', { panelsByMp, viewer: { roles: ['Team Member'] } });
-    // rbac drops whos-clocked-in; doc-inbox's EMPTY roles array means everyone.
     expect(member.map((e) => e.instance.panelId)).toEqual(['doc-inbox']);
   });
 
@@ -74,15 +64,11 @@ describe('resolveComposedLayout', () => {
     const targeted = (audience) => [place('time-clock', 'my-week', {}, { visibility: { audience } })];
     const resolve = (audience, viewer) => resolveComposedLayout(targeted(audience), 'dashboard', { panelsByMp, viewer });
 
-    // AND across contexts: matching only one of two present lists is not enough.
     expect(resolve({ roles: ['tag-r1'], locations: ['tag-l1'] }, { tagIds: ['tag-r1'] })).toHaveLength(0);
     expect(resolve({ roles: ['tag-r1'], locations: ['tag-l1'] }, { tagIds: ['tag-r1', 'tag-l1'] })).toHaveLength(1);
-    // OR within a list.
     expect(resolve({ roles: ['tag-r1', 'tag-r2'] }, { tagIds: ['tag-r2'] })).toHaveLength(1);
-    // members matches by userId as well as by tag.
     expect(resolve({ members: ['user-9'] }, { tagIds: [], userId: 'user-9' })).toHaveLength(1);
     expect(resolve({ members: ['user-9'] }, { tagIds: [], userId: 'user-1' })).toHaveLength(0);
-    // Absent/empty audience lists = everyone.
     expect(resolve({ roles: [] }, { tagIds: [] })).toHaveLength(1);
     expect(resolve(undefined, { tagIds: [] })).toHaveLength(1);
   });
@@ -90,8 +76,6 @@ describe('resolveComposedLayout', () => {
   it('KEEPS unknown-decl instances with decl:null — never dropped, cell preserved', () => {
     const composed = [
       place('uninstalled-mp', 'gone-panel', { x: 3, y: 1, w: 4, h: 2 }),
-      // Contract: with no decl, rules (a)-(c) do not evaluate — even a
-      // non-matching audience does not drop the placement.
       place('uninstalled-mp', 'gone-panel', {}, { visibility: { audience: { roles: ['tag-nobody-has'] } } }),
     ];
     const out = resolveComposedLayout(composed, 'dashboard', { panelsByMp, viewer: { tagIds: [] } });
@@ -101,10 +85,6 @@ describe('resolveComposedLayout', () => {
   });
 
   it('passes a declaration carrying params[] through UNTOUCHED — param resolution is host-side (FR-11/FR-12)', () => {
-    // The resolver joins, gates and clamps; it must NOT interpret the declared
-    // param vocabulary — the host's settings UI and FR-12 resolution read it
-    // off the entry's decl. Pin object IDENTITY, not just deep equality, so a
-    // future "helpful" normalization step in the resolver fails loudly here.
     const params = [
       { name: 'client_id', type: 'id', required: true, source: 'context' },
       { name: 'window_days', type: 'integer', source: 'static', label: 'Window' },
@@ -112,17 +92,17 @@ describe('resolveComposedLayout', () => {
     const declaring = { clients: { 'client-visits': { surfaces: ['dashboard'], params } } };
     const out = resolveComposedLayout([place('clients', 'client-visits')], 'dashboard', { panelsByMp: declaring });
     expect(out).toHaveLength(1);
-    expect(out[0].decl).toBe(declaring.clients['client-visits']); // same object, not a copy
-    expect(out[0].decl.params).toBe(params);                      // vocabulary rides along verbatim
+    expect(out[0].decl).toBe(declaring.clients['client-visits']);
+    expect(out[0].decl.params).toBe(params);
   });
 
   it('skips malformed instances without throwing; non-array input resolves empty', () => {
     const composed = [
       null,
       'not-an-object',
-      { id: 'u1', mpId: 'time-clock' },                                  // no panelId
-      place('time-clock', 'my-week', { w: 'wide' }),                     // non-numeric geometry
-      place('time-clock', 'my-week'),                                    // the one healthy row
+      { id: 'u1', mpId: 'time-clock' },
+      place('time-clock', 'my-week', { w: 'wide' }),
+      place('time-clock', 'my-week'),
     ];
     const out = resolveComposedLayout(composed, 'dashboard', { panelsByMp });
     expect(out).toHaveLength(1);
@@ -154,7 +134,6 @@ describe('mountSurface composed mode (opts.layout)', () => {
     const api = host.panelsApiFor('time-clock', panelsByMp['time-clock']);
     api.register(healthyDef('whos-clocked-in'));
     api.register(healthyDef('my-week'));
-    // Layout order deliberately reverses registration order.
     const layout = resolveComposedLayout([
       place('time-clock', 'my-week', { x: 6, y: 0, w: 6, h: 2 }),
       place('time-clock', 'whos-clocked-in', { x: 0, y: 0, w: 6, h: 2 }),
@@ -171,10 +150,6 @@ describe('mountSurface composed mode (opts.layout)', () => {
     expect(tiles.every((t) => t.className.includes('mp-panel-tile--ready'))).toBe(true);
   });
 
-  // pack:'flow' — the main dashboard's mode. Stored geometry decides ORDER
-  // (reading order: y then x); the grid decides placement, so a composition
-  // whose widths do not divide 12 never leaves a hole or strands a tile at the
-  // right edge of an otherwise empty row (owner-reported 2026-09-14).
   it("pack:'flow' orders tiles by y then x and spans without a start line", async () => {
     const api = host.panelsApiFor('time-clock', panelsByMp['time-clock']);
     api.register(healthyDef('whos-clocked-in'));
@@ -188,12 +163,9 @@ describe('mountSurface composed mode (opts.layout)', () => {
     await flush();
 
     const tiles = [...el.querySelectorAll('.mp-panel-tile')];
-    // Array order was my-week first; reading order puts the y0 tile first.
     expect(tiles.map((t) => t.dataset.panelId)).toEqual(['whos-clocked-in', 'my-week']);
     expect(tiles[0].style.gridColumn).toBe('span 4');
     expect(tiles[1].style.gridColumn).toBe('span 6');
-    // No row pinning: the grid flows them, so nothing reproduces the gap the
-    // stored x/y describe.
     expect(tiles[0].style.gridRow).toBe('');
     expect(tiles[1].style.gridRow).toBe('');
   });
@@ -217,7 +189,6 @@ describe('mountSurface composed mode (opts.layout)', () => {
     const api = host.panelsApiFor('time-clock', panelsByMp['time-clock']);
     const registered = healthyDef('my-week');
     api.register(registered);
-    // 'whos-clocked-in' is DECLARED but never registered; 'gone-panel' has no decl at all.
     const layout = resolveComposedLayout([
       place('time-clock', 'my-week'),
       place('time-clock', 'whos-clocked-in', { x: 0, y: 2 }),
@@ -232,7 +203,6 @@ describe('mountSurface composed mode (opts.layout)', () => {
       ['time-clock', 'whos-clocked-in'],
       ['uninstalled-mp', 'gone-panel'],
     ]);
-    // Placed in its cell, but never a PanelTile: no skeleton, no load lifecycle.
     expect(unavailable[1].style.gridColumn).toBe('7 / span 4');
     expect(unavailable.every((t) => !t.className.includes('mp-panel-tile'))).toBe(true);
     expect(el.querySelectorAll('.mp-panel-tile__skeleton')).toHaveLength(0);
@@ -276,7 +246,6 @@ describe('mountSurface composed mode (opts.layout)', () => {
     const ctxFor = vi.fn((_mp, def) => ({ panelId: def.id, surface: 'dashboard', online: true }));
     host.mountSurface(el, { surface: 'dashboard', ctxFor });
     await flush();
-    // Arity-sniffing hosts must see the same call shape as before 01c.
     expect(ctxFor.mock.calls[0]).toHaveLength(2);
     const tile = el.querySelector('.mp-panel-tile');
     expect(tile.className).toContain('mp-panel-tile--ready');

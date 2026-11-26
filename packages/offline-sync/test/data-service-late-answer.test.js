@@ -1,11 +1,4 @@
 // @vitest-environment node
-/**
- * A read whose callers were answered at its deadline (REFRESH_TIMEOUT) while
- * the scheduler went on with it: what it then stores marks the collection
- * fresh through the normal status path, with nothing asked again. The read
- * guard tells the scheduler while it stores an answer it already has, and
- * the service lists the status of its method reads.
- */
 import { describe, it, expect, vi } from 'vitest';
 import {
   createDataService, createDataStore, createMemoryStoreBackend,
@@ -14,9 +7,6 @@ import {
 const timeout = () => Object.assign(new Error('Refresh took too long'), { code: 'REFRESH_TIMEOUT', retryable: true });
 const flush = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 
-// A scheduler that runs each job at once and lets the test answer its
-// callers with REFRESH_TIMEOUT while the run goes on (`passDeadline()`), as
-// the host's does for a read past its deadline. It records the storing spans.
 function lateScheduler() {
   const runs = [];
   const spans = [];
@@ -97,7 +87,6 @@ describe('a read answered at its deadline that goes on', () => {
     await flush();
     scheduler.runs[0].passDeadline();
     await asked.catch(() => {});
-    // A later read is on its way when the first one's answer lands.
     data.refresh('members', { mode: 'silent' });
     await flush();
     expect(data.status('members').state).toBe('refreshing');
@@ -133,7 +122,6 @@ describe('the read guard', () => {
     data.source('members', { fetch: vi.fn(() => answer.promise) });
     const asked = data.refresh('members', { mode: 'visible' });
     await flush();
-    // Waiting for the server: not storing.
     expect(scheduler.spans).toHaveLength(0);
     answer.resolve(rows);
     await asked;

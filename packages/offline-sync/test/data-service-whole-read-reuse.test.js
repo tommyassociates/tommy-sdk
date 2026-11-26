@@ -1,12 +1,4 @@
 // @vitest-environment node
-/**
- * With `wholeReadReuseMs` (the host sets it for every collection on a phone,
- * and for its attendance collections in a browser), a whole read of a
- * collection nothing changed is answered again without reading the store
- * (on a phone, several native SQLite calls each): only by a service that hears
- * other tabs' changes (its feed), only while no change was heard, and only
- * for that long. Without it every read reads the store.
- */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDataService, createDataStore, createMemoryStoreBackend } from '../src/index';
 
@@ -50,14 +42,11 @@ describe('a whole read of an unchanged collection', () => {
     expect((await data.read('products')).map((row) => row.title)).toEqual(['One']);
     expect((await data.read('products')).map((row) => row.title)).toEqual(['One']);
     expect(getAll).toHaveBeenCalledTimes(1);
-    // Each caller gets its own copy.
     (await data.read('products'))[0].title = 'Mutated';
     expect((await data.read('products'))[0].title).toBe('One');
-    // This page's own write.
     await data.ingest('products', [{ id: '2', title: 'Two' }]);
     expect((await data.read('products')).map((row) => row.title).sort()).toEqual(['One', 'Two']);
     expect(getAll).toHaveBeenCalledTimes(2);
-    // Another tab's.
     elsewhere();
     await data.read('products');
     expect(getAll).toHaveBeenCalledTimes(3);
@@ -88,7 +77,6 @@ describe('whole reads asked while the first is still reading the store', () => {
   it('answer every caller with rows, not the read on its way, and read the store once', async () => {
     const { data, store, getAll } = fixture();
     await data.ingest('products', [{ id: '1', title: 'One' }, { id: '2', title: 'Two' }]);
-    // The store answers slowly, as a phone's does at boot.
     let release;
     const held = new Promise((resolve) => { release = resolve; });
     const rows = await store.getAll();

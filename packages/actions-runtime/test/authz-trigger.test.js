@@ -1,20 +1,3 @@
-/**
- * authz-trigger.test.js (F3 + F4) — trigger authority, both directions.
- *
- * F3: the emitter must own the trigger namespace. The broker resolved the
- *     owner from the trigger string and never asserted it, so any MP could
- *     emit `time-clock.shift_marked_absent` and drive another MP's Action.
- *     The platform-emit / host-injection intake is exempt.
- * F4: subscribing was entirely unauthorized — passive cross-MP exfiltration.
- *     A cross-MP subscription now needs a read grant on the trigger, resolved
- *     the same way F2 resolves condition reads (council C1 / Option B): the
- *     owner's catalogue DOMAIN scope, or the explicit per-primitive scope, read
- *     from the subscriber's DECLARED MANIFEST permissions. SENSITIVE_CONDITIONS
- *     entries are excluded from domain derivation here too.
- *
- * Both ride `strictEmitOwnership` (default OFF) — the manifests declare no
- * `read:` trigger scopes yet.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 
@@ -41,14 +24,12 @@ async function world({ strictEmitOwnership, subscriberScopes, sensitiveCondition
   const leaveToken = await issuer.issue('leave', '1.0.0', TENANT, [], 'i-leave');
   return {
     broker,
-    // 'leave' is the impostor: it emits a trigger that time-clock owns.
     emitForeign: () => broker.emit({
       sourceMpId: 'leave', instanceId: 'i-leave', capabilityToken: leaveToken, trigger: 'time-clock.shift_marked_absent', payload: {},
     }),
     emitOwn: () => broker.emit({
       sourceMpId: 'leave', instanceId: 'i-leave', capabilityToken: leaveToken, trigger: 'leave.leave_created', payload: {},
     }),
-    // What tommy-app's platform-emit intake sends: host identity, no token.
     emitFromPlatform: () => broker.emit({
       sourceMpId: 'leave',
       trigger: 'time-clock.shift_marked_absent',
@@ -65,7 +46,7 @@ describe('dispatchEmit — trigger owner assert (F3)', () => {
   it('flag OFF (default): a foreign-namespace emit still goes through', async () => {
     const w = await world();
     const receipt = await w.emitForeign();
-    expect(receipt.suppressed).toBe(true); // no consumer wired — D21 short-circuit
+    expect(receipt.suppressed).toBe(true);
   });
 
   it('flag ON: emitting another MP\'s trigger is PermissionDenied', async () => {
@@ -107,7 +88,6 @@ describe('subscribe — trigger read grant (F4)', () => {
   it('flag ON: a cross-MP subscription with no read grant is PermissionDenied', async () => {
     const w = await world({ strictEmitOwnership: true });
     expect(() => w.subscribeForeign()).toThrow(/read:time-clock.shift_marked_absent/);
-    // The denial names the derived route as well as the explicit one.
     expect(() => w.subscribeForeign()).toThrow(/read:attendance/);
   });
 
@@ -146,6 +126,6 @@ describe('subscribe — trigger read grant (F4)', () => {
     const w = await world({ strictEmitOwnership: true });
     expect(() => w.subscribeForeign()).toThrow();
     const receipt = await w.emitFromPlatform();
-    expect(receipt.suppressed).toBe(true); // still no consumer
+    expect(receipt.suppressed).toBe(true);
   });
 });

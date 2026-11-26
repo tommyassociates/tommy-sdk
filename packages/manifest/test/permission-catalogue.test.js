@@ -1,7 +1,3 @@
-// ac4 — the fixed permission catalogue is machine-checkable: non-catalogue scopes
-// are rejected with the named `permission-not-in-catalogue` rule + a suggestion,
-// and the catalogue itself is well-formed and covers the reference manifest.
-
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -25,7 +21,6 @@ describe('permission catalogue enforcement', () => {
   });
 
   it('carries a "did you mean" suggestion for a near-miss scope', () => {
-    // read:team_member is one edit from the catalogue's read:team_members.
     const src = [
       'manifestVersion: "1"',
       'id: typo-scope',
@@ -44,7 +39,7 @@ describe('permission catalogue enforcement', () => {
 
   it('accepts every scope the reference manifest requests', () => {
     const result = validateManifest(readFileSync(REF, 'utf8'));
-    expect(result.ok).toBe(true); // reference clears the catalogue layer
+    expect(result.ok).toBe(true);
     for (const scope of ['read:team_members', 'read:team_member_self', 'invoke:device_geolocation']) {
       expect(catalogue.scopes.has(scope)).toBe(true);
     }
@@ -56,14 +51,6 @@ describe('permission catalogue enforcement', () => {
   });
 });
 
-// The QUALIFIED per-primitive form. A cross-MP invoke has no domain derivation:
-// broker.authorizeInvoke and the server InvokeExecutor both require exactly
-// `invoke:<owner>.<activity>`, so that string is the only way a manifest can
-// declare the authority it needs — but the schema pattern and the catalogue
-// layer used to reject it, which is precisely why seven live cross-MP wirings
-// were granted out of band by seed data instead of being declared (convergence
-// M08, 2026-08-10). Both layers now admit it; the catalogue is not the right
-// authority for a scope addressed by another MP's manifest.
 describe('qualified per-primitive scopes', () => {
   const withScopes = (...scopes) => [
     'manifestVersion: "1"',
@@ -93,12 +80,10 @@ describe('qualified per-primitive scopes', () => {
   });
 
   it('is exempt from the catalogue, NOT from the shape rule', () => {
-    // No dot -> still an ordinary catalogue lookup, still rejected.
     const flat = validateManifest(withScopes('invoke:send_message'));
     expect(flat.ok).toBe(false);
     expect(flat.errors[0].rule).toBe('permission-not-in-catalogue');
 
-    // Dotted but malformed -> layer 2 rejects it before the catalogue is asked.
     for (const bad of ['invoke:Team-Comms.send_message', 'invoke:team-comms.', 'invoke:.send_message']) {
       const res = validateManifest(withScopes(bad));
       expect(res.ok, `${bad} should not validate`).toBe(false);
@@ -124,8 +109,6 @@ describe('catalogue integrity', () => {
     }
   });
 
-  // People's pay facts (agreed hours, agreements, qualifications) change what shifts cost, and some
-  // are sensitive, so both scopes are reviewed as high.
   it('carries the employee pay facts scopes, both high', () => {
     for (const scope of ['read:employee_facts', 'write:employee_facts']) {
       expect(catalogue.byScope.get(scope), scope).toMatchObject({ category: 'timesheets', sensitivity: 'high' });

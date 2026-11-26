@@ -1,26 +1,8 @@
-/**
- * errors.js — TommyError / TommySDKError + the unknown-method guard.
- *
- * Every rejection from the SDK is a TommyError with a named, machine-checkable
- * `code` (src/types.ts TommyErrorCode) — never a bare string or undefined
- * (03-sdk-runtime/README design rules). The guard makes a hallucinated method
- * name throw a helpful "did you mean" error instead of returning undefined.
- */
+// Every SDK rejection is a TommyError with a machine-checkable code, never a bare string.
 
 const RETRYABLE_CODES = new Set(['Timeout', 'RateLimited', 'ActivityFailed']);
 
 export class TommyError extends Error {
-  /**
-   * @param {object} opts
-   * @param {string} opts.code TommyErrorCode
-   * @param {string} opts.message names the broken rule
-   * @param {string} [opts.rule] manifest/schema path that failed
-   * @param {boolean} [opts.retryable]
-   * @param {string} [opts.runId]
-   * @param {unknown} [opts.cause]
-   * @param {number} [opts.retryAfterMs] on a `RateLimited` refusal: how long
-   *   until the broker has a token for the caller. Set only when known.
-   */
   constructor({ code, message, rule, retryable, runId, cause, retryAfterMs }) {
     super(message);
     this.name = 'TommyError';
@@ -43,7 +25,6 @@ export class TommySDKError extends Error {
   }
 }
 
-/** Levenshtein distance — small inputs only (method names). */
 function distance(a, b) {
   const m = a.length; const n = b.length;
   const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]);
@@ -69,22 +50,13 @@ export function nearest(name, known) {
   return bestDist <= Math.max(2, Math.floor(String(name).length / 3)) ? best : null;
 }
 
-/**
- * Wrap an SDK namespace so unknown property access throws a named error with
- * a suggestion — critical for AI authors (03-sdk-runtime/README §guard).
- */
+// Unknown property access throws a named error with a suggestion.
 export function guard(ns, nsName) {
   return new Proxy(ns, {
     get(target, prop) {
       if (typeof prop === 'symbol' || prop in target) return target[prop];
-      // Framework introspection markers (Vue reactivity probes `__v_isRef` /
-      // `__v_isReactive` / `__v_raw` / `__v_isShallow` …, `__vue__`, etc.) pass
-      // through as `undefined` — no SDK member is dunder-prefixed. This lets the
-      // `tommy` proxy be handed to Vue as a component prop/ctx (the panel-runtime
-      // contract) without a benign reactivity/warning-trace probe throwing and
-      // taking the whole panel down. (project_mp_tommy_proxy_not_reactive.)
+      // Dunder props read undefined so the proxy can be a Vue prop without a reactivity probe throwing.
       if (typeof prop === 'string' && prop.startsWith('__')) return undefined;
-      // Promise-interop probes (then/catch) and inspection internals pass through.
       if (['then', 'catch', 'finally', 'toJSON', 'constructor', 'valueOf', 'toString', 'inspect'].includes(prop)) return undefined;
       const known = Object.keys(target);
       const suggestion = nearest(prop, known);

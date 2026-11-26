@@ -1,6 +1,3 @@
-// Cross-reference layer (layer 4) — the advanced activity forms and the
-// dataRequirements/scope contract that the auto-discovered corpus does not cover.
-
 import { describe, it, expect } from 'vitest';
 import { validateManifest } from '../src/index.js';
 
@@ -13,7 +10,6 @@ const IDENTITY = [
   'publisher: { id: x, name: X, type: first_party }',
 ].join('\n');
 
-// required action fields (schema): title/trigger/activity/enabledByDefault/required/userConfigurable
 const ACTION_TAIL = `    enabledByDefault: true
     required: false
     userConfigurable: false`;

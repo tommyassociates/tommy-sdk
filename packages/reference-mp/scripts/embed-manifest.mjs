@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Regenerates src/manifest.js from manifest.yml (the vendored plans seed —
-// PROVENANCE in the header of manifest.yml). Same embed pattern as
-// @tommy/manifest: a JS module loads in node AND the browser/vite pipeline.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 

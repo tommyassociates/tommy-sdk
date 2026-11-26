@@ -1,12 +1,3 @@
-/**
- * local-store-backend.test.js — the localStorage-backed DataStore backend and
- * the createDataManager default that persists client-owned (`last_write_wins`)
- * stores across a shell reload. Fixes the "MP view settings aren't saved"
- * regression: the default memory backend was wiped on every reload.
- *
- * The package tests run in node (no DOM), so a minimal localStorage stub is
- * installed on globalThis — the backend reads `globalThis.localStorage`.
- */
 import {
   describe, it, expect, beforeEach, afterEach, vi,
 } from 'vitest';
@@ -15,19 +6,6 @@ import {
 } from '../src/index.js';
 import { databaseName } from '../src/names.js';
 
-/**
- * Database names come from the RESOLVER, not from literals (§8.8 requirement 3,
- * enforced by `sdk check:store-name-literals` — this file was its one standing
- * violation, parked as E.49).
- *
- * The literals it replaces were legitimate test INPUT, not hand-built store
- * names in a code path, so an allowlist entry would have been defensible. Going
- * through the resolver is strictly better: it keeps this test honest if the name
- * scheme ever changes, and it proves the backend is exercised with names the
- * resolver actually produces rather than with a hand-copy of them that could
- * drift silently. The tenant id still varies per case, which is what the
- * cross-tenant-bleed assertion below needs.
- */
 const dbFor = (tenantId) => databaseName({ tenantId }, 'scheduling');
 
 function fakeLocalStorage() {
@@ -61,7 +39,6 @@ describe('createLocalStorageBackend', () => {
     const first = createLocalStorageBackend(dbFor('team-3'), 'settings');
     await first.put('view', { key: 'view', value: { viewType: 'role', durationType: 'week' } });
 
-    // A new backend instance = the shell reloaded and re-created the store.
     const afterReload = createLocalStorageBackend(dbFor('team-3'), 'settings');
     expect((await afterReload.get('view')).value).toEqual({ viewType: 'role', durationType: 'week' });
   });
@@ -74,12 +51,6 @@ describe('createLocalStorageBackend', () => {
   });
 
   it('reports a write it could not make, and never reads an unreachable store as empty, when Web Storage has gone away', async () => {
-    // This backend is only ever chosen because Web Storage existed when the
-    // store was built, so reaching here means it went away mid-session (a
-    // WKWebView data store cleared, a permission revoked). A write reports
-    // it did not reach storage and keeps nothing (it does not know the rows
-    // beside it); a read rejects, so no caller takes the unknown store for
-    // an empty one.
     delete globalThis.localStorage;
     expect(hasWebStorage()).toBe(false);
     const b = createLocalStorageBackend(dbFor('team-3'), 'settings');
@@ -121,10 +92,9 @@ describe('createDataManager default backend selection', () => {
     await first.store('settings').put({ key: 'view', value: { durationType: 'day' } });
     await first.store('schedule_cache').put({ id: 's1' });
 
-    // Re-create the manager = a shell reload: new in-memory stores, same localStorage.
     const afterReload = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData, viewer: 'user-3' });
     expect((await afterReload.store('settings').get('view')).value).toEqual({ durationType: 'day' });
-    expect(await afterReload.store('schedule_cache').get('s1')).toBeUndefined(); // memory — gone
+    expect(await afterReload.store('schedule_cache').get('s1')).toBeUndefined();
   });
 
   it('keeps each viewer\'s prefs and client-owned rows apart in one browser', async () => {
@@ -154,7 +124,6 @@ describe('createDataManager default backend selection', () => {
     await expect(data.prefs.set('layout', 'grid')).rejects.toMatchObject({ code: 'DATA_NOT_SAVED' });
     await data.store('settings').put({ key: 'view', value: 'week' });
     expect(setItem).not.toHaveBeenCalled();
-    // Nor does it read what the same tenant and MP kept before viewers were named.
     globalThis.localStorage.setItem(`mp-store:${databaseName(token, 'scheduling')}:prefs`, JSON.stringify({ layout: { key: 'layout', value: 'grid', _rev: 1, _dirty: false } }));
     const named = createDataManager({ capabilityToken: token, mpId: 'scheduling', localData, viewer: 'user-1' });
     await named.prefs.ready();
@@ -162,11 +131,6 @@ describe('createDataManager default backend selection', () => {
   });
 });
 
-/**
- * Two tabs over the same Web Storage store: each has its own page (its own
- * module instance, so its own write turns); the origin's Web Locks and the
- * storage itself are shared.
- */
 describe('Web Storage stores across tabs', () => {
   const settle = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
   async function tab() {
@@ -182,8 +146,6 @@ describe('Web Storage stores across tabs', () => {
     await seed.put({ id: 'd1', body: 'first' });
     const listed = await seed.get('d1');
     const b = storeIn(tabB, tabB.createLocalStorageBackend(dbFor('team-3'), 'drafts'));
-    // Tab B edits the row while tab A is in its fenced delete: right after A
-    // reads the row, or before A's one-step compare-and-delete.
     let edit = null;
     const editMeanwhile = async () => {
       if (!edit) { edit = b.put({ id: 'd1', body: 'edited in tab B' }); await settle(30); }

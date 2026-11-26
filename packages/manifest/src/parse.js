@@ -1,14 +1,5 @@
-// Layer 1 — YAML parse with source positions retained.
-// Uses the `yaml` package's Document + LineCounter so every downstream error
-// can be mapped back to a line/column (README implementation note).
-
 import { parseDocument, LineCounter } from 'yaml';
 
-/**
- * Parse a manifest source string.
- * @returns {{ doc: import('yaml').Document, data: any, lineCounter: LineCounter,
- *            yamlErrors: Array<{line:number, col:number, message:string}> }}
- */
 export function parseManifest(source) {
   const lineCounter = new LineCounter();
   const doc = parseDocument(source, { lineCounter, prettyErrors: false });
@@ -32,20 +23,9 @@ export function parseManifest(source) {
   return { doc, data, lineCounter, yamlErrors };
 }
 
-/**
- * Resolve a JSON-Pointer-style path array to a 1-based line number in the source.
- * Falls back to the nearest resolvable ancestor, then to line 1.
- *
- * @param {import('yaml').Document} doc
- * @param {LineCounter} lineCounter
- * @param {Array<string|number>} path
- * @param {{ key?: string }} [opts]  when set, point at the given child KEY's line
- *                                    (used for unknown-field errors).
- */
 export function locateLine(doc, lineCounter, path, opts = {}) {
   const offsetToLine = (offset) => lineCounter.linePos(offset).line;
 
-  // Unknown-field: point at the offending key node, not its value.
   if (opts.key != null) {
     const parent = doc.getIn(path, true);
     if (parent && Array.isArray(parent.items)) {
@@ -60,7 +40,6 @@ export function locateLine(doc, lineCounter, path, opts = {}) {
   while (p.length >= 0) {
     const node = doc.getIn(p, true);
     if (node?.range) return offsetToLine(node.range[0]);
-    // For a map, prefer the first key's line when the value node has no range.
     if (node && Array.isArray(node.items) && node.items[0]?.key?.range) {
       return offsetToLine(node.items[0].key.range[0]);
     }
@@ -70,7 +49,6 @@ export function locateLine(doc, lineCounter, path, opts = {}) {
   return 1;
 }
 
-/** JSON Pointer ("/a/b/1") → path array (["a","b",1]). */
 export function pointerToPath(pointer) {
   if (!pointer) return [];
   return pointer
@@ -82,7 +60,6 @@ export function pointerToPath(pointer) {
     });
 }
 
-/** Path array → dotted display path ("permissions.scopes[1]"). */
 export function pathToDisplay(path) {
   let out = '';
   for (const seg of path) {

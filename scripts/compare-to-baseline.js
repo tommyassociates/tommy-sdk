@@ -1,29 +1,5 @@
 #!/usr/bin/env node
-/**
- * compare-to-baseline.js — the coupling freeze (block-on-increase).
- *
- * Parses ESLint JSON reports (array of file results) and dependency-cruiser
- * JSON reports ({ summary: { violations: [...] } }), counts violations per
- * rule, and compares against the committed coupling-baseline.json:
- *
- *   { "eslint": { "<ruleId>": <count> }, "depcruise": { "<ruleName>": <count> } }
- *
- * Usage:
- *   node scripts/compare-to-baseline.js --write <report.json>... [baseline.json]
- *   node scripts/compare-to-baseline.js --check <report.json>... [baseline.json]
- *
- * --write  regenerate the baseline from the report(s) and exit 0.
- * --check  exit 1 if ANY rule's count increased vs the baseline. On a
- *          decrease, print a reminder to commit the updated baseline
- *          (run --write) but still exit 0.
- *
- * Report type is detected by shape, so arguments may be passed in any order.
- * The baseline path is any argument ending in coupling-baseline.json
- * (default ./coupling-baseline.json). Missing report files are skipped with
- * a warning so one command works across repos with different tool sets.
- *
- * Design: plans/refactor-plan/06-instrumentation/detectors-in-ci.md.
- */
+// Coupling freeze: fails when ESLint or dependency-cruiser violation counts exceed coupling-baseline.json.
 const fs = require('fs');
 const path = require('path');
 
@@ -39,11 +15,7 @@ const baselinePath =
 const reportPaths = fileArgs.filter((f) => !f.endsWith('coupling-baseline.json'));
 
 const counts = { eslint: {}, depcruise: {} };
-// Tools that actually produced a parsed report this run. A tool with a
-// non-zero baseline and NO report must FAIL --check: otherwise a broken
-// linter (eslint exit 2 writes no output file, and the yarn script's
-// `|| true` swallows it) reads as "all violations fixed" and the freeze
-// silently disables itself.
+// A non-zero baseline with no report must fail --check, or a broken tool would pass.
 const toolsSeen = new Set();
 
 for (const p of reportPaths) {
@@ -63,12 +35,11 @@ for (const p of reportPaths) {
     toolsSeen.add('eslint');
     for (const file of data) {
       for (const msg of file.messages || []) {
-        if (!msg.ruleId) continue; // parse errors etc.
+        if (!msg.ruleId) continue;
         counts.eslint[msg.ruleId] = (counts.eslint[msg.ruleId] || 0) + 1;
       }
     }
   } else if (data && data.summary && Array.isArray(data.summary.violations)) {
-    // dependency-cruiser JSON output
     toolsSeen.add('depcruise');
     for (const v of data.summary.violations) {
       const name = v.rule && v.rule.name;
@@ -92,7 +63,6 @@ if (mode === '--write') {
   process.exit(0);
 }
 
-// --check
 if (!fs.existsSync(baselinePath)) {
   console.error(
     `[compare-to-baseline] no baseline at ${path.resolve(baselinePath)} — generate one with --write and commit it`
@@ -103,8 +73,7 @@ const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
 let increased = false;
 let decreased = false;
 
-// Fail-closed guard: every tool the baseline tracks (non-zero counts) must
-// have produced a report this run.
+// Fail closed: every tool the baseline tracks must have reported.
 for (const tool of ['eslint', 'depcruise']) {
   const baselineTotal = Object.values(baseline[tool] || {}).reduce((a, b) => a + b, 0);
   if (baselineTotal > 0 && !toolsSeen.has(tool)) {

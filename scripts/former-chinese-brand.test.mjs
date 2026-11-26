@@ -1,7 +1,3 @@
-// The SDK is Tommy in every language. No source, locale or sample add-on may
-// carry the former Chinese brand (托me / 托秘) or the name of the Hangzhou
-// company that ran it, and the brand is never spelled phonetically in another
-// script.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

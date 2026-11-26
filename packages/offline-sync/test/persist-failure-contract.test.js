@@ -1,15 +1,6 @@
-/**
- * persist-failure-contract.test.js — mp-store-quota-guard review findings F2 and
- * F5, pinned at the level they were found.
- *
- * The retain contract is: a write that does not reach disk still leaves the row
- * READABLE for the session, flagged `_persistFailed`, and the caller is told. The
- * review found two places where that promise quietly did not hold.
- */
 import { describe, it, expect } from 'vitest';
 import { createDataStore, createMemoryStoreBackend } from '../src/data-store.js';
 
-/** A backend that keeps rows but reports every write as never reaching disk. */
 function unpersistableBackend() {
   const inner = createMemoryStoreBackend();
   return {
@@ -23,10 +14,6 @@ function unpersistableBackend() {
 
 describe('F2 — reconcile must not prune a row it only failed to PERSIST', () => {
   it('keeps an unpersisted row instead of deleting it microseconds later', async () => {
-    // The row IS in the store; the put rejected because it did not reach disk.
-    // Skipping it left it out of `incoming`, so the prune below then deleted it
-    // as absent — on the one path (a durable cache under storage pressure) where
-    // the failure is most likely at scale.
     const store = createDataStore({
       name: 'grid', keyPath: 'id', backend: unpersistableBackend(),
     });
@@ -37,8 +24,6 @@ describe('F2 — reconcile must not prune a row it only failed to PERSIST', () =
   });
 
   it('still drops a record the SCHEMA rejected, which really is not there', async () => {
-    // The distinction the fix rests on: a schema failure means nothing was
-    // written, so the row is genuinely absent and the prune is correct.
     const store = createDataStore({
       name: 'grid',
       keyPath: 'id',
@@ -55,9 +40,6 @@ describe('F2 — reconcile must not prune a row it only failed to PERSIST', () =
 
 describe('F5 — a saturated row cap stops walking the store on every write', () => {
   it('does not re-walk once nothing is evictable, and resumes when something is', async () => {
-    // An unsynced drafts store is all-dirty by definition, so `enforceRowCap`
-    // can evict nothing and `residentCount` stays above `maxRows` forever. Every
-    // later put used to pay a full getAll() that could not help.
     const inner = createMemoryStoreBackend();
     let walks = 0;
     const counting = {
@@ -70,21 +52,15 @@ describe('F5 — a saturated row cap stops walking the store on every write', ()
     const store = createDataStore({
       name: 'drafts', keyPath: 'id', backend: counting, maxRows: 2,
     });
-    // ⚠ SILENT PUTS. `notify` takes its own `getAll()` snapshot for subscribers,
-    // so a plain put walks the store once for reasons that have nothing to do
-    // with the cap. Counting both together measured the notify path and called it
-    // the cap — the first version of this test failed for that reason alone.
     const put = (id) => store.put({ id }, { silent: true });
     await put('1');
     await put('2');
-    await put('3');                        // over the cap; nothing clean to evict
-    expect(walks).toBe(1);                 // exactly one cap walk, and it found nothing
+    await put('3');
+    expect(walks).toBe(1);
     await put('4');
     await put('5');
-    expect(walks).toBe(1);                 // the latch held: no further walks
+    expect(walks).toBe(1);
 
-    // markSynced clears _dirty, which makes a row evictable again — the cap must
-    // come back to life rather than stay latched off for the store's lifetime.
     await store.markSynced('1');
     await put('6');
     expect(walks).toBe(2);
@@ -92,7 +68,6 @@ describe('F5 — a saturated row cap stops walking the store on every write', ()
   });
 
   it('never evicts a dirty row to satisfy the cap', async () => {
-    // The reason saturation exists at all: unsent work outranks the cap.
     const store = createDataStore({
       name: 'drafts', keyPath: 'id', backend: createMemoryStoreBackend(), maxRows: 1,
     });
@@ -102,7 +77,6 @@ describe('F5 — a saturated row cap stops walking the store on every write', ()
   });
 });
 
-/** A backend that keeps rows but reports every DELETE as never reaching disk. */
 function undeletableBackend() {
   const inner = createMemoryStoreBackend();
   return {
@@ -116,12 +90,6 @@ function undeletableBackend() {
 
 describe('QG-R3-2 — a failed eviction must not abort the reconcile around it', () => {
   it('completes the reconcile, notifies once, and returns full counts', async () => {
-    // `delete()` rejects on a backend that cannot reach disk, and the prune,
-    // the row cap and window retention all delete INSIDE loops in the middle of
-    // reconcile. One failed eviction used to throw out after the rows had
-    // merged and before the single notify: subscribers never woke, the cap and
-    // retention never finished, and the store was left half-pruned. Invisible,
-    // too — `fetchAndReconcile` swallows the rejection to keep the cache.
     const store = createDataStore({
       name: 'grid', keyPath: 'id', backend: undeletableBackend(),
     });
@@ -129,19 +97,16 @@ describe('QG-R3-2 — a failed eviction must not abort the reconcile around it',
 
     let notifications = 0;
     store.subscribe(() => { notifications += 1; });
-    notifications = 0; // subscribe() paints once on attach
+    notifications = 0;
 
-    // 'b' is absent from the incoming set, so the prune must delete it.
     const res = await store.reconcile([{ id: 'a' }], { scope: () => true });
 
-    expect(res.pruned).toBe(1);          // the count is complete, not truncated
+    expect(res.pruned).toBe(1);
     expect(res.upserted).toBe(1);
-    expect(notifications).toBe(1);       // the one notify still fired
+    expect(notifications).toBe(1);
   });
 
   it('still surfaces a delete failure to a caller who asked for the delete', async () => {
-    // The swallow is scoped to evictions the STORE performs. An explicit
-    // `delete()` is a caller's instruction and must still report failure.
     const store = createDataStore({
       name: 'grid', keyPath: 'id', backend: undeletableBackend(),
     });

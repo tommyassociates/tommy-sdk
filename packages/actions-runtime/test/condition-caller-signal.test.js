@@ -1,8 +1,3 @@
-/**
- * condition-caller-signal.test.js — a query's own `signal` (the asking
- * surface's shown signal) reaches the condition handler's `signal`, so a read
- * still waiting when the person leaves the page can stop.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 
@@ -65,8 +60,6 @@ describe('the caller signal on a query', () => {
   });
 
   it('still aborts the handler signal when the caller leaves soon after an early answer', async () => {
-    // A handler that answers from what it holds and leaves a read queued
-    // behind (the Scheduling window read answered from its cache).
     let seen;
     const query = await world((args, ctx) => { seen = ctx.signal; return {}; });
     const caller = new AbortController();

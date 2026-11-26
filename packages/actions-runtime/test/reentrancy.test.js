@@ -1,19 +1,8 @@
-/**
- * reentrancy.test.js (F6) — the per-source-MP FIFO invoke chain must not
- * deadlock a NESTED invoke issued from inside a handler the same chain is
- * currently executing, while still serialising genuinely concurrent callers.
- *
- * Gap register Class F / F6: `broker.js` chained EVERY invoke per sourceMpId,
- * so an activity handler invoking another of its own MP's activities queued
- * behind its own ancestor and never resolved. That deadlock is the documented
- * reason two cross-MP writes (availability lock, leave-on-shift) went off-bus.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 
 const TENANT = 'team-1';
 
-/** Fails fast instead of hanging the suite when the chain deadlocks. */
 function withTimeout(promise, ms, what) {
   let timer;
   const guard = new Promise((_, reject) => {
@@ -63,7 +52,6 @@ describe('broker invoke re-entrancy (F6)', () => {
     }), {
       handlers: {
         activities: {
-          // The outer handler invokes another of its OWN activities — the F6 case.
           lock_window: async (args) => {
             const nested = await broker.invoke(env('availability.write_lock', args));
             return { nested: nested.result };
@@ -108,7 +96,6 @@ describe('broker invoke re-entrancy (F6)', () => {
     const first = call(1);
     const second = call(2);
 
-    // Let the first dispatch reach its handler; the second must still be queued.
     await new Promise((r) => { setTimeout(r, 10); });
     expect(order).toEqual(['enter1']);
 

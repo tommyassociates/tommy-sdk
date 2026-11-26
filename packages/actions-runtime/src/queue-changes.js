@@ -1,4 +1,3 @@
-/** Internal committed-row invalidations; public subscribers receive no row data. */
 export function createQueueChanges() {
   const listeners = new Set();
   const pending = new Set();

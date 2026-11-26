@@ -1,13 +1,3 @@
-/**
- * adapter-write-deadline.test.js — a write is waited for longer than a read.
- *
- * A write is an RPC of kind `invoke`, `transaction_invoke` or
- * `transaction_rollback`: the adapter tells from the envelope's kind, which
- * the SDK sets and an MP cannot. Its answer is the server's, so the adapter
- * waits DEFAULT_WRITE_TIMEOUT_MS for it; every other kind keeps
- * DEFAULT_RPC_TIMEOUT_MS. The deadlines the broker reads off the envelope
- * (`rpcDeadlineAt`, `restoreDeadlineAt`) stay on the shorter one.
- */
 import {
   afterEach, beforeEach, describe, expect, it, vi,
 } from 'vitest';

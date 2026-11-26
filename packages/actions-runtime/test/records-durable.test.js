@@ -1,11 +1,3 @@
-/**
- * D.43 — the run-record store survives a reload, REDACTED.
- *
- * This store is the one that spent the platform's whole life documenting a
- * shell-supplied IndexedDB backend nobody ever passed, so the tests that matter
- * are (a) the default picks itself when storage exists, and (b) what it writes
- * carries no tenant payload.
- */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createRecordStore, createWebStorageBackend, createMemoryBackend } from '../src/index.js';
 
@@ -145,7 +137,7 @@ describe('D.43 — durable, redacted run records', () => {
     await first.update(opened.runId, { status: 'succeeded' });
 
     vi.advanceTimersByTime(1000);
-    const second = makeStore();               // the reload
+    const second = makeStore();
     const found = await second.get(opened.runId);
     expect(found).toBeDefined();
     expect(found.activityName).toBe('submit');
@@ -159,7 +151,7 @@ describe('D.43 — durable, redacted run records', () => {
 
     vi.advanceTimersByTime(1000);
     const raw = storage.getItem('mp-action-records');
-    expect(raw).not.toContain('4321');        // the PIN never reaches disk
+    expect(raw).not.toContain('4321');
     expect(raw).not.toContain('secret');
     for (const row of persisted(storage)) {
       expect(row).not.toHaveProperty('args');
@@ -201,13 +193,13 @@ describe('D.43 — durable, redacted run records', () => {
     const quota = createRecordStore({ backend: createWebStorageBackend({ storage: full }) });
     const q = await quota.open({ kind: 'invoke', activityName: 'b', sourceMpId: 'm' });
     expect(() => vi.advanceTimersByTime(1000)).not.toThrow();
-    expect((await quota.get(q.runId)).activityName).toBe('b'); // still in the memory tier
+    expect((await quota.get(q.runId)).activityName).toBe('b');
   });
 
   it('an explicit backend still wins — the self-detecting default is a default, not a lock', async () => {
     const store = createRecordStore({ backend: createMemoryBackend() });
     const opened = await store.open({ kind: 'invoke', activityName: 'a', sourceMpId: 'm' });
     expect(await store.get(opened.runId)).toBeDefined();
-    expect(storage.getItem('mp-action-records')).toBeNull(); // nothing written
+    expect(storage.getItem('mp-action-records')).toBeNull();
   });
 });

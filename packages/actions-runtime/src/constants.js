@@ -1,11 +1,3 @@
-/**
- * constants.js — pinned defaults (sdk-broker harden round-1).
- *
- * Rate seeds from security-model.md §7 (120 action calls/min/MP, 500
- * RPC/min/instance); loop caps from actions-runtime.md §7.2/§7.3. The
- * per-kind split + burst were unspecified — recorded design decision,
- * tunable from telemetry (see the spec's Deviations).
- */
 export const DEFAULT_THROTTLE_PROFILE = Object.freeze({
   emitsPerMin: 120,
   invokesPerMin: 120,
@@ -16,71 +8,23 @@ export const DEFAULT_THROTTLE_PROFILE = Object.freeze({
   maxNodeRepeats: 3,
 });
 
-/**
- * How long a QUERY waits for its MP's next rate token before it is refused.
- *
- * A read that finds the bucket empty takes the next token (so reads queued
- * behind it take the ones after) and waits for it, up to this long. Past it the
- * read is refused at once with `RateLimited`, carrying `retryAfterMs`: how long
- * until a token is free for it. At the default 120 queries/min a token comes
- * every 500 ms, so a read made one at a time never waits long enough to be
- * refused, and a burst past the 30 is spread over about four tokens before the
- * rest are refused.
- *
- * Queries only. An emit or invoke that finds the bucket empty is refused at
- * once, as before, now with `retryAfterMs` too.
- */
+// A read that finds the bucket empty takes the next token and waits for it, up to this.
 export const QUERY_RATE_WAIT_MAX_MS = 2000;
 
-/** offline-sync.md §3 — per-MP offline queue caps. */
 export const QUEUE_MAX_ENTRIES = 500;
 export const QUEUE_MAX_BYTES = 5 * 1024 * 1024;
 // A queued row's lifetime; a row older than this is never sent.
 export const QUEUE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-/** actions-runtime.md §1 `sync` emission — broker ack timeout. */
 export const SYNC_EMIT_TIMEOUT_MS = 3000;
 
-/** Default retry budget when an activity declares none. */
 export const DEFAULT_RETRY = Object.freeze({ maxAttempts: 3, backoff: 'exponential' });
 
-/**
- * The spacing behind `retry.backoff`, and the cap that keeps it honest.
- *
- * `backoff` has been a manifest-schema enum (`none | linear | exponential`)
- * since v1 and is declared by 26 activities across 14 MPs plus the reference
- * MP — and until spec mp-declared-bounds-that-dont-bind nothing implemented it.
- * The three attempts fired back to back, so the spacing applies to the errors a
- * HANDLER raises — a transient host read, a 5xx from an adapter — which are the
- * only ones that reach the loop.
- *
- * ⚠ IT DOES NOT COVER `RateLimited`, and an earlier version of this comment
- * claimed it did. `takeToken` runs at the top of `dispatchInvokeInner`,
- * BEFORE the retry loop opens, so a throttled invoke throws straight out of
- * the dispatch and gets zero attempts and zero backoff (its error carries
- * `retryAfterMs` for the caller instead; a QUERY waits for its token, see
- * QUERY_RATE_WAIT_MAX_MS). Where a `RateLimited` does reach a loop — a nested child
- * bubbling up through its parent's handler — the arithmetic still does not
- * close: the bucket refills `perMin * elapsedMinutes`, so at 120 invokes/min one
- * token needs 500ms while the default schedule spends 300ms across both gaps.
- * Spacing the throttle case properly is a limiter change, not a backoff change.
- *
- * ⚠ THE CAP IS NOT A TUNING KNOB. Every Action run inherits this timing, so an
- * uncapped exponential turns a millisecond dead-letter into a multi-second one
- * and anything waiting on a run — a spinner, a fixed test timeout — waits with
- * it. At 100ms base and a 400ms ceiling the default 3-attempt budget adds 300ms
- * total, so a dead-letter still lands well inside a second.
- */
+// Spacing for handler-raised errors; the cap keeps the backoff honest.
 export const RETRY_BASE_DELAY_MS = 100;
 export const RETRY_MAX_DELAY_MS = 400;
 
-/**
- * Spacing between resends of a QUEUED write whose request never reached the
- * server (F8). The drain runs on every server answer, foreground and
- * reconnect, so on a weak link an unspaced row was resent back to back, its
- * whole body (a clock photo) each time. The first resend waits the base, each
- * further one doubles it, up to the ceiling. In memory: a reload resends at once.
- */
+// Spaced so a weak link does not resend a never-delivered write back to back on every drain.
 export const QUEUE_RESEND_BASE_MS = 5000;
 export const QUEUE_RESEND_MAX_MS = 120000;
 
@@ -93,41 +37,16 @@ export function queueResendDelayMs(failures) {
   return Math.min(QUEUE_RESEND_BASE_MS * (2 ** (failures - 1)), QUEUE_RESEND_MAX_MS);
 }
 
-/**
- * Delay BEFORE `attempt` (1-based). The first attempt is never delayed.
- * `none` keeps immediate retries for an activity that wants them, and is the
- * honest way to ask for immediate retries now that the default spaces them.
- */
+// The first attempt is never delayed; `none` keeps immediate retries.
 export function retryDelayMs(backoff, attempt) {
   if (attempt <= 1) return 0;
   const n = attempt - 1;
   if (backoff === 'none') return 0;
   if (backoff === 'linear') return Math.min(RETRY_BASE_DELAY_MS * n, RETRY_MAX_DELAY_MS);
-  // 'exponential', and anything unrecognised — the schema constrains the value,
-  // but a runtime that guesses wrong should guess toward spacing, not against.
   return Math.min(RETRY_BASE_DELAY_MS * (2 ** (n - 1)), RETRY_MAX_DELAY_MS);
 }
 
-/**
- * Read-scope DERIVATION map.
- *
- * The fixed permission catalogue (@tommy/manifest
- * src/catalogue/permission-catalogue.json) speaks in DOMAINS — `read:shifts`,
- * `read:attendance` — while the broker's cross-MP checks name PRIMITIVES —
- * `read:{owner}.{condition}`. Option B derives the second from the first: an
- * MP holding the owner's domain scope may read that owner's conditions and
- * subscribe to its triggers, with no new catalogue members and no per-primitive
- * minting. Explicit per-primitive scopes remain valid (a strict superset), and
- * SENSITIVE_CONDITIONS below opts individual primitives OUT of derivation.
- *
- * Only MPs whose catalogue domain differs from their id are listed; everything
- * else derives `read:{mpId with - → _}` (see `domainScopeForMp`). MPs whose
- * fallback is not yet a catalogue member (calendar, onboarding) are therefore
- * reachable only via an explicit per-primitive scope until the catalogue
- * grows — deliberate, and tracked in HANDOFF-m1-grants.md §A. `care-plans`
- * left that list in catalogue 0.3.0-starter, which added `read:care_plans`
- * for invoicing's three NDIS reads.
- */
+// The permission catalogue speaks in domains; the broker checks per-MP scopes, so domains are derived here.
 export const DOMAIN_SCOPE_BY_MP = Object.freeze({
   scheduling: 'shifts',
   'time-clock': 'attendance',
@@ -137,24 +56,13 @@ export const DOMAIN_SCOPE_BY_MP = Object.freeze({
   payroll: 'pay_templates',
 });
 
-/** `mpId` → the catalogue domain read-scope that covers it. */
 export function domainScopeForMp(mpId, overrides = {}) {
   const domain = overrides[mpId] || DOMAIN_SCOPE_BY_MP[mpId] || String(mpId).replace(/-/g, '_');
   return `read:${domain}`;
 }
 
-/**
- * Primitives that domain derivation must NEVER grant. A caller needs the
- * EXPLICIT `read:{owner}.{primitive}` scope for
- * these even with the enforcement flags on — holding `read:attendance` does
- * not hand you the kiosk PIN. Keyed `{ownerMpId}.{primitiveName}`; exported so
- * review tooling and tests read the same list the broker enforces.
- *
- * Growing it is a REVIEW decision, not a code convenience: each entry is a
- * primitive whose payload is a credential, a financial secret, or otherwise
- * outside its own domain's normal read sensitivity.
- */
+// Primitives domain derivation must never grant; they need the explicit scope.
 export const SENSITIVE_CONDITIONS = Object.freeze(new Set([
-  'time-clock.kiosk_pin',      // device kiosk credential
-  'invoicing.vendor_settings', // payment/vendor configuration
+  'time-clock.kiosk_pin',
+  'invoicing.vendor_settings',
 ]));

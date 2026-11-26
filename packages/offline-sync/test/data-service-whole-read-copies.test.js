@@ -1,16 +1,9 @@
 // @vitest-environment node
-/**
- * A whole read of a host-store collection copies each row once: the store's
- * whole read already answers rows copied for that caller alone, so the data
- * service only drops their storage metadata. Kept reads (`wholeReadReuseMs`)
- * and stores that hand out their own rows are still copied per caller.
- */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDataService, createDataStore, createMemoryStoreBackend } from '../src/index.js';
 import { createHostStorePort } from '../src/host-store/index.js';
 import { DATABASES, identity } from './helpers/host-databases.js';
 
-/** A host-store-backed collection the way the app opens one. */
 function transactionalBackend(port, options) {
   let handle;
   const ready = () => (handle ||= port.open(options));
@@ -57,7 +50,6 @@ function open(create, extra = {}) {
 }
 
 const ROWS = Array.from({ length: 60 }, (_, at) => ({ id: String(100 + at), user_id: String(at % 7), notes: { text: `n${at}` } }));
-// JSON.parse calls made by one read (each row copy is one or more).
 async function parsesDuring(read) {
   const parse = vi.spyOn(JSON, 'parse');
   const before = parse.mock.calls.length;
@@ -72,13 +64,11 @@ describe.each(DATABASES)('a whole read of a host-store collection (%s)', (_name,
     const { data, store } = open(create);
     await data.ingest('shifts', ROWS);
     await data.read('shifts');
-    // What the store's own whole read costs: it reads and copies each row.
     const { count: storeCount } = await parsesDuring(() => store.getAll());
     const { rows, count } = await parsesDuring(() => data.read('shifts'));
     expect(rows).toHaveLength(ROWS.length);
     expect(Object.keys(rows[0]).filter((field) => field.startsWith('_'))).toEqual([]);
     expect(rows[0]).toEqual(ROWS[0]);
-    // The service adds no copy of its own to the store's read.
     expect(count).toBeLessThan(storeCount + ROWS.length / 2);
     rows[0].notes.text = 'mutated';
     rows[1].user_id = 'mutated';

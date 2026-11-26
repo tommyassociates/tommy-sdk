@@ -1,12 +1,4 @@
 // @vitest-environment node
-/**
- * A source's refresh methods: named reads of part of a collection with
- * typed params. The service refuses what it cannot honour, batches the ids
- * of callers asking at once into one fetch, never fetches an id twice at
- * once or more often than the method's cadence, lets a whole read answer,
- * and merges every answer: rows it left out stay, the collection is not
- * marked synced, and only keys it names gone go.
- */
 import {
   describe, it, expect, vi,
 } from 'vitest';
@@ -22,7 +14,6 @@ function service({ at = () => 1_000_000, online = () => true, principal = { id: 
   });
   return { data, store };
 }
-// A server holding `rows`; `byUserIds` answers the rows of the users asked for.
 function server(rows) {
   const asked = [];
   const whole = vi.fn(async () => ({ rows: rows.map((row) => ({ ...row })) }));
@@ -52,13 +43,10 @@ describe('refresh methods', () => {
     await refused({ method: 'byUserIds', params: { user_ids: [] } });
     await refused({ method: 'byUserIds', params: { user_ids: [{ id: 1 }] } });
     await refused({ method: 'byUserIds', params: { user_ids: '101' } });
-    // More ids than the method takes.
     await refused({ method: 'byUserIds', params: { user_ids: ['1', '2', '3', '4'] } });
-    // A method with a key, query or window.
     await refused({ method: 'byUserIds', params: { user_ids: ['1'] }, key: '1' });
     expect(api.byUserIds).not.toHaveBeenCalled();
     expect(api.whole).not.toHaveBeenCalled();
-    // A declaration it could not honour is refused when registered.
     expect(() => data.source('members', { fetch: api.whole, methods: { byUserIds: { params: { user_ids: { type: 'list' } }, fetch: api.byUserIds } } }))
       .toThrow(expect.objectContaining({ code: 'DATA_INVALID' }));
     expect(() => data.source('members', { fetch: api.whole, methods: { byUserIds: { params: { q: { type: 'string' } }, batch: 'q', fetch: api.byUserIds } } }))
@@ -87,11 +75,9 @@ describe('refresh methods', () => {
     const slow = vi.fn(async (params, context) => { await held; return api.byUserIds(params, context); });
     data.source('members', { fetch: api.whole, read: {}, methods: methods({ byUserIds: slow }) });
     const ask = (userIds) => data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: userIds } }, { mode: 'visible' });
-    // Two MPs asking overlapping ids at once: one fetch of their union.
     const first = ask(['101', '102']);
     const second = ask(['102', '103']);
     await Promise.resolve();
-    // A third, while that fetch is out: only the id not being fetched goes.
     const third = ask(['103', '104']);
     release();
     await Promise.all([first, second, third]);
@@ -117,7 +103,6 @@ describe('refresh methods', () => {
   it('does not add ids to a batch that has waited past the share window without starting', async () => {
     let at = 1_000_000;
     const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
-    // A scheduler that never starts the first job it is given.
     let first = true;
     const scheduler = {
       request(job) {
@@ -156,13 +141,11 @@ describe('refresh methods', () => {
     at += MINUTE;
     await ask(['101'], { maxAge: 0 });
     expect(api.byUserIds).toHaveBeenCalledTimes(1);
-    // Only the id not fetched within the cadence goes.
     await ask(['101', '102']);
     expect(api.asked.map((call) => call.user_ids)).toEqual([['101'], ['102']]);
     at += 5 * MINUTE;
     await ask(['101']);
     expect(api.byUserIds).toHaveBeenCalledTimes(3);
-    // A whole read within the cadence answers every id, asked or not.
     await data.refresh('members', { mode: 'visible' });
     await ask(['101', '102']);
     expect(api.byUserIds).toHaveBeenCalledTimes(3);
@@ -233,7 +216,6 @@ describe('refresh methods', () => {
     const byIds = vi.fn(async (params) => ({ rows: params.ids.includes('1') ? [member(1, { name: 'Fresh' })] : [], gone: params.ids.filter((id) => id !== '1') }));
     data.source('members', { fetch: async () => ({ rows: [] }), read: {}, methods: { byIds: { params: { ids: { type: 'ids' } }, batch: 'ids', fetch: byIds } } });
     await data.ingest('members', [member(1), member(2), member(3), member(4)]);
-    // Row 3 has an unsent local change.
     await store.put({ ...member(3), name: 'Unsent' });
     expect((await store.getRaw('3'))._dirty).toBe(true);
     await data.refresh({ collection: 'members', method: 'byIds', params: { ids: ['1', '2', '3'] } }, { mode: 'visible' });
@@ -409,11 +391,9 @@ describe('refresh methods', () => {
     const api = server([member(1)]);
     data.source('members', { fetch: api.whole, read: {}, methods: methods(api, { field: 'user_id' }) });
     await data.ingest('members', [member(1), member(2), member(3), member(4)]);
-    // Member 3 has an unsent local change.
     await store.put({ ...member(3), name: 'Unsent' });
     await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101', '102', '103'] } }, { mode: 'visible' });
     expect(await ids(data)).toEqual(['1', '3', '4']);
-    // By key: an id the answer left out is gone.
     const byIds = vi.fn(async ({ ids: asked }) => asked.filter((id) => id === '1').map((id) => member(Number(id))));
     data.source('members', { fetch: api.whole, read: {}, methods: { byIds: { params: { ids: { type: 'ids' } }, batch: 'ids', field: 'id', fetch: byIds } } });
     await data.refresh({ collection: 'members', method: 'byIds', params: { ids: ['1', '4'] } }, { mode: 'visible' });
@@ -422,7 +402,6 @@ describe('refresh methods', () => {
 
   it('hands a batch to the scheduler only once every id of the ask is in it', async () => {
     const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
-    // A scheduler that runs a job the moment it is handed one.
     const scheduler = { request: (job) => Promise.resolve(job.run(() => true)) };
     const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), scheduler, principal: { id: 'p1' } });
     const api = server([member(1), member(2)]);
@@ -476,7 +455,6 @@ describe('refresh methods', () => {
     const held = new Promise((resolve, reject) => { refuse = reject; });
     const api = server([member(1), member(2)]);
     data.source('members', { fetch: () => held, read: {}, methods: methods(api) });
-    // A bootstrap's whole read, refused for this account once its access is known.
     const reading = data.refresh('members', { mode: 'visible' }).catch((error) => error);
     const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } });
     refuse(Object.assign(new Error('read on demand for this account'), { code: 'DATA_ON_DEMAND', retryable: false }));
@@ -568,13 +546,11 @@ describe('refresh methods', () => {
   it('answers a silent lookup retired while it waited on a joined read as retired, not with its old status', async () => {
     const { data } = service();
     const api = server([member(1)]);
-    // A first lookup of its own: the method's status is fresh.
     data.source('members', { fetch: () => held, read: {}, methods: methods(api) });
     let fail;
     let held = Promise.resolve({ rows: [] });
     expect((await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } })).state).toBe('fresh');
     held = new Promise((resolve, reject) => { fail = reject; });
-    // Retired before its turn, the whole read never starts: nothing else hears its failure.
     held.catch(() => {});
     const reading = data.refresh('members').catch(() => {});
     const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['102'] } });
@@ -605,7 +581,6 @@ describe('refresh methods', () => {
     const data = createDataService({ resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: () => 1_000_000 });
     const api = server([member(1), member(2)]);
     data.source('members', { fetch: api.whole, read: {}, methods: methods(api) });
-    // The second row is refused by the store: the ingest is not every row.
     await data.ingest('members', [member(1), { id: '2', user_id: 102 }], { complete: true });
     await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['102'] } }, { mode: 'visible' });
     expect(api.asked.map((call) => call.user_ids)).toEqual([['102']]);
@@ -622,7 +597,6 @@ describe('refresh methods', () => {
     });
     const keyed = data.refresh({ collection: 'members', key: '2' }, { mode: 'visible' });
     await new Promise((resolve) => { setTimeout(resolve, 0); });
-    // The lookup (begun after) finds user 102 gone.
     await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['102'] } }, { mode: 'visible' });
     release();
     await keyed;
@@ -641,7 +615,6 @@ describe('refresh methods', () => {
     shown = { id: 'p1', form: 'member' };
     await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
     expect(api.asked.map((call) => call.user_ids)).toEqual([['101']]);
-    // As the form it was read as, the whole read answers.
     shown = { id: 'p1', form: 'team' };
     await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
     expect(api.asked).toHaveLength(1);
@@ -665,7 +638,6 @@ describe('refresh methods', () => {
     const keyed = data.refresh({ collection: 'members', key: '2' }, { mode: 'visible' });
     await new Promise((resolve) => { setTimeout(resolve, 0); });
     await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['102'] } }, { mode: 'visible' });
-    // Enough other people found gone to evict that marker.
     for (let batch = 0; batch < 26; batch += 1) {
       const ids = Array.from({ length: 200 }, (_, n) => String(10_000 + (batch * 200) + n));
       await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ids } }, { mode: 'visible' }); // eslint-disable-line no-await-in-loop
@@ -689,7 +661,6 @@ describe('refresh methods', () => {
     const { data } = service();
     let fail;
     const held = new Promise((resolve, reject) => { fail = reject; });
-    // Retired before its turn, the whole read never starts: nothing else hears its failure.
     held.catch(() => {});
     const api = server([member(1)]);
     data.source('members', { fetch: () => held, read: {}, methods: methods(api) });
@@ -733,7 +704,6 @@ describe('refresh methods', () => {
     data.source('members', { fetch: () => held, read: {}, methods: methods({ byUserIds }) });
     const reading = data.refresh('members').catch(() => {});
     const first = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
-    // The whole read takes longer than the share window, then fails.
     at += 2 * MINUTE;
     fail(Object.assign(new Error('Service Unavailable'), { status: 503 }));
     await reading;
@@ -757,13 +727,11 @@ describe('refresh methods', () => {
     });
     const reading = data.refresh('members').catch(() => {});
     const asking = data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
-    // Enough other asks to clear the idle groups while it waits.
     for (let n = 0; n < 501; n += 1) await data.refresh({ collection: 'members', method: 'search', params: { q: `q${n}` } }); // eslint-disable-line no-await-in-loop
     fail(Object.assign(new Error('Service Unavailable'), { status: 503 }));
     await reading;
     await asking;
     expect(api.byUserIds).toHaveBeenCalledTimes(1);
-    // Within the cadence the id is answered without another fetch.
     await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } }, { mode: 'visible' });
     expect(api.byUserIds).toHaveBeenCalledTimes(1);
   });
@@ -775,7 +743,6 @@ describe('refresh methods', () => {
     let held = Promise.resolve();
     const api = server([member(1)]);
     data.source('members', { fetch: async () => { await held; return null; }, read: {}, methods: methods(api, { cadenceMs: 1000 }) });
-    // A fetch of its own first: the method's status is fresh.
     expect((await data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } })).state).toBe('fresh');
     at += 2000;
     held = new Promise((resolve) => { release = resolve; });
@@ -800,13 +767,10 @@ describe('refresh methods', () => {
     });
     const ask = (userIds, options) => data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: userIds } }, options);
     await expect(ask(['101'])).resolves.toMatchObject({ state: 'fresh', error: null });
-    // Another id's read fails: the method's status says so.
     await expect(ask(['102'])).resolves.toMatchObject({ state: 'error', error: { status: 503 } });
-    // The first id is still fresh: answered fresh, with nothing read.
     const calls = byUserIds.mock.calls.length;
     await expect(ask(['101'])).resolves.toMatchObject({ state: 'fresh', error: null });
     await expect(ask(['101'], { mode: 'visible' })).resolves.toMatchObject({ state: 'fresh', error: null });
-    // A moment the method was not offered, then offered again.
     offered = false;
     await expect(ask(['101'])).resolves.toMatchObject({ state: 'error', error: { code: 'DATA_UNSUPPORTED' } });
     offered = true;
@@ -824,13 +788,11 @@ describe('refresh methods', () => {
     const ask = (userIds) => data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: userIds } }, { mode: 'visible' });
     await ask(['101']);
     await ask(['102', '103']);
-    // The bound keeps two rows: the oldest (101's) went.
     expect(await ids(data)).toEqual(['2', '3']);
     await ask(['101']);
     expect(api.byUserIds).toHaveBeenCalledTimes(3);
     expect(api.byUserIds.mock.calls[2][0].user_ids).toEqual(['101']);
     expect(await data.read('members', '1')).toMatchObject({ id: '1', user_id: 101 });
-    // An id the server answered absent is not asked again within the cadence.
     await ask(['199']);
     await ask(['199']);
     expect(api.byUserIds).toHaveBeenCalledTimes(4);
@@ -839,8 +801,6 @@ describe('refresh methods', () => {
   it('stores what a search\'s retry reads after its callers were answered at the deadline, and never an older one over a newer', async () => {
     const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
     const jobs = [];
-    // As the host's scheduler does at a visible read's deadline: the callers
-    // are answered REFRESH_TIMEOUT and the same job runs again behind.
     const scheduler = {
       request: (job) => new Promise((resolve, reject) => { jobs.push({ job, resolve, reject }); }),
     };
@@ -857,11 +817,8 @@ describe('refresh methods', () => {
     await vi.waitFor(() => expect(jobs).toHaveLength(1));
     jobs[0].reject(Object.assign(new Error('Refresh took too long'), { code: 'REFRESH_TIMEOUT', retryable: true }));
     await expect(first).rejects.toMatchObject({ code: 'REFRESH_TIMEOUT' });
-    // The retry runs behind and its answer lands.
     await jobs[0].job.run(() => true);
     expect(await data.read('members', '1')).toMatchObject({ name: 'ada' });
-    // The same search asked again before the older one's retry answered:
-    // only the newer stores.
     const older = ask('bob');
     await vi.waitFor(() => expect(jobs).toHaveLength(2));
     jobs[1].reject(Object.assign(new Error('Refresh took too long'), { code: 'REFRESH_TIMEOUT', retryable: true }));
@@ -876,7 +833,6 @@ describe('refresh methods', () => {
   });
 
   describe('range methods that prune (prunesWhere), a complete answer, and fromNow', () => {
-    // Shifts by start day: `byRange` answers the rows whose `day` is in [from, to].
     const shift = (id, day, extra = {}) => ({ id: String(id), day, ...extra });
     const inRange = (row, { from, to }) => row.day >= from && row.day <= to;
     function shifts(rows, { complete = true } = {}) {
@@ -998,24 +954,18 @@ describe('refresh methods', () => {
       declare(data, byRange);
       const first = data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible' });
       await vi.waitFor(() => expect(byRange).toHaveBeenCalledTimes(1));
-      // Joins the flight in the share window.
       const joined = data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible' });
-      // Starts its own read.
       const own = data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible', fromNow: true });
       await vi.waitFor(() => expect(byRange).toHaveBeenCalledTimes(2));
       release();
       await Promise.all([first.catch(() => {}), joined.catch(() => {}), own]);
       gate = Promise.resolve();
-      // Fresh within the cadence: answered without a read.
       await data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible' });
       expect(byRange).toHaveBeenCalledTimes(2);
-      // fromNow reads again.
       await data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible', fromNow: true });
       expect(byRange).toHaveBeenCalledTimes(3);
     });
 
-    // A scheduler that holds every job until it is let go: the queue a burst
-    // of asks waits in.
     function heldService({ writeMark, reuseSinceWriteMs } = {}) {
       const held = [];
       const scheduler = { request: (job) => new Promise((resolve, reject) => { held.push(() => Promise.resolve(job.run(() => true)).then(resolve, reject)); }) };
@@ -1023,7 +973,6 @@ describe('refresh methods', () => {
       const data = createDataService({
         resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: () => 1_000_000, principal: { id: 'p1' }, scheduler, writeMark, reuseSinceWriteMs,
       });
-      // A panel's ask: a read begun since this device's last write answers it.
       const ask = (options = {}) => data.refresh(range('2026-10-05', '2026-10-11'), {
         mode: 'visible', priority: 'high', fromNow: true, sinceWrite: true, ...options,
       });
@@ -1034,14 +983,11 @@ describe('refresh methods', () => {
       const { data, held, ask } = heldService();
       const byRange = vi.fn(async () => ({ rows: [] }));
       declare(data, byRange, { cadenceMs: 0 });
-      // Three panels ask the same window while the first ask still waits: one
-      // read, and every one of them answered fresh by it.
       const asks = [ask(), ask(), ask({ priority: 'normal' })];
       expect(held).toHaveLength(1);
       await held[0]();
       expect((await Promise.all(asks)).map((answer) => answer.state)).toEqual(['fresh', 'fresh', 'fresh']);
       expect(byRange).toHaveBeenCalledTimes(1);
-      // A stronger ask never waits behind a weaker read: it reads on its own.
       const weak = ask({ priority: 'normal' });
       ask({ priority: 'visible' }).catch(() => {});
       expect(held).toHaveLength(3);
@@ -1058,10 +1004,8 @@ describe('refresh methods', () => {
       const first = ask();
       const running = held[0]();
       await vi.waitFor(() => expect(byRange).toHaveBeenCalledTimes(1));
-      // No write since it began: the same ask joins it.
       const joined = ask();
       expect(held).toHaveLength(1);
-      // A write since: the ask reads after it, on its own.
       mark += 1;
       const after = ask();
       expect(held).toHaveLength(2);
@@ -1086,14 +1030,11 @@ describe('refresh methods', () => {
       const ask = () => data.refresh(range('2026-10-05', '2026-10-11'), { mode: 'visible', fromNow: true, sinceWrite: true });
       await ask();
       at += 3000;
-      // No write since it began, ended 3 s ago: answered by it, with its keys.
       expect(await ask()).toMatchObject({ state: 'fresh', keys: ['1'] });
       expect(byRange).toHaveBeenCalledTimes(1);
-      // A write since: read again.
       mark += 1;
       await ask();
       expect(byRange).toHaveBeenCalledTimes(2);
-      // Past the window: read again.
       at += 5000;
       await ask();
       expect(byRange).toHaveBeenCalledTimes(3);
@@ -1137,8 +1078,6 @@ describe('refresh methods', () => {
     });
 
     it('fromNow without sinceWrite reads on its own: a newer ask replaces one still queued, whose caller is dropped', async () => {
-      // A write mark and a reuse window as the host gives them: neither lets
-      // a forced read share.
       const { data, held, ask } = heldService({ writeMark: () => 0, reuseSinceWriteMs: 5000 });
       const byRange = vi.fn(async () => ({ rows: [] }));
       declare(data, byRange, { cadenceMs: 0 });
@@ -1150,13 +1089,11 @@ describe('refresh methods', () => {
       expect(await older).toMatchObject({ code: 'REFRESH_DROPPED', retryable: false });
       expect(await newer).toMatchObject({ state: 'fresh' });
       expect(byRange).toHaveBeenCalledTimes(1);
-      // Ended a moment ago with no write since: a forced ask still reads again.
       const again = ask({ sinceWrite: false });
       expect(held).toHaveLength(3);
       await held[2]();
       expect(await again).toMatchObject({ state: 'fresh' });
       expect(byRange).toHaveBeenCalledTimes(2);
-      // A panel's ask is answered by that read.
       expect(await ask()).toMatchObject({ state: 'fresh' });
       expect(held).toHaveLength(3);
     });

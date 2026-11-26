@@ -13,7 +13,6 @@
         </f7-link>
       </f7-nav-right>
     </f7-navbar>
-    <!-- Main addons list -->
     <f7-input
       type="text"
       label="Search"
@@ -35,7 +34,6 @@
         </template>
       </f7-list-item>
     </f7-list>
-    <!-- Main addons views list -->
     <f7-block-title>Views</f7-block-title>
     <f7-list>
       <template v-for="(addon, index) in addonsSorted" :key="index">
@@ -55,8 +53,6 @@
   </f7-page>
 </template>
 <script>
-// Import config if dynamic re-routing needed from `mounted()`
-// import config from "../../config.json";
 import ActableMixin from 'tommy-core/src/mixins/actable.js';
 
 export default {
@@ -72,9 +68,6 @@ export default {
     ActableMixin,
   ],
   mounted() {
-    // Alternative implementation of default 'starting_page'
-    // by re-routing to desired starting_page.
-    // this.f7router.navigate({ name: config.starting_page })
   },
   methods: {
     addonUrl(addon) {
@@ -86,7 +79,7 @@ export default {
   },
   computed: {
     addonsSorted() {
-      let addons = this.$store.state.addons.addonInstalls; //$root.addons;
+      let addons = this.$store.state.addons.addonInstalls;
       if (this.search) {
         addons = addons.filter((addon) => {
           const title = addon.title.toUpperCase();

@@ -1,13 +1,10 @@
-/** Durable branch of DataStore. The injected backend owns physical CAS/epochs. */
 import { jsonBytes, utf8Bytes, boundedBatches, WRITE_BATCH_BYTES } from './bytes.js';
 import { MAX_ROW_BYTES } from './host-store/protocol.js';
 import { unchangedServerRow, heldProvenance, holdRowFields } from './unchanged-row.js';
-// The most rows one whole-collection read returns, page by page.
+// Most rows one whole-collection read returns, page by page.
 export const WHOLE_READ_ROWS = 20000;
-// A whole read that has to page stops at this many bytes too (a domain's
-// largest budget), so large rows are never all held in memory at once.
+// Large rows are never all held in memory at once.
 export const WHOLE_READ_BYTES = 32 * 1024 * 1024;
-// The most rows the host store returns in one complete read.
 const COMPLETE_ROWS = 1000;
 export class StorageReadError extends Error {
   constructor(reason) { super(`Storage read failed (${reason})`); this.name = 'StorageReadError'; this.reason = reason; }
@@ -31,8 +28,6 @@ export const copyStorageRow = (row) => {
   return JSON.parse(JSON.stringify(row));
 };
 const copy = copyStorageRow;
-// Whole reads (`getAll`, `getAllRaw`) answer rows copied for that caller alone;
-// a caller that hands them on unshared need not copy them again.
 const ownCopies = new WeakSet();
 export const isOwnCopy = (rows) => ownCopies.has(rows);
 const owned = (rows) => { ownCopies.add(rows); return rows; };
@@ -47,19 +42,12 @@ export function assertCompleteSet(rows, { maxRows = 1000, maxBytes = 8 * 1024 * 
   }
 }
 const keyString = (key) => String(key);
-// One commit carries at most MAX_BATCH_ROWS rows and about WRITE_BATCH_BYTES.
 const MAX_BATCH_ROWS = 100;
 const upsertBatches = (incoming) => boundedBatches([...incoming], { maxItems: MAX_BATCH_ROWS, sizeOf: (entry) => jsonBytes(entry[1]) });
-// A write of several keys whose stored rows, or whose changes, would not fit
-// one keyed read or one commit: it is split before anything is sent.
 const TOO_LARGE = Symbol('too large for one commit');
-// A change notice names at most this many keys; past it, any row may have changed.
 const NOTICE_KEYS = 1000;
 const nextRevision = (value = 0) => { if (!Number.isSafeInteger(value) || value < 0 || value >= Number.MAX_SAFE_INTEGER) throw new StorageReadError('write-failed'); return value + 1; };
-// A row's next revision: above its own and above the store's, which every
-// commit moves on, so a key written again after it was removed never takes a
-// revision it held before (a push still on its way cannot settle the new row).
-// What a push acknowledged of a row (`_ackRev`) stays known through later writes.
+// A key written again after removal never takes a revision it held before.
 const acknowledged = (previous) => (Number.isSafeInteger(previous?._ackRev) ? { _ackRev: previous._ackRev } : {});
 const rowRevision = (previous, storeRevision) => nextRevision(Math.max(previous?._rev || 0, Number.isSafeInteger(storeRevision) ? storeRevision : 0));
 
@@ -90,17 +78,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     try { onPersistError?.({ event: 'persist_failed', store: name, key, ...result }); } catch (_) { /* reporting cannot change commit truth */ }
     throw new PersistError(name, { retained: false, ...result });
   }
-  // The collection's rows as last read whole or written here, with the
-  // store revision they are exact for (`epoch`, `revision`): a whole read that
-  // finds the store still at that revision answers from them after reading
-  // one metadata row, and this store's own commits keep them in step. Any
-  // other change (another tab, an eviction) moves the revision, and the next
-  // whole read reads the store again. Only a paged whole read, which carries
-  // each row's metadata, fills them.
   let held = null;
-  // Whether the store's age limit keeps a row out of a reader's view. A row
-  // held from a read knows only its own last-written stamp (the store may
-  // have touched it since), so one that looks aged is not decided here.
   const ageLimit = () => (backend.policy !== 'authored' && Number.isFinite(backend.limits?.maxAgeMs) ? backend.limits.maxAgeMs : null);
   const looksAged = (entry, limit) => limit !== null && !entry.dirty && entry.updatedAt + limit <= now();
   function track(snapshot, changes, result) {
@@ -124,15 +102,8 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     });
     held.revision = result.storeRevision;
     if (Number.isSafeInteger(result.epoch)) held.epoch = result.epoch;
-    // Held rows answer only what a whole read of the store would: past its
-    // limits they go, and the next whole read is refused as it would be.
     if (held.rows.size > WHOLE_READ_ROWS || held.bytes > WHOLE_READ_BYTES) held = null;
   }
-  // The keys committed since change listeners were last told, with the rows
-  // a commit's eviction removed (`{ label, key }` from the host store, or the
-  // key itself), or null once they cannot all be named (an evicted row
-  // without a key, or more than NOTICE_KEYS). A key evicted from a sibling
-  // store of the same domain is named too: re-reading it here is harmless.
   let noticeKeys = new Set();
   function noted(changes, result) {
     if (result?.ok === false || noticeKeys === null) return;
@@ -149,9 +120,6 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     noted(changes, result);
     return result;
   }
-  // A write of more than one key throws TOO_LARGE, before it commits, when
-  // its keys' stored rows are past one keyed read or its changes past about
-  // WRITE_BATCH_BYTES (see `inParts`).
   async function mutation(keys, transform, { retry = false, syncedAt } = {}) {
     for (let attempt = 0; attempt < (retry ? 3 : 1); attempt += 1) {
       live();
@@ -170,18 +138,8 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       if (result.reason !== 'conflict' || !retry || attempt === 2) failure(result, keys[0]);
     }
   }
-  // A whole-collection read: one complete read when the collection fits it,
-  // else page by page (100 rows a page) with every page checked against the
-  // first page's revision, starting over when a write lands in between.
-  // Once a collection needed pages, later reads go straight to pages until
-  // one returns at most half a complete read. Past WHOLE_READ_ROWS a caller
-  // reads by index or scan instead.
-  // `aged` (writers) includes rows past the backend's age limit.
   let paged = false;
-  // Rows served from `held` are fresh copies; callers need not copy them again.
   const freshRows = new WeakSet();
-  // The held rows as a reader sees them (fresh copies), or null when the
-  // age limit may keep a held row out and only the store can say.
   function heldRows(aged) {
     if (!held.sorted) {
       held.rows = new Map([...held.rows.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
@@ -198,13 +156,9 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     freshRows.add(fresh);
     return fresh;
   }
-  // A complete read spans several port reads and is refused when a write
-  // moves the store in between: like a paged read, it starts over, three
-  // times in all, before the conflict is the answer.
   async function completeRows(aged) {
     for (let attempt = 1; ; attempt += 1) {
       try {
-        // Each attempt reads only after the one before it was refused.
         // eslint-disable-next-line no-await-in-loop
         return await backend.getAll({ aged });
       } catch (error) {
@@ -213,13 +167,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       }
     }
   }
-  // Concurrent whole reads share one read: a caller joins the read in flight
-  // for the same `aged` when no commit of this store began since it started
-  // (a read that may predate a write is never handed to a later caller), and
-  // only for WHOLE_SHARE_MS after it started, so a stalled read never holds
-  // later callers.
-  // Fresh held copies are copied again for each caller after the first; other
-  // rows are shared, and their consumers copy or only read them.
+  // A read that may predate a write is never handed to a later caller; shared only briefly so a stall never holds.
   const WHOLE_SHARE_MS = 30000;
   let writes = 0;
   let wholeFlight = null;
@@ -267,7 +215,6 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       let moved = false;
       const entries = [];
       do {
-        // Each page continues from the one before it.
         // eslint-disable-next-line no-await-in-loop
         const page = await backend.page({ afterKey, limit: 100, aged });
         live();
@@ -281,8 +228,6 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       } while (afterKey !== null);
       if (!moved) {
         if (rows.length <= COMPLETE_ROWS / 2) paged = false;
-        // A complete writers' read with each row's metadata: held, for the
-        // revision it was read at.
         if (aged && fence) {
           let bytes = 0;
           held = {
@@ -291,7 +236,6 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
             sorted: true,
             rows: new Map(entries.map((row) => {
               const json = JSON.stringify(row.value);
-              // As the page measured it (the store's own count), else its UTF-8 size.
               const size = Number.isSafeInteger(row.bytes) ? row.bytes : utf8Bytes(json);
               bytes += size;
               return [row.key, {
@@ -307,11 +251,6 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     }
     throw new StorageReadError('conflict');
   }
-  /**
-   * Runs `write(part)` over `keys`, as one part while it fits: a part whose
-   * mutation is TOO_LARGE is split in two, each written in turn, until every
-   * part fits or is a single key. A part writes nothing before it fits.
-   */
   async function inParts(keys, write) {
     try { await write(keys); } catch (error) {
       if (error !== TOO_LARGE) throw error;
@@ -320,17 +259,11 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       await inParts(keys.slice(half), write);
     }
   }
-  // Reads of the rows back after a change that another writer's commit
-  // interrupted (a conflict) are tried again this many times in all.
   const NOTIFY_READS = 3;
   async function notify({ unknown = false } = {}) {
     live();
     publication += 1;
     const mine = publication;
-    // Change listeners read only what they need (a key or an index range), so
-    // a collection too large for a complete read still tells them it changed.
-    // The notice names the keys written since the last one (`{ keys }`), or
-    // is null when any row may have changed.
     const notice = unknown || noticeKeys === null ? null : { keys: [...noticeKeys] };
     noticeKeys = new Set();
     for (const listener of changeListeners) { try { listener(notice); } catch (_) { /* isolated consumer */ } }
@@ -342,8 +275,6 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         rows = (await wholeRows()).filter(paintable);
         break;
       } catch (error) {
-        // Another writer committed while the rows were read: read them again,
-        // with its change, unless a later change is telling them already.
         if (error?.reason === 'conflict' && attempt < NOTIFY_READS && !retired && publication === mine) continue; // eslint-disable-line no-continue
         if (publication !== mine) return;
         for (const query of queries) { try { query.onError?.(error); } catch (_) { /* isolated consumer */ } }
@@ -352,8 +283,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     }
     // A later change's own read tells them; this older one never follows it.
     if (retired || publication !== mine) return;
-    // Keep the existing complete-array callback. A failed bounded read skips
-    // publication and never turns the committed operation into a failed write.
+    // A subscriber error never turns the committed operation into a failed write.
     for (const handler of subscribers) { try { handler(rows.map(copy)); } catch (_) { /* isolated consumer */ } }
     for (const query of queries) {
       try {
@@ -385,18 +315,10 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
   const api = {
     name,
     validateRecord,
-    /** How long a row stays visible without being written again (null: always). */
     ageLimitMs: () => ageLimit(),
-    /**
-     * Whether `records` could be stored as the store's rows, in its limits
-     * (each row within the host's row limit and the store's byte budget, and
-     * all of them together within that budget): null when they fit, else the
-     * reason they do not. Nothing is read or written.
-     */
     fitsWhole(records = []) {
       const maxBytes = backend.limits?.maxBytes;
       const budget = Number.isFinite(maxBytes);
-      // As stored: with the fields the store adds to every row.
       const stamp = { _rev: Number.MAX_SAFE_INTEGER, _dirty: false, _updatedAt: new Date(now()).toISOString() };
       let total = 0;
       for (const record of records) {
@@ -407,20 +329,15 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       }
       return null;
     },
-    // A whole read pages the host port's rows by key, so getAll answers in key order.
     keyOrdered: true,
     async get(key) { live(); const row = await backend.get(keyString(key)); live(); return paintable(row) ? copy(row) : undefined; },
     async getRaw(key) { live(); const row = await backend.get(keyString(key), { aged: true }); live(); return copy(row); },
     async getAll() { live(); const rows = await wholeRows(); live(); return owned(freshRows.has(rows) ? rows.filter(paintable) : rows.filter(paintable).map(copy)); },
     async getAllRaw() { live(); const rows = await wholeRows({ aged: true }); live(); return owned(freshRows.has(rows) ? rows : rows.map(copy)); },
     async readWhere(predicate = () => true) { return (await api.getAll()).filter(predicate).map(strip); },
-    /** What `readWhere(predicate)` would answer, from rows a subscriber was just given. */
     selectFrom(rows, predicate = () => true) { return (rows || []).filter(paintable).filter(predicate).map(strip); },
     scan: (options) => scan(options, false),
     scanRaw: (options) => scan(options, true),
-    // `when(previous)` is judged on the row read for this commit, and the
-    // commit is checked against the store revision, so a condition holds
-    // against writers in other tabs too; a write it refuses resolves undefined.
     async put(record, { dedupeKey, silent = false, when = null } = {}) {
       requiredRecord(record);
       const submitted = copy(record);
@@ -431,8 +348,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
           const previous = rows.get(key);
           refused = typeof when === 'function' && when(previous) !== true;
           if (refused) return [];
-          // A local write keeps the row's window, what a push acknowledged,
-          // and a refusal for access: the row stays refused until a retry.
+          // A refusal for access stays until a retry.
           const refusal = previous?._pushRefused != null ? { _pushRefused: previous._pushRefused } : {};
           const stamped = { ...holdRowFields(submitted, previous, heldFields), ...(previous?._window != null ? { _window: previous._window } : {}), ...acknowledged(previous), ...refusal, _rev: rowRevision(previous, storeRevision), _dirty: true, _updatedAt: new Date(now()).toISOString(), ...(dedupeKey ? { _dedupeKey: dedupeKey } : {}) };
           return [{ op: 'put', key, value: stamped }];
@@ -452,12 +368,6 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         if (!silent) await notify();
       });
     },
-    /**
-     * Deletes `keys` (at most 100) in one commit, each only while
-     * `keep(row)` is false for the row as committed; rows already gone are
-     * skipped. A write that lands first makes the commit read again. Resolves
-     * the keys removed.
-     */
     deleteMany(keys, { keep = () => false, silent = false } = {}) {
       const wanted = [...new Set(keys.map(keyString))];
       if (wanted.length > 100) return Promise.reject(new StorageReadError('payload-capacity'));
@@ -475,11 +385,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         return removed;
       });
     },
-    /**
-     * An internal synced replacement or removal, conditional on the row at
-     * the atomic commit. Every conflict retry rechecks ownership. Receipts
-     * stay in storage metadata and never make an outbox entry.
-     */
+    // Receipts stay in storage metadata and never make an outbox entry.
     /* eslint-disable no-underscore-dangle */
     replaceSynced(key, record, { when, receipt = null, guardKey = null } = {}) {
       if ((guardKey !== null && (typeof guardKey !== 'string' || !guardKey || guardKey.length > 1024))
@@ -517,8 +423,6 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       });
     },
     /* eslint-enable no-underscore-dangle */
-    // The sync engine's markers on a stored row, written without validating
-    // or re-stamping the record (see the DataStore's `markRow`).
     markRow(key, patch, { dirty = false, body = null } = {}) {
       return exclusive(async () => {
         let found = false;
@@ -536,14 +440,7 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         return found;
       });
     },
-    /**
-     * Sets `patch`'s fields on the stored rows of `keys` (at most 100) as a
-     * server change, in one revision-checked commit: a write that lands first
-     * makes it read the rows again, so the patch applies to them as they are.
-     * A row that is gone or holds an unsent local write is left as it is; a
-     * row the record schema refuses once patched is not written. Resolves
-     * `{ patched, unsaved: [], skipped: [{ key, reason }], refused: [{ key, reason }] }`.
-     */
+    // Revision-checked: a write that lands first makes it read the rows again.
     patchSynced(keys, patch) {
       const wanted = [...new Set((keys || []).map(keyString))];
       if (wanted.length > 100) return Promise.reject(new StorageReadError('payload-capacity'));
@@ -573,7 +470,6 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         return outcome;
       });
     },
-    // `pushed` records the revision as one a push acknowledged (`_ackRev`).
     markSynced(key, { expectedRevision, pushed = false } = {}) {
       return exclusive(async () => {
         await mutation([keyString(key)], (rows) => {
@@ -586,14 +482,6 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         await notify();
       });
     },
-    /**
-     * Server rows, stored synced (`syncedAt: null` stores them without
-     * stamping the collection synced). `prune: false` only upserts; otherwise rows
-     * in `scope` (every row without one) that the set leaves out are removed,
-     * dirty rows never. Upserts commit in bounded batches, not one per row.
-     * `keepDirty: true` leaves a row with an unsent local write as it is
-     * (its key listed in `skipped`), decided inside the same commit.
-     */
     async reconcile(submittedRecords = [], { scope, windowKey, syncedAt = now(), prune = true, keepDirty = false } = {}) {
       const records = submittedRecords.map((record) => {
         if (!record || typeof record !== 'object' || !Object.hasOwn(record, '_writeReceipt')) return record;
@@ -617,12 +505,6 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
           return previous?._window != null ? { _window: previous._window } : {};
         };
         const stamp = (row, previous, storeRevision) => ({ ...heldProvenance(row, previous), ...row, ...acknowledged(previous), _rev: rowRevision(previous, storeRevision), _dirty: false, _updatedAt: new Date(now()).toISOString(), ...windowOf(previous) });
-        // A row the server answered as it is held is not written (every commit
-        // is announced on the change feed): a read that stamps the collection
-        // synced (`syncedAt`) stamps the store alone, in a commit of no rows
-        // that is not announced. Only a row past half the store's age limit is
-        // restamped, keeping its revision, so the limit counts from a recent
-        // confirmation. See unchangedServerRow.
         const unchanged = (row, previous) => unchangedServerRow(row, previous, { paintable, now, windowKey, ignoredFields });
         const restamp = (previous) => ({ ...previous, _updatedAt: new Date(now()).toISOString() });
         const quiet = syncedAt === null || syncedAt === undefined;
@@ -659,8 +541,6 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
             left.forEach((key) => skipped.add(key));
           });
         }
-        // Rows answered unchanged (or, with `prune: false`, a call that only
-        // stamps): the store is stamped synced without writing a row.
         if (!wrote && !quiet && (incoming.size ? upserted : !prune)) {
           await mutation([], () => [], { syncedAt, retry: true });
         }
@@ -691,10 +571,6 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
         return { upserted, pruned, ...(prunedKeys.length ? { prunedKeys } : {}), ...counts };
       });
     },
-    // Rows by a secondary index, in index order: the physical index where the
-    // store opened with it, else the declared index over the complete row set.
-    // `raw: true` includes rows past the paint ceiling and the backend's age
-    // limit, for writers.
     async query(index, range = {}, { limit = 50, cursor = null, raw = false } = {}) {
       live();
       const visible = (row) => raw || paintable(row);
@@ -713,22 +589,14 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       const more = start + limit < rows.length;
       return { rows: page, nextCursor: more ? keyString(page.at(-1)[keyPath]) : null, complete: !more };
     },
-    // Another tab or handle changed this store: subscribers read it again.
     revalidateSubscribers() { return notify({ unknown: true }); },
     subscribe(handler) { live(); subscribers.add(handler); return () => subscribers.delete(handler); },
-    /**
-     * Called after every change, with nothing read: the listener reads what
-     * it needs. It is given `{ keys }`, the keys written since the last call,
-     * or null when any row may have changed.
-     */
     onChange(listener) { live(); changeListeners.add(listener); return () => changeListeners.delete(listener); },
     subscribeQuery(selector, handler, { onError } = {}) {
       live();
       const query = { selector, handler, onError, previous: undefined };
       queries.add(query);
       const captured = publication;
-      // The same whole read (paged past a complete read) that a change's
-      // notify compares against, so its first value is the one later changes see.
       wholeRows().then((rows) => {
         if (retired || !queries.has(query) || publication !== captured) return;
         const visible = rows.filter(paintable);

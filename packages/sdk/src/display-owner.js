@@ -1,4 +1,3 @@
-/** Compose host display admission with a consumer's local semantic lifetime. */
 export default function createDisplayOwner(tommy, { current: localCurrent = () => true, onRetire } = {}) {
   let active = true;
   let ticket;

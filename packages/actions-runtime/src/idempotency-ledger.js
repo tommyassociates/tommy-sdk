@@ -1,54 +1,9 @@
-/**
- * idempotency-ledger.js — a DURABLE half for the broker's
- * idempotency ledger, so `client_key` means what it advertises across a reload.
- *
- * THE DEFECT. `processedKeys` (broker.js) is a Map in closure scope, and its own
- * comment says so: "lives only for the lifetime of this broker (no
- * persistence)". `client_key` advertises caller-supplied exactly-once, and the
- * guarantee therefore evaporates across a reload, an app restart, or a retry
- * after a timeout. Fourteen activities declare it. One is user-visible harm:
- * `time-clock.issue_kiosk_pin` ROTATES the PIN, so a double-invocation
- * invalidates the PIN the user just wrote down; three others send a second
- * email.
- *
- * TWO DELIBERATE NARROWINGS, both of which change what this is allowed to hold.
- *
- * 1. KEYS ONLY — NEVER RESULTS. The in-memory ledger
- *    stores each activity's full result so a replay can RETURN it, and making
- *    that durable would write result payloads to localStorage.
- *    `issue_kiosk_pin`'s resultSchema is `{ issued, pin }` — the live credential
- *    — on a device that is frequently a shared kiosk. So the durable layer
- *    SUPPRESSES a repeat rather than replaying it: the caller gets a typed
- *    already-applied with no payload. That is the actual promise of
- *    `client_key` (the write happens once), and re-reading a PIN off disk is
- *    not a behaviour worth preserving. Full in-session replay is untouched —
- *    the Map still front-runs this.
- *
- * 2. `client_key` ONLY. "Keys only" is NOT by itself "no tenant data at rest",
- *    and that is easy to miss: `derived_from_input` keys are
- *    `d-${JSON.stringify(args)}`, so the ARGS ARE INSIDE THE KEY, and
- *    `verify_kiosk_pin` takes `pin` as an input — its key embeds the PIN
- *    verbatim. `natural_key` keys embed an identity value for the same reason.
- *    Only `client_key` keys are caller-supplied opaque tokens, so only those
- *    are persisted. The other strategies keep exactly today's in-memory
- *    behaviour, which is also all D.39 asked for.
- *
- * Keys are HASHED before storage as defence in depth. It is not the primary
- * control — a low-entropy secret stays brute-forceable through any digest,
- * which is precisely why narrowing (2) does the real work and this does not.
- *
- * NO HOST WIRING REQUIRED, deliberately. The record store next door
- * (`records.js`) documents "an IndexedDB backend in the shell" and the shell
- * half was never passed, so its records die with the tab while its header says
- * otherwise (filed as D.43). This detects storage itself and degrades to
- * memory, so there is no second half to forget.
- */
+// Durable so client_key still dedupes across a reload.
 
 const DEFAULT_MAX = 1000;
-const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days — a "retry" a week later is a new intent.
+const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days: a "retry" a week later is a new intent.
 const STORAGE_KEY = 'mp-idempotency-ledger';
 
-/** The runtime's Web Storage, or null (node, or access throws when locked down). */
 function webStorage() {
   try {
     return (typeof globalThis !== 'undefined' && globalThis.localStorage) || null;
@@ -57,14 +12,6 @@ function webStorage() {
   }
 }
 
-/**
- * FNV-1a, 32-bit, rendered hex. Synchronous by design — the alternative is
- * `crypto.subtle.digest`, which is async and would push an await into the
- * dispatch hot path for a control that is explicitly NOT the one being relied
- * on (see the header). Collisions suppress a write that should have run; at
- * 1000 retained keys the probability is ~1e-4, and the same activity+args would
- * have to collide with an unrelated entry in the same tenant.
- */
 function digest(value) {
   let h = 0x811c9dc5;
   for (let i = 0; i < value.length; i += 1) {
@@ -74,20 +21,7 @@ function digest(value) {
   return (h >>> 0).toString(16);
 }
 
-/**
- * A bounded, TTL'd set of processed idempotency keys that survives a reload.
- *
- * Reads and writes NEVER throw: storage that is absent, corrupt, disabled or
- * over quota degrades to in-memory-until-reload, which is exactly today's
- * behaviour. A ledger that threw would turn a durability improvement into an
- * outage on the write path.
- *
- * @param {object} [opts]
- * @param {number} [opts.max]    retained entries (FIFO eviction of the oldest)
- * @param {number} [opts.ttlMs]  entry lifetime
- * @param {function} [opts.now]  clock, injectable for tests
- * @param {object|null} [opts.storage] Web Storage override (tests)
- */
+// Reads and writes never throw: bad storage degrades to in-memory until reload.
 export function createIdempotencyLedger({
   max = DEFAULT_MAX,
   ttlMs = DEFAULT_TTL_MS,
@@ -96,7 +30,6 @@ export function createIdempotencyLedger({
 } = {}) {
   const store = () => (storage === undefined ? webStorage() : storage);
 
-  /** hash -> expiry epoch ms. Insertion order IS eviction order. */
   function load() {
     const s = store();
     if (!s) return new Map();
@@ -106,7 +39,7 @@ export function createIdempotencyLedger({
       if (!parsed || typeof parsed !== 'object') return new Map();
       return new Map(Object.entries(parsed).filter(([, exp]) => typeof exp === 'number'));
     } catch (_) {
-      return new Map(); // corrupt — behave as empty rather than poisoning the path
+      return new Map();
     }
   }
 
@@ -120,7 +53,6 @@ export function createIdempotencyLedger({
     }
   }
 
-  /** Drop expired entries, then evict oldest-first down to `max`. */
   function prune(map) {
     const t = now();
     for (const [k, exp] of map) if (exp <= t) map.delete(k);
@@ -133,13 +65,12 @@ export function createIdempotencyLedger({
   }
 
   return {
-    /** Has this key been processed in a previous (or this) session? */
     has(key) {
       if (!key) return false;
       const map = load();
       const exp = map.get(digest(key));
       if (exp === undefined) return false;
-      if (exp <= now()) {          // expired: treat as absent AND reclaim it
+      if (exp <= now()) {
         map.delete(digest(key));
         save(map);
         return false;
@@ -147,17 +78,16 @@ export function createIdempotencyLedger({
       return true;
     },
 
-    /** Record a key as processed. */
     add(key) {
       if (!key) return;
       const map = load();
       const h = digest(key);
-      map.delete(h);               // re-insert so insertion order stays LRU-ish
+      map.delete(h);
       map.set(h, now() + ttlMs);
       save(prune(map));
     },
 
-    /** Test/diagnostic surface — never used on the dispatch path. */
+    // Test/diagnostic surface; never used on the dispatch path.
     _size() {
       return prune(load()).size;
     },
@@ -170,43 +100,10 @@ export function createIdempotencyLedger({
 const EPOCHS_STORAGE_KEY = 'mp-invalidation-epochs';
 const EPOCHS_MAX = 500;
 
-/**
- * DURABLE INVALIDATION EPOCHS — the half of `invalidatesIdempotency` that a
- * DURABLE INVALIDATION EPOCHS — the half of `invalidatesIdempotency` that must
- * survive a reload.
- *
- * The epoch exists so a post-invalidation invoke FROM THIS DEVICE presents a
- * derived key the server has never seen, making its `Mp::Invocation` lookup
- * miss. Held only in a closure Map, the counter would reset to 0 on reload, the
- * next invoke would re-present the ORIGINAL key, and the server would replay
- * the stale result.
- *
- * ⚠ PER-DEVICE, WHILE THE SERVER LEDGER IS PER-TEAM, and this is a documented
- * limit rather than an oversight (review BSC-R2-7). `find_succeeded` matches on
- * (team, activity, idempotency_key), so a SECOND device that has not seen the
- * invalidation is still at epoch 0, still presents the unstamped key, and is
- * still replayed. Closing that needs the epoch to live server-side — an API
- * change this work is scoped out of. What this closes is the reload case, which
- * is the common one and was undoing the invalidation on a single device.
- *
- * ⚠ NO TTL, UNLIKE THE LEDGER ABOVE. An idempotency key expiring is safe — the
- * worst case is a write runs twice. An EPOCH expiring is not: it would silently
- * restore the stale server replay. Entries are evicted only by the size cap,
- * oldest-first, and the cap is large enough that a device would have to
- * invalidate 500 distinct activities in one installation to reach it.
- *
- * ⚠ KEYS CARRY NO ARGUMENTS. The key is `${tenantId}:${mpId}.${activity}` — a
- * tenant id and a manifest-declared name, never user input. That is what makes
- * this safe to persist where the derived idempotency keys themselves are not
- * (they embed `JSON.stringify(args)`, and one of them embeds a PIN).
- */
+// Invalidation epochs must survive a reload too.
 export function createInvalidationEpochs({ storage } = {}) {
   const store = () => (storage === undefined ? webStorage() : storage);
-  // ⚠ IN-MEMORY FALLBACK, NOT NOTHING. Without this, a runtime with no Web
-  // Storage (node, a locked-down WebView, a private-mode quirk) wrote the epoch
-  // nowhere and read back 0 — so the invalidation stopped working WITHIN the
-  // session too, which is worse than the durability defect this replaced.
-  // Degrade to session-scoped, which is exactly what the old Map gave.
+  // Storage that silently drops writes would read back 0, so memory is kept and merged.
   const memory = new Map();
 
   function load() {
@@ -220,18 +117,9 @@ export function createInvalidationEpochs({ storage } = {}) {
         disk = new Map(Object.entries(parsed).filter(([, n]) => Number.isFinite(n)));
       }
     } catch (_) {
-      disk = new Map();   // corrupt — fall back on memory alone
+      disk = new Map();
     }
-    // ⚠ MEMORY IS MERGED IN, NOT SKIPPED WHEN STORAGE EXISTS. The fallback was
-    // reachable only when Web Storage was ABSENT — so on a device where storage
-    // exists but the WRITE fails (quota full, private-mode quirk), `save` kept
-    // the epoch in memory and `load` then ignored it, reading the stale disk
-    // value straight back. The invalidation was lost in-session on exactly the
-    // devices under storage pressure, which is the opposite of what the comment
-    // above promised (review BSC-R2-3).
-    //
-    // The higher counter wins: an epoch only ever moves forward, so max() is the
-    // correct merge and cannot walk one backwards.
+    // Merge memory over disk even when storage exists but the write failed; never walk an epoch backwards.
     for (const [k, v] of memory) if (!disk.has(k) || v > disk.get(k)) disk.set(k, v);
     return disk;
   }
@@ -259,7 +147,7 @@ export function createInvalidationEpochs({ storage } = {}) {
       if (!key) return 0;
       const map = load();
       const next = (map.get(key) || 0) + 1;
-      map.delete(key);            // re-insert so insertion order stays LRU-ish
+      map.delete(key);
       map.set(key, next);
       while (map.size > EPOCHS_MAX) {
         const oldest = map.keys().next();

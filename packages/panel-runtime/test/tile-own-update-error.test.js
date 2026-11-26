@@ -1,14 +1,3 @@
-/**
- * tile-own-update-error.test.js — a child whose Options-API `data()` throws
- * while the tile's update mounts it.
- *
- * Vue runs `data()` outside its error wrapping, so the throw is reported as
- * the TILE's own "component update" error and never reaches the tile's
- * `onErrorCaptured`. The surface app's error handler takes a stale-world
- * refusal (an account switch landing while the tile mounts its panel)
- * quietly. The data() guard (panel-tile.js) hands any other error to the tile,
- * which shows its error card.
- */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { h, nextTick } from 'vue';
 import { createPanelHost } from '../src/index.js';
@@ -45,7 +34,6 @@ describe('a panel whose data() throws while its tile mounts it', () => {
   const panelErrors = () => events.filter((e) => e.type === 'panel-error' || e.type === 'panel-reload-required');
   const unhandledWarns = () => warn.mock.calls.filter((args) => String(args[0]).includes('Unhandled error'));
 
-  // Reads its world's time display in data(), as Week and Today's Schedule do.
   const panel = {
     name: 'DataPanel',
     data() {

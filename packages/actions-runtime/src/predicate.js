@@ -1,26 +1,6 @@
-/**
- * predicate.js — THE predicate evaluator. Singular, deliberately.
- *
- * The manifest schema's `$defs/predicate` is a CLOSED L6 comparator set
- * (`exists | not_exists | equals | not_equals | one_of | range | includes_any`,
- * with one level of `allOf`/`anyOf`). Its own $comment states the rule this file
- * exists to make enforceable:
- *
- *   "There is exactly ONE evaluator: an adapter that re-implements any
- *    comparison operator is the R4 drift risk and is forbidden."
- *
- * Everything that needs to evaluate a predicate — Action `when` gates,
- * `contributions.interactions` visibleWhen, and the manifest-driven settings
- * grammar's page/section/field `visibleWhen` + `readOnlyWhen` — calls THIS
- * function. Callers differ only in the CONTEXT they build: a plain bag of
- * already-resolved source values. Building that bag is a read; comparing
- * values is an operator, and operators live here and nowhere else.
- *
- * Adding an operator is a binary release (schema + this file + tests), never
- * config. That is the 2.20 §6 firewall, restated as code.
- */
+// The one evaluator for the schema's closed comparator set; a second would drift.
 
-/** Thrown when a predicate cannot be evaluated by THIS binary. */
+// Thrown when a predicate cannot be evaluated by this binary.
 export class PredicateError extends Error {
   constructor(message, { rule } = {}) {
     super(message);
@@ -30,13 +10,7 @@ export class PredicateError extends Error {
   }
 }
 
-/**
- * The closed set. `includes_any` (JD11) is a later addition, and it
- * landed in BOTH evaluators and the schema in one release, because an operator in
- * one evaluator only is the R4 drift this file's header forbids: an older binary
- * that meets it throws `unknown predicate operator`, so it fails CLOSED rather
- * than evaluating to a silent false.
- */
+// Operators land here, in the other evaluator and in the schema in one release.
 const OPERATORS = ['exists', 'not_exists', 'equals', 'not_equals', 'one_of', 'range', 'includes_any'];
 
 function dottedGet(obj, path) {
@@ -44,7 +18,6 @@ function dottedGet(obj, path) {
   return String(path).split('.').reduce((acc, part) => (acc === null || acc === undefined ? undefined : acc[part]), obj);
 }
 
-/** Structural equality over the JSON value space (scalars, arrays, objects). */
 function sameValue(a, b) {
   if (Object.is(a, b)) return true;
   if (a === null || b === null) return false;
@@ -62,27 +35,11 @@ function stableStringify(value) {
 const isPresent = (value) => value !== undefined && value !== null;
 const isNumber = (value) => typeof value === 'number' && Number.isFinite(value);
 
-/**
- * Resolve ONE `$defs/inputMapSource` against the caller's context bag.
- *
- * Context shape (all optional; a missing bucket resolves to undefined, which
- * `exists` / `not_exists` are there to test):
- *   {
- *     mpId,                          // whose settings namespace is "own"
- *     setting:    { [mpId]: { key: value } },   // S5, incl. cross-MP reads
- *     condition:  { [ref]: value },
- *     serviceRead:{ [ref]: value },
- *     trigger: {}, option: {}, item: {},
- *   }
- */
 export function resolveSource(source, context = {}) {
   if (!source || typeof source !== 'object') {
     throw new PredicateError('predicate source must be an object', { rule: 'source' });
   }
   if (source.transform) {
-    // E2 transform chains are declared in the schema but not implemented in
-    // this binary yet. Silently ignoring one would change the meaning of a
-    // manifest, so refuse loudly instead.
     throw new PredicateError('predicate source transform chains are not implemented in this binary', { rule: 'transform' });
   }
 
@@ -138,19 +95,13 @@ function evaluateComparator(node, context) {
       return candidates.some((candidate) => sameValue(value, candidate));
     }
     case 'includes_any': {
-      // An ARRAY value shares at least one element with `operands`. A non-array
-      // value — including a missing one and a bare scalar that happens to be in
-      // `operands` — is FALSE, never an error and never a coerced single-element
-      // array: "this member's role tags include one of these" has no meaning for
-      // a value that is not a set, and guessing one would make a predicate
-      // match a shape the contract never promised.
+      // Missing operands is false, never an error or a coerced single value.
       const candidates = Array.isArray(node.operands) ? node.operands
         : (Array.isArray(node.operand) ? node.operand : []);
       if (!Array.isArray(value)) return false;
       return value.some((element) => candidates.some((candidate) => sameValue(element, candidate)));
     }
     case 'range': {
-      // operand { min?, max? } (inclusive), or operands [min, max].
       const bounds = Array.isArray(node.operands)
         ? { min: node.operands[0], max: node.operands[1] }
         : (node.operand || {});
@@ -164,16 +115,7 @@ function evaluateComparator(node, context) {
   }
 }
 
-/**
- * Evaluate a `$defs/predicate` node. One level of allOf/anyOf composition,
- * exactly as the schema allows — no nesting beyond it, because the schema
- * does not permit it and a "convenience" recursion here would quietly widen
- * the grammar.
- *
- * @param {object} predicate the declared predicate (absent/undefined => true)
- * @param {object} context   resolved source values (see resolveSource)
- * @returns {boolean}
- */
+// One level of allOf/anyOf only, exactly as the schema allows.
 export function evaluatePredicate(predicate, context = {}) {
   if (predicate === undefined || predicate === null) return true;
   if (typeof predicate !== 'object') {
@@ -189,5 +131,4 @@ export function evaluatePredicate(predicate, context = {}) {
   return evaluateComparator(predicate, context);
 }
 
-/** The closed operator set, exported so tests can assert nothing else exists. */
 export const PREDICATE_OPERATORS = Object.freeze([...OPERATORS]);

@@ -1,8 +1,3 @@
-/**
- * condition-deadline-signal.test.js — a condition handler is told when its
- * caller has been answered with a Timeout, through the `signal` in its
- * context, so a read nobody waits for can stop.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 

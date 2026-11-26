@@ -1,11 +1,4 @@
 // @vitest-environment node
-/**
- * A host-store collection's complete read spans several port reads (the
- * metadata, then the bodies) and is refused when a write moves the store in
- * between. The store's own reader starts it over, as its paged read does, so
- * a read that overlaps one of the store's own writes still answers; a store
- * that keeps moving is still answered with the conflict.
- */
 import { afterEach, describe, expect, it } from 'vitest';
 import { createDataStore } from '../src/index.js';
 import { createHostStorePort } from '../src/host-store/index.js';
@@ -13,11 +6,6 @@ import { DATABASES, identity } from './helpers/host-databases.js';
 
 const storageError = (reason) => Object.assign(new Error(`Storage read failed (${reason})`), { name: 'StorageReadError', reason });
 
-/**
- * The app's complete read in brief: metadata first, then the bodies, each
- * fenced on the store revision the metadata was read at. `between` runs once
- * per complete read, after its metadata.
- */
 function fencedBackend(port, options, between) {
   let handle;
   const ready = () => (handle ||= port.open(options));

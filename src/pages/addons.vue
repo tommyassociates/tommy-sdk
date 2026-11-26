@@ -13,7 +13,6 @@
       v-model:value="search"
       style="margin: 16px; border:1px solid #999; padding: 8px;font-size:21px;"
     />
-		<!-- Main addons list -->
 		<f7-block-title>Addons</f7-block-title>
 		<f7-list media-list>
 			<f7-list-item
@@ -42,9 +41,6 @@ export default {
     }
   },
   mounted() {
-    // Alternative implementation of default 'starting_page'
-    // by re-routing to desired starting_page.
-    // this.f7router.navigate({ name: config.starting_page })
   },
   computed: {
     addonsSorted() {

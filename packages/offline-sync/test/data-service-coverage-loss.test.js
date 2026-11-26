@@ -262,7 +262,6 @@ describe('canonical coverage after row loss', () => {
 describe('a purge that names one store', () => {
   const otherAccount = JSON.stringify(['https://api.example.test', '31', 'Team', '45', null]);
   const storeOf = (ownerKey, name) => JSON.stringify([ownerKey, JSON.stringify(['host', name])]);
-  /** A whole read of `products` held on its way, and the events sent meanwhile. */
   const heldRead = () => {
     let release;
     const gate = new Promise((resolve) => { release = resolve; });
@@ -280,7 +279,6 @@ describe('a purge that names one store', () => {
     const read = heldRead();
     await vi.waitFor(() => expect(read.fetch).toHaveBeenCalledTimes(1));
 
-    // One store of an account that left the viewer's list, as the port announces it.
     read.send({
       type: 'purge', principal, owner: otherAccount, label: 'products', store: storeOf(otherAccount, 'products'), keys: ['9']
     });

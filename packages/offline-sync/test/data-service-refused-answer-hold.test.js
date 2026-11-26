@@ -27,7 +27,6 @@ describe('a method answer refused on this device', () => {
     data.source('plans', source(fetch));
     expect(await ask(data)).toMatchObject({ code: 'DATA_INVALID' });
     expect(fetch).toHaveBeenCalledTimes(1);
-    // Every panel asking again (and an ask after a write) is answered by the refusal.
     for (let i = 0; i < 5; i += 1) {
       advance(5000);
       expect(await ask(data, '1', { fromNow: i % 2 === 0 })).toMatchObject({ code: 'DATA_INVALID', retryable: false });
@@ -37,7 +36,6 @@ describe('a method answer refused on this device', () => {
     advance(5000);
     await ask(data);
     expect(fetch).toHaveBeenCalledTimes(2);
-    // Refused again: held twice as long.
     advance(59_000);
     await ask(data);
     expect(fetch).toHaveBeenCalledTimes(2);

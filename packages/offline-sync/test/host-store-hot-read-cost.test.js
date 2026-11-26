@@ -29,8 +29,6 @@ describe.each(DATABASES)('hot keyed port reads on %s', (_name, create) => {
       }
       expect(hot).toEqual(cold);
       expect(hot.rows.map(row => row.value.minutes)).toEqual(keys.map(key => Number(key) * 15));
-      // A held metadata row, a held body row and the body's value per key,
-      // plus the store's own reads (each held row was decoded twice before).
       expect(parses).toBeLessThanOrEqual(3 * ROWS + 10);
     } finally { await db.close(); }
   });

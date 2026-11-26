@@ -10,16 +10,10 @@ const cleanupRegistry = new Set();
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const next = (value) => { if (!integer(value) || value >= Number.MAX_SAFE_INTEGER) throw storageError('write-failed'); return value + 1; };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-// Batched keyed read where the database has one (SQLite); per-key otherwise.
 const getMany = (tx, table, keys) => (typeof tx.getMany === 'function'
   ? tx.getMany(table, keys)
   : Promise.all(keys.map((key) => tx.get(table, key))));
 const SCAN = 100;
-// A commit's row writes on a database that runs a transaction's requests in
-// the order they were asked (`database.ordered`, IndexedDB): each put and
-// delete is asked without waiting for the one before it, and `settle()` waits
-// for them all. Elsewhere (SQLite, whose held rows follow each write's own
-// outcome) every request is waited for in turn and `settle()` has nothing left.
 function rowWriter(tx, ordered) {
   if (!ordered) return { tx, settle: async () => {} };
   const asked = [];
@@ -38,18 +32,13 @@ function rowWriter(tx, ordered) {
     settle: () => Promise.all(asked.splice(0)),
   };
 }
-// How long a migration's opener holds the store; each write renews it. A
-// lease that runs out is a crashed opener, and the next one starts over.
 export const MIGRATION_LEASE_MS = 30000;
-// Row kinds under one store generation: metadata, body, index entry, LRU entry.
 const META = 'm';
 const BODY = 'b';
 const INDEX = 'x';
 const LRU = 't';
 
-// Normalized read rows, shared by selectors, never by authority checks. Every
-// reader first checks the persisted owner epoch and store revision in its own
-// transaction, including on IndexedDB where another tab may have committed.
+// Normalized read rows, shared by selectors, never by authority checks.
 function createReadProjection() {
   const snapshots = new Map();
   let size = 0;
@@ -81,9 +70,6 @@ function createReadProjection() {
       held.bytes += cost;
       while (size > 8 * 1024 * 1024 || count > 4096 || snapshots.size > 64) drop(snapshots.keys().next().value);
     };
-    // Each key is encoded once and each held row decoded once per read. Held
-    // entries are taken before any database wait, so a row evicted meanwhile
-    // still answers this read.
     const parsed = (entry) => (entry ? JSON.parse(entry.json) ?? undefined : undefined);
     const many = async (table, keys) => {
       if (table !== 'rows') return getMany(tx, table, keys);
@@ -93,7 +79,6 @@ function createReadProjection() {
       entries.forEach((entry, index) => { if (!entry) missing.push(index); });
       if (!missing.length) return entries.map(parsed);
       const rows = await getMany(tx, table, missing.map(index => keys[index]));
-      // Oversized answers may not be held, but still answer this read.
       const answer = entries.map(parsed);
       rows.forEach((row, at) => {
         keep(held.rows, ids[missing[at]], row);
@@ -127,11 +112,8 @@ function createReadProjection() {
   };
 }
 
-/** A host-local port. Database transactions, not handle queues, serialize other tabs. */
 export function createHostStorePort({ database, backend = 'indexeddb', now = () => Date.now(), randomId = () => globalThis.crypto.randomUUID() } = {}) {
   if (!database?.transaction || !['indexeddb', 'capacitor_sqlite', 'electron_sqlite', 'volatile'].includes(backend)) throw storageError('unavailable');
-  // Open handles by id. A closed or retired handle is forgotten when its
-  // owner closes it, or on its next use, so the map holds only live ones.
   const handles = new Map();
   const projection = createReadProjection();
   const reading = new Map();
@@ -158,8 +140,6 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
   function prefix(owner, namespace, generation, kind) { return [owner, namespace, generation, kind]; }
   function rowKey(owner, namespace, generation, kind, key) { return [owner, namespace, generation, kind, key]; }
   const storeIndexes = (store) => store.indexes || {};
-  // Index and LRU entries follow the row; the metadata keeps what it wrote so
-  // a later change or delete can remove exactly those entries.
   async function unlink(tx, store, generation, metadata) {
     const [owner, namespace] = store.key;
     for (const [name, encoded] of Object.entries(metadata.index || {})) {
@@ -183,7 +163,6 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
     }
     return { index, lru };
   }
-  // `count: false` leaves the store totals to a caller that already projected them.
   async function discard(tx, store, metadata, { count = true } = {}) {
     const [owner, namespace] = store.key;
     await unlink(tx, store, store.generation, metadata);
@@ -196,8 +175,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
   }
   async function writeRow(tx, store, generation, { key, value, json }, old, { syncedAt } = {}) {
     const [owner, namespace] = store.key;
-    // Above the store's revision, which every write and removal moves on: a
-    // key written again after it was removed never takes a revision it held.
+    // A key written again after removal never takes a revision it held.
     const revision = next(Math.max(old?.revision || 0, store.revision || 0));
     const valueBytes = bytes(json);
     const wireBytes = bytes({ key, value, revision, bytes: valueBytes });
@@ -226,8 +204,6 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
     let count = others.length + 1;
     while ((total > 64 * 1024 * 1024 || count > 20) && others.length) {
       const evicted = others.shift();
-      // Only ordinary subjects may share an evictable owner. Authored owners
-      // are a different host-reserved subject and never enter this index.
       const siblings = await tx.scan('stores', [evicted.key[0]], { limit: 2 });
       if (siblings.some((row) => row.policy !== 'ordinary_chat_fragments')) throw storageError('quota');
       await purgeOwner(tx, evicted.key[0]);
@@ -254,20 +230,13 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
     }
     return victims;
   }
-  // The other LRU cache stores of a store's domain within its owner, and the
-  // bytes each holds against the domain's budget: a store being rebuilt
-  // counts the larger of its old rows (still the ones read) and its new ones.
   async function domainSiblings(tx, store) {
     const [owner] = store.key;
     return (await tx.scan('stores', [owner], { limit: 1001 }))
       .filter((row) => row.evict === 'lru' && row.policy === 'cache' && row.domain === store.domain && !same(row.key, store.key));
   }
   const heldBytes = (row) => (row.migration ? Math.max(row.bytes, row.migration.bytes || 0) : row.bytes);
-  // Within one owner, every LRU cache store of the same domain shares a byte
-  // budget; the oldest rows across them go first. Authored stores and dirty
-  // rows are never candidates, so drafts and the outbox are never evicted,
-  // and nor are the rows of a store being rebuilt (it counts all the same).
-  // Returns what left the target store itself, whose totals the caller owns.
+  // Authored rows are never candidates, so drafts and the outbox are never evicted.
   async function domainCapacity(tx, store, projectedBytes, protect, evicted) {
     const own = { rows: 0, bytes: 0 };
     if (store.evict !== 'lru' || store.domainMaxBytes === null || store.domainMaxBytes === undefined) return own;
@@ -302,18 +271,12 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
     if (total > store.domainMaxBytes) throw storageError('quota');
     return own;
   }
-  // A rebuild's new generation is held to the budgets a commit is: the
-  // store's maxBytes and its domain's shared budget. It evicts nothing (the
-  // old generation still stands); over budget, the rebuild fails as 'quota'
-  // and its opener keeps the old rows.
   async function migrationCapacity(tx, store, projectedBytes, maxBytes) {
     if (maxBytes !== null && maxBytes !== undefined && projectedBytes > maxBytes) throw storageError('quota');
     if (store.evict !== 'lru' || store.domainMaxBytes === null || store.domainMaxBytes === undefined) return;
     const total = (await domainSiblings(tx, store)).reduce((sum, row) => sum + heldBytes(row), 0) + projectedBytes;
     if (total > store.domainMaxBytes) throw storageError('quota');
   }
-  // Cache rows older than the store's age limit are left out, unless the
-  // reader is a writer deciding what to remove (`includeAged`).
   async function readRows(tx, handle, store, metadata, { limit, keyed, metadataOnly, cursorOf, includeAged = false }) {
     const result = { epoch: handle.epoch, storeRevision: store.revision, rows: [], nextKey: null };
     const included = [];
@@ -399,7 +362,6 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
   const port = {
     version: HOST_STORE_VERSION,
     features: HOST_STORE_FEATURES,
-    /** How many handles this port holds (a diagnostic). */
     openHandles() { return handles.size; },
     async open(input) {
       const identity = validateOpen(input);
@@ -407,9 +369,6 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
       const handle = { ...identity, options: frozen, closed: false, port };
       const state = await database.transaction('readwrite', async (tx) => {
         let owner = await tx.get('owners', identity.owner);
-        // A caller continuing work it began under an epoch (a rebuild setting
-        // rows aside) opens only while that epoch holds: after a principal's
-        // retirement nothing is created again for it.
         if (input.expectedEpoch !== undefined && owner?.epoch !== input.expectedEpoch) throw storageError('retired');
         if (!owner) { owner = { key: identity.owner, epoch: 0, principal: JSON.stringify([input.identity.authorityOrigin, input.identity.viewerId]), identity: clone(input.identity) }; await tx.put('owners', owner); }
         const key = [identity.owner, identity.namespace];
@@ -421,12 +380,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
         const declared = { indexes: identity.indexes, evict: identity.evict, domainMaxBytes: identity.domainMaxBytes, label, domain: labelDomain(label) };
         let store = await tx.get('stores', key);
         let migration = null;
-        // The declared schema (key, indexes, record schema, version) as the
-        // caller fingerprints it. A store opened before it had one adopts it.
         const schemaFingerprint = input.schemaFingerprint ?? null;
-        // Only a caller that fingerprints its schema can take a store back to
-        // an older version (a rolled-back MP): its caches start empty and its
-        // authored rows go through the caller. Anyone else is refused.
         const downgrade = !!store && store.schemaVersion > input.schemaVersion;
         if (store && (store.policy !== input.policy || (downgrade && schemaFingerprint === null))) throw storageError('unavailable');
         if (store && store.dirtyCount === undefined) {
@@ -438,23 +392,17 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
         const schemaChanged = !!store && schemaFingerprint !== null && (store.schemaFingerprint ?? null) !== null
           && store.schemaFingerprint !== schemaFingerprint;
         const versionChanged = !!store && store.schemaVersion !== input.schemaVersion;
-        // A migration names the shape its rows come from.
         const source = store?.schemaFingerprint ? { fromFingerprint: store.schemaFingerprint } : {};
         if (store && input.policy === 'authored' && (versionChanged || store.migration || schemaChanged || reshaped)) {
-          // Authored rows are never dropped: the caller migrates them.
+          // Authored and unsent rows are never dropped: the caller migrates them.
           migration = { from: store.schemaVersion, to: input.schemaVersion, ...source };
         } else if (store && (store.migration || (input.policy !== 'authored' && (store.fingerprint !== input.cacheFingerprint
           || versionChanged || reshaped || schemaChanged)))) {
           if (store.migration || (store.dirtyCount ?? 0) > 0) {
-            // Unsent rows are never dropped either: the caller decides where
-            // they go and lets the cached rows go. A changed grant (the cache
-            // fingerprint) is named apart from a changed shape, so the caller
-            // can treat the two differently.
             const grant = store.fingerprint !== input.cacheFingerprint
               ? { cacheFingerprintChanged: true, fromCacheFingerprint: store.fingerprint ?? null } : {};
             migration = { from: store.schemaVersion, to: input.schemaVersion, ...source, ...grant };
           } else {
-            // A cache that changed shape, version or fingerprint starts empty.
             await tx.deletePrefix('rows', [identity.owner, identity.namespace]);
             store = { ...store, generation: next(store.generation), revision: next(store.revision), rowCount: 0, bytes: 0, dirtyCount: 0,
               fingerprint: input.cacheFingerprint, schemaVersion: input.schemaVersion, schemaFingerprint, migration: null, ...declared };
@@ -497,9 +445,6 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
         return readFailure(failureReason(error, 'read-failed'));
       }
     },
-    // Rows by a declared secondary index, in index order: `equals` (every
-    // field), or a `prefix` of the leading fields and/or an inclusive
-    // `lower`/`upper` bound on the next field. `nextKey` continues the scan.
     async query(input) {
       if (!validateQuery(input)) return readFailure('unserializable');
       try {
@@ -515,8 +460,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
             || (bounded && head.length >= fields.length)) throw storageError('unserializable');
           const base = `${input.index}\u0000`;
           const headEncoded = head.length ? indexValues(head) : null;
-          // Entries are `index\0v1\u0001v2…\0key`; the head closes with the
-          // separator that follows it so `s1` never matches `s12`.
+          // Include the separator so `s1` never matches `s12`.
           const headPrefix = headEncoded === null ? base
             : `${base}${headEncoded}${head.length < fields.length ? '\u0001' : '\u0000'}`;
           const lower = Object.hasOwn(input, 'lower') ? indexValues([input.lower]) : null;
@@ -631,13 +575,6 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
       handles.forEach((entry, id) => { if (entry.closed) handles.delete(id); });
       return { retired: true, purged: true };
     },
-    // Copy-on-write: `begin` claims the next generation under a lease held by
-    // this handle, `write` puts the caller's transformed rows into it,
-    // `complete` swaps it in atomically (other handles retire), `abort` drops
-    // it. Another opener's `begin` is refused as `busy` while the lease is
-    // live (it waits and reopens); a lease that ran out is a crashed opener,
-    // so the next `begin` starts over. `write`, `complete` and `abort` from
-    // a handle that no longer holds the lease fail as `conflict`.
     async migration(input) {
       const changes = validateMigration(input);
       const handle = getHandle(input.handle);
@@ -681,8 +618,6 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
           await tx.put('stores', store);
           return { ok: true };
         }
-        // The new generation fits the store's and its domain's byte budgets as
-        // they stand now, before it replaces the old one.
         await migrationCapacity(tx, target, store.migration.bytes, handle.options.limits.maxBytes);
         await tx.deletePrefix('rows', [owner, namespace, store.generation]);
         const done = { ...store, generation, schemaVersion: store.migration.to, indexes: target.indexes, rowCount: store.migration.rowCount,
@@ -697,8 +632,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
         return { ok: true, epoch: handle.epoch, storeRevision: done.revision };
       }).catch((error) => fail(failureReason(error)));
     },
-    // Host-only inspection for Settings → Data: store listings with counts,
-    // bytes and pending rows, and read-only row pages. Never MP-reachable.
+    // Never MP-reachable.
     async inspect(input) {
       validateInspect(input);
       try {
@@ -740,19 +674,13 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
         });
       } catch (error) { return readFailure(failureReason(error, 'read-failed')); }
     },
-    // Clears a store's cached rows, or just `keys`. Dirty rows and authored
-    // stores (drafts, outbox, settings) stay unless `force` is set by an
-    // explicit confirm. A forced clear of the whole store keeps its
-    // generation, so open handles stay usable and see it empty; the new
-    // revision makes their in-flight snapshots conflict and read again. A
-    // rebuild in progress is dropped, and its opener's next step conflicts.
+    // Authored stores stay unless `force` is set.
     async purge(input) {
       validatePurge(input);
       try {
         let named = {};
         const removed = await database.transaction('readwrite', async (tx) => {
           const { owner: account, store } = await selectedStore(tx, input.selector, input.store);
-          // Whose store it is and which collection it holds, for the change feed.
           named = { owner: ownerKey(account.identity), label: describe(account, store).label };
           if (store.policy === 'authored' && !input.force) return [];
           const [owner, namespace] = store.key;
@@ -786,8 +714,6 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
       } catch (error) { return fail(failureReason(error)); }
     },
   };
-  // Identical asks share one transaction until a mutation is asked. A read
-  // queued after that mutation always checks its new committed revision.
   for (const name of ['read', 'query']) {
     const read = port[name];
     port[name] = async (input) => {
@@ -839,11 +765,9 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
   return Object.freeze(port);
 }
 
-/** Trusted host logout/session hook; no MP or renderer-selected namespace API. */
 export async function retireHostStorePrincipal(selector) {
   retirementMatcher(selector);
   let failure;
-  // Separate adapters can target the same SQLite file; retire them sequentially.
   // One unavailable adapter must not prevent the remaining owners being fenced.
   for (const cleanup of cleanupRegistry) {
     try { await cleanup(selector); } catch (error) { failure ||= error; }
@@ -851,12 +775,6 @@ export async function retireHostStorePrincipal(selector) {
   if (failure) throw failure;
 }
 
-/**
- * The host store's change feed: every successful write, eviction, migration
- * and purge is announced to in-app listeners and, over BroadcastChannel, to
- * the app's other tabs. Events name the namespace and row keys only; values
- * never leave the store.
- */
 export const HOST_STORE_CHANNEL = 'tommy-host-store-v2';
 const MAX_KEYS = 100;
 const randomOrigin = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
@@ -887,14 +805,10 @@ export function createHostStoreChangeFeed({
   return {
     origin,
     crossTab: !!channel,
-    // An event names the keys it changed only when it can name them all
-    // (at most MAX_KEYS). Without `keys`, every row of the store(s) it names
-    // may have changed; `truncated` says a list was too long to carry.
+    // An event names the keys it changed only when it can name them all.
     publish(event) {
       const { keys, truncated: _truncated, keysByLabel, ...rest } = event;
       const listed = Array.isArray(keys) ? (keys.length <= MAX_KEYS ? { keys: [...keys] } : { truncated: true }) : {};
-      // An eviction can span the stores of a domain: `keysByLabel` names each
-      // store's keys, carried only while they fit the same limit.
       const lists = keysByLabel && typeof keysByLabel === 'object' ? Object.entries(keysByLabel) : [];
       if (lists.length && lists.every(([, list]) => Array.isArray(list)) && lists.reduce((sum, [, list]) => sum + list.length, 0) <= MAX_KEYS) {
         listed.keysByLabel = Object.fromEntries(lists.map(([label, list]) => [label, [...list]]));
@@ -913,16 +827,6 @@ export function createHostStoreChangeFeed({
   };
 }
 
-/** Wraps a port (local or bridged) so its successful mutations reach the feed. */
-/**
- * What a removal of a viewer's rows took, as the change feed announces it.
- * The whole viewer (sign-out): every collection of every account of theirs
- * hears its rows went. One session's chat fragments (`cacheSession`): only
- * those, so no whole read of another collection in flight is taken to have
- * lost rows. One client subject's namespace (`subjectKey`) is announced as
- * the whole viewer: that subject's MP worlds must hear it, and the feed
- * cannot name a subject.
- */
 export function retirementEvent(selector) {
   const principal = JSON.stringify([selector.authorityOrigin, selector.viewerId]);
   if (Object.hasOwn(selector, 'cacheSession')) return { type: 'purge', principal, label: FRAGMENT_LABEL };
@@ -972,9 +876,6 @@ export function observeHostStorePort(port, feed) {
   };
   if (typeof port.purge === 'function') {
     wrapped.purge = async (input) => {
-      // The port names the store's account and collection for the feed alone:
-      // only that collection of that account hears its rows went, and the
-      // caller is answered as before.
       const { owner, label, ...result } = (await port.purge(input)) || {};
       if (result.ok) {
         feed.publish({

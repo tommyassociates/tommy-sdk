@@ -48,8 +48,6 @@
         <div class="item-content item-input">
           <div class="item-inner">
             <div class="item-title item-label">
-              <!-- item-label -->
-              <!-- <div class="item-header"> -->
                 Environment
             </div>
             <div class="item-input-wrap">
@@ -83,21 +81,6 @@
               }}
             </f7-button>
           </p>
-<!--          <p>-->
-<!--            <f7-button-->
-<!--              :disabled="remoteAddon.deleting || remoteAddon.updating"-->
-<!--              fill-->
-<!--              big-->
-<!--              class="red-button"-->
-<!--              @click="deleteAddon"-->
-<!--            >-->
-<!--              {{-->
-<!--                remoteAddon.deleting-->
-<!--                  ? "Deleting..."-->
-<!--                  : "Delete from Sandbox"-->
-<!--              }}-->
-<!--            </f7-button>-->
-<!--          </p>-->
         </template>
         <template v-else>
           <p>
@@ -116,21 +99,6 @@
             </f7-button>
           </p>
         </template>
-        <!-- <p>
-          <f7-button
-            :disabled="remoteAddon.uploading || remoteAddon.updating"
-            fill
-            large
-            class="red-button"
-            @click="uploadAddon"
-          >
-            {{
-              remoteAddon.uploading
-                ? "Uploading..."
-                : "Upload Addon"
-            }}
-          </f7-button>
-        </p> -->
       </f7-block>
     </div>
   </f7-page>
@@ -146,8 +114,6 @@ export default {
   },
   data() {
     return {
-      // pkg,
-      // addon,
       environment: "development",
       environments: ["development", "beta", "production"],
       remoteAddon: {},
@@ -165,12 +131,12 @@ export default {
         this.remoteAddon = response;
       })
       .catch(() => {
-        this.remoteFetched = true; // doesn't exist
+        this.remoteFetched = true;
       });
   },
   computed: {
     addon() {
-      return this.$store.getters['addons/addonByPackage'](this.pkg); //, this.environment
+      return this.$store.getters['addons/addonByPackage'](this.pkg);
     },
     addonStatus() {
       const {status, deleting, uploading, updating} = this.remoteAddon;

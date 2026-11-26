@@ -10,22 +10,10 @@ function prefixWhere(prefix) {
   if (!Array.isArray(prefix) || prefix.length > fields.length) throw storageError('unserializable');
   return prefix.map((_, index) => `${fields[index]} = ?`).join(' AND ') || '1 = 1';
 }
-// Tables whose rows an exclusive database answers from memory once read.
 const HELD_TABLES = new Set(['owners', 'stores']);
-/**
- * Fixed SQL only. Driver owns its native connection; no SQL reaches the MP API.
- *
- * `exclusive`: this page is the database's only user (a phone's WebView, where
- * every statement is a native bridge call). Its transactions already run one
- * after another here, so a read needs no BEGIN and COMMIT of its own; and the
- * owner and store rows, which change only through this driver, are answered
- * from memory once read. A read was six bridge calls, four of them these.
- */
 export function createSqliteDatabase({ driver, exclusive = false }) {
   let tail = Promise.resolve();
   let initialized;
-  // Owner and store rows as last read or committed here, by table and key:
-  // their JSON, or null for a row known absent (exclusive only).
   const held = new Map([...HELD_TABLES].map((table) => [table, new Map()]));
   const scans = new Map();
   let heldBytes = 0;
@@ -41,7 +29,6 @@ export function createSqliteDatabase({ driver, exclusive = false }) {
     rows.set(id, json);
     heldBytes += cost;
   };
-  // A failed open is not remembered: the next transaction opens again.
   async function initialize() {
     if (!initialized) {
       const opening = setUp();
@@ -53,10 +40,6 @@ export function createSqliteDatabase({ driver, exclusive = false }) {
   function setUp() {
     return (async () => {
       await driver.open?.();
-      // A native connection kept across a WebView reload can still hold the
-      // reloaded page's open transaction; the pragmas below are refused inside
-      // one ("Safety level may not be changed inside a transaction"). That
-      // page is gone, so its work is rolled back. With none open this errors.
       await driver.run('ROLLBACK', []).catch(() => {});
       const mode = await driver.query('PRAGMA journal_mode = WAL', []);
       if (String(mode[0]?.journal_mode).toLowerCase() !== 'wal') throw storageError('unavailable');
@@ -85,8 +68,6 @@ export function createSqliteDatabase({ driver, exclusive = false }) {
         await initialize();
         const bare = exclusive && mode !== 'readwrite';
         if (!bare) await driver.run(mode === 'readwrite' ? 'BEGIN IMMEDIATE' : 'BEGIN', []);
-        // Held rows this transaction wrote: read from the database until it
-        // commits, then held as committed.
         const written = new Map();
         let clearedHeld = false;
         const heldRows = (table) => (exclusive && HELD_TABLES.has(table) ? held.get(table) : null);
@@ -108,10 +89,7 @@ export function createSqliteDatabase({ driver, exclusive = false }) {
             if (rows && !own) remember(rows, id, found.length ? found[0].payload : null);
             return decoded(found)[0];
           },
-          // One query per 100 keys, not one per key: on Capacitor every query is a
-          // native bridge round trip (~15 ms), and a keyed read of 250 rows was
-          // ~500 of them — 1.5 s per full-store read on an Android phone.
-          // Results follow `keys` order; a missing key is `undefined`.
+          // One query per 100 keys: each Capacitor query is a ~15 ms bridge round trip.
           async getMany(table, keys) {
             const found = new Map();
             for (let start = 0; start < keys.length; start += 100) {
@@ -166,7 +144,6 @@ export function createSqliteDatabase({ driver, exclusive = false }) {
           if (clearedHeld) forgetHeld();
           else {
             if (written.size) {
-              // Scan membership and order may change on any write to its table.
               for (const [id, json] of scans) {
                 if (!written.has(JSON.parse(id)[0])) continue;
                 scans.delete(id); heldBytes -= bytes(id) + bytes(json); heldCount -= 1;
@@ -176,7 +153,6 @@ export function createSqliteDatabase({ driver, exclusive = false }) {
           }
           return value;
         } catch (error) {
-          // What it wrote is undone; what is held may have been read inside it.
           if (written.size || clearedHeld) forgetHeld();
           if (!bare) await driver.run('ROLLBACK', []).catch(() => {});
           throw error;

@@ -1,23 +1,8 @@
-/**
- * MP-isolation lint.
- *
- * Standalone config run with `eslint --no-eslintrc -c .eslintrc.isolation.js`
- * (see the lint:isolation script). It is deliberately separate from the main
- * .eslintrc.js, whose airbnb/promise extends are not installed in this repo —
- * the isolation job must not depend on that toolchain. Rule data is vendored
- * in ./eslint-mp-isolation.json (source of record:
- * plans/refactor-plan/01-detectors/ in the workspace repo).
- *
- * All isolation rules stay `warn` — enforcement is the baseline compare in
- * scripts/compare-to-baseline.js (block-on-increase), per
- * plans/refactor-plan/06-instrumentation/detectors-in-ci.md.
- */
+// Standalone MP-isolation lint (lint:isolation): the main config's airbnb extends are not installed here.
 const iso = require('./eslint-mp-isolation.json');
 
-// Strip _-prefixed annotation keys (_scope, _comment) the ESLint schema
-// rejects, and drop the production/ tree globs: production is a release-sync
-// copy of development/src (never hand-edited), so scanning it double-counts
-// debt and a routine sync PR would trip the block-on-increase freeze.
+// Strip _-prefixed annotation keys (_scope, _comment), which the ESLint schema rejects.
+// production/ is a release-sync copy of development/src, so scanning it double-counts.
 const overrides = iso.overrides.map((o) => ({
   ...Object.fromEntries(Object.entries(o).filter(([k]) => !k.startsWith('_'))),
   files: o.files.filter((g) => !g.includes('/production/')),

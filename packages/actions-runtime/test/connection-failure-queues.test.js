@@ -1,15 +1,8 @@
-/**
- * A replayable server write whose request never reached the server (no
- * connection, though the device reports itself online) is queued like an
- * offline write instead of failing, and the next drain sends it once. A
- * refusal from the server, or a write that is not replayable, still fails.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 
 const TENANT = 'team-1';
 
-// A test clock for the queued-resend spacing (F8): `later()` moves past any wait.
 const clock = { t: 1000000 };
 const later = () => { clock.t += 10 * 60 * 1000; };
 const timing = { now: () => clock.t, setTimer: () => null, clearTimer: () => {} };

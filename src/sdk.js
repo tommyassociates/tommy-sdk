@@ -103,8 +103,6 @@ tommy.app.init({
       this.$store.dispatch('login', payload).then((token) => {
         this.$store.state.addons.addonInstalls.length = 0;
         localAddons.forEach(addon => {
-          // FIXME: Skip production addons for now - just work on development
-          // addons until we can fix internal environment specific routing
           console.log('sdk: addon loaded', addon.url);
           if (addon.url.indexOf('/development/') === -1) return;
 
@@ -123,21 +121,7 @@ tommy.app.init({
                 this.$f7.routes.push(...routes);
                 this.$f7.views.main.routes.push(...routes);
 
-                // FIXME: Cannot use registerModule with replaceState due to a vuex bug
-                // if (isModule) {
-                //   const { name: moduleName, store: moduleStore } = addonModule.default;
-                //   if (storeModuleIsRegistered(this.$store, moduleName)) {
-                //     console.log('sdk: store module already registered', moduleName);
-                //   } else {
-                //     console.log('sdk: registering store module', moduleName, moduleStore);
-                //     registerStoreModule(this.$store, moduleStore, moduleName);
-                //   }
-                // }
-
-                // Load the default addon if specified
-                // (SDK_CONFIG.defaultPath &&
-                  // SDK_CONFIG.defaultPath === addon.entry_path) ||
-                  //
+                // registerModule cannot be used with replaceState due to a vuex bug.
                 const loadAddon = window.location.href.indexOf(addon.entry_path) !== -1
                 if (loadAddon) {
                   const entryUrl = this.addonUrl(addon)

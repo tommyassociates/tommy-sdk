@@ -1,6 +1,4 @@
-// The SDK JSON is the current runtime authority. Guard both runtime copies;
-// optional relocated design sources must be explicitly selected, never skipped.
-// See src/schema/PROVENANCE.md for the frozen v3 design-seed relationship.
+// The SDK JSON is the runtime authority; optional design sources must be selected explicitly, never skipped.
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';

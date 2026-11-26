@@ -1,15 +1,3 @@
-/**
- * tokenless-grants.test.js — the paths that carry no capability token judge an
- * MP by the grants its install holds, the same authority invoke and query read
- * off the token's `effectiveScopes`.
- *
- * Three paths carry no token: `subscribe()`, an Action's trigger binding, and
- * the identity an Action's condition gates and activity run under. When the
- * host supplies `grantedScopes(mpId)`, each of them reads it. An install can
- * hold fewer scopes than its manifest asks for (a third-party version whose
- * review approved less, a scope the tenant has not granted), and the declared
- * list must not stand in for the grant.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 
@@ -42,7 +30,6 @@ const clients = {
   actions: {},
 };
 
-// Declares every scope it would need; what it is GRANTED is up to the test.
 const consumer = ({ gate = false, bindOwnTrigger = false } = {}) => ({
   id: 'rostering',
   version: '1.0.0',
@@ -241,8 +228,6 @@ describe('grants are per tenant and per delivery', () => {
     await w.emitIn(TENANT);
     await settle();
     expect(heard).toHaveLength(1);
-    // With the grant gone, the stored subscription no longer receives the
-    // payload and no longer keeps the trigger active.
     w.grants[TENANT].rostering = [];
     const receipt = await w.emitIn(TENANT);
     await settle();

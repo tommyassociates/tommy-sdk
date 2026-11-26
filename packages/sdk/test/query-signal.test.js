@@ -1,8 +1,3 @@
-/**
- * query-signal.test.js — `tommy.actions.query(condition, args, { signal })`
- * hands the caller's signal to the condition handler's own signal through the
- * adapter, so a read the asking surface stopped waiting for can stop.
- */
 import { describe, it, expect } from 'vitest';
 import { createActionsApi } from '../src/actions.js';
 

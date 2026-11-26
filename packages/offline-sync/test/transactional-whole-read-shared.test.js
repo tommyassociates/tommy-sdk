@@ -1,11 +1,4 @@
 // @vitest-environment node
-/**
- * Whole reads of a host-store collection asked while one is in flight share
- * it: many followers opening at once (a screen's MP worlds each following the
- * roster) read the store once. A read that may predate one of the store's own
- * writes is never handed to a caller that asked after the write began, and
- * every caller still gets rows of its own.
- */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDataStore } from '../src/index.js';
 import { createHostStorePort } from '../src/host-store/index.js';
@@ -13,8 +6,6 @@ import { DATABASES, identity } from './helpers/host-databases.js';
 
 const storageError = (reason) => Object.assign(new Error(`Storage read failed (${reason})`), { name: 'StorageReadError', reason });
 
-// The app's complete read in brief; `between` runs after each read's metadata
-// and `after` once its rows are read, before it answers.
 function countingBackend(port, options, between, after) {
   let handle;
   const ready = () => (handle ||= port.open(options));
@@ -89,7 +80,6 @@ describe.each(DATABASES)('whole reads asked together (%s)', (_name, create) => {
     });
     await store.put({ id: '1', name: 'Ada' });
     holdAt = backend.reads.complete + 1;
-    // The first read has its rows (Ada alone) but has not answered yet.
     const first = store.getAll();
     await readFinished;
     await store.put({ id: '2', name: 'Bo' });

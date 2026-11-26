@@ -1,10 +1,4 @@
 // @vitest-environment node
-/**
- * The SQLite engine's connection set-up: a failed open is not remembered, so
- * one refused open (a native connection left over from a WebView reload, a
- * busy file) does not leave every later host-store call failing until the app
- * is killed.
- */
 import { describe, it, expect } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdtempSync, rmSync } from 'node:fs';

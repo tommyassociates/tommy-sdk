@@ -1,58 +1,8 @@
 import { createQueueChanges } from './queue-changes.js';
 import { QUEUE_TTL_MS } from './constants.js';
 
-/**
- * durable-queue.js — the broker's offline queue survives a reload.
- *
- * WHY. An MP calls `invoke` while the broker is offline, the write is accepted
- * and the MP's promise RESOLVES as queued; a queue held only in memory would
- * lose that row on reload with no error, no dead-letter and no trace — DATA
- * LOSS, strictly worse than duplication. 123 of the estate's 199 activities
- * declare `offlineReplayable: true`.
- *
- * ⚠ THIS STORE HOLDS TENANT DATA AT REST, AND THAT IS THE CHOSEN TRADE.
- * The ledger next door could be narrowed to opaque keys; a queue row cannot.
- * A row IS the pending write — its full envelope, args included — so there is
- * no "keys only" version of persisting it. Losing an accepted write is worse
- * than storing it on the device that authored it, with a cap and a TTL as the
- * price. The payload exposure is deliberate, not overlooked:
- *
- *   - it persists ONLY to the device that already accepted the write (Web
- *     Storage is origin+device scoped — nothing leaves the machine);
- *   - a row is DELETED once the server has answered it (applied, or refused
- *     with a 4xx), so the resting set is exactly the not-yet-applied writes
- *     and not a history;
- *   - a row older than the TTL is dropped rather than replayed (below).
- *
- * TTL SEMANTICS ARE A REAL CHOICE, NOT A CLEANUP DETAIL. Replaying a write from
- * an arbitrarily old session can be WRONG — a shift edit queued three weeks ago
- * may apply over later truth. Expiry therefore drops the row; it is the one
- * place this file knowingly discards a write, and it is bounded by the same
- * 7 days the ledger uses so the two cannot disagree about what "stale" means.
- *
- * SELF-DETECTING, like the ledger and NOT like `records.js` — whose header
- * claimed a shell-supplied IndexedDB backend that was never passed for the
- * platform's whole life (D.43 again). A seam that needs the host to remember
- * something is a seam that eventually rots, so there is no second half here.
- * Absent, corrupt or disabled storage degrades to in-memory and never throws.
- * Storage that is there but cannot take a new row (its quota is spent, e.g. by
- * the photos of a form) refuses that row: `push` throws `QueueNotKept` with
- * the row taken back out, so the write is never reported as queued while it
- * would be gone at the next reload. Rows already held stay as they were.
- *
- * ONE STORE, SEVERAL INSTANCES. The host keeps a broker per warm world, and
- * each builds a queue over the same storage key. Every instance therefore
- * reads what storage holds before it changes or lists the rows, so one never
- * writes back its stale copy over rows another queued or sent.
- *
- * HELD ROWS. A replayable write is pushed `held` while its request is
- * in flight, so closing the app mid-request still leaves its row. Being held
- * is a fact about THIS page, never stored: the set of held row ids is shared
- * by the page's queues (default) and is empty after a restart, when the row is
- * an ordinary queued write that the next drain sends.
- */
+// Queued writes resolve to the MP as accepted, so the queue must survive a reload.
 
-// Rows held by a write still running in this page (see HELD ROWS above).
 const HELD_IN_THIS_PAGE = new Set();
 const CHANGES_BY_STORAGE = new WeakMap();
 let rowIds = 0;
@@ -61,7 +11,6 @@ const newRowId = () => `${Date.now().toString(36)}-${Math.random().toString(36).
 const DEFAULT_TTL_MS = QUEUE_TTL_MS;
 const STORAGE_KEY = 'mp-offline-queue';
 
-/** The runtime's Web Storage, or null (node, or access throws when locked down). */
 function webStorage() {
   try {
     return (typeof globalThis !== 'undefined' && globalThis.localStorage) || null;
@@ -70,23 +19,7 @@ function webStorage() {
   }
 }
 
-/**
- * A FIFO offline queue that survives a reload.
- *
- * The in-memory array stays the working copy — every read on the dispatch path
- * is unchanged, and storage is written only when the queue MUTATES. Restoring
- * happens once, at construction, so a reload resumes with the rows the previous
- * session accepted.
- *
- * @param {object} [opts]
- * @param {number} [opts.ttlMs]   row lifetime; older rows are DROPPED on load
- * @param {function} [opts.now]   clock, injectable for tests
- * @param {object|null} [opts.storage] Web Storage override (tests)
- * @param {Set} [opts.held] ids of the rows held by a write running in this
- *   page; shared by the page's queues by default (tests pass a fresh set to
- *   stand for a restart)
- */
-// Whether two rows' owner stamps name the same account (a row without one is anyone's).
+// The in-memory array is the working copy; storage is written only when the queue mutates.
 const OWNER_KEYS = ['tenantId', 'person', 'accountType', 'accountId'];
 const sameOwner = (a, b) => !a || !b || OWNER_KEYS.every((key) => String(a[key] ?? '') === String(b[key] ?? ''));
 
@@ -101,14 +34,9 @@ export function createDurableQueue({
   let rows = [];
   let seq = 0;
   let expired = 0;
-  // The stored text `rows` and `seq` were last read from or written as.
   let seen = null;
-  // seq -> id of the rows this queue pushed held, so a release finds its id
-  // even once another queue over the storage has removed the row.
   const heldHere = new Map();
 
-  // Whether storage holds the rows now: true with no storage at all (memory
-  // is all there is), false when storage is there and refused the write.
   function persist() {
     const s = store();
     if (!s) return true;
@@ -124,7 +52,6 @@ export function createDurableQueue({
 
   const wellFormed = (row) => row && typeof row === 'object' && row.envelope && typeof row.queuedAt === 'number';
 
-  // The stored text, or undefined when storage is absent or cannot be read.
   function storedText() {
     const s = store();
     if (!s) return undefined;
@@ -136,13 +63,10 @@ export function createDurableQueue({
       const parsed = raw ? JSON.parse(raw) : null;
       return parsed && Array.isArray(parsed.rows) ? parsed : null;
     } catch (_) {
-      return null; // corrupt — behave as empty rather than poisoning the write path
+      return null;
     }
   }
 
-  // Take up what storage holds now when another queue over it changed it (or
-  // deleted it); this queue's own copy otherwise. The TTL is applied once,
-  // at construction, as before.
   function refresh() {
     const raw = storedText();
     if (raw === undefined || raw === seen) return;
@@ -152,7 +76,6 @@ export function createDurableQueue({
     seq = parsed && typeof parsed.seq === 'number' ? Math.max(parsed.seq, seq) : seq;
   }
 
-  // Restore once, at construction.
   (function restore() {
     const raw = storedText();
     if (raw === undefined) return;
@@ -164,7 +87,7 @@ export function createDurableQueue({
     expired = parsed.rows.length - kept.length;
     rows = kept;
     seq = typeof parsed.seq === 'number' ? parsed.seq : kept.length;
-    if (expired && persist()) changes.committed(parsed.rows.filter((row) => !kept.includes(row))); // reclaim the dropped rows' bytes immediately
+    if (expired && persist()) changes.committed(parsed.rows.filter((row) => !kept.includes(row)));
   }());
 
   const rowAt = (rowSeq) => rows.findIndex((row) => row.seq === rowSeq);
@@ -181,23 +104,14 @@ export function createDurableQueue({
 
   return {
     onChange: (callback) => changes.subscribe(callback),
-    /** Live rows — the dispatch path reads this array directly. */
     all() {
       refresh();
       return rows;
     },
 
-    /**
-     * Append a row; assigns the FIFO sequence. Throws `QueueNotKept`, with
-     * the row taken back out, when storage is there but cannot take it.
-     * `held`: the row belongs to a write still running in this page, which
-     * no drain sends until it is released (or the page restarts).
-     */
     push({ sourceMpId, envelope, bytes, owner, held: holding = false, subject }) {
       refresh();
-      // A claim for a subject another row of the same activity holds takes
-      // nothing, judged within the claiming account: the device-wide queue
-      // holds other accounts' rows, which never block this one.
+      // Rows of other accounts never block this one.
       if (typeof subject === 'string' && rows.some((row) => row.subject === subject
         && row.sourceMpId === sourceMpId && row.envelope?.activity === envelope?.activity && sameOwner(row.owner, owner))) return null;
       seq += 1;
@@ -218,15 +132,10 @@ export function createDurableQueue({
       return seq;
     },
 
-    /**
-     * Push a row for `subject` only while no row of the same Mini Program and
-     * activity holds it. Returns its seq, or null when the subject is taken.
-     */
     claim(input) {
       return this.push({ ...input, subject: String(input.subject) });
     },
 
-    /** Mark a row as unsettled (`{ reason, at }`): it stays queued and no drain sends it. */
     markUnsettled(rowSeq, unsettled) {
       refresh();
       const row = rows[rowAt(rowSeq)];
@@ -260,10 +169,6 @@ export function createDurableQueue({
       return true;
     },
 
-    /**
-     * Remove one row, by its sequence, once its send has settled. Rows stay in
-     * storage while they are being sent, so a reload mid-send still has them.
-     */
     remove(rowSeq) {
       refresh();
       const at = rowAt(rowSeq);
@@ -275,11 +180,7 @@ export function createDurableQueue({
       return true;
     },
 
-    /**
-     * A drain sent this row and it was not settled: count the attempt on the
-     * row, so its receipt reads as tried and not sent, after a reload too.
-     * Best effort: a row storage cannot rewrite keeps the count in memory.
-     */
+    // Best effort: a row storage cannot rewrite keeps the count in memory.
     noteAttempt(rowSeq) {
       refresh();
       const row = rows[rowAt(rowSeq)];
@@ -289,24 +190,18 @@ export function createDurableQueue({
       return true;
     },
 
-    /** The write holding this row stopped running here; the row stays queued. */
     release,
 
-    /** Whether a write running in this page holds the row. */
     isHeld(row) {
       return !!row?.id && held.has(row.id);
     },
 
-    /**
-     * Rows dropped at load for exceeding the TTL. Surfaced rather than silent:
-     * this is the one path that discards an accepted write, so the host can
-     * report it instead of the write simply never appearing.
-     */
+    // Surfaced rather than silent: this is the one path that discards an accepted write.
     expiredOnLoad() {
       return expired;
     },
 
-    /** Test/diagnostic surface — never used on the dispatch path. */
+    // Test/diagnostic surface; never used on the dispatch path.
     _clear() {
       for (const row of rows) if (row.id) held.delete(row.id);
       for (const id of heldHere.values()) held.delete(id);

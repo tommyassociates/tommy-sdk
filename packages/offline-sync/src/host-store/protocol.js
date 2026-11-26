@@ -1,23 +1,16 @@
-/** Closed host storage boundary; no physical names or handles cross into an MP. */
 export const HOST_STORE_VERSION = 1;
-// What this engine accepts beyond version 1's open/read/commit/retire. A port
-// without a feature (an older desktop engine) is never sent its inputs.
+// A host without a feature (an older desktop engine) is never sent its inputs.
 export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at', 'schema-fingerprint', 'aged-reads', 'open-epoch', 'subject-retire', 'synced-commit', 'atomic-batch-256']);
 export const HOST_STORE_DATABASE = 'tommy-host-store-v2';
 export const MAX_ROWS = 100;
-// Commit size is independent of read pages: related authored rows stay atomic.
 export const MAX_COMMIT_ROWS = 256;
 export const MAX_READ_BYTES = 8 * 1024 * 1024;
 export const MAX_ROW_BYTES = 4 * 1024 * 1024;
 export const COMPLETE_ROWS = 1000;
-// The one UTF-8 measure every store byte budget uses (offline-sync's
-// bytes.js re-exports it): kept here, since the desktop shell vendors only
-// this directory's index, port, protocol and sqlite modules.
+// The one UTF-8 measure every store byte budget uses.
 const encoder = new TextEncoder();
-// Reused for the text that fits (at most three bytes a UTF-16 code unit).
 const SCRATCH_LIMIT = 1024 * 1024;
 let scratch = new Uint8Array(64 * 1024);
-/** The UTF-8 size of `text`, in bytes. */
 export function utf8Bytes(text) {
   const string = String(text);
   const most = string.length * 3;
@@ -27,7 +20,6 @@ export function utf8Bytes(text) {
   }
   return encoder.encodeInto(string, scratch).written;
 }
-// A value's UTF-8 size as stored: a string as it is, anything else as its JSON.
 export const bytes = (value) => utf8Bytes(typeof value === 'string' ? value : (JSON.stringify(value) ?? ''));
 export const integer = (value) => Number.isSafeInteger(value) && value >= 0;
 export const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -37,9 +29,6 @@ export function closed(value, required, optional = []) {
 }
 export function fail(reason) { return { ok: false, reason, retained: false }; }
 export function readFailure(reason) { return { ok: false, reason }; }
-// A retirement's selector: the viewer at an origin, all of it; or one
-// session's chat fragments (`cacheSession`); or one subject's namespace
-// (`subjectKey`, an MP opened for a client whose access was revoked).
 export function retirementMatcher(selector) {
   if (!closed(selector, ['authorityOrigin', 'viewerId'], ['cacheSession', 'subjectKey'])
     || typeof selector.viewerId !== 'string' || !/^[1-9][0-9]*$/.test(selector.viewerId)
@@ -63,10 +52,6 @@ export function storageError(reason) {
 }
 export function keyValid(key) { return typeof key === 'string' && key.length > 0 && key.length <= 512; }
 
-// Namespaces. A host domain collection is `<domain>.<collection>` (e.g.
-// `chats.rows`) stored under the reserved HOST_DATA_MP_ID; an MP store keeps
-// its declared plain name and is labelled `mp.<mpId>.<store>`. Both map onto the
-// same owner/subject keys, so principal and owner purges cover every namespace.
 export const HOST_DATA_MP_ID = 'platform-data';
 export const FRAGMENT_LABEL = 'chats.fragments';
 const PLAIN_STORE = /^[a-zA-Z][a-zA-Z0-9_]{0,63}$/;
@@ -92,9 +77,6 @@ export function labelDomain(label) {
   return parts[0] === 'mp' ? parts.slice(0, 2).join('.') : parts[0];
 }
 
-// Secondary indexes: `{ name: field | [field, ...] }` over top-level record
-// fields, at most 8 per collection and 4 fields each. Values encode so that
-// string order is the value order (numbers sort numerically, below strings).
 const INDEX_NAME = /^[a-z][a-zA-Z0-9_]{0,31}$/;
 const INDEX_FIELD = /^[a-zA-Z_][a-zA-Z0-9_]{0,63}$/;
 export const MAX_INDEXES = 8;
@@ -185,7 +167,7 @@ export function validateRead(input) {
     && Array.isArray(input.keys) && input.keys.length <= MAX_ROWS && input.keys.every(keyValid) && new Set(input.keys).size === input.keys.length;
   return (input.afterKey === null || keyValid(input.afterKey)) && Number.isInteger(input.limit) && input.limit > 0 && input.limit <= MAX_ROWS;
 }
-/** Reject lossy JSON instead of dropping user data (functions, holes, cycles, dates). */
+// Reject lossy JSON instead of dropping user data (functions, holes, cycles, dates).
 export function jsonRecord(value) {
   const seen = new Set();
   function check(entry) {
@@ -220,9 +202,6 @@ export function validateCommit(input) {
   if (bytes(input) > MAX_READ_BYTES) throw storageError('payload-capacity');
   return changes;
 }
-// Migrations: an authored store opened at a newer schemaVersion copies its rows,
-// transformed by the caller, into the next generation and swaps atomically on
-// `complete`. A cache store opened at a newer version starts empty instead.
 export function validateMigration(input) {
   if (!closed(input, ['handle', 'expectedEpoch', 'phase'], ['changes'])
     || !integer(input.expectedEpoch) || !['begin', 'write', 'complete', 'abort'].includes(input.phase)
@@ -232,8 +211,6 @@ export function validateMigration(input) {
   if (changes.some((change) => change.op !== 'put')) throw storageError('unserializable');
   return changes;
 }
-// Host inspection and cache clearing for Settings → Data. Selectors name one
-// principal; a store id comes from a listing and is opaque to callers.
 export function validateInspect(input) {
   if (!closed(input, ['op', 'selector'], ['store', 'afterKey', 'limit'])
     || !['stores', 'rows', 'pending'].includes(input.op)) throw storageError('unserializable');

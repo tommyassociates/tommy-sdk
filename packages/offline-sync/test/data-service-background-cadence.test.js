@@ -1,24 +1,14 @@
 // @vitest-environment node
-/**
- * An account that is not displayed reads at its device budget's cadence:
- * its refreshes wait `backgroundCadence()` times as long between reads, and
- * read nothing while the cadence is paused (Infinity); a read paused on its
- * way stores nothing and is not fresh. The displayed account reads as
- * asked, and so does a collection the service keeps in the foreground for
- * every account. Sends are never held.
- */
 import { describe, it, expect, vi } from 'vitest';
 import { createDataService, createDataStore, createMemoryStoreBackend } from '../src/index.js';
 
 const MINUTE = 60 * 1000;
-// A scheduler that holds jobs until `run()`, checking each job's `valid()` first.
 function heldScheduler() {
   const held = [];
   return {
     request(job) {
       return new Promise((resolve, reject) => { held.push({ job, resolve, reject }); });
     },
-    // Runs every held job, and the jobs they lead to, until none is left.
     async run() {
       for (let round = 0; round < 10; round += 1) {
         for (const { job, resolve, reject } of held.splice(0)) {
@@ -80,7 +70,6 @@ describe('a background account\'s cadence', () => {
     const account = service({ foreground: () => false, cadence: () => factor, scheduler });
     const whole = account.data.refresh('members');
     const method = account.data.refresh({ collection: 'members', method: 'byUserIds', params: { user_ids: ['101'] } });
-    // The method's ids are gathered for a moment before its job is asked.
     await new Promise((done) => { setTimeout(done, 10); });
     factor = Infinity;
     await scheduler.run();
@@ -105,7 +94,6 @@ describe('a background account\'s cadence', () => {
   it('stores nothing from a read paused on its way, and reads it again once displayed', async () => {
     let factor = 2;
     let shown = false;
-    // Each run asks the job whether it is still wanted, as the host's scheduler does.
     const scheduler = {
       request: (job) => Promise.resolve().then(() => job.run(() => job.valid())),
     };
@@ -118,7 +106,6 @@ describe('a background account\'s cadence', () => {
     answer([{ id: '1', user_id: 101 }]);
     await expect(read).resolves.toMatchObject({ state: 'stale', syncedAt: null });
     expect(await account.data.read('members')).toEqual([]);
-    // Displayed: a read asked with a maxAge is not answered by the paused one.
     shown = true;
     await account.data.refresh('members', { maxAge: MINUTE });
     expect(account.whole).toHaveBeenCalledTimes(2);

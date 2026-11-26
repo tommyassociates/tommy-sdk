@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 
-// A host may alias its own world ID to its issued-token ID, never other teams.
 const boundTeamKey = (value) => ([3, '3', 'team-3'].includes(value) ? 'team-3' : value);
 
 async function world(tenantStateKey) {

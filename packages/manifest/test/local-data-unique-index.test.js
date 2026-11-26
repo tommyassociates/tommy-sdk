@@ -1,8 +1,3 @@
-// A device store's indexes are never unique: uniqueness is the server's to
-// enforce. A localData index may still say `unique: false`, which changes
-// nothing; `unique: true` is refused with a message saying so, and no
-// device-store code reads a `unique` declaration.
-
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';

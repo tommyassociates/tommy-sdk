@@ -1,8 +1,3 @@
-/**
- * The desktop shell vendors exactly the host-store index, port, protocol and
- * sqlite modules: copied on their own into an empty directory they load, so
- * none of them imports anything outside that set.
- */
 import { describe, it, expect, afterEach } from 'vitest';
 import { mkdtempSync, copyFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

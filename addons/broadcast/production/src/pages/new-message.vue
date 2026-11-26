@@ -18,7 +18,6 @@
         ></tag-cmp>
       </f7-list-item>
 
-      <!-- <search-tag-cmp></search-tag-cmp> -->
       <f7-list-item title="Total Recipients">{{group.count}}</f7-list-item>
     </f7-list>
 
@@ -34,7 +33,6 @@
     
     <button class="message-button" @click="sendMessage">SEND {{group.count}} MESSAGES</button>
 
-    <!-- Customer Popup -->
     <group-popup-cmp 
       :opened="customerPopupOpened"
       @closed="customerPopupOpened = false"

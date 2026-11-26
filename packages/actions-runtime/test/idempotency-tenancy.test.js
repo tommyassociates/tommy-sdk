@@ -1,11 +1,3 @@
-/**
- * idempotency-tenancy.test.js (F5) — the processed-key ledger is per TENANT.
- *
- * Gap register Class F/F5: the key was `activity:idempotencyKey`, and a
- * `derived_from_input` key is a hash of the args alone — so the same write in
- * two tenants collided and the second caller was handed the FIRST tenant's
- * stored result instead of its own.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer } from '../src/index.js';
 
@@ -38,7 +30,6 @@ async function world() {
   broker.registerMp(manifest, {
     handlers: {
       activities: {
-        // The result is TENANT-derived: a leaked replay is visible in the value.
         upsert_derived: (args, ctx) => { applied.push(ctx.tenantId); return { tenantId: ctx.tenantId, ...args }; },
         upsert_client_key: (args, ctx) => { applied.push(ctx.tenantId); return { tenantId: ctx.tenantId, ...args }; },
       },
@@ -65,7 +56,7 @@ describe('processedKeys tenancy (F5)', () => {
     expect(a.result).toEqual({ tenantId: 'team-A', ...args });
     expect(b.result).toEqual({ tenantId: 'team-B', ...args });
     expect(b.idempotentReplay).toBeUndefined();
-    expect(w.applied).toEqual(['team-A', 'team-B']); // both actually applied
+    expect(w.applied).toEqual(['team-A', 'team-B']);
   });
 
   it('two tenants reusing the same client_key are not confused with each other', async () => {
@@ -83,6 +74,6 @@ describe('processedKeys tenancy (F5)', () => {
     const repeat = await w.asA('upsert_derived', args);
     expect(repeat.idempotentReplay).toBe(true);
     expect(repeat.result).toEqual(first.result);
-    expect(w.applied).toEqual(['team-A']); // applied ONCE
+    expect(w.applied).toEqual(['team-A']);
   });
 });

@@ -1,11 +1,3 @@
-// IDENTITY ADOPTION (council C3) — the `legacyPackages` manifest field and the
-// ONE derivation that turns those declarations into a package -> mpId index.
-//
-// The field lets an MP adopt the install identity of the legacy addon it
-// replaces (`addon_installs.package` = `time_clock` -> the `time-clock` MP).
-// The schema constrains the shape; `buildLegacyPackageIndex` asserts the
-// cross-manifest injectivity rule the resolver depends on.
-
 import { describe, it, expect } from 'vitest';
 import {
   validateManifest,

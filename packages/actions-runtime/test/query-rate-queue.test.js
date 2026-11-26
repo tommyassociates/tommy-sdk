@@ -1,14 +1,3 @@
-/**
- * query-rate-queue.test.js — a query that finds its MP's bucket empty waits
- * for the next token (up to QUERY_RATE_WAIT_MAX_MS) instead of failing at
- * once; past that it is refused with `retryAfterMs`; and an answer the broker
- * already holds in its condition cache spends no token.
- *
- * The clock and `sleep` are injected: `sleep` records what was asked and
- * moves the clock to the end of the wait on the next task (after every caller
- * asked together has reserved its token), so the schedule is asserted rather
- * than waited out.
- */
 import { describe, it, expect } from 'vitest';
 import { createBroker, createFakeIssuer, QUERY_RATE_WAIT_MAX_MS } from '../src/index.js';
 
@@ -88,7 +77,6 @@ describe('query rate limit: queue briefly, then refuse with retryAfterMs', () =>
     expect(await w.query('live_hours')).toBe(7);
     expect(await w.query('live_hours')).toBe(7);
     expect(w.waited).toEqual([]);
-    // The burst is spent: at 120/min the next token is 500 ms away.
     expect(await w.query('live_hours')).toBe(7);
     expect(w.waited).toEqual([500]);
     expect(w.evalCount()).toBe(3);
@@ -96,8 +84,6 @@ describe('query rate limit: queue briefly, then refuse with retryAfterMs', () =>
 
   it('queues callers behind each other, each on its own token', async () => {
     const w = await world({ burst: 1, queriesPerMin: 120 });
-    // Asked together: the first takes the token in hand, the next two take
-    // the tokens 500 ms and 1000 ms away rather than the same one.
     const sleeps = [];
     const answers = await Promise.all([w.query('live_hours'), w.query('live_hours'), w.query('live_hours')]);
     sleeps.push(...w.waited);
@@ -106,7 +92,6 @@ describe('query rate limit: queue briefly, then refuse with retryAfterMs', () =>
   });
 
   it('refuses with retryAfterMs once the wait would pass the cap, and reserves nothing', async () => {
-    // 30/min: a token every 2000 ms, so the second queued caller would wait 4000 ms.
     const w = await world({ burst: 1, queriesPerMin: 30 });
     expect(QUERY_RATE_WAIT_MAX_MS).toBe(2000);
     const refusedAt = w.now();
@@ -119,7 +104,6 @@ describe('query rate limit: queue briefly, then refuse with retryAfterMs', () =>
     expect(third.reason).toMatchObject({ name: 'TommyError', code: 'RateLimited', retryable: true, retryAfterMs: 4000 });
     expect(third.reason.message).toBe("mp 'timesheets' exceeded query rate (30/min, burst 1)");
     expect(w.evalCount()).toBe(2);
-    // Waiting out retryAfterMs is enough: the refusal took no token.
     w.setClock(refusedAt + third.reason.retryAfterMs);
     w.waited.length = 0;
     expect(await w.query('live_hours')).toBe(7);
@@ -128,11 +112,10 @@ describe('query rate limit: queue briefly, then refuse with retryAfterMs', () =>
 
   it('serves a condition-cache hit without spending a token', async () => {
     const w = await world({ burst: 1, queriesPerMin: 120 });
-    expect(await w.query('hours_for', { day: 1 })).toBe(8); // the one token, fills the cache
+    expect(await w.query('hours_for', { day: 1 })).toBe(8);
     for (let i = 0; i < 50; i += 1) expect(await w.query('hours_for', { day: 1 })).toBe(8);
     expect(w.waited).toEqual([]);
     expect(w.evalCount()).toBe(1);
-    // A read that runs its handler still pays: the bucket is where the first read left it.
     expect(await w.query('live_hours')).toBe(7);
     expect(w.waited).toEqual([500]);
   });

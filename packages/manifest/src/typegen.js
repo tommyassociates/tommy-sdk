@@ -1,7 +1,3 @@
-// `tommy manifest typegen` — emit <id>.contracts.d.ts so an MP author gets
-// autocomplete on THEIR OWN triggers/conditions/activities, derived from the
-// embedded payload/input/result JSON Schemas (README §Type generation).
-
 import { compile } from 'json-schema-to-typescript';
 import { parseManifest } from './parse.js';
 
@@ -11,9 +7,6 @@ function pascal(id) {
     .filter(Boolean)
     .map((w) => w[0].toUpperCase() + w.slice(1))
     .join('');
-  // Guarantee a valid TS identifier prefix even for pathological ids (empty or
-  // digit-leading) — schema-valid ids start with a letter, but typegen does not
-  // pre-validate its input.
   return !name || /^[0-9]/.test(name) ? `Mp${name}` : name;
 }
 
@@ -34,10 +27,6 @@ function groupSchema(title, properties) {
   };
 }
 
-/**
- * Generate a `.d.ts` string for a parsed manifest object.
- * @returns {Promise<string>}
- */
 export async function typegenFromManifest(data) {
   const Name = pascal(data.id ?? 'mini-program');
   const chunks = [];
@@ -92,7 +81,6 @@ export async function typegenFromManifest(data) {
   return banner + chunks.join('\n');
 }
 
-/** Convenience: generate types straight from manifest source text. */
 export async function typegenFromSource(source) {
   const { data, yamlErrors } = parseManifest(source);
   if (yamlErrors.length) {
