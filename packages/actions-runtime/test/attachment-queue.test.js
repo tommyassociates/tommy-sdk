@@ -56,7 +56,7 @@ function fakeAttachments(queue) {
 
 async function page({
   online = false, serverInvoke = vi.fn(async () => ({ result: { documentId: 'd-1' } })), keepRefused = false, store = true, queue = null, maxFiles,
-  now, options = {},
+  now, options = {}, tenant = 'team-1',
 } = {}) {
   const issuer = createFakeIssuer();
   const offlineQueue = queue || createDurableQueue({ storage: null, held: new Set() });
@@ -80,13 +80,13 @@ async function page({
   });
   broker.registerMp(manifest('documents'), { handlers: { activities: {} } });
   broker.registerMp(manifest('forms'), { handlers: { activities: {} } });
-  const token = await issuer.issue('documents', '1.0.0', 'team-1', [], 'i-d');
+  const token = await issuer.issue('documents', '1.0.0', tenant, [], 'i-d');
   identity = { capabilityToken: token, instanceId: 'i-d' };
   const invoke = (key, files, extra = {}) => broker.invoke({
     sourceMpId: 'documents', instanceId: 'i-d', capabilityToken: token, activity: 'documents.submit_document',
     args: { documentTypeId: '7', files }, idempotencyKey: key, ...extra,
   });
-  return { broker, invoke, attachments, serverInvoke, offlineQueue };
+  return { broker, invoke, attachments, serverInvoke, offlineQueue, issuer };
 }
 
 const fileRef = (ref) => ({ ref, name: `${ref}.jpg`, size: 3, type: 'image/jpeg' });
@@ -430,8 +430,118 @@ describe('a queued write that carries attachments', () => {
     }, { handlers: { activities: {} } });
     token = await issuer.issue('documents', '1.0.0', 'team-1', [], 'i-d');
     await draining;
+    await broker.drainOfflineQueue();
     expect(serverInvoke).not.toHaveBeenCalled();
     expect(attachments.kept.get('a-1')).toMatchObject({ expired: true });
+  });
+
+  it('an aged row discarded while its Mini Program has not registered is never sent', async () => {
+    const clock = { t: 1_000_000 };
+    const queue = createDurableQueue({ storage: null, held: new Set(), now: () => clock.t });
+    const before = await page({ now: () => clock.t, queue });
+    await before.invoke('k-1', []);
+    clock.t += 7 * 24 * 60 * 60 * 1000;
+    const issuer = createFakeIssuer();
+    const serverInvoke = vi.fn(async () => ({ result: { documentId: 'd-1' } }));
+    let token = null;
+    const broker = createBroker({
+      capabilityService: issuer, serverInvoke, online: true, sleep: async () => {}, now: () => clock.t, setTimer: () => 0, clearTimer: () => {},
+      offlineQueue: queue, attachmentStore: fakeAttachments(queue),
+      queueOwner: () => ({ tenantId: 'team-1', person: '5', accountType: 'TeamMember', accountId: '9' }),
+      replayEnvelope: async (envelope) => ({ ...envelope, capabilityToken: token, instanceId: 'i-d' }),
+    });
+    broker.expectMps(['documents']);
+    const draining = broker.drainOfflineQueue();
+    await new Promise((resolve) => { setTimeout(resolve, 10); });
+    const [row] = queue.all();
+    expect(await broker.discardQueuedWrite('documents', row.id)).toBe(true);
+    broker.registerMp({
+      id: 'documents', version: '1.0.0', publisher: { type: 'first_party' }, triggers: {}, conditions: {},
+      activities: { submit_document: submit() }, actions: {},
+    }, { handlers: { activities: {} } });
+    token = await issuer.issue('documents', '1.0.0', 'team-1', [], 'i-d');
+    await draining;
+    expect(serverInvoke).not.toHaveBeenCalled();
+  });
+
+  it('an aged file row whose Mini Program registers only after the registration wait is not sent', async () => {
+    const clock = { t: 1_000_000 };
+    const queue = createDurableQueue({ storage: null, held: new Set(), now: () => clock.t });
+    const before = await page({ now: () => clock.t, queue });
+    before.attachments.keep('a-1', 'documents');
+    await before.invoke('k-1', [fileRef('a-1')]);
+    clock.t += 7 * 24 * 60 * 60 * 1000;
+    const issuer = createFakeIssuer();
+    const attachments = fakeAttachments(queue);
+    delete attachments.describe;
+    attachments.keep('a-1', 'documents', { pin: 'documents|documents.submit_document|k-1' });
+    const serverInvoke = vi.fn(async () => ({ result: { documentId: 'd-1' } }));
+    let token = null;
+    const broker = createBroker({
+      capabilityService: issuer, serverInvoke, online: true, sleep: async () => {}, now: () => clock.t, setTimer: () => 0, clearTimer: () => {},
+      offlineQueue: queue, attachmentStore: attachments, registrationTimeoutMs: 20,
+      queueOwner: () => ({ tenantId: 'team-1', person: '5', accountType: 'TeamMember', accountId: '9' }),
+      replayEnvelope: async (envelope) => ({ ...envelope, capabilityToken: token, instanceId: 'i-d' }),
+    });
+    broker.expectMps(['documents']);
+    const draining = broker.drainOfflineQueue();
+    await new Promise((resolve) => { setTimeout(resolve, 30); });
+    broker.registerMp({
+      id: 'documents', version: '1.0.0', publisher: { type: 'first_party' }, triggers: {}, conditions: {},
+      activities: { submit_document: submit() }, actions: {},
+    }, { handlers: { activities: {} } });
+    token = await issuer.issue('documents', '1.0.0', 'team-1', [], 'i-d');
+    await draining;
+    expect(serverInvoke).not.toHaveBeenCalled();
+    await broker.drainOfflineQueue();
+    expect(serverInvoke).not.toHaveBeenCalled();
+    expect(attachments.kept.get('a-1')).toMatchObject({ expired: true });
+  });
+
+  it('with no queue owner, another tenant\'s row under the same key keeps neither this tenant\'s files nor its outcome', async () => {
+    const queue = createDurableQueue({ storage: null, held: new Set() });
+    const mine = await page({ queue, options: { queueOwner: undefined } });
+    const theirs = await page({ queue, tenant: 'team-2', options: { queueOwner: undefined } });
+    mine.attachments.keep('a-1', 'documents');
+    theirs.attachments.keep('b-1', 'documents');
+    await mine.invoke('k-1', [fileRef('a-1')]);
+    await theirs.invoke('k-1', [fileRef('b-1')]);
+    const [first] = queue.all();
+    expect(await mine.broker.discardQueuedWrite('documents', first.id)).toBe(true);
+    expect(mine.attachments.kept.has('a-1')).toBe(false);
+    expect(mine.broker.writeOutcome('documents', 'submit_document', 'k-1', { tenantId: 'team-1' })).toBeNull();
+  });
+
+  it('an expired row leaves another Mini Program\'s wait under the same key', async () => {
+    const clock = { t: 1_000_000 };
+    const unreachable = () => Object.assign(new TypeError('Failed to fetch'), { status: 0 });
+    const busy = () => Object.assign(new Error('Too many requests'), { status: 429, retryAfterMs: 90_000 });
+    const queue = createDurableQueue({ storage: null, held: new Set(), now: () => clock.t });
+    const serverInvoke = vi.fn(async () => { throw unreachable(); });
+    const { broker, invoke, attachments, issuer } = await page({ online: true, now: () => clock.t, queue, serverInvoke });
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')]);
+    clock.t += 7 * 24 * 60 * 60 * 1000 - 10_000;
+    serverInvoke.mockImplementation(async () => { throw busy(); });
+    const formsToken = await issuer.issue('forms', '1.0.0', 'team-1', [], 'i-f');
+    attachments.keep('f-1', 'forms');
+    await broker.invoke({
+      sourceMpId: 'forms', instanceId: 'i-f', capabilityToken: formsToken, activity: 'forms.submit_document',
+      args: { documentTypeId: '7', files: [fileRef('f-1')] }, idempotencyKey: 'k-1',
+    });
+    expect(broker.queuedWrites('forms')[0].retryAt).toBe(clock.t + 90_000);
+    clock.t += 10_000;
+    await broker.drainOfflineQueue();
+    expect(broker.queuedWrites('documents')).toEqual([]);
+    expect(broker.queuedWrites('forms')[0].retryAt).toBe(clock.t + 80_000);
+  });
+
+  it('a write without files never reaches the attachment store when it settles', async () => {
+    const { broker, invoke, attachments } = await page();
+    await invoke('k-2', []);
+    broker.setOnline(true);
+    await broker.drainOfflineQueue();
+    expect(attachments.events.filter((event) => event[0] === 'settle')).toEqual([]);
   });
 
   it('a summary is plain text up to 80 characters, kept with the host-store row', async () => {

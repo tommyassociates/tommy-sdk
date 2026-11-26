@@ -1212,36 +1212,57 @@ export function createBroker({
   // 'succeeded' and 'discarded' delete the files; 'refused' keeps them when a receipt was kept; 'released' unpins them;
   // 'unconfirmed' holds them for the confirm window; 'expired' removes their bytes and keeps their names.
   // Files another of the owner's rows of the same write still waits to send stay pinned to it; a kept refused row keeps them as refused.
-  async function settleAttachments(envelope, idempotencyKey, state, { rowId = null, receiptKept = false } = {}) {
+  async function settleAttachments(envelope, idempotencyKey, state, {
+    rowId = null, receiptKept = false, tenantId = envelope?.identity?.tenantId,
+  } = {}) {
     if (typeof attachmentStore?.settle !== 'function' || typeof idempotencyKey !== 'string' || !idempotencyKey
       || typeof envelope?.activity !== 'string' || envelope.trigger) return;
-    const others = otherRowsOfWrite(envelope.sourceMpId, envelope.activity, idempotencyKey, rowId);
+    const refs = declaredRefs(envelope);
+    if (refs && !refs.length) return;
+    const others = otherRowsOfWrite(envelope.sourceMpId, envelope.activity, idempotencyKey, rowId, tenantId);
     if (others.some((row) => !row.refused)) return;
     const settled = others.length ? 'refused' : state;
     const keep = settled === 'refused' && (receiptKept === true || others.length > 0);
     try {
-      await attachmentStore.settle({ sourceMpId: envelope.sourceMpId, activity: envelope.activity, idempotencyKey, state: settled, keep });
+      await attachmentStore.settle({
+        sourceMpId: envelope.sourceMpId, activity: envelope.activity, idempotencyKey, state: settled, keep, ...(refs ? { refs } : {}),
+      });
     } catch (_) { /* the host's sweep removes what a settle could not */ }
   }
 
-  function otherRowsOfWrite(sourceMpId, activity, idempotencyKey, rowId = null) {
-    return ownQueuedRows().filter((row) => row.id !== rowId && row.sourceMpId === sourceMpId
-      && row.envelope?.activity === activity && row.envelope?.idempotencyKey === idempotencyKey);
+  // The refs a write carries by its registered manifest; null while that manifest is not registered.
+  function declaredRefs(envelope) {
+    const [ownerMpId, name] = splitQualified(envelope.activity);
+    const activityDef = mps.get(ownerMpId)?.manifest?.activities?.[name];
+    if (!activityDef) return null;
+    try { return attachmentRefsOf(activityDef, envelope); } catch (_) { return null; }
   }
 
-  // Judged against the declaring Mini Program's manifest once it has registered.
-  async function carriesFiles(row) {
+  const rowTenantOf = (row) => row?.owner?.tenantId ?? row?.envelope?.identity?.tenantId;
+
+  function otherRowsOfWrite(sourceMpId, activity, idempotencyKey, rowId = null, tenantId = null) {
+    const keyOf = (value) => { try { return String(tenantStateKey(value)); } catch (_) { return String(value); } };
+    const sameTenant = (row) => !known(tenantId) || !known(rowTenantOf(row)) || keyOf(rowTenantOf(row)) === keyOf(tenantId);
+    return ownQueuedRows().filter((row) => row.id !== rowId && row.sourceMpId === sourceMpId
+      && row.envelope?.activity === activity && row.envelope?.idempotencyKey === idempotencyKey && sameTenant(row));
+  }
+
+  // True or false by the registered manifest or the store's files; null (unknown) while the manifest is not registered.
+  function carriesFiles(row) {
     const envelope = row.envelope;
     if (!envelope || envelope.trigger || typeof envelope.activity !== 'string') return false;
     const [ownerMpId, name] = splitQualified(envelope.activity);
-    const entry = await resolveMpEntry(ownerMpId).catch(() => undefined);
-    try { if (attachmentRefsOf(entry?.manifest?.activities?.[name], envelope).length) return true; } catch (_) { return true; }
+    const entry = mps.get(ownerMpId);
+    try { if (entry && attachmentRefsOf(entry.manifest?.activities?.[name], envelope).length) return true; } catch (_) { return true; }
     const key = envelope.idempotencyKey;
-    if (typeof attachmentStore?.describe !== 'function' || typeof key !== 'string' || !key) return false;
+    let files = null;
     try {
-      const files = attachmentStore.describe({ sourceMpId: row.sourceMpId, activity: envelope.activity, idempotencyKey: key });
-      return Array.isArray(files) && files.length > 0;
-    } catch (_) { return false; }
+      if (typeof attachmentStore?.describe === 'function' && typeof key === 'string' && key) {
+        files = attachmentStore.describe({ sourceMpId: row.sourceMpId, activity: envelope.activity, idempotencyKey: key });
+      }
+    } catch (_) { files = null; }
+    if (Array.isArray(files) && files.length > 0) return true;
+    return entry ? false : null;
   }
 
   function idempotencyKeyFor(activityDef, envelope, epoch = 0) {
@@ -2080,16 +2101,22 @@ export function createBroker({
         if (refusedBefore) {
           outcome = refusedBefore;
         } else {
-          // eslint-disable-next-line no-await-in-loop
-          if (now() - row.queuedAt >= QUEUE_TTL_MS && await carriesFiles(row)) {
+          const aged = now() - row.queuedAt >= QUEUE_TTL_MS;
+          const files = aged ? carriesFiles(row) : false;
+          // An aged row stays queued until its Mini Program registers and a later drain can tell whether it carries files.
+          if (files === null) break;
+          if (files) {
             // eslint-disable-next-line no-await-in-loop
             if (await queueStore.remove(row.seq)) {
-              if (!otherRowsOfWrite(row.sourceMpId, envelope.activity, envelope.idempotencyKey).length) {
+              const tenantId = rowTenantOf(row);
+              if (!otherRowsOfWrite(row.sourceMpId, envelope.activity, envelope.idempotencyKey, null, tenantId).length) {
                 forgetDiscardedOutcome(row, recordOwner(envelope?.identity?.tenantId ?? row.owner?.tenantId));
+              }
+              if (!queueStore.all().some((queued) => queued.envelope?.idempotencyKey === envelope.idempotencyKey)) {
                 resendFailures.delete(envelope.idempotencyKey);
               }
               // eslint-disable-next-line no-await-in-loop
-              await settleAttachments(envelope, envelope.idempotencyKey, 'expired', { rowId: row.id });
+              await settleAttachments(envelope, envelope.idempotencyKey, 'expired', { rowId: row.id, tenantId });
             }
             continue;
           }
@@ -2153,7 +2180,7 @@ export function createBroker({
           }
         }
         // eslint-disable-next-line no-await-in-loop
-        await settleAttachments(envelope, envelope.idempotencyKey, outcome.ok ? 'succeeded' : 'refused', { rowId: row.id, receiptKept });
+        await settleAttachments(envelope, envelope.idempotencyKey, outcome.ok ? 'succeeded' : 'refused', { rowId: row.id, receiptKept, tenantId: rowTenantOf(row) });
         if (typeof onOfflineOutcome === 'function') {
           try {
             Promise.resolve(onOfflineOutcome(envelope, outcome)).catch(() => {});
@@ -2534,8 +2561,9 @@ export function createBroker({
         let removed;
         try { removed = (await queueStore.remove(row.seq)) === true; } finally { discardingRows.delete(row.id); }
         if (removed) {
-          if (!otherRowsOfWrite(row.sourceMpId, row.envelope.activity, row.envelope.idempotencyKey).length) forgetDiscardedOutcome(row, owner);
-          await settleAttachments(row.envelope, row.envelope.idempotencyKey, 'discarded', { rowId: row.id });
+          const tenantId = rowTenantOf(row);
+          if (!otherRowsOfWrite(row.sourceMpId, row.envelope.activity, row.envelope.idempotencyKey, null, tenantId).length) forgetDiscardedOutcome(row, owner);
+          await settleAttachments(row.envelope, row.envelope.idempotencyKey, 'discarded', { rowId: row.id, tenantId });
         }
         return removed;
       } catch (_) { return false; }
