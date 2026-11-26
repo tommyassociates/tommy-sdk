@@ -430,9 +430,8 @@ describe('a queued write that carries attachments', () => {
     }, { handlers: { activities: {} } });
     token = await issuer.issue('documents', '1.0.0', 'team-1', [], 'i-d');
     await draining;
-    await broker.drainOfflineQueue();
+    await vi.waitFor(() => expect(attachments.kept.get('a-1')).toMatchObject({ expired: true }), { timeout: 500 });
     expect(serverInvoke).not.toHaveBeenCalled();
-    expect(attachments.kept.get('a-1')).toMatchObject({ expired: true });
   });
 
   it('an aged row discarded while its Mini Program has not registered is never sent', async () => {
@@ -492,10 +491,8 @@ describe('a queued write that carries attachments', () => {
     }, { handlers: { activities: {} } });
     token = await issuer.issue('documents', '1.0.0', 'team-1', [], 'i-d');
     await draining;
+    await vi.waitFor(() => expect(attachments.kept.get('a-1')).toMatchObject({ expired: true }), { timeout: 500 });
     expect(serverInvoke).not.toHaveBeenCalled();
-    await broker.drainOfflineQueue();
-    expect(serverInvoke).not.toHaveBeenCalled();
-    expect(attachments.kept.get('a-1')).toMatchObject({ expired: true });
   });
 
   it('with no queue owner, another tenant\'s row under the same key keeps neither this tenant\'s files nor its outcome', async () => {

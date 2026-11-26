@@ -1990,6 +1990,8 @@ export function createBroker({
 
   // One drain at a time, so a row is never sent twice.
   let drainInFlight = null;
+  // Mini Programs whose registration an aged row waits for; registering one drains again.
+  const drainAwaitsMps = new Set();
 
   const resendFailures = new Map();
   let resendTimer = null;
@@ -2104,7 +2106,10 @@ export function createBroker({
           const aged = now() - row.queuedAt >= QUEUE_TTL_MS;
           const files = aged ? carriesFiles(row) : false;
           // An aged row stays queued until its Mini Program registers and a later drain can tell whether it carries files.
-          if (files === null) break;
+          if (files === null) {
+            drainAwaitsMps.add(splitQualified(envelope.activity)[0]);
+            break;
+          }
           if (files) {
             // eslint-disable-next-line no-await-in-loop
             if (await queueStore.remove(row.seq)) {
@@ -2205,6 +2210,10 @@ export function createBroker({
         firstParty: firstParty !== undefined ? firstParty : manifest.publisher?.type === 'first_party',
       });
       expectedMps.delete(manifest.id);
+      if (drainAwaitsMps.delete(manifest.id)) {
+        Promise.resolve(drainInFlight).catch(() => {})
+          .then(() => (retired || !isOnline ? null : drainOfflineQueue())).catch(() => {});
+      }
       const waiters = registrationWaiters.get(manifest.id);
       if (waiters) {
         registrationWaiters.delete(manifest.id);
