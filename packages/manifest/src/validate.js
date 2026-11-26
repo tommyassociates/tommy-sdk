@@ -26,6 +26,13 @@ function describeSemantic(err) {
   }
   if (err.schemaPath.includes('/activities/')) {
     // Name the two allOf branches apart, or a naturalKeyField misuse sends the author to the wrong field.
+    if (/\/activities\/additionalProperties\/allOf\/6\//.test(err.schemaPath)) {
+      return {
+        path,
+        rule: 'attachments-require-queued-client-key',
+        message: `activity '${name}' declares attachments but is not a server_write with idempotency 'client_key' and offlineReplayable true — attached files are uploaded before the write is sent and replayed under the caller's own key.`,
+      };
+    }
     if (/\/activities\/additionalProperties\/allOf\/5\//.test(err.schemaPath)) {
       return {
         path,
@@ -153,6 +160,25 @@ function finalize(doc, lineCounter, d, layer, suggestion) {
     layer,
     ...(suggestion ? { suggestion } : {}),
   };
+}
+
+// Each `attachments.fields` entry names a top-level array argument; the host reads refs only from those arrays.
+function attachmentFieldErrors(doc, lineCounter, data) {
+  const errors = [];
+  for (const [name, activity] of Object.entries(data?.activities ?? {})) {
+    const fields = activity?.attachments?.fields;
+    if (!Array.isArray(fields)) continue;
+    const properties = activity?.inputSchema?.properties ?? {};
+    for (const field of fields) {
+      if ([].concat(properties[field]?.type ?? []).includes('array')) continue;
+      errors.push(finalize(doc, lineCounter, {
+        path: ['activities', name, 'attachments', 'fields'],
+        rule: 'attachments-fields-are-arrays',
+        message: `activity '${name}' attachments field '${field}' is not a top-level array argument of its inputSchema.`,
+      }, 2));
+    }
+  }
+  return errors;
 }
 
 // JSON Schema cannot compare items, so ascending retry steps are checked here.
@@ -358,6 +384,7 @@ export function validateManifest(source, opts = {}) {
   );
 
   shape.push(...retryStepErrors(doc, lineCounter, data));
+  shape.push(...attachmentFieldErrors(doc, lineCounter, data));
   if (shape.length > 0) return { ok: false, manifestId, errors: shape };
 
   // Qualified per-primitive scopes are addressed by the owning MP's manifest, not the catalogue.

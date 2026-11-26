@@ -530,6 +530,32 @@ offlineReplayable: boolean
  * A queued write of this activity that the server refuses when it is replayed is kept (with its idempotency key and the refusal) and shown to the person, instead of being dropped from the queue. Requires `offlineReplayable: true`: only a queued write is refused later. Host API level 20; inert on older hosts.
  */
 keepRefused?: boolean
+/**
+ * Files this write carries by reference. The Mini Program hands each picked file to `tommy.host.attachments.keep()` and puts the returned `{ ref, name, size, type }` items in the named top-level array arguments; the host keeps the bytes on the device, pins them to the write's queue row at admission, uploads them before it sends the write under the same idempotency key, and deletes them once the write settles, is discarded or expires. Requires a server_write with `idempotency: client_key` and `offlineReplayable: true`. Host API level 21; inert on older hosts, where the write keeps its inline data URLs.
+ */
+attachments?: {
+/**
+ * Top-level `inputSchema` properties of type array whose items carry a `ref`.
+ *
+ * @minItems 1
+ * @maxItems 4
+ */
+fields: [string]|[string, string]|[string, string, string]|[string, string, string, string]
+/**
+ * Most files one write may carry, across every field. The host never allows more than 10.
+ */
+maxFiles?: number
+/**
+ * Largest file the host keeps for this write, in bytes. The host never keeps a file over 25 MB.
+ */
+maxBytesEach?: number
+/**
+ * MIME types or `type/*` families the host keeps for this write; absent or empty accepts any type.
+ *
+ * @maxItems 20
+ */
+accept?: []|[string]|[string, string]|[string, string, string]|[string, string, string, string]|[string, string, string, string, string]|[string, string, string, string, string, string]|[string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]
+}
 retry?: {
 maxAttempts?: number
 backoff?: ("none" | "linear" | "exponential")
