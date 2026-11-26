@@ -769,8 +769,9 @@ export function createBroker({
     return mps.get(mpId);
   }
 
+  // A stale answer carries rows the device held, not a completed read: never kept, cached or fresh.
   function isKnownUnknown(value) {
-    return !!(value && typeof value === 'object' && value.unresolved);
+    return !!(value && typeof value === 'object' && (value.unresolved || value.stale === true));
   }
 
   function pruneConditionCache(justSetKey = null) {
