@@ -1,0 +1,269 @@
+import { describe, it, expect, vi } from 'vitest';
+import { TommyError } from '@tommy/sdk';
+import { createBroker, createFakeIssuer, createDurableQueue, createHostStoreQueue } from '../src/index.js';
+
+const submit = ({ keepRefused = false, maxFiles } = {}) => ({
+  description: 'submit a document',
+  inputSchema: {
+    type: 'object',
+    properties: { documentTypeId: { type: 'string' }, files: { type: 'array', items: { type: 'object' } } },
+  },
+  sideEffect: 'server_write',
+  idempotency: 'client_key',
+  offlineReplayable: true,
+  keepRefused,
+  attachments: { fields: ['files'], ...(maxFiles ? { maxFiles } : {}) },
+  retry: { maxAttempts: 1 },
+});
+
+/** The host's attachment store as the broker sees it: kept refs, pins by key, released by outcome. */
+function fakeAttachments(queue) {
+  const kept = new Map();
+  const events = [];
+  const keyOf = ({ sourceMpId, activity, idempotencyKey }) => `${sourceMpId}|${activity}|${idempotencyKey}`;
+  return {
+    kept,
+    events,
+    keep(ref, sourceMpId, extra = {}) { kept.set(ref, { ref, sourceMpId, name: `${ref}.jpg`, size: 3, type: 'image/jpeg', pin: null, ...extra }); },
+    async pin(request) {
+      events.push(['pin', request.refs]);
+      for (const ref of request.refs) {
+        const row = kept.get(ref);
+        if (!row || row.sourceMpId !== request.sourceMpId) throw Object.assign(new Error('not here'), { code: 'ATTACHMENT_NOT_FOUND' });
+        if (row.pin && row.pin !== keyOf(request)) throw Object.assign(new Error('pinned'), { code: 'ATTACHMENT_IN_USE' });
+      }
+      for (const ref of request.refs) kept.get(ref).pin = keyOf(request);
+    },
+    async settle(request) {
+      const rowsLeft = queue ? queue.all().filter((row) => row.envelope?.idempotencyKey === request.idempotencyKey).length : null;
+      events.push(['settle', request.state, request.keep, rowsLeft]);
+      for (const [ref, row] of kept) {
+        if (row.pin !== keyOf(request)) continue;
+        if (request.state === 'unconfirmed') row.hold = true;
+        else if (request.state === 'refused' && request.keep) row.refused = true;
+        else kept.delete(ref);
+      }
+    },
+    describe(request) {
+      const rows = [...kept.values()].filter((row) => row.pin === keyOf(request));
+      return rows.length ? rows.map(({ ref, name, size, type }) => ({ ref, name, size, type })) : null;
+    },
+    progress: () => 0.5,
+  };
+}
+
+async function page({
+  online = false, serverInvoke = vi.fn(async () => ({ result: { documentId: 'd-1' } })), keepRefused = false, store = true, queue = null, maxFiles,
+} = {}) {
+  const issuer = createFakeIssuer();
+  const offlineQueue = queue || createDurableQueue({ storage: null, held: new Set() });
+  const attachments = store ? fakeAttachments(offlineQueue) : null;
+  let identity = {};
+  const broker = createBroker({
+    capabilityService: issuer,
+    serverInvoke,
+    online,
+    sleep: async () => {},
+    offlineQueue,
+    ...(attachments ? { attachmentStore: attachments } : {}),
+    queueOwner: () => ({ tenantId: 'team-1', person: '5', accountType: 'TeamMember', accountId: '9' }),
+    replayEnvelope: async (envelope) => ({ ...envelope, ...identity }),
+  });
+  const manifest = (id) => ({
+    id, version: '1.0.0', publisher: { type: 'first_party' }, triggers: {}, conditions: {},
+    activities: { submit_document: submit({ keepRefused, maxFiles }) }, actions: {},
+  });
+  broker.registerMp(manifest('documents'), { handlers: { activities: {} } });
+  broker.registerMp(manifest('forms'), { handlers: { activities: {} } });
+  const token = await issuer.issue('documents', '1.0.0', 'team-1', [], 'i-d');
+  identity = { capabilityToken: token, instanceId: 'i-d' };
+  const invoke = (key, files, extra = {}) => broker.invoke({
+    sourceMpId: 'documents', instanceId: 'i-d', capabilityToken: token, activity: 'documents.submit_document',
+    args: { documentTypeId: '7', files }, idempotencyKey: key, ...extra,
+  });
+  return { broker, invoke, attachments, serverInvoke, offlineQueue };
+}
+
+const fileRef = (ref) => ({ ref, name: `${ref}.jpg`, size: 3, type: 'image/jpeg' });
+
+describe('a queued write that carries attachments', () => {
+  it('is queued holding only its refs, pinned to its key, with a receipt naming the files', async () => {
+    const { broker, invoke, attachments, offlineQueue } = await page();
+    attachments.keep('a-1', 'documents');
+    const answer = await invoke('k-1', [fileRef('a-1')], { summary: 'Police check' });
+    expect(answer.status).toBe('queued_offline');
+    expect(attachments.kept.get('a-1').pin).toBe('documents|documents.submit_document|k-1');
+    const [row] = offlineQueue.all();
+    expect(JSON.stringify(row.envelope.args)).not.toMatch(/base64|data:/);
+    const [receipt] = broker.queuedWrites('documents');
+    expect(receipt).toMatchObject({
+      idempotencyKey: 'k-1', summary: 'Police check', attachments: [{ ref: 'a-1', name: 'a-1.jpg', size: 3, type: 'image/jpeg' }], progress: null,
+    });
+  });
+
+  it('a write without files keeps today\'s receipt shape', async () => {
+    const { broker, invoke } = await page();
+    await invoke('k-2', []);
+    const [receipt] = broker.queuedWrites('documents');
+    expect(receipt).not.toHaveProperty('attachments');
+    expect(receipt).not.toHaveProperty('progress');
+    expect(receipt).not.toHaveProperty('summary');
+  });
+
+  it('a ref another Mini Program kept is not found, and nothing is queued', async () => {
+    const { broker, invoke, attachments } = await page();
+    attachments.keep('a-9', 'forms');
+    await expect(invoke('k-1', [fileRef('a-9')])).rejects.toMatchObject({ code: 'ATTACHMENT_NOT_FOUND', retryable: false });
+    expect(broker.queuedWrites('documents')).toEqual([]);
+  });
+
+  it('a ref pinned to another write is in use', async () => {
+    const { invoke, attachments } = await page();
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')]);
+    await expect(invoke('k-2', [fileRef('a-1')])).rejects.toMatchObject({ code: 'ATTACHMENT_IN_USE' });
+  });
+
+  it('more files than the activity declares is refused before anything is pinned', async () => {
+    const { invoke, attachments } = await page({ maxFiles: 1 });
+    attachments.keep('a-1', 'documents');
+    attachments.keep('a-2', 'documents');
+    await expect(invoke('k-1', [fileRef('a-1'), fileRef('a-2')])).rejects.toMatchObject({ code: 'InvalidPayload' });
+    expect(attachments.events).toEqual([]);
+  });
+
+  it('a host with no attachment store refuses refs', async () => {
+    const { invoke } = await page({ store: false });
+    await expect(invoke('k-1', [fileRef('a-1')])).rejects.toMatchObject({ code: 'ATTACHMENTS_UNAVAILABLE' });
+  });
+
+  it('success deletes the bytes, only after the queue row is gone', async () => {
+    const { broker, invoke, attachments, serverInvoke } = await page();
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')], { summary: 'Police check' });
+    broker.setOnline(true);
+    await broker.drainOfflineQueue();
+    expect(serverInvoke).toHaveBeenCalledTimes(1);
+    expect(serverInvoke.mock.calls[0][0]).not.toHaveProperty('summary');
+    expect(JSON.stringify(serverInvoke.mock.calls[0][0])).not.toContain('Police check');
+    expect(attachments.kept.has('a-1')).toBe(false);
+    expect(attachments.events.find((event) => event[0] === 'settle')).toEqual(['settle', 'succeeded', false, 0]);
+  });
+
+  it('an online write held in the queue releases its files after the row is removed', async () => {
+    const queue = createHostStoreQueue({ backend: memoryBackend(), held: new Set() });
+    const { invoke, attachments } = await page({ online: true, queue });
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')]);
+    expect(attachments.kept.has('a-1')).toBe(false);
+    expect(attachments.events.find((event) => event[0] === 'settle')).toEqual(['settle', 'succeeded', false, 0]);
+  });
+
+  it('a refusal of a keepRefused write keeps the files for its receipt', async () => {
+    const refused = () => Object.assign(new TommyError({ code: 'FORM_INACTIVE', message: 'inactive', retryable: false }), { status: 422 });
+    const { broker, invoke, attachments } = await page({ keepRefused: true, serverInvoke: vi.fn(async () => { throw refused(); }) });
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')]);
+    broker.setOnline(true);
+    await broker.drainOfflineQueue();
+    expect(attachments.kept.get('a-1')).toMatchObject({ refused: true });
+  });
+
+  it('a refusal of a write that keeps nothing deletes the files', async () => {
+    const refused = () => Object.assign(new TommyError({ code: 'FORM_INACTIVE', message: 'inactive', retryable: false }), { status: 422 });
+    const { broker, invoke, attachments } = await page({ serverInvoke: vi.fn(async () => { throw refused(); }) });
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')]);
+    broker.setOnline(true);
+    await broker.drainOfflineQueue();
+    expect(attachments.kept.has('a-1')).toBe(false);
+  });
+
+  it('a write that never reached the server keeps its files queued', async () => {
+    const unreachable = () => Object.assign(new TypeError('Failed to fetch'), { status: 0 });
+    const { broker, invoke, attachments } = await page({ serverInvoke: vi.fn(async () => { throw unreachable(); }) });
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')]);
+    broker.setOnline(true);
+    await broker.drainOfflineQueue();
+    expect(attachments.kept.get('a-1')).toMatchObject({ pin: 'documents|documents.submit_document|k-1' });
+    expect(attachments.events.some((event) => event[0] === 'settle')).toBe(false);
+    expect(broker.queuedWrites('documents')).toHaveLength(1);
+  });
+
+  it('an answer that never came holds the files for the confirm window', async () => {
+    const lost = () => new TommyError({ code: 'Timeout', message: 'no answer', retryable: false });
+    const { invoke, attachments } = await page({ online: true, serverInvoke: vi.fn(async () => { throw lost(); }) });
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')]).catch(() => {});
+    expect(attachments.kept.get('a-1')).toMatchObject({ hold: true });
+  });
+
+  it('a discard deletes the files', async () => {
+    const { broker, invoke, attachments } = await page();
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')]);
+    const [receipt] = broker.queuedWrites('documents');
+    expect(await broker.discardQueuedWrite('documents', receipt.id)).toBe(true);
+    expect(attachments.kept.has('a-1')).toBe(false);
+  });
+
+  it('a queue that cannot keep the write releases the files it pinned', async () => {
+    const issuer = createFakeIssuer();
+    const full = {
+      ...createDurableQueue({ storage: null }),
+      push: async () => { throw Object.assign(new Error('full'), { name: 'QueueNotKept' }); },
+    };
+    const attachments = fakeAttachments(null);
+    const broker = createBroker({
+      capabilityService: issuer, online: false, offlineQueue: full, attachmentStore: attachments, sleep: async () => {},
+    });
+    broker.registerMp({
+      id: 'documents', version: '1.0.0', publisher: { type: 'first_party' }, triggers: {}, conditions: {},
+      activities: { submit_document: submit() }, actions: {},
+    }, { handlers: { activities: {} } });
+    const token = await issuer.issue('documents', '1.0.0', 'team-1', [], 'i-d');
+    attachments.keep('a-1', 'documents');
+    await expect(broker.invoke({
+      sourceMpId: 'documents', instanceId: 'i-d', capabilityToken: token, activity: 'documents.submit_document',
+      args: { documentTypeId: '7', files: [fileRef('a-1')] }, idempotencyKey: 'k-1',
+    })).rejects.toMatchObject({ code: 'Offline_QueueFull' });
+    expect(attachments.kept.has('a-1')).toBe(false);
+  });
+
+  it('a summary is plain text up to 80 characters, kept with the host-store row', async () => {
+    const backend = memoryBackend();
+    const queue = createHostStoreQueue({ backend, held: new Set() });
+    const { invoke, attachments } = await page({ queue });
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')], { summary: `${'x'.repeat(100)}` });
+    const reloaded = createHostStoreQueue({ backend, held: new Set() });
+    await reloaded.ready();
+    expect(reloaded.all()[0].envelope.summary).toBe('x'.repeat(80));
+  });
+});
+
+function memoryBackend() {
+  const rows = new Map();
+  let revision = 0;
+  return {
+    async page({ afterKey = null, limit = 100 } = {}) {
+      const keys = [...rows.keys()].sort();
+      const start = afterKey === null ? 0 : keys.indexOf(afterKey) + 1;
+      const slice = keys.slice(start, start + limit);
+      return {
+        ok: true, epoch: 1, storeRevision: revision, rows: slice.map((key) => ({ key, value: rows.get(key) })),
+        nextKey: start + limit < keys.length ? slice[slice.length - 1] : null,
+      };
+    },
+    async commit(before, changes) {
+      if (before.storeRevision !== revision) return { ok: false, reason: 'conflict' };
+      for (const change of changes) {
+        if (change.op === 'put') rows.set(change.key, JSON.parse(JSON.stringify(change.value)));
+        else rows.delete(change.key);
+      }
+      revision += 1;
+      return { ok: true };
+    },
+  };
+}

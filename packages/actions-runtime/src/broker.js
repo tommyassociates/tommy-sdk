@@ -169,6 +169,7 @@ export function createBroker({
   replayEnvelope = null,
   outcomeStore = null,
   conditionAnswerStore = null,
+  attachmentStore = null,
   viewerFingerprint = () => '',
   reportReadCode = null,
   registrationTimeoutMs = 8000,
@@ -1118,6 +1119,72 @@ export function createBroker({
     handlerSignal.addEventListener('abort', unlink, { once: true });
   }
 
+  const ATTACHMENTS_MAX_FILES = 10;
+  const SUMMARY_MAX = 80;
+  const summaryOf = (value) => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, SUMMARY_MAX) : '');
+
+  function attachmentRefsOf(activityDef, envelope) {
+    const fields = activityDef?.attachments?.fields;
+    if (!Array.isArray(fields)) return [];
+    const refs = [];
+    for (const field of fields) {
+      const items = envelope.args?.[field];
+      if (!Array.isArray(items)) continue;
+      for (const item of items) {
+        if (!item || typeof item !== 'object' || item.ref === undefined) continue;
+        if (typeof item.ref !== 'string' || !item.ref) {
+          throw err('InvalidPayload', `activity '${envelope.activity}' ${field}: a file ref must be a non-empty string`, { rule: 'attachments.ref', retryable: false });
+        }
+        refs.push(item.ref);
+      }
+    }
+    return refs;
+  }
+
+  // Pinned before the write is queued or sent, so its files live exactly as long as its queue row.
+  async function pinAttachments(activityDef, envelope, idempotencyKey) {
+    const refs = attachmentRefsOf(activityDef, envelope);
+    if (!refs.length) return false;
+    const maxFiles = Math.min(Number(activityDef.attachments.maxFiles) || ATTACHMENTS_MAX_FILES, ATTACHMENTS_MAX_FILES);
+    if (refs.length > maxFiles) {
+      throw err('InvalidPayload', `activity '${envelope.activity}' carries ${refs.length} files; at most ${maxFiles}`, { rule: 'attachments.max_files', retryable: false });
+    }
+    if (new Set(refs).size !== refs.length) {
+      throw err('ATTACHMENT_IN_USE', `activity '${envelope.activity}' carries the same file twice`, { retryable: false });
+    }
+    if (typeof attachmentStore?.pin !== 'function') {
+      throw err('ATTACHMENTS_UNAVAILABLE', `files cannot be kept for '${envelope.activity}' on this device`, { retryable: false });
+    }
+    try {
+      await attachmentStore.pin({
+        sourceMpId: envelope.sourceMpId,
+        activity: envelope.activity,
+        idempotencyKey,
+        refs,
+        limits: {
+          maxBytesEach: activityDef.attachments.maxBytesEach ?? null,
+          accept: Array.isArray(activityDef.attachments.accept) ? [...activityDef.attachments.accept] : [],
+        },
+      });
+    } catch (cause) {
+      if (isTommyError(cause)) throw cause;
+      const code = typeof cause?.code === 'string' && /^ATTACHMENTS?_/.test(cause.code) ? cause.code : 'ActivityFailed';
+      throw err(code, cause?.message || `the files of '${envelope.activity}' could not be kept`, { retryable: false, cause });
+    }
+    return true;
+  }
+
+  // 'succeeded' and 'discarded' delete the files; 'refused' keeps them for a kept receipt; 'released' unpins them; 'unconfirmed' holds them for the confirm window.
+  async function settleAttachments(envelope, idempotencyKey, state) {
+    if (typeof attachmentStore?.settle !== 'function' || typeof idempotencyKey !== 'string' || !idempotencyKey
+      || typeof envelope?.activity !== 'string' || envelope.trigger) return;
+    const [ownerMpId, name] = splitQualified(envelope.activity);
+    const keep = state === 'refused' && mps.get(ownerMpId)?.manifest?.activities?.[name]?.keepRefused === true;
+    try {
+      await attachmentStore.settle({ sourceMpId: envelope.sourceMpId, activity: envelope.activity, idempotencyKey, state, keep });
+    } catch (_) { /* the host's sweep removes what a settle could not */ }
+  }
+
   function idempotencyKeyFor(activityDef, envelope, epoch = 0) {
     // The epoch stamps broker-derived keys only, never client_key (the server ledger keys on it); epoch 0 adds none.
     const stamp = epoch > 0 ? `e${epoch}.` : '';
@@ -1236,7 +1303,12 @@ export function createBroker({
     }
   }
 
-  async function dispatchInvokeInner(envelope) {
+  async function dispatchInvokeInner(given) {
+    let envelope = given;
+    if (envelope.summary !== undefined) {
+      const { summary, ...rest } = envelope;
+      envelope = summaryOf(summary) ? { ...rest, summary: summaryOf(summary) } : rest;
+    }
     const identity = envelope.identity || authenticate(envelope);
     const tenantId = envelope.tenantId || identity.tenantId;
     // A confirm's outcome belongs to the owner it was kept for, never to whoever is current when it runs.
@@ -1269,11 +1341,13 @@ export function createBroker({
       const stored = processedKeys.get(processedKey);
       await releaseSettledHold(activityDef, envelope);
       noteReplayedSuccess(activityDef, envelope, idempotencyKey, outcomeScope);
+      if (!envelope.restoreDrain) await settleAttachments(envelope, idempotencyKey, 'succeeded');
       return { ...stored, idempotentReplay: true };
     }
     if (processedKey && appliedKeysOverflow.has(processedKey)) {
       await releaseSettledHold(activityDef, envelope);
       noteReplayedSuccess(activityDef, envelope, idempotencyKey, outcomeScope);
+      if (!envelope.restoreDrain) await settleAttachments(envelope, idempotencyKey, 'succeeded');
       return { status: 'succeeded', idempotentReplay: true, resultRetained: false };
     }
 
@@ -1281,14 +1355,22 @@ export function createBroker({
     if (processedKey && activityDef.idempotency === 'client_key' && idempotencyLedger?.has(processedKey)) {
       await releaseSettledHold(activityDef, envelope);
       noteReplayedSuccess(activityDef, envelope, idempotencyKey, outcomeScope);
+      if (!envelope.restoreDrain) await settleAttachments(envelope, idempotencyKey, 'succeeded');
       return { status: 'succeeded', idempotentReplay: true, resultRetained: false };
     }
+
+    const pinned = await pinAttachments(activityDef, envelope, idempotencyKey);
 
     // A row being drained is already queued; never queue it again beside itself.
     if (!isOnline && activityDef.sideEffect !== 'local_write') {
       if (envelope.restoreDrain === true) throw err('Offline', `'${envelope.activity}' waits in the queue for a connection`, { retryable: true });
       if (activityDef.offlineReplayable) {
-        await enqueueOffline(envelope.sourceMpId, { ...envelope, identity, idempotencyKey });
+        try {
+          await enqueueOffline(envelope.sourceMpId, { ...envelope, identity, idempotencyKey });
+        } catch (cause) {
+          if (pinned) await settleAttachments(envelope, idempotencyKey, 'released');
+          throw cause;
+        }
         const queuedRecord = await records.open({
           kind: 'invoke',
           activityName: envelope.activity,
@@ -1527,6 +1609,8 @@ export function createBroker({
             if (heldId) { appliedHolds.add(heldId); scheduleHoldCleanup(); }
           }
         }
+        // A drained row's files are settled by the drain, after it removes the row.
+        if (!envelope.restoreDrain) await settleAttachments(envelope, idempotencyKey, 'succeeded');
         if (envelope.txnId) {
           const steps = txnSteps.get(envelope.txnId) || [];
           steps.push({ activity: envelope.activity, args: envelope.args, idempotencyKey });
@@ -1577,12 +1661,15 @@ export function createBroker({
       return { rpcId: record.runId, status: 'queued_offline' };
     }
 
-    if (refusedForGood(lastError)) {
+    const refused = refusedForGood(lastError);
+    if (refused) {
       noteOutcome(activityDef, envelope, idempotencyKey, 'refused', { rpcId: record.runId, refusal: refusalOf(lastError) }, outcomeScope);
     } else {
       noteOutcome(activityDef, envelope, idempotencyKey, envelope.restoreDrain && (neverReachedServer(lastError) || throttle) ? 'queued' : 'unconfirmed', { rpcId: record.runId }, outcomeScope);
     }
     if (heldSeq !== null) await queueStore.remove(heldSeq);
+    // A refusal answered to the caller unpins its files so the caller may send them again.
+    if (!envelope.restoreDrain) await settleAttachments(envelope, idempotencyKey, refused ? 'released' : 'unconfirmed');
     await records.update(record.runId, {
       status: 'dead_letter',
       error: { code: lastError.code, message: lastError.message },
@@ -1982,6 +2069,8 @@ export function createBroker({
             await queueStore.remove(row.seq);
           }
         }
+        // eslint-disable-next-line no-await-in-loop
+        await settleAttachments(envelope, envelope.idempotencyKey, outcome.ok ? 'succeeded' : 'refused');
         if (typeof onOfflineOutcome === 'function') {
           try {
             Promise.resolve(onOfflineOutcome(envelope, outcome)).catch(() => {});
@@ -2182,6 +2271,22 @@ export function createBroker({
     },
 
     queuedWrites(sourceMpId) {
+      const queuedAttachmentsOf = (row, state) => {
+        const key = row.envelope.idempotencyKey;
+        if (typeof attachmentStore?.describe !== 'function' || typeof key !== 'string' || !key) return {};
+        const request = { sourceMpId: row.sourceMpId, activity: row.envelope.activity, idempotencyKey: key };
+        let files = null;
+        try { files = attachmentStore.describe(request); } catch (_) { files = null; }
+        if (!Array.isArray(files) || !files.length) return {};
+        let progress = null;
+        if (state === 'sending') {
+          try { const value = attachmentStore.progress?.(request); progress = Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : null; } catch (_) { progress = null; }
+        }
+        return {
+          attachments: files.map((file) => ({ ref: String(file.ref), name: String(file.name ?? ''), size: Number(file.size) || 0, type: String(file.type ?? '') })),
+          progress,
+        };
+      };
       return ownQueuedRows()
         .filter((row) => row.sourceMpId === sourceMpId && row.envelope?.activity && row.id && typeof row.subject !== 'string')
         .sort((a, b) => a.seq - b.seq)
@@ -2198,6 +2303,8 @@ export function createBroker({
             attempts,
             state,
             idempotencyKey: typeof row.envelope.idempotencyKey === 'string' ? row.envelope.idempotencyKey : null,
+            ...(summaryOf(row.envelope.summary) ? { summary: summaryOf(row.envelope.summary) } : {}),
+            ...queuedAttachmentsOf(row, state),
             ...(row.refused ? {
               refusal: {
                 code: row.refused.refusal?.code ?? null, message: String(row.refused.refusal?.message || ''), status: row.refused.refusal?.status ?? null,
@@ -2339,7 +2446,10 @@ export function createBroker({
         discardingRows.add(row.id);
         let removed;
         try { removed = (await queueStore.remove(row.seq)) === true; } finally { discardingRows.delete(row.id); }
-        if (removed) forgetDiscardedOutcome(row, owner);
+        if (removed) {
+          forgetDiscardedOutcome(row, owner);
+          await settleAttachments(row.envelope, row.envelope.idempotencyKey, 'discarded');
+        }
         return removed;
       } catch (_) { return false; }
     },
