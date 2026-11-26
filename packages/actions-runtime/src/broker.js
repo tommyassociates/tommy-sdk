@@ -170,6 +170,7 @@ export function createBroker({
   outcomeStore = null,
   conditionAnswerStore = null,
   attachmentStore = null,
+  hostKeptOffline = null,
   viewerFingerprint = () => '',
   reportReadCode = null,
   registrationTimeoutMs = 8000,
@@ -267,6 +268,15 @@ export function createBroker({
   const drainingRows = new Set();
   const discardingRows = new Set();
   let isOnline = online;
+  // A write the host keeps durably itself (it answers without the network) runs offline too.
+  const keptByHost = (activityDef, envelope, idempotencyKey) => {
+    if (typeof hostKeptOffline !== 'function' || activityDef.sideEffect !== 'server_write'
+      || activityDef.offlineReplayable || envelope.restoreDrain === true) return false;
+    try {
+      return hostKeptOffline({ activity: envelope.activity, args: envelope.args, sourceMpId: envelope.sourceMpId,
+        instanceId: envelope.instanceId, idempotencyKey }) === true;
+    } catch (_) { return false; }
+  };
   let pendingWork = 0;
   let retired = false;
   const queueSubscriptions = new Set();
@@ -1362,7 +1372,7 @@ export function createBroker({
     const pinned = await pinAttachments(activityDef, envelope, idempotencyKey);
 
     // A row being drained is already queued; never queue it again beside itself.
-    if (!isOnline && activityDef.sideEffect !== 'local_write') {
+    if (!isOnline && activityDef.sideEffect !== 'local_write' && !keptByHost(activityDef, envelope, idempotencyKey)) {
       if (envelope.restoreDrain === true) throw err('Offline', `'${envelope.activity}' waits in the queue for a connection`, { retryable: true });
       if (activityDef.offlineReplayable) {
         try {
