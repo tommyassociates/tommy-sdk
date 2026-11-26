@@ -170,6 +170,10 @@ export function createBroker({
   outcomeStore = null,
   conditionAnswerStore = null,
   viewerFingerprint = () => '',
+  // False where no answer may be held (a kiosk): a heldFirst condition then answers as any other.
+  holdConditionAnswers = () => true,
+  // True once the fingerprint reflects the viewer's loaded permissions; answers under any other then leave the device.
+  viewerFingerprintSettled = () => false,
   reportReadCode = null,
   registrationTimeoutMs = 8000,
   callerLinkAfterAnswerMs = 60000,
@@ -925,6 +929,7 @@ export function createBroker({
 
   function heldConditionKey(envelope, { conditionDef, ownerEntry, tenantId }) {
     if (conditionDef?.heldFirst !== true) return null;
+    try { if (holdConditionAnswers() === false) return null; } catch (_) { return null; }
     const owner = recordOwner(tenantId);
     if (!owner) return null;
     const fingerprint = currentFingerprint();
@@ -944,6 +949,16 @@ export function createBroker({
     return Number.isFinite(showAgeMs) && Number.isFinite(at) && now() - at > showAgeMs;
   }
 
+  let sweptFor = null;
+  function sweepOtherFingerprints({ owner, fingerprint }) {
+    let settled = false;
+    try { settled = viewerFingerprintSettled() === true; } catch (_) { settled = false; }
+    const pair = JSON.stringify([owner, fingerprint]);
+    if (!settled || sweptFor === pair) return;
+    sweptFor = pair;
+    conditionAnswers.purge((entry) => entry.owner === owner && entry.fingerprint !== fingerprint);
+  }
+
   function retryStepsOf(conditionDef) {
     const steps = conditionDef?.freshness?.retryAfterMs;
     if (Array.isArray(steps) && steps.length && steps.length <= 3 && steps.every((step, i) => Number.isFinite(step) && step > 0 && (i === 0 || step > steps[i - 1]))) return steps;
@@ -956,6 +971,7 @@ export function createBroker({
     if (cached) return { answer: cached.value, state: 'fresh', asOf: cached.at, aged: agedAt(conditionDef, cached.at) };
     const key = heldConditionKey(envelope, prepared);
     if (key) await conditionAnswers.ready();
+    if (key && key.current()) sweepOtherFingerprints(key);
     const found = key && key.current() ? conditionAnswers.get(key.id) : null;
     const held = found ? conditionAnswers.get(key.id, key.expected) : null;
     if (found && !held) conditionAnswers.remove(key.id);
