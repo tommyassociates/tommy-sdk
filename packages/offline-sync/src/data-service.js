@@ -1547,9 +1547,18 @@ export function createDataService({
           && wantedValues.has(String(row[method.field]))).map((row) => String(row[keyPath]));
         return { keys, field: method.field, values: missing };
       } : null);
+      // Past the store's whole-read bound, the rows this method last answered stand in for the collection.
+      const prunable = async () => {
+        try { return await rawRows(store); } catch (error) {
+          if (error?.reason !== 'scan-required' || method.strictReceipt === true) throw error;
+          const held = Array.isArray(group.state.keys) ? group.state.keys : [];
+          const rows = await Promise.all(held.map((key) => Promise.resolve().then(() => store.getRaw(String(key))).catch(() => null)));
+          return rows.filter(Boolean);
+        }
+      };
       const unansweredOf = (asked) => (typeof method.prunesWhere === 'function' ? async (records, keyPath) => {
         const answeredKeys = new Set(records.map((record) => String(record[keyPath])));
-        const keys = (await rawRows(store)).filter((row) => {
+        const keys = (await prunable()).filter((row) => {
           if (answeredKeys.has(String(row[keyPath]))) return false;
           try { return method.prunesWhere(row, asked) === true; } catch (_) { return false; }
         }).map((row) => String(row[keyPath]));
