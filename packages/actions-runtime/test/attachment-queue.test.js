@@ -42,6 +42,7 @@ function fakeAttachments(queue) {
         if (request.state === 'unconfirmed') row.hold = true;
         else if (request.state === 'refused' && request.keep) row.refused = true;
         else if (request.state === 'released') row.pin = null;
+        else if (request.state === 'expired') row.expired = true;
         else kept.delete(ref);
       }
     },
@@ -55,7 +56,7 @@ function fakeAttachments(queue) {
 
 async function page({
   online = false, serverInvoke = vi.fn(async () => ({ result: { documentId: 'd-1' } })), keepRefused = false, store = true, queue = null, maxFiles,
-  now,
+  now, options = {},
 } = {}) {
   const issuer = createFakeIssuer();
   const offlineQueue = queue || createDurableQueue({ storage: null, held: new Set() });
@@ -71,6 +72,7 @@ async function page({
     ...(attachments ? { attachmentStore: attachments } : {}),
     queueOwner: () => ({ tenantId: 'team-1', person: '5', accountType: 'TeamMember', accountId: '9' }),
     replayEnvelope: async (envelope) => ({ ...envelope, ...identity }),
+    ...options,
   });
   const manifest = (id) => ({
     id, version: '1.0.0', publisher: { type: 'first_party' }, triggers: {}, conditions: {},
@@ -267,6 +269,79 @@ describe('a queued write that carries attachments', () => {
     await expect(attachments.pin({
       sourceMpId: 'documents', activity: 'documents.submit_document', idempotencyKey: 'k-2', refs: ['a-1'],
     })).resolves.toBeUndefined();
+  });
+
+  it('a retried offline write under the same key keeps its files until the last row carrying them settles', async () => {
+    const { broker, invoke, attachments } = await page();
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')]);
+    await invoke('k-1', [fileRef('a-1')]);
+    const receipts = broker.queuedWrites('documents');
+    expect(receipts).toHaveLength(2);
+    expect(await broker.discardQueuedWrite('documents', receipts[0].id)).toBe(true);
+    expect(attachments.kept.get('a-1')).toMatchObject({ pin: 'documents|documents.submit_document|k-1' });
+    expect(await broker.discardQueuedWrite('documents', receipts[1].id)).toBe(true);
+    expect(attachments.kept.has('a-1')).toBe(false);
+  });
+
+  it('a write with files left unsent for the queue\'s 7 days is never sent: its row goes and its files are settled expired', async () => {
+    const clock = { t: 1_000_000 };
+    const queue = createDurableQueue({ storage: null, held: new Set(), now: () => clock.t });
+    const { broker, invoke, attachments, serverInvoke } = await page({ now: () => clock.t, queue });
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')]);
+    await invoke('k-2', []);
+    clock.t += 7 * 24 * 60 * 60 * 1000;
+    broker.setOnline(true);
+    await broker.drainOfflineQueue();
+    expect(serverInvoke).toHaveBeenCalledTimes(1);
+    expect(serverInvoke.mock.calls[0][0].idempotencyKey).toBe('k-2');
+    expect(broker.queuedWrites('documents')).toEqual([]);
+    expect(attachments.events.filter((event) => event[0] === 'settle')[0]).toEqual(['settle', 'expired', false, 0]);
+    expect(attachments.kept.get('a-1')).toMatchObject({ expired: true });
+  });
+
+  it('files pinned for a write refused for in-flight capacity are released for another key', async () => {
+    let started;
+    const running = new Promise((resolve) => { started = resolve; });
+    const { broker, invoke, attachments } = await page({
+      online: true,
+      serverInvoke: vi.fn(() => { started(); return new Promise(() => {}); }),
+      options: { throttleOverrides: { documents: { invokesPerMin: 1e6, burst: 1e6 } } },
+    });
+    invoke('busy-0', []).catch(() => {});
+    await running;
+    // Issued while a write of the same Mini Program is executing, so each runs inline.
+    for (let i = 1; i < 500; i += 1) invoke(`busy-${i}`, []).catch(() => {});
+    await new Promise((resolve) => { setTimeout(resolve, 50); });
+    expect(broker.inflightStats().runs).toBe(500);
+    attachments.keep('a-1', 'documents');
+    await expect(invoke('k-1', [fileRef('a-1')])).rejects.toMatchObject({ code: 'RateLimited' });
+    expect(attachments.kept.get('a-1')).toMatchObject({ pin: null });
+  });
+
+  it('files of an online write that never reached the server and that the queue cannot keep are released', async () => {
+    const unreachable = () => Object.assign(new TypeError('Failed to fetch'), { status: 0 });
+    const full = {
+      ...createDurableQueue({ storage: null, held: new Set() }),
+      push: async () => { throw Object.assign(new Error('full'), { name: 'QueueNotKept' }); },
+    };
+    const { invoke, attachments } = await page({ online: true, queue: full, serverInvoke: vi.fn(async () => { throw unreachable(); }) });
+    attachments.keep('a-1', 'documents');
+    await expect(invoke('k-1', [fileRef('a-1')])).rejects.toMatchObject({ code: 'Offline_QueueFull' });
+    expect(attachments.kept.get('a-1')).toMatchObject({ pin: null });
+  });
+
+  it('a drained refusal of a keepRefused write deletes its files when the queue kept no receipt', async () => {
+    const refused = () => Object.assign(new TommyError({ code: 'FORM_INACTIVE', message: 'inactive', retryable: false }), { status: 422 });
+    const queue = createHostStoreQueue({ backend: memoryBackend(), held: new Set() });
+    const { broker, invoke, attachments } = await page({ keepRefused: true, queue, serverInvoke: vi.fn(async () => { throw refused(); }) });
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')]);
+    broker.setOnline(true);
+    await broker.drainOfflineQueue();
+    expect(attachments.events.find((event) => event[0] === 'settle')).toEqual(['settle', 'refused', false, 0]);
+    expect(attachments.kept.has('a-1')).toBe(false);
   });
 
   it('a summary is plain text up to 80 characters, kept with the host-store row', async () => {

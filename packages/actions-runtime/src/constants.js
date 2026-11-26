@@ -35,6 +35,8 @@ export const QUERY_RATE_WAIT_MAX_MS = 2000;
 /** offline-sync.md §3 — per-MP offline queue caps. */
 export const QUEUE_MAX_ENTRIES = 500;
 export const QUEUE_MAX_BYTES = 5 * 1024 * 1024;
+// A queued row's lifetime; a row older than this is never sent.
+export const QUEUE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** actions-runtime.md §1 `sync` emission — broker ack timeout. */
 export const SYNC_EMIT_TIMEOUT_MS = 3000;

@@ -1,8 +1,7 @@
 import { createQueueChanges } from './queue-changes.js';
-import { QUEUE_MAX_ENTRIES, QUEUE_MAX_BYTES } from './constants.js';
+import { QUEUE_MAX_ENTRIES, QUEUE_MAX_BYTES, QUEUE_TTL_MS } from './constants.js';
 
 const HELD = new Set();
-const TTL_MS = 7 * 24 * 60 * 60 * 1000;
 let ids = 0;
 const copy = (value) => JSON.parse(JSON.stringify(value));
 const notKept = (cause) => Object.assign(new Error('the offline queue could not be kept on this device'), { name: 'QueueNotKept', cause });
@@ -28,7 +27,7 @@ const envelopeOf = (envelope) => copy(Object.fromEntries([
  * ready() restores its synchronous receipt view; every mutation reads the
  * current revision and resolves only after the port confirms its commit.
  */
-export function createHostStoreQueue({ backend, now = Date.now, ttlMs = TTL_MS, held = HELD } = {}) {
+export function createHostStoreQueue({ backend, now = Date.now, ttlMs = QUEUE_TTL_MS, held = HELD } = {}) {
   const changes = createQueueChanges();
   let rows = [];
   let seq = 0;

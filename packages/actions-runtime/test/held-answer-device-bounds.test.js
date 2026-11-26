@@ -58,6 +58,38 @@ describe('what a held answer leaves on the device', () => {
     expect([...store.rows.values()].map((row) => row.fingerprint).sort()).toEqual(['rf-before', 'rf-now']);
   });
 
+  it('an ordinary query (no onRead) sweeps answers kept under another fingerprint, as a cached answer does', async () => {
+    const store = deviceStore([entry({ fingerprint: 'rf-before' })]);
+    const issuer = createFakeIssuer();
+    const broker = createBroker({
+      capabilityService: issuer, conditionAnswerStore: store, viewerFingerprint: () => 'rf-now', viewerFingerprintSettled: () => true,
+      setTimer: () => ({}), clearTimer: () => {},
+    });
+    broker.registerMp({
+      id: 'scheduling', version: '1.0.0', publisher: { type: 'first_party' }, triggers: {}, conditions: { c: { ...def, cacheable: true, cacheTtlMs: 60000 } }, activities: {}, actions: {},
+    }, { handlers: { conditions: { c: async () => ({ fresh: true }) } } });
+    const token = await issuer.issue('scheduling', '1.0.0', TENANT, [], 'i-1');
+    await broker.conditionAnswersReady();
+    await broker.query({ sourceMpId: 'scheduling', instanceId: 'i-1', capabilityToken: token, condition: 'scheduling.c', args: {} });
+    await broker.conditionAnswersReady();
+    expect([...store.rows.values()].map((row) => row.fingerprint)).toEqual(['rf-now']);
+  });
+
+  it('an onRead query answered from the in-memory cache still sweeps another fingerprint\'s answers', async () => {
+    const store = deviceStore([entry({ fingerprint: 'rf-before' })]);
+    let settled = false;
+    const w = await world({ store, viewerFingerprintSettled: () => settled, handler: async () => ({ fresh: true }) });
+    w.broker.registerMp({
+      id: 'scheduling', version: '1.0.0', publisher: { type: 'first_party' }, triggers: {}, conditions: { c: { ...def, cacheable: true, cacheTtlMs: 60000 } }, activities: {}, actions: {},
+    }, { handlers: { conditions: { c: async () => ({ fresh: true }) } } });
+    expect(await w.ask()).toMatchObject({ state: 'fresh' });
+    expect([...store.rows.values()].map((row) => row.fingerprint).sort()).toEqual(['rf-before', 'rf-now']);
+    settled = true;
+    expect(await w.ask()).toMatchObject({ state: 'fresh' });
+    await w.broker.conditionAnswersReady();
+    expect([...store.rows.values()].map((row) => row.fingerprint)).toEqual(['rf-now']);
+  });
+
   it('the viewer\'s own held answer is served and kept by the sweep', async () => {
     const store = deviceStore([entry({ fingerprint: 'rf-now', answer: { mine: true } }), entry({ fingerprint: 'rf-before' })]);
     const w = await world({ store, viewerFingerprintSettled: () => true, handler: () => new Promise(() => {}) });

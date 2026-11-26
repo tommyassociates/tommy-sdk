@@ -1,4 +1,5 @@
 import { createQueueChanges } from './queue-changes.js';
+import { QUEUE_TTL_MS } from './constants.js';
 
 /**
  * durable-queue.js — the broker's offline queue survives a reload.
@@ -57,7 +58,7 @@ const CHANGES_BY_STORAGE = new WeakMap();
 let rowIds = 0;
 const newRowId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}-${(rowIds += 1)}`;
 
-const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_TTL_MS = QUEUE_TTL_MS;
 const STORAGE_KEY = 'mp-offline-queue';
 
 /** The runtime's Web Storage, or null (node, or access throws when locked down). */
