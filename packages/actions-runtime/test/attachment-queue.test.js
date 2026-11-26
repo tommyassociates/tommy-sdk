@@ -344,6 +344,96 @@ describe('a queued write that carries attachments', () => {
     expect(attachments.kept.has('a-1')).toBe(false);
   });
 
+  it('another account\'s row under the same key never holds this account\'s files', async () => {
+    const queue = createDurableQueue({ storage: null, held: new Set() });
+    const theirs = await page({ queue, options: { queueOwner: () => ({ tenantId: 'team-2', person: '6', accountType: 'TeamMember', accountId: '10' }) } });
+    const mine = await page({ queue });
+    theirs.attachments.keep('b-1', 'documents');
+    mine.attachments.keep('a-1', 'documents');
+    await theirs.invoke('k-1', [fileRef('b-1')]);
+    await mine.invoke('k-1', [fileRef('a-1')]);
+    const [receipt] = mine.broker.queuedWrites('documents');
+    expect(await mine.broker.discardQueuedWrite('documents', receipt.id)).toBe(true);
+    expect(mine.attachments.kept.has('a-1')).toBe(false);
+    expect(theirs.attachments.kept.get('b-1')).toMatchObject({ pin: 'documents|documents.submit_document|k-1' });
+  });
+
+  it('two refused rows of one keepRefused write leave its files kept as refused', async () => {
+    const refused = () => Object.assign(new TommyError({ code: 'FORM_INACTIVE', message: 'inactive', retryable: false }), { status: 422 });
+    const { broker, invoke, attachments } = await page({ keepRefused: true, serverInvoke: vi.fn(async () => { throw refused(); }) });
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')]);
+    await invoke('k-1', [fileRef('a-1')]);
+    broker.setOnline(true);
+    await broker.drainOfflineQueue();
+    expect(attachments.kept.get('a-1')).toMatchObject({ refused: true });
+  });
+
+  it('an expired row of a write retried later keeps the newer row\'s outcome', async () => {
+    const clock = { t: 1_000_000 };
+    const queue = createDurableQueue({ storage: null, held: new Set(), now: () => clock.t });
+    const { broker, invoke, attachments } = await page({ now: () => clock.t, queue });
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')]);
+    clock.t += 6 * 24 * 60 * 60 * 1000;
+    await invoke('k-1', [fileRef('a-1')]);
+    clock.t += 24 * 60 * 60 * 1000;
+    await broker.drainOfflineQueue();
+    expect(broker.queuedWrites('documents')).toHaveLength(1);
+    expect(broker.writeOutcome('documents', 'submit_document', 'k-1')).toMatchObject({ state: 'queued' });
+  });
+
+  it('a write whose last row expired leaves no resend wait for a new write under its key', async () => {
+    const clock = { t: 1_000_000 };
+    const unreachable = () => Object.assign(new TypeError('Failed to fetch'), { status: 0 });
+    const queue = createDurableQueue({ storage: null, held: new Set(), now: () => clock.t });
+    const { broker, invoke, attachments } = await page({ now: () => clock.t, queue, serverInvoke: vi.fn(async () => { throw unreachable(); }) });
+    attachments.keep('a-1', 'documents');
+    await invoke('k-1', [fileRef('a-1')]);
+    clock.t += 7 * 24 * 60 * 60 * 1000 - 1000;
+    broker.setOnline(true);
+    await broker.drainOfflineQueue();
+    clock.t += 1000;
+    await broker.drainOfflineQueue();
+    expect(broker.queuedWrites('documents')).toEqual([]);
+    broker.setOnline(false);
+    attachments.keep('a-2', 'documents');
+    await invoke('k-1', [fileRef('a-2')]);
+    expect(broker.queuedWrites('documents')[0]).toMatchObject({ retryAt: null });
+  });
+
+  it('an expired row of a Mini Program that registers after the drain starts is not sent', async () => {
+    const clock = { t: 1_000_000 };
+    const queue = createDurableQueue({ storage: null, held: new Set(), now: () => clock.t });
+    const before = await page({ now: () => clock.t, queue });
+    before.attachments.keep('a-1', 'documents');
+    await before.invoke('k-1', [fileRef('a-1')]);
+    clock.t += 7 * 24 * 60 * 60 * 1000;
+    const issuer = createFakeIssuer();
+    const attachments = fakeAttachments(queue);
+    delete attachments.describe;
+    attachments.keep('a-1', 'documents', { pin: 'documents|documents.submit_document|k-1' });
+    const serverInvoke = vi.fn(async () => ({ result: { documentId: 'd-1' } }));
+    let token = null;
+    const broker = createBroker({
+      capabilityService: issuer, serverInvoke, online: true, sleep: async () => {}, now: () => clock.t, setTimer: () => 0, clearTimer: () => {},
+      offlineQueue: queue, attachmentStore: attachments,
+      queueOwner: () => ({ tenantId: 'team-1', person: '5', accountType: 'TeamMember', accountId: '9' }),
+      replayEnvelope: async (envelope) => ({ ...envelope, capabilityToken: token, instanceId: 'i-d' }),
+    });
+    broker.expectMps(['documents']);
+    const draining = broker.drainOfflineQueue();
+    await new Promise((resolve) => { setTimeout(resolve, 10); });
+    broker.registerMp({
+      id: 'documents', version: '1.0.0', publisher: { type: 'first_party' }, triggers: {}, conditions: {},
+      activities: { submit_document: submit() }, actions: {},
+    }, { handlers: { activities: {} } });
+    token = await issuer.issue('documents', '1.0.0', 'team-1', [], 'i-d');
+    await draining;
+    expect(serverInvoke).not.toHaveBeenCalled();
+    expect(attachments.kept.get('a-1')).toMatchObject({ expired: true });
+  });
+
   it('a summary is plain text up to 80 characters, kept with the host-store row', async () => {
     const backend = memoryBackend();
     const queue = createHostStoreQueue({ backend, held: new Set() });
