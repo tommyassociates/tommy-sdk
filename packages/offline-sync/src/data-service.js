@@ -204,6 +204,7 @@ export const METHOD_PARAM_TYPES = Object.freeze(['ids', 'id', 'string', 'date', 
 export const METHOD_SHARE_MS = 30 * 1000;
 const METHOD_FRESH_KEPT = 5000;
 const METHOD_GROUPS_KEPT = 500;
+const EVICTIONS_KEPT = 64;
 export const METHOD_REFUSAL_HOLD_MS = Object.freeze([30 * 1000, 5 * 60 * 1000]);
 const METHOD_REFUSALS_KEPT = 200;
 const HELD_REFUSAL_CODES = new Set(['DATA_INVALID', 'DATA_TOO_LARGE']);
@@ -542,7 +543,7 @@ export function createDataService({
       const off = store.onChange((notice) => {
         bump(name);
         if (notice?.evicted) {
-          loseCoverage(name);
+          loseCoverage(name, Array.isArray(notice.keys) ? notice.keys : null);
           emitStatus();
         }
       });
@@ -1209,14 +1210,14 @@ export function createDataService({
     if (methodRefusals.size >= METHOD_REFUSALS_KEPT) methodRefusals.delete(methodRefusals.keys().next().value);
     methodRefusals.set(key, { until: now() + holdMs, holdMs, error });
   };
-  function methodGroup(key, collection) {
+  function methodGroup(key, collection, batch = false) {
     if (!methodGroups.has(key)) {
       if (methodGroups.size >= METHOD_GROUPS_KEPT) {
         [...methodGroups.entries()].filter(([, group]) => !group.flying.size && !group.open && !group.state.flight)
           .slice(0, methodGroups.size - METHOD_GROUPS_KEPT + 1).forEach(([old]) => methodGroups.delete(old));
       }
       methodGroups.set(key, {
-        collection, flying: new Map(), open: null, fetched: new Map(), state: { state: 'stale', syncedAt: null, error: null, flight: null },
+        collection, batch, voidSeq: 0, flying: new Map(), open: null, fetched: new Map(), state: { state: 'stale', syncedAt: null, error: null, flight: null },
       });
     }
     return methodGroups.get(key);
@@ -1258,17 +1259,46 @@ export function createDataService({
   const coverageLoss = new Map();
   const wholeCovers = new Map();
   const coverKey = (form, name) => JSON.stringify([form, name]);
-  const forgetMethods = (name) => {
+  const evictions = new Map();
+  const voidGroup = (group) => {
+    group.voidSeq = coverageSeq;
+    group.state.syncedAt = null;
+    if (group.state.state === 'fresh') group.state.state = 'stale';
+  };
+  // With keys, only method groups whose answer or fetched ids lost a row are voided.
+  const forgetMethods = (name, keys = null) => {
     coverageSeq += 1;
     coverageVoid.set(name, coverageSeq);
+    const lost = keys ? new Set(keys.map(String)) : null;
+    if (lost) {
+      const log = evictions.get(name) || { floor: 0, entries: [] };
+      log.entries.push({ seq: coverageSeq, keys: lost });
+      if (log.entries.length > EVICTIONS_KEPT) log.floor = log.entries.shift().seq;
+      evictions.set(name, log);
+    }
     methodGroups.forEach((group) => {
       if (group.collection !== name) return;
-      group.fetched.clear();
-      group.state.syncedAt = null;
+      if (!lost) {
+        group.fetched.clear();
+        voidGroup(group);
+        return;
+      }
+      let hit = false;
+      lost.forEach((key) => { if (group.fetched.delete(key)) hit = true; });
+      if (!group.batch && (Array.isArray(group.state.keys)
+        ? group.state.keys.some((key) => lost.has(String(key))) : group.state.syncedAt !== null)) hit = true;
+      if (hit) voidGroup(group);
     });
     emitStatus();
   };
+  const evictedSince = (name, seq, keys) => {
+    const log = evictions.get(name);
+    if (!log || !keys.length) return false;
+    if (seq < log.floor) return true;
+    return log.entries.some((entry) => entry.seq > seq && keys.some((key) => entry.keys.has(String(key))));
+  };
   const voidOf = (name) => coverageVoid.get(name) || 0;
+  const groupVoid = (group) => group.voidSeq || 0;
   const purgedAt = new Map();
   function voidReads(name) {
     coverageSeq += 1;
@@ -1292,16 +1322,13 @@ export function createDataService({
     return event?.label === label || event?.labels?.includes(label) || event?.store === label
       || (event?.type === 'purge' && !event.label && !event.labels);
   };
-  function loseCoverage(name) {
-    forgetMethods(name);
+  function loseCoverage(name, keys = null) {
+    forgetMethods(name, keys);
     coverageLoss.set(name, voidOf(name));
     states.forEach((state, key) => {
       if (JSON.parse(key)[0] !== name) return;
       state.syncedAt = null;
       if (state.state === 'fresh') state.state = 'stale';
-    });
-    methodGroups.forEach((group) => {
-      if (group.collection === name && group.state.state === 'fresh') group.state.state = 'stale';
     });
   }
   const offGenerationFeed = feed?.subscribe((event) => {
@@ -1311,7 +1338,8 @@ export function createDataService({
       if (!matchesCollection(event, name)) return;
       if (watchedStores.has(name)) bump(name);
       if (event.type === 'evict' || event.type === 'purge') {
-        loseCoverage(name);
+        const keys = event.type === 'evict' && event.truncated !== true ? event.keysByLabel?.[labelOf(name)] : null;
+        loseCoverage(name, Array.isArray(keys) ? keys : null);
         invalidated = true;
       }
     });
@@ -1418,7 +1446,7 @@ export function createDataService({
     if (stillWanted !== null && batchParam) return Promise.reject(serviceError('stillWanted needs an unbatched method', 'DATA_UNSUPPORTED'));
     const shared = batchParam ? Object.fromEntries(Object.entries(params).filter(([param]) => param !== batchParam)) : params;
     const groupKey = JSON.stringify([form, name, wanted.method, shared]);
-    let group = methodGroup(groupKey, name);
+    let group = methodGroup(groupKey, name, !!batchParam);
     const outcome = (value) => {
       if (value === ANSWERED_FRESH) return { ...describeState(group.state), state: 'fresh', error: null };
       return batchParam ? describeState(group.state)
@@ -1476,7 +1504,7 @@ export function createDataService({
           };
           if (disposed) refuse('Data service retired', 'DATA_RETIRED');
           if (formOf(jobContextNow()) !== form) refuse('The account changed while the lookup waited', 'DATA_RETIRED');
-          group = methodGroup(groupKey, name);
+          group = methodGroup(groupKey, name, !!batchParam);
           let offered = true;
           try { offered = typeof method.available !== 'function' || method.available(params) !== false; } catch (_) { offered = false; }
           if (!offered) refuse(`'${wanted.collection}' cannot run '${wanted.method}' now`, 'DATA_UNSUPPORTED');
@@ -1534,7 +1562,8 @@ export function createDataService({
           throw dropped();
         }
         const began = now();
-        const voidAtStart = voidOf(name);
+        const voidAtStart = groupVoid(group);
+        const seqAtStart = coverageSeq;
         group.state.state = 'refreshing';
         if (!batchParam) {
           group.state.error = null;
@@ -1581,7 +1610,13 @@ export function createDataService({
           group.state.state = 'fresh';
           group.state.error = null;
           if (!batchParam) methodRefusals.delete(groupKey);
-          if (voidOf(name) !== voidAtStart) return;
+          if (evictedSince(name, seqAtStart, [...(stored.keys || []), ...(ids || [])])) {
+            coverageSeq += 1;
+            voidGroup(group);
+            if (!batchParam) emitStatus();
+            return;
+          }
+          if (groupVoid(group) !== voidAtStart) return;
           if (ids) {
             const absent = Array.isArray(stored.absent) ? new Set(stored.absent.map(String)) : null;
             ids.forEach((id) => noteFetched(group, id, began, absent ? !absent.has(String(id)) : null));
@@ -1634,18 +1669,18 @@ export function createDataService({
         const last = group.state.answered;
         if (sharesSinceWrite && reuseSinceWriteMs > 0 && last && method.strictReceipt !== true && group.state.state === 'fresh'
           && !group.state.flight && last.writeMark !== null && last.writeMark === writeMarkNow()
-          && last.voidAt === voidOf(name) && at - last.at < reuseSinceWriteMs) {
+          && last.voidAt === groupVoid(group) && at - last.at < reuseSinceWriteMs) {
           return Promise.resolve();
         }
         const flying = group.state.flight;
-        if (sharesSinceWrite && flying && !flying.settled && flying.rank <= askRank && flying.voidAtAsk === voidOf(name)
+        if (sharesSinceWrite && flying && !flying.settled && flying.rank <= askRank && flying.voidAtAsk === groupVoid(group)
           && !flying.attempts.failing() && at - flying.at < METHOD_SHARE_MS
           && (!flying.begun || (flying.writeMark !== null && flying.writeMark === writeMarkNow()))) {
           return join(flying);
         }
         if (stillWanted && !(() => { try { return !!stillWanted(); } catch (_) { return false; } })()) return Promise.reject(dropped());
         methodBatches += 1;
-        const voidAtAsk = voidOf(name);
+        const voidAtAsk = groupVoid(group);
         const flight = {
           at,
           seq: methodBatches,
@@ -1665,7 +1700,7 @@ export function createDataService({
         const afterDeadline = () => flight.settled && flight.deadlineRetry;
         const current = () => !disposed && cadenceFactor(name) !== Infinity
           && methodGroups.get(groupKey) === group && (group.state.flight === flight || afterDeadline()) && group.state.flightSeq === flight.seq
-          && (sources.get(name) || decl?.source) === spec && formOf(jobContextNow()) === form && voidOf(name) === voidAtAsk;
+          && (sources.get(name) || decl?.source) === spec && formOf(jobContextNow()) === form && groupVoid(group) === voidAtAsk;
         let resolveFlight;
         let rejectFlight;
         flight.promise = new Promise((_resolve, _reject) => { resolveFlight = _resolve; rejectFlight = _reject; });
