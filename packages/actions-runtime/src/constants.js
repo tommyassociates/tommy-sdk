@@ -13,14 +13,14 @@ export const QUERY_RATE_WAIT_MAX_MS = 2000;
 
 export const QUEUE_MAX_ENTRIES = 500;
 export const QUEUE_MAX_BYTES = 5 * 1024 * 1024;
-// A queued row's lifetime; a row older than this is never sent.
+// A queued row older than this is never sent.
 export const QUEUE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const SYNC_EMIT_TIMEOUT_MS = 3000;
 
 export const DEFAULT_RETRY = Object.freeze({ maxAttempts: 3, backoff: 'exponential' });
 
-// Spacing for handler-raised errors; the cap keeps the backoff honest.
+// Backoff base for errors a handler raises.
 export const RETRY_BASE_DELAY_MS = 100;
 export const RETRY_MAX_DELAY_MS = 400;
 
@@ -28,10 +28,10 @@ export const RETRY_MAX_DELAY_MS = 400;
 export const QUEUE_RESEND_BASE_MS = 5000;
 export const QUEUE_RESEND_MAX_MS = 120000;
 
-/** The longest Retry-After a throttled queued write waits for before its next send. */
+// The longest Retry-After a throttled queued write waits for before its next send.
 export const QUEUE_THROTTLE_MAX_MS = 60 * 60 * 1000;
 
-/** The wait after the `failures`-th unanswered send of a queued write. */
+// The wait after the `failures`-th unanswered send of a queued write.
 export function queueResendDelayMs(failures) {
   if (!(failures > 0)) return 0;
   return Math.min(QUEUE_RESEND_BASE_MS * (2 ** (failures - 1)), QUEUE_RESEND_MAX_MS);
@@ -46,7 +46,7 @@ export function retryDelayMs(backoff, attempt) {
   return Math.min(RETRY_BASE_DELAY_MS * (2 ** (n - 1)), RETRY_MAX_DELAY_MS);
 }
 
-// The permission catalogue speaks in domains; the broker checks per-MP scopes, so domains are derived here.
+// The catalogue speaks in domains but the broker checks per-MP scopes, so domains are derived here.
 export const DOMAIN_SCOPE_BY_MP = Object.freeze({
   scheduling: 'shifts',
   'time-clock': 'attendance',

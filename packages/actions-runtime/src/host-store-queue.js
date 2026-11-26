@@ -17,11 +17,7 @@ const envelopeOf = (envelope) => copy(Object.fromEntries([
   'sourceMpId', 'activity', 'args', 'trigger', 'payload', 'idempotencyKey', 'txnId', 'chain', 'summary',
 ].filter((key) => envelope[key] !== undefined).map((key) => [key, envelope[key]])));
 
-/**
- * A row-oriented queue over the host's existing transactional store backend.
- * ready() restores its synchronous receipt view; every mutation reads the
- * current revision and resolves only after the port confirms its commit.
- */
+// Each mutation reads the current revision and resolves only after the port confirms its commit.
 export function createHostStoreQueue({ backend, now = Date.now, ttlMs = QUEUE_TTL_MS, held = HELD } = {}) {
   const changes = createQueueChanges();
   let rows = [];

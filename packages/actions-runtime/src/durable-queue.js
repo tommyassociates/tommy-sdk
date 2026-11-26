@@ -19,7 +19,6 @@ function webStorage() {
   }
 }
 
-// The in-memory array is the working copy; storage is written only when the queue mutates.
 const OWNER_KEYS = ['tenantId', 'person', 'accountType', 'accountId'];
 const sameOwner = (a, b) => !a || !b || OWNER_KEYS.every((key) => String(a[key] ?? '') === String(b[key] ?? ''));
 
@@ -147,7 +146,7 @@ export function createDurableQueue({
       return true;
     },
 
-    /** Keep a row the server refused for good (`{ refusal, at }`): no drain sends it again; it reads as a refused receipt. */
+    // A row refused for good stays as a refused receipt (`{ refusal, at }`); no drain sends it again.
     markRefused(rowSeq, refused) {
       refresh();
       const row = rows[rowAt(rowSeq)];
@@ -159,7 +158,7 @@ export function createDurableQueue({
       return true;
     },
 
-    /** Hold a queued row for a write running in this page; false when held already or gone. */
+    // False when the row is held already or gone.
     hold(rowSeq) {
       refresh();
       const id = rows[rowAt(rowSeq)]?.id;
