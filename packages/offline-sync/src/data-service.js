@@ -179,6 +179,23 @@ async function rangeKeys(store, keyPath, { index, range }) {
   } while (cursor !== null);
   return keys;
 }
+async function wholePurgeKeys(store, keyPath) {
+  const entry = (row) => ({ key: String(row[keyPath]), dirty: !!row._dirty });
+  try {
+    return (await rawRows(store)).map(entry);
+  } catch (error) {
+    if (error?.reason !== 'scan-required' || typeof store.scanRaw !== 'function') throw error;
+  }
+  const keys = [];
+  let cursor = null;
+  do {
+    // eslint-disable-next-line no-await-in-loop
+    const page = await store.scanRaw({ limit: PAGE_ROWS, cursor });
+    page.rows.forEach((row) => keys.push(entry(row)));
+    cursor = page.nextCursor;
+  } while (cursor !== null);
+  return keys;
+}
 const same = (a, b) => {
   try { return JSON.stringify(a) === JSON.stringify(b); } catch (_) { return false; }
 };
@@ -913,8 +930,18 @@ export function createDataService({
     const distinct = new Set(rows.filter((row) => row && typeof row === 'object').map((row) => String(row[keyPath])));
     let everyRow = false;
     if ((complete === true || (replace && !scoped)) && kept.size === distinct.size && !unsaved.size) {
-      const present = new Set((await rawRows(store)).map((row) => String(row[keyPath])));
-      everyRow = [...kept].every((key) => present.has(key));
+      try {
+        const present = new Set((await rawRows(store)).map((row) => String(row[keyPath])));
+        everyRow = [...kept].every((key) => present.has(key));
+      } catch (error) {
+        if (error?.reason !== 'scan-required') throw error;
+        everyRow = true;
+        for (const keys of boundedBatches([...kept], { maxItems: PAGE_ROWS })) {
+          // eslint-disable-next-line no-await-in-loop
+          const present = await Promise.all(keys.map((key) => store.getRaw(key)));
+          if (!present.every(Boolean)) { everyRow = false; break; }
+        }
+      }
     }
     if (replace && scoped && complete !== true) {
       const state = stateFor(targetKey({ collection: name }));
@@ -2502,7 +2529,7 @@ export function createDataService({
           entries = (await Promise.all(keys.map((key) => store.getRaw(String(key))))).filter(Boolean)
             .map((row) => ({ key: String(row[keyPath]), dirty: !!row._dirty }));
         } else if (range) entries = await rangeKeys(store, keyPath, range);
-        else entries = (await rawRows(store)).map((row) => ({ key: String(row[keyPath]), dirty: !!row._dirty }));
+        else entries = await wholePurgeKeys(turn.raw, keyPath);
         const removed = await removeRows({
           label, store: turn.store, keys: entries.filter(({ dirty }) => force || !dirty).map(({ key }) => key), force, origin,
         });

@@ -4,7 +4,8 @@ import { createDataService, createDataStore, createMemoryStoreBackend, createLoc
 import { PREFS_DECL } from '../src/manager.js';
 import { createHostStorePort, createHostStoreChangeFeed, observeHostStorePort } from '../src/host-store/index.js';
 import { COMPLETE_ROWS } from '../src/host-store/protocol.js';
-import { DATABASES, identity, createChannelBus } from './helpers/host-databases.js';
+import { StorageReadError, WHOLE_READ_ROWS } from '../src/transactional-store.js';
+import { DATABASES, identity, createChannelBus, createNodeSqliteDatabase } from './helpers/host-databases.js';
 
 const settle = () => new Promise((resolve) => { setTimeout(resolve, 0); });
 const INDEXES = { byChat: ['chat_id', 'seq'] };
@@ -1478,6 +1479,51 @@ describe('a memory store writes each row in turn', () => {
 });
 
 describe('whole-range purge and trim, and the rows an ingest stored', () => {
+  it('purges synced rows past the whole-read cap and keeps the local draft', async () => {
+    const { data, store, close } = hostService(createNodeSqliteDatabase, { maxRows: WHOLE_READ_ROWS + 2 });
+    const synced = WHOLE_READ_ROWS + 1;
+    try {
+      const history = messages(7, 1, synced);
+      await expect(data.ingest('chats.messages', history, { complete: true }))
+        .resolves.toMatchObject({ written: synced });
+      expect(data.status('chats.messages').state).toBe('fresh');
+      await data.mutate('chats.messages', { op: 'put', record: { id: 'draft', chat_id: 7, seq: synced + 1 } });
+      await expect(store.getAllRaw()).rejects.toMatchObject({ reason: 'scan-required' });
+
+      const result = await data.purge('chats.messages', {});
+
+      expect(result.removed).toHaveLength(synced);
+      expect(new Set(result.removed).size).toBe(synced);
+      expect(await data.read('chats.messages', null, { raw: true })).toEqual([
+        expect.objectContaining({ id: 'draft', _dirty: true }),
+      ]);
+    } finally {
+      data.dispose();
+      await close();
+    }
+  }, 60_000);
+
+  it('leaves the collection intact if a paged purge loses its snapshot', async () => {
+    const { data, store, close } = hostService(createNodeSqliteDatabase);
+    try {
+      await data.ingest('chats.messages', messages(7, 1, 101));
+      vi.spyOn(store, 'getAllRaw').mockRejectedValue(new StorageReadError('scan-required'));
+      const scan = store.scanRaw.bind(store);
+      vi.spyOn(store, 'scanRaw').mockImplementation(async (options) => {
+        const page = await scan(options);
+        if (options.cursor === null) await store.put({ id: 'new', chat_id: 7, seq: 102 });
+        return page;
+      });
+
+      await expect(data.purge('chats.messages', { force: true })).rejects.toMatchObject({ reason: 'conflict' });
+
+      expect(await data.read('chats.messages')).toHaveLength(102);
+    } finally {
+      data.dispose();
+      await close();
+    }
+  });
+
   it('purges and trims an index range of any size, never stopping part-way', async () => {
     const data = memoryService();
     await data.ingest('chats.messages', messages(7, 1, 6000));

@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDataService, createDataStore, createMemoryStoreBackend } from '../src/index';
+import { StorageReadError } from '../src/transactional-store';
 
 const stopped = [];
 afterEach(() => stopped.splice(0).forEach((stop) => stop()));
@@ -72,6 +73,27 @@ describe('canonical coverage after row loss', () => {
     expect(f.keyed).toHaveBeenCalledTimes(1);
     expect(await f.data.read('products', '1')).toMatchObject({ title: 'Recovered' });
     expect(f.data.status('products').syncedAt).toBeNull();
+  });
+
+  it.each([{ complete: true }, { replace: true }])('verifies retained keys when the ingest exceeds the whole-read bound: %j', async (options) => {
+    const f = fixture();
+    vi.spyOn(f.store, 'getAllRaw').mockRejectedValue(new StorageReadError('scan-required'));
+    await expect(f.data.ingest('products', [{ id: '1' }], options)).resolves.toMatchObject({ written: 1 });
+    expect(f.data.status('products')).toMatchObject({ state: 'fresh', syncedAt: 1000 });
+    await f.lookup();
+    expect(f.keyed).not.toHaveBeenCalled();
+  });
+
+  it('withholds coverage if a key is missing when the whole read cannot run', async () => {
+    const f = fixture();
+    vi.spyOn(f.store, 'getAllRaw').mockRejectedValue(new StorageReadError('scan-required'));
+    const getRaw = f.store.getRaw.bind(f.store);
+    vi.spyOn(f.store, 'getRaw').mockImplementation((key) => (key === '2' ? undefined : getRaw(key)));
+    await expect(f.data.ingest('products', [{ id: '1' }, { id: '2' }], { complete: true }))
+      .resolves.toMatchObject({ written: 2 });
+    expect(f.data.status('products').syncedAt).toBeNull();
+    await f.lookup();
+    expect(f.keyed).toHaveBeenCalledTimes(1);
   });
 
   it.each([{ complete: true }, { replace: true }])('does not stamp an ingest whose retained snapshot predates a purge: %j', async (options) => {
