@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createDataStore } from '../src/index.js';
 import { createHostStorePort } from '../src/host-store/index.js';
+import { WHOLE_READ_ROWS } from '../src/transactional-store.js';
 import { DATABASES, identity } from './helpers/host-databases.js';
 
 const storageError = (reason) => Object.assign(new Error(`Storage read failed (${reason})`), { name: 'StorageReadError', reason });
@@ -44,6 +45,48 @@ function countingBackend(port, options, between, after) {
 
 const closers = [];
 afterEach(async () => { await Promise.all(closers.splice(0).map((close) => close())); });
+
+describe('an oversized whole read', () => {
+  it('reuses a size refusal by revision and checks again after writes or row expiry', async () => {
+    let clock = 1000;
+    let revision = 1;
+    let count = WHOLE_READ_ROWS + 1;
+    const expiresAt = 2000;
+    const pages = vi.fn(async ({ afterKey, limit, metadataOnly, aged, includeExpiry }) => {
+      const start = afterKey === null ? 0 : Number(afterKey) + 1;
+      const end = Math.min(aged || clock < expiresAt ? count : 1, start + limit);
+      const rows = Array.from({ length: end - start }, (_, offset) => {
+        const key = String(start + offset);
+        return { key, value: metadataOnly ? null : { id: key }, revision, bytes: 20 };
+      });
+      return {
+        epoch: 1, storeRevision: revision, rows,
+        nextKey: end < (aged || clock < expiresAt ? count : 1) ? String(end - 1) : null,
+        ...(includeExpiry ? { expiresAt } : {}),
+      };
+    });
+    const backend = {
+      transactional: true, policy: 'cache', limits: { maxAgeMs: 1000 }, page: pages, readExpiry: true,
+      getAll: async () => { throw storageError('scan-required'); },
+    };
+    const store = createDataStore({ name: 'shifts', backend, now: () => clock });
+    await expect(store.getAll()).rejects.toMatchObject({ reason: 'scan-required' });
+    const baselinePages = pages.mock.calls.length;
+    expect(baselinePages).toBe(Math.ceil(count / 100));
+    await expect(store.getAll()).rejects.toMatchObject({ reason: 'scan-required' });
+    expect(pages.mock.calls.length - baselinePages).toBe(1);
+
+    revision += 1;
+    count = 1;
+    await expect(store.getAll()).resolves.toEqual([{ id: '0' }]);
+
+    revision += 1;
+    count = WHOLE_READ_ROWS + 1;
+    await expect(store.getAll()).rejects.toMatchObject({ reason: 'scan-required' });
+    clock = expiresAt;
+    await expect(store.getAll()).resolves.toEqual([{ id: '0' }]);
+  });
+});
 
 describe.each(DATABASES)('whole reads asked together (%s)', (_name, create) => {
   function open(between = async () => {}, after = async () => {}) {

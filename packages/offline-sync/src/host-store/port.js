@@ -277,8 +277,15 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
     const total = (await domainSiblings(tx, store)).reduce((sum, row) => sum + heldBytes(row), 0) + projectedBytes;
     if (total > store.domainMaxBytes) throw storageError('quota');
   }
-  async function readRows(tx, handle, store, metadata, { limit, keyed, metadataOnly, cursorOf, includeAged = false }) {
-    const result = { epoch: handle.epoch, storeRevision: store.revision, rows: [], nextKey: null };
+  async function readRows(tx, handle, store, metadata, {
+    limit, keyed, metadataOnly, cursorOf, includeAged = false, includeExpiry = false,
+  }) {
+    const result = {
+      epoch: handle.epoch, storeRevision: store.revision, rows: [], nextKey: null,
+      ...(includeExpiry ? { expiresAt: Number.MAX_SAFE_INTEGER } : {}),
+    };
+    const ageLimit = includeAged || handle.options.policy === 'authored' ? null : handle.options.limits.maxAgeMs;
+    let earliest = Infinity;
     const included = [];
     let scanned = 0;
     let lastScanned = null;
@@ -286,8 +293,8 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
     for (const row of metadata) {
       if (scanned >= limit) break;
       if (!row) { scanned += 1; continue; }
-      if (!includeAged && handle.options.policy !== 'authored' && !row.dirty && handle.options.limits.maxAgeMs !== null
-        && row.updatedAt + handle.options.limits.maxAgeMs <= now()) {
+      const expiresAt = ageLimit === null || row.dirty ? Infinity : row.updatedAt + ageLimit;
+      if (expiresAt !== Infinity && expiresAt <= now()) {
         scanned += 1;
         lastScanned = cursorOf(row);
         continue;
@@ -301,9 +308,11 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
       }
       encodedBytes += rowBytes + (included.length ? 1 : 0);
       included.push(row);
+      if (includeExpiry) earliest = Math.min(earliest, expiresAt);
       scanned += 1;
       lastScanned = cursorOf(row);
     }
+    if (includeExpiry) result.expiresAt = Number.isFinite(earliest) ? Math.min(earliest, Number.MAX_SAFE_INTEGER) : null;
     if (!keyed && scanned < metadata.length) result.nextKey = lastScanned;
     const [owner, namespace] = [handle.owner, handle.namespace];
     const bodies = metadataOnly ? []
@@ -435,7 +444,8 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
           const metadata = input.keys ? (await getMany(tx, 'rows', input.keys.map((key) => rowKey(handle.owner, handle.namespace, store.generation, META, key)))).filter(Boolean)
             : await tx.scan('rows', prefix(handle.owner, handle.namespace, store.generation, META), { after: input.afterKey, limit: input.limit + 1 });
           const result = await readRows(tx, handle, store, metadata, { limit: input.keys ? MAX_ROWS : input.limit, keyed: !!input.keys,
-            metadataOnly: !!input.metadataOnly, cursorOf: (row) => row.id, includeAged: input.includeAged === true });
+            metadataOnly: !!input.metadataOnly, cursorOf: (row) => row.id,
+            includeAged: input.includeAged === true, includeExpiry: input.includeExpiry === true });
           if (handle.closed) throw storageError('retired');
           return result;
         });

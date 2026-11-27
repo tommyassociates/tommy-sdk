@@ -79,6 +79,8 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     throw new PersistError(name, { retained: false, ...result });
   }
   let held = null;
+  // Visible and aged reads can prove the bound from different sets of rows.
+  const wholeReadRefusals = { visible: null, aged: null };
   const ageLimit = () => (backend.policy !== 'authored' && Number.isFinite(backend.limits?.maxAgeMs) ? backend.limits.maxAgeMs : null);
   const looksAged = (entry, limit) => limit !== null && !entry.dirty && entry.updatedAt + limit <= now();
   function track(snapshot, changes, result) {
@@ -193,9 +195,18 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     return new Promise((resolve, reject) => { flight.waiters.push({ resolve, reject }); });
   }
   async function readWholeRows({ aged = false } = {}) {
-    if (held && typeof backend.page === 'function') {
+    const refusalMode = aged ? 'aged' : 'visible';
+    const refusal = wholeReadRefusals[refusalMode];
+    if (refusal && refusal.until <= now()) wholeReadRefusals[refusalMode] = null;
+    if ((held || wholeReadRefusals[refusalMode]) && typeof backend.page === 'function') {
       const head = await backend.page({ afterKey: null, limit: 1, aged: true, metadataOnly: true });
       live();
+      if (refusal && wholeReadRefusals[refusalMode] === refusal) {
+        if (head.epoch === refusal.epoch && head.storeRevision === refusal.revision && now() < refusal.until) {
+          throw new StorageReadError('scan-required');
+        }
+        wholeReadRefusals[refusalMode] = null;
+      }
       if (held && head.epoch === held.epoch && head.storeRevision === held.revision) {
         const rows = heldRows(aged);
         if (rows) return rows;
@@ -207,23 +218,33 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       }
     }
     paged = true;
+    const includeExpiry = backend.readExpiry === true;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const rows = [];
       let size = 0;
       let afterKey = null;
       let fence = null;
       let moved = false;
+      let until = Infinity;
+      let expiryKnown = true;
       const entries = [];
       do {
         // eslint-disable-next-line no-await-in-loop
-        const page = await backend.page({ afterKey, limit: 100, aged });
+        const page = await backend.page({ afterKey, limit: 100, aged, ...(includeExpiry ? { includeExpiry: true } : {}) });
         live();
         if (fence && (page.epoch !== fence.epoch || page.storeRevision !== fence.revision)) { moved = true; break; }
         fence = { epoch: page.epoch, revision: page.storeRevision };
+        if (Number.isFinite(page.expiresAt)) until = Math.min(until, page.expiresAt);
+        else if (page.expiresAt !== null) expiryKnown = false;
         rows.push(...page.rows.map((row) => row.value));
         if (aged) entries.push(...page.rows);
         size += page.rows.reduce((total, row) => total + (Number.isSafeInteger(row.bytes) ? row.bytes : jsonBytes(row.value)), 0);
-        if (rows.length > WHOLE_READ_ROWS || size > WHOLE_READ_BYTES) throw new StorageReadError('scan-required');
+        if (rows.length > WHOLE_READ_ROWS || size > WHOLE_READ_BYTES) {
+          if (includeExpiry && expiryKnown && Number.isSafeInteger(fence.epoch) && Number.isSafeInteger(fence.revision)) {
+            wholeReadRefusals[refusalMode] = { ...fence, until };
+          }
+          throw new StorageReadError('scan-required');
+        }
         afterKey = page.nextKey;
       } while (afterKey !== null);
       if (!moved) {

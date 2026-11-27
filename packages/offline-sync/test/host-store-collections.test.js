@@ -376,8 +376,13 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     const { port, open, tick } = await setup(create);
     const rows = await open({ indexes: { byN: 'n' } });
     await rows.put([{ id: 1, n: 1 }, { id: 2, n: 2, _dirty: true }]);
+    const read = { handle: rows.handle, expectedEpoch: rows.epoch, afterKey: null, limit: 10, includeExpiry: true };
+    await expect(port.read(read)).resolves.toMatchObject({ expiresAt: 1000 + 86400000 });
+    await expect(port.read({ ...read, metadataOnly: true })).resolves.toMatchObject({ expiresAt: 1000 + 86400000 });
+    await expect(port.read({ ...read, includeAged: true })).resolves.toMatchObject({ expiresAt: null });
     tick(86400000 + 1);
     expect(await rows.all()).toEqual([{ id: 2, n: 2, _dirty: true }]);
+    await expect(port.read(read)).resolves.toMatchObject({ expiresAt: null, rows: [expect.objectContaining({ key: '2' })] });
     const aged = await port.read({ handle: rows.handle, expectedEpoch: rows.epoch, afterKey: null, limit: 10, includeAged: true });
     expect(aged.rows.map((row) => row.key)).toEqual(['1', '2']);
     const keyed = await port.read({ handle: rows.handle, expectedEpoch: rows.epoch, keys: ['1'], includeAged: true });
