@@ -9,12 +9,15 @@ import { HOST_STORE_FEATURES } from '../src/host-store/protocol.js';
 import { DATABASES, identity, createChannelBus } from './helpers/host-databases.js';
 
 const SELECTOR = { authorityOrigin: 'https://api.example.test', viewerId: '7' };
-function openInput({ storeName = 'chats.rows', policy = 'cache', schemaVersion = 1, indexes, limits = {}, who = identity(), schemaFingerprint } = {}) {
+function openInput({
+  storeName = 'chats.rows', policy = 'cache', schemaVersion = 1, indexes, dateIndexes, limits = {}, who = identity(), schemaFingerprint,
+} = {}) {
   return {
     identity: who, storeName, policy, schemaVersion,
     cacheFingerprint: policy === 'authored' ? null : 'fp-1',
     limits: { maxRows: 1000, maxAgeMs: policy === 'authored' ? null : 86400000, maxBytes: null, ...limits },
     ...(indexes ? { indexes } : {}),
+    ...(dateIndexes ? { dateIndexes } : {}),
     ...(schemaFingerprint !== undefined ? { schemaFingerprint } : {}),
   };
 }
@@ -53,6 +56,38 @@ async function setup(create) {
 }
 
 describe.each(DATABASES)('host store collections on %s', (_name, create) => {
+  it('adds a date index in place and keeps the same cache readable through an older declaration', async () => {
+    const { port, open, stores } = await setup(create);
+    const storeName = 'workforce.shifts';
+    const original = await open({ storeName });
+    const rows = [
+      { id: 1, start_at: '2026-01-14T00:30:00+10:00' },
+      { id: 2, start_at: '2026-01-13T15:30:00Z', _dirty: true },
+      { id: 3, start_at: '2026-01-14T14:00:00Z' },
+    ];
+    await original.put(rows);
+    const dates = await open({ storeName, dateIndexes: { byStart: 'start_at' } });
+    expect(dates.migration).toBeUndefined();
+    const lower = Date.parse('2026-01-13T00:00:00Z');
+    const upper = Date.parse('2026-01-14T00:00:00Z') - 1;
+    const findDay = () => dates.query({ index: 'byStart', lower, upper, includeAged: true });
+    await expect(dates.query({ index: 'byStart', lower: 'wrong type' })).resolves.toMatchObject({ ok: false, reason: 'unserializable' });
+    const beforeBuild = await port.read({ handle: dates.handle, expectedEpoch: dates.epoch, keys: [] });
+    expect(beforeBuild.storeRevision).toBe(dates.storeRevision);
+    const before = await findDay();
+    expect(before.rows.map((row) => row.value)).toEqual(rows.slice(0, 2));
+    expect(await dates.all()).toEqual(rows);
+    expect(await original.all()).toEqual(rows);
+    const old = await open({ storeName });
+    expect(await old.all()).toEqual(rows);
+    const moved = { ...rows[0], start_at: '2026-01-15T00:00:00Z' };
+    await old.put([moved]);
+    expect((await findDay()).rows.map((row) => row.value)).toEqual([rows[1]]);
+    expect((await stores()).find((row) => row.label === storeName)).toMatchObject({ rowCount: 3, dirtyCount: 1 });
+    await expect(port.open(openInput({ storeName, dateIndexes: { byStart: 'start_at' }, policy: 'authored' })))
+      .rejects.toMatchObject({ reason: 'unserializable' });
+  });
+
   it('names host collections <domain>.<collection> beside MP stores on the same owner', async () => {
     const { port, open, stores } = await setup(create);
     expect(collectionName('chats', 'rows')).toBe('chats.rows');

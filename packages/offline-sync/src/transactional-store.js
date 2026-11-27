@@ -351,6 +351,14 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       return null;
     },
     keyOrdered: true,
+    hasIndex: (index) => typeof backend.query === 'function' && Array.isArray(backend.indexes) && backend.indexes.includes(index),
+    async readRevision() {
+      live();
+      const { storeRevision } = await backend.snapshot([], { aged: true });
+      live();
+      if (!Number.isSafeInteger(storeRevision)) throw new StorageReadError('read-failed');
+      return storeRevision;
+    },
     async get(key) { live(); const row = await backend.get(keyString(key)); live(); return paintable(row) ? copy(row) : undefined; },
     async getRaw(key) { live(); const row = await backend.get(keyString(key), { aged: true }); live(); return copy(row); },
     async getAll() { live(); const rows = await wholeRows(); live(); return owned(freshRows.has(rows) ? rows.filter(paintable) : rows.filter(paintable).map(copy)); },

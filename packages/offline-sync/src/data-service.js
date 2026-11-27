@@ -233,7 +233,7 @@ function checkMethods(methods) {
   Object.entries(methods).forEach(([name, method]) => {
     if (!METHOD_NAME.test(name)) refuse(`'${name}' is not a method name`);
     if (!method || typeof method !== 'object' || typeof method.fetch !== 'function') refuse(`'${name}' needs a fetch`);
-    const known = ['params', 'fetch', 'batch', 'field', 'cadenceMs', 'available', 'prunesWhere', 'strictReceipt', 'retainHeldKeys'];
+    const known = ['params', 'fetch', 'batch', 'field', 'cadenceMs', 'available', 'prunesWhere', 'pruneQuery', 'strictReceipt', 'retainHeldKeys'];
     if (Object.keys(method).some((field) => !known.includes(field))) refuse(`'${name}' takes ${known.join(', ')} only`);
     const { params } = method;
     if (!params || typeof params !== 'object' || Array.isArray(params)) refuse(`'${name}' needs its params`);
@@ -251,6 +251,9 @@ function checkMethods(methods) {
     if (method.cadenceMs !== undefined && !(Number.isFinite(method.cadenceMs) && method.cadenceMs >= 0)) refuse(`'${name}.cadenceMs' must be a duration`);
     if (method.field !== undefined && (!method.batch || typeof method.field !== 'string' || !method.field)) refuse(`'${name}.field' names the row field a batched method's ids name`);
     if (method.prunesWhere !== undefined && (typeof method.prunesWhere !== 'function' || method.batch)) refuse(`'${name}.prunesWhere' is a row predicate of a method that is not batched`);
+    if (method.pruneQuery !== undefined && (typeof method.pruneQuery !== 'function' || !method.prunesWhere || method.strictReceipt)) {
+      refuse(`'${name}.pruneQuery' needs a non-strict method with a prune predicate`);
+    }
     if (method.available !== undefined && typeof method.available !== 'function') refuse(`'${name}.available' must be a function`);
     if (method.strictReceipt !== undefined && (typeof method.strictReceipt !== 'boolean' || method.batch)) {
       refuse(`'${name}.strictReceipt' is a boolean for a method that is not batched`);
@@ -704,10 +707,10 @@ export function createDataService({
     });
   }
   const offOrphanFeed = feed?.subscribe((event) => dropOrphaned(event));
-  function removeRow({ label, store, key, force, origin = null }) {
+  function removeRow({ label, store, key, force, origin = null, preserve = null }) {
     return serial(`${label}:${key}`, async () => {
       const row = await store.getRaw(key);
-      if (!row || (!force && row._dirty)) return false;
+      if (!row || (!force && row._dirty) || preserve?.(row)) return false;
       try {
         await store.delete(key, withStoreMutationOrigin({ silent: true, ...(Number.isSafeInteger(row._rev) ? { expectedRevision: row._rev } : {}) }, origin));
       } catch (error) {
@@ -718,17 +721,18 @@ export function createDataService({
       return true;
     });
   }
-  async function removeRows({ label, store, keys, force, origin = null }) {
+  async function removeRows({ label, store, keys, force, origin = null, preserve = null }) {
     const removed = [];
     if (force || typeof store.deleteMany !== 'function') {
       for (const key of keys) {
         // eslint-disable-next-line no-await-in-loop
-        if (await removeRow({ label, store, key, force, origin })) removed.push(key);
+        if (await removeRow({ label, store, key, force, origin, preserve })) removed.push(key);
       }
     } else {
       for (let start = 0; start < keys.length; start += PAGE_ROWS) {
         // eslint-disable-next-line no-await-in-loop
-        removed.push(...await store.deleteMany(keys.slice(start, start + PAGE_ROWS), withStoreMutationOrigin({ keep: (row) => !!row._dirty, silent: true }, origin)));
+        removed.push(...await store.deleteMany(keys.slice(start, start + PAGE_ROWS),
+          withStoreMutationOrigin({ keep: (row) => !!row._dirty || preserve?.(row) === true, silent: true }, origin)));
       }
     }
     if (removed.length) await store.revalidateSubscribers?.(removed);
@@ -1431,27 +1435,30 @@ export function createDataService({
     }
     if (!current()) return null;
     const answered = new Set(keys);
-    const left = unanswered ? await unanswered(mapped, keyPath) : { keys: [], field: null, values: [] };
+    const more = !Array.isArray(answer) && answer?.more === true;
+    const left = unanswered ? await unanswered(mapped, keyPath, more) : { keys: [], field: null, values: [] };
     if (!current()) return null;
     if (left.field && left.field !== keyPath) noteGoneValues(name, left.field, left.values, startedAt);
     const unansweredKeys = [...new Set([...gone.map(String), ...left.keys])].filter((key) => !answered.has(key));
     if (strictReceipt && unansweredKeys.some((key) => touched.has(key))) throw incomplete();
     const goneKeys = unansweredKeys.filter((key) => !touched.has(key));
     if (strictReceipt && (await Promise.all(goneKeys.map((key) => store.getRaw(key)))).some((row) => row?._dirty)) throw incomplete();
-    recordEffect(name, { removedKeys: goneKeys, at: startedAt });
+    const explicit = left.matches ? new Set(gone.map(String)) : null;
+    recordEffect(name, { removedKeys: explicit ? goneKeys.filter((key) => explicit.has(key)) : goneKeys, at: startedAt });
     const goneRows = (await Promise.all(goneKeys.map((key) => store.getRaw(key)))).filter((row) => row && !row._dirty);
+    const preserve = left.matches ? (row) => !explicit.has(String(row[keyPath])) && !left.matches(row) : null;
     const removed = [];
     for (let start = 0; start < goneRows.length; start += PAGE_ROWS) {
       if (!current()) return null;
       // eslint-disable-next-line no-await-in-loop
       removed.push(...await removeRows({
-        label, store: turn.store, keys: goneRows.slice(start, start + PAGE_ROWS).map((row) => String(row[keyPath])), force: false,
+        label, store: turn.store, keys: goneRows.slice(start, start + PAGE_ROWS).map((row) => String(row[keyPath])), force: false, preserve,
       }));
     }
     const after = await Promise.all(keys.map((key) => store.getRaw(key)));
     if (strictReceipt && after.some((row) => !row || row._dirty || row._persistFailed)) throw incomplete();
     await adjustMeta(name, { added: keys.filter((key, at) => !before[at] && after[at]), removed });
-    return { keys, more: !Array.isArray(answer) && answer?.more === true, absent: unanswered ? left.values : null };
+    return { keys, more, absent: unanswered ? left.values : null };
   }
   function refreshMethodAs(wanted, {
     mode = 'silent', priority = 'normal', maxAge = 0, reason = null, fromNow = false, sinceWrite = false, retry = false,
@@ -1587,13 +1594,33 @@ export function createDataService({
           return rows.filter(Boolean);
         }
       };
-      const unansweredOf = (asked) => (typeof method.prunesWhere === 'function' ? async (records, keyPath) => {
+      const unansweredOf = (asked, requested, revision) => (typeof method.prunesWhere === 'function' ? async (records, keyPath, more) => {
         const answeredKeys = new Set(records.map((record) => String(record[keyPath])));
-        const keys = (await prunable()).filter((row) => {
-          if (answeredKeys.has(String(row[keyPath]))) return false;
+        const matches = (row) => {
           try { return method.prunesWhere(row, asked) === true; } catch (_) { return false; }
-        }).map((row) => String(row[keyPath]));
-        return { keys, field: null, values: [] };
+        };
+        if (more && method.pruneQuery) return { keys: [], field: null, values: [] };
+        if (!requested) {
+          const keys = (await prunable()).filter((row) => !answeredKeys.has(String(row[keyPath])) && matches(row))
+            .map((row) => String(row[keyPath]));
+          return { keys, field: null, values: [] };
+        }
+        const covered = (row) => matches(row) && (
+          revision === null || (Number.isSafeInteger(row._rev) && row._rev <= revision)
+        );
+        const { index, range } = wholeRange(requested, 'method prune');
+        const keys = [];
+        let cursor = null;
+        do {
+          // eslint-disable-next-line no-await-in-loop
+          const page = await store.query(index, range, { limit: PAGE_ROWS, cursor, raw: true });
+          page.rows.forEach((row) => {
+            const key = String(row[keyPath]);
+            if (!answeredKeys.has(key) && !row._dirty && covered(row)) keys.push(key);
+          });
+          cursor = page.nextCursor;
+        } while (cursor !== null);
+        return { keys, field: null, values: [], matches: covered };
       } : null);
       const run = async (asked, ids, isCurrent, afterDeadline = () => false, storing = null) => {
         const current = () => !disposed && isCurrent();
@@ -1616,8 +1643,15 @@ export function createDataService({
         try {
           let stored = null;
           let truncated = false;
-          await guardedRead(name, () => {
+          let revision = null;
+          const query = method.pruneQuery?.(asked);
+          const requested = query && store.hasIndex?.(query.index) ? query : null;
+          await guardedRead(name, async () => {
             if (!batchParam && !current()) return undefined;
+            if (requested && typeof store.readRevision === 'function') {
+              revision = await store.readRevision();
+              if (!current()) return undefined;
+            }
             return method.fetch(asked, context);
           }, async (answer, touched, startedAt, turn) => {
             if (answer && !Array.isArray(answer) && answer.complete === false) {
@@ -1627,7 +1661,7 @@ export function createDataService({
             stored = await commitMethod({
               name, label, store, decl,
             }, spec, answer, {
-              touched, turn, startedAt, current, unanswered: unansweredBy(ids) || unansweredOf(asked), strictReceipt: method.strictReceipt === true,
+              touched, turn, startedAt, current, unanswered: unansweredBy(ids) || unansweredOf(asked, requested, revision), strictReceipt: method.strictReceipt === true,
             });
             if (stored && method.strictReceipt === true) stored.receiptRevision = generationOf(name);
             if (stored && !stored.more && method.retainHeldKeys && current()) {

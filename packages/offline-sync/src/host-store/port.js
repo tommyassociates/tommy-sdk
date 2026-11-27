@@ -36,6 +36,7 @@ export const MIGRATION_LEASE_MS = 30000;
 const META = 'm';
 const BODY = 'b';
 const INDEX = 'x';
+const DATE_INDEX = 'd';
 const LRU = 't';
 
 // Normalized read rows, shared by selectors, never by authority checks.
@@ -140,12 +141,55 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
   function prefix(owner, namespace, generation, kind) { return [owner, namespace, generation, kind]; }
   function rowKey(owner, namespace, generation, kind, key) { return [owner, namespace, generation, kind, key]; }
   const storeIndexes = (store) => store.indexes || {};
+  const datesCurrent = (store) => store.dateIndexRevision === store.revision;
   async function unlink(tx, store, generation, metadata) {
     const [owner, namespace] = store.key;
     for (const [name, encoded] of Object.entries(metadata.index || {})) {
       await tx.delete('rows', rowKey(owner, namespace, generation, INDEX, indexEntry(name, encoded, metadata.id)));
     }
+    for (const [name, encoded] of Object.entries(metadata.dateIndex || {})) {
+      await tx.delete('rows', rowKey(owner, namespace, generation, DATE_INDEX, indexEntry(name, encoded, metadata.id)));
+    }
     if (metadata.lru !== undefined) await tx.delete('rows', rowKey(owner, namespace, generation, LRU, metadata.lru));
+  }
+  async function linkDates(tx, store, generation, id, value) {
+    const [owner, namespace] = store.key;
+    const dates = {};
+    for (const [name, [field]] of Object.entries(store.dateIndexes || {})) {
+      const time = Date.parse(value?.[field]);
+      if (!Number.isFinite(time)) continue;
+      dates[name] = indexValues([time]);
+      await tx.put('rows', { key: rowKey(owner, namespace, generation, DATE_INDEX, indexEntry(name, dates[name], id)), target: id });
+    }
+    return dates;
+  }
+  async function ensureDateIndexes(tx, store, indexes) {
+    if (datesCurrent(store) && same(store.dateIndexes, indexes)) return;
+    const [owner, namespace] = store.key;
+    const { generation } = store;
+    await tx.deletePrefix('rows', prefix(owner, namespace, generation, DATE_INDEX));
+    store.dateIndexes = indexes;
+    const cursor = prefix(owner, namespace, generation, META);
+    let after = null;
+    do {
+      const page = await tx.scan('rows', cursor, { after, limit: SCAN + 1 });
+      const batch = page.slice(0, SCAN);
+      const bodies = await getMany(tx, 'rows', batch.map((row) => rowKey(owner, namespace, generation, BODY, row.id)));
+      const writer = rowWriter(tx, ordered);
+      for (const [at, metadata] of batch.entries()) {
+        if (typeof bodies[at]?.json !== 'string') throw storageError('read-failed');
+        const dates = await linkDates(writer.tx, store, generation, metadata.id, JSON.parse(bodies[at].json));
+        if (Object.keys(dates).length) metadata.dateIndex = dates;
+        else delete metadata.dateIndex;
+        await writer.tx.put('rows', metadata);
+      }
+      await writer.settle();
+      after = page.length > SCAN ? batch.at(-1).id : null;
+    } while (after !== null);
+    // Rebuilds touch only derived entries and metadata. Other handles see the new revision.
+    store.revision = next(store.revision);
+    store.dateIndexRevision = store.revision;
+    await tx.put('stores', store);
   }
   async function link(tx, store, generation, id, value, updatedAt, dirty) {
     const [owner, namespace] = store.key;
@@ -183,8 +227,10 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
     const dirty = !!value._dirty;
     if (old) await unlink(tx, store, generation, old);
     const links = await link(tx, store, generation, key, value, updatedAt, dirty);
+    const dates = datesCurrent(store) ? await linkDates(tx, store, generation, key, value) : {};
     await tx.put('rows', { key: rowKey(owner, namespace, generation, META, key), id: key, revision, bytes: valueBytes, wireBytes, dirty, updatedAt,
       ...(Object.keys(links.index).length ? { index: links.index } : {}), ...(links.lru !== undefined ? { lru: links.lru } : {}),
+      ...(Object.keys(dates).length ? { dateIndex: dates } : {}),
       ...(syncedAt !== undefined ? { syncedAt } : {}) });
     await tx.put('rows', { key: rowKey(owner, namespace, generation, BODY, key), json });
     return { valueBytes, dirty };
@@ -459,15 +505,18 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
       if (!validateQuery(input)) return readFailure('unserializable');
       try {
         const handle = getHandle(input.handle);
-        return await database.transaction('readonly', async (transaction) => {
+        const dateIndex = Object.hasOwn(handle.dateIndexes, input.index);
+        return await database.transaction(dateIndex ? 'readwrite' : 'readonly', async (transaction) => {
           let tx = transaction;
           const store = await current(tx, handle, input.expectedEpoch);
-          tx = projection.wrap(tx, store, handle.epoch);
-          const fields = storeIndexes(store)[input.index];
+          const fields = dateIndex ? handle.dateIndexes[input.index] : storeIndexes(store)[input.index];
           const head = input.equals || input.prefix || [];
           const bounded = Object.hasOwn(input, 'lower') || Object.hasOwn(input, 'upper');
           if (!fields || head.length > fields.length || (input.equals && head.length !== fields.length)
             || (bounded && head.length >= fields.length)) throw storageError('unserializable');
+          if (dateIndex && (!head.every(Number.isFinite)
+            || (Object.hasOwn(input, 'lower') && !Number.isFinite(input.lower))
+            || (Object.hasOwn(input, 'upper') && !Number.isFinite(input.upper)))) throw storageError('unserializable');
           const base = `${input.index}\u0000`;
           const headEncoded = head.length ? indexValues(head) : null;
           // Include the separator so `s1` never matches `s12`.
@@ -475,6 +524,8 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
             : `${base}${headEncoded}${head.length < fields.length ? '\u0001' : '\u0000'}`;
           const lower = Object.hasOwn(input, 'lower') ? indexValues([input.lower]) : null;
           const upper = Object.hasOwn(input, 'upper') ? indexValues([input.upper]) : null;
+          if (dateIndex) await ensureDateIndexes(tx, store, handle.dateIndexes);
+          tx = projection.wrap(tx, store, handle.epoch);
           const start = lower === null ? headPrefix.slice(0, -1) : `${headPrefix}${lower}`;
           const within = (entry) => {
             if (!entry.startsWith(headPrefix)) return false;
@@ -487,7 +538,7 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
           let after = input.afterKey ?? start;
           let exhausted = false;
           while (entries.length <= input.limit && !exhausted) {
-            const page = await tx.scan('rows', prefix(handle.owner, handle.namespace, store.generation, INDEX), { after, limit: SCAN + 1 });
+            const page = await tx.scan('rows', prefix(handle.owner, handle.namespace, store.generation, dateIndex ? DATE_INDEX : INDEX), { after, limit: SCAN + 1 });
             for (const entry of page.slice(0, SCAN)) {
               if (!within(entry.key[4])) { exhausted = true; break; }
               entries.push(entry);
@@ -564,7 +615,9 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
           store.rowCount = rowCount;
           store.bytes = totalBytes;
           store.dirtyCount = Math.max(0, dirtyCount);
+          const retainedDateIndex = datesCurrent(store);
           store.revision = next(store.revision);
+          if (retainedDateIndex) store.dateIndexRevision = store.revision;
           store.touchedAt = now();
           if (input.syncedAt !== undefined) store.syncedAt = input.syncedAt;
           await tx.put('stores', store);

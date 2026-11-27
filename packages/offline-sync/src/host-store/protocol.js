@@ -1,6 +1,6 @@
 export const HOST_STORE_VERSION = 1;
 // A host without a feature (an older desktop engine) is never sent its inputs.
-export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at', 'schema-fingerprint', 'aged-reads', 'open-epoch', 'subject-retire', 'synced-commit', 'atomic-batch-256', 'read-expiry']);
+export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at', 'schema-fingerprint', 'aged-reads', 'open-epoch', 'subject-retire', 'synced-commit', 'atomic-batch-256', 'read-expiry', 'date-indexes']);
 export const HOST_STORE_DATABASE = 'tommy-host-store-v2';
 export const MAX_ROWS = 100;
 export const MAX_COMMIT_ROWS = 256;
@@ -137,7 +137,7 @@ export function ownerKey(identity) {
   return JSON.stringify([identity.authorityOrigin, identity.viewerId, identity.accountType, identity.accountId, identity.subjectKey]);
 }
 export function validateOpen(input) {
-  if (!closed(input, ['identity', 'storeName', 'policy', 'schemaVersion', 'cacheFingerprint', 'limits'], ['indexes', 'schemaFingerprint', 'expectedEpoch'])
+  if (!closed(input, ['identity', 'storeName', 'policy', 'schemaVersion', 'cacheFingerprint', 'limits'], ['indexes', 'schemaFingerprint', 'expectedEpoch', 'dateIndexes'])
     || (input.expectedEpoch !== undefined && !integer(input.expectedEpoch))
     || (input.schemaFingerprint !== undefined && input.schemaFingerprint !== null
       && (typeof input.schemaFingerprint !== 'string' || !input.schemaFingerprint || input.schemaFingerprint.length > 128))
@@ -156,8 +156,12 @@ export function validateOpen(input) {
   if (evict === 'lru' && input.policy !== 'cache') throw storageError('unserializable');
   if ((input.limits.domainMaxBytes ?? null) !== null && (evict !== 'lru' || !input.storeName.includes('.'))) throw storageError('unserializable');
   const indexes = validateIndexes(input.indexes);
+  const dates = validateIndexes(input.dateIndexes);
+  if (Object.keys(dates).length && (input.policy !== 'cache' || input.identity?.mpId !== HOST_DATA_MP_ID
+    || Object.keys(indexes).length + Object.keys(dates).length > MAX_INDEXES
+    || Object.entries(dates).some(([name, fields]) => fields.length !== 1 || Object.hasOwn(indexes, name)))) throw storageError('unserializable');
   return { namespace: JSON.stringify([identityKey(input.identity), input.storeName]), owner: ownerKey(input.identity),
-    indexes, evict, domainMaxBytes: input.limits.domainMaxBytes ?? null };
+    indexes, dateIndexes: dates, evict, domainMaxBytes: input.limits.domainMaxBytes ?? null };
 }
 export function validateRead(input) {
   if (!closed(input, ['handle', 'expectedEpoch'], ['keys', 'afterKey', 'limit', 'metadataOnly', 'includeAged', 'includeExpiry'])
