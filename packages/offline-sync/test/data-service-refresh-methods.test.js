@@ -7,10 +7,10 @@ import {
 } from '../src/index.js';
 
 const MINUTE = 60000;
-function service({ at = () => 1_000_000, online = () => true, principal = { id: 'p1' } } = {}) {
+function service({ at = () => 1_000_000, online = () => true, principal = { id: 'p1' }, retainedMethodKeys } = {}) {
   const store = createDataStore({ name: 'members', backend: createMemoryStoreBackend() });
   const data = createDataService({
-    resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: at, isOnline: online, principal,
+    resolve: (name) => (name === 'members' ? { store, decl: { keyPath: 'id' } } : null), now: at, isOnline: online, principal, retainedMethodKeys,
   });
   return { data, store };
 }
@@ -32,6 +32,49 @@ const methods = (api, extra = {}) => ({
 });
 
 describe('refresh methods', () => {
+  it('keeps only complete exact held keys across service recreation and clears them on purge', async () => {
+    const persisted = new Map();
+    const retainedMethodKeys = {
+      async put(collection, key, keys) { persisted.set(key, { collection, keys }); },
+      async get(key) { return persisted.get(key)?.keys; },
+      async clear(collection) {
+        for (const [key, row] of persisted) {
+          if (row.collection === collection) persisted.delete(key);
+        }
+      },
+    };
+    let principal = { accountType: 'Team', accountId: '10' };
+    const options = { retainedMethodKeys, principal: () => principal };
+    const source = {
+      fetch: async () => [],
+      methods: {
+        byLocation: {
+          params: { location_id: { type: 'id' } }, retainHeldKeys: true,
+          fetch: async ({ location_id: id }) => (id === '1' ? [member(1)] : { rows: [member(2)], more: true }),
+        },
+      },
+    };
+    const target = (id) => ({ collection: 'members', method: 'byLocation', params: { location_id: id } });
+    const original = service(options).data;
+    original.source('members', source);
+    await original.refresh(target(1), { mode: 'visible' });
+    await original.refresh(target(2), { mode: 'visible' });
+    original.dispose();
+
+    const reopened = service(options).data;
+    reopened.source('members', source);
+    await expect(reopened.heldMethodKeys(target('1'))).resolves.toEqual(['1']);
+    await expect(reopened.heldMethodKeys(target('2'))).resolves.toBeNull();
+    await expect(reopened.heldMethodKeys(target('3'))).resolves.toBeNull();
+    expect(reopened.status(target('1'))).toMatchObject({ state: 'stale', keys: null });
+    principal = { accountType: 'TeamMember', accountId: '10' };
+    await expect(reopened.heldMethodKeys(target('1'))).resolves.toBeNull();
+    principal = { accountType: 'Team', accountId: '10' };
+    await reopened.purge('members');
+    await expect(reopened.heldMethodKeys(target('1'))).resolves.toBeNull();
+    reopened.dispose();
+  });
+
   it('refuses an unknown method, unknown params and params of the wrong shape, without fetching', async () => {
     const { data } = service();
     const api = server([member(1)]);

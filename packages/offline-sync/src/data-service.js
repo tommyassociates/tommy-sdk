@@ -233,7 +233,7 @@ function checkMethods(methods) {
   Object.entries(methods).forEach(([name, method]) => {
     if (!METHOD_NAME.test(name)) refuse(`'${name}' is not a method name`);
     if (!method || typeof method !== 'object' || typeof method.fetch !== 'function') refuse(`'${name}' needs a fetch`);
-    const known = ['params', 'fetch', 'batch', 'field', 'cadenceMs', 'available', 'prunesWhere', 'strictReceipt'];
+    const known = ['params', 'fetch', 'batch', 'field', 'cadenceMs', 'available', 'prunesWhere', 'strictReceipt', 'retainHeldKeys'];
     if (Object.keys(method).some((field) => !known.includes(field))) refuse(`'${name}' takes ${known.join(', ')} only`);
     const { params } = method;
     if (!params || typeof params !== 'object' || Array.isArray(params)) refuse(`'${name}' needs its params`);
@@ -254,6 +254,9 @@ function checkMethods(methods) {
     if (method.available !== undefined && typeof method.available !== 'function') refuse(`'${name}.available' must be a function`);
     if (method.strictReceipt !== undefined && (typeof method.strictReceipt !== 'boolean' || method.batch)) {
       refuse(`'${name}.strictReceipt' is a boolean for a method that is not batched`);
+    }
+    if (method.retainHeldKeys !== undefined && (typeof method.retainHeldKeys !== 'boolean' || method.batch || method.strictReceipt)) {
+      refuse(`'${name}.retainHeldKeys' is a boolean for a method without a batch or strict receipt`);
     }
   });
 }
@@ -388,6 +391,7 @@ export function createDataService({
   foreground = () => true,
   backgroundCadence = () => 1,
   sourceMeta = createMemorySourceMeta(),
+  retainedMethodKeys = null,
 } = {}) {
   if (typeof resolve !== 'function') throw serviceError('createDataService: resolve(collection) is required', 'DATA_INVALID');
   // Background work: never reported by the request layer.
@@ -1626,6 +1630,9 @@ export function createDataService({
               touched, turn, startedAt, current, unanswered: unansweredBy(ids) || unansweredOf(asked), strictReceipt: method.strictReceipt === true,
             });
             if (stored && method.strictReceipt === true) stored.receiptRevision = generationOf(name);
+            if (stored && !stored.more && method.retainHeldKeys && current()) {
+              try { await retainedMethodKeys?.put(name, groupKey, stored.keys); } catch (_) { /* the held-key cache is optional */ }
+            }
           }, { isCurrent: current, storing });
           if (!batchParam && !current()) {
             if (afterDeadline()) return;
@@ -2533,6 +2540,10 @@ export function createDataService({
         const removed = await removeRows({
           label, store: turn.store, keys: entries.filter(({ dirty }) => force || !dirty).map(({ key }) => key), force, origin,
         });
+        const spec = sources.get(name) || decl?.source;
+        if (Object.values(spec?.methods || {}).some((method) => method.retainHeldKeys)) {
+          try { await retainedMethodKeys?.clear(name); } catch (_) { /* rows are removed independently of the held-key cache */ }
+        }
         await adjustMeta(name, whole ? null : { added: [], removed });
         forgetMethods(name);
         return { removed };
@@ -2555,6 +2566,23 @@ export function createDataService({
         forgetMethods(name);
         return { removed };
       });
+    },
+    async heldMethodKeys(target) {
+      live();
+      const wanted = targetOf(target);
+      const { name, decl } = local(wanted.collection);
+      const source = sources.get(name) || decl?.source;
+      const method = source?.methods && Object.hasOwn(source.methods, wanted.method) ? source.methods[wanted.method] : null;
+      if (!method?.retainHeldKeys || wanted.key !== undefined || wanted.query !== undefined || wanted.window !== undefined) return null;
+      const form = formOf(jobContextNow());
+      const before = voidOf(name);
+      const params = methodParams(name, wanted.method, method, wanted.params);
+      const groupKey = JSON.stringify([form, name, wanted.method, params]);
+      let keys;
+      try { keys = await retainedMethodKeys?.get(groupKey); } catch (_) { return null; }
+      live();
+      if (voidOf(name) !== before || formOf(jobContextNow()) !== form || (sources.get(name) || decl?.source) !== source) return null;
+      return Array.isArray(keys) && keys.length <= MAX_METHOD_ROWS && keys.every((key) => methodId(key) === key) ? keys : null;
     },
     status(target, { receipt = false } = {}) {
       const wanted = targetOf(target);
