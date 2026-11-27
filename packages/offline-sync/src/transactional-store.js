@@ -5,6 +5,7 @@ import { unchangedServerRow, heldProvenance, holdRowFields } from './unchanged-r
 export const WHOLE_READ_ROWS = 20000;
 // Large rows are never all held in memory at once.
 export const WHOLE_READ_BYTES = 32 * 1024 * 1024;
+const WHOLE_READ_LIMITS = Object.freeze({ rows: WHOLE_READ_ROWS, bytes: WHOLE_READ_BYTES });
 const COMPLETE_ROWS = 1000;
 export class StorageReadError extends Error {
   constructor(reason) { super(`Storage read failed (${reason})`); this.name = 'StorageReadError'; this.reason = reason; }
@@ -162,12 +163,20 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     for (let attempt = 1; ; attempt += 1) {
       try {
         // eslint-disable-next-line no-await-in-loop
-        return await backend.getAll({ aged });
+        return await backend.getAll({ aged, ...(backend.wholeReadBounds === true ? { wholeReadLimits: WHOLE_READ_LIMITS } : {}) });
       } catch (error) {
         if (error?.reason !== 'conflict' || attempt === 3) throw error;
         live();
       }
     }
+  }
+  function keepWholeReadProof(mode, proof) {
+    if (proof?.wholeReadRefusal !== true || !Number.isSafeInteger(proof.epoch) || !Number.isSafeInteger(proof.storeRevision)) return false;
+    if (proof.expiresAt !== null && !Number.isSafeInteger(proof.expiresAt)) return false;
+    const until = proof.expiresAt === null ? Infinity : proof.expiresAt;
+    if (!(until > now())) return false;
+    wholeReadRefusals[mode] = { epoch: proof.epoch, revision: proof.storeRevision, until };
+    return true;
   }
   // A read that may predate a write is never handed to a later caller; shared only briefly so a stall never holds.
   const WHOLE_SHARE_MS = 30000;
@@ -215,6 +224,11 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
     if (!paged || typeof backend.page !== 'function') {
       try { return await completeRows(aged); } catch (error) {
         if (error?.reason !== 'scan-required' || typeof backend.page !== 'function') throw error;
+        live();
+        if (backend.wholeReadBounds === true && keepWholeReadProof(refusalMode, error.bound)) {
+          paged = true;
+          throw new StorageReadError('scan-required');
+        }
       }
     }
     paged = true;
@@ -229,9 +243,19 @@ export function createTransactionalDataStore({ name, keyPath, backend, validate,
       let expiryKnown = true;
       const entries = [];
       do {
+        const request = { afterKey, limit: 100, aged, ...(includeExpiry ? { includeExpiry: true } : {}) };
+        const proofRequested = afterKey === null && backend.wholeReadBounds === true;
         // eslint-disable-next-line no-await-in-loop
-        const page = await backend.page({ afterKey, limit: 100, aged, ...(includeExpiry ? { includeExpiry: true } : {}) });
+        let page = await backend.page({ ...request, ...(proofRequested ? { wholeReadLimits: WHOLE_READ_LIMITS } : {}) });
         live();
+        if (page.wholeReadRefusal === true) {
+          if (proofRequested && keepWholeReadProof(refusalMode, page)) throw new StorageReadError('scan-required');
+          // An expiry may pass between the native check and delivery.
+          // eslint-disable-next-line no-await-in-loop
+          page = await backend.page(request);
+          live();
+          if (page.wholeReadRefusal === true) throw new StorageReadError('read-failed');
+        }
         if (fence && (page.epoch !== fence.epoch || page.storeRevision !== fence.revision)) { moved = true; break; }
         fence = { epoch: page.epoch, revision: page.storeRevision };
         if (Number.isFinite(page.expiresAt)) until = Math.min(until, page.expiresAt);

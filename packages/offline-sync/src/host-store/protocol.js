@@ -1,6 +1,6 @@
 export const HOST_STORE_VERSION = 1;
 // A host without a feature (an older desktop engine) is never sent its inputs.
-export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at', 'schema-fingerprint', 'aged-reads', 'open-epoch', 'subject-retire', 'synced-commit', 'atomic-batch-256', 'read-expiry', 'date-indexes']);
+export const HOST_STORE_FEATURES = Object.freeze(['collections', 'indexes', 'eviction', 'migration', 'inspect', 'purge', 'synced-at', 'schema-fingerprint', 'aged-reads', 'open-epoch', 'subject-retire', 'synced-commit', 'atomic-batch-256', 'read-expiry', 'date-indexes', 'whole-read-bounds']);
 export const HOST_STORE_DATABASE = 'tommy-host-store-v2';
 export const MAX_ROWS = 100;
 export const MAX_COMMIT_ROWS = 256;
@@ -164,10 +164,15 @@ export function validateOpen(input) {
     indexes, dateIndexes: dates, evict, domainMaxBytes: input.limits.domainMaxBytes ?? null };
 }
 export function validateRead(input) {
-  if (!closed(input, ['handle', 'expectedEpoch'], ['keys', 'afterKey', 'limit', 'metadataOnly', 'includeAged', 'includeExpiry'])
+  if (!closed(input, ['handle', 'expectedEpoch'], ['keys', 'afterKey', 'limit', 'metadataOnly', 'includeAged', 'includeExpiry', 'wholeReadLimits'])
     || !integer(input.expectedEpoch) || (input.metadataOnly !== undefined && typeof input.metadataOnly !== 'boolean')
     || (input.includeAged !== undefined && typeof input.includeAged !== 'boolean')
     || (input.includeExpiry !== undefined && typeof input.includeExpiry !== 'boolean')) return false;
+  if (input.wholeReadLimits !== undefined) {
+    const bounds = input.wholeReadLimits;
+    if (Object.hasOwn(input, 'keys') || input.afterKey !== null || !closed(bounds, ['rows', 'bytes'])
+      || !integer(bounds.rows) || bounds.rows < 1 || !integer(bounds.bytes) || bounds.bytes < 1) return false;
+  }
   if (Object.hasOwn(input, 'keys')) return !Object.hasOwn(input, 'afterKey') && !Object.hasOwn(input, 'limit')
     && !Object.hasOwn(input, 'includeExpiry')
     && Array.isArray(input.keys) && input.keys.length <= MAX_ROWS && input.keys.every(keyValid) && new Set(input.keys).size === input.keys.length;

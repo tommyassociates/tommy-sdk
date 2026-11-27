@@ -56,6 +56,29 @@ async function setup(create) {
 }
 
 describe.each(DATABASES)('host store collections on %s', (_name, create) => {
+  it('proves whole-read bounds only while committed counts cover visible rows', async () => {
+    const { port, open, tick } = await setup(create);
+    const store = await open({ limits: { maxAgeMs: 100, evict: 'lru' } });
+    await store.put([{ id: 1 }, { id: 2, _dirty: true }]);
+    const request = { handle: store.handle, expectedEpoch: store.epoch, afterKey: null, limit: 100 };
+    const wholeReadLimits = { rows: 1, bytes: 1024 };
+    await expect(port.read({ ...request, wholeReadLimits })).resolves.toMatchObject({
+      wholeReadRefusal: true, expiresAt: 1100, rows: [],
+    });
+    await expect(port.read({ ...request, wholeReadLimits: { rows: 3, bytes: 1 } })).resolves.toMatchObject({
+      wholeReadRefusal: true, expiresAt: 1100, rows: [],
+    });
+    tick(100);
+    const visible = await port.read({ ...request, wholeReadLimits });
+    expect(visible.wholeReadRefusal).toBeUndefined();
+    expect(visible.rows.map((row) => row.key)).toEqual(['2']);
+    await expect(port.read({ ...request, wholeReadLimits, includeAged: true })).resolves.toMatchObject({
+      wholeReadRefusal: true, expiresAt: null, rows: [],
+    });
+    const normal = await port.read(request);
+    expect(normal.rows.map((row) => row.key)).toEqual(['2']);
+  });
+
   it('adds a date index in place and keeps the same cache readable through an older declaration', async () => {
     const { port, open, stores } = await setup(create);
     const storeName = 'workforce.shifts';

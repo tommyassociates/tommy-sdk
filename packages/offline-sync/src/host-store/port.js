@@ -323,6 +323,25 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
     const total = (await domainSiblings(tx, store)).reduce((sum, row) => sum + heldBytes(row), 0) + projectedBytes;
     if (total > store.domainMaxBytes) throw storageError('quota');
   }
+  async function wholeReadRefusal(tx, handle, store, input) {
+    const limits = input.wholeReadLimits;
+    if (!limits || !integer(store.rowCount) || !integer(store.bytes)
+      || (store.rowCount <= limits.rows && store.bytes <= limits.bytes)) return null;
+    const proof = {
+      epoch: handle.epoch, storeRevision: store.revision, rows: [], nextKey: null, wholeReadRefusal: true, expiresAt: null,
+    };
+    const ageLimit = handle.options.limits.maxAgeMs;
+    if (input.includeAged || handle.options.policy === 'authored' || ageLimit === null || store.rowCount === store.dirtyCount) return proof;
+    if (store.evict !== 'lru') return null;
+    // A visible read can use the committed totals while even the oldest clean row is eligible.
+    const [owner, namespace] = store.key;
+    const [oldest] = await tx.scan('rows', prefix(owner, namespace, store.generation, LRU), { limit: 1 });
+    if (!oldest) return null;
+    const metadata = await tx.get('rows', rowKey(owner, namespace, store.generation, META, oldest.target));
+    if (!metadata || metadata.dirty || metadata.lru !== oldest.key[4]) return null;
+    const expiresAt = Math.min(metadata.updatedAt + ageLimit, Number.MAX_SAFE_INTEGER);
+    return Number.isSafeInteger(expiresAt) && expiresAt > now() ? { ...proof, expiresAt } : null;
+  }
   async function readRows(tx, handle, store, metadata, {
     limit, keyed, metadataOnly, cursorOf, includeAged = false, includeExpiry = false,
   }) {
@@ -486,6 +505,11 @@ export function createHostStorePort({ database, backend = 'indexeddb', now = () 
         return await database.transaction('readonly', async (transaction) => {
           let tx = transaction;
           const store = await current(tx, handle, input.expectedEpoch, { migrating: !!handle.migration });
+          if (input.wholeReadLimits) {
+            const bound = await wholeReadRefusal(tx, handle, store, input);
+            if (handle.closed) throw storageError('retired');
+            if (bound) return bound;
+          }
           tx = projection.wrap(tx, store, handle.epoch);
           const metadata = input.keys ? (await getMany(tx, 'rows', input.keys.map((key) => rowKey(handle.owner, handle.namespace, store.generation, META, key)))).filter(Boolean)
             : await tx.scan('rows', prefix(handle.owner, handle.namespace, store.generation, META), { after: input.afterKey, limit: input.limit + 1 });

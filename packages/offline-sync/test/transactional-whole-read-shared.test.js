@@ -47,6 +47,59 @@ const closers = [];
 afterEach(async () => { await Promise.all(closers.splice(0).map((close) => close())); });
 
 describe('an oversized whole read', () => {
+  it('refuses from one bound proof on a cold read and after another writer changes the revision', async () => {
+    let revision = 1;
+    let bodies = 0;
+    const proof = () => ({
+      epoch: 1, storeRevision: revision, rows: [], nextKey: null, expiresAt: 2000, wholeReadRefusal: true,
+    });
+    const page = vi.fn(async ({ afterKey, limit, metadataOnly, wholeReadLimits }) => {
+      if (wholeReadLimits) return proof();
+      if (!metadataOnly) bodies += 1;
+      const start = afterKey === null ? 0 : Number(afterKey) + 1;
+      const end = Math.min(WHOLE_READ_ROWS + 1, start + limit);
+      return {
+        epoch: 1, storeRevision: revision, nextKey: end > WHOLE_READ_ROWS ? null : String(end - 1),
+        rows: Array.from({ length: end - start }, (_, index) => ({ key: String(start + index), value: { id: start + index }, bytes: 20 })),
+        expiresAt: 2000,
+      };
+    });
+    const backend = {
+      transactional: true, policy: 'cache', limits: { maxAgeMs: 1000 }, page, readExpiry: true, wholeReadBounds: true,
+      async getAll({ wholeReadLimits }) {
+        const error = storageError('scan-required');
+        if (wholeReadLimits) error.bound = proof();
+        throw error;
+      },
+    };
+    const store = createDataStore({ name: 'shifts', backend, now: () => 1000 });
+    await expect(store.getAll()).rejects.toMatchObject({ reason: 'scan-required' });
+    expect(bodies).toBe(0);
+    expect(page).not.toHaveBeenCalled();
+    await expect(store.getAll()).rejects.toMatchObject({ reason: 'scan-required' });
+    expect(page).toHaveBeenCalledTimes(1);
+    revision += 1;
+    await expect(store.getAll()).rejects.toMatchObject({ reason: 'scan-required' });
+    expect(bodies).toBe(0);
+    expect(page).toHaveBeenCalledTimes(3);
+  });
+
+  it('does an ordinary read when the bound expires in transit', async () => {
+    const clock = 2000;
+    const expired = { epoch: 1, storeRevision: 1, rows: [], nextKey: null, expiresAt: clock, wholeReadRefusal: true };
+    const page = vi.fn(async ({ wholeReadLimits }) => wholeReadLimits ? expired : {
+      epoch: 1, storeRevision: 1, rows: [{ key: 'draft', value: { id: 'draft', _dirty: true } }], nextKey: null,
+    });
+    const backend = {
+      transactional: true, policy: 'cache', limits: { maxAgeMs: 1000 }, page, wholeReadBounds: true,
+      async getAll() { throw Object.assign(storageError('scan-required'), { bound: expired }); },
+    };
+    const store = createDataStore({ name: 'shifts', backend, now: () => clock });
+    await expect(store.getAll()).resolves.toEqual([{ id: 'draft', _dirty: true }]);
+    expect(page).toHaveBeenCalledTimes(2);
+    expect(page.mock.lastCall[0]).not.toHaveProperty('wholeReadLimits');
+  });
+
   it('reuses a size refusal by revision and checks again after writes or row expiry', async () => {
     let clock = 1000;
     let revision = 1;
