@@ -2133,7 +2133,11 @@ export function createDataService({
       live();
       const { name, store } = local(collection);
       const project = storageMetadata ? copyRow : clean;
-      const one = async (item) => (raw ? copyRow(await store.getRaw(String(item))) : project(await store.get(String(item))));
+      const one = async (item) => {
+        const row = await (raw ? store.getRaw(String(item)) : store.get(String(item)));
+        if (isOwnCopy(row)) return raw || storageMetadata ? asIs(row) : bare(row);
+        return raw ? copyRow(row) : project(row);
+      };
       if (Array.isArray(key)) return Promise.all(key.map(one));
       if (key !== undefined && key !== null) return one(key);
       const { rows, own } = await readWhole(name, store, raw);

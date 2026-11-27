@@ -59,7 +59,31 @@ async function parsesDuring(read) {
   return { rows, count };
 }
 
-describe.each(DATABASES)('a whole read of a host-store collection (%s)', (_name, create) => {
+describe.each(DATABASES)('reads of a host-store collection (%s)', (_name, create) => {
+  it('omits the second keyed copy while giving each caller independent nested values', async () => {
+    const { data, store } = open(create);
+    const record = { ...ROWS[0], notes: { text: 'n0', _label: 'application data' } };
+    await data.ingest('shifts', [record]);
+    const { count: storeCount } = await parsesDuring(() => store.get(record.id));
+    const { rows: one, count } = await parsesDuring(() => data.read('shifts', record.id));
+    expect(one).toEqual(record);
+    expect(count).toBe(storeCount);
+
+    const [left, right] = await data.read('shifts', [record.id, record.id]);
+    left.notes._label = 'changed';
+    expect(right).toEqual(record);
+
+    const { count: rawStoreCount } = await parsesDuring(() => store.getRaw(record.id));
+    const { rows: raw, count: rawCount } = await parsesDuring(() => data.read('shifts', record.id, { raw: true }));
+    expect(rawCount).toBe(rawStoreCount);
+    expect(raw).toHaveProperty('_rev');
+    raw.notes.text = 'changed';
+    const metadata = await data.read('shifts', record.id, { storageMetadata: true });
+    expect(metadata).toHaveProperty('_rev');
+    expect(metadata.notes).toEqual(record.notes);
+    expect(await data.read('shifts', 'absent')).toBeNull();
+  });
+
   it('copies each row once and still gives each caller its own rows', async () => {
     const { data, store } = open(create);
     await data.ingest('shifts', ROWS);
