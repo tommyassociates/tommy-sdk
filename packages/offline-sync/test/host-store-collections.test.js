@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest';
+import { afterAll, describe, it, expect } from 'vitest';
 import {
   createHostStorePort, retireHostStorePrincipal, createHostStoreChangeFeed, observeHostStorePort,
   HOST_DATA_MP_ID, collectionName, storeNameValid,
@@ -9,6 +9,8 @@ import { HOST_STORE_FEATURES } from '../src/host-store/protocol.js';
 import { DATABASES, identity, createChannelBus } from './helpers/host-databases.js';
 
 const SELECTOR = { authorityOrigin: 'https://api.example.test', viewerId: '7' };
+const dateTestDatabases = [];
+afterAll(async () => { await Promise.all(dateTestDatabases.map(database => database.close())); });
 function openInput({
   storeName = 'chats.rows', policy = 'cache', schemaVersion = 1, indexes, dateIndexes, limits = {}, who = identity(), schemaFingerprint,
 } = {}) {
@@ -109,6 +111,54 @@ describe.each(DATABASES)('host store collections on %s', (_name, create) => {
     expect((await stores()).find((row) => row.label === storeName)).toMatchObject({ rowCount: 3, dirtyCount: 1 });
     await expect(port.open(openInput({ storeName, dateIndexes: { byStart: 'start_at' }, policy: 'authored' })))
       .rejects.toMatchObject({ reason: 'unserializable' });
+  });
+
+  it('reuses an identical date entry and still moves or deletes it when the row changes', async () => {
+    const dateOps = [];
+    const { open, database } = await setup(() => {
+      const db = create();
+      return {
+        ...db,
+        transaction: (mode, work) => db.transaction(mode, (tx) => work({
+          ...tx,
+          put(table, row) {
+            if (table === 'rows' && row.key[3] === 'd') dateOps.push('put');
+            return tx.put(table, row);
+          },
+          delete(table, key) {
+            if (table === 'rows' && key[3] === 'd') dateOps.push('delete');
+            return tx.delete(table, key);
+          },
+        })),
+      };
+    });
+    dateTestDatabases.push(database);
+    const store = await open({ storeName: 'workforce.shifts', dateIndexes: { byStart: 'start_at' } });
+    const shift = { id: 1, start_at: '2026-01-14T00:30:00+10:00' };
+    const day = (date) => store.query({
+      index: 'byStart', lower: Date.parse(date), upper: Date.parse(date) + 86_400_000 - 1,
+    });
+    expect((await store.put([shift])).ok).toBe(true);
+    const built = await day('2026-01-13');
+    expect(built.rows.map(row => row.value)).toEqual([shift]);
+    store.refresh(built);
+
+    dateOps.length = 0;
+    const withFindings = { ...shift, start_at: '2026-01-13T14:30:00Z', pay_rule_findings: [{ code: 'review' }] };
+    expect((await store.put([withFindings])).ok).toBe(true);
+    expect(dateOps).toEqual([]);
+    expect((await day('2026-01-13')).rows.map(row => row.value)).toEqual([withFindings]);
+
+    const moved = { ...withFindings, start_at: '2026-01-15T00:30:00Z' };
+    expect((await store.put([moved])).ok).toBe(true);
+    expect(dateOps).toEqual(['delete', 'put']);
+    expect((await day('2026-01-13')).rows).toEqual([]);
+    expect((await day('2026-01-15')).rows.map(row => row.value)).toEqual([moved]);
+
+    dateOps.length = 0;
+    expect((await store.remove(['1'])).ok).toBe(true);
+    expect(dateOps).toEqual(['delete']);
+    expect((await day('2026-01-15')).rows).toEqual([]);
   });
 
   it('names host collections <domain>.<collection> beside MP stores on the same owner', async () => {
