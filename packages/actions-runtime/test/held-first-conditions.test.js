@@ -154,6 +154,34 @@ describe('held-first conditions (contract fixtures)', () => {
     expect([...store.rows.values()][0].answer).toEqual(held.answer);
   });
 
+  it('a cold unresolved answer, with nothing held, follows the retry schedule and arrives fresh', async () => {
+    const store = deviceStore();
+    let reads = 0;
+    const w = await world({ store, handler: async () => { reads += 1; return reads < 2 ? { rows: [], unresolved: true } : { rows: [1] }; } });
+    await w.broker.conditionAnswersReady();
+    const got = await w.ask({});
+    expect(got).toMatchObject({ state: 'fresh', answer: { rows: [], unresolved: true } });
+    await settle();
+    expect(w.notices.find((n) => n.state === 'stale')).toMatchObject({ retrying: true, error: { code: 'DATA_NOT_READ' } });
+    expect(reads).toBe(1);
+    expect(w.timers.map((timer) => timer.ms)).toEqual([4000]);
+    await w.runTimers();
+    expect(w.notices.at(-1)).toMatchObject({ state: 'fresh', answered: true, answer: { rows: [1] } });
+    expect(reads).toBe(2);
+    await w.runTimers();
+    expect(reads).toBe(2);
+  });
+
+  it('a cold answer that read is not asked again', async () => {
+    const handler = vi.fn(async () => ({ rows: [] }));
+    const w = await world({ store: deviceStore(), handler });
+    await w.broker.conditionAnswersReady();
+    await w.ask({});
+    await settle(); await w.runTimers();
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(w.notices).toEqual([]);
+  });
+
   it('J9-condition-purged-on-role-change: an answer held under another fingerprint is never served', async () => {
     const f = fixture('J9-condition-purged-on-role-change');
     const [held] = f.given.held['account.mp_condition_answers'];

@@ -997,6 +997,8 @@ export function createBroker({
     if (found && !held) conditionAnswers.remove(key.id);
     if (!held) {
       const value = await runQuery(envelope, prepared).catch((error) => { throw asRefusal(error); });
+      // A cold answer the condition could not read follows the same retry schedule a held one does.
+      if (key && isKnownUnknown(value)) revalidateHeld(envelope, prepared, key, { at: null, stale: true }, { notRead: true });
       return { answer: value, state: 'fresh', asOf: now(), aged: false };
     }
     const refreshAfterMs = conditionDef.freshness?.refreshAfterMs;
@@ -1007,7 +1009,7 @@ export function createBroker({
     };
   }
 
-  function revalidateHeld(envelope, prepared, key, held) {
+  function revalidateHeld(envelope, prepared, key, held, { notRead = false } = {}) {
     const { conditionDef } = prepared;
     const { onRead } = envelope;
     const steps = retryStepsOf(conditionDef);
@@ -1101,7 +1103,10 @@ export function createBroker({
       }
       deliver({ state: 'stale', ...base(), retrying: false, nextAttemptAt: null, error }, true);
     };
-    attempt(0).catch(() => { end(); });
+    if (!notRead) { attempt(0).catch(() => { end(); }); return; }
+    const error = readErrorOf(Object.assign(new Error(`condition '${envelope.condition}' answered unresolved`), { code: 'DATA_NOT_READ' }));
+    deliver({ state: 'stale', ...base(), retrying: true, nextAttemptAt: now() + steps[0], error });
+    setTimer(() => { attempt(1).catch(() => { end(); }); }, steps[0]);
   }
 
   function asRefusal(error) {
