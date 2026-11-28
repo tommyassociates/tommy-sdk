@@ -11,6 +11,21 @@ const target = (client) => ({ collection: 'plans', method: 'client', params: { c
 const source = (fetch) => ({ fetch: async () => [], methods: { client: { params: { client: { type: 'id' } }, fetch } } });
 
 describe('canonical non-batched method status receipts', () => {
+  it('can return the stored status after a visible method or whole read fails', async () => {
+    const { data } = setup();
+    const unavailable = async () => { throw Object.assign(new Error('Unavailable'), { code: 'DATA_UNSUPPORTED' }); };
+    data.source('plans', { ...source(unavailable), fetch: unavailable });
+    const options = { mode: 'visible', priority: 'high', statusOnly: true };
+
+    await expect(data.refresh(target(1), options)).resolves.toMatchObject({
+      state: 'error', keys: null, error: { code: 'DATA_UNSUPPORTED' }
+    });
+    await expect(data.refresh('plans', options)).resolves.toMatchObject({
+      state: 'error', error: { code: 'DATA_UNSUPPORTED' }
+    });
+    await expect(data.refresh(target(2), { mode: 'visible' })).rejects.toMatchObject({ code: 'DATA_UNSUPPORTED' });
+    data.dispose();
+  });
   it('reports the exact empty query without granting whole-collection coverage', async () => {
     const { data } = setup();
     data.source('plans', source(async () => ({ rows: [], more: false })));

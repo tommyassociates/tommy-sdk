@@ -1462,7 +1462,7 @@ export function createDataService({
   }
   function refreshMethodAs(wanted, {
     mode = 'silent', priority = 'normal', maxAge = 0, reason = null, fromNow = false, sinceWrite = false, retry = false,
-    stillWanted = null,
+    stillWanted = null, statusOnly = false,
   } = {}, context) {
     live();
     const {
@@ -1490,7 +1490,7 @@ export function createDataService({
       return batchParam ? describeState(group.state)
         : describeMethod(group.state, method.strictReceipt === true);
     };
-    const settle = (promise) => (mode === 'visible' ? promise.then(outcome) : promise.then(outcome, outcome));
+    const settle = (promise) => (mode === 'visible' && !statusOnly ? promise.then(outcome) : promise.then(outcome, outcome));
     if (!available) {
       const refusal = Object.assign(serviceError(`'${wanted.collection}' cannot run '${wanted.method}' now`, 'DATA_UNSUPPORTED'), { retryable: false });
       group.state.state = 'error';
@@ -1872,18 +1872,19 @@ export function createDataService({
 
   function refreshAs(target, {
     mode = 'silent', priority = 'normal', maxAge = 0, reason = null, full = false, fromNow = false, sinceWrite = false, nextAttempt = false,
-    storedChecked = false, retry = false, stillWanted = null,
+    storedChecked = false, retry = false, stillWanted = null, statusOnly = false,
   } = {}, context) {
     live();
     const wanted = targetOf(target);
     if (stillWanted !== null && typeof stillWanted !== 'function') return Promise.reject(serviceError('stillWanted must be a function', 'DATA_INVALID'));
     if (typeof nextAttempt !== 'boolean') return Promise.reject(serviceError('nextAttempt must be true or false', 'DATA_INVALID'));
+    if (typeof statusOnly !== 'boolean') return Promise.reject(serviceError('statusOnly must be true or false', 'DATA_INVALID'));
     if (nextAttempt && (wanted.method !== undefined || wanted.query !== undefined || wanted.window !== undefined)) {
       return Promise.reject(serviceError('nextAttempt needs a collection or exact key read', 'DATA_UNSUPPORTED'));
     }
     if (wanted.method !== undefined) {
       return refreshMethodAs(wanted, {
-        mode, priority, maxAge, reason, fromNow, sinceWrite, retry, stillWanted,
+        mode, priority, maxAge, reason, fromNow, sinceWrite, retry, stillWanted, statusOnly,
       }, context);
     }
     const { name, label, store, decl } = local(wanted.collection);
@@ -1893,7 +1894,7 @@ export function createDataService({
     const key = targetKey({ ...wanted, collection: name });
     const { state, release } = targetStates.acquire(key);
     const settle = (promise) => {
-      const answer = mode === 'visible' ? promise : promise.then(() => service.status(target), () => service.status(target));
+      const answer = mode === 'visible' && !statusOnly ? promise : promise.then(() => service.status(target), () => service.status(target));
       return release ? answer.finally(release) : answer;
     };
     try {
@@ -1920,7 +1921,7 @@ export function createDataService({
         }
         const check = state.storedCheck;
         const asked = {
-          mode, priority, maxAge, reason, full, fromNow, sinceWrite, nextAttempt, storedChecked: true, stillWanted,
+          mode, priority, maxAge, reason, full, fromNow, sinceWrite, nextAttempt, storedChecked: true, stillWanted, statusOnly,
         };
         return settle(check.done.then(() => {
           if (check.loss === lossOf(name) && check.form === formOf(jobContextNow()) && check.at !== null && now() - check.at < age && state.syncedAt === null && !state.flight && state.state !== 'error') {
@@ -1965,7 +1966,7 @@ export function createDataService({
       if (state.flight) {
         const { attempts } = state;
         const after = () => refreshAs(target, {
-          mode: 'visible', priority, maxAge: 0, reason, full, stillWanted,
+          mode: 'visible', priority, maxAge: 0, reason, full, stillWanted, statusOnly,
         }, context);
         return settle(attempts.answer(state.flight, { nextAttempt }).then(after, (error) => (nextAttempt || attempts.failing() ? Promise.reject(error) : after())));
       }
