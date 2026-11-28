@@ -40,7 +40,7 @@ const DATE_INDEX = 'd';
 const LRU = 't';
 
 // Normalized read rows, shared by selectors, never by authority checks.
-function createReadProjection() {
+function createReadProjection(maxEntries) {
   const snapshots = new Map();
   let size = 0;
   let count = 0;
@@ -69,7 +69,7 @@ function createReadProjection() {
       map.set(key, { json, cost });
       size += cost;
       held.bytes += cost;
-      while (size > 8 * 1024 * 1024 || count > 4096 || snapshots.size > 64) drop(snapshots.keys().next().value);
+      while (size > 8 * 1024 * 1024 || count > maxEntries || snapshots.size > 64) drop(snapshots.keys().next().value);
     };
     const parsed = (entry) => (entry ? JSON.parse(entry.json) ?? undefined : undefined);
     const many = async (table, keys) => {
@@ -116,7 +116,8 @@ function createReadProjection() {
 export function createHostStorePort({ database, backend = 'indexeddb', now = () => Date.now(), randomId = () => globalThis.crypto.randomUUID() } = {}) {
   if (!database?.transaction || !['indexeddb', 'capacitor_sqlite', 'electron_sqlite', 'volatile'].includes(backend)) throw storageError('unavailable');
   const handles = new Map();
-  const projection = createReadProjection();
+  // Each browser row can occupy two projection entries, for metadata and body.
+  const projection = createReadProjection(backend === 'indexeddb' ? 8192 : 4096);
   const reading = new Map();
   const ordered = database.ordered === true;
   function forget(id, handle) {
