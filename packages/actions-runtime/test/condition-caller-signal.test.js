@@ -88,6 +88,17 @@ describe('the caller signal on a query', () => {
     expect(seen.aborted).toBe(false);
   });
 
+  it('lets detached work check caller ownership after the handler link has ended', async () => {
+    let context;
+    const query = await world((args, ctx) => { context = ctx; return {}; }, { callerLinkAfterAnswerMs: 0 });
+    const caller = new AbortController();
+    await query(caller.signal);
+    expect(context.stillWanted()).toBe(true);
+    caller.abort();
+    expect(context.signal.aborted).toBe(false);
+    expect(context.stillWanted()).toBe(false);
+  });
+
   it('leaves a query without a caller signal on the deadline alone', async () => {
     let seen;
     const query = await world(async (args, ctx) => { seen = ctx.signal; await tick(5); return {}; });

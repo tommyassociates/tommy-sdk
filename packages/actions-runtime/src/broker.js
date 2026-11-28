@@ -879,7 +879,11 @@ export function createBroker({
     });
     let handled;
     try {
-      handled = Promise.resolve(handler(envelope.args, { tenantId, signal: deadline.signal }));
+      handled = Promise.resolve(handler(envelope.args, {
+        tenantId, signal: deadline.signal,
+        // Work that survives the reply can check caller ownership without keeping a listener attached.
+        ...(callerSignal ? { stillWanted: () => !callerSignal.aborted } : {}),
+      }));
     } catch (cause) {
       handled = Promise.reject(cause);
     }
