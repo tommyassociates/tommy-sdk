@@ -998,7 +998,11 @@ export function createBroker({
     if (!held) {
       const value = await runQuery(envelope, prepared).catch((error) => { throw asRefusal(error); });
       // A cold answer the condition could not read follows the same retry schedule a held one does.
-      if (key && isKnownUnknown(value)) revalidateHeld(envelope, prepared, key, { at: null, stale: true }, { notRead: true });
+      // Nothing is held, so only the owner must stay the same: the viewer's grants settling on a cold start does not stop it.
+      if (key && isKnownUnknown(value)) {
+        const sameOwner = { ...key, current: () => !retired && recordOwner(prepared.tenantId) === key.owner };
+        revalidateHeld(envelope, prepared, sameOwner, { at: null, stale: true }, { notRead: true });
+      }
       return { answer: value, state: 'fresh', asOf: now(), aged: false };
     }
     const refreshAfterMs = conditionDef.freshness?.refreshAfterMs;

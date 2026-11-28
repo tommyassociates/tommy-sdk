@@ -172,6 +172,17 @@ describe('held-first conditions (contract fixtures)', () => {
     expect(reads).toBe(2);
   });
 
+  it('a cold unresolved retry still answers after the viewer grants settle to a new fingerprint', async () => {
+    let reads = 0;
+    const w = await world({ store: deviceStore(), handler: async () => { reads += 1; return reads < 2 ? { rows: [], unresolved: true } : { rows: [1] }; } });
+    await w.broker.conditionAnswersReady();
+    await w.ask({});
+    await settle();
+    w.fingerprint.value = 'rf-settled';
+    await w.runTimers();
+    expect(w.notices.at(-1)).toMatchObject({ state: 'fresh', answered: true, answer: { rows: [1] } });
+  });
+
   it('a cold answer that read is not asked again', async () => {
     const handler = vi.fn(async () => ({ rows: [] }));
     const w = await world({ store: deviceStore(), handler });
